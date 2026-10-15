@@ -1,6 +1,7 @@
 # Blockchain assets and gas sponsorship
 
-Wallet Provider Kit comes from Moovha's decentralised finance (DeFi) project.
+Wallet Provider Kit supports blockchain wallets for payments and decentralised
+finance (DeFi).
 It helps teams make blockchain wallets usable through familiar login, consent
 and approval experiences. The assets and transactions still live on a blockchain;
 the simpler experience should make them easier to understand.

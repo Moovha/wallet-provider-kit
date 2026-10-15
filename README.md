@@ -6,8 +6,9 @@
 
 Wallet Provider Kit is a configurable wallet service and TypeScript toolkit for
 teams building and operating blockchain wallets for their users. Rooted in Moovha's
-decentralised finance (DeFi) project, it makes access to on-chain assets such as
-USDC and ZARP easier to integrate into everyday products. It brings account creation,
+work with blockchain payments and decentralised finance (DeFi), it makes access
+to on-chain assets such as USDC and ZARP easier to integrate into everyday products.
+It brings account creation,
 user onboarding, application access and approved-action signing into one toolkit. You choose the system that
 creates wallet accounts and signs approved actions, define who may use an account,
 and retain responsibility for key control and recovery.
@@ -162,7 +163,7 @@ keeping their keys with the wallet provider.
 Learn about [Moovha](https://moovha.com/) and explore the
 [Moovha GitHub organization](https://github.com/Moovha).
 
-Moovha's DeFi project owns the business-operation API, transaction intent,
+Moovha's business-operation API coordinates transaction intent,
 sponsorship, execution and settlement. Device wallets, backup and recovery belong
 to the separate device-wallet profile. The [architecture guide](docs/architecture.md#applications-and-wallet-control)
 explains the provider boundary and application access.
@@ -203,7 +204,7 @@ configured token contract and signing domain need independent verification.
 
 Production custody acceptance remains pending. Mainnet, contract accounts,
 WalletConnect and ERC-1271/4337/7702 are unsupported. The separate
-[orchestration draft](spec/orchestration-draft.json) is a reference for DeFi's
+[orchestration draft](spec/orchestration-draft.json) is a reference for Moovha's
 business API; those orchestration, sponsorship and settlement routes aren't
 implemented here. The sponsorship commitment belongs to the connected application's
 execution rail; installing the kit or approving access does not activate it.

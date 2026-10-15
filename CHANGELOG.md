@@ -2,6 +2,8 @@
 
 ## Unreleased — blockchain assets and application-sponsored gas
 
+- Distinguish decentralised finance (DeFi) from ownership of Moovha's API and
+  smart-contract implementation; use service names for implementation responsibilities.
 - Make the toolkit's blockchain and DeFi foundations visible in its introduction,
   with USDC and ZARP as wider-project asset examples and explicit test-profile limits.
 - Document gas sponsorship as a project-supported integration rail and connected
