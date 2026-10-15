@@ -13,11 +13,26 @@ const rewrites: Record<string, string> = {
 };
 
 export default defineConfig({
-  title: 'Wallet Provider Kit',
+  title: 'Moovha Wallet Provider Kit',
   description:
     'Build a wallet service with your backend and your host authority.',
   lang: 'en-GB',
   base: '/wallet-provider-kit/',
+  head: [
+    [
+      'link',
+      {
+        rel: 'icon',
+        type: 'image/svg+xml',
+        href: '/wallet-provider-kit/brand/moovha-logo.svg',
+      },
+    ],
+    ['meta', { name: 'theme-color', content: '#0f2338' }],
+    [
+      'meta',
+      { property: 'og:site_name', content: 'Moovha Wallet Provider Kit' },
+    ],
+  ],
   srcDir: '..',
   srcExclude: [
     'AGENTS.md',
@@ -27,11 +42,60 @@ export default defineConfig({
     'artifacts/**',
   ],
   rewrites,
+  vite: { publicDir: resolve(root, 'docs/public') },
   themeConfig: {
+    siteTitle: 'Wallet Provider Kit',
+    logo: {
+      light: '/brand/moovha-mark-navy.png',
+      dark: '/brand/moovha-mark-white.png',
+      alt: 'Moovha',
+    },
     nav: [
-      { text: 'Get started', link: '/docs/package' },
-      { text: 'API', link: '/docs/api' },
-      { text: 'GitHub', link: repository },
+      {
+        text: 'Get started',
+        items: [
+          { text: 'Understand the roles', link: '/docs/concepts' },
+          {
+            text: 'Install the package',
+            link: '/docs/package#build-an-installable-tarball',
+          },
+          {
+            text: 'Run the offline tutorial',
+            link: '/docs/integration-example#_1-install-and-run',
+          },
+          {
+            text: 'Connect your backend',
+            link: '/docs/backend-guide#choose-an-integration',
+          },
+        ],
+      },
+      {
+        text: 'API',
+        items: [
+          {
+            text: 'Choose an integration profile',
+            link: '/docs/api#choose-a-profile',
+          },
+          {
+            text: 'Core wallet service',
+            link: '/docs/api#core-wallet-service',
+          },
+          { text: 'TypeScript declarations', link: '/docs/api-reference' },
+          {
+            text: 'HTTP authentication',
+            link: '/docs/http-api#authentication-and-profiles',
+          },
+          { text: 'HTTP schemas', link: '/docs/http-reference' },
+        ],
+      },
+      { text: 'Moovha', link: 'https://moovha.com/' },
+    ],
+    socialLinks: [
+      {
+        icon: 'github',
+        link: repository,
+        ariaLabel: 'Wallet Provider Kit on GitHub',
+      },
     ],
     search: { provider: 'local' },
     outline: [2, 3],
@@ -117,7 +181,7 @@ export default defineConfig({
       },
     ],
     footer: {
-      message: `<a href="${repository}/blob/main/LICENSE">Apache-2.0</a> · <a href="${repository}/blob/main/NOTICE">Attribution</a>`,
+      message: `<a href="https://moovha.com/">Moovha</a> · <a href="${repository}/issues">Issues and integration questions</a> · <a href="${repository}/blob/main/LICENSE">Apache-2.0</a> · <a href="${repository}/blob/main/NOTICE">Attribution</a>`,
     },
   },
   markdown: {

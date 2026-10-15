@@ -107,6 +107,20 @@ publishes only the documentation. No documentation deployment happens on a push
 or PR merge; npm publication remains disabled. See
 [GitHub's Pages workflow guide](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages).
 
+### Documentation branding and links
+
+The bundled Moovha symbols in `docs/public/brand/` are the existing navy artwork
+used by the app and the white artwork used by the website. Keep those originals
+intact. `moovha-logo.svg` places the white symbol on its navy background for the
+README and favicon. The documentation theme uses the same navy (`#0f2338`) and
+app cyan (`#12bfde`); its styles live in `docs/.vitepress/theme/brand.css`.
+Assets are local to this repository and included with the packaged Markdown.
+
+Use the Moovha website for company information and this repository's GitHub links
+for code, issues and contributions. Documentation links should take readers to
+the relevant guide or heading. Check their anchors after renaming a section;
+check logos, navigation and contrast in both themes and at phone width.
+
 ## Submit and review
 
 Use `feat:`, `fix:`, `docs:` or `chore:` commit summaries. Include checks,
