@@ -34,5 +34,6 @@ Before enabling an integration, retain evidence for:
 
 A passed offline suite establishes only the behavior it exercises. The default
 CLI remains unconfigured, CDP is not yet vendor-certified, and no durable
-production authority adapter is supplied. Moovha's full operation, sponsorship,
-settlement and device acceptance remain in their owning rollout scopes.
+production authority adapter is supplied. Full operation orchestration,
+sponsorship, settlement and device recovery require separate implementations and
+acceptance evidence.

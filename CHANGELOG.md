@@ -2,6 +2,8 @@
 
 ## 0.1.0 — unreleased
 
+- Reworked project and contributor documentation around integration, entity
+  control and supported behavior; clarified external orchestration boundaries.
 - Extracted the wallet authority/signing interfaces and CDP adapter into an
   independent Apache-2.0 repository with recorded provenance.
 - Added Fastify HTTP service, generated OpenAPI, Swagger UI, RFC 9068 access-token

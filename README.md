@@ -1,72 +1,71 @@
 # Moovha Wallet Provider Kit
 
-Apache-2.0 reference library and HTTP service for wallet providers implementing a
-reviewed signing backend. Fastify serves the API, Swagger UI presents its contract,
-and OpenTelemetry exports operational signals to existing monitoring systems.
-No custom dashboard, wallet GUI, login system or cryptography protocol is required.
+TypeScript library and HTTP service for entities embedding wallets with their own
+signing backend and authorization policy. External orchestration services, such
+as Moovha, can request permitted actions while the deploying entity controls
+signing access and enforces the wallet owner's consent.
 
-**Experimental, unpublished 0.1.0 foundation.** This is not production custody
-software or a provider certification. The standalone CLI exposes documentation
-and health/discovery endpoints; signing stays unavailable until a host supplies
-reviewed durable authority. The optional CDP adapter admits only Base Sepolia
-EIP-712 actions. No exchange deployment, customer account or funds are changed.
+**Experimental · 0.1.0 · unpublished.** The default service cannot provision
+accounts or sign. Integration requires host-supplied durable authorization and
+recovery. Production acceptance is pending; see [verification](docs/verification.md).
+
+## Features
+
+- Fastify service with generated OpenAPI and Swagger UI.
+- OAuth JWT access-token verification and owner/KYC checks.
+- Pluggable account provisioning and EIP-712 signing interfaces.
+- Optional Coinbase CDP adapter for Base Sepolia EOAs.
+- OpenTelemetry traces and metrics over OTLP/HTTP.
+
+## Control model
+
+| Role             | Responsibility                                                                               |
+| ---------------- | -------------------------------------------------------------------------------------------- |
+| Deploying entity | Operate the service, configure the signer, enforce authorization and retain attempt records. |
+| Wallet owner     | Authorize the actions allowed by the host's consent policy.                                  |
+| Orchestrator     | Request authorized actions; manage its own execution and settlement workflow.                |
+
+The signing interface exposes no private-key or seed export. Actual custody and
+recovery depend on the chosen backend; the CDP adapter uses app-controlled API-key
+wallets. Deployment alone establishes neither end-user self-custody nor regulatory
+compliance. See the [security model](docs/security-model.md).
 
 ## Quick start
 
-Use Node **24.22.0** and npm **11.11.1**, then:
+Use Node **24.22.0** and npm **11.11.1**:
 
 ```sh
 npm ci
-npm run verify
 npm run build
 npm start
 ```
 
-Open [Swagger UI](http://127.0.0.1:8080/docs/) or retrieve
-[OpenAPI](http://127.0.0.1:8080/openapi.json). Health is at `/health/live`;
-`/health/ready` intentionally returns 503 without a reviewed integration.
-Use `npm run dev` while editing. No credentials are needed for these commands.
+Open [Swagger UI](http://127.0.0.1:8080/docs/) or
+[OpenAPI](http://127.0.0.1:8080/openapi.json). No credentials are required.
+`/health/live` returns 200; `/health/ready` returns 503 until an integration is
+configured. Use `npm run dev` for development and `npm run verify` for checks.
 
-| Surface                                                           | Implemented here                           | Activation requirement                                                   |
-| ----------------------------------------------------------------- | ------------------------------------------ | ------------------------------------------------------------------------ |
-| Fastify HTTP, Swagger UI, strict request schemas, Problem Details | Yes                                        | Local startup                                                            |
-| OAuth JWT access-token verification                               | Yes, using jose                            | Existing trusted issuer/audience/JWKS; no token issuer included          |
-| Provision/sign handlers and current owner/KYC guards              | Yes, dependency injected                   | Durable authority, consent and attempt recovery supplied by host         |
-| CDP named EVM accounts and exact EIP-712 signing                  | Offline tests pass                         | Isolated credentials and unfunded live recovery drill; Base Sepolia only |
-| OpenTelemetry traces/metrics → Grafana                            | OTLP export tested; Docker recipe included | Existing collector or local Docker; container smoke test pending         |
-| Moovha operation orchestration, sponsorship, settlement           | Draft reference only                       | Remains in Moovha DeFi Scope 1–3                                         |
-| WalletConnect, key export, mainnet, ERC-1271/4337/7702            | Not implemented                            | Separate reviewed profiles and acceptance evidence                       |
+## Integrate
 
-## Provider integration
+Implement `EmbeddedWalletAuthority` for current owner, grant, consent, KYC and
+durable attempt admission. Implement `WalletSigningProvider` for your backend,
+then compose both with `EmbeddedWalletService` and `createServer`. Start with the
+[provider guide](docs/provider-guide.md) and [acceptance requirements](docs/conformance.md).
 
-Read [the adapter and authority contract](docs/provider-guide.md),
-[architecture and standards](docs/architecture.md), and
-[conformance requirements](docs/conformance.md). Providers can use their own
-HSM/MPC/vendor signer behind `WalletSigningProvider`; no seed or private-key
-interface is required. The CDP factory has its own package export (`./cdp`) and is
-not imported by the CLI. An external hosting arrangement is not proof of user
-self-custody; key control and recovery must be disclosed separately.
+[Provider OpenAPI](spec/provider-api.json) describes the implemented HTTP routes.
+The separate [orchestration draft](spec/orchestration-draft.json) supplies reference
+action types; full Moovha orchestration, sponsorship and settlement are not
+implemented here. Mainnet, WalletConnect and ERC-1271/4337/7702 are unsupported.
+Use a local build or tarball while the package is unpublished.
 
-The implemented service contract is [spec/provider-api.json](spec/provider-api.json),
-generated from actual Fastify route schemas. It uses OpenAPI 3.0.3, a maintained
-Fastify plugin path. The separate OpenAPI 3.1.1
-[orchestration snapshot](spec/orchestration-draft.json) is a versioned **reference**
-from Moovha's business API design, not a list of implemented routes. This service
-must not replace or be mounted over the Moovha public operation API.
+## Documentation
 
-## Operations and contribution
+- [Architecture and standards](docs/architecture.md)
+- [Operations and monitoring](docs/operations.md)
+- [Contributing](CONTRIBUTING.md) · [Governance](GOVERNANCE.md) · [Code of conduct](CODE_OF_CONDUCT.md)
+- [Security reporting](SECURITY.md) · [Release process](docs/releases.md)
+- [Changelog](CHANGELOG.md) · [Provenance](docs/extraction.json)
 
-- [OpenTelemetry and Grafana setup](docs/operations.md)
-- [Threat model and security boundaries](docs/security-model.md)
-- [Contributing and DCO](CONTRIBUTING.md), [governance](GOVERNANCE.md), [conduct](CODE_OF_CONDUCT.md)
-- [Security reporting](SECURITY.md), [release and publication gates](docs/releases.md)
-- [Local verification evidence](docs/verification.md)
-- [Change log](CHANGELOG.md), [extraction provenance](docs/extraction.json)
+## License
 
-The local repository has no public remote. `private: true` prevents accidental
-npm publication. Public hosting, maintainer handles, private security reporting
-and release permissions must be configured before publication. Existing capacity
-and open-source tooling are the default; nothing here creates a paid subscription.
-
-Licensed under [Apache-2.0](LICENSE). See [NOTICE](NOTICE) for provenance and the
-rights-holder's authorization. Dependencies retain their own licenses.
+[Apache-2.0](LICENSE). See [NOTICE](NOTICE) for attribution.

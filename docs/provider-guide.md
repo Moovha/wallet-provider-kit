@@ -1,10 +1,15 @@
 # Implementing a provider
 
-This is a provider-hosted service profile. The institution deploying it controls
-its signer and authority adapters. Its OAuth audience, client registrations and
-network boundary must be separate from Moovha's external-provider public API.
-A third-party Moovha provider grant must never invoke Moovha-held custody keys.
-No vendor SDK determines business authority.
+The deploying entity supplies signing and authorization. External orchestrators,
+including Moovha, request permitted actions without receiving keys through the
+kit. The host enforces owner consent, current grants, KYC and revocation, retains
+durable attempts, and discloses backend key control and recovery.
+
+Use a dedicated OAuth audience, client registrations and network boundary.
+Keep these separate from any orchestrator's public API or custody service;
+a provider grant must not authorize access to Moovha-held custody keys.
+
+## Compose the service
 
 Compose the exported `createServer`, `createAuthenticator`,
 `EmbeddedWalletService` and your implementation of `EmbeddedWalletAuthority`.
@@ -100,8 +105,8 @@ primary type, CAIP-10 address and digest, then verifies the returned signature.
 It snapshots the input before awaits and rechecks expiry after the account read.
 These are tested restrictions, not a claim of universal account compatibility.
 
-The backend uses app-controlled CDP API-key wallets. Describe actual operator and
-vendor key control, recovery/export rights and failure modes to adopters. Reusing
-Moovha login does not convert backend custody into self-custody. CDP selection is
-an integration choice, not procurement approval; measure live usage/costs before
-activation. WalletConnect is a connection protocol, not this custody backend.
+The backend uses app-controlled CDP API-key wallets. Describe operator and vendor
+key control, recovery/export rights and failure modes to adopters. A login
+integration does not establish end-user self-custody. Measure live usage and costs
+before activation. WalletConnect supplies connectivity and is not a signing
+backend included in this kit.
