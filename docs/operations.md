@@ -12,6 +12,13 @@ availability and retention separately.
 
 ## Local Grafana
 
+<figure class="wallet-visual">
+  <img src="./public/diagrams/operations-and-evidence.webp" alt="Diagram: the service exports allowlisted traces and metrics while keeping authoritative approvals, attempts and recovery records private." width="1536" height="1024" loading="lazy" decoding="async">
+  <figcaption>Telemetry can be dropped. Durable authority, financial journals and recovery records remain separate.</figcaption>
+</figure>
+
+[View full-size diagram](public/diagrams/operations-and-evidence.webp)
+
 You'll need Docker Engine and Compose. Then run:
 
 ```sh

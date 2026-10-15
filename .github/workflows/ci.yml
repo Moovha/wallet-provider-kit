@@ -12,7 +12,7 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -25,6 +25,8 @@ jobs:
       - run: npm ci
       - run: npm run verify
       - run: npm run build
+      - run: npx --no-install playwright install --with-deps chromium
+      - run: npx --no-install playwright test --config setup-ui/playwright.config.ts
       - run: npm run docs:build
       - run: npm run check:package
       - run: node scripts/smoke-built.mjs

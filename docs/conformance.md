@@ -5,6 +5,13 @@ Use these checks after [connecting your backend](backend-guide.md) and
 deployment/release records. This guide describes what to prove, not a historical
 record of a particular development checkout.
 
+<figure class="wallet-visual">
+  <img src="./public/diagrams/operations-and-evidence.webp" alt="Diagram: telemetry is separate from private approvals, attempt results and recovery evidence; monitoring has no signing authority." width="1536" height="1024" loading="lazy" decoding="async">
+  <figcaption>Collect deployment evidence separately from observability. Offline checks do not certify a live backend.</figcaption>
+</figure>
+
+[View full-size diagram](public/diagrams/operations-and-evidence.webp)
+
 Start with the automated tests, then collect evidence for your actual deployment.
 The suite runs offline with temporary, unfunded keys; passing it doesn't certify
 a provider. `test/embedded-wallet.test.ts`

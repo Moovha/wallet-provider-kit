@@ -26,6 +26,13 @@ your provider policy.
 
 ## Authentication and profiles
 
+<figure class="wallet-visual">
+  <img src="./public/diagrams/action-authority.webp" alt="Diagram: a token admits an authenticated request to current authority and exact approved-action checks before signing." width="1536" height="1024" loading="lazy" decoding="async">
+  <figcaption>HTTP authentication reaches the policy boundary; scopes alone never authorize spending.</figcaption>
+</figure>
+
+[View full-size diagram](public/diagrams/action-authority.webp)
+
 Send `Authorization: Bearer <access-token>` for protected routes. Use a dedicated
 provider audience and the configured trusted issuer. Scopes admit the request to
 host policy; current owner/grant/consent/KYC and exact-action authority still apply.

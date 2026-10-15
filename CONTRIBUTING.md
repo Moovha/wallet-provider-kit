@@ -108,11 +108,14 @@ remove it when a stable VitePress release supplies a patched dependency directly
 
 The published documentation is at
 [moovha.github.io/wallet-provider-kit](https://moovha.github.io/wallet-provider-kit/).
-GitHub Pages is configured to use GitHub Actions. Publication is separate from
-commits and package releases: for an approved documentation update, run
-**Actions → Publish documentation → Run workflow** on `main`. The workflow
-publishes only the documentation. No documentation deployment happens on a push
-or PR merge; npm publication remains disabled. See
+GitHub Pages is configured to use GitHub Actions. Toolkit documentation delivery
+includes publication to this existing site under the owner's standing
+authorization. After checks pass and changes reach `main` through the repository's
+merge process, run **Actions → Publish documentation → Run workflow** on `main`.
+Verify the workflow succeeds and the live pages contain the update before
+reporting documentation delivery complete. The workflow publishes only the
+documentation. It still requires dispatch after a push or PR merge; npm
+publication remains disabled. See
 [GitHub's Pages workflow guide](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages).
 
 ### Documentation branding and links
@@ -123,6 +126,16 @@ intact. `moovha-logo.svg` places the white symbol on its navy background for the
 README and favicon. The documentation theme uses the same navy (`#0f2338`) and
 app cyan (`#12bfde`); its styles live in `docs/.vitepress/theme/brand.css`.
 Assets are local to this repository and included with the packaged Markdown.
+
+Conceptual diagrams live in `docs/public/diagrams/`. They use labelled nodes,
+directed connections and explicit responsibility boundaries in the navy/cyan
+palette. Use them where a relationship, decision or lifecycle benefits from a
+visual explanation. Pair each with descriptive alternative text, a caption and
+a relative full-size link so GitHub, the site and packaged docs remain usable.
+Keep exact request sequences in editable Mermaid and reference tables in text.
+The diagrams are generated raster artwork with a vector style, not editable SVG.
+Their prompts are recorded in `docs/public/diagrams/prompts.json`; review labels,
+arrows and implementation limits against the owning guide before replacing one.
 
 Use the Moovha website for company information and this repository's GitHub links
 for code, issues and contributions. Documentation links should take readers to

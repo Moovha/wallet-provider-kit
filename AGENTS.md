@@ -32,3 +32,11 @@ a signed-off commit. The owner authorized public hosting at
 https://github.com/Moovha/wallet-provider-kit. Keep npm publication disabled until separately authorized. A commit/push never authorizes
 deployment, funds movement or credential rotation. Keep secrets only in ignored
 local environment files or a secret store.
+
+Toolkit documentation delivery includes updating the existing GitHub Pages site.
+The owner has given standing authorization for that documentation publication.
+After checks pass and the changes reach main through the repository's merge
+process, run the Publish documentation workflow on main and verify the updated
+live pages. Report publication status alongside the commit and PR. This applies
+only to the documentation site; application deployments and npm releases remain
+separately authorized.

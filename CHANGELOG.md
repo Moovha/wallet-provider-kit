@@ -1,5 +1,29 @@
 # Changelog
 
+## Unreleased — documentation publication
+
+- Include GitHub Pages publication and live-page verification in Toolkit
+  documentation delivery under the owner's standing authorization.
+
+## Unreleased — FormKit operator setup
+
+- Add a local, bundled FormKit wizard for supported wallet backends, login,
+  identity services, policies, activation settings and configuration export.
+- Include provider logos, official setup references and deployment/variable
+  templates without collecting credentials or implementing custom adapters.
+- Reuse service validation and show identity-funding, permission and deployment
+  prerequisites separately from external acceptance.
+- Add browser walkthroughs, local API isolation checks and package verification.
+
+## Unreleased — visual documentation guides
+
+- Add labelled vector-style diagrams for service boundaries, owner access,
+  signing authority, durable attempts, backend selection, service setup,
+  gas sponsorship and operations.
+- Pair diagrams with descriptive alternatives, captions and full-size links
+  across the integration guides; retain editable Mermaid request flows.
+- Bundle optimized local assets and their generation prompts with the docs.
+
 ## Unreleased — blockchain assets and application-sponsored gas
 
 - Distinguish decentralised finance (DeFi) from ownership of Moovha's API and

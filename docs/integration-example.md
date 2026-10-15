@@ -99,6 +99,13 @@ no backend effect.
 
 ## 4. Load current authority and admit an attempt
 
+<figure class="wallet-visual">
+  <img src="./public/diagrams/action-authority.webp" alt="Diagram: a verified caller passes current authority and exact-action checks before durable admission, reauthorization and signing." width="1536" height="1024" loading="lazy" decoding="async">
+  <figcaption>The offline walkthrough exercises these authority and attempt boundaries through the public interfaces.</figcaption>
+</figure>
+
+[View full-size diagram](public/diagrams/action-authority.webp)
+
 The fixture starts with an already accepted owner, active client-bound grant,
 current KYC and consent, a reserved account ID, and two reviewed immutable proof
 actions. These are private host records. No HTTP route accepts signable bytes.

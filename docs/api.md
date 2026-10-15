@@ -65,6 +65,13 @@ ports used by the runnable walkthrough. Choose one admission lifecycle for an ef
 
 ## Core wallet service
 
+<figure class="wallet-visual">
+  <img src="./public/diagrams/action-authority.webp" alt="Diagram: the core signing path checks caller identity, current authority, an exact approved action and a durable attempt before signing and persistence." width="1536" height="1024" loading="lazy" decoding="async">
+  <figcaption>Use the interfaces below to preserve each boundary in the core wallet service.</figcaption>
+</figure>
+
+[View full-size diagram](public/diagrams/action-authority.webp)
+
 Import from `@moovha/wallet-provider-kit/core`.
 
 ```ts

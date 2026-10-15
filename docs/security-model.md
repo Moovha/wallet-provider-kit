@@ -19,6 +19,13 @@ authority still decides provisioning/signing. Identity data stays out of respons
 telemetry and errors; real storage, issuer integration and consent capture remain
 host responsibilities.
 
+<figure class="wallet-visual">
+  <img src="./public/diagrams/action-authority.webp" alt="Diagram: authenticated identity must pass current authority, exact-action and durable-attempt checks before a backend can sign." width="1536" height="1024" loading="lazy" decoding="async">
+  <figcaption>Fail before backend effects when authority is missing or stale; preserve the original attempt when effects are uncertain.</figcaption>
+</figure>
+
+[View full-size diagram](public/diagrams/action-authority.webp)
+
 Your deployment connects an untrusted HTTP caller, a token issuer and its public
 JSON Web Key Set (JWKS), your authorization store, a signing provider, an operator
 and a monitoring backend. Each has a different trust role. A compromised token issuer and a

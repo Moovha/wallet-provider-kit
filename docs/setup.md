@@ -1,5 +1,9 @@
 # Configure, deploy and integrate
 
+For graphical setup, run `wallet-provider-kit setup` and follow the
+[FormKit operator wizard](setup-wizard.md). It exports this same validated
+configuration through forms, with supported backend logos and setup references.
+
 The standard adoption path is a configured wallet service. Supported setups need
 configuration, deployment and HTTP API consumption; they do not require a Node.js
 host application, authority callbacks, database adapters or journal implementations.
@@ -9,6 +13,13 @@ The service remains experimental and test-network-only. Configuration selects an
 implemented profile; it does not establish production custody or vendor acceptance.
 
 ## Initialize and validate
+
+<figure class="wallet-visual">
+  <img src="./public/diagrams/service-setup.webp" alt="Diagram: installation and offline validation precede operator-controlled storage setup, explicit activation and HTTP API use." width="1536" height="1024" loading="lazy" decoding="async">
+  <figcaption>Offline validation, storage initialization and activation are distinct steps. Existing stores require a reviewed migration.</figcaption>
+</figure>
+
+[View full-size diagram](public/diagrams/service-setup.webp)
 
 [Install a reviewed package](package.md), then run its executable:
 

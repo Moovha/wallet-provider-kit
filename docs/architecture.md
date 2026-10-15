@@ -16,6 +16,13 @@ Moovha user records, databases or settlement services.
 
 ## Responsibilities
 
+<figure class="wallet-visual">
+  <img src="./public/diagrams/service-boundary.webp" alt="Diagram: host authority and the wallet backend are inside the provider service; owners and connected applications remain separate callers." width="1536" height="1024" loading="lazy" decoding="async">
+  <figcaption>The service boundary contains permission checks and the selected wallet backend, rather than the connected application.</figcaption>
+</figure>
+
+[View full-size diagram](public/diagrams/service-boundary.webp)
+
 - **Onboarding/access profile:** approved applications, hosted provider login and
   owner consent, identity-vendor adapters, provider review, private persistent
   records and expiring/revocable account grants. The small reference store and

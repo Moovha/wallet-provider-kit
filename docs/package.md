@@ -11,6 +11,13 @@ owner, connected application (OAuth client), host authority, wallet backend and 
 
 ## Build an installable tarball
 
+<figure class="wallet-visual">
+  <img src="./public/diagrams/service-setup.webp" alt="Diagram: a reviewed package is the start of configuration, validation, explicit setup and eventual API consumption." width="1536" height="1024" loading="lazy" decoding="async">
+  <figcaption>Installing the package starts the integration path; it does not activate a wallet backend.</figcaption>
+</figure>
+
+[View full-size diagram](public/diagrams/service-setup.webp)
+
 From a reviewed checkout of this repository:
 
 ```sh

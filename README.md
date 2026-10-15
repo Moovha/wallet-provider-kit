@@ -2,7 +2,7 @@
 
 # Moovha Wallet Provider Kit
 
-**Build a blockchain wallet service your users can authorise and other applications can access.**
+**Build a blockchain wallet service that lets applications request transactions on behalf of your users.**
 
 Wallet Provider Kit is a configurable wallet service and TypeScript toolkit for
 teams building and operating blockchain wallets for their users. Rooted in Moovha's
@@ -13,8 +13,14 @@ user onboarding, application access and approved-action signing into one toolkit
 creates wallet accounts and signs approved actions, define who may use an account,
 and retain responsibility for key control and recovery.
 
-An application such as Moovha can then work with those wallets through limited,
-user-approved access. Your team keeps control of its signing integration;
+During onboarding, an application such as Moovha requests wallet access on the
+user's behalf. The user signs in and grants application-access consent. After the
+required identity verification (KYC) and provider acceptance, your service records
+a limited, revocable access grant. The application then submits transaction
+requests under that grant. Your service checks the stored grant, current identity
+status, the exact approved action and provider policies before authorising signing.
+Application-access consent is not requested again for each transaction. Your team
+keeps control of its signing integration;
 the application receives the results of permitted actions without receiving
 private keys or seed phrases.
 
@@ -32,6 +38,13 @@ rail, the application's obligations and the current implementation boundary.
 [Choose an API profile](https://moovha.github.io/wallet-provider-kit/docs/api.html#choose-a-profile)
 
 ## Who takes part
+
+<figure class="wallet-visual">
+  <img src="./docs/public/diagrams/service-boundary.webp" alt="Diagram: owner consent and application requests enter the provider service; authority checks precede backend signing and only permitted results return." width="1536" height="1024" loading="lazy" decoding="async">
+  <figcaption>The provider checks current authority; the connected application receives permitted results without receiving wallet keys.</figcaption>
+</figure>
+
+[View full-size diagram](docs/public/diagrams/service-boundary.webp)
 
 Your team is the **wallet provider**: it operates the wallet service for its users.
 The server application in which you run the toolkit is called the **host**.
@@ -52,6 +65,10 @@ For your next step, [choose a backend](docs/backend-guide.md#choose-an-integrati
 [connect an application over HTTP](docs/http-api.md#authentication-and-profiles).
 
 ## A foundation for adopting teams
+
+Operators can run `wallet-provider-kit setup` to configure supported deployments
+through the [FormKit setup wizard](docs/setup-wizard.md), then export configuration
+and a deployment checklist. No application code is needed for this setup path.
 
 The standard path is **configure, deploy and consume the API**. Use one validated
 JSON configuration for supported login, identity, wallet backends and SQLite storage.
@@ -95,17 +112,36 @@ application doesn't transfer the wallet's keys to it.
 
 ## How wallet access works
 
-A user establishes an account with the wallet provider and approves an
-application's access. The provider records that relationship, its permissions
-and its expiry. The user can later pause or revoke access.
+<figure class="wallet-visual">
+  <img src="./docs/public/diagrams/action-authority.webp" alt="Diagram: token verification, current owner authority, exact action approval and durable admission precede signing, verification and result persistence." width="1536" height="1024" loading="lazy" decoding="async">
+  <figcaption>Authentication identifies the caller. Current authority, an exact approved action and a durable attempt are also required.</figcaption>
+</figure>
+
+[View full-size diagram](docs/public/diagrams/action-authority.webp)
+
+The application starts an access request, and the user signs in to the provider
+and grants application-access consent. Required identity checks and provider
+acceptance establish eligibility for a stored access grant with specific
+permissions and an expiry. An accepted user's identity can be reused when they
+connect another application without repeating KYC, while that new application
+still requires access consent. Subsequent transaction requests use the stored
+grant without repeating application-access consent. The user can pause or revoke
+access; reconnection, renewal or changed permissions require a new access request
+and consent.
 
 When an application requests an action, the host resolves the caller to the
 account owner and checks current access, consent and identity-verification
-status. For signing, it also loads the exact **approved action**: an instruction
+status against stored records. These are provider checks, not fresh consent prompts.
+For signing, it also loads the exact **approved action**: an instruction
 stored by the host with the content and limits that were approved. It records an
 **attempt**, the identity of this execution that retries must preserve, before
 the backend is called. The application references a stored action;
 it doesn't submit arbitrary bytes for the service to sign.
+
+The bundled transfer profile currently requires a separate owner approval for
+each exact transfer before signing. This transaction approval is distinct from
+the application-access consent recorded during onboarding; an access grant alone
+does not authorise spending. See the [configured transfer flow](docs/setup.md).
 
 The **journal** is the private, persistent record of attempts, their state and
 their results. The toolkit's journal wrapper coordinates the backend call,
@@ -149,6 +185,13 @@ sequenceDiagram
 ```
 
 ## Where it fits in Moovha
+
+<figure class="wallet-visual">
+  <img src="./docs/public/diagrams/assets-and-gas.webp" alt="Diagram: the provider checks and signs an approved action; the connected application separately budgets gas, arranges funding and coordinates execution." width="1536" height="1024" loading="lazy" decoding="async">
+  <figcaption>Sponsorship and execution belong to the connected application; a signing result alone does not establish settlement.</figcaption>
+</figure>
+
+[View full-size diagram](docs/public/diagrams/assets-and-gas.webp)
 
 Moovha's foundations are on-chain transfers, swaps and access to DeFi through
 assets such as USDC and ZARP. These wallets hold blockchain assets and authorise

@@ -6,6 +6,13 @@ login, grants, exact owner approval, financial policy and durable journals.
 
 ## Versioned startup module
 
+<figure class="wallet-visual">
+  <img src="./public/diagrams/backend-selection.webp" alt="Diagram: one signing interface has distinct hosted, local-vault and managed-signer backend profiles." width="1536" height="1024" loading="lazy" decoding="async">
+  <figcaption>A custom backend implements the same narrow signing boundary; it must establish its own capability and recovery evidence.</figcaption>
+</figure>
+
+[View full-size diagram](public/diagrams/backend-selection.webp)
+
 Set `backend` in your deployment configuration:
 
 ```json

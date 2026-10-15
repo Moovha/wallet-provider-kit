@@ -21,6 +21,13 @@ tokens and the owner's consent screen.
 
 ## Follow the integration path
 
+<figure class="wallet-visual">
+  <img src="./public/diagrams/service-setup.webp" alt="Diagram: install a reviewed package, configure integrations, validate offline, initialize empty storage, activate explicitly and consume the HTTP API." width="1536" height="1024" loading="lazy" decoding="async">
+  <figcaption>Follow the configured-service path before choosing an advanced embedded integration.</figcaption>
+</figure>
+
+[View full-size diagram](public/diagrams/service-setup.webp)
+
 For supported setups, follow [Configure, deploy and integrate](setup.md): one JSON
 configuration, deployment commands and API consumption. Use [custom adapters](custom-adapters.md)
 or the embedded library guides below only when your integration needs custom code.
