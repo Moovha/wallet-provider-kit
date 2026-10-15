@@ -2,6 +2,10 @@
 
 ## 0.1.0 — unreleased
 
+- Review dependency updates against the full toolkit; adopt Vitest 5 and Prettier
+  3.9 with formatting fixes. Keep Node/types on major 24 and defer TypeScript 7
+  until the contract generator supports its compiler/API migration.
+
 - Add an optional OpenZeppelin Relayer HTTP integration for configured EIP-712
   signers and a separate host-approved execution profile. Delegate nonce/queue/
   broadcast work to Relayer; reuse the host journal for acceptance, replay and status.
