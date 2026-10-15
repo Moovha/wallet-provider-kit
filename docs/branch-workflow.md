@@ -45,10 +45,6 @@ draft or adding `hold` / `manual-review`. To disable the workflow, set the repos
 Actions variable `TOOLKIT_AUTO_MERGE` to `false` or remove it. Set it to `true` to
 enable it. You can also rerun it through **Actions → Merge toolkit branch → Run workflow**.
 
-The first installation must reach main before GitHub can run this trusted-main
-workflow. Its initial PR follows the same contribution, review and CI gates;
-pending contributions are not bypassed to bootstrap automation.
-
 ## Protected main
 
 The workflow requires protected main, a pull request and strict up-to-date

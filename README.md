@@ -67,8 +67,8 @@ keeping their keys with the wallet provider.
 
 Moovha's DeFi project owns the business-operation API, transaction intent,
 sponsorship, execution and settlement. Device wallets, backup and recovery belong
-to the separate client profile. The [scope guide](docs/moovha-scope.md) explains
-these responsibilities and the two API directions.
+to the separate client profile. The [architecture guide](docs/architecture.md#applications-and-wallet-control)
+explains the provider boundary and application access.
 
 Non-custodial application access describes Moovha's relationship to the wallet's
 keys. Exclusive end-user self-custody depends on who can actually control and
@@ -96,8 +96,7 @@ Production custody acceptance remains pending. Mainnet, contract accounts,
 WalletConnect and ERC-1271/4337/7702 are unsupported. The separate
 [orchestration draft](spec/orchestration-draft.json) is a reference for DeFi's
 business API; those orchestration, sponsorship and settlement routes aren't
-implemented here. See [verification](docs/verification.md) and
-[acceptance requirements](docs/conformance.md) for the evidence and remaining work.
+implemented here. Use the [acceptance requirements](docs/conformance.md) to assess your integration.
 
 ## Try the complete provider flow
 
@@ -124,10 +123,8 @@ start with the [API guide](docs/api.md) and [durable attempts](docs/durable-atte
 
 ## Build with us
 
-The [documentation index](docs/README.md) covers APIs, architecture, backend
-selection and operations. The [adoption assessment](docs/adoption-assessment.md)
-records how the developer experience compares with maintained public projects
-and what still needs improvement.
+The [documentation index](docs/README.md) takes you from installation through
+[backend integration](docs/backend-guide.md), host authority, APIs and operations.
 
 Contributions follow the [contributor guide](CONTRIBUTING.md),
 [governance](GOVERNANCE.md) and [code of conduct](CODE_OF_CONDUCT.md).

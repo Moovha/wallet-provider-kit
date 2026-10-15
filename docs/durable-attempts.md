@@ -7,9 +7,8 @@ identical retry. A lost response stays tied to the original attempt.
 
 You supply the persistent journal and current authorization callback. The kit
 provides the provider lifecycle; it doesn't select your database or connect to
-Moovha's API database. The CLI remains unconfigured. No database adapter, migration,
-in-memory runtime store, live provider call or production recovery guarantee is
-included in this checkpoint.
+Moovha's API database. The CLI remains unconfigured. The host supplies financial persistence and
+recovery; the [walkthrough](integration-example.md) uses single-run offline fixtures.
 
 ## Compose it in your host
 
@@ -129,7 +128,8 @@ The offline contract fixtures exercise concurrent identical callers, changed
 requests/resources, stored replay after wrapper restart, current authorization,
 lost claim/result commits, failed persistence, stale leases, unknown/rejected
 outcomes, corrupt signatures/accounts, integer precision and action mutation.
-Their ephemeral journal is test-only and is not packaged as runtime storage.
+Their ephemeral journal is test-only. The separately packaged walkthrough journal
+is also an example fixture, not deployment storage.
 It proves wrapper behavior, not PostgreSQL concurrency, disk durability, backup
 restoration, live provider idempotency or deployment authorization.
 
@@ -146,21 +146,3 @@ lifecycle with `kind: relay_transaction` and stores its verified provider
 `transactionId` as the acceptance result. Hosts enabling it must support that
 journal variant and a strictly read-only `read` method for status checks.
 Existing signing integrations need no execution capability.
-
-### Checkpoint — 15 October 2026
-
-An independent checkout of the staged files installed from its own committed lock
-on Node 24.22.0 / npm 11.11.1. `npm run verify` passes all 165 tests, including 46
-new journal cases, application/test type checks, generated OpenAPI/types,
-formatting and Secretlint. Build, loopback HTTP/default-denial smoke tests, the
-compiled journal export and `npm pack --dry-run` pass. The reviewed package has
-67 files and excludes test fixtures/environment files. `npm audit` reports zero
-known vulnerabilities for that exact lock at this checkpoint; it is not a
-security certification. The local current-services map freshness check passes
-with unchanged 162 routes/315 calls; it does not index this undeployed provider.
-
-Separate in-progress Open Wallet Standard dependency/adapter work was excluded
-from the staged checkout and this change. Docker is unavailable on this host;
-no container, live issuer/provider, storage durability or production cost/recovery
-acceptance was exercised. No Moovha database proposal was applied, and exchange,
-provider credentials, deployments and npm publication were not changed.

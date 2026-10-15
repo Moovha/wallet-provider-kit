@@ -1,7 +1,8 @@
 # API guide
 
 Use this guide to choose the public API and understand the responsibilities you
-must supply. Then follow the [end-to-end provider tutorial](integration-example.md).
+must supply. Then follow the [end-to-end provider tutorial](integration-example.md) and
+[connect your backend](backend-guide.md).
 For exact declarations, use the [generated TypeScript reference](api-reference.md);
 for requests and responses, use the [HTTP guide](http-api.md) and
 [generated HTTP schemas](http-reference.md).
@@ -9,13 +10,14 @@ for requests and responses, use the [HTTP guide](http-api.md) and
 The kit is a wallet/provider implementation that an adopter can host or embed.
 It supports controlled wallet access for applications including Moovha. Key
 control, recovery, business authorization and transaction execution are distinct
-choices. Read [the Moovha scope boundary](moovha-scope.md) before treating this
-provider's HTTP routes as Moovha's orchestration API.
+choices. The [architecture guide](architecture.md#applications-and-wallet-control)
+explains the provider API and its relationship to a business-operation host.
 
 ## Choose a profile
 
 | Your application already has…                                                | Compose                                                                            | You still supply                                                                                                     |
 | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Approved stored actions and trusted transactional authority ports            | `createStoredWalletBackend` from `/backend`                                        | Current owner/grant/KYC/consent policy and accepted persistent authority adapters                                    |
 | Current owner/consent/KYC records and approved financial actions             | `EmbeddedWalletService`, a journaled signing backend and optionally `createServer` | Durable authority, attempts, current dispatch/replay authorization and recovery                                      |
 | A wallet backend but needs provider-hosted onboarding and application access | `createOnboardingProvider`                                                         | Existing OIDC login, approved clients, identity vendors/reviewers, private persistent storage and backend acceptance |
 | Existing login and a custom identity-acceptance workflow                     | `EnrollmentService` plus the wallet service                                        | Durable enrollment/identity authority and current financial authority                                                |
@@ -25,6 +27,10 @@ Choose onboarding **or** lower-level enrollment per server. The toolkit rejects
 combining them. Onboarding manages access and account provisioning; its bundled
 journal denies signing. Relayer execution is library-only. The default executable
 configures none of these financial profiles.
+
+For the supplied existing-host lifecycle, follow [stored-backend.md](stored-backend.md).
+The core composition below covers the separate `EmbeddedWalletService`/journal
+ports used by the runnable walkthrough. Choose one admission lifecycle for an effect.
 
 ## Core wallet service
 

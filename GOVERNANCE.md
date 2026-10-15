@@ -29,6 +29,6 @@ require migration notes and compatibility review; patches preserve public
 behavior. At 1.0, follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 and define a tested deprecation window.
 
-Only the latest experimental minor is planned to receive fixes. Public support
-begins after publication. See [SECURITY.md](SECURITY.md) for vulnerability reporting
+Only the latest experimental minor is planned to receive fixes. No stable-release
+support or response-time guarantee is offered. See [SECURITY.md](SECURITY.md) for vulnerability reporting
 and [CONTRIBUTING.md](CONTRIBUTING.md) for review requirements.

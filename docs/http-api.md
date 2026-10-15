@@ -2,7 +2,7 @@
 
 This is the toolkit's **provider-hosted** API. Use a base URL chosen by the
 adopting wallet provider. It is distinct from Moovha's planned business-operation
-API; see [scope and direction](moovha-scope.md). The
+API; see [the application/provider boundary](architecture.md#applications-and-wallet-control). The
 [generated schema reference](http-reference.md) records all implemented request
 and response schemas. Swagger UI is available at `/docs/` by default.
 

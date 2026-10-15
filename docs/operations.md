@@ -1,5 +1,9 @@
 # Run and monitor the service
 
+Start after [backend integration](backend-guide.md), [host composition](provider-guide.md)
+and [acceptance checks](conformance.md). The default executable and container
+inspect the API; your configured application owns financial readiness and recovery.
+
 You can send traces and metrics to your existing OpenTelemetry collector using
 OTLP/HTTP. For local development, the optional Grafana `otel-lgtm` image bundles
 a collector, metric and trace stores, and Grafana. You can explore the data in
@@ -33,9 +37,9 @@ consume local disk: inspect usage and stop it when unused. Use
 `docker compose --env-file .env -f ops/compose.yaml down` to stop; adding `-v`
 deletes local observability history and is an explicit operator choice.
 
-Docker was not available on the extraction host. OTLP transport has a real local
-receiver test, and Compose syntax/image digests are checked; container startup,
-Grafana rendering and restart/volume behavior still require a Docker smoke test.
+For your deployment, test container startup, Grafana access, restart and volume
+behavior on a Docker host. CI's container build and local OTLP transport tests
+do not establish those runtime properties.
 
 ## Use your existing monitoring
 
@@ -71,11 +75,9 @@ it doesn't establish financial readiness. The default container lets you explore
 the API. Environment variables alone won't turn it into a production signer.
 SIGTERM drains HTTP and flushes telemetry within a bounded shutdown.
 
-New infrastructure must remain in the existing expense tier. Reuse existing
-collector/monitoring capacity first; local development uses local resources.
-Estimate vendor requests, retention, egress and deployment CPU/storage separately.
-No actual invoice, production volume or hosting budget was available, so no claim
-of zero total cost or production cost fit is made.
+Plan collector retention, deployment capacity, vendor requests and egress for
+your own operating budget. Reuse existing observability capacity where suitable
+and measure costs under your expected workload.
 
 [Official Grafana OTEL LGTM development image](https://github.com/grafana/docker-otel-lgtm)
 provides the local stack; operators own production authentication and retention.

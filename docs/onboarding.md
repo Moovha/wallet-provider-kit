@@ -4,7 +4,8 @@ Give users one clear path to open a wallet, share identity evidence and choose
 which applications can use their account. Your provider keeps acceptance,
 authorization, signing and recovery under its control.
 
-Start with [the single configuration example](provider.config.example.ts).
+After [installing the package](package.md), [choose a wallet backend](backend-guide.md)
+and start with [the single configuration example](provider.config.example.ts).
 `createOnboardingProvider` supplies hosted consent, provider review, persistent
 grants and journaled wallet creation. You configure your provider, approved
 applications, existing identity service and selected wallet backend. There is
@@ -166,14 +167,11 @@ importPrice: {
 ```
 
 The application also needs `funding: { agreement, monthlyLimitMinor }`. The kit
-reserves the maximum atomically before dispatch and retains the reservation on
-an uncertain result. Zero-cost reuse still needs confirmed terms and an explicit
-agreement. No public vendor price is hardcoded: Didit's official pages currently
-disagree on B2B import charges, and Sumsub charges recipient-configured services
-under its terms. See [Didit pricing](https://didit.me/pricing/),
-[Didit B2B reuse](https://didit.me/products/reusable-kyc/),
-[the conflicting Didit page](https://didit.me/solutions/reusable-identity-once/)
-and [Sumsub terms, section 12](https://sumsub.com/terms-and-conditions/).
+reserves the configured maximum atomically before dispatch and retains the
+reservation on an uncertain result. Confirm recipient-vendor charges for the
+configured workflow/level and record your agreed terms. Zero-cost reuse still
+requires confirmed terms and an explicit agreement; no vendor price is assumed
+by the toolkit.
 
 This is a reservation/reimbursement ledger, not a payment processor or vendor
 billing cap. Recipient credentials can cause vendor charges to the provider;
@@ -215,29 +213,24 @@ check for incomplete attempts, and remove only that lock directory before restar
 Never edit the state to make an uncertain attempt dispatchable. Host/database
 failure, missing evidence and unknown policy all deny effects.
 
-## Why this shape
+## Protocol references
 
-We follow [Ory's separation of login and consent](https://www.ory.com/docs/oauth2-oidc/custom-login-consent/flow)
-and the explicit, versioned resource/action approach in
-[Cerbos policies](https://docs.cerbos.dev/cerbos/latest/policies/resource_policies.html).
-This narrow profile does not require either server or introduce a general policy
-language. [`openid-client`](https://github.com/panva/openid-client) implements the
-OIDC code client, including PKCE and signed-token checks; we do not build an
-authorization server.
+The configuration uses a fixed typed policy profile. Your existing OIDC service
+owns user login and recovery; the toolkit uses `openid-client` for authorization
+code exchange, PKCE and signed-token checks. Application API access uses a
+separately configured OAuth resource-server audience.
 
 The access-detail vocabulary follows
 [OAuth Rich Authorization Requests](https://www.rfc-editor.org/rfc/rfc9396.html).
-These request routes and the wallet detail type are toolkit-specific; this is
-not an implementation of the OAuth RAR authorization-server protocol. Login uses
-[OIDC Core](https://openid.net/specs/openid-connect-core-1_0.html) and
-[current OAuth security guidance](https://www.rfc-editor.org/rfc/rfc9700.html).
-Vendor behavior follows the official
+The request routes and wallet detail type are toolkit-specific; this package does
+not implement an OAuth authorization server or the complete RAR protocol.
+Identity reuse and hosted flows use the supported recipient-vendor interfaces:
 [Didit import](https://docs.didit.me/sessions-api/share-session/import),
 [Didit session](https://docs.didit.me/sessions-api/retrieve-session),
 [Sumsub reuse](https://docs.sumsub.com/reference/reuse-applicant-for-reusable-kyc)
-and [Sumsub hosted link](https://docs.sumsub.com/reference/generate-websdk-external-link)
-contracts, researched 15 October 2026.
+and [Sumsub hosted link](https://docs.sumsub.com/reference/generate-websdk-external-link).
+Check vendor compatibility and agreed terms before activation.
 
-The earlier [OIDC Identity Assurance enrollment](enrollment.md) remains available
-as a separate lower-level profile. Choose one profile per server; the toolkit
-rejects combining them so an acceptance path cannot silently bypass the other.
+The [OIDC Identity Assurance enrollment](enrollment.md) guide covers the alternative
+lower-level profile. Choose one profile per server; neither identity evidence nor
+access consent replaces financial-action authority.
