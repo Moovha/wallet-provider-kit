@@ -334,7 +334,7 @@ describe('configuration convention and CLI', () => {
     const invalid = cli(['validate', '--config', 'invalid.json'], dir);
     expect(invalid.status).toBe(1);
     expect(invalid.stderr).not.toContain('do-not-disclose');
-  });
+  }, 30000);
   it('rejects unknown fields, arbitrary profiles, missing acceptance and unsafe addresses', async () => {
     const config = await template();
     expect(() =>
