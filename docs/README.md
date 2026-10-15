@@ -48,6 +48,8 @@ tokens and the owner's consent screen.
 - [OpenZeppelin Relayer](openzeppelin-relayer.md): configured signers and separate execution profile.
 - [Stored-action host backend](stored-backend.md): supplied account/recovery/signing lifecycle for existing authority ports.
 - [Durable attempts](durable-attempts.md): claims, results, replay and reconciliation.
+- [Built-in SQLite database](storage.md): onboarding, approvals, usage reservations,
+  signing/execution journals and optional enrollment storage.
 - [OIDC Identity Assurance enrollment](enrollment.md): an alternative for hosts
   with their own identity acceptance flow; choose this or bundled onboarding.
 - [Architecture](architecture.md) and [security model](security-model.md): wallet
@@ -66,6 +68,7 @@ Use [Contributing](../CONTRIBUTING.md), [security reporting](../SECURITY.md),
 | -------------------------------------------- | ---------------------------------------------------------------------- |
 | `src/index.ts`, `src/core.ts`, `src/http.ts` | Public package entry points                                            |
 | `src/backend.ts`                             | Supplied lifecycle for stored-action host integrations                 |
+| `src/storage/`                               | Toolkit-owned SQLite storage, approvals and financial journals         |
 | `src/domain/`                                | Wallet authority, signing, enrollment and execution contracts          |
 | `src/service/`                               | HTTP composition, authentication, schemas and telemetry                |
 | `src/onboarding/`, `src/identity/`           | Owner access, consent, review and identity verification                |

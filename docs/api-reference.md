@@ -11,7 +11,7 @@ Supporting names and schema aliases
 retain their source declaration names; follow the declaration link for their imports.
 
 The root `@moovha/wallet-provider-kit` re-exports core, HTTP, onboarding,
-identity and telemetry. Provider adapters require their explicit subpaths.
+identity, telemetry and storage. Provider adapters require their explicit subpaths.
 
 ## Host authority and signing attempts
 
@@ -823,8 +823,10 @@ export interface OnboardingPolicy {
 ```ts
 export interface OnboardingProviderConfiguration {
   policy: OnboardingPolicy;
-  /** Private absolute directory on a persistent local POSIX filesystem. */
-  storageDirectory: string;
+  /** Existing file-store configuration. Use this or storage, exclusively. */
+  storageDirectory?: string;
+  /** Supplied database.onboardingStore or an equivalent transactional host store. */
+  storage?: OnboardingStore;
   oauth: OAuthConfiguration;
   ownerLogin: OwnerLoginConfiguration;
   reviewers: string[];
@@ -1940,5 +1942,181 @@ export interface StoredWalletBackendConfiguration<
   provider: WalletSigningProvider;
   signingAuthority: StoredSigningAuthority<SigningContext>;
   accountAuthority: StoredAccountAuthority<AccountContext>;
+}
+```
+
+## Built-in SQLite storage and financial authority
+
+Import from `@moovha/wallet-provider-kit/storage`. [Integration guide](storage.md).
+
+- [AttemptAdmission](#attemptadmission)
+- [DatabaseEnrollmentOptions](#databaseenrollmentoptions)
+- [FinancialApproval](#financialapproval)
+- [FinancialAuthorityOptions](#financialauthorityoptions)
+- [FinancialAuthorization](#financialauthorization)
+- [openProviderDatabase](#openproviderdatabase)
+- [ProviderDatabase](#providerdatabase)
+- [ProviderDatabaseOptions](#providerdatabaseoptions)
+
+### AttemptAdmission
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/storage/journal.ts).
+
+```ts
+export interface AttemptAdmission {
+  request: WalletAttemptRequest;
+  budgetId: string;
+  /** Nonnegative decimal integer usage units; reservations are retained after unknown effects. */
+  units: string;
+}
+```
+
+### DatabaseEnrollmentOptions
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/storage/enrollment.ts).
+
+```ts
+export interface DatabaseEnrollmentOptions {
+  /** Fresh caller, current consent, object and policy checks. No provider effects. */
+  authorize(
+    context: AuthorityContext,
+    record: EnrollmentRecord,
+    purpose: 'begin' | 'read' | 'decide' | 'provision',
+  ): Promise<boolean>;
+  /** Host acceptance policy, independent of vendor approval. Raw verified claims are never persisted. */
+  decide(
+    context: AuthorityContext,
+    challenge: EnrollmentChallenge,
+    identity: VerifiedIdentity,
+  ): Promise<{
+    status: Exclude<EnrollmentRecord['status'], 'awaiting_identity'>;
+    decision: EnrollmentDecision;
+  }>;
+}
+```
+
+### FinancialApproval
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/storage/types.ts).
+
+```ts
+/** Insert only from the host's trusted exact-action approval flow, never an HTTP body. */
+export interface FinancialApproval {
+  ownerSubject: string;
+  caller: Pick<VerifiedPrincipal, 'issuer' | 'subject' | 'clientId'>;
+  grantId: string;
+  consentReference: string;
+  policyRevision: string;
+  account: EmbeddedAccount;
+  action: TypedDataAction | RelayerExecutionAction;
+  budgetId: string;
+  units: string;
+}
+```
+
+### FinancialAuthorityOptions
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/storage/types.ts).
+
+```ts
+export interface FinancialAuthorityOptions {
+  namespace: string;
+  provider: string;
+  /** Recheck live owner/grant/KYC/consent, unchanged plan, dependencies and any step-up proof. No vendor effects. */
+  authorize(
+    context: AuthorityContext,
+    approval: FinancialApproval,
+    purpose: 'sign' | 'submit' | 'status',
+  ): Promise<FinancialAuthorization | null>;
+}
+```
+
+### FinancialAuthorization
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/storage/types.ts).
+
+```ts
+/** Fresh host evidence; matching a stored approval is necessary but is not a policy check. */
+export interface FinancialAuthorization {
+  ownerSubject: string;
+  accountId: string;
+  address: string;
+  chainAccountId: string;
+  currentUserStatus: 'ID VERIFIED';
+  grantId: string;
+  consentReference: string;
+  policyRevision: string;
+  bindingRevision: string;
+  capabilityRevision: string;
+  planRevision: string;
+  planHash: string;
+  expiresAt: string;
+}
+```
+
+### openProviderDatabase
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/storage/index.ts).
+
+```ts
+/** Opt-in toolkit-owned SQLite database. Initialization never activates a wallet backend. */
+export declare function openProviderDatabase(
+  options: ProviderDatabaseOptions,
+): {
+  onboardingStore: import('../index.js').OnboardingStore;
+  journal: import('../providers/openzeppelin-relayer.js').RelayerAttemptJournal;
+  ready: () => Promise<boolean>;
+  close: () => void;
+  setBudget(id: string, maximum: string): Promise<void>;
+  budget(id: string): Promise<{
+    maximum: string;
+    reserved: string;
+  } | null>;
+  approveAction(approval: FinancialApproval): Promise<string>;
+  revokeAction(id: string): Promise<void>;
+  financialAuthority: (configuration: FinancialAuthorityOptions) => {
+    authority: import('../core.js').EmbeddedWalletAuthority;
+    executionAuthority: import('../domain/relayer-execution.js').RelayerExecutionAuthority;
+    journal: import('../providers/openzeppelin-relayer.js').RelayerAttemptJournal;
+    authorizeAttempt: (request: WalletAttemptRequest) => Promise<boolean>;
+    authorizeStatus: (request: WalletAttemptRequest) => Promise<boolean>;
+  };
+  enrollmentAuthority: (
+    configuration: DatabaseEnrollmentOptions,
+  ) => import('../index.js').EnrollmentAuthority;
+  revokeEnrollment(id: string): Promise<void>;
+  /** For existing trusted host authorities. Supply current authorizeAttempt when wrapping the backend. */
+  admitAttempt(input: AttemptAdmission): Promise<WalletAttemptRequest>;
+  reconcileAttempt: (
+    request: WalletAttemptRequest,
+    result: WalletAttemptResult,
+    evidenceReference: string,
+    verify: (
+      request: WalletAttemptRequest,
+      result: WalletAttemptResult,
+      evidenceReference: string,
+    ) => Promise<boolean>,
+  ) => Promise<void>;
+};
+```
+
+### ProviderDatabase
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/storage/index.ts).
+
+```ts
+export type ProviderDatabase = ReturnType<typeof openProviderDatabase>;
+```
+
+### ProviderDatabaseOptions
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/storage/connection.ts).
+
+```ts
+export interface ProviderDatabaseOptions {
+  /** Dedicated private directory on persistent local POSIX storage. */
+  directory: string;
+  /** Explicitly initialize an empty toolkit database. Never upgrades an existing schema. */
+  initialize?: boolean;
 }
 ```

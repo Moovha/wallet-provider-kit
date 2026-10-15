@@ -155,8 +155,10 @@ library-only execution profile.
 
 **Experimental · 0.1.0 · unpublished.** The default service stays unconfigured.
 The bundled onboarding profile manages access and provisioning; signing requires
-an exact-action authority and financial journal supplied by the host. Its reference
-file storage supports one persistent POSIX host.
+an exact-action authority and financial journal. The [built-in SQLite database](docs/storage.md)
+stores onboarding, approvals, budgets and financial attempts on one persistent
+POSIX host, with required current host-policy checks. The original file store
+remains available for onboarding.
 
 Production custody acceptance remains pending. Mainnet, contract accounts,
 WalletConnect and ERC-1271/4337/7702 are unsupported. The separate

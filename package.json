@@ -51,6 +51,10 @@
     "./backend": {
       "types": "./dist/backend.d.ts",
       "import": "./dist/backend.js"
+    },
+    "./storage": {
+      "types": "./dist/storage/index.d.ts",
+      "import": "./dist/storage/index.js"
     }
   },
   "files": [

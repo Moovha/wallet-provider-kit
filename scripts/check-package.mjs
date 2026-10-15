@@ -95,6 +95,10 @@ try {
   `,
   );
   run(process.execPath, ['exports.mjs']);
+  assert.match(
+    run(process.execPath, [join(installed, 'examples/sqlite-storage.mjs')]),
+    /SQLite storage verified/,
+  );
   await copyFile(
     join(installed, 'examples/inspect-api.mjs'),
     join(temporary, 'inspect-api.mjs'),

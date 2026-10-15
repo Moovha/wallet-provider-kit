@@ -13,10 +13,11 @@ Wrap your signing backend with `createJournaledWalletProvider` when you compose
 backend, verifies and stores the result, and returns that stored result on an
 identical retry. A lost response stays tied to the original attempt.
 
-You supply the persistent journal and current authorization callback. The kit
-provides the provider lifecycle; it doesn't select your database or connect to
-Moovha's API database. The CLI remains unconfigured. The host supplies financial persistence and
-recovery; the [walkthrough](integration-example.md) uses single-run offline fixtures.
+Use the [built-in SQLite database](storage.md) for a supplied journal, immutable
+approvals and financial authority on one host, or supply your own accepted
+persistent journal. Current host authorization and recovery evidence remain
+required. The kit does not connect to Moovha's API database; the CLI remains
+unconfigured. The [walkthrough](integration-example.md) uses single-run offline fixtures.
 
 ## Compose it in your host
 
@@ -63,7 +64,8 @@ exclusive, persisted permission for one worker to dispatch an attempt. Its
 worker records completion so a stale worker cannot overwrite the result. An
 expired lease after dispatch doesn't authorise another backend call.
 
-Implement `WalletAttemptJournal` through your selected durable store. Before a
+The SQLite implementation follows the contract below. For another database,
+implement `WalletAttemptJournal` through your selected durable store. Before a
 database-backed implementation, inspect that deployment's actual schema, roles
 and isolation; this repository has no production database or verified schema.
 Do not assume it shares Moovha's Supabase project.

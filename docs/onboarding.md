@@ -50,7 +50,8 @@ Registering an application client doesn't register or approve a user. See
    `/onboarding/review`; users manage access at `/onboarding/access`.
 5. Choose Didit, Sumsub or both, using recipient credentials and a recipient
    workflow/level. Confirm sharing is enabled and agree the funding terms.
-6. Choose a private, persistent local storage directory and your wallet backend.
+6. Initialize the [built-in SQLite database](storage.md), or choose the reference
+   file store's private persistent directory, and configure your wallet backend.
    Keep `ready()` false until its unfunded lifecycle and recovery checks pass.
 
 The example uses the existing CDP Base Sepolia adapter to show a concrete backend.
@@ -198,6 +199,12 @@ must cover that distinction. Review vendor-side workflow and price changes
 before enabling them; the kit cannot discover an undeclared vendor charge.
 
 ## Storage and recovery
+
+For SQLite, pass `database.onboardingStore` as `storage` instead of
+`storageDirectory`. It persists the same onboarding records and can also store
+financial approvals and journals through an explicit financial integration. See
+[SQLite setup and recovery](storage.md). Existing file-store data is not imported
+automatically; arrange a reviewed migration before switching an active provider.
 
 The bundled file store gives this experimental profile a working durable path
 without requiring a customer database schema or migration. It serializes across

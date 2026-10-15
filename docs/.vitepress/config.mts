@@ -55,6 +55,7 @@ export default defineConfig({
           },
           { text: '3. Connect your backend', link: '/docs/backend-guide' },
           { text: '4. Supply host authority', link: '/docs/provider-guide' },
+          { text: 'Built-in SQLite storage', link: '/docs/storage' },
           { text: '5. Validate your integration', link: '/docs/conformance' },
           { text: '6. Operate the service', link: '/docs/operations' },
         ],

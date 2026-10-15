@@ -8,6 +8,10 @@ coverage/
 *.tgz
 artifacts/
 .provider-data/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite-journal
 .DS_Store
 docs/.vitepress/cache/
 docs/.vitepress/dist/
