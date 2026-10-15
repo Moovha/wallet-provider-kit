@@ -51,6 +51,12 @@ Moovha repository to install or run this kit.
 
 ## Authentication and policy
 
+For new users, follow [enrollment and identity handoff](enrollment.md). The kit
+verifies provider-bound OIDC Identity Assurance evidence; your host decides
+acceptance and keeps current local KYC and wallet authorization separate. The
+existing empty-body provisioning endpoint assumes a pre-enrolled owner unless
+you enable `EnrollmentService`, which adds a current-acceptance gate.
+
 Use an existing OAuth authorization server (for example the deployment's managed
 IdP or maintained `oidc-provider`). Configure exact HTTPS issuer and JWKS URL and
 an audience dedicated to this service. The resource server validates RFC 9068

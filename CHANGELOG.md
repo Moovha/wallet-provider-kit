@@ -2,6 +2,10 @@
 
 ## 0.1.0 — unreleased
 
+- Add optional user enrollment with provider-bound OIDC Identity Assurance proof
+  validation, durable host acceptance/receipt ports and acceptance-gated provisioning.
+  Keep identity evidence, provider KYC decisions and wallet/spending authority separate.
+
 - Review dependency updates against the full toolkit; adopt Vitest 5 and Prettier
   3.9 with formatting fixes. Keep Node/types on major 24 and defer TypeScript 7
   until the contract generator supports its compiler/API migration.

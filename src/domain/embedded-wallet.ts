@@ -64,12 +64,16 @@ export class EmbeddedWalletService {
   async provision(
     context: AuthorityContext,
     accountId: string,
+    enrollmentGuard?: (ownerSubject: string) => Promise<void>,
   ): Promise<EmbeddedAccount> {
-    const authority = await this.authority.provision(context, accountId);
+    const authority = structuredClone(
+      await this.authority.provision(context, accountId),
+    );
     requireOwner(authority);
     if (authority.accountId !== accountId) {
       throw new WalletProviderError('wallet_authorization_denied');
     }
+    await enrollmentGuard?.(authority.ownerSubject);
     return this.provider.createAccount(accountId, authority.attemptId);
   }
 

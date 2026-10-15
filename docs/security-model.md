@@ -1,5 +1,12 @@
 # Security model
 
+Optional [enrollment](enrollment.md) accepts only provider-nonce-bound, signed
+identity evidence. It never treats caller-written KYC fields or an API scope as
+user verification/consent. Provider policy decides acceptance, and current wallet
+authority still decides provisioning/signing. Identity data stays out of responses,
+telemetry and errors; real storage, issuer integration and consent capture remain
+host responsibilities.
+
 Your deployment connects an untrusted HTTP caller, a token issuer and its public
 JSON Web Key Set (JWKS), your authorization store, a signing provider, an operator
 and a monitoring backend. Each has a different trust role. A compromised token issuer and a

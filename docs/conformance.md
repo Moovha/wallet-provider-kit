@@ -20,6 +20,9 @@ profile; include success, denial and uncertain-outcome cases. See the
 
 Before you enable an integration, keep evidence for these cases:
 
+- [Enrollment](enrollment.md): real provider-bound OIDC flow and consent, requested
+  subject/nonce/client isolation, provider-owned acceptance, atomic nonce/identity
+  persistence, lost-response recovery and current acceptance before provisioning.
 - Two independent client/owner tenants, denied cross-object access and current
   consent/revocation/KYC before effects, including native proof where required.
 - Exact approved action and account/domain/digest validation, expiry during awaits,
