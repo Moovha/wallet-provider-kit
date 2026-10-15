@@ -1,9 +1,8 @@
-# Implementing a provider
+# Integrate your wallet service
 
-For installation, supported imports and your first credential-free example, see
-the [package guide](package.md). The [API guide](api.md) and
-[end-to-end tutorial](integration-example.md) show complete offline composition
-before you replace fixtures with durable host integrations.
+After [installing the package](package.md) and running the
+[provider walkthrough](integration-example.md), [choose and connect your backend](backend-guide.md).
+This guide connects it to your application's authority, durable records and HTTP API.
 
 For new integrations, start with [onboarding and application access](onboarding.md)
 and its [single configuration example](provider.config.example.ts). It supplies
@@ -156,9 +155,8 @@ and durable attempt identity. The default CLI does not activate any adapter.
 | Submission   | No broadcast, gas sponsorship or settlement implementation.                                  |
 | Evidence     | Offline adapter/service tests; live lifecycle and recovery remain unverified.                |
 
-This follows the explicit capability approach described in
-[related projects](related-projects.md). It doesn't imply compatibility with those
-projects.
+Use this supported profile when evaluating your integration; a backend SDK
+method or vendor feature alone does not establish account compatibility.
 
 ### Implement an adapter
 

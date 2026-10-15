@@ -18,12 +18,9 @@ wallet engine or claim general OWS conformance.
 | Platforms    | OWS prebuilt bindings for macOS and glibc Linux, arm64/x64. Windows and Alpine are unverified.           |
 | Evidence     | Real native-engine offline tests with ephemeral wallets; production storage/recovery remains unverified. |
 
-OWS was selected for this local proof because its Node API provides the lifecycle
-and signing operations without a vendor account or network call. Web3Signer is
-another sensible choice when a deployment already has remote signers and key
-provisioning. OpenZeppelin Relayer addresses a broader submission workflow; WDK
-and Safe serve different integration/account profiles. See
-[the comparison and primary references](related-projects.md).
+Use this adapter when your provider will operate a dedicated local OWS vault.
+For a separately operated signer or queue, compare the supported capabilities
+in [backend integration](backend-guide.md), then use that adapter's guide.
 
 ## Compose it
 

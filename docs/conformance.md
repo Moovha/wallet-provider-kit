@@ -1,5 +1,10 @@
 # Check your integration
 
+Use these checks after [connecting your backend](backend-guide.md) and
+[integrating host authority](provider-guide.md). Keep acceptance evidence with your
+deployment/release records. This guide describes what to prove, not a historical
+record of a particular development checkout.
+
 Start with the automated tests, then collect evidence for your actual deployment.
 The suite runs offline with temporary, unfunded keys; passing it doesn't certify
 a provider. `test/embedded-wallet.test.ts`
@@ -15,8 +20,7 @@ Record adapter/version, environment, account/key-control profile, supported chai
 action kinds, signature encoding, payload limits, recovery method and submission
 ownership. Do not advertise a profile based only on a vendor SDK method name.
 Use shared payload/digest/signature vectors when two adapters claim the same
-profile; include success, denial and uncertain-outcome cases. See the
-[related-project lessons](related-projects.md#apply-the-lessons).
+profile; include success, denial and uncertain-outcome cases.
 
 Before you enable an integration, keep evidence for these cases:
 

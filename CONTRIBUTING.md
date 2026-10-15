@@ -54,9 +54,20 @@ Use ephemeral offline fixtures. Test supported behavior, denied effects and
 uncertain outcomes without live providers, credentials, customer data or funds.
 Adapters must include [conformance evidence](docs/conformance.md) and untested cases.
 
-For docs and user-facing explanations, follow our
-[writing guide](docs/writing-guide.md). Keep the reader's next step clear and
-separate working features from proposals.
+## Documentation and examples
+
+Write for someone installing and integrating the wallet service. Put prerequisites,
+commands, expected results and the next integration step close together. Explain
+who controls the wallet and which host responsibilities an example replaces.
+Keep runnable offline fixtures distinct from production configuration templates.
+
+Document implemented behavior and explicit limits. Keep project assessments,
+workspace handoffs and development-session logs outside this repository. Release
+and deployment evidence belongs in the corresponding PR, CI artifact or operator's
+records; package documentation should explain tasks and contracts.
+
+After changing documentation, check local links and packaged examples. Public
+API/schema changes require generated-reference updates and the existing checks.
 
 ## Submit and review
 

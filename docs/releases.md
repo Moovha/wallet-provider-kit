@@ -1,44 +1,48 @@
 # Prepare a release
 
-The public source repository is
-[Moovha/wallet-provider-kit](https://github.com/Moovha/wallet-provider-kit).
-The owner authorized public hosting and the [toolkit branch workflow](branch-workflow.md)
-on 15 October 2026. npm publication still requires separate authorization.
-The rights holder authorized Apache-2.0 for the extracted foundation on 15 October 2026. NOTICE and extraction.json identify its origin; the old license is retained
-only as historical evidence in docs/LICENSE.source. Do not extend that permission
-to unrelated source or third-party dependencies.
+Maintain the package and provider API as explicit integration contracts. Review
+compatibility, supported backend profiles and recovery behavior for each candidate.
+The package is experimental and `private: true` keeps registry publication disabled;
+publication requires separate maintainer authorization.
 
-GitHub private vulnerability reporting is enabled. Main uses required CI and
-pull requests; [CODEOWNERS](../.github/CODEOWNERS) identifies the verified
-maintainer. A backup maintainer and out-of-band security contact are still needed;
-public hosting does not imply those roles have been filled. `private: true` in
-package.json prevents accidental npm publication.
+## Verify the candidate
 
-When you're preparing a release candidate, work through these checks:
+1. Start from a clean checkout with the pinned Node/npm versions and `npm ci`.
+   Run `npm run verify`, `npm run build`, `npm run check:package`, `npm audit`
+   and `npm pack --dry-run`. Review the package contents and confirm the standalone
+   install requires no sibling modules or local secrets.
+2. Review generated contract/reference diffs, API compatibility, dependencies and
+   licensing. [NOTICE](../NOTICE), [extraction.json](extraction.json) and
+   [LICENSE.source](LICENSE.source) preserve source attribution; third-party
+   dependencies retain their own licenses.
+3. Run Docker runtime checks on a suitable host. Record container build evidence
+   separately from startup/restart/storage checks. Live-provider acceptance needs
+   a separately authorized, unfunded pilot and the [integration checks](conformance.md).
+4. Create the ignored `artifacts` directory and generate an inventory:
+   `npm run sbom --silent > artifacts/sbom.cdx.json`. Review the CycloneDX inventory
+   and advisory results. CI uploads an SBOM and package candidate for the exact run.
+5. Update changelog/version/support notes, obtain required review and tag the
+   exact tested commit. Financial activation requires independent security review.
+   Retain results and unresolved limitations in the PR/release records.
 
-1. Use a clean checkout with pinned Node/npm and `npm ci`. Run `npm run verify`,
-   `npm run build`, `npm audit`, `npm pack --dry-run` and review package contents.
-   Run `npm run check:package` to exercise a tarball installation outside the checkout.
-   All runtime dependencies must install without sibling modules or local secrets.
-2. Review protocol/schema compatibility, generated diffs, provider acceptance,
-   threat changes and licensing. Run the Docker smoke test on a Docker host;
-   live provider evidence requires a separate unfunded authorized pilot.
-3. Generate `npm run sbom --silent > artifacts/sbom.cdx.json` after creating the
-   ignored artifacts directory. Review the CycloneDX inventory and advisory
-   results. CI uploads the SBOM and package candidate as build evidence.
-4. Update CHANGELOG/version/support notes, require maintainer review and tag the
-   exact tested commit. An independent security reviewer is required before
-   financial activation. Never invent code-signing, SLSA or vendor certification.
-5. Once publishing is authorized, configure an approved registry/repository and
-   short-lived OIDC trusted publishing with a protected environment; verify the
-   actual provenance/signatures and checksums. There is intentionally no automatic
-   publish workflow or stored registry token in this initial repository.
+Use the [branch workflow](branch-workflow.md) and required checks for integration.
+A candidate, commit, tag or passing mock is not provider certification or deployment
+authorization. See [SECURITY.md](../SECURITY.md) for support and vulnerability reporting.
 
-## Rollback and records
+## Publish only when authorized
 
-Before rolling back to a verified immutable image, check that its schema and
-authorization rules are compatible. Keep admitted attempts and check uncertain
-outcomes; rollback can't revoke a signature or erase financial history.
-The kit has no deployed database migration to reverse. Pin/review dependency and
-OCI/action updates rather than using floating `latest` tags. CI artifacts are
-retained for 14 days as candidate evidence, not a long-term audit archive.
+Configure the approved registry and short-lived OIDC trusted publishing through
+a protected environment. Verify actual provenance/signatures and checksums.
+There is no automatic npm publication workflow or stored registry token.
+
+CI candidates are retained for 14 days. Store approved release artifacts and
+acceptance evidence in a durable release archive; temporary CI artifacts are not
+a long-term audit record.
+
+## Rollback and recovery
+
+Before rollback, check schema and authorization compatibility with the candidate.
+Preserve admitted attempts and reconcile uncertain effects. A rollback cannot
+revoke a signature or erase financial history. The kit ships no production database
+migration to reverse. Pin and review package/image/action updates rather than
+using floating `latest` references.

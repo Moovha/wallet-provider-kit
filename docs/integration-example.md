@@ -8,7 +8,9 @@ an uncertain result are exercised in the same run.
 
 This tutorial covers the kit's implemented provider API. It doesn't call Moovha's
 planned operation API or implement prepare/commit, gas sponsorship or settlement.
-Read [wallet access and Moovha scope](moovha-scope.md) for the distinction.
+Read [the architecture guide](architecture.md#applications-and-wallet-control)
+for the application/provider boundary. After the walkthrough, follow
+[Connect your wallet backend](backend-guide.md) to replace its signer.
 
 ## 1. Install and run
 
@@ -46,13 +48,14 @@ Assertions make the process fail if a step behaves differently. It prints no
 keys, tokens, account/action identifiers, request bodies or signatures. When it
 finishes, HTTP resources close and all fixture state is discarded.
 
-## 2. Find the three parts
+## 2. Find the four parts
 
-| File                                                                 | Responsibility                                                                                    | Replace for a real integration                                                                                      |
-| -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| [run.mjs](../examples/provider-flow/run.mjs)                         | Composition, ephemeral JWT issuer, HTTP requests and response assertions                          | Trusted issuer registration/key resolution, your application's lifecycle and authenticated requests                 |
-| [host.mjs](../examples/provider-flow/host.mjs)                       | Preseeded owner/grant/KYC/consent, approved action records, attempt admission and offline backend | Your reviewed durable authority, owner binding, approved-action records, backend and current dispatch/replay checks |
-| [attempt-journal.mjs](../examples/provider-flow/attempt-journal.mjs) | In-process journal contract fixture                                                               | Transactional persistent claims/results, uniqueness, fencing, audit/outbox and recovery                             |
+| File                                                                 | Responsibility                                                                     | Replace for a real integration                                                                             |
+| -------------------------------------------------------------------- | ---------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| [run.mjs](../examples/provider-flow/run.mjs)                         | Composition, ephemeral JWT issuer, HTTP requests and response assertions           | Trusted issuer registration/key resolution, your application's lifecycle and authenticated requests        |
+| [host.mjs](../examples/provider-flow/host.mjs)                       | Preseeded owner/grant/KYC/consent, approved action records and attempt admission   | Your reviewed durable authority, owner binding, approved-action records and current dispatch/replay checks |
+| [backend.mjs](../examples/provider-flow/backend.mjs)                 | Ephemeral wallet implementing account creation, read-only lookup and typed signing | Your selected engine/service or a supported toolkit adapter                                                |
+| [attempt-journal.mjs](../examples/provider-flow/attempt-journal.mjs) | In-process journal contract fixture                                                | Transactional persistent claims/results, uniqueness, fencing, audit/outbox and recovery                    |
 
 **The host and journal here are fixtures, not deployment adapters.** They lose
 state on exit and cannot coordinate processes or recover after a crash. The
@@ -142,7 +145,7 @@ For a deployed provider these same method/path/header/body shapes travel over
 HTTPS; see the [HTTP guide](http-api.md). `app.inject()` is used here so the
 walkthrough doesn't create a service a user might accidentally deploy.
 
-The offline backend uses an ephemeral ethers wallet to sign a harmless EIP-712
+The separate `backend.mjs` adapter uses an ephemeral ethers wallet to sign a harmless EIP-712
 challenge with Base Sepolia chain ID. It has no asset-transfer fields and no
 chain connection. The journal wrapper checks the exact digest and recovered
 signer. The runner verifies the response again. PASS 2 and PASS 4 assert that
@@ -167,7 +170,8 @@ to an application or invalidate an on-chain authorization by itself.
 
 ## 7. Keep a lost response unknown
 
-The second approved proof action signs internally, then simulates losing the
+The runner calls `host.loseNextSigningResponse()` before the second approved proof
+action. That action signs internally, then simulates losing the
 response with `WalletProviderError('wallet_provider_unavailable', 'unknown')`.
 The HTTP response is 503 with `outcome: unknown`. The journal retains that state;
 a retry with the same key stays unknown and doesn't sign again.
@@ -199,8 +203,8 @@ A database adapter requires verified current schema evidence before you implemen
 it. This example adds no schema, migration or production authority adapter.
 Use [conformance](conformance.md) to plan the independent security and live-provider
 acceptance work. Passing this tutorial doesn't certify a provider or establish
-exclusive end-user custody. For Moovha adoption, it supplies a readable provider
-reference for the Scope 1/4 boundary described in [the scope guide](moovha-scope.md).
+exclusive end-user custody. Continue with [backend integration](backend-guide.md),
+[host authority](provider-guide.md) and [deployment acceptance](conformance.md).
 
 ## Troubleshooting
 

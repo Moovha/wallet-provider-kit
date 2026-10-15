@@ -1,6 +1,6 @@
 // Copy into your provider application. Public settings live here; credentials come from your secret store.
 import { resolve } from 'node:path';
-import { createOnboardingProvider } from '@moovha/wallet-provider-kit';
+import { createOnboardingProvider } from '@moovha/wallet-provider-kit/onboarding';
 import { createCdpWalletProvider } from '@moovha/wallet-provider-kit/cdp';
 
 function secret(name: string): string {
@@ -20,8 +20,8 @@ const app = await createOnboardingProvider({
     applications: [
       {
         issuer: 'https://applications.example.com',
-        clientId: 'your-registered-moovha-client',
-        name: 'Moovha',
+        clientId: 'your-registered-application-client',
+        name: 'Your Connected Application',
         permissions: ['account:read', 'operations:request'],
         // Add funding only after agreeing who pays, the cap and reimbursement terms.
         // funding: { agreement: 'signed-partner-agreement', monthlyLimitMinor: yourUsdCentsCap },

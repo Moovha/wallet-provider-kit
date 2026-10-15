@@ -11,6 +11,8 @@ publication disabled.
 From a reviewed checkout of this repository:
 
 ```sh
+git clone https://github.com/Moovha/wallet-provider-kit.git
+cd wallet-provider-kit
 npm ci
 npm run pack:local
 ```
@@ -71,6 +73,13 @@ Open [Swagger UI](http://127.0.0.1:8080/docs/). Use Ctrl-C to stop. This executa
 has the same unconfigured behavior as `npm start` in the source checkout.
 It has no provider configuration/module loader. Use the library to compose a
 configured host; adding environment credentials cannot activate signing.
+
+## Continue with your wallet backend
+
+Follow [Connect your wallet backend](backend-guide.md) to choose CDP, OWS, Relayer
+or your own implementation. Then use [host integration](provider-guide.md) for
+current authority, durable attempts and HTTP composition. Use [onboarding](onboarding.md)
+when you need owner login, consent, identity review and application grants.
 
 ## Choose imports by responsibility
 
@@ -168,4 +177,4 @@ Dependency installation may access the npm registry; the examples and service
 checks use offline fixtures and loopback only. This check runs in CI.
 
 Actual OWS engine behavior is a separate smoke check. Docker execution and live
-provider acceptance are separate evidence; see [verification](verification.md).
+provider acceptance are separate evidence; use [integration acceptance](conformance.md).

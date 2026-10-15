@@ -1,8 +1,5 @@
 # Architecture
 
-For custody/access terminology and the separate DeFi delivery scopes, see
-[wallet access and Moovha scope](moovha-scope.md).
-
 `HTTP → verified principal → host authority → EmbeddedWalletService → signing provider`
 
 Your application supplies persistent authorization and a signing backend. We call
@@ -37,10 +34,35 @@ account ownership, spending permission and transaction submission each need thei
 own checks. OAuth scopes let a request reach your policy checks; your host must
 still authorize the action. See the [provider guide](provider-guide.md).
 
+## Applications and wallet control
+
+An adopting team operates the wallet service and chooses its key controller and
+recovery model. Connected applications, including Moovha, request scoped access
+and receive permitted action results without receiving keys. That relationship
+doesn't establish exclusive end-user self-custody: an operator or vendor may still
+control the selected backend. Explain the actual model to users.
+
+There are two different API directions:
+
+| Surface                         | Caller and responsibility                                                                                                               |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Implemented provider API        | An application calls your provider for access, owner-bound provisioning and approved stored-action signing                              |
+| Separate business-operation API | A provider/application coordinates account linking, operation preparation, execution, sponsorship and settlement with its business host |
+
+This package implements the provider side. Its signing routes are not a business
+operation planner or a settlement API. The orchestration snapshot below supplies
+reference action schemas only. Keep service registrations, OAuth audiences,
+owner grants and legacy custody systems separate; a provider token must not grant
+access to another host's custody keys.
+
+For implementation, follow [package installation](package.md), the
+[provider walkthrough](integration-example.md), [backend integration](backend-guide.md)
+and [host authority](provider-guide.md).
+
 ## Standards and interfaces
 
-The [onboarding guide](onboarding.md#why-this-shape) records the researched Ory,
-Cerbos, OIDC, OAuth and vendor patterns. The configuration is a fixed typed profile,
+The [onboarding guide](onboarding.md#protocol-references) explains its OIDC, OAuth
+and identity-vendor interfaces. Configuration is a fixed typed profile,
 not a general policy language. Access details use RAR's structure; the toolkit
 does not implement an OAuth authorization server or the full RAR protocol.
 

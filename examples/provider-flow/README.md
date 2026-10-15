@@ -9,3 +9,9 @@ unfunded signer and the public journal wrapper. `host.mjs` and
 `attempt-journal.mjs` are single-run fixtures, not persistent or deployable host
 adapters. The runner opens no port and reads no live credentials. It asserts seven
 success/denial/replay/unknown-outcome steps and closes the application on exit.
+
+Read `run.mjs` for composition, `host.mjs` for authority, `backend.mjs` for the
+wallet adapter and `attempt-journal.mjs` for the journal fixture. Continue with
+[backend integration](../../docs/backend-guide.md) to replace the wallet adapter,
+then connect your host's durable policy and storage through the
+[provider guide](../../docs/provider-guide.md).

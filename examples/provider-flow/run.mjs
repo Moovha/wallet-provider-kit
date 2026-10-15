@@ -123,6 +123,7 @@ try {
 
   const uncertainPath = `/v1/actions/${host.uncertainAction.action_id}/sign`;
   const uncertainKey = randomUUID();
+  host.loseNextSigningResponse();
   for (let attempt = 0; attempt < 2; attempt += 1) {
     const lost = await post(uncertainPath, uncertainKey);
     assert.equal(lost.statusCode, 503);

@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased — adopter documentation
+
+- Remove internal assessments, workspace handoffs and historical verification
+  logs from the public documentation and package.
+- Organize installation, examples, backend selection, host authority and operations
+  into a linked integration path; keep contributor and licensing material.
+- Separate the walkthrough's wallet backend from host policy and journal fixtures
+  so adopters can see exactly where their engine or service connects.
+
 ## Unreleased — project introduction
 
 - Rewrite the README around wallet adoption, the provider/user/application
@@ -13,8 +22,7 @@
 - Add a complete offline authenticated provider flow with readable host/backend/
   journal fixtures and seven asserted admission, signing, replay, denial and
   uncertain-outcome steps; run/typecheck it from the installed tarball in CI.
-- Align positioning with the parent/DeFi wallet-access scopes, separating
-  non-custodial application access, backend key control and device self-custody.
+- Clarify application access, backend key control and device self-custody.
 - Document experimental compatibility and production fixture replacement; retain
   default denial, unchanged financial boundaries and disabled npm publication.
 
@@ -25,8 +33,7 @@
   and an unconfigured inspection executable.
 - Add a fresh-build tarball command, a credential-free consumer example and CI
   installation/type/runtime checks outside the source checkout.
-- Organize adopter documentation by task and configuration ownership, and record
-  a sourced comparison with maintained public projects and remaining maturity gaps.
+- Organize adopter documentation by task and configuration ownership.
 - Keep npm publication disabled and production authority/provider acceptance pending.
 
 ## Unreleased — onboarding and application access
@@ -70,8 +77,7 @@
   and explicit pending/conflict/unknown outcomes. Durable storage stays host-owned;
   no database adapter, migration or production activation is included.
 
-- Added a sourced comparison with related open-source projects and an explicit
-  CDP capability/evidence profile.
+- Document the explicit CDP capability and evidence profile.
 - Added public GitHub hosting, a persistent `codex/toolkit` branch and a tested
   merge workflow that waits for CI and outstanding contributions/reviews.
 - Added a contributor writing guide and a friendlier documentation voice, with

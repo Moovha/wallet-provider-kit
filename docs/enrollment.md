@@ -3,6 +3,8 @@
 For a ready-made flow with hosted consent, provider review, Didit/Sumsub evidence
 and access grants, use [onboarding and application access](onboarding.md). This
 guide describes the separate OIDC Identity Assurance profile for existing hosts.
+Start with [installation](package.md) and [backend integration](backend-guide.md)
+before composing it with your wallet service.
 Do not submit vendor share tokens as OIDC ID tokens. A server chooses one profile.
 
 An orchestrator can request a wallet for a named user without deciding whether

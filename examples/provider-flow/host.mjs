@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { TypedDataEncoder, Wallet } from 'ethers';
+import { TypedDataEncoder } from 'ethers';
 import { WalletProviderError } from '@moovha/wallet-provider-kit/core';
+import { createFixtureBackend } from './backend.mjs';
 
 /** @typedef {import('@moovha/wallet-provider-kit/core').AuthorityContext} Context */
 /** @typedef {import('@moovha/wallet-provider-kit/core').TypedDataAction} Action */
@@ -14,18 +15,15 @@ export const oauth = {
 
 /** Offline test fixture only: no environment configuration, network client or storage adapter. */
 export function createFixtureHost() {
-  // Generated in memory, never funded, persisted, printed or exposed by a route.
-  const wallet = Wallet.createRandom();
   const accountId = randomUUID();
   const owner = 'fixture-owner';
-  const account = { accountId, address: wallet.address };
+  const fixture = createFixtureBackend(accountId);
+  const account = fixture.account;
   const state = {
     grantActive: true,
     consentActive: true,
     kyc: 'ID VERIFIED',
-    provisioned: false,
   };
-  const calls = { provision: 0, sign: 0 };
   /** @type {Map<string, { request: string, attemptId: string }>} */
   const admissions = new Map();
   /** @type {Map<string, { kind: 'provision' | 'sign_typed_data', resourceId: string, requestHash?: string, resourceKey?: string }>} */
@@ -51,7 +49,7 @@ export function createFixtureHost() {
       profile_revision: '1',
       status: 'ready',
       chain_id: 'eip155:84532',
-      chain_account_id: `eip155:84532:${wallet.address}`,
+      chain_account_id: `eip155:84532:${account.address}`,
       binding_revision: '1',
       capability_revision: '1',
       plan_revision: '1',
@@ -134,7 +132,7 @@ export function createFixtureHost() {
       const stored = actions.get(actionId);
       if (
         !currentOwner(context, 'wallet:sign') ||
-        !state.provisioned ||
+        !fixture.isProvisioned() ||
         !stored ||
         stored.status !== 'ready' ||
         Date.parse(stored.expires_at) <= Date.now()
@@ -172,7 +170,7 @@ export function createFixtureHost() {
     if (admitted.kind === 'sign_typed_data') {
       const stored = actions.get(admitted.resourceId);
       if (
-        !state.provisioned ||
+        !fixture.isProvisioned() ||
         !stored ||
         stored.status !== 'ready' ||
         Date.parse(stored.expires_at) <= Date.now()
@@ -192,50 +190,15 @@ export function createFixtureHost() {
     return true;
   }
 
-  /** @type {import('@moovha/wallet-provider-kit/core').WalletSigningProvider} */
-  const backend = {
-    provider: 'offline-fixture',
-    async createAccount(requestedAccount) {
-      if (requestedAccount !== accountId)
-        throw new WalletProviderError('wallet_provider_input');
-      calls.provision += 1;
-      state.provisioned = true;
-      return { ...account };
-    },
-    async findAccount(requestedAccount) {
-      return state.provisioned && requestedAccount === accountId
-        ? { ...account }
-        : null;
-    },
-    async signTypedData(boundAccount, approved) {
-      if (
-        boundAccount.accountId !== accountId ||
-        boundAccount.address !== wallet.address ||
-        approved.payload_hash !== actions.get(approved.action_id)?.payload_hash
-      ) {
-        throw new WalletProviderError('wallet_provider_input');
-      }
-      calls.sign += 1;
-      const signature = await wallet.signTypedData(
-        approved.payload.domain,
-        approved.payload.types,
-        approved.payload.message,
-      );
-      if (approved.action_id === uncertainAction.action_id) {
-        // The effect occurred; the caller lost the response. Do not dispatch again.
-        throw new WalletProviderError('wallet_provider_unavailable', 'unknown');
-      }
-      return signature;
-    },
-  };
   return {
     accountId,
     action: structuredClone(action),
     uncertainAction: structuredClone(uncertainAction),
     authority,
-    backend,
+    backend: fixture.provider,
+    loseNextSigningResponse: fixture.loseNextSigningResponse,
     authorizeAttempt,
     state,
-    calls,
+    calls: fixture.calls,
   };
 }
