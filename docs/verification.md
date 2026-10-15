@@ -1,4 +1,34 @@
-# Extraction verification — 15 October 2026
+# Verification record
+
+## Onboarding and access — 15 October 2026
+
+Local Node 24.22.0 / npm 11.11.1 checks pass: **343 tests** across 13 suites,
+TypeScript, generated OpenAPI/types, formatting and secret scan. The 51 new cases
+cover the complete HTTP consent/review path, real ephemeral signed OIDC code/PKCE
+login, vendor request signing and normalization, client/owner isolation, budgets,
+renewal/revocation, policy changes, provider suspension and uncertain-outcome recovery.
+The tests use temporary private files and offline vendor fixtures, not customer data.
+
+Build, built-service/OWS smoke tests and standalone configuration-example
+typechecking pass. The package dry-run contains 129 files with no source tests,
+credentials or provider state. `npm audit` reports no known vulnerabilities.
+The consent screen was visually checked in a temporary loopback-only fixture.
+`openid-client` 6.8.8 and its locked `oauth4webapi` dependency use MIT licenses.
+
+The current-services workspace integration map refresh/check passes (156
+screens/flows, 315 calls, 171 routes, 13 unresolved observations). The default
+legacy-inclusive refresh/check each timed out after 15 seconds while reading the
+separate external Python checkout; prior outputs were preserved. The standalone
+toolkit remains outside that workspace scanner's service inventory.
+
+No live identity service, Didit/Sumsub workspace, consent agreement, customer
+database, provider wallet or funds were used. Docker is unavailable locally;
+GitHub CI performs the container build. Production filesystem/recovery and vendor
+acceptance remain outstanding. No deployment, schema change or npm publication
+is included. Current remote check evidence is available in
+[GitHub Actions](https://github.com/Moovha/wallet-provider-kit/actions).
+
+## Initial extraction — 15 October 2026
 
 This records the initial extraction checkpoint, before public GitHub hosting.
 For the current branch workflow and CI, see the

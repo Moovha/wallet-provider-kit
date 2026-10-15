@@ -1,5 +1,17 @@
 # Security model
 
+The [onboarding profile](onboarding.md) keeps application authentication, provider
+owner login, identity evidence, customer acceptance and account access as distinct
+records. Share tokens never authenticate an owner. Provider reviewers explicitly
+match evidence to the authenticated owner; no vendor result automatically grants
+access or changes an existing host's KYC status. Browser decisions require a
+short-lived provider session, a CSRF token and an exact Origin check.
+
+The bundled private file store contains authentication state, identity references
+and audit records. Protect its directory and backups; do not use shared/ephemeral
+filesystems. It never steals a stale lock or retries an uncertain vendor mutation.
+The ready-made profile journals provisioning only and denies financial signing.
+
 Optional [enrollment](enrollment.md) accepts only provider-nonce-bound, signed
 identity evidence. It never treats caller-written KYC fields or an API scope as
 user verification/consent. Provider policy decides acceptance, and current wallet

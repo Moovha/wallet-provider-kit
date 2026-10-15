@@ -1,5 +1,10 @@
 # Enroll a user before creating their wallet
 
+For a ready-made flow with hosted consent, provider review, Didit/Sumsub evidence
+and access grants, use [onboarding and application access](onboarding.md). This
+guide describes the separate OIDC Identity Assurance profile for existing hosts.
+Do not submit vendor share tokens as OIDC ID tokens. A server chooses one profile.
+
 An orchestrator can request a wallet for a named user without deciding whether
 your provider should accept that user. Enrollment lets you check identity
 evidence, collect consent and apply your policy before provisioning. Your team

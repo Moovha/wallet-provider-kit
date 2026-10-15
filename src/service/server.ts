@@ -12,6 +12,10 @@ import { WalletProviderError } from '../domain/signing.js';
 import { AuthenticationError, type Authenticate } from './auth.js';
 import { observeRequest } from './telemetry.js';
 import {
+  registerOnboardingRoutes,
+  type OnboardingHttpOptions,
+} from '../onboarding/http.js';
+import {
   accountSchema,
   emptyBodySchema,
   problemSchema,
@@ -27,12 +31,16 @@ export interface ServerOptions {
   service?: EmbeddedWalletService;
   /** Enabling enrollment also gates the provisioning route on current provider acceptance. */
   enrollment?: EnrollmentService;
+  /** Hosted owner consent, provider review and application access. Independent of legacy OIDC enrollment. */
+  onboarding?: OnboardingHttpOptions;
   /** Must check durable authority/recovery dependencies; never infer readiness from env keys. */
   ready?: () => Promise<boolean>;
   documentation?: boolean;
 }
 
 export async function createServer(options: ServerOptions = {}) {
+  if (options.enrollment && options.onboarding)
+    throw new WalletProviderError('wallet_provider_configuration');
   const app = Fastify({
     logger: false,
     bodyLimit: 1024,
@@ -366,7 +374,23 @@ export async function createServer(options: ServerOptions = {}) {
             context,
             request.params.accountId,
           )
-        : await options.service!.provision(context, request.params.accountId);
+        : await options.service!.provision(
+            context,
+            request.params.accountId,
+            options.onboarding
+              ? async (owner) => {
+                  const grant =
+                    await options.onboarding!.service.authorizeCurrent(
+                      context.principal,
+                      request.params.accountId,
+                    );
+                  if (grant.owner !== owner)
+                    throw new WalletProviderError(
+                      'wallet_authorization_denied',
+                    );
+                }
+              : undefined,
+          );
       return { account_id: account.accountId, address: account.address };
     },
   );
@@ -379,15 +403,33 @@ export async function createServer(options: ServerOptions = {}) {
     async (request) => {
       if (!(await isReady()))
         throw Object.assign(new Error('Unavailable'), { statusCode: 503 });
+      const context = {
+        principal: principals.get(request)!,
+        idempotencyKey: request.headers['idempotency-key'] as string,
+      };
       const signature = await options.service!.sign(
-        {
-          principal: principals.get(request)!,
-          idempotencyKey: request.headers['idempotency-key'] as string,
-        },
+        context,
         request.params.actionId,
+        options.onboarding
+          ? async (owner, accountId) => {
+              const grant = await options.onboarding!.service.authorize(
+                context.principal,
+                accountId,
+                'operations:request',
+              );
+              if (grant.owner !== owner)
+                throw new WalletProviderError('wallet_authorization_denied');
+            }
+          : undefined,
       );
       return { signature };
     },
+  );
+  await registerOnboardingRoutes(
+    app,
+    options.onboarding,
+    options.authenticate,
+    isReady,
   );
   await app.ready();
   return app;

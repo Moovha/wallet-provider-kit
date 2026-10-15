@@ -9,6 +9,10 @@ Moovha user records, databases or settlement services.
 
 ## Responsibilities
 
+- **Onboarding/access profile:** approved applications, hosted provider login and
+  owner consent, identity-vendor adapters, provider review, private persistent
+  records and expiring/revocable account grants. The small reference store and
+  provisioning journal are bundled; financial-action authorization stays separate.
 - **HTTP service:** validate requests/tokens and dispatch account/action references.
 - **Host authority:** check owner, grant, consent and KYC; supply durable attempts,
   result storage, concurrency control and recovery.
@@ -31,6 +35,11 @@ own checks. OAuth scopes let a request reach your policy checks; your host must
 still authorize the action. See the [provider guide](provider-guide.md).
 
 ## Standards and interfaces
+
+The [onboarding guide](onboarding.md#why-this-shape) records the researched Ory,
+Cerbos, OIDC, OAuth and vendor patterns. The configuration is a fixed typed profile,
+not a general policy language. Access details use RAR's structure; the toolkit
+does not implement an OAuth authorization server or the full RAR protocol.
 
 | Surface                   | Specification                                                                                                             | Implementation scope                                                      |
 | ------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |

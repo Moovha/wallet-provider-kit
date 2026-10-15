@@ -77,8 +77,14 @@ export class EmbeddedWalletService {
     return this.provider.createAccount(accountId, authority.attemptId);
   }
 
-  async sign(context: AuthorityContext, actionId: string): Promise<string> {
-    const authority = await this.authority.sign(context, actionId);
+  async sign(
+    context: AuthorityContext,
+    actionId: string,
+    accessGuard?: (ownerSubject: string, accountId: string) => Promise<void>,
+  ): Promise<string> {
+    const authority = structuredClone(
+      await this.authority.sign(context, actionId),
+    );
     requireOwner(authority);
     if (
       authority.action.action_id !== actionId ||
@@ -90,6 +96,7 @@ export class EmbeddedWalletService {
     ) {
       throw new WalletProviderError('wallet_authorization_denied');
     }
+    await accessGuard?.(authority.ownerSubject, authority.accountId);
     return this.provider.signTypedData(
       authority.account,
       authority.action,

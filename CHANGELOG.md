@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased — onboarding and application access
+
+- Add one provider configuration with hosted OIDC login, owner consent, provider
+  review, expiring access grants, revocation and account suspension.
+- Add recipient Didit and Sumsub Reusable KYC Share adapters, optional hosted fresh
+  verification, explicit requester funding reservations and uncertain-outcome recovery.
+- Add private single-host file persistence and a provisioning-only journal with
+  read-only wallet recovery; financial signing remains a separate host integration.
+- Publish the access-request OpenAPI and a compact configuration example. Existing
+  lower-level enrollment and signing integrations remain separate profiles.
+
 ## 0.1.0 — unreleased
 
 - Add optional user enrollment with provider-bound OIDC Identity Assurance proof

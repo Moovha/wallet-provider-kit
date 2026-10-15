@@ -14,8 +14,9 @@ pending; see [verification](docs/verification.md).
 
 - Fastify service with generated OpenAPI and Swagger UI.
 - OAuth access-token verification and owner/identity checks.
-- Optional [user enrollment](docs/enrollment.md) with verified identity evidence
-  and provider-controlled acceptance before wallet provisioning.
+- [User onboarding and application access](docs/onboarding.md): hosted consent,
+  provider review, Didit/Sumsub identity reuse and expiring, revocable grants.
+- Lower-level [OIDC identity enrollment](docs/enrollment.md) for existing host integrations.
 - Pluggable account provisioning and EIP-712 signing interfaces.
 - A [journal-backed provider wrapper](docs/durable-attempts.md) for persistent claims, results and retry handling.
 - Optional Coinbase CDP adapter for Base Sepolia typed signing.
@@ -53,7 +54,15 @@ configured. Use `npm run dev` for development and `npm run verify` for checks.
 
 ## Connect your backend
 
-Your application supplies two interfaces:
+Start with [one provider configuration](docs/provider.config.example.ts) and the
+[onboarding guide](docs/onboarding.md). `createOnboardingProvider` supplies the
+consent/review screens, default policies, private file persistence and journaled
+account creation. You choose approved applications, your existing login service,
+identity vendors, agreed cost limits and wallet backend. Users can revoke access;
+your provider decides acceptance. The reference storage supports one persistent
+POSIX host; production and vendor acceptance remain outstanding.
+
+For an existing financial host, your application supplies two interfaces:
 
 - `EmbeddedWalletAuthority` checks the current owner, grant, consent and
   identity-verification status, and records an attempt before signing.
@@ -61,9 +70,11 @@ Your application supplies two interfaces:
 
 Wire both into `EmbeddedWalletService` and `createServer`. Start with the
 [provider guide](docs/provider-guide.md) and [acceptance requirements](docs/conformance.md).
-For an orchestrator requesting a wallet for a new user, add `EnrollmentService`
-and your durable `EnrollmentAuthority`. Identity evidence and user consent are
-checked before your provider accepts enrollment; acceptance grants no signing rights.
+The ready-made onboarding profile creates wallets and manages account access;
+it does not approve financial actions or enable signing. Existing financial hosts
+can integrate its current-grant checks alongside their exact-action authority and
+durable dispatch journal. The earlier `EnrollmentService` remains an alternative
+OIDC Identity Assurance profile; choose one onboarding profile per server.
 
 [Provider OpenAPI](spec/provider-api.json) describes the implemented HTTP routes.
 The separate [orchestration draft](spec/orchestration-draft.json) supplies reference

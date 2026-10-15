@@ -20,6 +20,11 @@ profile; include success, denial and uncertain-outcome cases. See the
 
 Before you enable an integration, keep evidence for these cases:
 
+- [Onboarding/access](onboarding.md): real provider login, browser-bound PKCE and
+  consent, reviewer isolation, evidence-to-owner binding, approved client/permission
+  checks, current grants, superseding renewal, expiry/revocation and provider suspension.
+  Prove actual vendor sharing/hosted flows, confirmed cost bounds, concurrent budget
+  reservations and read-only recovery after lost import or creation responses.
 - [Enrollment](enrollment.md): real provider-bound OIDC flow and consent, requested
   subject/nonce/client isolation, provider-owned acceptance, atomic nonce/identity
   persistence, lost-response recovery and current acceptance before provisioning.
@@ -38,8 +43,10 @@ Before you enable an integration, keep evidence for these cases:
 - Production network/TLS/pool tests, monitored operating limits, bounded budgets,
   release rollback and recovery ownership. Load tests must not use funded wallets.
 
-Offline tests cover the cases they exercise. You'll still need a persistent
-production authority adapter; none is supplied here. The CLI starts unconfigured,
+Offline tests cover the cases they exercise. The onboarding profile supplies a
+private single-host file store and provisioning journal; verify its filesystem,
+backup and crash behavior in your deployment. Existing financial hosts still
+supply their production authority and financial journal. The CLI starts unconfigured,
 and the CDP adapter has offline test evidence only. Full operation orchestration,
 sponsorship, settlement and device recovery each need their own implementation
 and acceptance evidence.

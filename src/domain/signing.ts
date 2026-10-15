@@ -31,6 +31,8 @@ export class WalletProviderError extends Error {
       | 'wallet_attempt_pending'
       | 'wallet_attempt_unavailable'
       | 'wallet_identity_invalid'
+      | 'wallet_identity_unavailable'
+      | 'wallet_onboarding_unavailable'
       | 'wallet_enrollment_unavailable',
     readonly outcome:
       'not_dispatched' | 'rejected' | 'unknown' = 'not_dispatched',
