@@ -31,9 +31,7 @@ export class WalletProviderError extends Error {
       | 'wallet_attempt_pending'
       | 'wallet_attempt_unavailable',
     readonly outcome:
-      | 'not_dispatched'
-      | 'rejected'
-      | 'unknown' = 'not_dispatched',
+      'not_dispatched' | 'rejected' | 'unknown' = 'not_dispatched',
   ) {
     // Provider exceptions can contain request headers, credentials and payloads.
     super(code);
