@@ -13,6 +13,13 @@ the provider/application responsibilities and current supported scope.
 
 ## The people and systems
 
+<figure class="wallet-visual">
+  <img src="./public/diagrams/service-boundary.webp" alt="Diagram: an account owner approves access, an application requests actions, and the provider checks authority before calling its wallet backend." width="1536" height="1024" loading="lazy" decoding="async">
+  <figcaption>Account ownership, application identity, host authority and backend key control are separate responsibilities.</figcaption>
+</figure>
+
+[View full-size diagram](public/diagrams/service-boundary.webp)
+
 The **wallet provider** is the team operating the wallet service. Its **host** is
 the server application where the toolkit runs. You supply that application's
 startup code, persistent records and permission checks. The toolkit runs as a
@@ -100,6 +107,13 @@ by the provider's policy. A token scope, an active grant and accepted identity
 each answer different questions; none alone approves a signing action.
 
 ## Actions, attempts and the journal
+
+<figure class="wallet-visual">
+  <img src="./public/diagrams/durable-attempts.webp" alt="Diagram: a journal distinguishes a new attempt, saved success and pending or unknown outcomes while preserving one attempt identity." width="1536" height="1024" loading="lazy" decoding="async">
+  <figcaption>Retries keep the original attempt. Saved successes are checked; uncertain effects require evidence.</figcaption>
+</figure>
+
+[View full-size diagram](public/diagrams/durable-attempts.webp)
 
 An **approved action** is the host's stored instruction with the exact account,
 signing content, limits and expiry that have been approved. The application sends

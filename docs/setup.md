@@ -10,6 +10,13 @@ implemented profile; it does not establish production custody or vendor acceptan
 
 ## Initialize and validate
 
+<figure class="wallet-visual">
+  <img src="./public/diagrams/service-setup.webp" alt="Diagram: installation and offline validation precede operator-controlled storage setup, explicit activation and HTTP API use." width="1536" height="1024" loading="lazy" decoding="async">
+  <figcaption>Offline validation, storage initialization and activation are distinct steps. Existing stores require a reviewed migration.</figcaption>
+</figure>
+
+[View full-size diagram](public/diagrams/service-setup.webp)
+
 [Install a reviewed package](package.md), then run its executable:
 
 ```sh

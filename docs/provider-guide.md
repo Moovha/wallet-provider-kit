@@ -97,6 +97,13 @@ Moovha repository to install or run this kit.
 
 ## Authentication and policy
 
+<figure class="wallet-visual">
+  <img src="./public/diagrams/action-authority.webp" alt="Diagram: token identity is followed by owner, grant, KYC, consent, immutable-action and durable-attempt checks before backend effects." width="1536" height="1024" loading="lazy" decoding="async">
+  <figcaption>The host must authorize the exact action and recheck current permission immediately before dispatch or saved-result replay.</figcaption>
+</figure>
+
+[View full-size diagram](public/diagrams/action-authority.webp)
+
 When `createServer` has `onboarding`, provision/sign HTTP routes also check current
 access and the account owner. In a financial host, use
 `onboarding.bindWalletAuthority(authority)` and recheck

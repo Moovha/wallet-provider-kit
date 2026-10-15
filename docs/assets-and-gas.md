@@ -32,6 +32,13 @@ than a list of production capabilities included in this profile. See
 
 ## The application covers gas
 
+<figure class="wallet-visual">
+  <img src="./public/diagrams/assets-and-gas.webp" alt="Diagram: the wallet provider authorizes signing while the application arranges a separate network-fee budget, payer, execution and reconciliation." width="1536" height="1024" loading="lazy" decoding="async">
+  <figcaption>The sponsor funds eligible network fees; the provider retains wallet authority. Live sponsorship is outside this kit.</figcaption>
+</figure>
+
+[View full-size diagram](public/diagrams/assets-and-gas.webp)
+
 **Gas** is the blockchain network fee for executing a transaction. It is separate
 from the asset being sent and from any disclosed product, swap or payout fee.
 

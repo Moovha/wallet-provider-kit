@@ -46,6 +46,13 @@ don't stack both admission systems around one signing operation.
 
 ## Choose an integration
 
+<figure class="wallet-visual">
+  <img src="./public/diagrams/backend-selection.webp" alt="Diagram: the WalletSigningProvider interface connects CDP, OWS and Relayer, each with a different control and recovery model." width="1536" height="1024" loading="lazy" decoding="async">
+  <figcaption>Compare backend profiles before wiring them. Journal ownership and supported capabilities still differ.</figcaption>
+</figure>
+
+[View full-size diagram](public/diagrams/backend-selection.webp)
+
 The table below shows journal ownership for `EmbeddedWalletService`. For the
 stored-action lifecycle, use a raw backend such as CDP or your own raw adapter.
 The OWS and Relayer factories already journal effects; don't stack them inside

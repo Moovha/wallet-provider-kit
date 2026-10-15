@@ -37,6 +37,13 @@ turns vendor credentials or OAuth scopes into spending authority.
 
 ## Authority configuration
 
+<figure class="wallet-visual">
+  <img src="./public/diagrams/durable-attempts.webp" alt="Diagram: new attempts dispatch under a claim, successes return validated stored results, and uncertain attempts retain their identity during reconciliation." width="1536" height="1024" loading="lazy" decoding="async">
+  <figcaption>The supplied lifecycle coordinates account and signing effects over the host authority ports.</figcaption>
+</figure>
+
+[View full-size diagram](public/diagrams/durable-attempts.webp)
+
 `signingAuthority.admit` must atomically check current owner/grant/KYC/consent,
 reserve bounded usage and persist the exact attempt. Replays must reauthorize
 before returning a stored result. `dispatch` must recheck that authority and

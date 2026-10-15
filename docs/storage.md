@@ -199,6 +199,13 @@ their separate acceptance policies.
 
 ## Recovery, backup and operations
 
+<figure class="wallet-visual">
+  <img src="./public/diagrams/durable-attempts.webp" alt="Diagram: durable records distinguish new, successful and uncertain attempts; only a new claimed attempt dispatches." width="1536" height="1024" loading="lazy" decoding="async">
+  <figcaption>The journal preserves attempts and verified results across restarts. A timeout never justifies replacement effects.</figcaption>
+</figure>
+
+[View full-size diagram](public/diagrams/durable-attempts.webp)
+
 SQLite uses WAL journaling, `synchronous=FULL`, foreign keys and `BEGIN IMMEDIATE`
 writer transactions. Independent processes on the same host serialize through
 SQLite's locks. Lock waits are bounded at two seconds. Database/commit uncertainty

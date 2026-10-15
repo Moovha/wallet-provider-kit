@@ -209,9 +209,11 @@ export default defineConfig({
           const suffix = fragment ? `#${fragment}` : '';
           token.attrSet(
             'href',
-            source.endsWith('.md')
-              ? `/${rewrites[source] ?? source}${suffix}`
-              : `${repository}/blob/main/${source}${suffix}`,
+            source.startsWith('docs/public/')
+              ? `/${source.slice('docs/public/'.length)}${suffix}`
+              : source.endsWith('.md')
+                ? `/${rewrites[source] ?? source}${suffix}`
+                : `${repository}/blob/main/${source}${suffix}`,
           );
         }
         return link(tokens, index, options, env, renderer);

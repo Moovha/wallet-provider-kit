@@ -21,6 +21,13 @@ unconfigured. The [walkthrough](integration-example.md) uses single-run offline 
 
 ## Compose it in your host
 
+<figure class="wallet-visual">
+  <img src="./public/diagrams/durable-attempts.webp" alt="Diagram: check current authority and journal state; dispatch a new claimed attempt once, replay saved success, or reconcile an uncertain original attempt." width="1536" height="1024" loading="lazy" decoding="async">
+  <figcaption>This shows the main decision paths. Safe failure handling and the full journal contract are described below.</figcaption>
+</figure>
+
+[View full-size diagram](public/diagrams/durable-attempts.webp)
+
 ```ts
 import {
   createJournaledWalletProvider,

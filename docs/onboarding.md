@@ -86,6 +86,13 @@ readable `version` for your audit history; the kit also fingerprints configurati
 
 ## What a user experiences
 
+<figure class="wallet-visual">
+  <img src="./public/diagrams/owner-access.webp" alt="Diagram: provider sign-in, owner consent and provider acceptance lead to an application grant; grants can be paused or revoked and provisioning is separate." width="1536" height="1024" loading="lazy" decoding="async">
+  <figcaption>New and already accepted customers take different identity paths. Access approval does not create a wallet or authorize spending.</figcaption>
+</figure>
+
+[View full-size diagram](public/diagrams/owner-access.webp)
+
 The requesting application starts a **create** or **connect** request and opens
 the returned provider consent URL. The user signs in with the provider and sees
 the application, permissions, duration, privacy notice and identity-sharing

@@ -124,6 +124,16 @@ README and favicon. The documentation theme uses the same navy (`#0f2338`) and
 app cyan (`#12bfde`); its styles live in `docs/.vitepress/theme/brand.css`.
 Assets are local to this repository and included with the packaged Markdown.
 
+Conceptual diagrams live in `docs/public/diagrams/`. They use labelled nodes,
+directed connections and explicit responsibility boundaries in the navy/cyan
+palette. Use them where a relationship, decision or lifecycle benefits from a
+visual explanation. Pair each with descriptive alternative text, a caption and
+a relative full-size link so GitHub, the site and packaged docs remain usable.
+Keep exact request sequences in editable Mermaid and reference tables in text.
+The diagrams are generated raster artwork with a vector style, not editable SVG.
+Their prompts are recorded in `docs/public/diagrams/prompts.json`; review labels,
+arrows and implementation limits against the owning guide before replacing one.
+
 Use the Moovha website for company information and this repository's GitHub links
 for code, issues and contributions. Documentation links should take readers to
 the relevant guide or heading. Check their anchors after renaming a section;

@@ -39,6 +39,13 @@ rail, the application's obligations and the current implementation boundary.
 
 ## Who takes part
 
+<figure class="wallet-visual">
+  <img src="./docs/public/diagrams/service-boundary.webp" alt="Diagram: owner consent and application requests enter the provider service; authority checks precede backend signing and only permitted results return." width="1536" height="1024" loading="lazy" decoding="async">
+  <figcaption>The provider checks current authority; the connected application receives permitted results without receiving wallet keys.</figcaption>
+</figure>
+
+[View full-size diagram](docs/public/diagrams/service-boundary.webp)
+
 Your team is the **wallet provider**: it operates the wallet service for its users.
 The server application in which you run the toolkit is called the **host**.
 
@@ -100,6 +107,13 @@ The backend's control and recovery model determines custody; connecting an
 application doesn't transfer the wallet's keys to it.
 
 ## How wallet access works
+
+<figure class="wallet-visual">
+  <img src="./docs/public/diagrams/action-authority.webp" alt="Diagram: token verification, current owner authority, exact action approval and durable admission precede signing, verification and result persistence." width="1536" height="1024" loading="lazy" decoding="async">
+  <figcaption>Authentication identifies the caller. Current authority, an exact approved action and a durable attempt are also required.</figcaption>
+</figure>
+
+[View full-size diagram](docs/public/diagrams/action-authority.webp)
 
 The application starts an access request, and the user signs in to the provider
 and grants application-access consent. Required identity checks and provider
@@ -167,6 +181,13 @@ sequenceDiagram
 ```
 
 ## Where it fits in Moovha
+
+<figure class="wallet-visual">
+  <img src="./docs/public/diagrams/assets-and-gas.webp" alt="Diagram: the provider checks and signs an approved action; the connected application separately budgets gas, arranges funding and coordinates execution." width="1536" height="1024" loading="lazy" decoding="async">
+  <figcaption>Sponsorship and execution belong to the connected application; a signing result alone does not establish settlement.</figcaption>
+</figure>
+
+[View full-size diagram](docs/public/diagrams/assets-and-gas.webp)
 
 Moovha's foundations are on-chain transfers, swaps and access to DeFi through
 assets such as USDC and ZARP. These wallets hold blockchain assets and authorise

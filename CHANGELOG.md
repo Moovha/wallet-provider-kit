@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased — visual documentation guides
+
+- Add labelled vector-style diagrams for service boundaries, owner access,
+  signing authority, durable attempts, backend selection, service setup,
+  gas sponsorship and operations.
+- Pair diagrams with descriptive alternatives, captions and full-size links
+  across the integration guides; retain editable Mermaid request flows.
+- Bundle optimized local assets and their generation prompts with the docs.
+
 ## Unreleased — blockchain assets and application-sponsored gas
 
 - Distinguish decentralised finance (DeFi) from ownership of Moovha's API and
