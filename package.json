@@ -58,7 +58,7 @@
   },
   "devDependencies": {
     "@types/node": "24.10.1",
-    "typescript": "5.9.3",
+    "typescript": "7.0.2",
     "tsx": "4.23.15",
     "vitest": "4.1.11",
     "prettier": "3.6.2",
