@@ -2,11 +2,14 @@
 
 # Moovha Wallet Provider Kit
 
-**Build a wallet service your users can authorise and other applications can access.**
+**Build a blockchain wallet service your users can authorise and other applications can access.**
 
-Wallet Provider Kit is a TypeScript foundation for teams building and operating
-wallets for their users. It brings account creation, user onboarding, application
-access and approved-action signing into one toolkit. You choose the system that
+Wallet Provider Kit is a configurable wallet service and TypeScript toolkit for
+teams building and operating blockchain wallets for their users. Rooted in Moovha's
+work with blockchain payments and decentralised finance (DeFi), it makes access
+to on-chain assets such as USDC and ZARP easier to integrate into everyday products.
+It brings account creation,
+user onboarding, application access and approved-action signing into one toolkit. You choose the system that
 creates wallet accounts and signs approved actions, define who may use an account,
 and retain responsibility for key control and recovery.
 
@@ -14,6 +17,14 @@ An application such as Moovha can then work with those wallets through limited,
 user-approved access. Your team keeps control of its signing integration;
 the application receives the results of permitted actions without receiving
 private keys or seed phrases.
+
+Connected applications are expected to cover the blockchain network fees, often
+called **gas**, for the supported actions they request. When a provider connects
+its wallets to Moovha with user approval, Moovha takes that sponsorship role for
+admitted operations. Providers should be able to integrate without building their
+own gas-funding rail or asking users to keep a separate gas-token balance.
+The [assets and gas guide](docs/assets-and-gas.md) explains this project-supported
+rail, the application's obligations and the current implementation boundary.
 
 [Documentation](https://moovha.github.io/wallet-provider-kit/) ·
 [Install the package](https://moovha.github.io/wallet-provider-kit/docs/package.html#build-an-installable-tarball) ·
@@ -42,6 +53,12 @@ For your next step, [choose a backend](docs/backend-guide.md#choose-an-integrati
 
 ## A foundation for adopting teams
 
+The standard path is **configure, deploy and consume the API**. Use one validated
+JSON configuration for supported login, identity, wallet backends and SQLite storage.
+The kit supplies consent, grants, account recovery, exact owner-approved transfer
+authorizations and durable signing coordination. Start with [service setup](docs/setup.md).
+Custom backend adapters and embedded host composition are the advanced path.
+
 The kit is for a team that wants to provide wallets as part of its own product,
 or make its wallet service available to other applications. Your users interact
 with your login, consent and approval experience. Your host decides which
@@ -54,9 +71,9 @@ those systems, you can connect its existing authority and records through the
 public interfaces. Both approaches leave the wallet backend and the business
 rules under your team's control.
 
-The toolkit can be embedded as a Node.js package or composed into a
-provider-hosted HTTP service. Its OpenAPI contract also lets applications written
-in other languages use the implemented service routes.
+Deploy the configured provider service and connect your product through its API.
+The toolkit can also be embedded as a Node.js package for advanced integrations.
+Its OpenAPI contract also lets applications written in other languages use the implemented service routes.
 
 ```mermaid
 flowchart TB
@@ -71,7 +88,8 @@ flowchart TB
     kit -->|"Permitted result"|connectedApp
 ```
 
-Your team supplies the authority and backend shown inside the service boundary.
+Your team configures the authority and backend shown inside the service boundary.
+For supported profiles, the kit supplies the permission checks and durable records.
 The backend's control and recovery model determines custody; connecting an
 application doesn't transfer the wallet's keys to it.
 
@@ -132,6 +150,11 @@ sequenceDiagram
 
 ## Where it fits in Moovha
 
+Moovha's foundations are on-chain transfers, swaps and access to DeFi through
+assets such as USDC and ZARP. These wallets hold blockchain assets and authorise
+transactions involving token and vault contracts. A simple product experience
+still needs to make the asset, network, approval and fees clear.
+
 Within Moovha's architecture, this project supplies a portable wallet/provider
 implementation for the signing foundation and independent-provider integration
 work. It is intended to support access to independently controlled wallets while
@@ -140,10 +163,14 @@ keeping their keys with the wallet provider.
 Learn about [Moovha](https://moovha.com/) and explore the
 [Moovha GitHub organization](https://github.com/Moovha).
 
-Moovha's DeFi project owns the business-operation API, transaction intent,
+Moovha's business-operation API coordinates transaction intent,
 sponsorship, execution and settlement. Device wallets, backup and recovery belong
 to the separate device-wallet profile. The [architecture guide](docs/architecture.md#applications-and-wallet-control)
 explains the provider boundary and application access.
+
+Gas sponsorship is part of that integration design: the connected application
+funds eligible network fees while the provider retains wallet control and checks
+the user's authority. It does not require sharing keys with the application.
 
 Non-custodial application access describes Moovha's relationship to the wallet's
 keys. Exclusive end-user self-custody depends on who can actually control and
@@ -163,17 +190,25 @@ network, key-control and recovery profile. Relayer also offers a separate
 library-only execution profile.
 
 **Experimental · 0.1.0 · unpublished.** The default service stays unconfigured.
-The bundled onboarding profile manages access and provisioning; signing requires
-an exact-action authority and financial journal. The [built-in SQLite database](docs/storage.md)
+The bundled onboarding-only profile manages access and provisioning. The
+configured service optionally supplies an exact owner-approved ERC-3009 transfer
+profile and financial journal on Base Sepolia; custom financial actions require
+advanced host integration. The [built-in SQLite database](docs/storage.md)
 stores onboarding, approvals, budgets and financial attempts on one persistent
 POSIX host, with required current host-policy checks. The original file store
 remains available for onboarding.
 
+USDC and ZARP describe the wider project's asset use cases; they are not a claim
+that this experimental profile supports every token or mainnet operation. Its
+configured token contract and signing domain need independent verification.
+
 Production custody acceptance remains pending. Mainnet, contract accounts,
 WalletConnect and ERC-1271/4337/7702 are unsupported. The separate
-[orchestration draft](spec/orchestration-draft.json) is a reference for DeFi's
+[orchestration draft](spec/orchestration-draft.json) is a reference for Moovha's
 business API; those orchestration, sponsorship and settlement routes aren't
-implemented here. Use the [acceptance requirements](docs/conformance.md) to assess your integration.
+implemented here. The sponsorship commitment belongs to the connected application's
+execution rail; installing the kit or approving access does not activate it.
+Use the [acceptance requirements](docs/conformance.md) to assess your integration.
 
 ## Try the complete provider flow
 
@@ -194,8 +229,8 @@ step and the production integrations you must supply.
 
 To consume the toolkit in your own application, run `npm run pack:local` and
 follow the [package installation guide](docs/package.md). npm publication remains
-disabled. For a new provider, continue with [onboarding](docs/onboarding.md) and
-[one typed configuration](docs/provider.config.example.ts); for an existing host,
+disabled. For a new provider, continue with [declarative setup](docs/setup.md) and
+[one JSON configuration](docs/provider.config.example.json); for an existing host,
 start with the [API guide](docs/api.md) and [durable attempts](docs/durable-attempts.md).
 
 ## Build with us

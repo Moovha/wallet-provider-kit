@@ -100,6 +100,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/transfer-authorizations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Fixed Base Sepolia ERC-3009 transfer authorization. Current application access and separate exact owner approval are required. No broadcast or settlement. */
+        post: operations["requestTransferAuthorization"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/transfer-authorizations/{actionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Fixed Base Sepolia ERC-3009 transfer authorization. Current application access and separate exact owner approval are required. No broadcast or settlement. */
+        get: operations["getTransferAuthorization"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/access-requests": {
         parameters: {
             query?: never;
@@ -197,6 +231,9 @@ export interface operations {
                         /** @enum {string} */
                         status: "experimental";
                         configured: boolean;
+                        /** @enum {string} */
+                        configuration_profile?: "provider-service-v1";
+                        action_profiles?: "owner-approved-erc3009-v1"[];
                     };
                 };
             };
@@ -1196,6 +1233,474 @@ export interface operations {
                 };
             };
             /** @description Problem response */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+        };
+    };
+    requestTransferAuthorization: {
+        parameters: {
+            query?: never;
+            header: {
+                "idempotency-key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    account_id: string;
+                    recipient: string;
+                    amount: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        action_id: string;
+                        account_id: string;
+                        /** @enum {string} */
+                        status: "approval_required" | "approved" | "denied";
+                        /** Format: uri */
+                        approval_url: string;
+                        /** Format: date-time */
+                        expires_at: string;
+                        payload_hash: string;
+                        payload: {
+                            /** @enum {string} */
+                            primaryType: "TransferWithAuthorization";
+                            domain: {
+                                name: string;
+                                version: string;
+                                /** @enum {string} */
+                                chainId: "84532";
+                                verifyingContract: string;
+                            };
+                            types: {
+                                TransferWithAuthorization: {
+                                    /** @enum {string} */
+                                    name: "from" | "to" | "value" | "validAfter" | "validBefore" | "nonce";
+                                    /** @enum {string} */
+                                    type: "address" | "uint256" | "bytes32";
+                                }[];
+                            };
+                            message: {
+                                from: string;
+                                to: string;
+                                value: string;
+                                /** @enum {string} */
+                                validAfter: "0";
+                                validBefore: string;
+                                nonce: string;
+                            };
+                        };
+                    };
+                };
+            };
+            /** @description Default Response */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+        };
+    };
+    getTransferAuthorization: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                actionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        action_id: string;
+                        account_id: string;
+                        /** @enum {string} */
+                        status: "approval_required" | "approved" | "denied";
+                        /** Format: uri */
+                        approval_url: string;
+                        /** Format: date-time */
+                        expires_at: string;
+                        payload_hash: string;
+                        payload: {
+                            /** @enum {string} */
+                            primaryType: "TransferWithAuthorization";
+                            domain: {
+                                name: string;
+                                version: string;
+                                /** @enum {string} */
+                                chainId: "84532";
+                                verifyingContract: string;
+                            };
+                            types: {
+                                TransferWithAuthorization: {
+                                    /** @enum {string} */
+                                    name: "from" | "to" | "value" | "validAfter" | "validBefore" | "nonce";
+                                    /** @enum {string} */
+                                    type: "address" | "uint256" | "bytes32";
+                                }[];
+                            };
+                            message: {
+                                from: string;
+                                to: string;
+                                value: string;
+                                /** @enum {string} */
+                                validAfter: "0";
+                                validBefore: string;
+                                nonce: string;
+                            };
+                        };
+                    };
+                };
+            };
+            /** @description Default Response */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
             503: {
                 headers: {
                     [name: string]: unknown;

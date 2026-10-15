@@ -4,7 +4,9 @@ This is the toolkit's **provider-hosted** API. Use a base URL chosen by the
 adopting wallet provider. It is distinct from Moovha's planned business-operation
 API; see [the application/provider boundary](architecture.md#applications-and-wallet-control). The
 [generated schema reference](http-reference.md) records all implemented request
-and response schemas. Swagger UI is available at `/docs/` by default.
+and response schemas. Swagger UI is available at `/docs/` in the inspection
+service; configured deployments disable it by default. See [service setup](setup.md)
+for configuration and API consumption without a custom host implementation.
 
 For a complete runnable request sequence without credentials, use the
 [integration example](integration-example.md). The snippets below show a real
@@ -36,18 +38,20 @@ owner. For bundled onboarding, the issuer and client ID must match an allowed
 `policy.applications[]` entry; its `name` is shown on the consent screen. The
 separate `ownerLogin.clientId` configures the provider's own login integration.
 
-| Method and path                                 | Required scope        | Required configured profile                                                            |
-| ----------------------------------------------- | --------------------- | -------------------------------------------------------------------------------------- |
-| `GET /v1/capabilities`                          | None                  | None; `configured` reflects readiness                                                  |
-| `POST /v1/accounts/{accountId}/provision`       | `wallet:provision`    | Financial host or accepted onboarding/enrollment host                                  |
-| `POST /v1/actions/{actionId}/sign`              | `wallet:sign`         | Financial host with stored-action authority/journal; bundled onboarding denies signing |
-| `POST /v1/access-requests`                      | `wallet:access`       | Onboarding                                                                             |
-| `GET /v1/access-requests/{requestId}`           | `wallet:access:read`  | Onboarding                                                                             |
-| `POST /v1/access-requests/{requestId}/identity` | `wallet:access`       | Onboarding, owner consent and agreed vendor policy                                     |
-| `GET /v1/accounts/{accountId}`                  | `wallet:account:read` | Onboarding with current `account:read` grant                                           |
-| `POST /v1/enrollments`                          | `wallet:enroll`       | Lower-level enrollment                                                                 |
-| `POST /v1/enrollments/{enrollmentId}/identity`  | `wallet:enroll`       | Lower-level enrollment                                                                 |
-| `GET /v1/enrollments/{enrollmentId}`            | `wallet:enroll:read`  | Lower-level enrollment                                                                 |
+| Method and path                                 | Required scope        | Required configured profile                                                                           |
+| ----------------------------------------------- | --------------------- | ----------------------------------------------------------------------------------------------------- |
+| `GET /v1/capabilities`                          | None                  | None; `configured` reflects readiness                                                                 |
+| `POST /v1/accounts/{accountId}/provision`       | `wallet:provision`    | Financial host or accepted onboarding/enrollment host                                                 |
+| `POST /v1/actions/{actionId}/sign`              | `wallet:sign`         | Configured owner-approved transfer profile or advanced financial host; onboarding-only denies signing |
+| `POST /v1/transfer-authorizations`              | `wallet:actions`      | Configured owner-approved transfer profile                                                            |
+| `GET /v1/transfer-authorizations/{actionId}`    | `wallet:actions:read` | Configured owner-approved transfer profile                                                            |
+| `POST /v1/access-requests`                      | `wallet:access`       | Onboarding                                                                                            |
+| `GET /v1/access-requests/{requestId}`           | `wallet:access:read`  | Onboarding                                                                                            |
+| `POST /v1/access-requests/{requestId}/identity` | `wallet:access`       | Onboarding, owner consent and agreed vendor policy                                                    |
+| `GET /v1/accounts/{accountId}`                  | `wallet:account:read` | Onboarding with current `account:read` grant                                                          |
+| `POST /v1/enrollments`                          | `wallet:enroll`       | Lower-level enrollment                                                                                |
+| `POST /v1/enrollments/{enrollmentId}/identity`  | `wallet:enroll`       | Lower-level enrollment                                                                                |
+| `GET /v1/enrollments/{enrollmentId}`            | `wallet:enroll:read`  | Lower-level enrollment                                                                                |
 
 Optional routes appear in OpenAPI even when unavailable. Choose onboarding or
 enrollment, not both. Hosted `/onboarding/*` login/consent/review pages are

@@ -35,6 +35,11 @@ including [client IDs and owner-login registrations](concepts.md#what-does-clien
 
 ## Choose a profile
 
+For supported setups, use [declarative service configuration](setup.md) and the
+HTTP API. The kit supplies current authority, exact owner approval and durable
+journals; no adopter callbacks are required. The composition profiles below are
+advanced integrations for custom behavior and existing hosts.
+
 The [built-in SQLite database](storage.md) supplies onboarding persistence,
 immutable approvals, financial admission/usage budgets and signing/execution
 journals for one host. Its financial authority still requires your current

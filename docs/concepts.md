@@ -4,6 +4,13 @@ Start here if you are new to the kit. The same names appear in the README,
 configuration, examples and API reference. This page explains the roles first,
 then maps the technical names to the code you will integrate.
 
+These are blockchain wallets: their addresses hold on-chain assets, and approved
+signatures can authorise transactions involving token contracts. USDC and ZARP
+are examples of assets used across Moovha's blockchain products. **Gas** is the
+network fee for executing a transaction; the connected application is expected to sponsor it for
+its admitted operations. See [assets and gas sponsorship](assets-and-gas.md) for
+the provider/application responsibilities and current supported scope.
+
 ## The people and systems
 
 The **wallet provider** is the team operating the wallet service. Its **host** is

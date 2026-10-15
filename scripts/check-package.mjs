@@ -38,6 +38,8 @@ try {
   const paths = candidate.files.map(({ path }) => path);
   assert.ok(paths.includes('dist/providers/ows-worker.js'));
   assert.ok(paths.includes('examples/inspect-api.mjs'));
+  assert.ok(paths.includes('spec/provider-config.schema.json'));
+  assert.ok(paths.includes('docs/provider.config.example.json'));
   for (const path of paths) {
     assert.match(path, /^(dist\/|spec\/|docs\/|examples\/|[^/]+$)/);
     assert.doesNotMatch(
@@ -106,6 +108,46 @@ try {
   assert.match(
     run(process.execPath, ['inspect-api.mjs']),
     /live: 200, ready: 503, openapi: '3.0.3'/,
+  );
+  const executable = join(installed, 'dist/main.js');
+  assert.match(
+    run(process.execPath, [executable, 'init']),
+    /Configuration created/,
+  );
+  assert.match(
+    run(process.execPath, [
+      executable,
+      'validate',
+      '--config',
+      'provider.config.json',
+    ]),
+    /Configuration valid/,
+  );
+  assert.match(
+    run(process.execPath, [
+      executable,
+      'init-storage',
+      '--config',
+      'provider.config.json',
+    ]),
+    /Toolkit storage initialized/,
+  );
+  assert.throws(
+    () =>
+      execFileSync(
+        process.execPath,
+        [executable, 'doctor', '--config', 'provider.config.json'],
+        {
+          cwd: temporary,
+          env: { PATH: process.env.PATH, HOME: process.env.HOME },
+          encoding: 'utf8',
+          stdio: ['ignore', 'pipe', 'pipe'],
+        },
+      ),
+    (error) =>
+      error.status === 1 &&
+      String(error.stdout).includes('storage:catalog-and-integrity') &&
+      String(error.stdout).includes('not_verified'),
   );
   const walkthrough = run(process.execPath, [
     join(installed, 'examples/provider-flow/run.mjs'),

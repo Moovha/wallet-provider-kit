@@ -11,7 +11,7 @@ Supporting names and schema aliases
 retain their source declaration names; follow the declaration link for their imports.
 
 The root `@moovha/wallet-provider-kit` re-exports core, HTTP, onboarding,
-identity, telemetry and storage. Provider adapters require their explicit subpaths.
+identity, telemetry, storage and deployment. Provider adapters require their explicit subpaths.
 
 ## Host authority and signing attempts
 
@@ -595,6 +595,10 @@ export interface ServerOptions {
   /** Must check durable authority/recovery dependencies; never infer readiness from env keys. */
   ready?: () => Promise<boolean>;
   documentation?: boolean;
+  configurationProfile?: 'provider-service-v1';
+  actionProfiles?: readonly 'owner-approved-erc3009-v1'[];
+  /** Release host-owned resources when the service closes. Registered before ready. */
+  onClose?: () => Promise<void>;
 }
 ```
 
@@ -1138,6 +1142,23 @@ export type Permission = (typeof permissions)[number];
 ```ts
 export interface ProviderState {
   format: 'moovha-onboarding-1';
+  supportedActions?: Record<string, TransferRecord>;
+  backendAccounts?: Record<
+    string,
+    {
+      binding: string;
+      signer: RelayerBinding;
+    }
+  >;
+  deploymentBindings?: Record<
+    string,
+    {
+      origin: string;
+      provider: string;
+      binding: string;
+      activeRevision?: string;
+    }
+  >;
   requests: Record<string, AccessRequest>;
   accounts: Record<string, AccountRecord>;
   grants: Record<string, AccessGrant>;
@@ -2067,6 +2088,8 @@ export declare function openProviderDatabase(
   journal: import('../providers/openzeppelin-relayer.js').RelayerAttemptJournal;
   ready: () => Promise<boolean>;
   close: () => void;
+  /** Read-only ownership guard before assigning an empty toolkit store to a configured service. */
+  hasStoredRecords(): Promise<boolean>;
   setBudget(id: string, maximum: string): Promise<void>;
   budget(id: string): Promise<{
     maximum: string;
@@ -2118,5 +2141,213 @@ export interface ProviderDatabaseOptions {
   directory: string;
   /** Explicitly initialize an empty toolkit database. Never upgrades an existing schema. */
   initialize?: boolean;
+}
+```
+
+## Configuration-first provider service
+
+Import from `@moovha/wallet-provider-kit/deployment`. [Integration guide](setup.md).
+
+- [ConfigurationError](#configurationerror)
+- [createConfiguredProvider](#createconfiguredprovider)
+- [loadProviderConfiguration](#loadproviderconfiguration)
+- [ProviderConfiguration](#providerconfiguration)
+- [SecretReference](#secretreference)
+- [TransferInput](#transferinput)
+- [TransferPolicy](#transferpolicy)
+- [validateProviderConfiguration](#validateproviderconfiguration)
+- [WalletBackendAdapterV1](#walletbackendadapterv1)
+
+### ConfigurationError
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/deployment/config.ts).
+
+```ts
+export declare class ConfigurationError extends Error {
+  readonly issues: readonly string[];
+  constructor(issues: readonly string[]);
+}
+```
+
+### createConfiguredProvider
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/deployment/provider.ts).
+
+```ts
+/** Compose the supported service. No adopter authority callbacks, module loading from HTTP or implicit activation. */
+export declare function createConfiguredProvider(
+  input: unknown,
+  directory?: string,
+): Promise<
+  import('fastify').FastifyInstance<
+    import('http').Server<
+      typeof import('http').IncomingMessage,
+      typeof import('http').ServerResponse
+    >,
+    import('http').IncomingMessage,
+    import('http').ServerResponse<import('http').IncomingMessage>,
+    import('fastify').FastifyBaseLogger,
+    import('fastify').FastifyTypeProviderDefault
+  >
+>;
+```
+
+### loadProviderConfiguration
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/deployment/config.ts).
+
+```ts
+export declare function loadProviderConfiguration(path: string): Promise<{
+  config: ProviderConfiguration;
+  directory: string;
+}>;
+```
+
+### ProviderConfiguration
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/deployment/config.ts).
+
+```ts
+export interface ProviderConfiguration {
+  configVersion: 1;
+  profile: 'provider-service-v1';
+  policy: OnboardingPolicy;
+  oauth: OAuthConfiguration;
+  ownerLogin: {
+    issuer: string;
+    clientId: string;
+    clientSecret: SecretReference;
+    idTokenAlgorithm?: 'RS256' | 'ES256';
+  };
+  reviewers: string[];
+  identity: {
+    didit?: {
+      apiKey: SecretReference;
+      workflowId: string;
+      importPrice?: VendorPrice;
+      verificationPrice?: VendorPrice;
+    };
+    sumsub?: {
+      appToken: SecretReference;
+      secretKey: SecretReference;
+      levelName: string;
+      reusableKycShareEnabled: true;
+      importPrice?: VendorPrice;
+      verificationPrice?: VendorPrice;
+    };
+  };
+  backend:
+    | {
+        kind: 'cdp';
+        binding: string;
+        apiKeyId: SecretReference;
+        apiKeySecret: SecretReference;
+        walletSecret: SecretReference;
+      }
+    | {
+        kind: 'ows';
+        binding: string;
+        vaultDirectory: string;
+        passphrase: SecretReference;
+      }
+    | {
+        kind: 'openzeppelin-relayer';
+        binding: string;
+        url: string;
+        apiKey: SecretReference;
+        signers: RelayerBinding[];
+      }
+    | {
+        kind: 'custom';
+        binding: string;
+        module: string;
+        options?: Record<string, unknown>;
+      };
+  storage: {
+    kind: 'sqlite';
+    directory: string;
+  };
+  activation: {
+    enabled: boolean;
+    backendAcceptance?: string;
+    recoveryAcceptance?: string;
+    tokenAcceptance?: string;
+  };
+  financial?: TransferPolicy;
+  http?: {
+    host?: '127.0.0.1' | '0.0.0.0' | '::1' | '::';
+    port?: number;
+    documentation?: boolean;
+  };
+}
+```
+
+### SecretReference
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/deployment/config.ts).
+
+```ts
+export interface SecretReference {
+  env: string;
+}
+```
+
+### TransferInput
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/deployment/actions.ts).
+
+```ts
+export interface TransferInput {
+  account_id: string;
+  recipient: string;
+  amount: string;
+}
+```
+
+### TransferPolicy
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/deployment/actions.ts).
+
+```ts
+export interface TransferPolicy {
+  profile: 'owner-approved-erc3009-v1';
+  token: {
+    address: string;
+    name: string;
+    version: string;
+    symbol: string;
+    decimals: number;
+  };
+  recipients: string[];
+  maximumAmount: string;
+  /** Lifetime authorized atomic units per account/token; unknown effects retain usage. */
+  lifetimeAmount: string;
+  maxValiditySeconds: number;
+}
+```
+
+### validateProviderConfiguration
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/deployment/config.ts).
+
+```ts
+/** Offline and side-effect free. Diagnostics never include configuration values or credentials. */
+export declare function validateProviderConfiguration(
+  input: unknown,
+): ProviderConfiguration;
+```
+
+### WalletBackendAdapterV1
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/deployment/backends.ts).
+
+```ts
+/** Trusted deployment extension. The returned raw backend receives toolkit-owned policy/journals. */
+export interface WalletBackendAdapterV1 {
+  adapterVersion: 1;
+  createWalletBackend(context: {
+    options: Record<string, unknown>;
+    secret(name: string): string;
+  }): Promise<WalletSigningProvider> | WalletSigningProvider;
 }
 ```

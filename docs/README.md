@@ -1,12 +1,18 @@
-# Build your wallet service
+# Build your blockchain wallet service
 
 Read these guides with grouped navigation and search on the
 [documentation site](https://moovha.github.io/wallet-provider-kit/).
 
-Wallet Provider Kit helps your team operate wallets for users and make approved
-wallet actions available to connected applications. You choose the backend and
+Wallet Provider Kit helps your team operate blockchain wallets for users and make approved
+on-chain actions available to connected applications. Its DeFi roots include
+assets such as USDC and ZARP. You choose the backend and
 key-control model; the toolkit connects onboarding, application access and signing
 under your host's authority.
+
+Read [blockchain assets and gas sponsorship](assets-and-gas.md) for the project's
+asset context and the connected application's obligation to cover eligible
+network fees. Moovha takes that sponsorship role for admitted Moovha operations;
+the guide distinguishes the planned rail from today's provider implementation.
 
 New to these terms? Start with [roles and concepts](concepts.md): account owner,
 host authority, wallet backend, connected application/client, approved action and
@@ -14,6 +20,10 @@ journal. It also shows how application registrations appear in configuration,
 tokens and the owner's consent screen.
 
 ## Follow the integration path
+
+For supported setups, follow [Configure, deploy and integrate](setup.md): one JSON
+configuration, deployment commands and API consumption. Use [custom adapters](custom-adapters.md)
+or the embedded library guides below only when your integration needs custom code.
 
 1. **[Install the package](package.md).** Build a reviewed tarball, install it in
    your application and inspect the unconfigured API.

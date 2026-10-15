@@ -36,6 +36,10 @@ export interface ServerOptions {
   /** Must check durable authority/recovery dependencies; never infer readiness from env keys. */
   ready?: () => Promise<boolean>;
   documentation?: boolean;
+  configurationProfile?: 'provider-service-v1';
+  actionProfiles?: readonly 'owner-approved-erc3009-v1'[];
+  /** Release host-owned resources when the service closes. Registered before ready. */
+  onClose?: () => Promise<void>;
 }
 
 export async function createServer(options: ServerOptions = {}) {
@@ -57,6 +61,7 @@ export async function createServer(options: ServerOptions = {}) {
       },
     },
   });
+  if (options.onClose) app.addHook('onClose', options.onClose);
   const principals = new WeakMap<FastifyRequest, VerifiedPrincipal>();
   await app.register(helmet);
   await app.register(rateLimit, { max: 60, timeWindow: '1 minute' });
@@ -194,6 +199,14 @@ export async function createServer(options: ServerOptions = {}) {
               profile: { type: 'string', enum: ['provider-signing-preview'] },
               status: { type: 'string', enum: ['experimental'] },
               configured: { type: 'boolean' },
+              configuration_profile: {
+                type: 'string',
+                enum: ['provider-service-v1'],
+              },
+              action_profiles: {
+                type: 'array',
+                items: { type: 'string', enum: ['owner-approved-erc3009-v1'] },
+              },
             },
           },
         },
@@ -203,6 +216,12 @@ export async function createServer(options: ServerOptions = {}) {
       profile: 'provider-signing-preview',
       status: 'experimental',
       configured: await isReady(),
+      ...(options.configurationProfile
+        ? {
+            configuration_profile: options.configurationProfile,
+            action_profiles: [...(options.actionProfiles ?? [])],
+          }
+        : {}),
     }),
   );
 

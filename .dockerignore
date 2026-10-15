@@ -7,3 +7,7 @@
 !src/**
 !LICENSE
 !NOTICE
+!spec/
+!spec/provider-config.schema.json
+!docs/
+!docs/provider.config.example.json

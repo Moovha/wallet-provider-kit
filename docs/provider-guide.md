@@ -1,5 +1,9 @@
 # Integrate your wallet service
 
+For supported deployments, use [configuration-first setup](setup.md); the kit
+supplies authority and journals. This guide covers advanced embedded hosts and
+custom financial integrations.
+
 After [installing the package](package.md) and running the
 [provider walkthrough](integration-example.md), [choose and connect your backend](backend-guide.md).
 This guide connects it to your application's permission checks, persistent records and HTTP API.
@@ -37,13 +41,30 @@ Use a dedicated OAuth audience, application registrations and network boundary.
 Keep these separate from any orchestrator's public API or custody service;
 a provider grant must not authorize access to Moovha-held custody keys.
 
+## Agree asset support and gas sponsorship
+
+Record the actual network, token contract, units and action capabilities for
+each integration. Moovha's DeFi use cases include USDC and ZARP; that context
+does not enable those assets or mainnet operations in the kit's test-network profile.
+
+Connected applications are expected to cover eligible gas for the operations
+they request. When your users approve Moovha access, Moovha takes that sponsor
+role for admitted operations. Your provider retains key control, current
+authority checks and approved signing/submission; the application arranges the
+funding rail. Agree submission ownership, bounded budgets and uncertain-outcome
+recovery before enabling it. Access consent alone cannot trigger funding.
+See [assets and gas sponsorship](assets-and-gas.md) for the coverage contract
+and implementation status. The provider kit does not itself supply live Moovha
+sponsorship or settlement.
+
 ## Compose the service
 
 Wire together `createServer`, `createAuthenticator`, `EmbeddedWalletService` and
 your implementation of `EmbeddedWalletAuthority` in your application's startup
 code. Supply `ready()` to check the persistent authorization and recovery
 services your host needs. Adding CDP credentials isn't enough to enable signing:
-the CLI has no authority module loader or sample database. Supply reviewed
+the no-argument CLI remains unconfigured; `run --config` supplies only its
+supported configured-service profiles. Supply reviewed
 authority and recovery implementations in your startup code; never load module
 names from a request.
 

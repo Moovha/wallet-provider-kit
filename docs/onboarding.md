@@ -1,5 +1,10 @@
 # Onboard users and connect applications
 
+For the standard deployment, [configure the service](setup.md) without host code.
+The programmatic onboarding-only profile below remains available for advanced
+composition and deliberately denies signing; the configured service can add the
+separate owner-approved transfer profile.
+
 Give users one clear path to open a wallet, share identity evidence and choose
 which applications can use their account. Your provider keeps acceptance,
 authorization, signing and recovery under its control.
