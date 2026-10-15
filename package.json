@@ -60,7 +60,7 @@
     "@types/node": "24.10.1",
     "typescript": "5.9.3",
     "tsx": "4.23.15",
-    "vitest": "4.1.11",
+    "vitest": "5.0.4",
     "prettier": "3.9.10",
     "ajv": "8.20.0",
     "ajv-formats": "3.0.1",
