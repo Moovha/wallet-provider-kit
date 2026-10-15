@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased — published documentation
+
+- Publish the documentation site on GitHub Pages and make it the primary README
+  documentation link, with direct installation, tutorial and API links.
+- Keep later documentation deployments in the separate manual publication workflow.
+
 ## Unreleased — roles and terminology
 
 - Introduce account owners, connected applications, hosts, authority and wallet
