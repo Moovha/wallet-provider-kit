@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import { createAuthenticator } from './service/auth.js';
 import { createServer } from './service/server.js';
 import { startTelemetry } from './service/telemetry.js';

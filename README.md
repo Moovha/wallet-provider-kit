@@ -1,117 +1,115 @@
 # Moovha Wallet Provider Kit
 
-Build wallets into your product with a signing backend and authorization policy
-you control. This TypeScript library and HTTP service lets your team connect
-external orchestration services, including Moovha, while your application
-enforces the wallet owner's consent and controls signing access.
+Embed provider-hosted wallets into your product while your application controls
+who can use them and which actions they may take. This TypeScript package and
+HTTP service connects onboarding, owner consent and approved stored actions to
+a signing backend you choose.
 
-**Experimental · 0.1.0 · not on npm.** You can explore the API locally without
-credentials. Account creation and signing stay disabled until your application
-supplies persistent authorization and recovery. Production acceptance is still
-pending; see [verification](docs/verification.md).
+Rewards becoming spendable value is one possible use case. The toolkit's role is
+the wallet authorization and provider boundary; your product supplies execution,
+funding, redemption and settlement integrations appropriate to its purpose.
 
-## What you get
+**Experimental · 0.1.0 · unpublished.** Explore locally without credentials.
+Production custody acceptance is pending; see [verification](docs/verification.md).
 
-- Fastify service with generated OpenAPI and Swagger UI.
-- OAuth access-token verification and owner/identity checks.
-- [User onboarding and application access](docs/onboarding.md): hosted consent,
-  provider review, Didit/Sumsub identity reuse and expiring, revocable grants.
-- Lower-level [OIDC identity enrollment](docs/enrollment.md) for existing host integrations.
-- Pluggable account provisioning and EIP-712 signing interfaces.
-- A [journal-backed provider wrapper](docs/durable-attempts.md) for persistent claims, results and retry handling.
-- Optional Coinbase CDP adapter for Base Sepolia typed signing.
-- Experimental [OWS adapter](docs/ows-adapter.md) reusing an existing open-source wallet engine.
-- Experimental [OpenZeppelin Relayer integration](docs/openzeppelin-relayer.md) for configured signers and host-approved queued transactions.
-- OpenTelemetry traces and metrics over OTLP/HTTP.
+[Getting started](docs/package.md) · [Documentation](docs/README.md) ·
+[Adoption assessment](docs/adoption-assessment.md) · [Security](SECURITY.md)
+
+## Install as a package
+
+Use Node **24.22.0** and npm **11.11.1**. Build a tarball from a reviewed checkout:
+
+```sh
+git clone https://github.com/Moovha/wallet-provider-kit.git
+cd wallet-provider-kit
+npm ci
+npm run pack:local
+```
+
+In your own application directory:
+
+```sh
+npm install /absolute/path/to/moovha-wallet-provider-kit-0.1.0.tgz
+node node_modules/@moovha/wallet-provider-kit/examples/inspect-api.mjs
+```
+
+Expected output: `{ live: 200, ready: 503, openapi: '3.0.3' }`. The example runs
+in-process without a provider or financial effects. Readiness stays unavailable
+until your host supplies reviewed authorization and recovery.
+
+Use focused imports in an ESM application:
+
+```js
+import { createServer } from '@moovha/wallet-provider-kit/http';
+
+const app = await createServer();
+await app.listen({ host: '127.0.0.1', port: 8080 });
+```
+
+Open [Swagger UI](http://127.0.0.1:8080/docs/). You can also run
+`npx --no-install wallet-provider-kit` after installation, or `npm run build`
+then `npm start` in this checkout. These start the unconfigured inspection server.
+The [package guide](docs/package.md) covers TypeScript, exports, installation
+constraints and configuration ownership. npm publication remains disabled.
+
+## Choose your integration
+
+| You want to…                                                   | Start here                                                                                                                                      |
+| -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Add new-user login, consent, identity review and wallet access | [Onboarding guide](docs/onboarding.md) and [one typed configuration](docs/provider.config.example.ts)                                           |
+| Connect an existing financial host and signing backend         | [Provider guide](docs/provider-guide.md) and [durable attempts](docs/durable-attempts.md)                                                       |
+| Select a backend                                               | [CDP profile](docs/provider-guide.md#current-adapter-profile), [OWS](docs/ows-adapter.md), [OpenZeppelin Relayer](docs/openzeppelin-relayer.md) |
+| Consume the HTTP contract from another language                | [Implemented OpenAPI](spec/provider-api.json), served at `/openapi.json`                                                                        |
+| Run the service and local monitoring with Docker               | [Operations](docs/operations.md) and [Dockerfile](Dockerfile)                                                                                   |
+| Understand the code and standards                              | [Architecture](docs/architecture.md) and [repository map](docs/README.md#repository-map)                                                        |
+
+Public package paths include `/core`, `/http`, `/onboarding`, `/identity`,
+`/telemetry` and the three backend adapters. Root convenience imports remain
+available. No application needs to import internal source files.
 
 ## Who controls what
 
-| Role         | Responsibility                                                                    |
-| ------------ | --------------------------------------------------------------------------------- |
-| Your team    | Run the service, configure signing, enforce permissions and keep attempt records. |
-| Wallet owner | Approve actions through your consent policy.                                      |
-| Orchestrator | Request permitted actions and coordinate execution and settlement.                |
+| Role                                    | Responsibility                                                                                             |
+| --------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Your team (the host)                    | Choose key control/recovery, run the provider, verify current permissions and keep durable attempt records |
+| Wallet owner                            | Approve access and actions through your consent policy                                                     |
+| External orchestrator, including Moovha | Request permitted actions and coordinate execution/settlement                                              |
 
-The signing interface doesn't expose private keys or seed phrases. Who can
-control or recover a wallet depends on your backend; the CDP adapter uses
-app-controlled API-key wallets. You'll need to assess custody and compliance for
-your deployment. See the [security model](docs/security-model.md).
+OAuth scopes alone never grant spending authority. Your host verifies current
+owner, grant, KYC, consent, immutable action and durable attempt authority before
+provider effects. The interface exposes no private keys or seed phrases. Custody
+and recovery depend on the selected backend and operator; login doesn't establish
+end-user self-custody. See the [security model](docs/security-model.md).
 
-## Quick start
+The onboarding profile creates accounts and manages access; its bundled journal
+denies signing. Financial hosts supply their own reviewed authority and durable
+journal. The reference file store supports one persistent POSIX host.
 
-Use Node **24.22.0** and npm **11.11.1**:
+## Supported scope
 
-```sh
-npm ci
-npm run build
-npm start
-```
+The kit includes Fastify HTTP/OpenAPI, OAuth verification, onboarding and separate
+OIDC enrollment, signing/authority interfaces, a durable-journal wrapper and
+optional OTLP telemetry. Backend adapters are experimental and have explicit
+supported profiles and acceptance limits in their guides.
 
-Open [Swagger UI](http://127.0.0.1:8080/docs/) or
-[OpenAPI](http://127.0.0.1:8080/openapi.json). No credentials are required.
-`/health/live` returns 200; `/health/ready` returns 503 until an integration is
-configured. Use `npm run dev` for development and `npm run verify` for checks.
+The [orchestration draft](spec/orchestration-draft.json) is a reference contract;
+full Moovha orchestration, sponsorship and settlement aren't implemented here.
+Mainnet, contract accounts, WalletConnect and ERC-1271/4337/7702 are unsupported.
+Relayer execution is a separate library profile; generic transaction HTTP routes
+remain unsupported. Prefer a maintained wallet engine that meets your custody
+needs and use this kit for the host authorization boundary around it.
 
-## Connect your backend
+## Contribute
 
-Start with [one provider configuration](docs/provider.config.example.ts) and the
-[onboarding guide](docs/onboarding.md). `createOnboardingProvider` supplies the
-consent/review screens, default policies, private file persistence and journaled
-account creation. You choose approved applications, your existing login service,
-identity vendors, agreed cost limits and wallet backend. Users can revoke access;
-your provider decides acceptance. The reference storage supports one persistent
-POSIX host; production and vendor acceptance remain outstanding.
+See [contributing](CONTRIBUTING.md), [governance](GOVERNANCE.md),
+[code of conduct](CODE_OF_CONDUCT.md), [branch workflow](docs/branch-workflow.md)
+and [release process](docs/releases.md). Run `npm run verify` and
+`npm run check:package` before proposing a package change.
 
-For an existing financial host, your application supplies two interfaces:
-
-- `EmbeddedWalletAuthority` checks the current owner, grant, consent and
-  identity-verification status, and records an attempt before signing.
-- `WalletSigningProvider` connects your signing backend.
-
-Wire both into `EmbeddedWalletService` and `createServer`. Start with the
-[provider guide](docs/provider-guide.md) and [acceptance requirements](docs/conformance.md).
-The ready-made onboarding profile creates wallets and manages account access;
-it does not approve financial actions or enable signing. Existing financial hosts
-can integrate its current-grant checks alongside their exact-action authority and
-durable dispatch journal. The earlier `EnrollmentService` remains an alternative
-OIDC Identity Assurance profile; choose one onboarding profile per server.
-
-[Provider OpenAPI](spec/provider-api.json) describes the implemented HTTP routes.
-The separate [orchestration draft](spec/orchestration-draft.json) supplies reference
-action types; full Moovha orchestration, sponsorship and settlement are not
-implemented here. Mainnet, contract accounts, WalletConnect and ERC-1271/4337/7702
-are unsupported.
-Relayer execution is a separate library profile; the draft's nonce-bound
-transaction actions and generic transaction HTTP routes remain unsupported.
-Use a local build or tarball while the package is unpublished.
-
-Prefer a maintained wallet engine that fits your custody and recovery needs.
-This kit supplies the host authorization boundary around it. The
-[OWS integration](docs/ows-adapter.md) demonstrates that approach with real offline
-signing. The [Relayer integration](docs/openzeppelin-relayer.md) delegates queue,
-nonce and broadcast work to OpenZeppelin. Both need your reviewed persistent host
-integration before deployment.
-
-## Why we're building this
-
-Wallets should fit the people and organisations using them. That means clear
-permissions, understandable approvals and integrations that work with existing
-systems. Your team should be able to connect an orchestrator without handing it
-your signing keys.
+[Related projects](docs/related-projects.md) explain reuse choices;
+[the adoption assessment](docs/adoption-assessment.md) compares the human-facing
+setup with Viem, ethers and OpenZeppelin Relayer and records remaining gaps.
 
 This follows [Moovha's](https://moovha.com) wider focus on helping people get paid,
-save and spend across Southern Africa.
-
-## Documentation
-
-- [Architecture and standards](docs/architecture.md)
-- [Related projects and lessons](docs/related-projects.md)
-- [Operations and monitoring](docs/operations.md)
-- [Contributing](CONTRIBUTING.md) · [Governance](GOVERNANCE.md) · [Code of conduct](CODE_OF_CONDUCT.md)
-- [Branch and merge workflow](docs/branch-workflow.md)
-- [Security reporting](SECURITY.md) · [Release process](docs/releases.md)
-- [Changelog](CHANGELOG.md) · [Provenance](docs/extraction.json)
-
-## License
-
-[Apache-2.0](LICENSE). See [NOTICE](NOTICE) for attribution.
+save and spend across Southern Africa. [Apache-2.0](LICENSE); see [NOTICE](NOTICE)
+and [provenance](docs/extraction.json). [Changelog](CHANGELOG.md).

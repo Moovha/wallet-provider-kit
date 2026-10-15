@@ -25,6 +25,7 @@ Use the Node/npm versions in [README.md](README.md):
 npm ci
 npm run verify
 npm run build
+npm run check:package
 npm audit
 npm pack --dry-run
 ```

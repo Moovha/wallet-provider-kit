@@ -20,6 +20,10 @@ Sources reviewed on **15 October 2026**.
 | [Tether WDK](https://docs.wdk.tether.io/sdk/core-module/)                  | Modular wallet managers, middleware and transaction policies.                       | Publish a capability matrix and explain module/key lifecycle responsibilities instead of promising universal wallet support.      |
 | [Safe SDK](https://docs.safe.global/sdk/overview)                          | Separate kits for smart-account interaction, sharing transactions and relaying.     | Describe account execution and signature verification per account type; a contract account needs more than an EOA signer adapter. |
 
+For a focused comparison of package installation, documentation and configuration,
+see the [adoption assessment](adoption-assessment.md). It uses Viem and ethers as
+package benchmarks and Relayer as the closest service/configuration reference.
+
 ## A useful distinction from OWS
 
 OWS is a close reference for policy before signing, but its
