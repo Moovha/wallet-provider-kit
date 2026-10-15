@@ -2,7 +2,7 @@
 
 # Moovha Wallet Provider Kit
 
-**Build a blockchain wallet service your users can authorise and other applications can access.**
+**Build a blockchain wallet service that checks transaction requests against user consent and your policies.**
 
 Wallet Provider Kit is a configurable wallet service and TypeScript toolkit for
 teams building and operating blockchain wallets for their users. Rooted in Moovha's
@@ -13,8 +13,11 @@ user onboarding, application access and approved-action signing into one toolkit
 creates wallet accounts and signs approved actions, define who may use an account,
 and retain responsibility for key control and recovery.
 
-An application such as Moovha can then work with those wallets through limited,
-user-approved access. Your team keeps control of its signing integration;
+Users request transactions through applications such as Moovha and consent to
+those applications accessing their wallets. Your wallet service decides whether
+to authorise signing by checking the user's approval of the exact action, current
+account and application permissions, identity-verification status and your
+provider policies. Your team keeps control of its signing integration;
 the application receives the results of permitted actions without receiving
 private keys or seed phrases.
 
