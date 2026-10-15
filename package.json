@@ -3,22 +3,57 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "OpenAPI wallet provider service and conformance kit with pluggable signing backends",
+  "description": "Provider-hosted wallet authorization, onboarding and signing adapters for Node.js",
   "license": "Apache-2.0",
   "engines": {
     "node": ">=24.22.0 <25"
   },
   "packageManager": "npm@11.11.1",
   "exports": {
-    ".": "./dist/index.js",
-    "./cdp": "./dist/providers/cdp.js",
-    "./ows": "./dist/providers/ows.js",
-    "./openzeppelin-relayer": "./dist/providers/openzeppelin-relayer.js"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./core": {
+      "types": "./dist/core.d.ts",
+      "import": "./dist/core.js"
+    },
+    "./http": {
+      "types": "./dist/http.d.ts",
+      "import": "./dist/http.js"
+    },
+    "./onboarding": {
+      "types": "./dist/onboarding/index.d.ts",
+      "import": "./dist/onboarding/index.js"
+    },
+    "./identity": {
+      "types": "./dist/identity/index.d.ts",
+      "import": "./dist/identity/index.js"
+    },
+    "./telemetry": {
+      "types": "./dist/telemetry.d.ts",
+      "import": "./dist/telemetry.js"
+    },
+    "./cdp": {
+      "types": "./dist/providers/cdp.d.ts",
+      "import": "./dist/providers/cdp.js"
+    },
+    "./ows": {
+      "types": "./dist/providers/ows.d.ts",
+      "import": "./dist/providers/ows.js"
+    },
+    "./openzeppelin-relayer": {
+      "types": "./dist/providers/openzeppelin-relayer.d.ts",
+      "import": "./dist/providers/openzeppelin-relayer.js"
+    },
+    "./spec/provider-api.json": "./spec/provider-api.json",
+    "./spec/orchestration-draft.json": "./spec/orchestration-draft.json"
   },
   "files": [
     "dist",
     "spec",
     "docs",
+    "examples",
     "LICENSE",
     "NOTICE",
     "README.md",
@@ -40,7 +75,9 @@
     "generate:spec": "node --import tsx scripts/check-spec.mjs --write",
     "check:secrets": "secretlint \"**/*\"",
     "sbom": "npm sbom --sbom-format cyclonedx --omit=dev",
-    "verify": "npm run typecheck && npm run test && npm run check:spec && npm run format:check && npm run check:secrets"
+    "verify": "npm run typecheck && npm run test && npm run check:spec && npm run format:check && npm run check:secrets",
+    "pack:local": "npm run build && npm pack --ignore-scripts",
+    "check:package": "npm run build && node scripts/check-package.mjs"
   },
   "dependencies": {
     "@coinbase/cdp-sdk": "1.58.0",
@@ -79,5 +116,26 @@
     "@open-wallet-standard/core": {
       "optional": true
     }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Moovha/wallet-provider-kit.git"
+  },
+  "homepage": "https://github.com/Moovha/wallet-provider-kit#readme",
+  "bugs": {
+    "url": "https://github.com/Moovha/wallet-provider-kit/issues"
+  },
+  "keywords": [
+    "wallet",
+    "custody",
+    "onboarding",
+    "oauth",
+    "eip-712",
+    "typescript"
+  ],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "wallet-provider-kit": "./dist/main.js"
   }
 }

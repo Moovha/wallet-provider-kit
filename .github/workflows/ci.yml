@@ -25,6 +25,7 @@ jobs:
       - run: npm ci
       - run: npm run verify
       - run: npm run build
+      - run: npm run check:package
       - run: node scripts/smoke-built.mjs
       - run: node scripts/smoke-ows.mjs
       - run: npm audit --audit-level=low

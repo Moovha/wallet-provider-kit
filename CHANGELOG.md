@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased — package adoption
+
+- Add explicit typed package entry points for core, HTTP, onboarding, identity and
+  telemetry while preserving root and backend imports; expose packaged contracts
+  and an unconfigured inspection executable.
+- Add a fresh-build tarball command, a credential-free consumer example and CI
+  installation/type/runtime checks outside the source checkout.
+- Organize adopter documentation by task and configuration ownership, and record
+  a sourced comparison with maintained public projects and remaining maturity gaps.
+- Keep npm publication disabled and production authority/provider acceptance pending.
+
 ## Unreleased — onboarding and application access
 
 - Preserve delayed identity acceptance without granting expired access; owners can

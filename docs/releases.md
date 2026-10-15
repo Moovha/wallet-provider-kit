@@ -18,6 +18,7 @@ When you're preparing a release candidate, work through these checks:
 
 1. Use a clean checkout with pinned Node/npm and `npm ci`. Run `npm run verify`,
    `npm run build`, `npm audit`, `npm pack --dry-run` and review package contents.
+   Run `npm run check:package` to exercise a tarball installation outside the checkout.
    All runtime dependencies must install without sibling modules or local secrets.
 2. Review protocol/schema compatibility, generated diffs, provider acceptance,
    threat changes and licensing. Run the Docker smoke test on a Docker host;

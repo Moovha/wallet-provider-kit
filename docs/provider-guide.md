@@ -1,5 +1,8 @@
 # Implementing a provider
 
+For installation, supported imports and your first credential-free example, see
+the [package guide](package.md).
+
 For new integrations, start with [onboarding and application access](onboarding.md)
 and its [single configuration example](provider.config.example.ts). It supplies
 default policy evaluation, owner consent, provider review, Didit/Sumsub adapters,

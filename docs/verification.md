@@ -1,5 +1,31 @@
 # Verification record
 
+## Package adoption — 15 October 2026
+
+Local checks use Node 24.22.0 and npm 11.11.1. All **347 existing tests** pass;
+TypeScript, generated-contract drift, formatting and the secret scan pass.
+`npm audit` reports zero known vulnerabilities. The build and tarball dry-run
+pass; the reviewed candidate contains **148 files**, including compiled entry
+points/declarations, contracts, documentation, the consumer example and licenses.
+Generated contracts remain unchanged.
+
+`npm run check:package` builds and installs a tarball into a temporary application
+outside the checkout with development dependencies and the optional OWS engine
+omitted. Public ESM imports, TypeScript declarations and the canonical typed
+configuration example, the credential-free example, packaged contracts and the
+installed CLI's liveness/default denial pass. A separate compiler-export check
+confirms all **58 previous root exports**, including interfaces, remain available.
+Changed-document local file links resolve. CI now runs the package consumer check.
+Built-service HTTP and compiled OWS worker smoke checks also pass; the OWS smoke
+uses an ephemeral offline wallet.
+
+The public-project comparison is recorded in the
+[adoption assessment](adoption-assessment.md); package usability is distinct from
+financial acceptance. No live provider, identity vendor, credentials, wallet
+creation or funds were used in these package checks. Docker is unavailable
+locally; container execution and live-provider acceptance were not run. No npm
+publication, deployment or financial authority/storage implementation is included.
+
 ## Onboarding and access — 15 October 2026
 
 Local Node 24.22.0 / npm 11.11.1 checks pass: **347 tests** across 13 suites,
