@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased — blockchain assets and application-sponsored gas
+
+- Make the toolkit's blockchain and DeFi foundations visible in its introduction,
+  with USDC and ZARP as wider-project asset examples and explicit test-profile limits.
+- Document gas sponsorship as a project-supported integration rail and connected
+  application obligation, with Moovha sponsoring admitted Moovha operations.
+- Explain provider responsibilities, coverage and activation checks while keeping
+  the sponsorship implementation in the application's business-operation API.
+
 ## Unreleased — configuration-first provider service
 
 - Add validated versioned JSON configuration, environment-backed secret references,

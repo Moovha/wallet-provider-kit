@@ -28,7 +28,10 @@ Moovha user records, databases or settlement services.
   claims/results through a host-supplied storage port and current policy callback.
 - **Enrollment:** verify nonce/subject-bound identity evidence before your host
   accepts a user; reserve account identity without creating a wallet or spend grant.
-- **Orchestrator:** coordinate approval, execution, sponsorship and settlement.
+- **Connected application/orchestrator:** coordinate approval, execution,
+  sponsorship and settlement. It is expected to cover eligible network fees for
+  its admitted operations; Moovha is the sponsor for Moovha operations. The
+  [assets and gas guide](assets-and-gas.md) explains the rail and activation boundary.
 
 The optional [Relayer integration](openzeppelin-relayer.md) adds the library-only
 path `verified host context → execution authority → journal → OpenZeppelin Relayer`.

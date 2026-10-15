@@ -46,6 +46,15 @@ Before you enable an integration, keep evidence for these cases:
   supports export, with safe evidence and no secrets committed.
 - Production network/TLS/pool tests, monitored operating limits, bounded budgets,
   release rollback and recovery ownership. Load tests must not use funded wallets.
+- For a sponsored application integration, evidence of the application's funding
+  rail, economic sponsor and actual on-chain payer, supported assets/networks and
+  submission ownership. Prove full admitted step coverage with zero and existing
+  personal gas balances, required approvals, eligible failures/replacements,
+  bounded grants, deduplicated funding and shortfall reconciliation. Unsupported
+  paths/budgets must fail explicitly before execution; sponsor exhaustion must
+  not silently charge a compliant mined operation to the owner. See
+  [assets and gas sponsorship](assets-and-gas.md). The toolkit's signing tests
+  do not establish this application-level coverage.
 
 Offline tests cover the cases they exercise. The onboarding profile supplies a
 private single-host file store and provisioning journal; verify its filesystem,

@@ -41,6 +41,22 @@ Use a dedicated OAuth audience, application registrations and network boundary.
 Keep these separate from any orchestrator's public API or custody service;
 a provider grant must not authorize access to Moovha-held custody keys.
 
+## Agree asset support and gas sponsorship
+
+Record the actual network, token contract, units and action capabilities for
+each integration. Moovha's DeFi use cases include USDC and ZARP; that context
+does not enable those assets or mainnet operations in the kit's test-network profile.
+
+Connected applications are expected to cover eligible gas for the operations
+they request. When your users approve Moovha access, Moovha takes that sponsor
+role for admitted operations. Your provider retains key control, current
+authority checks and approved signing/submission; the application arranges the
+funding rail. Agree submission ownership, bounded budgets and uncertain-outcome
+recovery before enabling it. Access consent alone cannot trigger funding.
+See [assets and gas sponsorship](assets-and-gas.md) for the coverage contract
+and implementation status. The provider kit does not itself supply live Moovha
+sponsorship or settlement.
+
 ## Compose the service
 
 Wire together `createServer`, `createAuthenticator`, `EmbeddedWalletService` and

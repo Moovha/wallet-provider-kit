@@ -61,6 +61,11 @@ commands, expected results and the next integration step close together. Explain
 who controls the wallet and which host responsibilities an example replaces.
 Keep runnable offline fixtures distinct from production configuration templates.
 
+Keep the blockchain and DeFi context visible in plain language, with concrete
+asset examples and verified capability limits. Present gas sponsorship as a
+connected-application responsibility and project-supported rail; distinguish
+that commitment from the provider kit's implemented signing capabilities.
+
 Document implemented behavior and explicit limits. Keep project assessments,
 workspace handoffs and development-session logs outside this repository. Release
 and deployment evidence belongs in the corresponding PR, CI artifact or operator's

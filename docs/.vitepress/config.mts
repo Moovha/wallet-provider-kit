@@ -15,7 +15,7 @@ const rewrites: Record<string, string> = {
 export default defineConfig({
   title: 'Moovha Wallet Provider Kit',
   description:
-    'Build a wallet service with your backend and your host authority.',
+    'Build a blockchain wallet service for on-chain assets, with user-approved application access and application-sponsored gas.',
   lang: 'en-GB',
   base: '/wallet-provider-kit/',
   head: [
@@ -107,6 +107,7 @@ export default defineConfig({
         items: [
           { text: 'What the kit does', link: '/' },
           { text: 'Roles and terms', link: '/docs/concepts' },
+          { text: 'Assets and gas sponsorship', link: '/docs/assets-and-gas' },
           { text: 'Integration path', link: '/docs/' },
         ],
       },
