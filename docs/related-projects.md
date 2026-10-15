@@ -6,8 +6,9 @@ service. Its focus is a provider-hosted HTTP boundary: your application checks
 the current owner, grant, consent and identity status before an approved stored
 action reaches a signing backend.
 
-The projects below overlap with parts of that work. These are documentation and
-design references, not supported adapters or claims of protocol compatibility.
+The projects below overlap with parts of that work. OWS has an
+[experimental adapter](ows-adapter.md); the others are design references.
+This comparison does not claim protocol compatibility.
 Sources reviewed on **15 October 2026**.
 
 | Project                                                                    | Relevant overlap                                                                    | Lesson for this kit                                                                                                               |
@@ -43,8 +44,9 @@ places to evaluate, not interchangeable production selections.
 
 This kit has a useful role if an integration needs its host-owned authorization
 and stored-action boundary as a separate service. It currently provides interfaces,
-guards and an offline-tested CDP adapter; a complete durable host integration
-hasn't been demonstrated. Prove that flow before expanding the framework.
+guards, a journal wrapper and optional CDP/OWS adapters. The OWS flow is proved
+offline against the actual native engine; a durable production host integration
+hasn't been demonstrated. Prove that deployment before expanding the framework.
 If an existing project's adapter can meet the same requirements, prefer a
 companion integration or an upstream contribution over duplicating it here.
 
@@ -65,5 +67,6 @@ companion integration or an upstream contribution over duplicating it here.
 Referencing a project doesn't import its code or license. OpenZeppelin Relayer's
 stable documentation identifies its license as AGPL-3.0; this kit remains
 Apache-2.0. Review the relevant license before copying code or adding a dependency.
-No vendor integration, dependency change or compatibility certification is
-introduced by this comparison.
+The optional OWS dependency is MIT licensed; it is pinned separately and tested
+through its public Node API. No code is copied from the compared projects and
+no compatibility certification is claimed.

@@ -11,7 +11,8 @@
   "packageManager": "npm@11.11.1",
   "exports": {
     ".": "./dist/index.js",
-    "./cdp": "./dist/providers/cdp.js"
+    "./cdp": "./dist/providers/cdp.js",
+    "./ows": "./dist/providers/ows.js"
   },
   "files": [
     "dist",
@@ -66,6 +67,15 @@
     "ajv-formats": "3.0.1",
     "openapi-typescript": "7.13.0",
     "secretlint": "13.0.7",
-    "@secretlint/secretlint-rule-preset-recommend": "13.0.7"
+    "@secretlint/secretlint-rule-preset-recommend": "13.0.7",
+    "@open-wallet-standard/core": "1.4.3"
+  },
+  "peerDependencies": {
+    "@open-wallet-standard/core": "1.4.3"
+  },
+  "peerDependenciesMeta": {
+    "@open-wallet-standard/core": {
+      "optional": true
+    }
   }
 }

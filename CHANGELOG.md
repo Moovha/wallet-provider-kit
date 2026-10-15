@@ -2,6 +2,13 @@
 
 ## 0.1.0 — unreleased
 
+- Add an optional OWS 1.4.3 adapter for Base Sepolia EOA typed signing, with a
+  required host journal and bounded child-process calls.
+- Prove provisioning, exact large/nested integer signing, replay, denial and
+  uncertain-result handling against the real native engine using ephemeral wallets.
+- Share the existing EIP-712 profile validation with CDP and document the
+  reuse-first integration, operator control and deployment acceptance limits.
+
 - Added an optional journal-backed provider wrapper with immutable request
   fingerprints, fresh host-policy checks, stored-result replay, fenced completion
   and explicit pending/conflict/unknown outcomes. Durable storage stays host-owned;

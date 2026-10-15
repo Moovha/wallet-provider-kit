@@ -102,6 +102,11 @@ own policy. No sample in-memory authority is shipped as a deployment option.
 
 ## Signing backend contract
 
+The experimental [OWS adapter](ows-adapter.md) reuses local OWS wallet storage
+and signing behind the same approved-action boundary. Its profile requires the
+host journal wrapper and owner credential; read its control and recovery limits
+before choosing it. The default CLI does not activate either adapter.
+
 ### Current adapter profile
 
 | Capability   | CDP adapter                                                                                  |
