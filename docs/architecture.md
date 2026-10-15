@@ -1,5 +1,8 @@
 # Architecture
 
+For custody/access terminology and the separate DeFi delivery scopes, see
+[wallet access and Moovha scope](moovha-scope.md).
+
 `HTTP → verified principal → host authority → EmbeddedWalletService → signing provider`
 
 Your application supplies persistent authorization and a signing backend. We call

@@ -75,9 +75,12 @@
     "generate:spec": "node --import tsx scripts/check-spec.mjs --write",
     "check:secrets": "secretlint \"**/*\"",
     "sbom": "npm sbom --sbom-format cyclonedx --omit=dev",
-    "verify": "npm run typecheck && npm run test && npm run check:spec && npm run format:check && npm run check:secrets",
+    "verify": "npm run typecheck && npm run test && npm run check:spec && npm run check:docs && npm run format:check && npm run check:secrets",
     "pack:local": "npm run build && npm pack --ignore-scripts",
-    "check:package": "npm run build && node scripts/check-package.mjs"
+    "check:package": "npm run build && node scripts/check-package.mjs",
+    "generate:docs": "node scripts/api-docs.mjs --write",
+    "check:docs": "node scripts/api-docs.mjs",
+    "example:provider": "npm run build && node examples/provider-flow/run.mjs"
   },
   "dependencies": {
     "@coinbase/cdp-sdk": "1.58.0",

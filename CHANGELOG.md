@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased — API documentation and provider tutorial
+
+- Add task-oriented API and HTTP guides, generated public declaration/schema
+  references and a verification gate that rejects documentation drift.
+- Add a complete offline authenticated provider flow with readable host/backend/
+  journal fixtures and seven asserted admission, signing, replay, denial and
+  uncertain-outcome steps; run/typecheck it from the installed tarball in CI.
+- Align positioning with the parent/DeFi wallet-access scopes, separating
+  non-custodial application access, backend key control and device self-custody.
+- Document experimental compatibility and production fixture replacement; retain
+  default denial, unchanged financial boundaries and disabled npm publication.
+
 ## Unreleased — package adoption
 
 - Add explicit typed package entry points for core, HTTP, onboarding, identity and

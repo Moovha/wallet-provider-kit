@@ -1,5 +1,30 @@
 # Verification record
 
+## API documentation and provider walkthrough — 15 October 2026
+
+Node 24.22.0 / npm 11.11.1 checks pass: **347 existing tests**, TypeScript,
+implemented OpenAPI/generated types, generated API/HTTP documentation drift,
+Prettier and Secretlint. The documented provider walkthrough asserts **seven**
+authentication, provisioning, signing, idempotency/replay, revocation, current-KYC
+and unknown-outcome results using real JWT validation and an ephemeral offline
+signer. It prints no identifiers, tokens or signatures and opens no listener.
+
+The temporary tarball consumer executes both packaged examples and typechecks
+the provider-flow JavaScript fixtures with `checkJs`, alongside public declarations
+and the typed configuration example. Build, package consumer checks and
+`npm pack --dry-run` pass; **158 files** are reviewed. `npm audit` reports zero
+known vulnerabilities. Generated contracts remain unchanged. Built HTTP and real
+ephemeral offline OWS worker smoke checks pass. Changed-document local references
+resolve.
+
+Scope interpretation uses the unmodified parent/DeFi governing briefs recorded
+in [the scope guide](moovha-scope.md). Those repositories are context only; they
+are not install/test dependencies and were not changed. The walkthrough journal
+and authority are explicitly non-deployable single-run fixtures, not durable
+financial storage or provider certification. Docker is unavailable locally;
+container execution and live-provider acceptance were not run. No schema change,
+financial activation, deployment or npm publication is included.
+
 ## Package adoption — 15 October 2026
 
 Local checks use Node 24.22.0 and npm 11.11.1. All **347 existing tests** pass;

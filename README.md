@@ -5,14 +5,16 @@ who can use them and which actions they may take. This TypeScript package and
 HTTP service connects onboarding, owner consent and approved stored actions to
 a signing backend you choose.
 
-Rewards becoming spendable value is one possible use case. The toolkit's role is
-the wallet authorization and provider boundary; your product supplies execution,
-funding, redemption and settlement integrations appropriate to its purpose.
+Adopters choose their wallet backend, key control and recovery model. Applications
+including Moovha can request scoped wallet access without receiving the provider's
+keys. See [wallet access and Moovha scope](docs/moovha-scope.md) for the distinction
+between non-custodial application access and exclusive end-user self-custody.
 
 **Experimental · 0.1.0 · unpublished.** Explore locally without credentials.
 Production custody acceptance is pending; see [verification](docs/verification.md).
 
-[Getting started](docs/package.md) · [Documentation](docs/README.md) ·
+[Getting started](docs/package.md) · [Integration tutorial](docs/integration-example.md) ·
+[API guide](docs/api.md) · [Documentation](docs/README.md) ·
 [Adoption assessment](docs/adoption-assessment.md) · [Security](SECURITY.md)
 
 ## Install as a package
@@ -49,6 +51,9 @@ await app.listen({ host: '127.0.0.1', port: 8080 });
 Open [Swagger UI](http://127.0.0.1:8080/docs/). You can also run
 `npx --no-install wallet-provider-kit` after installation, or `npm run build`
 then `npm start` in this checkout. These start the unconfigured inspection server.
+For the complete offline authenticated provider flow, run `npm run example:provider`
+in this checkout or follow the [step-by-step tutorial](docs/integration-example.md).
+
 The [package guide](docs/package.md) covers TypeScript, exports, installation
 constraints and configuration ownership. npm publication remains disabled.
 

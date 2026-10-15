@@ -3,6 +3,7 @@ import { execFileSync, spawn } from 'node:child_process';
 import { once } from 'node:events';
 import {
   access,
+  cp,
   mkdtemp,
   readFile,
   copyFile,
@@ -102,6 +103,19 @@ try {
     run(process.execPath, ['inspect-api.mjs']),
     /live: 200, ready: 503, openapi: '3.0.3'/,
   );
+  const walkthrough = run(process.execPath, [
+    join(installed, 'examples/provider-flow/run.mjs'),
+  ]);
+  assert.equal(walkthrough.trim().split('\n').length, 7);
+  assert.match(
+    walkthrough,
+    /PASS 7: unknown signing outcome retained; retry does not redispatch/,
+  );
+  await cp(
+    join(installed, 'examples/provider-flow'),
+    join(temporary, 'provider-flow'),
+    { recursive: true },
+  );
   await copyFile(
     join(installed, 'docs/provider.config.example.ts'),
     join(temporary, 'provider.config.ts'),
@@ -130,8 +144,10 @@ try {
         moduleResolution: 'NodeNext',
         strict: true,
         noEmit: true,
+        allowJs: true,
+        checkJs: true,
       },
-      include: ['*.ts'],
+      include: ['*.ts', 'provider-flow/**/*.mjs'],
     }),
   );
   run(process.execPath, [
@@ -198,7 +214,7 @@ try {
     clearTimeout(timer);
   }
   console.log(
-    `Package consumer verified: ${candidate.files.length} files, ESM exports, TypeScript, example, OpenAPI and unconfigured CLI; optional OWS engine omitted`,
+    `Package consumer verified: ${candidate.files.length} files, ESM exports, TypeScript, inspection and provider-flow examples, OpenAPI and unconfigured CLI; optional OWS engine omitted`,
   );
 } finally {
   await rm(temporary, { recursive: true, force: true });

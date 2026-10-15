@@ -1,7 +1,9 @@
 # Implementing a provider
 
 For installation, supported imports and your first credential-free example, see
-the [package guide](package.md).
+the [package guide](package.md). The [API guide](api.md) and
+[end-to-end tutorial](integration-example.md) show complete offline composition
+before you replace fixtures with durable host integrations.
 
 For new integrations, start with [onboarding and application access](onboarding.md)
 and its [single configuration example](provider.config.example.ts). It supplies

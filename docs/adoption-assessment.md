@@ -14,10 +14,11 @@ change, a newcomer had to infer tarball installation, configuration ownership an
 which documentation to read. The source tree itself did not need a wholesale
 reorganization; its public entrance needed a concrete consumer workflow.
 
-The purpose should remain broad: provider-hosted wallet authorization, onboarding
-and backend integration. Rewards redemption is an application of that boundary.
-It still needs external execution, liquidity, redemption/settlement and appropriate
-host controls; the toolkit doesn't turn arbitrary rewards into cash by itself.
+The purpose is a portable wallet implementation and controlled provider access,
+including Moovha's access to independently controlled wallets. Key control and
+recovery depend on the selected profile. The [scope guide](moovha-scope.md)
+records its relationship to DeFi's four delivery scopes and distinguishes
+non-custodial application access from exclusive end-user custody.
 
 ## Public benchmarks
 
@@ -41,22 +42,37 @@ financial behavior or custody guarantees.
 
 ## Findings and changes
 
-| Adoption criterion    | Before this change                                                                         | Delivered here                                                                                                 | Remaining gap                                                                                  |
-| --------------------- | ------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| Installation          | Package exports existed, but README primarily described building the checkout              | Explicit tarball build/install, package metadata and executable                                                | Authorized versioned registry release and immutable long-term artifacts                        |
-| Public API            | Root barrel and three adapter paths; declarations inferred from neighboring files          | Explicit type/import conditions, focused core/HTTP/onboarding/identity/telemetry paths; root imports preserved | API reference generation and a documented compatibility/support policy before a stable release |
-| First result          | Clone, build and start the HTTP service                                                    | Packaged credential-free example with exact expected output                                                    | More complete integration tutorials after durable host acceptance                              |
-| Distribution evidence | Source tests and built-service smoke                                                       | Temporary external consumer installs tarball and checks runtime, types, example, contracts and CLI in CI       | Wider supported environment evidence if runtime support expands                                |
-| Navigation            | Many individual guides linked from a long README                                           | Task-based documentation index, short entry point and repository map                                           | Usability feedback from independent adopters                                                   |
-| Configuration         | Typed onboarding example plus environment/operations files with different roles            | One configuration ownership guide explaining each role                                                         | Production configuration validation in each adopter's reviewed application                     |
-| Custody/recovery      | Explicit host ports, testnet profiles, offline fixtures and single-host onboarding storage | Existing controls preserved and boundaries made prominent                                                      | Reviewed persistent financial authority/journal and actual recovery/concurrency evidence       |
-| Operations            | Docker definition, monitoring instructions and release gates                               | Existing service/HTTP/Docker choices documented alongside package consumption                                  | Local Docker execution, live vendor lifecycle evidence and production acceptance               |
+| Adoption criterion    | Before this change                                                                         | Delivered here                                                                                                   | Remaining gap                                                                                 |
+| --------------------- | ------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| Installation          | Package exports existed, but README primarily described building the checkout              | Explicit tarball build/install, package metadata and executable                                                  | Authorized versioned registry release and immutable long-term artifacts                       |
+| Public API            | Root barrel and three adapter paths; declarations inferred from neighboring files          | Typed focused paths, preserved root imports, generated API/HTTP references and experimental compatibility policy | Stable release/support commitments and versioned migration evidence                           |
+| First result          | Clone, build and start the HTTP service                                                    | Packaged inspection example and complete offline provider tutorial with exact expected output                    | Persistent production-host tutorial after durable acceptance and independent adopter feedback |
+| Distribution evidence | Source tests and built-service smoke                                                       | Temporary consumer checks runtime/types, both examples, contracts and CLI; verification rejects API-doc drift    | Wider supported environment evidence if runtime support expands                               |
+| Navigation            | Many individual guides linked from a long README                                           | Task-based documentation index, short entry point and repository map                                             | Usability feedback from independent adopters                                                  |
+| Configuration         | Typed onboarding example plus environment/operations files with different roles            | One configuration ownership guide explaining each role                                                           | Production configuration validation in each adopter's reviewed application                    |
+| Custody/recovery      | Explicit host ports, testnet profiles, offline fixtures and single-host onboarding storage | Existing controls preserved and boundaries made prominent                                                        | Reviewed persistent financial authority/journal and actual recovery/concurrency evidence      |
+| Operations            | Docker definition, monitoring instructions and release gates                               | Existing service/HTTP/Docker choices documented alongside package consumption                                    | Container runtime/recovery, live vendor lifecycle evidence and production acceptance          |
 
 The focused imports improve discoverability and module loading. They don't split
 runtime dependencies into independent packages. Introducing a monorepo or a
 configuration framework now would create more concepts without demonstrated
 consumer demand. Keep one package until measured deployment or dependency needs
 justify a split.
+
+## API documentation and tutorial checkpoint
+
+The next adoption increment adds a [human API guide](api.md), a generated
+[TypeScript declaration reference](api-reference.md), an [HTTP usage guide](http-api.md)
+and [schema reference](http-reference.md). `npm run check:docs` rejects drift from
+public exports and the implemented OpenAPI. The API guide states the current
+experimental compatibility/support policy; stable release commitments remain open.
+
+The [end-to-end tutorial](integration-example.md) supplies complete readable
+source and seven asserted request outcomes using real JWT validation, an ephemeral
+offline signer, current authority checks and the journal wrapper. The tarball
+consumer check runs and typechecks those packaged fixtures. This addresses the
+API-reference and complete offline-integration gaps above. Independent usability
+feedback, persistent production-host tutorials and live acceptance remain open.
 
 ## What reaching the mark means
 
