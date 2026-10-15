@@ -11,6 +11,13 @@
 - Keep file-store compatibility, required current host-policy checks and the
   unconfigured CLI; no production database, backend or deployment is activated.
 
+## Unreleased — Moovha documentation branding
+
+- Add the existing Moovha symbols to the README, documentation navigation and
+  favicon, with navy/cyan styling and light/dark theme support.
+- Link directly to installation, tutorial, backend and API sections, plus the
+  Moovha website, source repository and issue tracker.
+
 ## Unreleased — published documentation
 
 - Publish the documentation site on GitHub Pages and make it the primary README

@@ -1,3 +1,5 @@
+<a href="https://moovha.com/"><img src="./docs/public/brand/moovha-logo.svg" alt="Moovha home" width="80" height="80"></a>
+
 # Moovha Wallet Provider Kit
 
 **Build a wallet service your users can authorise and other applications can access.**
@@ -14,25 +16,29 @@ the application receives the results of permitted actions without receiving
 private keys or seed phrases.
 
 [Documentation](https://moovha.github.io/wallet-provider-kit/) ·
-[Get started](https://moovha.github.io/wallet-provider-kit/docs/package.html) ·
-[Integration tutorial](https://moovha.github.io/wallet-provider-kit/docs/integration-example.html) ·
-[API documentation](https://moovha.github.io/wallet-provider-kit/docs/api.html)
+[Install the package](https://moovha.github.io/wallet-provider-kit/docs/package.html#build-an-installable-tarball) ·
+[Run the tutorial](https://moovha.github.io/wallet-provider-kit/docs/integration-example.html#_1-install-and-run) ·
+[Choose an API profile](https://moovha.github.io/wallet-provider-kit/docs/api.html#choose-a-profile)
 
 ## Who takes part
 
 Your team is the **wallet provider**: it operates the wallet service for its users.
 The server application in which you run the toolkit is called the **host**.
 
-| Term                      | What it means here                                                                                                                                                                          |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Account owner**         | The user your service records as owning a wallet account. They sign in and approve application access. Also called the wallet owner; this doesn't by itself say who holds the private keys. |
-| **Connected application** | Software, such as Moovha, that requests access to an owner's account through your wallet service. In OAuth configuration and API authentication, its registration is called a **client**.   |
-| **Host authority**        | Your host's permission-checking code and stored records. Together they decide which owner and application may use an account, and which exact action is approved now.                       |
-| **Wallet backend**        | The wallet engine or signing service your host connects to. It creates or locates accounts and signs approved actions; its key-control and recovery model determines custody.               |
+| Term                      | What it means here                                                                                                                                                                                                                  |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Account owner**         | The user your service records as owning a wallet account. They sign in and approve application access. Also called the wallet owner; this doesn't by itself say who holds the private keys.                                         |
+| **Connected application** | Software, such as Moovha, that requests access to an owner's account through your wallet service. In OAuth configuration and API authentication, its registration is called a **[client](docs/concepts.md#what-does-client-mean)**. |
+| **Host authority**        | Your host's permission-checking code and stored records. Together they decide which owner and application may use an account, and which exact action is approved now.                                                               |
+| **Wallet backend**        | The wallet engine or signing service your host connects to. It creates or locates accounts and signs approved actions; its key-control and recovery model determines custody.                                                       |
 
 Your product may contain both a wallet service and an application that calls it;
 the responsibilities still remain distinct. The [concepts guide](docs/concepts.md)
 maps these names to configuration, API fields and the user's consent screen.
+
+For your next step, [choose a backend](docs/backend-guide.md#choose-an-integration),
+[implement your own adapter](docs/backend-guide.md#your-own-backend), or
+[connect an application over HTTP](docs/http-api.md#authentication-and-profiles).
 
 ## A foundation for adopting teams
 
@@ -131,6 +137,9 @@ implementation for the signing foundation and independent-provider integration
 work. It is intended to support access to independently controlled wallets while
 keeping their keys with the wallet provider.
 
+Learn about [Moovha](https://moovha.com/) and explore the
+[Moovha GitHub organization](https://github.com/Moovha).
+
 Moovha's DeFi project owns the business-operation API, transaction intent,
 sponsorship, execution and settlement. Device wallets, backup and recovery belong
 to the separate device-wallet profile. The [architecture guide](docs/architecture.md#applications-and-wallet-control)
@@ -199,6 +208,8 @@ previews and how to publish reviewed documentation updates.
 
 Contributions follow the [contributor guide](CONTRIBUTING.md),
 [governance](GOVERNANCE.md) and [code of conduct](CODE_OF_CONDUCT.md).
+Use [GitHub issues](https://github.com/Moovha/wallet-provider-kit/issues) for bugs
+and integration questions.
 Report vulnerabilities through [SECURITY.md](SECURITY.md). See the
 [changelog](CHANGELOG.md) and [release process](docs/releases.md) for project
 history and release requirements.
