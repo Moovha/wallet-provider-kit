@@ -40,6 +40,12 @@ export function openProviderDatabase(options: ProviderDatabaseOptions) {
     journal: sqliteJournal(connection),
     ready: () => connection.ready(),
     close: () => connection.close(),
+    /** Read-only ownership guard before assigning an empty toolkit store to a configured service. */
+    async hasStoredRecords() {
+      return !!connection.get(`SELECT 1 FROM onboarding_records UNION ALL SELECT 1 FROM onboarding_audit
+        UNION ALL SELECT 1 FROM budgets UNION ALL SELECT 1 FROM approvals UNION ALL SELECT 1 FROM admissions
+        UNION ALL SELECT 1 FROM attempts UNION ALL SELECT 1 FROM financial_audit UNION ALL SELECT 1 FROM enrollments LIMIT 1`);
+    },
     async setBudget(id: string, maximum: string) {
       if (!text(id)) throw new WalletProviderError('wallet_provider_input');
       const limit = units(maximum);

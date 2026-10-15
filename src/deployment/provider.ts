@@ -1,0 +1,222 @@
+import { createConfiguredBackend } from './backends.js';
+import { resolve } from 'node:path';
+import { EmbeddedWalletService } from '../domain/embedded-wallet.js';
+import { createOnboardingJournal } from '../onboarding/journal.js';
+import { createOwnerLogin } from '../onboarding/login.js';
+import { fingerprint } from '../onboarding/policy.js';
+import { OnboardingService } from '../onboarding/service.js';
+import {
+  createDiditIdentityAdapter,
+  createSumsubIdentityAdapter,
+} from '../onboarding/vendors.js';
+import { createAuthenticator } from '../service/auth.js';
+import { createServer } from '../service/server.js';
+import { openProviderDatabase } from '../storage/index.js';
+import {
+  ConfigurationError,
+  resolveSecret,
+  validateProviderConfiguration,
+} from './config.js';
+import { SupportedActions } from './actions.js';
+
+/** Compose the supported service. No adopter authority callbacks, module loading from HTTP or implicit activation. */
+export async function createConfiguredProvider(
+  input: unknown,
+  directory = process.cwd(),
+) {
+  if (
+    process.env.GAE_SERVICE === 'exchange' ||
+    process.env.NODE_TLS_REJECT_UNAUTHORIZED === '0'
+  )
+    throw new ConfigurationError(['/: unsafe environment']);
+  const config = validateProviderConfiguration(input);
+  const database = openProviderDatabase({
+    directory: resolve(directory, config.storage.directory),
+  });
+  try {
+    let onboarding: OnboardingService | undefined;
+    let financial: ReturnType<typeof database.financialAuthority> | undefined;
+    let activeRevision: string | undefined;
+    const backend = await createConfiguredBackend(
+      config.backend,
+      directory,
+      database,
+      {
+        namespace:
+          'onboarding-' +
+          fingerprint(config.policy.provider.origin).slice(0, 32),
+        journal: createOnboardingJournal(database.onboardingStore),
+        authorizeAttempt: async (request) =>
+          request.kind === 'provision' &&
+          !!onboarding &&
+          !!activeRevision &&
+          (await database.onboardingStore.transaction(
+            (state) =>
+              state.deploymentBindings?.['service-v1']?.activeRevision ===
+              activeRevision,
+          )) &&
+          (await onboarding.canDispatchProvision(
+            request.attemptId,
+            request.accountId,
+          )),
+      },
+      {
+        namespace: 'configured-transfers-v1',
+        journal: database.journal,
+        authorizeAttempt: (request) =>
+          financial?.authorizeAttempt(request) ?? Promise.resolve(false),
+      },
+    );
+    const occupied = await database.hasStoredRecords();
+    const bound = await database.onboardingStore.transaction((state) => {
+      const expected = {
+        origin: config.policy.provider.origin,
+        provider: backend.provider,
+        binding: config.backend.binding,
+      };
+      const previous = state.deploymentBindings?.['service-v1'];
+      if (
+        previous
+          ? fingerprint({
+              origin: previous.origin,
+              provider: previous.provider,
+              binding: previous.binding,
+            }) !== fingerprint(expected)
+          : occupied
+      )
+        return false;
+      (state.deploymentBindings ??= {})['service-v1'] = {
+        ...previous,
+        ...expected,
+      };
+      return true;
+    });
+    if (!bound)
+      throw new ConfigurationError([
+        '/storage: provider binding changed or existing host requires reviewed migration',
+      ]);
+    const identity = [
+      ...(config.identity.didit
+        ? [
+            createDiditIdentityAdapter({
+              ...config.identity.didit,
+              apiKey: resolveSecret(config.identity.didit.apiKey),
+            }),
+          ]
+        : []),
+      ...(config.identity.sumsub
+        ? [
+            createSumsubIdentityAdapter({
+              ...config.identity.sumsub,
+              appToken: resolveSecret(config.identity.sumsub.appToken),
+              secretKey: resolveSecret(config.identity.sumsub.secretKey),
+            }),
+          ]
+        : []),
+    ];
+    onboarding = new OnboardingService(
+      config.policy,
+      database.onboardingStore,
+      identity,
+      backend,
+    );
+    const login = await createOwnerLogin(
+      {
+        ...config.ownerLogin,
+        clientSecret: resolveSecret(config.ownerLogin.clientSecret),
+      },
+      config.policy.provider.origin,
+      database.onboardingStore,
+    );
+    activeRevision = fingerprint([
+      onboarding!.policy.revision,
+      config.financial ?? null,
+      config.backend,
+      config.reviewers,
+      config.ownerLogin.issuer,
+      config.ownerLogin.clientId,
+      config.activation.enabled,
+    ]);
+    await database.onboardingStore.transaction((state) => {
+      const binding = state.deploymentBindings!['service-v1'];
+      if (binding.activeRevision !== activeRevision) {
+        for (const record of Object.values(state.supportedActions ?? {})) {
+          if (record.revision !== activeRevision) record.status = 'denied';
+        }
+        for (const grant of Object.values(state.grants)) {
+          if (grant.revision !== onboarding!.policy.revision)
+            grant.state = 'revoked';
+        }
+        state.audit.push({
+          at: Date.now(),
+          event: 'configured_policy_activated',
+          resource: 'service-v1',
+          revision: activeRevision,
+        });
+      }
+      binding.activeRevision = activeRevision;
+    });
+    const actions = config.financial
+      ? new SupportedActions(
+          onboarding,
+          database,
+          config.financial,
+          activeRevision,
+        )
+      : undefined;
+    financial = actions
+      ? database.financialAuthority({
+          namespace: 'configured-transfers-v1',
+          provider: backend.provider,
+          authorize: (context, approval, purpose) =>
+            purpose === 'sign'
+              ? actions.authorize(context, approval)
+              : Promise.resolve(null),
+        })
+      : undefined;
+    const authority = onboarding.walletAuthority();
+    const service = new EmbeddedWalletService(
+      {
+        provision: async (context, accountId) => {
+          const admitted = await authority.provision(context, accountId);
+          if (admitted) await backend.reserveAccount?.(accountId);
+          return admitted;
+        },
+        sign: financial?.authority.sign ?? authority.sign,
+      },
+      backend,
+    );
+    const app = await createServer({
+      authenticate: createAuthenticator(config.oauth),
+      configurationProfile: config.profile,
+      actionProfiles: config.financial ? [config.financial.profile] : [],
+      service,
+      onboarding: {
+        service: onboarding,
+        login,
+        reviewers: config.reviewers,
+        currentConfiguration: () =>
+          database.onboardingStore.transaction(
+            (state) =>
+              state.deploymentBindings?.['service-v1']?.activeRevision ===
+              activeRevision,
+          ),
+        actions,
+      },
+      onClose: async () => database.close(),
+      ready: async () =>
+        config.activation.enabled &&
+        (await database.ready()) &&
+        (await database.onboardingStore.transaction(
+          (state) =>
+            state.deploymentBindings?.['service-v1']?.activeRevision ===
+            activeRevision,
+        )),
+      documentation: config.http?.documentation ?? false,
+    });
+    return app;
+  } catch (error) {
+    database.close();
+    throw error;
+  }
+}

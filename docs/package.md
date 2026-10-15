@@ -74,10 +74,15 @@ npx --no-install wallet-provider-kit
 
 Open [Swagger UI](http://127.0.0.1:8080/docs/). Use Ctrl-C to stop. This executable
 has the same unconfigured behavior as `npm start` in the source checkout.
-It has no provider configuration/module loader. Use the library to compose a
-configured host; adding environment credentials cannot activate signing.
+For a configured deployment, follow [Configure, deploy and integrate](setup.md).
+The `init`, `validate`, `doctor`, `init-storage` and `run --config` commands supply
+the supported service without adopter startup code. Environment credentials alone
+cannot activate signing.
 
 ## Continue with your wallet backend
+
+For the standard service, start with [declarative setup](setup.md). The guides
+below describe advanced embedded composition and custom integrations.
 
 Follow [Connect your wallet backend](backend-guide.md) to choose CDP, OWS, Relayer
 or your own implementation. Then use [host integration](provider-guide.md) for
@@ -142,6 +147,9 @@ that adapter, following the [OWS guide](ows-adapter.md). CDP and Relayer imports
 remain opt-in; importing them doesn't configure or invoke their services.
 
 ## Configure one host application
+
+The standard deployment uses [JSON configuration](setup.md) and API consumption.
+The TypeScript examples below are the advanced embedded path.
 
 For a new onboarding integration, copy
 [provider.config.example.ts](provider.config.example.ts) into your application.

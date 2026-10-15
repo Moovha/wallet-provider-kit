@@ -15,6 +15,10 @@ tokens and the owner's consent screen.
 
 ## Follow the integration path
 
+For supported setups, follow [Configure, deploy and integrate](setup.md): one JSON
+configuration, deployment commands and API consumption. Use [custom adapters](custom-adapters.md)
+or the embedded library guides below only when your integration needs custom code.
+
 1. **[Install the package](package.md).** Build a reviewed tarball, install it in
    your application and inspect the unconfigured API.
 2. **[Run the provider walkthrough](integration-example.md).** Follow an authenticated

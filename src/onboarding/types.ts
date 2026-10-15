@@ -1,3 +1,5 @@
+import type { RelayerBinding } from '../providers/openzeppelin-relayer.js';
+import type { TransferRecord } from '../deployment/actions.js';
 import type { VerifiedPrincipal } from '../domain/principal.js';
 import type {
   WalletAttemptRequest,
@@ -129,6 +131,17 @@ export interface StoredAttempt {
 }
 export interface ProviderState {
   format: 'moovha-onboarding-1';
+  supportedActions?: Record<string, TransferRecord>;
+  backendAccounts?: Record<string, { binding: string; signer: RelayerBinding }>;
+  deploymentBindings?: Record<
+    string,
+    {
+      origin: string;
+      provider: string;
+      binding: string;
+      activeRevision?: string;
+    }
+  >;
   requests: Record<string, AccessRequest>;
   accounts: Record<string, AccountRecord>;
   grants: Record<string, AccessGrant>;

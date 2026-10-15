@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased — configuration-first provider service
+
+- Add validated versioned JSON configuration, environment-backed secret references,
+  explicit storage initialization, offline diagnosis and configured CLI startup.
+- Supply API-requested, owner-approved Base Sepolia ERC-3009 transfer authorizations
+  with recipient/amount policy, lifetime reservations and durable signing/replay.
+- Wire CDP, OWS and Relayer signer pools from configuration with toolkit-owned
+  authority and journals; retain stable backend/account bindings across restarts.
+- Add trusted versioned custom backend modules, deployment compose and setup guides.
+  Existing no-argument preview and advanced embedded APIs remain available.
+
 ## Unreleased — built-in SQLite persistence
 
 - Add opt-in, explicitly initialized SQLite storage for onboarding, login,

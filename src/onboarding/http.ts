@@ -1,3 +1,6 @@
+import { formatUnits } from 'ethers';
+import type { SupportedActions, TransferInput } from '../deployment/actions.js';
+import { transferReceiptSchema } from '../deployment/schemas.js';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { AuthenticationError, type Authenticate } from '../service/auth.js';
@@ -18,6 +21,10 @@ export interface OnboardingHttpOptions {
   login: OwnerLogin;
   /** Provider IdP subjects allowed to review; applications cannot grant themselves staff access. */
   reviewers: readonly string[];
+  /** Configuration-first exact transfer approvals; absent in the onboarding-only profile. */
+  actions?: SupportedActions;
+  /** Fence superseded configured-service instances, including browser authority writers. */
+  currentConfiguration?: () => Promise<boolean>;
 }
 export const accessReceiptSchema = {
   type: 'object',
@@ -171,6 +178,57 @@ export async function registerOnboardingRoutes(
       },
     };
   }
+  const actions = () => options?.actions ?? unavailable();
+  const actionParams = {
+    type: 'object',
+    additionalProperties: false,
+    required: ['actionId'],
+    properties: { actionId: uuidSchema },
+  };
+  const transferBody = {
+    type: 'object',
+    additionalProperties: false,
+    required: ['account_id', 'recipient', 'amount'],
+    properties: {
+      account_id: uuidSchema,
+      recipient: { type: 'string', pattern: '^0x[0-9a-fA-F]{40}$' },
+      amount: { type: 'string', pattern: '^[1-9][0-9]{0,77}$' },
+    },
+  };
+  const transferSchema = (
+    operationId: string,
+    body?: object,
+    params?: object,
+  ) => {
+    const base = schema(operationId, body, params);
+    return {
+      ...base,
+      description:
+        'Fixed Base Sepolia ERC-3009 transfer authorization. Current application access and separate exact owner approval are required. No broadcast or settlement.',
+      response: { ...base.response, 200: transferReceiptSchema },
+    };
+  };
+  app.post<{ Body: TransferInput }>(
+    '/v1/transfer-authorizations',
+    { schema: transferSchema('requestTransferAuthorization', transferBody) },
+    async (request) =>
+      actions().request(await context(request, 'wallet:actions'), request.body),
+  );
+  app.get<{ Params: { actionId: string } }>(
+    '/v1/transfer-authorizations/:actionId',
+    {
+      schema: transferSchema(
+        'getTransferAuthorization',
+        undefined,
+        actionParams,
+      ),
+    },
+    async (request) =>
+      actions().read(
+        (await context(request, 'wallet:actions:read')).principal,
+        request.params.actionId,
+      ),
+  );
   const requestParams = {
     type: 'object',
     additionalProperties: false,
@@ -351,6 +409,11 @@ export async function registerOnboardingRoutes(
       },
     );
     ui.addHook('onRequest', async (_request, reply) => {
+      if (
+        options?.currentConfiguration &&
+        !(await options.currentConfiguration())
+      )
+        return unavailable();
       reply.header(
         'content-security-policy',
         "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
@@ -418,11 +481,77 @@ export async function registerOnboardingRoutes(
         );
         if (
           !uuid.test(result.requestId) &&
-          !['access', 'review'].includes(result.requestId)
+          !['access', 'review'].includes(result.requestId) &&
+          !(
+            result.requestId.startsWith('actions/') &&
+            uuid.test(result.requestId.slice(8))
+          )
         )
           deny();
         setCookie(reply, '__Host-wpk-session', result.sessionToken);
         return reply.redirect('/onboarding/' + result.requestId);
+      },
+    );
+    ui.get<{ Params: { actionId: string } }>(
+      '/onboarding/actions/:actionId',
+      { schema: { hide: true, params: actionParams } },
+      async (request, reply) => {
+        if (!(await ready())) return unavailable();
+        const current = await session(
+          request,
+          reply,
+          'actions/' + request.params.actionId,
+        );
+        if (!current) return;
+        const action = await actions().ownerView(
+          current.identity,
+          request.params.actionId,
+        );
+        const message = action.payload.message;
+        return html(
+          reply,
+          'Approve a transfer authorization',
+          `<p>${escape(action.application)} requests your approval.</p>
+<p>Send <strong>${escape(formatUnits(String(message.value), action.token.decimals))} ${escape(action.token.symbol)}</strong> on Base Sepolia (test network).</p>
+<p>From: <code>${escape(message.from)}</code><br>Recipient: <code>${escape(message.to)}</code><br>Token contract: <code>${escape(action.token.address)}</code><br>Token domain: ${escape(action.token.name)} / ${escape(action.token.version)}</p>
+<p>Valid until ${escape(action.expires_at)}. This authorizes one transfer for this exact amount and recipient. Once signed, revoking application access does not cancel the signature. The application may submit it before expiry.</p>
+<p>Status: ${escape(action.status)}</p>${action.status === 'approval_required' ? `<form method="post" action="/onboarding/actions/${action.action_id}"><input type="hidden" name="csrf" value="${escape(current.csrf)}"><button name="decision" value="approve">Approve this transfer</button><button name="decision" value="deny">Decline</button></form>` : '<p>You can return to your application.</p>'}`,
+        );
+      },
+    );
+    ui.post<{
+      Params: { actionId: string };
+      Body: { csrf: string; decision: string };
+    }>(
+      '/onboarding/actions/:actionId',
+      {
+        schema: {
+          hide: true,
+          params: actionParams,
+          body: {
+            type: 'object',
+            additionalProperties: false,
+            required: ['csrf', 'decision'],
+            properties: {
+              csrf: csrfSchema,
+              decision: { type: 'string', enum: ['approve', 'deny'] },
+            },
+          },
+        },
+      },
+      async (request, reply) => {
+        if (!(await ready())) return unavailable();
+        const current = await formSession(request, request.body.csrf);
+        await actions().decide(
+          current.identity,
+          request.params.actionId,
+          request.body.decision === 'approve',
+        );
+        return html(
+          reply,
+          'Transfer decision recorded',
+          '<p>Your decision has been recorded. Return to your application to continue.</p>',
+        );
       },
     );
     ui.get(

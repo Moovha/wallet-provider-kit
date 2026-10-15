@@ -32,6 +32,17 @@ Success response schema:
     },
     "configured": {
       "type": "boolean"
+    },
+    "configuration_profile": {
+      "type": "string",
+      "enum": ["provider-service-v1"]
+    },
+    "action_profiles": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["owner-approved-erc3009-v1"]
+      }
     }
   }
 }
@@ -361,6 +372,374 @@ Success response schema:
     "signature": {
       "type": "string",
       "pattern": "^0x[0-9a-fA-F]{130}$"
+    }
+  }
+}
+```
+
+## POST /v1/transfer-authorizations
+
+Operation: `requestTransferAuthorization`.
+
+Fixed Base Sepolia ERC-3009 transfer authorization. Current application access and separate exact owner approval are required. No broadcast or settlement.
+
+| Parameter         | Location | Required | Schema                                                                                                |
+| ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
+| `idempotency-key` | header   | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+
+Request body (application/json):
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["account_id", "recipient", "amount"],
+  "properties": {
+    "account_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "recipient": {
+      "type": "string",
+      "pattern": "^0x[0-9a-fA-F]{40}$"
+    },
+    "amount": {
+      "type": "string",
+      "pattern": "^[1-9][0-9]{0,77}$"
+    }
+  }
+}
+```
+
+| Status | Content type             | Description      |
+| ------ | ------------------------ | ---------------- |
+| 200    | application/json         | Default Response |
+| 400    | application/problem+json | Default Response |
+| 401    | application/problem+json | Default Response |
+| 403    | application/problem+json | Default Response |
+| 409    | application/problem+json | Default Response |
+| 413    | application/problem+json | Default Response |
+| 415    | application/problem+json | Default Response |
+| 422    | application/problem+json | Default Response |
+| 429    | application/problem+json | Default Response |
+| 500    | application/problem+json | Default Response |
+| 503    | application/problem+json | Default Response |
+
+Success response schema:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "action_id",
+    "account_id",
+    "status",
+    "approval_url",
+    "expires_at",
+    "payload_hash",
+    "payload"
+  ],
+  "properties": {
+    "action_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "account_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["approval_required", "approved", "denied"]
+    },
+    "approval_url": {
+      "type": "string",
+      "format": "uri"
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "payload_hash": {
+      "type": "string",
+      "pattern": "^0x[0-9a-f]{64}$"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["domain", "types", "primaryType", "message"],
+      "properties": {
+        "primaryType": {
+          "type": "string",
+          "enum": ["TransferWithAuthorization"]
+        },
+        "domain": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "version", "chainId", "verifyingContract"],
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "version": {
+              "type": "string"
+            },
+            "chainId": {
+              "type": "string",
+              "enum": ["84532"]
+            },
+            "verifyingContract": {
+              "type": "string",
+              "pattern": "^0x[0-9a-fA-F]{40}$"
+            }
+          }
+        },
+        "types": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["TransferWithAuthorization"],
+          "properties": {
+            "TransferWithAuthorization": {
+              "type": "array",
+              "minItems": 6,
+              "maxItems": 6,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["name", "type"],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "enum": [
+                      "from",
+                      "to",
+                      "value",
+                      "validAfter",
+                      "validBefore",
+                      "nonce"
+                    ]
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": ["address", "uint256", "bytes32"]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "message": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "from",
+            "to",
+            "value",
+            "validAfter",
+            "validBefore",
+            "nonce"
+          ],
+          "properties": {
+            "from": {
+              "type": "string",
+              "pattern": "^0x[0-9a-fA-F]{40}$"
+            },
+            "to": {
+              "type": "string",
+              "pattern": "^0x[0-9a-fA-F]{40}$"
+            },
+            "value": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]{0,77})$"
+            },
+            "validAfter": {
+              "type": "string",
+              "enum": ["0"]
+            },
+            "validBefore": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]{0,77})$"
+            },
+            "nonce": {
+              "type": "string",
+              "pattern": "^0x[0-9a-f]{64}$"
+            }
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+## GET /v1/transfer-authorizations/{actionId}
+
+Operation: `getTransferAuthorization`.
+
+Fixed Base Sepolia ERC-3009 transfer authorization. Current application access and separate exact owner approval are required. No broadcast or settlement.
+
+| Parameter  | Location | Required | Schema                                                                                                |
+| ---------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
+| `actionId` | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+
+| Status | Content type             | Description      |
+| ------ | ------------------------ | ---------------- |
+| 200    | application/json         | Default Response |
+| 400    | application/problem+json | Default Response |
+| 401    | application/problem+json | Default Response |
+| 403    | application/problem+json | Default Response |
+| 409    | application/problem+json | Default Response |
+| 413    | application/problem+json | Default Response |
+| 415    | application/problem+json | Default Response |
+| 422    | application/problem+json | Default Response |
+| 429    | application/problem+json | Default Response |
+| 500    | application/problem+json | Default Response |
+| 503    | application/problem+json | Default Response |
+
+Success response schema:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "action_id",
+    "account_id",
+    "status",
+    "approval_url",
+    "expires_at",
+    "payload_hash",
+    "payload"
+  ],
+  "properties": {
+    "action_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "account_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["approval_required", "approved", "denied"]
+    },
+    "approval_url": {
+      "type": "string",
+      "format": "uri"
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "payload_hash": {
+      "type": "string",
+      "pattern": "^0x[0-9a-f]{64}$"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["domain", "types", "primaryType", "message"],
+      "properties": {
+        "primaryType": {
+          "type": "string",
+          "enum": ["TransferWithAuthorization"]
+        },
+        "domain": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "version", "chainId", "verifyingContract"],
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "version": {
+              "type": "string"
+            },
+            "chainId": {
+              "type": "string",
+              "enum": ["84532"]
+            },
+            "verifyingContract": {
+              "type": "string",
+              "pattern": "^0x[0-9a-fA-F]{40}$"
+            }
+          }
+        },
+        "types": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["TransferWithAuthorization"],
+          "properties": {
+            "TransferWithAuthorization": {
+              "type": "array",
+              "minItems": 6,
+              "maxItems": 6,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["name", "type"],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "enum": [
+                      "from",
+                      "to",
+                      "value",
+                      "validAfter",
+                      "validBefore",
+                      "nonce"
+                    ]
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": ["address", "uint256", "bytes32"]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "message": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "from",
+            "to",
+            "value",
+            "validAfter",
+            "validBefore",
+            "nonce"
+          ],
+          "properties": {
+            "from": {
+              "type": "string",
+              "pattern": "^0x[0-9a-fA-F]{40}$"
+            },
+            "to": {
+              "type": "string",
+              "pattern": "^0x[0-9a-fA-F]{40}$"
+            },
+            "value": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]{0,77})$"
+            },
+            "validAfter": {
+              "type": "string",
+              "enum": ["0"]
+            },
+            "validBefore": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]{0,77})$"
+            },
+            "nonce": {
+              "type": "string",
+              "pattern": "^0x[0-9a-f]{64}$"
+            }
+          }
+        }
+      }
     }
   }
 }

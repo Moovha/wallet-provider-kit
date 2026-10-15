@@ -54,6 +54,7 @@ export default defineConfig({
       {
         text: 'Get started',
         items: [
+          { text: 'Configure and deploy', link: '/docs/setup' },
           { text: 'Understand the roles', link: '/docs/concepts' },
           {
             text: 'Install the package',
@@ -112,6 +113,8 @@ export default defineConfig({
       {
         text: 'Build your wallet service',
         items: [
+          { text: 'Configure and deploy', link: '/docs/setup' },
+          { text: 'Custom adapters', link: '/docs/custom-adapters' },
           { text: '1. Install the package', link: '/docs/package' },
           {
             text: '2. Run the integration example',

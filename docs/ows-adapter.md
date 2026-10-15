@@ -24,6 +24,9 @@ in [backend integration](backend-guide.md), then use that adapter's guide.
 
 ## Compose it
 
+For supported deployments, use [OWS configuration](setup.md#select-a-built-in-backend);
+the kit supplies authority and journals. The code below is the advanced embedded path.
+
 Install the optional engine explicitly in your host. The default service and CDP
 entry point do not import its native binding.
 

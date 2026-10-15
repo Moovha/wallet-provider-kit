@@ -12,6 +12,10 @@ Relayer is AGPL-3.0 licensed and this kit remains Apache-2.0. Review the
 [upstream license](https://github.com/OpenZeppelin/openzeppelin-relayer/blob/b8cf360a49c5739e43491ca5d2f6bbc934b7438e/LICENSE)
 for the service you operate or modify.
 
+For the configured signing service, select a [Relayer signer pool](setup.md#select-a-built-in-backend)
+without startup code. The library profiles below remain available for advanced
+hosts and the separate transaction-execution integration.
+
 ## Supported profile
 
 | Capability      | Scope                                                                                                                            |

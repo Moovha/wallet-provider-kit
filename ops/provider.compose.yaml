@@ -1,0 +1,24 @@
+name: wallet-provider-service
+services:
+  api:
+    build:
+      context: ..
+    user: '${PROVIDER_UID:?Set the owner UID of the private data directory}:${PROVIDER_GID:?Set the owner GID of the private data directory}'
+    command: [node, dist/main.js, run, --config, /config/provider.json]
+    ports:
+      - '127.0.0.1:8080:8080'
+    env_file:
+      - '${PROVIDER_SECRETS_FILE:?Set the absolute path of your private environment file}'
+    volumes:
+      - type: bind
+        source: '${PROVIDER_CONFIG:?Set the absolute path of provider.config.json}'
+        target: /config/provider.json
+        read_only: true
+      - type: bind
+        source: '${PROVIDER_DATA:?Set the absolute path of your private persistent data directory}'
+        target: /config/.provider-data
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    stop_grace_period: 15s

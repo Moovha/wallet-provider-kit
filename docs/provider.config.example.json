@@ -1,0 +1,72 @@
+{
+  "configVersion": 1,
+  "profile": "provider-service-v1",
+  "policy": {
+    "version": "1",
+    "provider": {
+      "name": "Your Wallet Provider",
+      "origin": "https://wallet.example.com",
+      "privacyUrl": "https://wallet.example.com/privacy"
+    },
+    "applications": [
+      {
+        "issuer": "https://applications.example.com",
+        "clientId": "your-registered-application-client",
+        "name": "Your Connected Application",
+        "permissions": ["account:read", "operations:request"]
+      }
+    ],
+    "identity": {
+      "maxAgeDays": 90
+    },
+    "access": {
+      "maxAgeDays": 7
+    }
+  },
+  "oauth": {
+    "issuer": "https://applications.example.com",
+    "audience": "your-wallet-provider",
+    "jwksUrl": "https://applications.example.com/jwks"
+  },
+  "ownerLogin": {
+    "issuer": "https://login.example.com",
+    "clientId": "your-provider-login-client",
+    "clientSecret": {
+      "env": "PROVIDER_LOGIN_SECRET"
+    }
+  },
+  "reviewers": ["your-provider-reviewer-oidc-subject"],
+  "identity": {
+    "didit": {
+      "apiKey": {
+        "env": "DIDIT_API_KEY"
+      },
+      "workflowId": "00000000-0000-4000-8000-000000000001"
+    }
+  },
+  "backend": {
+    "kind": "cdp",
+    "apiKeyId": {
+      "env": "WALLET_CDP_API_KEY_ID"
+    },
+    "apiKeySecret": {
+      "env": "WALLET_CDP_API_KEY_SECRET"
+    },
+    "walletSecret": {
+      "env": "WALLET_CDP_WALLET_SECRET"
+    },
+    "binding": "your-stable-cdp-environment"
+  },
+  "storage": {
+    "kind": "sqlite",
+    "directory": ".provider-data"
+  },
+  "activation": {
+    "enabled": false
+  },
+  "http": {
+    "host": "127.0.0.1",
+    "port": 8080,
+    "documentation": false
+  }
+}

@@ -1,5 +1,9 @@
 # Integrate your wallet service
 
+For supported deployments, use [configuration-first setup](setup.md); the kit
+supplies authority and journals. This guide covers advanced embedded hosts and
+custom financial integrations.
+
 After [installing the package](package.md) and running the
 [provider walkthrough](integration-example.md), [choose and connect your backend](backend-guide.md).
 This guide connects it to your application's permission checks, persistent records and HTTP API.
@@ -43,7 +47,8 @@ Wire together `createServer`, `createAuthenticator`, `EmbeddedWalletService` and
 your implementation of `EmbeddedWalletAuthority` in your application's startup
 code. Supply `ready()` to check the persistent authorization and recovery
 services your host needs. Adding CDP credentials isn't enough to enable signing:
-the CLI has no authority module loader or sample database. Supply reviewed
+the no-argument CLI remains unconfigured; `run --config` supplies only its
+supported configured-service profiles. Supply reviewed
 authority and recovery implementations in your startup code; never load module
 names from a request.
 

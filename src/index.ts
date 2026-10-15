@@ -5,3 +5,4 @@ export * from './onboarding/index.js';
 export * from './identity/index.js';
 export * from './telemetry.js';
 export * from './storage/index.js';
+export * from './deployment/index.js';
