@@ -1,0 +1,6 @@
+package-lock.json
+src/protocol/*.generated.ts
+spec/orchestration-*.json
+LICENSE*
+NOTICE
+artifacts/

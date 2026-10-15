@@ -1,0 +1,20 @@
+name: Bug report
+description: Report a reproducible non-security defect. Use SECURITY.md for vulnerabilities.
+body:
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Expected and actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Safe reproduction and version
+      description: Use dummy data. Never include keys, tokens, signatures or customer data.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Sanitized evidence and environment

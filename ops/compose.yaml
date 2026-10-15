@@ -1,0 +1,30 @@
+name: wallet-provider-kit
+services:
+  api:
+    build:
+      context: ..
+    ports:
+      - '127.0.0.1:8080:8080'
+    environment:
+      NODE_ENV: development
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://lgtm:4318
+      OTEL_ALLOW_INSECURE_DEVELOPMENT: 'true'
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    depends_on: [lgtm]
+  lgtm:
+    image: grafana/otel-lgtm:0.36.0@sha256:57c04cbd8e7022f32bb84c4ac005d79baf8b08e2c5be44facf11f5f1f9944ba2
+    ports:
+      - '127.0.0.1:3000:3000'
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: 'false'
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?Set GRAFANA_ADMIN_PASSWORD in your private .env file}
+    volumes:
+      - telemetry:/data
+    security_opt: [no-new-privileges:true]
+volumes:
+  telemetry:

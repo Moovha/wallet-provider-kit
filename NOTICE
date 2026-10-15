@@ -1,0 +1,10 @@
+Wallet Provider Kit
+Copyright 2026 Moovha and contributors.
+
+The initial wallet foundation was extracted from Moovha/swap commit
+71a90c6bca9395a90a0d412f048d002f54054636. On 15 October 2026 the rights
+holder confirmed ownership and authorized Apache-2.0 licensing for this
+standalone foundation. The source repository license is retained only as
+historical provenance in docs/LICENSE.source; it is not this project license.
+Third-party dependencies retain their own licenses. No contract implementation,
+customer data, production secret or source repository history was imported.
