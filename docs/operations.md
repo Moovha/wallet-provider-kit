@@ -1,14 +1,14 @@
-# Operational visibility and deployment
+# Run and monitor the service
 
-The kit exports OTLP/HTTP to an existing OpenTelemetry collector. It does not
-require Grafana Cloud, an enterprise monitoring plan or a custom dashboard.
-The optional local profile uses Grafana's official `otel-lgtm` development image,
-which includes collector, metric and trace stores and Grafana. Use Grafana Explore
-and existing dashboards; it is not a production availability/retention design.
+You can send traces and metrics to your existing OpenTelemetry collector using
+OTLP/HTTP. For local development, the optional Grafana `otel-lgtm` image bundles
+a collector, metric and trace stores, and Grafana. You can explore the data in
+Grafana without a cloud subscription or a custom dashboard. Plan production
+availability and retention separately.
 
 ## Local Grafana
 
-With Docker Engine and Compose available:
+You'll need Docker Engine and Compose. Then run:
 
 ```sh
 cp .env.example .env
@@ -37,7 +37,7 @@ Docker was not available on the extraction host. OTLP transport has a real local
 receiver test, and Compose syntax/image digests are checked; container startup,
 Grafana rendering and restart/volume behavior still require a Docker smoke test.
 
-## Existing monitoring or enterprise deployment
+## Use your existing monitoring
 
 Set `OTEL_EXPORTER_OTLP_ENDPOINT` to a trusted HTTPS collector base URL; the SDK
 adds `/v1/traces` and `/v1/metrics`. Export is disabled when unset. Use a local
@@ -53,11 +53,10 @@ provider exceptions are not logged. Keep reverse-proxy and collector policies
 consistent; avoid adding request/body logging downstream. Traces are independent
 server spans, not an assertion of end-to-end parent context propagation.
 
-Telemetry may be dropped and must never control authorization or financial
-correctness. Export timeout is bounded; operational telemetry is **not** a durable
-audit journal. The host must retain access-controlled business audit/attempt
-records separately, with tamper evidence, retention and recovery policy. Grafana
-viewer roles must not grant signing authority.
+Monitoring data can be dropped, so authorization and financial correctness must
+never depend on it. Export timeouts are bounded. Your host must keep business
+audit and attempt records separately, with access control, tamper evidence,
+retention and recovery rules. Grafana access must not grant signing permission.
 
 Terminate TLS at a trusted edge, restrict inbound clients, configure the IdP and
 current-grant policy, enforce deployment-specific timeouts/quotas and disable docs
@@ -66,11 +65,11 @@ forwarded client IP headers. The local in-process rate limiter is an abuse guard
 not a distributed financial budget. Configure shared edge quotas for replicas;
 prove durable host admission independently.
 
-Readiness is false unless the integration explicitly supplies a service,
-authenticator and a successful dependency check. Liveness does not establish
-financial readiness. The default container is a documentation/integration shell;
-it cannot be promoted to a production signer merely by configuring environment
-variables. SIGTERM drains HTTP and flushes telemetry with a bounded shutdown.
+Readiness stays false until your integration supplies a service, authenticator
+and successful dependency check. Liveness tells you the process is running;
+it doesn't establish financial readiness. The default container lets you explore
+the API. Environment variables alone won't turn it into a production signer.
+SIGTERM drains HTTP and flushes telemetry within a bounded shutdown.
 
 New infrastructure must remain in the existing expense tier. Reuse existing
 collector/monitoring capacity first; local development uses local resources.

@@ -2,6 +2,8 @@
 
 ## 0.1.0 — unreleased
 
+- Added a contributor writing guide and a friendlier documentation voice, with
+  a short project philosophy and a link to the Moovha platform.
 - Reworked project and contributor documentation around integration, entity
   control and supported behavior; clarified external orchestration boundaries.
 - Extracted the wallet authority/signing interfaces and CDP adapter into an

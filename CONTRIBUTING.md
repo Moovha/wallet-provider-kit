@@ -1,14 +1,16 @@
 # Contributing
 
-Documentation, fixes, tests and signing adapters are welcome. Follow the
+You can help with docs, fixes, tests or signing adapters. If you're new to the
+project, a small documentation improvement is a good place to start. Follow the
 [code of conduct](CODE_OF_CONDUCT.md); report vulnerabilities through
 [SECURITY.md](SECURITY.md).
 
 ## Propose a change
 
 For bugs, include the version, expected behavior and an offline reproduction.
-Discuss authorization, custody, public schema, capability or dependency changes
-first, covering compatibility, security and cost.
+If your change affects authorization, custody, public schemas, capabilities or
+dependencies, start a design discussion so we can review compatibility, security
+and cost together.
 
 While the repository is unpublished, use the existing project channel for
 proposals and patches. After public hosting, use issues and pull requests.
@@ -34,9 +36,9 @@ Use ephemeral offline fixtures. Test supported behavior, denied effects and
 uncertain outcomes without live providers, credentials, customer data or funds.
 Adapters must include [conformance evidence](docs/conformance.md) and untested cases.
 
-Keep docs task-focused, distinguish implementation from proposals and cite primary
-specifications. Follow [GitHub's README guidance](https://opensource.guide/starting-a-project/#writing-a-readme)
-and [OpenSSF's documentation criteria](https://www.bestpractices.dev/en/criteria/0).
+For docs and user-facing explanations, follow our
+[writing guide](docs/writing-guide.md). Keep the reader's next step clear and
+separate working features from proposals.
 
 ## Submit and review
 

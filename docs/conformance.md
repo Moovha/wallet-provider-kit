@@ -1,21 +1,21 @@
-# Provider conformance and adoption
+# Check your integration
 
-The automated suite is a reference test foundation, not certification. It runs
-without live credentials and uses unfunded ephemeral keys. `test/embedded-wallet.test.ts`
+Start with the automated tests, then collect evidence for your actual deployment.
+The suite runs offline with temporary, unfunded keys; passing it doesn't certify
+a provider. `test/embedded-wallet.test.ts`
 exercises the CDP adapter through a mocked HTTP boundary with real JWT/EIP-712
 cryptography; `test/service.test.ts` exercises RFC 9068 verification, current KYC,
 two client/owner isolation, body/idempotency validation and sanitized outcomes.
 `test/telemetry.test.ts` captures actual OTLP exports locally;
 `test/startup.test.ts` verifies unsafe/incomplete configuration fails without
-credential disclosure. No test creates a
-vendor account or moves funds.
+credential disclosure. No test creates a vendor account or moves funds.
 
-For each new backend, add equivalent fixtures against its public adapter seam.
+For each new backend, add equivalent fixtures through its public adapter interface.
 Record adapter/version, environment, account/key-control profile, supported chains,
 action kinds, signature encoding, payload limits, recovery method and submission
 ownership. Do not advertise a profile based only on a vendor SDK method name.
 
-Before enabling an integration, retain evidence for:
+Before you enable an integration, keep evidence for these cases:
 
 - Two independent client/owner tenants, denied cross-object access and current
   consent/revocation/KYC before effects, including native proof where required.
@@ -32,8 +32,8 @@ Before enabling an integration, retain evidence for:
 - Production network/TLS/pool tests, monitored operating limits, bounded budgets,
   release rollback and recovery ownership. Load tests must not use funded wallets.
 
-A passed offline suite establishes only the behavior it exercises. The default
-CLI remains unconfigured, CDP is not yet vendor-certified, and no durable
-production authority adapter is supplied. Full operation orchestration,
-sponsorship, settlement and device recovery require separate implementations and
-acceptance evidence.
+Offline tests cover the cases they exercise. You'll still need a persistent
+production authority adapter; none is supplied here. The CLI starts unconfigured,
+and the CDP adapter has offline test evidence only. Full operation orchestration,
+sponsorship, settlement and device recovery each need their own implementation
+and acceptance evidence.

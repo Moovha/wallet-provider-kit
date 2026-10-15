@@ -1,9 +1,12 @@
 # Implementing a provider
 
-The deploying entity supplies signing and authorization. External orchestrators,
-including Moovha, request permitted actions without receiving keys through the
-kit. The host enforces owner consent, current grants, KYC and revocation, retains
-durable attempts, and discloses backend key control and recovery.
+You bring the signing backend and the application that decides who may use it.
+We call that application the **host**. It checks owner consent, current grants,
+Know Your Customer (KYC) status and revocation, and keeps persistent attempt
+records.
+External orchestrators, including Moovha, request permitted actions without
+receiving keys through the kit. Your integration must explain who controls the
+backend and how recovery works.
 
 Use a dedicated OAuth audience, client registrations and network boundary.
 Keep these separate from any orchestrator's public API or custody service;
@@ -11,13 +14,13 @@ a provider grant must not authorize access to Moovha-held custody keys.
 
 ## Compose the service
 
-Compose the exported `createServer`, `createAuthenticator`,
-`EmbeddedWalletService` and your implementation of `EmbeddedWalletAuthority`.
-Provide `ready()` that checks actual durable authority/recovery dependencies.
-The CLI intentionally has no authority module loader or fake database. Merely
-adding CDP credentials cannot enable signing. Use your normal reviewed application
-composition root to inject implementations; do not load arbitrary module names
-from a request.
+Wire together `createServer`, `createAuthenticator`, `EmbeddedWalletService` and
+your implementation of `EmbeddedWalletAuthority` in your application's startup
+code. Supply `ready()` to check the persistent authorization and recovery
+services your host needs. Adding CDP credentials isn't enough to enable signing:
+the CLI has no authority module loader or sample database. Supply reviewed
+authority and recovery implementations in your startup code; never load module
+names from a request.
 
 ```ts
 import {
@@ -35,25 +38,27 @@ const app = await createServer({
 await app.listen({ host: '127.0.0.1', port: 8080 });
 ```
 
-This snippet illustrates composition, not a working production adapter. The
-package is local/unpublished; build it and use a local tarball in an isolated
-integration project until an authorized release exists. No sibling dependency is
-needed by this repository.
+This example shows where your implementations fit. You'll still need to build
+and review them before production use. While the package is unpublished, use a
+local build or tarball in your integration project. You don't need any sibling
+Moovha repository to install or run this kit.
 
 ## Authentication and policy
 
 Use an existing OAuth authorization server (for example the deployment's managed
 IdP or maintained `oidc-provider`). Configure exact HTTPS issuer and JWKS URL and
 an audience dedicated to this service. The resource server validates RFC 9068
-`at+jwt` tokens using RS256/ES256, trusted keys and mandatory issuer, subject,
-audience, expiry, issue time, token ID and client ID. Tokens may live at most ten
-minutes. It rejects ID tokens, expired tokens and tokens with the wrong scope.
+JSON Web Tokens (JWTs) with type `at+jwt`, using RS256/ES256, trusted keys and
+mandatory issuer, subject, audience, expiry, issue time, token ID and client ID.
+Tokens may live at most ten minutes. It rejects ID tokens, expired tokens and
+tokens with the wrong scope.
 No endpoint issues tokens or accepts shared Moovha admin API keys.
 
-`wallet:provision` and `wallet:sign` are service-specific scopes. They only reach
-policy evaluation. The authority adapter must validate **current** client/grant
-state, map the trusted issuer/subject/client tuple to the owner and object, enforce
-first-party step-up/device proof where applicable, and read current stored KYC
+`wallet:provision` and `wallet:sign` let a request reach your policy checks;
+they don't grant permission to spend. Your authority adapter must validate
+**current** client/grant state, map the trusted issuer/subject/client tuple to
+the owner and object, enforce first-party step-up/device proof where applicable,
+and read current stored KYC
 as exactly `ID VERIFIED`. Missing or uncertain policy must deny before provider
 calls. Provider scope cannot confer admin, source-wallet migration or custody
 access. Do not trust body status, caller-selected addresses or cached approvals.
@@ -100,8 +105,9 @@ The CDP adapter uses the vendor's public authentication helper, fixed vendor URL
 explicit credentials, ten-second HTTP timeout, bounded response bytes, no
 redirects and no automatic mutation retries. Its name is `moovha-<opaque UUID>`;
 phone numbers and customer identifiers never go to the vendor as names. It checks
-Base Sepolia chain 84532, EOA revision 1, a 32 KiB payload, expiry, matching domain,
-primary type, CAIP-10 address and digest, then verifies the returned signature.
+Base Sepolia chain 84532, externally owned account (EOA) revision 1, a 32 KiB
+payload, expiry, matching domain, primary type, CAIP-10 address and digest, then
+verifies the returned signature.
 It snapshots the input before awaits and rechecks expiry after the account read.
 These are tested restrictions, not a claim of universal account compatibility.
 

@@ -8,19 +8,19 @@ public release support starts after publication.
 
 ## Report a vulnerability
 
-Contact Brandon Musa through the existing private project channel. Include the
-affected version or commit, impact, a safe offline reproduction and any suggested
-mitigation. Keep vulnerabilities, customer data, secrets and exploit credentials
-out of public issues. Use dummy fixtures without accessing others' accounts or
-moving funds.
+If you've found a vulnerability, contact Brandon Musa through the existing
+private project channel. Share the affected version or commit, what could go
+wrong, a safe offline reproduction and any suggested fix. Keep the report and
+sensitive data out of public issues. Use dummy fixtures without accessing
+others' accounts or moving funds.
 
 Before publication, the owner must enable GitHub private vulnerability reporting
 and add its verified link and a backup contact here. Publication is gated on that
 setup; no public reporting channel is configured yet.
 
-Maintainers acknowledge and triage reports, coordinate disclosure with affected
-vendors and publish fixes/advisories when ready. No guaranteed SLA or bug bounty
-is offered. Credential rotation belongs to the credential owner.
+We'll review the report, coordinate disclosure with affected vendors and publish
+a fix or advisory when ready. We don't offer a guaranteed response time or bug
+bounty. If a credential is exposed, its owner is responsible for rotating it.
 
 See the [security model](docs/security-model.md) and
 [release checks](docs/releases.md). Offline tests establish neither an audit nor

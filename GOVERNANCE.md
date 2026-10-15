@@ -4,12 +4,12 @@ Moovha is the project steward. Brandon Musa is the initial maintainer and local
 project contact. Verified public handles and backup maintainers are required
 before publication; see [release prerequisites](docs/releases.md).
 
-## Decisions
+## How we make decisions
 
-Maintainers review proposals and pull requests for compatibility, security,
-licensing and operating cost. Record significant decisions with rationale and
-alternatives. Seek agreement with affected implementers; the steward resolves
-unresolved release decisions and records dissent and safeguards.
+We review proposals and pull requests for compatibility, security, licensing and
+operating cost. For significant decisions, we record the reasoning and
+alternatives and seek agreement with affected implementers. The steward resolves
+release decisions when agreement isn't possible, recording dissent and safeguards.
 
 Signing adapters implement the host's authorization policy. Vendor behavior must
 not redefine who may authorize an action. Production changes to financial or

@@ -2,8 +2,9 @@
 
 `HTTP → verified principal → host authority → EmbeddedWalletService → signing provider`
 
-The host supplies durable authorization and a signing backend. HTTP and vendor
-adapters remain outside the domain service. The kit has no direct connection to
+Your application supplies persistent authorization and a signing backend. We call
+it the host. The domain service works through interfaces, so HTTP handling and
+vendor-specific code stay in their adapters. The kit doesn't connect directly to
 Moovha user records, databases or settlement services.
 
 ## Responsibilities
@@ -14,9 +15,10 @@ Moovha user records, databases or settlement services.
 - **Signing provider:** provision/find accounts and sign authorized actions.
 - **Orchestrator:** coordinate approval, execution, sponsorship and settlement.
 
-Authentication, account ownership, spending authorization and transaction
-submission are separate responsibilities. OAuth scopes permit policy evaluation,
-not spending. See the [provider guide](provider-guide.md) for the host contract.
+Knowing who made a request doesn't tell you whether they may spend. Authentication,
+account ownership, spending permission and transaction submission each need their
+own checks. OAuth scopes let a request reach your policy checks; your host must
+still authorize the action. See the [provider guide](provider-guide.md).
 
 ## Standards and interfaces
 

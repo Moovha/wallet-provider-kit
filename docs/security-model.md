@@ -1,10 +1,14 @@
 # Security model
 
-Trust boundaries are the untrusted HTTP caller, OAuth issuer/JWKS, host authority
-store, signing provider, deployment operator and observability backend. Provider
-and issuer compromise are separate risks; scopes never substitute for current
-owner/grant/consent checks. Operators with backend signing credentials may control
-keys. No self-custody or HSM attestation is implied.
+Your deployment connects an untrusted HTTP caller, a token issuer and its public
+JSON Web Key Set (JWKS), your authorization store, a signing provider, an operator
+and a monitoring backend. Each has a different trust role. A compromised token issuer and a
+compromised signing provider create separate risks; OAuth scopes never replace
+current owner, grant and consent checks.
+
+Anyone with backend signing credentials may control the wallet. Explain that
+control and recovery model to your users. The kit doesn't establish end-user
+self-custody or hardware security module (HSM) attestation.
 
 | Threat                                  | Implemented control                                                                                     | Remaining host obligation                                          |
 | --------------------------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
@@ -17,8 +21,8 @@ keys. No self-custody or HSM attestation is implied.
 | Mainnet/unsupported account use         | CDP admits only tested Sepolia EOA action profile                                                       | Independent acceptance before new chains/account types             |
 | Monitor outage or compromise            | Optional bounded OTLP export; no authority in dashboard                                                 | Audit persistence separate from telemetry; monitoring RBAC         |
 
-No live custody/account recovery test, external security audit, penetration test,
-SOC2 certification or on-chain settlement proof has been completed by this repo.
-Do not enable production operations until the relevant conformance gates pass.
-Database DDL must be based on verified current schema and explicitly approved;
-this repository contains no production schema or migration.
+Live custody/account recovery, an external security audit, penetration testing,
+SOC2 certification and on-chain settlement remain unverified. Before enabling
+production operations, complete the relevant [acceptance checks](conformance.md).
+Any database schema change must use verified current schema evidence and receive
+explicit approval; this repository has no production schema or migration.

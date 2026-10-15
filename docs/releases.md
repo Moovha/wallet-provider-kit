@@ -1,4 +1,4 @@
-# Releases and publication gates
+# Prepare a release
 
 The repository is locally initialized on main and deliberately has no remote.
 The rights holder authorized Apache-2.0 for the extracted foundation on 15 October 2026. NOTICE and extraction.json identify its origin; the old license is retained
@@ -11,7 +11,7 @@ licenses; configure protected main, CODEOWNERS and required CI/reviews. Obtain t
 owner's explicit public-hosting authorization. `private: true` remains until a
 separately authorized npm release. A local commit is not publication.
 
-For a candidate release:
+When you're preparing a release candidate, work through these checks:
 
 1. Use a clean checkout with pinned Node/npm and `npm ci`. Run `npm run verify`,
    `npm run build`, `npm audit`, `npm pack --dry-run` and review package contents.
@@ -30,9 +30,11 @@ For a candidate release:
    actual provenance/signatures and checksums. There is intentionally no automatic
    publish workflow or stored registry token in this initial repository.
 
-Roll back a deployed service to a previously verified immutable image only after
-checking schema/authority compatibility. Preserve admitted attempts and reconcile
-unknown outcomes; rollback cannot revoke a signature or erase financial history.
+## Rollback and records
+
+Before rolling back to a verified immutable image, check that its schema and
+authorization rules are compatible. Keep admitted attempts and check uncertain
+outcomes; rollback can't revoke a signature or erase financial history.
 The kit has no deployed database migration to reverse. Pin/review dependency and
 OCI/action updates rather than using floating `latest` tags. CI artifacts are
 retained for 14 days as candidate evidence, not a long-term audit archive.
