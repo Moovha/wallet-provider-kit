@@ -19,3 +19,13 @@ export { createAuthenticator } from './service/auth.js';
 export type { Authenticate, OAuthConfiguration } from './service/auth.js';
 export { startTelemetry } from './service/telemetry.js';
 export type { paths as ProviderPaths } from './protocol/provider-api.generated.js';
+
+export { createJournaledWalletProvider } from './providers/journaled.js';
+export type {
+  JournaledProviderOptions,
+  WalletAttemptJournal,
+  WalletAttemptRequest,
+  WalletAttemptResult,
+  WalletAttemptFailure,
+  WalletAttemptClaim,
+} from './domain/attempt-journal.js';

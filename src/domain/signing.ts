@@ -26,7 +26,10 @@ export class WalletProviderError extends Error {
       | 'wallet_provider_rejected'
       | 'wallet_provider_unavailable'
       | 'wallet_provider_response'
-      | 'wallet_authorization_denied',
+      | 'wallet_authorization_denied'
+      | 'wallet_attempt_conflict'
+      | 'wallet_attempt_pending'
+      | 'wallet_attempt_unavailable',
     readonly outcome:
       | 'not_dispatched'
       | 'rejected'

@@ -27,9 +27,15 @@ import {
   createServer,
   createAuthenticator,
   EmbeddedWalletService,
+  createJournaledWalletProvider,
 } from '@moovha/wallet-provider-kit';
 
-// authority, signer and authorityIsReady are your reviewed implementations.
+// authority, backend, journal, authorizeAttempt and authorityIsReady are reviewed host integrations.
+const signer = createJournaledWalletProvider(backend, {
+  namespace: 'your-product-test',
+  journal,
+  authorizeAttempt,
+});
 const app = await createServer({
   authenticate: createAuthenticator({ issuer, audience, jwksUrl }),
   service: new EmbeddedWalletService(authority, signer),
@@ -78,10 +84,12 @@ They never accept a transaction payload from HTTP. The host must:
 3. Serialize concurrent work and prevent duplicate dispatch. For signing, require
    current unexpired approved action and dependencies, exact chain/account/hash,
    and the provider's tested profile. Current status is checked on every attempt.
-4. Persist results and uncertain outcomes through the host's provider decorator /
-   dispatch journal. This kit's authority port only admits work; it does not
-   implement completion storage, distributed leases, a replay cache or recovery.
-   Do not mark readiness true until those mechanisms are demonstrated.
+4. Persist results and uncertain outcomes through a transactional dispatch journal.
+   The [journal-backed provider wrapper](durable-attempts.md) implements claim,
+   completion, exact-result replay and safe error handling through your
+   `WalletAttemptJournal`. You supply the actual durable storage and current
+   authorization callback. The authority port alone only admits work. Do not
+   mark readiness true until real storage, concurrency and recovery are demonstrated.
 5. Reconcile lost responses read-only before considering a retry. A 503 with
    `outcome: unknown` does not establish that no account/signature exists. Never
    repeat a mutation blindly or treat cancellation as signature revocation.

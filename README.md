@@ -15,6 +15,7 @@ pending; see [verification](docs/verification.md).
 - Fastify service with generated OpenAPI and Swagger UI.
 - OAuth access-token verification and owner/identity checks.
 - Pluggable account provisioning and EIP-712 signing interfaces.
+- A [journal-backed provider wrapper](docs/durable-attempts.md) for persistent claims, results and retry handling.
 - Optional Coinbase CDP adapter for Base Sepolia typed signing.
 - OpenTelemetry traces and metrics over OTLP/HTTP.
 

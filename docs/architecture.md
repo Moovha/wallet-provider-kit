@@ -13,6 +13,8 @@ Moovha user records, databases or settlement services.
 - **Host authority:** check owner, grant, consent and KYC; supply durable attempts,
   result storage, concurrency control and recovery.
 - **Signing provider:** provision/find accounts and sign authorized actions.
+  The optional [journal-backed wrapper](durable-attempts.md) coordinates durable
+  claims/results through a host-supplied storage port and current policy callback.
 - **Orchestrator:** coordinate approval, execution, sponsorship and settlement.
 
 Knowing who made a request doesn't tell you whether they may spend. Authentication,

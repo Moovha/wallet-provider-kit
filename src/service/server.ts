@@ -111,6 +111,11 @@ export async function createServer(options: ServerOptions = {}) {
       status = 503;
       if (code === 'wallet_authorization_denied') status = 403;
       if (code === 'wallet_provider_input') status = 422;
+      if (
+        code === 'wallet_attempt_conflict' ||
+        code === 'wallet_attempt_pending'
+      )
+        status = 409;
     } else if (
       typeof error === 'object' &&
       error &&
@@ -215,7 +220,7 @@ export async function createServer(options: ServerOptions = {}) {
       response: {
         200: response,
         ...Object.fromEntries(
-          [400, 401, 403, 413, 415, 422, 429, 500, 503].map((status) => [
+          [400, 401, 403, 409, 413, 415, 422, 429, 500, 503].map((status) => [
             status,
             {
               description: 'Problem response',

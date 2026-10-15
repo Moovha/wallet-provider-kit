@@ -2,6 +2,11 @@
 
 ## 0.1.0 — unreleased
 
+- Added an optional journal-backed provider wrapper with immutable request
+  fingerprints, fresh host-policy checks, stored-result replay, fenced completion
+  and explicit pending/conflict/unknown outcomes. Durable storage stays host-owned;
+  no database adapter, migration or production activation is included.
+
 - Added a sourced comparison with related open-source projects and an explicit
   CDP capability/evidence profile.
 - Added public GitHub hosting, a persistent `codex/toolkit` branch and a tested
