@@ -21,8 +21,14 @@ Generated contracts must match npm run generate:spec. Review generated diffs;
 never label the orchestration reference as implemented or claim provider
 certification from mocks. Docker/live-provider checks must be reported separately.
 
-Work on main unless the owner requests another branch. Stage only intended work,
-inspect the staged diff and run the secret scan before a signed-off commit.
-Keep this repository local/unpublished until the owner authorizes a remote or
-release. A commit/push never authorizes deployment, funds movement or credential
-rotation. Keep secrets only in ignored local environment files or a secret store.
+Use codex/toolkit for the owner's ongoing work. Fetch and merge origin/main before
+starting changes; preserve unrelated work and never force-push. Push this branch
+and open/update its PR to main. Follow docs/branch-workflow.md: auto-merge waits
+for successful checks and an empty contribution/review queue. Other contributors'
+PRs require review; do not merge them through this automation.
+
+Stage only intended work, inspect the staged diff and run the secret scan before
+a signed-off commit. The owner authorized public hosting at
+https://github.com/Moovha/wallet-provider-kit. Keep npm publication disabled until separately authorized. A commit/push never authorizes
+deployment, funds movement or credential rotation. Keep secrets only in ignored
+local environment files or a secret store.

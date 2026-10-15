@@ -2,6 +2,32 @@
 
 ## 0.1.0 — unreleased
 
+- Review dependency updates against the full toolkit; adopt Vitest 5 and Prettier
+  3.9 with formatting fixes. Keep Node/types on major 24 and defer TypeScript 7
+  until the contract generator supports its compiler/API migration.
+
+- Add an optional OpenZeppelin Relayer HTTP integration for configured EIP-712
+  signers and a separate host-approved execution profile. Delegate nonce/queue/
+  broadcast work to Relayer; reuse the host journal for acceptance, replay and status.
+- Document the pinned API/source, signer/network bindings, recovery/fee limits,
+  separate service license and offline evidence.
+
+- Add an optional OWS 1.4.3 adapter for Base Sepolia EOA typed signing, with a
+  required host journal and bounded child-process calls.
+- Prove provisioning, exact large/nested integer signing, replay, denial and
+  uncertain-result handling against the real native engine using ephemeral wallets.
+- Share the existing EIP-712 profile validation with CDP and document the
+  reuse-first integration, operator control and deployment acceptance limits.
+
+- Added an optional journal-backed provider wrapper with immutable request
+  fingerprints, fresh host-policy checks, stored-result replay, fenced completion
+  and explicit pending/conflict/unknown outcomes. Durable storage stays host-owned;
+  no database adapter, migration or production activation is included.
+
+- Added a sourced comparison with related open-source projects and an explicit
+  CDP capability/evidence profile.
+- Added public GitHub hosting, a persistent `codex/toolkit` branch and a tested
+  merge workflow that waits for CI and outstanding contributions/reviews.
 - Added a contributor writing guide and a friendlier documentation voice, with
   a short project philosophy and a link to the Moovha platform.
 - Reworked project and contributor documentation around integration, entity

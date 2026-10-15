@@ -1,7 +1,7 @@
 name: verify
 on:
   push:
-    branches: [main]
+    branches: [main, codex/toolkit]
   pull_request:
   workflow_dispatch:
 permissions:
@@ -26,6 +26,7 @@ jobs:
       - run: npm run verify
       - run: npm run build
       - run: node scripts/smoke-built.mjs
+      - run: node scripts/smoke-ows.mjs
       - run: npm audit --audit-level=low
       - run: mkdir -p artifacts
       - run: npm run sbom --silent > artifacts/sbom.cdx.json

@@ -12,9 +12,10 @@ If your change affects authorization, custody, public schemas, capabilities or
 dependencies, start a design discussion so we can review compatibility, security
 and cost together.
 
-While the repository is unpublished, use the existing project channel for
-proposals and patches. After public hosting, use issues and pull requests.
-Public contacts are a [publication prerequisite](docs/releases.md).
+Use GitHub issues for proposals and pull requests for changes. The owner's ongoing
+work uses the [toolkit branch workflow](docs/branch-workflow.md). Other
+contributions use separate branches and receive review before merging.
+See [SECURITY.md](SECURITY.md) for private vulnerability reports.
 
 ## Development
 
@@ -31,6 +32,19 @@ npm pack --dry-run
 Write readable TypeScript with explicit validation and failure paths. Run
 `npm run format`; after schema changes, run `npm run generate:spec` and review
 the diff. Dependency changes require exact pins, lockfile and advisory/license review.
+
+Keep Node, its type definitions, CI and Docker on the supported Node 24 major.
+Runtime migrations need a coordinated PR; Dependabot still proposes updates within
+that major and image digest updates. TypeScript stays on major 5 while
+`openapi-typescript` requires its compiler API: [TypeScript 7 removes that
+API](https://devblogs.microsoft.com/typescript/announcing-typescript-7-0/).
+Dependabot major updates for Node, `@types/node` and TypeScript are paused in
+[its configuration](.github/dependabot.yml); revisit those rules during a reviewed
+migration. Other dependency majors remain eligible for review.
+
+For tooling updates, check the upstream migration guide, run the full toolkit
+suite and inspect generated/formatting changes. Passing dependency PR CI against
+an older main alone is not enough to validate pending adapter work.
 
 Use ephemeral offline fixtures. Test supported behavior, denied effects and
 uncertain outcomes without live providers, credentials, customer data or funds.

@@ -27,9 +27,15 @@ import {
   createServer,
   createAuthenticator,
   EmbeddedWalletService,
+  createJournaledWalletProvider,
 } from '@moovha/wallet-provider-kit';
 
-// authority, signer and authorityIsReady are your reviewed implementations.
+// authority, backend, journal, authorizeAttempt and authorityIsReady are reviewed host integrations.
+const signer = createJournaledWalletProvider(backend, {
+  namespace: 'your-product-test',
+  journal,
+  authorizeAttempt,
+});
 const app = await createServer({
   authenticate: createAuthenticator({ issuer, audience, jwksUrl }),
   service: new EmbeddedWalletService(authority, signer),
@@ -78,10 +84,12 @@ They never accept a transaction payload from HTTP. The host must:
 3. Serialize concurrent work and prevent duplicate dispatch. For signing, require
    current unexpired approved action and dependencies, exact chain/account/hash,
    and the provider's tested profile. Current status is checked on every attempt.
-4. Persist results and uncertain outcomes through the host's provider decorator /
-   dispatch journal. This kit's authority port only admits work; it does not
-   implement completion storage, distributed leases, a replay cache or recovery.
-   Do not mark readiness true until those mechanisms are demonstrated.
+4. Persist results and uncertain outcomes through a transactional dispatch journal.
+   The [journal-backed provider wrapper](durable-attempts.md) implements claim,
+   completion, exact-result replay and safe error handling through your
+   `WalletAttemptJournal`. You supply the actual durable storage and current
+   authorization callback. The authority port alone only admits work. Do not
+   mark readiness true until real storage, concurrency and recovery are demonstrated.
 5. Reconcile lost responses read-only before considering a retry. A 503 with
    `outcome: unknown` does not establish that no account/signature exists. Never
    repeat a mutation blindly or treat cancellation as signature revocation.
@@ -94,6 +102,32 @@ own policy. No sample in-memory authority is shipped as a deployment option.
 
 ## Signing backend contract
 
+The experimental [OWS adapter](ows-adapter.md) reuses local OWS wallet storage
+and signing behind the same approved-action boundary. Its profile requires the
+host journal wrapper and owner credential; read its control and recovery limits
+before choosing it. The [OpenZeppelin Relayer adapter](openzeppelin-relayer.md)
+binds preconfigured signers and adds a separate stored-action execution service.
+Relayer owns its nonce and broadcast workers; the host keeps spending authority
+and durable attempt identity. The default CLI does not activate any adapter.
+
+### Current adapter profile
+
+| Capability   | CDP adapter                                                                                  |
+| ------------ | -------------------------------------------------------------------------------------------- |
+| Network      | Base Sepolia, chain 84532 only.                                                              |
+| Account type | Externally owned account (EOA), revision 1. Contract accounts are unsupported.               |
+| Signing      | Exact approved EIP-712 typed data; digest, domain and recovered signer checked.              |
+| Key control  | App-controlled CDP API-key wallets; no keys or seed phrases exposed by the kit interface.    |
+| Recovery     | Read-only account lookup by stable opaque ID; the host supplies the durable attempt journal. |
+| Submission   | No broadcast, gas sponsorship or settlement implementation.                                  |
+| Evidence     | Offline adapter/service tests; live lifecycle and recovery remain unverified.                |
+
+This follows the explicit capability approach described in
+[related projects](related-projects.md). It doesn't imply compatibility with those
+projects.
+
+### Implement an adapter
+
 Implement `WalletSigningProvider` with `createAccount`, read-only `findAccount`,
 and `signTypedData`. Never export keys through this interface. Stable account IDs
 must resolve to the same owner-bound address, and typed signatures must recover
@@ -105,7 +139,7 @@ The CDP adapter uses the vendor's public authentication helper, fixed vendor URL
 explicit credentials, ten-second HTTP timeout, bounded response bytes, no
 redirects and no automatic mutation retries. Its name is `moovha-<opaque UUID>`;
 phone numbers and customer identifiers never go to the vendor as names. It checks
-Base Sepolia chain 84532, externally owned account (EOA) revision 1, a 32 KiB
+Base Sepolia chain 84532, EOA revision 1, a 32 KiB
 payload, expiry, matching domain, primary type, CAIP-10 address and digest, then
 verifies the returned signature.
 It snapshots the input before awaits and rechecks expiry after the account read.

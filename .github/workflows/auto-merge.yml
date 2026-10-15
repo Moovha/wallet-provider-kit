@@ -1,0 +1,56 @@
+name: Merge toolkit branch
+on:
+  workflow_run:
+    workflows: [verify]
+    types: [completed]
+  pull_request_target:
+    types:
+      [
+        opened,
+        reopened,
+        closed,
+        synchronize,
+        ready_for_review,
+        review_requested,
+        review_request_removed,
+        labeled,
+        unlabeled,
+        edited,
+      ]
+  pull_request_review:
+    types: [submitted, dismissed]
+  pull_request_review_comment:
+    types: [created, edited, deleted]
+  # Review-thread resolution is a webhook event, not an Actions trigger.
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+permissions: {}
+concurrency:
+  group: toolkit-auto-merge
+  cancel-in-progress: false
+jobs:
+  merge:
+    if: >-
+      github.repository == 'Moovha/wallet-provider-kit' &&
+      vars.TOOLKIT_AUTO_MERGE == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      pull-requests: write
+      checks: read
+      statuses: read
+      actions: write
+    steps:
+      # Only trusted main code runs with write access. No PR artifacts or caches.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+      - run: node scripts/auto-merge.ts
+        env:
+          GITHUB_TOKEN: ${{ github.token }}

@@ -14,6 +14,9 @@ For each new backend, add equivalent fixtures through its public adapter interfa
 Record adapter/version, environment, account/key-control profile, supported chains,
 action kinds, signature encoding, payload limits, recovery method and submission
 ownership. Do not advertise a profile based only on a vendor SDK method name.
+Use shared payload/digest/signature vectors when two adapters claim the same
+profile; include success, denial and uncertain-outcome cases. See the
+[related-project lessons](related-projects.md#apply-the-lessons).
 
 Before you enable an integration, keep evidence for these cases:
 
@@ -37,3 +40,11 @@ production authority adapter; none is supplied here. The CLI starts unconfigured
 and the CDP adapter has offline test evidence only. Full operation orchestration,
 sponsorship, settlement and device recovery each need their own implementation
 and acceptance evidence.
+
+The [Relayer profile](openzeppelin-relayer.md) adds offline contract fixtures for
+configured-account binding, typed signing, transaction admission, provider-ID
+replay/status, fee-policy restrictions, cross-relayer denial and uncertain
+dispatch. These fixtures are not a running Relayer/Redis/RPC system. Prove the
+pinned daemon and real queue/recovery behavior before readiness. Its nonce-owning
+execution profile does not claim draft `SubmitTransactionAction` conformance or
+prove financial settlement.

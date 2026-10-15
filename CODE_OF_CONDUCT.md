@@ -7,8 +7,8 @@ These expectations apply in project discussions, reviews and community spaces.
 
 Maintainers may edit/remove abusive content, warn participants or restrict access.
 Responses should be proportional and documented privately. Report concerns
-privately to the verified project maintainer; before public launch a dedicated
-reporting contact and independent appeal contact must be published. In this local
-prepublication phase, contact Brandon Musa through the established private
-project channel. Do not post sensitive reports in issues. A conflicted maintainer
-must recuse themselves from handling a report.
+privately to Brandon Musa through the established project channel. If you don't
+have that channel, open an issue asking for a private contact without posting
+incident details. A dedicated reporting address and independent appeal contact
+remain open maintenance tasks for this initial public release. A conflicted
+maintainer must recuse themselves from handling a report.
