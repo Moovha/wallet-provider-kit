@@ -6,6 +6,9 @@ supported. TypeScript declarations accompany every JavaScript entry point.
 Version 0.1.0 is experimental and unpublished; `private: true` keeps npm
 publication disabled.
 
+Before choosing an integration, read [roles and terms](concepts.md) for the account
+owner, connected application (OAuth client), host authority, wallet backend and journal.
+
 ## Build an installable tarball
 
 From a reviewed checkout of this repository:

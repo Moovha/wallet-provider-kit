@@ -4,6 +4,12 @@ Start with [package installation](package.md) and [backend selection](backend-gu
 This guide covers the existing-host lifecycle profile; use the
 [provider guide](provider-guide.md) for the separate `EmbeddedWalletService` profile.
 
+The **host** is your wallet service's server application. Its **authority** supplies
+trusted records and permission checks. Here, authority **ports** mean typed interfaces
+your host implements over its own storage and policy. The **raw provider** is the
+account/signing engine before toolkit attempt coordination is added. See
+[roles and terms](concepts.md) for owners, application clients, actions and attempts.
+
 Use `createStoredWalletBackend` when an existing application already owns trusted
 identity, current grants/KYC, approved stored actions and transactional authority.
 The toolkit supplies account creation, read-only account recovery, durable signing

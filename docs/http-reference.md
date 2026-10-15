@@ -3,7 +3,8 @@
 Generated from [provider-api.json](../spec/provider-api.json); do not edit manually.
 Read the [HTTP usage guide](http-api.md) for authentication, scopes, error handling
 and integration profiles. Optional-profile routes are present in the contract even
-when the corresponding service is not configured.
+when the corresponding service is not configured. Read [roles and terms](concepts.md)
+for application clients, account owners, authority and journals.
 
 ## GET /v1/capabilities
 

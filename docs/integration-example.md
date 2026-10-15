@@ -2,8 +2,8 @@
 
 Build and run a complete **offline provider flow**, then use the same public
 interfaces in your application. You will see a real access token pass the JWT
-verifier, HTTP middleware resolve host authority, and an approved stored action
-reach a journaled signing backend. Retries, revocation, current KYC denial and
+verifier, HTTP middleware resolve host permission checks, and an approved stored action
+reach a signing backend with recorded attempt tracking. Retries, revocation, current KYC denial and
 an uncertain result are exercised in the same run.
 
 This tutorial covers the kit's implemented provider API. It doesn't call Moovha's
@@ -11,6 +11,14 @@ planned operation API or implement prepare/commit, gas sponsorship or settlement
 Read [the architecture guide](architecture.md#applications-and-wallet-control)
 for the application/provider boundary. After the walkthrough, follow
 [Connect your wallet backend](backend-guide.md) to replace its signer.
+
+The **host** is your wallet service's server application. Its **authority** decides
+which account owner and connected application may perform the requested action.
+The **backend** creates accounts and signs; the **journal** records attempts and
+results so retries don't repeat those effects. In this tutorial, the application's
+OAuth registration is its **client**, and the checked token identity is its
+**principal**. The application isn't the account owner. See [roles and terms](concepts.md)
+for how these names appear in configuration and API fields.
 
 ## 1. Install and run
 
@@ -83,7 +91,7 @@ local resolver means no discovery or remote JWKS request occurs. In deployment,
 use your existing trusted issuer and `createAuthenticator({ issuer, audience,
 jwksUrl })`. This resource server doesn't issue tokens for your customers.
 
-The application-service subject deliberately differs from the wallet owner.
+The application-service subject deliberately differs from the account owner.
 `host.mjs` resolves the verified issuer/client/subject tuple through its preseeded
 owner grant. It never treats the token subject, a scope or a caller-written KYC
 status as sufficient spending authority. PASS 1 proves a missing token reaches
@@ -208,10 +216,10 @@ exclusive end-user custody. Continue with [backend integration](backend-guide.md
 
 ## Troubleshooting
 
-| Observation                                | Check                                                                                                               |
-| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
-| Package import cannot resolve              | Run `npm run build` in the checkout, or install its built tarball in your application                               |
-| Runtime rejects syntax/imports             | Use the pinned Node 24 ESM runtime from the package guide                                                           |
-| `npm start` stays unconfigured             | Expected: the default executable doesn't load this fixture or a production authority                                |
-| Example assertion fails                    | Check Node/npm pins and package/source consistency; it exits without enabling a live service                        |
-| Production request returns 401/403/409/503 | Use the [HTTP error table](http-api.md#problems-and-client-decisions); preserve the original attempt on uncertainty |
+| Observation                                | Check                                                                                                                    |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
+| Package import cannot resolve              | Run `npm run build` in the checkout, or install its built tarball in your application                                    |
+| Runtime rejects syntax/imports             | Use the pinned Node 24 ESM runtime from the package guide                                                                |
+| `npm start` stays unconfigured             | Expected: the default executable doesn't load this fixture or a production authority                                     |
+| Example assertion fails                    | Check Node/npm pins and package/source consistency; it exits without enabling a live service                             |
+| Production request returns 401/403/409/503 | Use the [HTTP error table](http-api.md#problems-and-application-decisions); preserve the original attempt on uncertainty |

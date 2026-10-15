@@ -10,11 +10,31 @@ For a complete runnable request sequence without credentials, use the
 [integration example](integration-example.md). The snippets below show a real
 integration's request shape; their tokens and IDs are placeholders.
 
+The **wallet provider** operates this service. A **connected application** calls
+it on behalf of an **account owner**, the user recorded as owning the account.
+That application's OAuth registration is the **client** mentioned in token and
+access configuration. Your server application, the **host**, checks current
+permission before calling the **wallet backend**, the account/signing engine.
+A **journal** stores attempt states and results across retries. See
+[roles and terms](concepts.md) for their code and configuration names.
+
+A **grant** is stored application access permission; **consent** is the owner's
+approval. **KYC** means Know Your Customer, the identity acceptance required by
+your provider policy.
+
 ## Authentication and profiles
 
 Send `Authorization: Bearer <access-token>` for protected routes. Use a dedicated
 provider audience and the configured trusted issuer. Scopes admit the request to
 host policy; current owner/grant/consent/KYC and exact-action authority still apply.
+
+The checked token's `client_id` identifies the connected application's registration.
+`createAuthenticator` exposes it to host code as `VerifiedPrincipal.clientId`.
+Its `sub` identifies the caller's user or service identity and may differ from the
+account owner. The host resolves the application's stored access grant to the
+owner. For bundled onboarding, the issuer and client ID must match an allowed
+`policy.applications[]` entry; its `name` is shown on the consent screen. The
+separate `ownerLogin.clientId` configures the provider's own login integration.
 
 | Method and path                                 | Required scope        | Required configured profile                                                            |
 | ----------------------------------------------- | --------------------- | -------------------------------------------------------------------------------------- |
@@ -88,7 +108,7 @@ bodies are defined in the generated reference. JSON validation doesn't coerce
 types, fill defaults or discard unrecognized fields. The default body limit is
 1 KiB; enrollment identity submission has its own bounded limit.
 
-## Problems and client decisions
+## Problems and application decisions
 
 Errors use `application/problem+json`:
 
@@ -134,5 +154,5 @@ automatic mutation retry. Error middleware preserves no raw upstream error text.
   routes. The separate orchestration draft isn't served as implemented routes.
 
 Health/docs routes are hidden from the generated application OpenAPI. Disabling
-Swagger UI doesn't disable `/openapi.json`. Application API responses use `cache-control: no-store`. The service doesn't trust arbitrary forwarded client-IP headers; place
+Swagger UI doesn't disable `/openapi.json`. Application API responses use `cache-control: no-store`. The service doesn't trust arbitrary forwarded IP headers; place
 it behind a reviewed TLS and ingress boundary for a real deployment.

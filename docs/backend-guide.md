@@ -5,6 +5,12 @@ host decides who may use each account, records the approved action and supplies
 durable attempt authority. The toolkit brings those parts together as a wallet
 service that connected applications can use without receiving keys.
 
+Here, **host** means your wallet service's server application, and **authority**
+means its current permission checks and trusted records. A **journal** is the
+persistent record of backend attempts and results, used to coordinate calls and
+handle retries. See [roles and terms](concepts.md) before choosing a lifecycle
+if these are new concepts.
+
 Start after [installing the package](package.md) and running the
 [provider walkthrough](integration-example.md). Keep its authentication, authority
 and journal responsibilities in place when you replace the offline backend.

@@ -16,6 +16,24 @@ This is an experimental single-host reference integration. It has offline
 conformance evidence; real vendor accounts, identity-service setup and backend
 recovery still need acceptance testing before you enable it.
 
+## Applications, clients and owner login
+
+A **connected application** is software asking to access a user's wallet account.
+Its OAuth registration is called a **client**. The **account owner** is the user
+who signs in and approves access; it isn't the application client. Your **host**
+is the wallet service's server application, where the toolkit runs.
+
+In the configuration template, `policy.applications[]` lists allowed connected
+applications. Each entry has a trusted `issuer`, a matching `clientId`, a display
+`name` for the consent screen and permitted access. The application's checked
+access token supplies `client_id`; the host receives it as
+`VerifiedPrincipal.clientId`.
+
+`ownerLogin.clientId` is a separate registration for the wallet provider's login
+with its existing identity service. It signs the owner in to the consent screen.
+Registering an application client doesn't register or approve a user. See
+[roles and terms](concepts.md) for grants, authority, backends and journals.
+
 ## Set it up
 
 1. Copy the example into your application and set your provider's HTTPS origin

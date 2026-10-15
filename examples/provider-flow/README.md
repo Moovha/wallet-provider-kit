@@ -4,6 +4,11 @@ Follow the [step-by-step tutorial](../../docs/integration-example.md). From the
 repository root run `npm run example:provider`. After installing its tarball, run
 `node node_modules/@moovha/wallet-provider-kit/examples/provider-flow/run.mjs`.
 
+The [roles and terms guide](../../docs/concepts.md) explains the **host** (the
+wallet service's server application), **authority** (its permission checks),
+**backend** (its account/signing engine) and **journal** (its attempt/result store).
+The connected application's OAuth client is separate from the account owner.
+
 The example uses real JWT verification, actual HTTP middleware, an ephemeral
 unfunded signer and the public journal wrapper. `host.mjs` and
 `attempt-journal.mjs` are single-run fixtures, not persistent or deployable host

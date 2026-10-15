@@ -83,7 +83,7 @@ const guides = {
     'openzeppelin-relayer.md',
   ],
 };
-let markdown = `# TypeScript API reference\n\nGenerated from the public package exports and TypeScript declarations. Run\n\`npm run generate:docs\` after API changes; \`npm run check:docs\` rejects drift.\n\nStart with the [API guide](api.md) for composition, ownership and errors, or the\n[runnable integration tutorial](integration-example.md). These declaration excerpts\nare a reference, not standalone programs. Supporting names and schema aliases\nretain their source declaration names; follow the declaration link for their imports.\n\nThe root \`@moovha/wallet-provider-kit\` re-exports core, HTTP, onboarding,\nidentity and telemetry. Provider adapters require their explicit subpaths.\n\n`;
+let markdown = `# TypeScript API reference\n\nGenerated from the public package exports and TypeScript declarations. Run\n\`npm run generate:docs\` after API changes; \`npm run check:docs\` rejects drift.\n\nStart with the [API guide](api.md) for composition, ownership and errors, or the\n[runnable integration tutorial](integration-example.md). These declaration excerpts\nare a reference, not standalone programs. Read [roles and terms](concepts.md)\nfor owners, application clients, host authority, wallet backends and journals.\nSupporting names and schema aliases\nretain their source declaration names; follow the declaration link for their imports.\n\nThe root \`@moovha/wallet-provider-kit\` re-exports core, HTTP, onboarding,\nidentity and telemetry. Provider adapters require their explicit subpaths.\n\n`;
 for (const [path, target] of surfaces.filter(([path]) => path !== '.')) {
   const source = typed.getSourceFile(resolve(root, target.types));
   assert.ok(source, `Missing declarations for ${path}`);
@@ -142,7 +142,7 @@ const schema = JSON.parse(
   await readFile(resolve(root, 'spec/provider-api.json'), 'utf8'),
 );
 let http =
-  '# HTTP schema reference\n\nGenerated from [provider-api.json](../spec/provider-api.json); do not edit manually.\nRead the [HTTP usage guide](http-api.md) for authentication, scopes, error handling\nand integration profiles. Optional-profile routes are present in the contract even\nwhen the corresponding service is not configured.\n\n';
+  '# HTTP schema reference\n\nGenerated from [provider-api.json](../spec/provider-api.json); do not edit manually.\nRead the [HTTP usage guide](http-api.md) for authentication, scopes, error handling\nand integration profiles. Optional-profile routes are present in the contract even\nwhen the corresponding service is not configured. Read [roles and terms](concepts.md)\nfor application clients, account owners, authority and journals.\n\n';
 for (const [path, methods] of Object.entries(schema.paths)) {
   for (const [method, operation] of Object.entries(methods)) {
     if (!['get', 'post', 'delete', 'put', 'patch'].includes(method)) continue;
