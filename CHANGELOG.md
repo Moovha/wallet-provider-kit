@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased — documentation site and diagrams
+
+- Add README diagrams for the wallet owner/application/provider relationship and
+  the approved signing path, with the same rendering in the documentation site.
+- Supply a searchable VitePress site with grouped navigation and an ordered
+  integration path, built from the repository's existing Markdown.
+- Check the site build in CI, exclude site tooling/output from the package, and
+  provide a separate manual GitHub Pages publication workflow.
+
 ## Unreleased — adopter documentation
 
 - Remove internal assessments, workspace handoffs and historical verification

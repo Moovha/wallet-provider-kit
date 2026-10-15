@@ -69,6 +69,43 @@ records; package documentation should explain tasks and contracts.
 After changing documentation, check local links and packaged examples. Public
 API/schema changes require generated-reference updates and the existing checks.
 
+### Preview and publish documentation
+
+The documentation site uses [VitePress](https://vitepress.dev/) and the same
+Markdown as GitHub and the installed package. Navigation lives in
+[`docs/.vitepress/config.mts`](docs/.vitepress/config.mts); update its sidebar when
+adding a guide. Keep README diagrams in Mermaid fences so GitHub and the site
+both render them. Explain the same relationships in nearby prose.
+
+```sh
+npm run docs:dev
+```
+
+Open the local URL printed by VitePress. Search runs locally in the browser and
+requires no external search account. To check the production build:
+
+```sh
+npm run docs:build
+npm run docs:preview
+```
+
+The build rejects missing local links; CI builds the site on every PR. Check
+diagram rendering, narrow-screen navigation and search in the preview after
+changes to the theme. Source-code and contract links open their GitHub files.
+Site tooling, cache and built HTML are excluded from the installable package.
+
+VitePress 1.6.4 uses a scoped Vite 6.4.4 override to avoid advisories in its Vite 5
+dependency. Its Vue plugin supports Vite 6. Keep that override audited and tested;
+remove it when a stable VitePress release supplies a patched dependency directly.
+
+Publication is separate from commits and package releases. A repository
+administrator must first select **Settings → Pages → Source → GitHub Actions**.
+After approval to publish, run **Actions → Publish documentation → Run workflow**
+on `main`. It publishes only the documentation to
+`https://moovha.github.io/wallet-provider-kit/`; later updates use the same manual
+workflow. No documentation deployment happens on a push or PR merge. npm
+publication remains disabled. See [GitHub's Pages workflow guide](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages).
+
 ## Submit and review
 
 Use `feat:`, `fix:`, `docs:` or `chore:` commit summaries. Include checks,

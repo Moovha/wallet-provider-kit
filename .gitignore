@@ -9,3 +9,5 @@ coverage/
 artifacts/
 .provider-data/
 .DS_Store
+docs/.vitepress/cache/
+docs/.vitepress/dist/

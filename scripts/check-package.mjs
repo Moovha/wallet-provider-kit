@@ -42,7 +42,7 @@ try {
     assert.match(path, /^(dist\/|spec\/|docs\/|examples\/|[^/]+$)/);
     assert.doesNotMatch(
       path,
-      /(^|\/)(\.env[^/]*|\.provider-data|node_modules|test|\.git)(\/|$)/,
+      /(^|\/)(\.env[^/]*|\.provider-data|\.vitepress|node_modules|test|\.git)(\/|$)/,
     );
   }
   await writeFile(

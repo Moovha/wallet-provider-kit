@@ -34,6 +34,23 @@ The toolkit can be embedded as a Node.js package or composed into a
 provider-hosted HTTP service. Its OpenAPI contract also lets applications written
 in other languages use the implemented service routes.
 
+```mermaid
+flowchart TB
+    accTitle: Wallet owner, connected application and provider control
+    accDescr: The owner approves access through the host. Applications request actions from the toolkit, which checks host authority and calls the chosen backend. Only permitted results return to the application.
+    walletOwner["Wallet owner"] -->|"Login, consent and approval"|authority
+    connectedApp["Connected application"] -->|"Authenticated action request"|kit
+    subgraph walletService["Your wallet service"]
+        kit["Wallet Provider Kit"] -->|"Check current permission"|authority["Your host authority"]
+        kit -->|"Admitted action only"|backend["Your chosen wallet backend"]
+    end
+    kit -->|"Permitted result"|connectedApp
+```
+
+Your team supplies the authority and backend shown inside the service boundary.
+The backend's control and recovery model determines custody; connecting an
+application doesn't transfer the wallet's keys to it.
+
 ## How wallet access works
 
 A user establishes an account with the wallet provider and approves an
@@ -57,6 +74,30 @@ responsibility. OAuth scopes allow a request to reach the host's policy checks;
 spending authority also requires current owner, grant, KYC, consent, immutable
 action and durable-attempt checks. The [provider guide](docs/provider-guide.md)
 and [security model](docs/security-model.md) explain that contract.
+
+The signing path below shows a new successful attempt. An authorised retry uses
+the stored result; a pending or unknown attempt requires reconciliation.
+
+```mermaid
+sequenceDiagram
+    accTitle: A successful approved signing attempt
+    accDescr: The host verifies current authority, loads an approved action, claims a durable attempt, rechecks permission, calls the backend, verifies and persists the result, then returns it.
+    participant Application
+    participant Host
+    participant Journal
+    participant Backend
+    Application->>Host: Request stored action with access token
+    Host->>Host: Verify caller and current owner authority
+    Host->>Host: Load exact approved action
+    Host->>Journal: Admit and claim durable attempt
+    Journal-->>Host: Exclusive dispatch claim
+    Host->>Host: Recheck current permission
+    Host->>Backend: Sign admitted action
+    Backend-->>Host: Signing result
+    Host->>Host: Verify exact digest and signer
+    Host->>Journal: Persist verified result
+    Host-->>Application: Return permitted result
+```
 
 ## Where it fits in Moovha
 
@@ -125,6 +166,10 @@ start with the [API guide](docs/api.md) and [durable attempts](docs/durable-atte
 
 The [documentation index](docs/README.md) takes you from installation through
 [backend integration](docs/backend-guide.md), host authority, APIs and operations.
+For a documentation site with grouped navigation and local search, run
+`npm run docs:dev` from this checkout after `npm ci`, then open the printed local
+address. The [contributor guide](CONTRIBUTING.md#preview-and-publish-documentation)
+explains site previews and GitHub Pages publication.
 
 Contributions follow the [contributor guide](CONTRIBUTING.md),
 [governance](GOVERNANCE.md) and [code of conduct](CODE_OF_CONDUCT.md).

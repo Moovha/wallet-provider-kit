@@ -84,7 +84,10 @@
     "check:package": "npm run build && node scripts/check-package.mjs",
     "generate:docs": "node scripts/api-docs.mjs --write",
     "check:docs": "node scripts/api-docs.mjs",
-    "example:provider": "npm run build && node examples/provider-flow/run.mjs"
+    "example:provider": "npm run build && node examples/provider-flow/run.mjs",
+    "docs:dev": "vitepress dev docs --host 127.0.0.1",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs --host 127.0.0.1"
   },
   "dependencies": {
     "@coinbase/cdp-sdk": "1.58.0",
@@ -114,7 +117,9 @@
     "openapi-typescript": "7.13.0",
     "secretlint": "13.0.7",
     "@secretlint/secretlint-rule-preset-recommend": "13.0.7",
-    "@open-wallet-standard/core": "1.4.3"
+    "@open-wallet-standard/core": "1.4.3",
+    "mermaid": "12.2.0",
+    "vitepress": "1.6.4"
   },
   "peerDependencies": {
     "@open-wallet-standard/core": "1.4.3"
@@ -144,5 +149,10 @@
   "types": "./dist/index.d.ts",
   "bin": {
     "wallet-provider-kit": "./dist/main.js"
+  },
+  "overrides": {
+    "vitepress": {
+      "vite": "6.4.4"
+    }
   }
 }
