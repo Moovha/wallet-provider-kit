@@ -4,3 +4,5 @@ spec/orchestration-*.json
 LICENSE*
 NOTICE
 artifacts/
+docs/.vitepress/cache/
+docs/.vitepress/dist/
