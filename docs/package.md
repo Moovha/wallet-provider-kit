@@ -51,6 +51,16 @@ The example uses Fastify's in-process request injection. It opens no network
 listener, reads no credentials and creates no wallets. A 503 readiness response
 is expected: the default server has no authority or signing integration.
 
+For a complete authenticated provider flow, follow the [integration tutorial](integration-example.md):
+
+```sh
+node node_modules/@moovha/wallet-provider-kit/examples/provider-flow/run.mjs
+```
+
+It asserts provisioning, exact signing, replay, denial and uncertain-outcome
+behavior with ephemeral offline fixtures. The [API guide](api.md) explains each
+interface, and [generated reference](api-reference.md) records public declarations.
+
 To explore Swagger over local HTTP, run the installed executable:
 
 ```sh
@@ -148,7 +158,8 @@ npm run check:package
 This builds, packs and installs into a temporary directory outside the checkout,
 with development dependencies and the optional OWS engine omitted. It checks
 public ESM imports, root compatibility, declarations and the typed configuration
-example, packaged OpenAPI, the runnable example, and the installed executable's
+example, packaged OpenAPI, both runnable examples (including typechecked provider-flow
+fixtures), and the installed executable's
 liveness/readiness/default denial. The temporary consumer uses the repository's
 compiler tooling, resolving application imports against the installed tarball.
 Dependency installation may access the npm registry; the examples and service

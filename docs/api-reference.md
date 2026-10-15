@@ -1,0 +1,1607 @@
+# TypeScript API reference
+
+Generated from the public package exports and TypeScript declarations. Run
+`npm run generate:docs` after API changes; `npm run check:docs` rejects drift.
+
+Start with the [API guide](api.md) for composition, ownership and errors, or the
+[runnable integration tutorial](integration-example.md). These declaration excerpts
+are a reference, not standalone programs. Supporting names and schema aliases
+retain their source declaration names; follow the declaration link for their imports.
+
+The root `@moovha/wallet-provider-kit` re-exports core, HTTP, onboarding,
+identity and telemetry. Provider adapters require their explicit subpaths.
+
+## Host authority and signing attempts
+
+Import from `@moovha/wallet-provider-kit/core`. [Integration guide](api.md#core-wallet-service).
+
+- [AuthorityContext](#authoritycontext)
+- [createJournaledWalletProvider](#createjournaledwalletprovider)
+- [EmbeddedAccount](#embeddedaccount)
+- [EmbeddedWalletAuthority](#embeddedwalletauthority)
+- [EmbeddedWalletService](#embeddedwalletservice)
+- [JournaledProviderOptions](#journaledprovideroptions)
+- [SigningAuthority](#signingauthority)
+- [TypedDataAction](#typeddataaction)
+- [VerifiedPrincipal](#verifiedprincipal)
+- [WalletAttemptClaim](#walletattemptclaim)
+- [WalletAttemptFailure](#walletattemptfailure)
+- [WalletAttemptJournal](#walletattemptjournal)
+- [WalletAttemptRequest](#walletattemptrequest)
+- [WalletAttemptResult](#walletattemptresult)
+- [WalletProviderError](#walletprovidererror)
+- [WalletSigningProvider](#walletsigningprovider)
+
+### AuthorityContext
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/domain/principal.ts).
+
+```ts
+export interface AuthorityContext {
+  readonly principal: VerifiedPrincipal;
+  /** Bind this key to principal, operation, resource and exact request durably. */
+  readonly idempotencyKey: string;
+}
+```
+
+### createJournaledWalletProvider
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/providers/journaled.ts).
+
+```ts
+/** Decorates an authorized backend; no database choice, credentials, retries or policy bypass. */
+export declare function createJournaledWalletProvider(
+  provider: WalletSigningProvider,
+  options: JournaledProviderOptions,
+): WalletSigningProvider;
+```
+
+### EmbeddedAccount
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/domain/signing.ts).
+
+```ts
+export interface EmbeddedAccount {
+  accountId: string;
+  address: string;
+}
+```
+
+### EmbeddedWalletAuthority
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/domain/embedded-wallet.ts).
+
+```ts
+/**
+ * Server-owned port, deliberately without a production implementation yet.
+ * Each call must verify the principal's current grant/session/proof and owner permission,
+ * read current stored KYC, and durably admit the exact attempt and usage budget.
+ * Signing additionally requires current consent, immutable committed plan/action,
+ * active binding and lease. Return null on denial; throw on storage uncertainty.
+ * Never construct these records from an HTTP body or a cached approval.
+ */
+export interface EmbeddedWalletAuthority {
+  provision(
+    context: AuthorityContext,
+    accountId: string,
+  ): Promise<OwnerAuthority | null>;
+  sign(
+    context: AuthorityContext,
+    actionId: string,
+  ): Promise<SigningAuthority | null>;
+}
+```
+
+### EmbeddedWalletService
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/domain/embedded-wallet.ts).
+
+```ts
+/** Internal service only: HTTP-independent; the host supplies authoritative persistence and policy. */
+export declare class EmbeddedWalletService {
+  constructor(
+    authority: EmbeddedWalletAuthority,
+    provider: WalletSigningProvider,
+  );
+  provision(
+    context: AuthorityContext,
+    accountId: string,
+    enrollmentGuard?: (ownerSubject: string) => Promise<void>,
+  ): Promise<EmbeddedAccount>;
+  sign(
+    context: AuthorityContext,
+    actionId: string,
+    accessGuard?: (ownerSubject: string, accountId: string) => Promise<void>,
+  ): Promise<string>;
+}
+```
+
+### JournaledProviderOptions
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/domain/attempt-journal.ts).
+
+```ts
+export interface JournaledProviderOptions {
+  /** Stable deployment/backend environment identity; never a credential or URL. */
+  namespace: string;
+  journal: WalletAttemptJournal;
+  /**
+   * Resolve the admitted attempt's CURRENT owner/grant/KYC/consent/proof and exact
+   * immutable request. Called on every request and again after a dispatch claim.
+   * A JWT scope or the existence of a journal row cannot return true by itself.
+   */
+  authorizeAttempt(request: WalletAttemptRequest): Promise<boolean>;
+}
+```
+
+### SigningAuthority
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/domain/embedded-wallet.ts).
+
+```ts
+export interface SigningAuthority extends OwnerAuthority {
+  account: EmbeddedAccount;
+  chainAccountId: string;
+  bindingRevision: string;
+  capabilityRevision: string;
+  action: TypedDataAction;
+}
+```
+
+### TypedDataAction
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/domain/signing.ts).
+
+```ts
+export type TypedDataAction = components['schemas']['TypedDataAction'];
+```
+
+### VerifiedPrincipal
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/domain/principal.ts).
+
+```ts
+/** Constructed by a trusted authentication adapter, never from a request body. */
+export interface VerifiedPrincipal {
+  readonly issuer: string;
+  readonly subject: string;
+  readonly clientId: string;
+  readonly scopes: readonly string[];
+}
+```
+
+### WalletAttemptClaim
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/domain/attempt-journal.ts).
+
+```ts
+export type WalletAttemptClaim = {
+  attemptId: string;
+  resourceKey: string;
+  requestHash: string;
+} & (
+  | {
+      state: 'dispatch';
+      leaseToken: string;
+      leaseExpiresAt: string;
+    }
+  | {
+      state: 'pending' | 'unknown' | 'conflict';
+    }
+  | {
+      state: 'succeeded';
+      result: WalletAttemptResult;
+    }
+  | {
+      state: 'failed';
+      failure: WalletAttemptFailure;
+    }
+);
+```
+
+### WalletAttemptFailure
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/domain/attempt-journal.ts).
+
+```ts
+export interface WalletAttemptFailure {
+  code: WalletProviderError['code'];
+  outcome: WalletProviderError['outcome'];
+}
+```
+
+### WalletAttemptJournal
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/domain/attempt-journal.ts).
+
+```ts
+/**
+ * Host-owned transactional persistence. No default or in-memory implementation.
+ *
+ * claim must atomically bind namespace/provider/attempt and resource identities,
+ * reserve the bounded usage, and commit dispatch with a fresh fencing token.
+ * Identical callers share one record; mismatched request/resource reuse conflicts.
+ * Only one caller may receive dispatch, including after process restart.
+ * Lease expiry after dispatch is unknown, never permission for another dispatch.
+ *
+ * complete/fail must fence the token and atomically store a terminal result and
+ * its audit/outbox event. Preserve results beyond HTTP/vendor cache lifetimes.
+ * Never retry uncertain writes or release reservations for unknown outcomes.
+ */
+export interface WalletAttemptJournal {
+  claim(request: WalletAttemptRequest): Promise<WalletAttemptClaim>;
+  complete(
+    request: WalletAttemptRequest,
+    leaseToken: string,
+    result: WalletAttemptResult,
+  ): Promise<void>;
+  fail(
+    request: WalletAttemptRequest,
+    leaseToken: string,
+    failure: WalletAttemptFailure,
+  ): Promise<void>;
+}
+```
+
+### WalletAttemptRequest
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/domain/attempt-journal.ts).
+
+```ts
+/** References and fingerprints only: no token, raw action, private key or PII. */
+export interface WalletAttemptRequest {
+  readonly namespace: string;
+  readonly provider: string;
+  readonly attemptId: string;
+  readonly kind: 'provision' | 'sign_typed_data' | 'relay_transaction';
+  readonly accountId: string;
+  readonly resourceKey: string;
+  readonly requestHash: string;
+}
+```
+
+### WalletAttemptResult
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/domain/attempt-journal.ts).
+
+```ts
+export type WalletAttemptResult =
+  | {
+      kind: 'provision';
+      account: EmbeddedAccount;
+    }
+  | {
+      kind: 'sign_typed_data';
+      signature: string;
+    }
+  | {
+      kind: 'relay_transaction';
+      transactionId: string;
+    };
+```
+
+### WalletProviderError
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/domain/signing.ts).
+
+```ts
+export declare class WalletProviderError extends Error {
+  readonly code:
+    | 'wallet_provider_configuration'
+    | 'wallet_provider_input'
+    | 'wallet_provider_rejected'
+    | 'wallet_provider_unavailable'
+    | 'wallet_provider_response'
+    | 'wallet_authorization_denied'
+    | 'wallet_attempt_conflict'
+    | 'wallet_attempt_pending'
+    | 'wallet_attempt_unavailable'
+    | 'wallet_identity_invalid'
+    | 'wallet_identity_unavailable'
+    | 'wallet_onboarding_unavailable'
+    | 'wallet_enrollment_unavailable';
+  readonly outcome: 'not_dispatched' | 'rejected' | 'unknown';
+  constructor(
+    code:
+      | 'wallet_provider_configuration'
+      | 'wallet_provider_input'
+      | 'wallet_provider_rejected'
+      | 'wallet_provider_unavailable'
+      | 'wallet_provider_response'
+      | 'wallet_authorization_denied'
+      | 'wallet_attempt_conflict'
+      | 'wallet_attempt_pending'
+      | 'wallet_attempt_unavailable'
+      | 'wallet_identity_invalid'
+      | 'wallet_identity_unavailable'
+      | 'wallet_onboarding_unavailable'
+      | 'wallet_enrollment_unavailable',
+    outcome?: 'not_dispatched' | 'rejected' | 'unknown',
+  );
+}
+```
+
+### WalletSigningProvider
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/domain/signing.ts).
+
+```ts
+export interface WalletSigningProvider {
+  readonly provider: string;
+  createAccount(accountId: string, attemptId: string): Promise<EmbeddedAccount>;
+  findAccount(accountId: string): Promise<EmbeddedAccount | null>;
+  signTypedData(
+    account: EmbeddedAccount,
+    action: TypedDataAction,
+    attemptId: string,
+  ): Promise<string>;
+}
+```
+
+## HTTP composition and authentication
+
+Import from `@moovha/wallet-provider-kit/http`. [Integration guide](api.md#http-and-authentication).
+
+- [Authenticate](#authenticate)
+- [createAuthenticator](#createauthenticator)
+- [createServer](#createserver)
+- [OAuthConfiguration](#oauthconfiguration)
+- [ProviderPaths](#providerpaths)
+- [ServerOptions](#serveroptions)
+
+### Authenticate
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/service/auth.ts).
+
+```ts
+export type Authenticate = (
+  authorization: string | undefined,
+  requiredScope: string,
+) => Promise<VerifiedPrincipal>;
+```
+
+### createAuthenticator
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/service/auth.ts).
+
+```ts
+/** RFC 9068 resource server; keys and issuer are operator configuration, never token input. */
+export declare function createAuthenticator(
+  configuration: OAuthConfiguration,
+  keys?: JWTVerifyGetKey,
+): Authenticate;
+```
+
+### createServer
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/service/server.ts).
+
+```ts
+export declare function createServer(
+  options?: ServerOptions,
+): Promise<
+  Fastify.FastifyInstance<
+    import('http').Server<
+      typeof import('http').IncomingMessage,
+      typeof import('http').ServerResponse
+    >,
+    import('http').IncomingMessage,
+    import('http').ServerResponse<import('http').IncomingMessage>,
+    Fastify.FastifyBaseLogger,
+    Fastify.FastifyTypeProviderDefault
+  >
+>;
+```
+
+### OAuthConfiguration
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/service/auth.ts).
+
+```ts
+export interface OAuthConfiguration {
+  issuer: string;
+  audience: string;
+  jwksUrl: string;
+}
+```
+
+### ProviderPaths
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/protocol/provider-api.generated.ts).
+
+Generated OpenAPI path types from [the implemented provider contract](../spec/provider-api.json).
+Use `ProviderPaths["/v1/actions/{actionId}/sign"]["post"]` to select an operation.
+See the [HTTP reference](http-reference.md).
+
+### ServerOptions
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/service/server.ts).
+
+```ts
+export interface ServerOptions {
+  authenticate?: Authenticate;
+  service?: EmbeddedWalletService;
+  /** Enabling enrollment also gates the provisioning route on current provider acceptance. */
+  enrollment?: EnrollmentService;
+  /** Hosted owner consent, provider review and application access. Independent of legacy OIDC enrollment. */
+  onboarding?: OnboardingHttpOptions;
+  /** Must check durable authority/recovery dependencies; never infer readiness from env keys. */
+  ready?: () => Promise<boolean>;
+  documentation?: boolean;
+}
+```
+
+## Onboarding, owner login and access
+
+Import from `@moovha/wallet-provider-kit/onboarding`. [Integration guide](onboarding.md).
+
+- [accessType](#accesstype)
+- [ApplicationPolicy](#applicationpolicy)
+- [createDiditIdentityAdapter](#creatediditidentityadapter)
+- [createFileOnboardingStore](#createfileonboardingstore)
+- [createOnboardingJournal](#createonboardingjournal)
+- [createOnboardingProvider](#createonboardingprovider)
+- [createOwnerLogin](#createownerlogin)
+- [createSumsubIdentityAdapter](#createsumsubidentityadapter)
+- [defineOnboardingPolicy](#defineonboardingpolicy)
+- [DiditConfiguration](#diditconfiguration)
+- [IdentityAdapter](#identityadapter)
+- [IdentityEvidence](#identityevidence)
+- [OnboardingPolicy](#onboardingpolicy)
+- [OnboardingProviderConfiguration](#onboardingproviderconfiguration)
+- [OnboardingService](#onboardingservice)
+- [OnboardingStore](#onboardingstore)
+- [OwnerIdentity](#owneridentity)
+- [ownerKey](#ownerkey)
+- [OwnerLogin](#ownerlogin)
+- [OwnerLoginConfiguration](#ownerloginconfiguration)
+- [Permission](#permission)
+- [ProviderState](#providerstate)
+- [SumsubConfiguration](#sumsubconfiguration)
+- [VendorPrice](#vendorprice)
+
+### accessType
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/onboarding/types.ts).
+
+```ts
+export declare const accessType = 'https://moovha.com/wallet/account-access';
+```
+
+### ApplicationPolicy
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/onboarding/types.ts).
+
+```ts
+export interface ApplicationPolicy {
+  issuer: string;
+  clientId: string;
+  name: string;
+  enabled?: boolean;
+  permissions?: Permission[];
+  /** Contractually agreed reimbursement, not a payment instruction or vendor price quote. */
+  funding?: {
+    agreement: string;
+    monthlyLimitMinor: number;
+  };
+}
+```
+
+### createDiditIdentityAdapter
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/onboarding/vendors.ts).
+
+```ts
+/** Recipient-only B2B import. An upstream approval never becomes provider acceptance. */
+export declare function createDiditIdentityAdapter(
+  input: DiditConfiguration,
+  request?: typeof fetch,
+): IdentityAdapter;
+```
+
+### createFileOnboardingStore
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/onboarding/file-store.ts).
+
+```ts
+/** Small, single-host reference store. Requires a private local POSIX filesystem with atomic rename/fsync. */
+export declare function createFileOnboardingStore(
+  directory: string,
+): OnboardingStore;
+```
+
+### createOnboardingJournal
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/onboarding/journal.ts).
+
+```ts
+/** Provisioning-only reference journal. Access grants never enable generic signatures. */
+export declare function createOnboardingJournal(
+  store: OnboardingStore,
+): WalletAttemptJournal;
+```
+
+### createOnboardingProvider
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/onboarding/provider.ts).
+
+```ts
+/** One configuration, hosted consent/review, persistent grants and journaled account creation. */
+export declare function createOnboardingProvider(
+  config: OnboardingProviderConfiguration,
+): Promise<
+  import('fastify').FastifyInstance<
+    import('http').Server<
+      typeof import('http').IncomingMessage,
+      typeof import('http').ServerResponse
+    >,
+    import('http').IncomingMessage,
+    import('http').ServerResponse<import('http').IncomingMessage>,
+    import('fastify').FastifyBaseLogger,
+    import('fastify').FastifyTypeProviderDefault
+  >
+>;
+```
+
+### createOwnerLogin
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/onboarding/login.ts).
+
+```ts
+/** The maintained OIDC client handles protocol validation; the provider's IdP owns login and MFA. */
+export declare function createOwnerLogin(
+  inputConfiguration: OwnerLoginConfiguration,
+  origin: string,
+  store: OnboardingStore,
+): Promise<OwnerLogin>;
+```
+
+### createSumsubIdentityAdapter
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/onboarding/vendors.ts).
+
+```ts
+export declare function createSumsubIdentityAdapter(
+  input: SumsubConfiguration,
+  request?: typeof fetch,
+): IdentityAdapter;
+```
+
+### defineOnboardingPolicy
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/onboarding/policy.ts).
+
+```ts
+export declare function defineOnboardingPolicy(
+  input: OnboardingPolicy,
+): ResolvedPolicy;
+```
+
+### DiditConfiguration
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/onboarding/vendors.ts).
+
+```ts
+export interface DiditConfiguration {
+  apiKey: string;
+  workflowId: string;
+  importPrice?: VendorPrice;
+  verificationPrice?: VendorPrice;
+}
+```
+
+### IdentityAdapter
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/onboarding/types.ts).
+
+```ts
+export interface IdentityAdapter {
+  vendor: Vendor;
+  /** Public workflow/level and review profile identity; excludes credentials. */
+  policyFingerprint?: string;
+  price?: VendorPrice;
+  verificationPrice?: VendorPrice;
+  startVerification?(correlation: string): Promise<{
+    url: string;
+    reference?: string;
+  }>;
+  readByCorrelation?(correlation: string): Promise<IdentityEvidence>;
+  importShared(token: string, correlation: string): Promise<IdentityEvidence>;
+  read(reference: string, correlation: string): Promise<IdentityEvidence>;
+}
+```
+
+### IdentityEvidence
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/onboarding/types.ts).
+
+```ts
+export interface IdentityEvidence {
+  vendor: Vendor;
+  reference: string;
+  correlation: string;
+  status: 'approved' | 'review' | 'rejected';
+  /** Recipient review time. Retrieval/import time must never substitute for verification time. */
+  verifiedAt?: string;
+  fetchedAt: string;
+}
+```
+
+### OnboardingPolicy
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/onboarding/types.ts).
+
+```ts
+export interface OnboardingPolicy {
+  version: string;
+  provider: {
+    name: string;
+    origin: string;
+    privacyUrl: string;
+  };
+  applications: ApplicationPolicy[];
+  identity?: {
+    maxAgeDays?: number;
+  };
+  access?: {
+    maxAgeDays?: number;
+  };
+}
+```
+
+### OnboardingProviderConfiguration
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/onboarding/provider.ts).
+
+```ts
+export interface OnboardingProviderConfiguration {
+  policy: OnboardingPolicy;
+  /** Private absolute directory on a persistent local POSIX filesystem. */
+  storageDirectory: string;
+  oauth: OAuthConfiguration;
+  ownerLogin: OwnerLoginConfiguration;
+  reviewers: string[];
+  identity: {
+    didit?: DiditConfiguration;
+    sumsub?: SumsubConfiguration;
+  };
+  walletBackend: WalletSigningProvider;
+  /** Prove the selected backend's lifecycle and recovery before enabling provisioning. */
+  ready: () => Promise<boolean>;
+}
+```
+
+### OnboardingService
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/onboarding/service.ts).
+
+```ts
+/** Provider decisions are stored locally. Vendor results, OAuth scopes and share tokens cannot grant access. */
+export declare class OnboardingService {
+  readonly store: OnboardingStore;
+  readonly policy: Readonly<{
+    revision: string;
+    identity: {
+      maxAgeDays: number;
+    };
+    access: {
+      maxAgeDays: number;
+    };
+    version: string;
+    provider: {
+      name: string;
+      origin: string;
+      privacyUrl: string;
+    };
+    applications: import('./types.js').ApplicationPolicy[];
+  }>;
+  constructor(
+    input: OnboardingPolicy,
+    store: OnboardingStore,
+    adapters?: IdentityAdapter[],
+    walletReader?: Pick<WalletSigningProvider, 'findAccount'> | undefined,
+  );
+  request(
+    inputContext: AuthorityContext,
+    value: AccessInput,
+  ): Promise<{
+    account_id?: string | undefined;
+    permissions?: ('account:read' | 'operations:request')[] | undefined;
+    expires_at?: string | undefined;
+    grant_id?: string | undefined;
+    request_id: string;
+    status: string;
+    consent_url: string;
+  }>;
+  read(
+    context: AuthorityContext,
+    id: string,
+  ): Promise<{
+    account_id?: string | undefined;
+    permissions?: ('account:read' | 'operations:request')[] | undefined;
+    expires_at?: string | undefined;
+    grant_id?: string | undefined;
+    request_id: string;
+    status: string;
+    consent_url: string;
+  }>;
+  consentView(
+    id: string,
+    identity: OwnerIdentity,
+  ): Promise<{
+    application: string;
+    provider: string;
+    privacyUrl: string;
+    permissions: ('account:read' | 'operations:request')[];
+    mode: 'create' | 'connect';
+    durationDays: number;
+    status: string;
+  }>;
+  consent(
+    id: string,
+    identity: OwnerIdentity,
+    approve: boolean,
+  ): Promise<{
+    account_id?: string | undefined;
+    permissions?: ('account:read' | 'operations:request')[] | undefined;
+    expires_at?: string | undefined;
+    grant_id?: string | undefined;
+    request_id: string;
+    status: string;
+    consent_url: string;
+  }>;
+  importIdentity(
+    inputContext: AuthorityContext,
+    id: string,
+    vendor: Vendor,
+    token: string,
+  ): Promise<{
+    account_id?: string | undefined;
+    permissions?: ('account:read' | 'operations:request')[] | undefined;
+    expires_at?: string | undefined;
+    grant_id?: string | undefined;
+    request_id: string;
+    status: string;
+    consent_url: string;
+  }>;
+  verificationVendors(): Vendor[];
+  startVerification(
+    id: string,
+    identity: OwnerIdentity,
+    vendor: Vendor,
+  ): Promise<
+    | {
+        dispatch: boolean;
+        url: string;
+        status: string;
+      }
+    | {
+        dispatch: boolean;
+        status: string;
+        url?: undefined;
+      }
+  >;
+  reviews(principal: VerifiedPrincipal): Promise<
+    {
+      requestId: string;
+      owner: Pick<OwnerIdentity, 'issuer' | 'subject'> | undefined;
+      vendor: Vendor | undefined;
+      reference: string | undefined;
+      verifiedAt: string | undefined;
+      status: string;
+    }[]
+  >;
+  providerAccounts(principal: VerifiedPrincipal): Promise<
+    {
+      id: string;
+      status: 'suspended' | 'active';
+      provisioned: boolean;
+    }[]
+  >;
+  suspendAccount(principal: VerifiedPrincipal, id: string): Promise<void>;
+  reconcileAccount(
+    principal: VerifiedPrincipal,
+    id: string,
+  ): Promise<{
+    status: string;
+  }>;
+  review(
+    principal: VerifiedPrincipal,
+    id: string,
+    input: {
+      decision: 'accept' | 'reject';
+      identity_matches_owner: boolean;
+      verified_at?: string;
+      reference?: string;
+      vendor?: Vendor;
+    },
+  ): Promise<{
+    account_id?: string | undefined;
+    permissions?: ('account:read' | 'operations:request')[] | undefined;
+    expires_at?: string | undefined;
+    grant_id?: string | undefined;
+    request_id: string;
+    status: string;
+    consent_url: string;
+  }>;
+  authorize(
+    principal: VerifiedPrincipal,
+    accountId: string,
+    permission: Permission,
+  ): Promise<AccessGrant>;
+  account(
+    principal: VerifiedPrincipal,
+    accountId: string,
+  ): Promise<{
+    status: string;
+    address?: string | undefined;
+    account_id: string;
+  }>;
+  ownerRequests(identity: OwnerIdentity): Promise<
+    {
+      id: string;
+      application: string;
+      status: string;
+    }[]
+  >;
+  cancelPending(
+    id: string,
+    identity: OwnerIdentity,
+  ): Promise<{
+    account_id?: string | undefined;
+    permissions?: ('account:read' | 'operations:request')[] | undefined;
+    expires_at?: string | undefined;
+    grant_id?: string | undefined;
+    request_id: string;
+    status: string;
+    consent_url: string;
+  }>;
+  ownerGrants(identity: OwnerIdentity): Promise<
+    {
+      id: string;
+      application: string;
+      permissions: ('account:read' | 'operations:request')[];
+      state: 'revoked' | 'suspended' | 'active';
+      expiresAt: number;
+    }[]
+  >;
+  changeGrant(
+    id: string,
+    stateValue: 'suspended' | 'revoked',
+    identity: OwnerIdentity | VerifiedPrincipal,
+  ): Promise<{
+    grant_id: string;
+    status: 'revoked' | 'suspended';
+  }>;
+  /** Use on an existing financial authority; exact-action approval still belongs to that authority. */
+  bindWalletAuthority(
+    authority: EmbeddedWalletAuthority,
+  ): EmbeddedWalletAuthority;
+  authorizeCurrent(
+    principal: VerifiedPrincipal,
+    accountId: string,
+  ): Promise<AccessGrant>;
+  /** Ready-to-compose creation authority. No signing is enabled without an exact-action host integration. */
+  walletAuthority(): EmbeddedWalletAuthority;
+  canDispatchProvision(attemptId: string, accountId: string): Promise<boolean>;
+}
+```
+
+### OnboardingStore
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/onboarding/types.ts).
+
+```ts
+/** Callback is synchronous; never make vendor/network calls inside a storage transaction. */
+export interface OnboardingStore {
+  transaction<T>(operation: (state: ProviderState) => T): Promise<T>;
+}
+```
+
+### OwnerIdentity
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/onboarding/types.ts).
+
+```ts
+export interface OwnerIdentity {
+  issuer: string;
+  subject: string;
+  authenticatedAt: number;
+}
+```
+
+### ownerKey
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/onboarding/service.ts).
+
+```ts
+export declare function ownerKey(
+  owner: Pick<OwnerIdentity, 'issuer' | 'subject'>,
+): string;
+```
+
+### OwnerLogin
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/onboarding/login.ts).
+
+```ts
+export interface OwnerLogin {
+  start(requestId: string, browserToken: string): Promise<string>;
+  finish(
+    url: URL,
+    browserToken: string,
+  ): Promise<{
+    sessionToken: string;
+    requestId: string;
+  }>;
+  session(token: string): Promise<{
+    identity: OwnerIdentity;
+    csrf: string;
+  }>;
+}
+```
+
+### OwnerLoginConfiguration
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/onboarding/login.ts).
+
+```ts
+export interface OwnerLoginConfiguration {
+  issuer: string;
+  clientId: string;
+  clientSecret: string;
+  idTokenAlgorithm?: 'RS256' | 'ES256';
+}
+```
+
+### Permission
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/onboarding/types.ts).
+
+```ts
+export type Permission = (typeof permissions)[number];
+```
+
+### ProviderState
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/onboarding/types.ts).
+
+```ts
+export interface ProviderState {
+  format: 'moovha-onboarding-1';
+  requests: Record<string, AccessRequest>;
+  accounts: Record<string, AccountRecord>;
+  grants: Record<string, AccessGrant>;
+  idempotency: Record<
+    string,
+    {
+      hash: string;
+      id: string;
+    }
+  >;
+  budgets: Record<string, number>;
+  evidenceOwners: Record<string, string>;
+  attempts: Record<string, StoredAttempt>;
+  admissions: Record<
+    string,
+    {
+      accountId: string;
+      grantId: string;
+      caller: AccessRequest['caller'];
+    }
+  >;
+  sessions: Record<
+    string,
+    {
+      owner: OwnerIdentity;
+      expiresAt: number;
+      csrf: string;
+    }
+  >;
+  logins: Record<
+    string,
+    {
+      verifier: string;
+      nonce: string;
+      browserHash: string;
+      requestId: string;
+      expiresAt: number;
+    }
+  >;
+  audit: {
+    at: number;
+    event: string;
+    resource: string;
+    revision: string;
+  }[];
+}
+```
+
+### SumsubConfiguration
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/onboarding/vendors.ts).
+
+```ts
+export interface SumsubConfiguration {
+  appToken: string;
+  secretKey: string;
+  levelName: string;
+  /** Confirm the newer Reusable KYC Share feature is enabled; legacy ignores body controls. */
+  reusableKycShareEnabled: true;
+  importPrice?: VendorPrice;
+  verificationPrice?: VendorPrice;
+}
+```
+
+### VendorPrice
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/onboarding/types.ts).
+
+```ts
+export interface VendorPrice {
+  /** Upper bound in USD cents, confirmed with the vendor for this configured workflow/level. */
+  maximumMinor: number;
+  termsReference: string;
+}
+```
+
+## OIDC Identity Assurance enrollment
+
+Import from `@moovha/wallet-provider-kit/identity`. [Integration guide](enrollment.md).
+
+- [createIdentityVerifier](#createidentityverifier)
+- [EnrollmentAuthority](#enrollmentauthority)
+- [EnrollmentChallenge](#enrollmentchallenge)
+- [EnrollmentDecision](#enrollmentdecision)
+- [EnrollmentRecord](#enrollmentrecord)
+- [EnrollmentService](#enrollmentservice)
+- [EnrollmentStatus](#enrollmentstatus)
+- [IdentityAttribute](#identityattribute)
+- [IdentityConfiguration](#identityconfiguration)
+- [IdentityVerifier](#identityverifier)
+- [VerifiedIdentity](#verifiedidentity)
+
+### createIdentityVerifier
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/identity/oidc.ts).
+
+```ts
+/** Narrow OIDC Core / Identity Assurance profile; no token-driven discovery or evidence fetching. */
+export declare function createIdentityVerifier(
+  configuration: IdentityConfiguration,
+  keys?: JWTVerifyGetKey,
+): IdentityVerifier;
+```
+
+### EnrollmentAuthority
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/domain/enrollment.ts).
+
+```ts
+/** Trusted host integration. No runtime database or automatic KYC-acceptance implementation is supplied. */
+export interface EnrollmentAuthority {
+  /** Authorize current caller; atomically reserve IDs/unique nonce and bind the idempotency key. Return original record on exact retry. */
+  begin(
+    context: AuthorityContext,
+    proposal: EnrollmentChallenge,
+  ): Promise<EnrollmentRecord | null>;
+  /** Current tenant/client/grant/object authorization, including completed-result reads. Reject a previously consumed submission key bound to another enrollment. */
+  load(
+    context: AuthorityContext,
+    enrollmentId: string,
+  ): Promise<EnrollmentRecord | null>;
+  /** Apply provider policy and independently verified enrollment consent. Atomically consume nonce and submission idempotency key, bind issuer/subject to owner/account, persist decision and proofHash. Exact proof replay returns stored result; changed proofs conflict. Never provision/sign here. */
+  decide(
+    context: AuthorityContext,
+    challenge: EnrollmentChallenge,
+    identity: VerifiedIdentity,
+  ): Promise<EnrollmentRecord>;
+  /** Recheck current acceptance, consent, revocation, subject/account mapping and policy. Null denies. */
+  forAccount(
+    context: AuthorityContext,
+    accountId: string,
+  ): Promise<EnrollmentRecord | null>;
+}
+```
+
+### EnrollmentChallenge
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/domain/enrollment.ts).
+
+```ts
+export interface EnrollmentChallenge {
+  enrollmentId: string;
+  accountId: string;
+  nonce: string;
+  createdAt: string;
+  expiresAt: string;
+  caller: Pick<VerifiedPrincipal, 'issuer' | 'subject' | 'clientId'>;
+  identityIssuer: string;
+  identityClientId: string;
+  /** Claimed at enrollment start; becomes verified only after matching the issuer's ID token. */
+  identitySubject: string;
+}
+```
+
+### EnrollmentDecision
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/domain/enrollment.ts).
+
+```ts
+export interface EnrollmentDecision {
+  proofHash: string;
+  identityIssuer: string;
+  identitySubject: string;
+  verifiedAt: string;
+  policyRevision: string;
+  /** Required for acceptance; host-resolved owner, never copied from an API claim. */
+  ownerSubject?: string;
+  consentReference?: string;
+  acceptanceExpiresAt?: string;
+}
+```
+
+### EnrollmentRecord
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/domain/enrollment.ts).
+
+```ts
+export interface EnrollmentRecord extends EnrollmentChallenge {
+  status: EnrollmentStatus;
+  decision?: EnrollmentDecision;
+}
+```
+
+### EnrollmentService
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/domain/enrollment.ts).
+
+```ts
+/** Enrollment consumes identity evidence; it never creates grants, changes KYC or calls a signing backend. */
+export declare class EnrollmentService {
+  constructor(identity: IdentityVerifier, authority: EnrollmentAuthority);
+  begin(
+    input: AuthorityContext,
+    identitySubject: string,
+  ): Promise<{
+    nonce: string;
+    expires_at: string;
+    identity_issuer: string;
+    identity_client_id: string;
+    required_claims: (
+      | 'name'
+      | 'given_name'
+      | 'family_name'
+      | 'middle_name'
+      | 'birthdate'
+      | 'phone_number'
+    )[];
+    enrollment_id: string;
+    account_id: string;
+    status: EnrollmentStatus;
+  }>;
+  complete(
+    input: AuthorityContext,
+    enrollmentId: string,
+    token: string,
+  ): Promise<{
+    enrollment_id: string;
+    account_id: string;
+    status: EnrollmentStatus;
+  }>;
+  read(
+    input: AuthorityContext,
+    enrollmentId: string,
+  ): Promise<{
+    enrollment_id: string;
+    account_id: string;
+    status: EnrollmentStatus;
+  }>;
+  provision(
+    wallets: EmbeddedWalletService,
+    input: AuthorityContext,
+    accountId: string,
+  ): Promise<import('./signing.js').EmbeddedAccount>;
+}
+```
+
+### EnrollmentStatus
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/domain/enrollment.ts).
+
+```ts
+export type EnrollmentStatus =
+  'awaiting_identity' | 'accepted' | 'needs_verification' | 'rejected';
+```
+
+### IdentityAttribute
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/identity/oidc.ts).
+
+```ts
+export type IdentityAttribute = (typeof attributeNames)[number];
+```
+
+### IdentityConfiguration
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/identity/oidc.ts).
+
+```ts
+export interface IdentityConfiguration {
+  issuer: string;
+  /** Provider's registered OIDC RP client; separate from the API OAuth audience. */
+  clientId: string;
+  jwksUrl: string;
+  requiredClaims: readonly IdentityAttribute[];
+  /** Provider-selected freshness, not a universal KYC lifetime. */
+  maxVerificationAgeSeconds: number;
+}
+```
+
+### IdentityVerifier
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/identity/oidc.ts).
+
+```ts
+export interface IdentityVerifier {
+  readonly issuer: string;
+  readonly clientId: string;
+  readonly requiredClaims: readonly IdentityAttribute[];
+  readonly maxVerificationAgeSeconds: number;
+  verify(
+    token: string,
+    challenge: IdentityChallenge,
+  ): Promise<VerifiedIdentity>;
+}
+```
+
+### VerifiedIdentity
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/identity/oidc.ts).
+
+```ts
+export interface VerifiedIdentity {
+  issuer: string;
+  subject: string;
+  proofHash: string;
+  verifiedAt: string;
+  authenticatedAt: string;
+  verifiedClaims: {
+    verification: {
+      trust_framework: string;
+      time: string;
+      verification_process: string;
+      assurance_level?: string;
+    };
+    claims: Partial<Record<IdentityAttribute, string>>;
+  };
+}
+```
+
+## Telemetry lifecycle
+
+Import from `@moovha/wallet-provider-kit/telemetry`. [Integration guide](operations.md).
+
+- [startTelemetry](#starttelemetry)
+
+### startTelemetry
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/service/telemetry.ts).
+
+```ts
+export declare function startTelemetry(
+  endpoint?: string,
+  allowInsecureDevelopment?: boolean,
+): {
+  shutdown: () => Promise<void>;
+};
+```
+
+## Coinbase CDP adapter
+
+Import from `@moovha/wallet-provider-kit/cdp`. [Integration guide](provider-guide.md#current-adapter-profile).
+
+- [createCdpWalletProvider](#createcdpwalletprovider)
+
+### createCdpWalletProvider
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/providers/cdp.ts).
+
+```ts
+/**
+ * No SDK singleton, telemetry, ambient credentials, redirects or automatic retries.
+ * Auth uses the vendor's public SDK; HTTP lifecycle belongs to this adapter.
+ * This factory is not imported by application startup. Business policy and durable
+ * attempts must be composed through EmbeddedWalletService before activation.
+ */
+export declare function createCdpWalletProvider(
+  environment: NodeJS.ProcessEnv,
+  request?: typeof fetch,
+): WalletSigningProvider;
+```
+
+## Open Wallet Standard adapter
+
+Import from `@moovha/wallet-provider-kit/ows`. [Integration guide](ows-adapter.md).
+
+- [createOwsWalletProvider](#createowswalletprovider)
+- [OwsProviderOptions](#owsprovideroptions)
+
+### createOwsWalletProvider
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/providers/ows.ts).
+
+```ts
+/** Experimental local OWS owner-credential profile. No export, broadcast or raw signing. */
+export declare function createOwsWalletProvider(
+  options: OwsProviderOptions,
+  attempts: JournaledProviderOptions,
+): WalletSigningProvider;
+```
+
+### OwsProviderOptions
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/providers/ows.ts).
+
+```ts
+export interface OwsProviderOptions {
+  /** Dedicated, existing, operator-owned vault; never the ambient ~/.ows vault. */
+  vaultPath: string;
+  /** Owner credential from the host secret store. Never from an HTTP caller. */
+  passphrase(): Promise<string>;
+}
+```
+
+## OpenZeppelin Relayer adapter and execution
+
+Import from `@moovha/wallet-provider-kit/openzeppelin-relayer`. [Integration guide](openzeppelin-relayer.md).
+
+- [createOpenZeppelinRelayerExecutor](#createopenzeppelinrelayerexecutor)
+- [createOpenZeppelinRelayerWalletProvider](#createopenzeppelinrelayerwalletprovider)
+- [hashRelayerTransaction](#hashrelayertransaction)
+- [RelayerAcceptance](#relayeracceptance)
+- [RelayerAttemptJournal](#relayerattemptjournal)
+- [RelayerAttemptOptions](#relayerattemptoptions)
+- [RelayerBinding](#relayerbinding)
+- [RelayerConnection](#relayerconnection)
+- [RelayerExecutionAction](#relayerexecutionaction)
+- [RelayerExecutionAuthority](#relayerexecutionauthority)
+- [RelayerExecutionAuthorityRecord](#relayerexecutionauthorityrecord)
+- [RelayerExecutionProvider](#relayerexecutionprovider)
+- [RelayerExecutionService](#relayerexecutionservice)
+- [RelayerTransaction](#relayertransaction)
+- [RelayerTransactionStatus](#relayertransactionstatus)
+
+### createOpenZeppelinRelayerExecutor
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/providers/openzeppelin-relayer.ts).
+
+```ts
+/** Relayer allocates nonces and owns its queue/broadcast workers. Host approval stays here. */
+export declare function createOpenZeppelinRelayerExecutor(
+  connection: RelayerConnection,
+  options: RelayerAttemptOptions,
+  request?: typeof fetch,
+): RelayerExecutionProvider;
+```
+
+### createOpenZeppelinRelayerWalletProvider
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/providers/openzeppelin-relayer.ts).
+
+```ts
+/** Binds preconfigured Relayer keys; never creates a signer or wallet through its admin API. */
+export declare function createOpenZeppelinRelayerWalletProvider(
+  connection: RelayerConnection,
+  attempts: JournaledProviderOptions,
+  request?: typeof fetch,
+): WalletSigningProvider;
+```
+
+### hashRelayerTransaction
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/domain/relayer-execution.ts).
+
+```ts
+/** Hash the approved call/initial fees, not an unsigned Ethereum transaction. */
+export declare function hashRelayerTransaction(
+  transaction: RelayerTransaction,
+): string;
+```
+
+### RelayerAcceptance
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/domain/relayer-execution.ts).
+
+```ts
+export interface RelayerAcceptance {
+  /** A provider record ID. Never a chain transaction hash or settlement proof. */
+  transactionId: string;
+}
+```
+
+### RelayerAttemptJournal
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/providers/openzeppelin-relayer.ts).
+
+```ts
+export interface RelayerAttemptJournal extends WalletAttemptJournal {
+  /** No claims, reservations, state transitions or writes during read. */
+  read(request: WalletAttemptRequest): Promise<WalletAttemptClaim | null>;
+}
+```
+
+### RelayerAttemptOptions
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/providers/openzeppelin-relayer.ts).
+
+```ts
+export interface RelayerAttemptOptions extends JournaledProviderOptions {
+  journal: RelayerAttemptJournal;
+  /** Current read permission for the original attempt; no new spending lease required. */
+  authorizeStatus(request: WalletAttemptRequest): Promise<boolean>;
+}
+```
+
+### RelayerBinding
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/providers/relayer-client.ts).
+
+```ts
+export interface RelayerBinding {
+  relayerId: string;
+  signerId: string;
+  address: string;
+  bindingRevision: string;
+}
+```
+
+### RelayerConnection
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/providers/relayer-client.ts).
+
+```ts
+export interface RelayerConnection {
+  /** Operator-configured HTTPS origin, without path, query, credentials or fragment. */
+  url: string;
+  apiKey: string;
+  /** Server-owned binding. Never resolve from an HTTP transaction body. */
+  resolveAccount(accountId: string): Promise<RelayerBinding | null>;
+}
+```
+
+### RelayerExecutionAction
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/domain/relayer-execution.ts).
+
+```ts
+export interface RelayerExecutionAction {
+  actionId: string;
+  operationId: string;
+  kind: 'relay_transaction';
+  profile: 'oz_relayer_evm_v1';
+  profileRevision: '1';
+  status: 'ready';
+  chainId: 'eip155:84532';
+  chainAccountId: string;
+  bindingRevision: string;
+  capabilityRevision: string;
+  planRevision: string;
+  planHash: string;
+  payloadHash: string;
+  expiresAt: string;
+  transaction: RelayerTransaction;
+}
+```
+
+### RelayerExecutionAuthority
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/domain/relayer-execution.ts).
+
+```ts
+export interface RelayerExecutionAuthority {
+  /** Load immutable action by ID, verify current owner/grant/KYC/consent and admit its budget durably. */
+  execution(
+    context: AuthorityContext,
+    actionId: string,
+    purpose: 'submit' | 'status',
+  ): Promise<RelayerExecutionAuthorityRecord | null>;
+}
+```
+
+### RelayerExecutionAuthorityRecord
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/domain/relayer-execution.ts).
+
+```ts
+export interface RelayerExecutionAuthorityRecord {
+  sessionSubject: string;
+  ownerSubject: string;
+  currentUserStatus: string | null;
+  accountId: string;
+  attemptId: string;
+  account: EmbeddedAccount;
+  bindingRevision: string;
+  capabilityRevision: string;
+  action: RelayerExecutionAction;
+}
+```
+
+### RelayerExecutionProvider
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/domain/relayer-execution.ts).
+
+```ts
+export interface RelayerExecutionProvider {
+  submit(
+    account: EmbeddedAccount,
+    action: RelayerExecutionAction,
+    attemptId: string,
+  ): Promise<RelayerAcceptance>;
+  /** Read-only; checks current host authority and the original stored request. */
+  status(
+    account: EmbeddedAccount,
+    action: RelayerExecutionAction,
+    attemptId: string,
+    transactionId: string,
+  ): Promise<RelayerTransactionStatus>;
+}
+```
+
+### RelayerExecutionService
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/domain/relayer-execution.ts).
+
+```ts
+/** Library-only stored-action service. No raw transaction HTTP endpoint is added. */
+export declare class RelayerExecutionService {
+  constructor(
+    authority: RelayerExecutionAuthority,
+    provider: RelayerExecutionProvider,
+  );
+  submit(
+    context: AuthorityContext,
+    actionId: string,
+  ): Promise<RelayerAcceptance>;
+  status(
+    context: AuthorityContext,
+    actionId: string,
+    transactionId: string,
+  ): Promise<RelayerTransactionStatus>;
+}
+```
+
+### RelayerTransaction
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/domain/relayer-execution.ts).
+
+```ts
+/** Relayer owns the nonce. This is NOT the draft's fully populated Transaction. */
+export interface RelayerTransaction {
+  to: string;
+  value: string;
+  data: string;
+  gasLimit: string;
+  maxFeePerGas: string;
+  maxPriorityFeePerGas: string;
+}
+```
+
+### RelayerTransactionStatus
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/domain/relayer-execution.ts).
+
+```ts
+export interface RelayerTransactionStatus extends RelayerAcceptance {
+  status:
+    | 'canceled'
+    | 'pending'
+    | 'sent'
+    | 'submitted'
+    | 'mined'
+    | 'confirmed'
+    | 'failed'
+    | 'expired';
+  hash?: string;
+}
+```

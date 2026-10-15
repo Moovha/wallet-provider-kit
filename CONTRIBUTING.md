@@ -32,7 +32,10 @@ npm pack --dry-run
 
 Write readable TypeScript with explicit validation and failure paths. Run
 `npm run format`; after schema changes, run `npm run generate:spec` and review
-the diff. Dependency changes require exact pins, lockfile and advisory/license review.
+the diff. After public API changes, run `npm run generate:docs` and review the
+generated declaration/HTTP references; `verify` checks them for drift. The packaged
+provider-flow example is exercised and typechecked by `npm run check:package`.
+Dependency changes require exact pins, lockfile and advisory/license review.
 
 Keep Node, its type definitions, CI and Docker on the supported Node 24 major.
 Runtime migrations need a coordinated PR; Dependabot still proposes updates within
