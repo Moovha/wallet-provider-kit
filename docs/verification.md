@@ -1,5 +1,10 @@
 # Extraction verification — 15 October 2026
 
+This records the initial extraction checkpoint, before public GitHub hosting.
+For the current branch workflow and CI, see the
+[branch guide](branch-workflow.md) and
+[GitHub Actions](https://github.com/Moovha/wallet-provider-kit/actions).
+
 The final source was checked locally on Node 24.22.0 / npm 11.11.1. A separate
 checkout of the staged files installed from its own lockfile with `npm ci`, with
 no sibling modules, local environment files or live provider credentials.

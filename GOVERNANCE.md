@@ -1,8 +1,10 @@
 # Governance
 
-Moovha is the project steward. Brandon Musa is the initial maintainer and local
-project contact. Verified public handles and backup maintainers are required
-before publication; see [release prerequisites](docs/releases.md).
+Moovha is the project steward. Brandon Musa
+([BossBuusMuus](https://github.com/BossBuusMuus)) is the initial maintainer.
+GitHub private vulnerability reporting is available. A backup maintainer and
+out-of-band reporting contact remain open maintenance tasks; see the
+[release process](docs/releases.md).
 
 ## How we make decisions
 

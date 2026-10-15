@@ -2,21 +2,22 @@
 
 ## Supported versions
 
-The kit is experimental and unpublished. No release is approved for production
-custody or funds. Only the latest experimental minor is planned to receive fixes;
-public release support starts after publication.
+The source is public and experimental, with no npm release. No release is
+approved for production custody or funds. Only the latest experimental minor
+is planned to receive fixes; no stable release support is offered yet.
 
 ## Report a vulnerability
 
-If you've found a vulnerability, contact Brandon Musa through the existing
-private project channel. Share the affected version or commit, what could go
+If you've found a vulnerability, use
+[GitHub private vulnerability reporting](https://github.com/Moovha/wallet-provider-kit/security/advisories/new).
+Reports are visible to the repository's security maintainers, not public issues. Share the affected version or commit, what could go
 wrong, a safe offline reproduction and any suggested fix. Keep the report and
 sensitive data out of public issues. Use dummy fixtures without accessing
 others' accounts or moving funds.
 
-Before publication, the owner must enable GitHub private vulnerability reporting
-and add its verified link and a backup contact here. Publication is gated on that
-setup; no public reporting channel is configured yet.
+A separate backup reporting contact is not configured yet. If you cannot use
+GitHub reporting, open an issue asking for a private contact without including
+vulnerability details or sensitive data.
 
 We'll review the report, coordinate disclosure with affected vendors and publish
 a fix or advisory when ready. We don't offer a guaranteed response time or bug

@@ -14,6 +14,9 @@ For each new backend, add equivalent fixtures through its public adapter interfa
 Record adapter/version, environment, account/key-control profile, supported chains,
 action kinds, signature encoding, payload limits, recovery method and submission
 ownership. Do not advertise a profile based only on a vendor SDK method name.
+Use shared payload/digest/signature vectors when two adapters claim the same
+profile; include success, denial and uncertain-outcome cases. See the
+[related-project lessons](related-projects.md#apply-the-lessons).
 
 Before you enable an integration, keep evidence for these cases:
 

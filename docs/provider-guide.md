@@ -94,6 +94,24 @@ own policy. No sample in-memory authority is shipped as a deployment option.
 
 ## Signing backend contract
 
+### Current adapter profile
+
+| Capability   | CDP adapter                                                                                  |
+| ------------ | -------------------------------------------------------------------------------------------- |
+| Network      | Base Sepolia, chain 84532 only.                                                              |
+| Account type | Externally owned account (EOA), revision 1. Contract accounts are unsupported.               |
+| Signing      | Exact approved EIP-712 typed data; digest, domain and recovered signer checked.              |
+| Key control  | App-controlled CDP API-key wallets; no keys or seed phrases exposed by the kit interface.    |
+| Recovery     | Read-only account lookup by stable opaque ID; the host supplies the durable attempt journal. |
+| Submission   | No broadcast, gas sponsorship or settlement implementation.                                  |
+| Evidence     | Offline adapter/service tests; live lifecycle and recovery remain unverified.                |
+
+This follows the explicit capability approach described in
+[related projects](related-projects.md). It doesn't imply compatibility with those
+projects.
+
+### Implement an adapter
+
 Implement `WalletSigningProvider` with `createAccount`, read-only `findAccount`,
 and `signTypedData`. Never export keys through this interface. Stable account IDs
 must resolve to the same owner-bound address, and typed signatures must recover
@@ -105,7 +123,7 @@ The CDP adapter uses the vendor's public authentication helper, fixed vendor URL
 explicit credentials, ten-second HTTP timeout, bounded response bytes, no
 redirects and no automatic mutation retries. Its name is `moovha-<opaque UUID>`;
 phone numbers and customer identifiers never go to the vendor as names. It checks
-Base Sepolia chain 84532, externally owned account (EOA) revision 1, a 32 KiB
+Base Sepolia chain 84532, EOA revision 1, a 32 KiB
 payload, expiry, matching domain, primary type, CAIP-10 address and digest, then
 verifies the returned signature.
 It snapshots the input before awaits and rechecks expiry after the account read.

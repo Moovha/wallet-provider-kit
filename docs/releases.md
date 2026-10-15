@@ -1,15 +1,18 @@
 # Prepare a release
 
-The repository is locally initialized on main and deliberately has no remote.
+The public source repository is
+[Moovha/wallet-provider-kit](https://github.com/Moovha/wallet-provider-kit).
+The owner authorized public hosting and the [toolkit branch workflow](branch-workflow.md)
+on 15 October 2026. npm publication still requires separate authorization.
 The rights holder authorized Apache-2.0 for the extracted foundation on 15 October 2026. NOTICE and extraction.json identify its origin; the old license is retained
 only as historical evidence in docs/LICENSE.source. Do not extend that permission
 to unrelated source or third-party dependencies.
 
-Before initial public hosting, verify contributor rights, package namespace,
-maintainer/backup handles, security reporting contacts and applicable dependency
-licenses; configure protected main, CODEOWNERS and required CI/reviews. Obtain the
-owner's explicit public-hosting authorization. `private: true` remains until a
-separately authorized npm release. A local commit is not publication.
+GitHub private vulnerability reporting is enabled. Main uses required CI and
+pull requests; [CODEOWNERS](../.github/CODEOWNERS) identifies the verified
+maintainer. A backup maintainer and out-of-band security contact are still needed;
+public hosting does not imply those roles have been filled. `private: true` in
+package.json prevents accidental npm publication.
 
 When you're preparing a release candidate, work through these checks:
 

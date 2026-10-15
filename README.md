@@ -5,7 +5,7 @@ you control. This TypeScript library and HTTP service lets your team connect
 external orchestration services, including Moovha, while your application
 enforces the wallet owner's consent and controls signing access.
 
-**Experimental · 0.1.0 · unpublished.** You can explore the API locally without
+**Experimental · 0.1.0 · not on npm.** You can explore the API locally without
 credentials. Account creation and signing stay disabled until your application
 supplies persistent authorization and recovery. Production acceptance is still
 pending; see [verification](docs/verification.md).
@@ -77,8 +77,10 @@ save and spend across Southern Africa.
 ## Documentation
 
 - [Architecture and standards](docs/architecture.md)
+- [Related projects and lessons](docs/related-projects.md)
 - [Operations and monitoring](docs/operations.md)
 - [Contributing](CONTRIBUTING.md) · [Governance](GOVERNANCE.md) · [Code of conduct](CODE_OF_CONDUCT.md)
+- [Branch and merge workflow](docs/branch-workflow.md)
 - [Security reporting](SECURITY.md) · [Release process](docs/releases.md)
 - [Changelog](CHANGELOG.md) · [Provenance](docs/extraction.json)
 

@@ -2,6 +2,10 @@
 
 ## 0.1.0 — unreleased
 
+- Added a sourced comparison with related open-source projects and an explicit
+  CDP capability/evidence profile.
+- Added public GitHub hosting, a persistent `codex/toolkit` branch and a tested
+  merge workflow that waits for CI and outstanding contributions/reviews.
 - Added a contributor writing guide and a friendlier documentation voice, with
   a short project philosophy and a link to the Moovha platform.
 - Reworked project and contributor documentation around integration, entity

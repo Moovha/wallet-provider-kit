@@ -12,9 +12,10 @@ If your change affects authorization, custody, public schemas, capabilities or
 dependencies, start a design discussion so we can review compatibility, security
 and cost together.
 
-While the repository is unpublished, use the existing project channel for
-proposals and patches. After public hosting, use issues and pull requests.
-Public contacts are a [publication prerequisite](docs/releases.md).
+Use GitHub issues for proposals and pull requests for changes. The owner's ongoing
+work uses the [toolkit branch workflow](docs/branch-workflow.md). Other
+contributions use separate branches and receive review before merging.
+See [SECURITY.md](SECURITY.md) for private vulnerability reports.
 
 ## Development
 
