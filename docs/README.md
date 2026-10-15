@@ -1,5 +1,8 @@
 # Build your wallet service
 
+Read these guides with grouped navigation and search on the
+[documentation site](https://moovha.github.io/wallet-provider-kit/).
+
 Wallet Provider Kit helps your team operate wallets for users and make approved
 wallet actions available to connected applications. You choose the backend and
 key-control model; the toolkit connects onboarding, application access and signing

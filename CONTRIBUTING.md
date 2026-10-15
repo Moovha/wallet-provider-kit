@@ -98,13 +98,14 @@ VitePress 1.6.4 uses a scoped Vite 6.4.4 override to avoid advisories in its Vit
 dependency. Its Vue plugin supports Vite 6. Keep that override audited and tested;
 remove it when a stable VitePress release supplies a patched dependency directly.
 
-Publication is separate from commits and package releases. A repository
-administrator must first select **Settings → Pages → Source → GitHub Actions**.
-After approval to publish, run **Actions → Publish documentation → Run workflow**
-on `main`. It publishes only the documentation to
-`https://moovha.github.io/wallet-provider-kit/`; later updates use the same manual
-workflow. No documentation deployment happens on a push or PR merge. npm
-publication remains disabled. See [GitHub's Pages workflow guide](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages).
+The published documentation is at
+[moovha.github.io/wallet-provider-kit](https://moovha.github.io/wallet-provider-kit/).
+GitHub Pages is configured to use GitHub Actions. Publication is separate from
+commits and package releases: for an approved documentation update, run
+**Actions → Publish documentation → Run workflow** on `main`. The workflow
+publishes only the documentation. No documentation deployment happens on a push
+or PR merge; npm publication remains disabled. See
+[GitHub's Pages workflow guide](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages).
 
 ## Submit and review
 

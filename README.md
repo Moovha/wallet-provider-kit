@@ -13,8 +13,10 @@ user-approved access. Your team keeps control of its signing integration;
 the application receives the results of permitted actions without receiving
 private keys or seed phrases.
 
-[Get started](docs/package.md) · [Integration tutorial](docs/integration-example.md) ·
-[API documentation](docs/api.md) · [All documentation](docs/README.md)
+[Documentation](https://moovha.github.io/wallet-provider-kit/) ·
+[Get started](https://moovha.github.io/wallet-provider-kit/docs/package.html) ·
+[Integration tutorial](https://moovha.github.io/wallet-provider-kit/docs/integration-example.html) ·
+[API documentation](https://moovha.github.io/wallet-provider-kit/docs/api.html)
 
 ## Who takes part
 
@@ -187,12 +189,11 @@ start with the [API guide](docs/api.md) and [durable attempts](docs/durable-atte
 
 ## Build with us
 
-The [documentation index](docs/README.md) takes you from installation through
-[backend integration](docs/backend-guide.md), host authority, APIs and operations.
-For a documentation site with grouped navigation and local search, run
-`npm run docs:dev` from this checkout after `npm ci`, then open the printed local
-address. The [contributor guide](CONTRIBUTING.md#preview-and-publish-documentation)
-explains site previews and GitHub Pages publication.
+The [documentation site](https://moovha.github.io/wallet-provider-kit/) takes you
+from installation through backend integration, host authority, APIs and operations,
+with grouped navigation and local search. The
+[contributor guide](CONTRIBUTING.md#preview-and-publish-documentation) explains local
+previews and how to publish reviewed documentation updates.
 
 Contributions follow the [contributor guide](CONTRIBUTING.md),
 [governance](GOVERNANCE.md) and [code of conduct](CODE_OF_CONDUCT.md).
