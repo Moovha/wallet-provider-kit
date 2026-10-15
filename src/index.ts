@@ -44,3 +44,34 @@ export type {
   WalletAttemptFailure,
   WalletAttemptClaim,
 } from './domain/attempt-journal.js';
+export { createOnboardingProvider } from './onboarding/provider.js';
+export type { OnboardingProviderConfiguration } from './onboarding/provider.js';
+export { defineOnboardingPolicy } from './onboarding/policy.js';
+export { OnboardingService, ownerKey } from './onboarding/service.js';
+export { createFileOnboardingStore } from './onboarding/file-store.js';
+export { createOnboardingJournal } from './onboarding/journal.js';
+export { createOwnerLogin } from './onboarding/login.js';
+export type {
+  OwnerLogin,
+  OwnerLoginConfiguration,
+} from './onboarding/login.js';
+export {
+  createDiditIdentityAdapter,
+  createSumsubIdentityAdapter,
+} from './onboarding/vendors.js';
+export type {
+  DiditConfiguration,
+  SumsubConfiguration,
+} from './onboarding/vendors.js';
+export { accessType } from './onboarding/types.js';
+export type {
+  OnboardingPolicy,
+  ApplicationPolicy,
+  OnboardingStore,
+  ProviderState,
+  IdentityAdapter,
+  IdentityEvidence,
+  OwnerIdentity,
+  Permission,
+  VendorPrice,
+} from './onboarding/types.js';

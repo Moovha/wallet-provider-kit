@@ -1,5 +1,11 @@
 # Implementing a provider
 
+For new integrations, start with [onboarding and application access](onboarding.md)
+and its [single configuration example](provider.config.example.ts). It supplies
+default policy evaluation, owner consent, provider review, Didit/Sumsub adapters,
+durable reference storage and journaled account creation. The interfaces below
+are for existing hosts and financial-action integration.
+
 You bring the signing backend and the application that decides who may use it.
 We call that application the **host**. It checks owner consent, current grants,
 Know Your Customer (KYC) status and revocation, and keeps persistent attempt
@@ -50,6 +56,19 @@ local build or tarball in your integration project. You don't need any sibling
 Moovha repository to install or run this kit.
 
 ## Authentication and policy
+
+When `createServer` has `onboarding`, provision/sign HTTP routes also check current
+access and the account owner. In a financial host, use
+`onboarding.bindWalletAuthority(authority)` and recheck
+`onboarding.authorize(principal, accountId, 'operations:request')` **inside your
+existing journal's `authorizeAttempt`**, alongside exact approved action, limits,
+current owner, KYC and consent. An HTTP admission check alone cannot protect
+against revocation between admission and dispatch or during result replay.
+The bundled onboarding journal is provisioning-only; it denies signing.
+Its canonical owner key is `ownerKey({ issuer, subject })` from the verified
+provider login. Existing hosts must resolve that trusted login tuple to their
+customer record and use the same owner binding in their authority integration.
+Do not derive it from an application's service-account subject or supplied name.
 
 For new users, follow [enrollment and identity handoff](enrollment.md). The kit
 verifies provider-bound OIDC Identity Assurance evidence; your host decides

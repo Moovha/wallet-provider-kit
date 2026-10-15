@@ -7,4 +7,5 @@ coverage/
 *.log
 *.tgz
 artifacts/
+.provider-data/
 .DS_Store
