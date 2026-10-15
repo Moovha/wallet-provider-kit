@@ -106,12 +106,16 @@ export class OnboardingService {
     application(this.policy, context.principal);
     return context;
   }
-  private current(state: ProviderState, id: string): AccessRequest {
+  private current(
+    state: ProviderState,
+    id: string,
+    allowExpired = false,
+  ): AccessRequest {
     const request = state.requests[id];
     if (
       !request ||
       request.revision !== this.policy.revision ||
-      request.expiresAt <= Date.now()
+      (!allowExpired && request.expiresAt <= Date.now())
     )
       deny();
     application(this.policy, { ...request.caller, scopes: [] });
@@ -231,7 +235,7 @@ export class OnboardingService {
   async consentView(id: string, identity: OwnerIdentity) {
     const owner = this.freshOwner(identity);
     return this.store.transaction((state) => {
-      const request = this.current(state, id);
+      const request = this.current(state, id, true);
       if (request.owner && request.owner !== owner) deny();
       if (
         request.input.mode === 'connect' &&
@@ -549,7 +553,7 @@ export class OnboardingService {
             r.consent &&
             !r.denied &&
             !r.grantId &&
-            r.expiresAt > Date.now() &&
+            !r.acceptance &&
             r.revision === this.policy.revision,
         )
         .map((r) => ({
@@ -655,7 +659,7 @@ export class OnboardingService {
     )
       invalid();
     const before = await this.store.transaction((state) => {
-      const request = this.current(state, id);
+      const request = this.current(state, id, true);
       if (
         !request.owner ||
         !request.consent ||
@@ -667,7 +671,7 @@ export class OnboardingService {
     });
     if (input.decision === 'reject')
       return this.store.transaction((state) => {
-        const request = this.current(state, id);
+        const request = this.current(state, id, true);
         if (request.grantId) conflict();
         request.denied = true;
         audit(state, 'provider_rejected', id, this.policy.revision);
@@ -727,7 +731,7 @@ export class OnboardingService {
     )
       deny();
     return this.store.transaction((state) => {
-      const request = this.current(state, id);
+      const request = this.current(state, id, true);
       if (
         request.owner !== before.owner ||
         request.denied ||
@@ -771,7 +775,8 @@ export class OnboardingService {
         acceptanceRevision: this.policy.revision,
         evidenceHash: evidenceKey,
       };
-      this.grant(state, request);
+      // A completed identity review can be reused, but expired application consent cannot create access.
+      if (request.expiresAt > Date.now()) this.grant(state, request);
       audit(state, 'provider_accepted', id, this.policy.revision);
       return this.receipt(state, request);
     });
@@ -822,6 +827,41 @@ export class OnboardingService {
         ...(account.address ? { address: account.address } : {}),
         status: account.address ? 'provisioned' : 'accepted',
       };
+    });
+  }
+  async ownerRequests(identity: OwnerIdentity) {
+    const owner = this.freshOwner(identity);
+    return this.store.transaction((state) =>
+      Object.values(state.requests)
+        .filter(
+          (r) => r.owner === owner && !r.denied && !r.grantId && !r.acceptance,
+        )
+        .map((r) => ({
+          id: r.id,
+          application:
+            this.policy.applications.find(
+              (a) =>
+                a.issuer === r.caller.issuer &&
+                a.clientId === r.caller.clientId,
+            )?.name ?? 'Disconnected application',
+          status: this.stateOf(state, r),
+        })),
+    );
+  }
+  async cancelPending(id: string, identity: OwnerIdentity) {
+    const owner = this.freshOwner(identity);
+    return this.store.transaction((state) => {
+      const request = state.requests[id];
+      if (
+        !request ||
+        request.owner !== owner ||
+        request.grantId ||
+        request.acceptance
+      )
+        deny();
+      request.denied = true;
+      audit(state, 'owner_cancelled_request', id, this.policy.revision);
+      return this.receipt(state, request);
     });
   }
   async ownerGrants(identity: OwnerIdentity) {

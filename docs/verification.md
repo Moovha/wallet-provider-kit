@@ -2,11 +2,13 @@
 
 ## Onboarding and access — 15 October 2026
 
-Local Node 24.22.0 / npm 11.11.1 checks pass: **343 tests** across 13 suites,
-TypeScript, generated OpenAPI/types, formatting and secret scan. The 51 new cases
+Local Node 24.22.0 / npm 11.11.1 checks pass: **347 tests** across 13 suites,
+TypeScript, generated OpenAPI/types, formatting and secret scan. The 55 new cases
 cover the complete HTTP consent/review path, real ephemeral signed OIDC code/PKCE
 login, vendor request signing and normalization, client/owner isolation, budgets,
 renewal/revocation, policy changes, provider suspension and uncertain-outcome recovery.
+Delayed provider reviews cannot grant expired access, and owners can cancel
+pending requests, including while a vendor result is in flight.
 The tests use temporary private files and offline vendor fixtures, not customer data.
 
 Build, built-service/OWS smoke tests and standalone configuration-example

@@ -341,6 +341,61 @@ it('keeps owner consent separate from requester authentication and rejects CSRF,
     ).status,
   ).toBe('consent_required');
 });
+it('shows pending requests and lets only their authenticated owner cancel with CSRF protection', async () => {
+  const f = await setup();
+  await f.app.inject({
+    method: 'POST',
+    url: '/onboarding/' + f.receipt.request_id,
+    headers: formHeaders(),
+    payload: new URLSearchParams({
+      csrf: f.csrf,
+      decision: 'approve',
+    }).toString(),
+  });
+  const page = await f.app.inject({
+    url: '/onboarding/access',
+    headers: { cookie: formHeaders().cookie },
+  });
+  expect(page.body).toContain('Cancel request');
+  const url = `/onboarding/requests/${f.receipt.request_id}/cancel`;
+  expect(
+    (
+      await f.app.inject({
+        method: 'POST',
+        url,
+        headers: formHeaders('b'),
+        payload: new URLSearchParams({ csrf: f.csrf }).toString(),
+      })
+    ).statusCode,
+  ).toBe(403);
+  expect(
+    (
+      await f.app.inject({
+        method: 'POST',
+        url,
+        headers: formHeaders(),
+        payload: new URLSearchParams({ csrf: 'x'.repeat(43) }).toString(),
+      })
+    ).statusCode,
+  ).toBe(403);
+  expect(
+    (
+      await f.app.inject({
+        method: 'POST',
+        url,
+        headers: formHeaders(),
+        payload: new URLSearchParams({ csrf: f.csrf }).toString(),
+      })
+    ).statusCode,
+  ).toBe(302);
+  const receipt = await f.app.inject({
+    url: '/v1/access-requests/' + f.receipt.request_id,
+    headers: f.headers,
+  });
+  expect(receipt.json().status).toBe('denied');
+  expect(f.adapter.importShared).not.toHaveBeenCalled();
+});
+
 it('opens provider login with a secure browser cookie and rejects an unavailable default profile', async () => {
   const f = await setup();
   const response = await f.app.inject({

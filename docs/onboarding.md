@@ -84,7 +84,15 @@ Concurrent create requests for the same provider user converge on one account.
 External legacy account imports require a reviewed ownership/migration adapter;
 an arbitrary account ID is never adopted automatically.
 
-Users can pause or revoke grants. To reconnect, renew, or change permissions, the
+Users can pause or revoke grants. They can also cancel a pending request from the access page, even if its access
+link has expired. Cancellation blocks further acceptance/access; an already
+dispatched verification may still finish and incur its agreed cost.
+
+Request links last 24 hours. Your provider can finish an already-consented identity
+review after that without granting expired application access. A fresh request
+and owner approval then reuse the accepted identity without another import/check.
+
+To reconnect, renew, or change permissions, the
 application starts a new connect request and obtains consent again. The provider
 stores the new grant and revokes the superseded grant for that application/account.
 This prevents an older permission set remaining active after renewal. The provider

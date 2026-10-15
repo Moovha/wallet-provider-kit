@@ -432,6 +432,7 @@ export async function registerOnboardingRoutes(
         const current = await session(request, reply, 'access');
         if (!current) return;
         const grants = await service().ownerGrants(current.identity);
+        const pending = await service().ownerRequests(current.identity);
         return html(
           reply,
           'Your application access',
@@ -451,8 +452,31 @@ export async function registerOnboardingRoutes(
                   )
                   .join('')
               : '<p>No applications have access yet.</p>'
-          }`,
+          }<h2>Pending requests</h2><p>You can cancel a request before access is granted. Checks already started may still finish and incur the agreed cost.</p>${pending.length ? pending.map((r) => `<article><h2>${escape(r.application)}</h2><p>${escape(statusLabels[r.status] ?? 'Your provider will help with the next step.')}</p><form method="post" action="/onboarding/requests/${r.id}/cancel"><input type="hidden" name="csrf" value="${escape(current.csrf)}"><button>Cancel request</button></form></article>`).join('') : '<p>No requests are waiting.</p>'}`,
         );
+      },
+    );
+    ui.post<{ Params: { requestId: string }; Body: { csrf: string } }>(
+      '/onboarding/requests/:requestId/cancel',
+      {
+        schema: {
+          hide: true,
+          params: requestParams,
+          body: {
+            type: 'object',
+            additionalProperties: false,
+            required: ['csrf'],
+            properties: { csrf: csrfSchema },
+          },
+        },
+      },
+      async (request, reply) => {
+        const current = await formSession(request, request.body.csrf);
+        await service().cancelPending(
+          request.params.requestId,
+          current.identity,
+        );
+        return reply.redirect('/onboarding/access');
       },
     );
     ui.post<{
@@ -523,7 +547,7 @@ export async function registerOnboardingRoutes(
 </label>
 <label>
 <input type="checkbox" name="identity_matches_owner" value="yes"> I checked that this verified identity belongs to this provider user and meets our policy.</label>
-<button name="decision" value="accept">Accept user and access</button>
+<button name="decision" value="accept">Accept verified user</button>
 <button name="decision" value="reject">Decline request</button>
 </form>
 </article>`,
