@@ -65,6 +65,7 @@ const guides = {
     'Host authority and signing attempts',
     'api.md#core-wallet-service',
   ],
+  './backend': ['Supplied stored-action backend', 'stored-backend.md'],
   './http': [
     'HTTP composition and authentication',
     'api.md#http-and-authentication',

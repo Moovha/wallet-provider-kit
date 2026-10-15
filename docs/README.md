@@ -66,3 +66,6 @@ DeFi operation/execution and device-recovery scopes.
 One source package keeps the current project small. New applications consume its
 public entry points; they don't need to understand the contributor scripts or
 rearrange internal directories.
+
+The [supplied stored-action backend](stored-backend.md) configures account recovery
+and durable signing dispatch for existing hosts with trusted policy/storage adapters.

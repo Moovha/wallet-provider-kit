@@ -16,12 +16,22 @@ identity and telemetry. Provider adapters require their explicit subpaths.
 Import from `@moovha/wallet-provider-kit/core`. [Integration guide](api.md#core-wallet-service).
 
 - [AuthorityContext](#authoritycontext)
+- [createDurableSigningService](#createdurablesigningservice)
 - [createJournaledWalletProvider](#createjournaledwalletprovider)
+- [createStoredWalletBackend](#createstoredwalletbackend)
 - [EmbeddedAccount](#embeddedaccount)
 - [EmbeddedWalletAuthority](#embeddedwalletauthority)
 - [EmbeddedWalletService](#embeddedwalletservice)
 - [JournaledProviderOptions](#journaledprovideroptions)
 - [SigningAuthority](#signingauthority)
+- [StoredAccountAuthority](#storedaccountauthority)
+- [StoredAccountRecord](#storedaccountrecord)
+- [StoredAccountResult](#storedaccountresult)
+- [StoredSigningAuthority](#storedsigningauthority)
+- [StoredSigningDispatch](#storedsigningdispatch)
+- [StoredSigningResult](#storedsigningresult)
+- [StoredTypedDataSigner](#storedtypeddatasigner)
+- [StoredWalletBackendConfiguration](#storedwalletbackendconfiguration)
 - [TypedDataAction](#typeddataaction)
 - [VerifiedPrincipal](#verifiedprincipal)
 - [WalletAttemptClaim](#walletattemptclaim)
@@ -44,6 +54,20 @@ export interface AuthorityContext {
 }
 ```
 
+### createDurableSigningService
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/backend.ts).
+
+```ts
+/** Supplied durable dispatch: admission and dispatch commits precede the only signing call. */
+export declare function createDurableSigningService<Context>(
+  authority: StoredSigningAuthority<Context>,
+  signer: StoredTypedDataSigner,
+): {
+  sign(context: Context, actionId: string): Promise<StoredSigningResult>;
+};
+```
+
 ### createJournaledWalletProvider
 
 [Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/providers/journaled.ts).
@@ -54,6 +78,32 @@ export declare function createJournaledWalletProvider(
   provider: WalletSigningProvider,
   options: JournaledProviderOptions,
 ): WalletSigningProvider;
+```
+
+### createStoredWalletBackend
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/backend.ts).
+
+```ts
+/** Ready-made lifecycle around a selected provider and trusted host policy/storage adapters. */
+export declare function createStoredWalletBackend<
+  SigningContext,
+  AccountContext,
+>(
+  configuration: StoredWalletBackendConfiguration<
+    SigningContext,
+    AccountContext
+  >,
+): {
+  sign: (
+    context: SigningContext,
+    actionId: string,
+  ) => Promise<StoredSigningResult>;
+  account(
+    context: AccountContext,
+    recover?: boolean,
+  ): Promise<StoredAccountResult>;
+};
 ```
 
 ### EmbeddedAccount
@@ -145,6 +195,121 @@ export interface SigningAuthority extends OwnerAuthority {
   bindingRevision: string;
   capabilityRevision: string;
   action: TypedDataAction;
+}
+```
+
+### StoredAccountAuthority
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/backend.ts).
+
+```ts
+export interface StoredAccountAuthority<Context> {
+  reserve(context: Context, recover: boolean): Promise<StoredAccountRecord>;
+  claim(
+    context: Context,
+    account: StoredAccountRecord,
+  ): Promise<StoredAccountRecord>;
+  finish(
+    account: StoredAccountRecord,
+    address: string | null,
+  ): Promise<StoredAccountResult>;
+}
+```
+
+### StoredAccountRecord
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/backend.ts).
+
+```ts
+export interface StoredAccountRecord {
+  accountId: string;
+  attemptId: string;
+  state: 'admitted' | 'dispatching' | 'bound' | 'unknown';
+  leaseToken: string;
+  address: string | null;
+}
+```
+
+### StoredAccountResult
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/backend.ts).
+
+```ts
+export interface StoredAccountResult {
+  accountId: string;
+  address: string | null;
+  state: StoredAccountRecord['state'];
+}
+```
+
+### StoredSigningAuthority
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/backend.ts).
+
+```ts
+/** Trusted host policy/storage, never records or callbacks supplied by an HTTP caller. */
+export interface StoredSigningAuthority<Context> {
+  admit(context: Context, actionId: string): Promise<StoredSigningResult>;
+  dispatch(context: Context, attemptId: string): Promise<StoredSigningDispatch>;
+  finish(
+    dispatch: StoredSigningDispatch,
+    state: 'succeeded' | 'rejected' | 'unknown',
+    signature?: string,
+  ): Promise<StoredSigningResult>;
+}
+```
+
+### StoredSigningDispatch
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/backend.ts).
+
+```ts
+export interface StoredSigningDispatch {
+  attemptId: string;
+  leaseToken: string;
+  accountId: string;
+  address: string;
+  action: TypedDataAction;
+}
+```
+
+### StoredSigningResult
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/backend.ts).
+
+```ts
+export interface StoredSigningResult {
+  attemptId: string;
+  state: 'admitted' | 'dispatching' | 'succeeded' | 'rejected' | 'unknown';
+  signature: string | null;
+}
+```
+
+### StoredTypedDataSigner
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/backend.ts).
+
+```ts
+export interface StoredTypedDataSigner {
+  readonly provider: string;
+  signTypedData(dispatch: StoredSigningDispatch): Promise<string>;
+}
+```
+
+### StoredWalletBackendConfiguration
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/backend.ts).
+
+```ts
+export interface StoredWalletBackendConfiguration<
+  SigningContext,
+  AccountContext,
+> {
+  /** Explicit host opt-in; credentials never activate this backend. */
+  enabled: boolean;
+  provider: WalletSigningProvider;
+  signingAuthority: StoredSigningAuthority<SigningContext>;
+  accountAuthority: StoredAccountAuthority<AccountContext>;
 }
 ```
 
@@ -1603,5 +1768,175 @@ export interface RelayerTransactionStatus extends RelayerAcceptance {
     | 'failed'
     | 'expired';
   hash?: string;
+}
+```
+
+## Supplied stored-action backend
+
+Import from `@moovha/wallet-provider-kit/backend`. [Integration guide](stored-backend.md).
+
+- [createDurableSigningService](#createdurablesigningservice)
+- [createStoredWalletBackend](#createstoredwalletbackend)
+- [StoredAccountAuthority](#storedaccountauthority)
+- [StoredAccountRecord](#storedaccountrecord)
+- [StoredAccountResult](#storedaccountresult)
+- [StoredSigningAuthority](#storedsigningauthority)
+- [StoredSigningDispatch](#storedsigningdispatch)
+- [StoredSigningResult](#storedsigningresult)
+- [StoredTypedDataSigner](#storedtypeddatasigner)
+- [StoredWalletBackendConfiguration](#storedwalletbackendconfiguration)
+
+### createDurableSigningService
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/backend.ts).
+
+```ts
+/** Supplied durable dispatch: admission and dispatch commits precede the only signing call. */
+export declare function createDurableSigningService<Context>(
+  authority: StoredSigningAuthority<Context>,
+  signer: StoredTypedDataSigner,
+): {
+  sign(context: Context, actionId: string): Promise<StoredSigningResult>;
+};
+```
+
+### createStoredWalletBackend
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/backend.ts).
+
+```ts
+/** Ready-made lifecycle around a selected provider and trusted host policy/storage adapters. */
+export declare function createStoredWalletBackend<
+  SigningContext,
+  AccountContext,
+>(
+  configuration: StoredWalletBackendConfiguration<
+    SigningContext,
+    AccountContext
+  >,
+): {
+  sign: (
+    context: SigningContext,
+    actionId: string,
+  ) => Promise<StoredSigningResult>;
+  account(
+    context: AccountContext,
+    recover?: boolean,
+  ): Promise<StoredAccountResult>;
+};
+```
+
+### StoredAccountAuthority
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/backend.ts).
+
+```ts
+export interface StoredAccountAuthority<Context> {
+  reserve(context: Context, recover: boolean): Promise<StoredAccountRecord>;
+  claim(
+    context: Context,
+    account: StoredAccountRecord,
+  ): Promise<StoredAccountRecord>;
+  finish(
+    account: StoredAccountRecord,
+    address: string | null,
+  ): Promise<StoredAccountResult>;
+}
+```
+
+### StoredAccountRecord
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/backend.ts).
+
+```ts
+export interface StoredAccountRecord {
+  accountId: string;
+  attemptId: string;
+  state: 'admitted' | 'dispatching' | 'bound' | 'unknown';
+  leaseToken: string;
+  address: string | null;
+}
+```
+
+### StoredAccountResult
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/backend.ts).
+
+```ts
+export interface StoredAccountResult {
+  accountId: string;
+  address: string | null;
+  state: StoredAccountRecord['state'];
+}
+```
+
+### StoredSigningAuthority
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/backend.ts).
+
+```ts
+/** Trusted host policy/storage, never records or callbacks supplied by an HTTP caller. */
+export interface StoredSigningAuthority<Context> {
+  admit(context: Context, actionId: string): Promise<StoredSigningResult>;
+  dispatch(context: Context, attemptId: string): Promise<StoredSigningDispatch>;
+  finish(
+    dispatch: StoredSigningDispatch,
+    state: 'succeeded' | 'rejected' | 'unknown',
+    signature?: string,
+  ): Promise<StoredSigningResult>;
+}
+```
+
+### StoredSigningDispatch
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/backend.ts).
+
+```ts
+export interface StoredSigningDispatch {
+  attemptId: string;
+  leaseToken: string;
+  accountId: string;
+  address: string;
+  action: TypedDataAction;
+}
+```
+
+### StoredSigningResult
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/backend.ts).
+
+```ts
+export interface StoredSigningResult {
+  attemptId: string;
+  state: 'admitted' | 'dispatching' | 'succeeded' | 'rejected' | 'unknown';
+  signature: string | null;
+}
+```
+
+### StoredTypedDataSigner
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/backend.ts).
+
+```ts
+export interface StoredTypedDataSigner {
+  readonly provider: string;
+  signTypedData(dispatch: StoredSigningDispatch): Promise<string>;
+}
+```
+
+### StoredWalletBackendConfiguration
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/backend.ts).
+
+```ts
+export interface StoredWalletBackendConfiguration<
+  SigningContext,
+  AccountContext,
+> {
+  /** Explicit host opt-in; credentials never activate this backend. */
+  enabled: boolean;
+  provider: WalletSigningProvider;
+  signingAuthority: StoredSigningAuthority<SigningContext>;
+  accountAuthority: StoredAccountAuthority<AccountContext>;
 }
 ```

@@ -89,3 +89,10 @@
 - Added contribution/DCO, governance, security, release and dependency maintenance
   policies plus CI. Production authority, live provider acceptance and publication
   remain gated.
+
+### Supplied stored-action backend
+
+- Add `/backend` and core exports for configured account recovery and durable
+  signing dispatch, preserving trusted host policy/storage authority.
+- Keep unknown effects fenced to original identities, verify exact signatures
+  and expose no arbitrary signing, key-export or transaction endpoint.

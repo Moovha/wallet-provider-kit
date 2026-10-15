@@ -83,6 +83,7 @@ installed packages; runtime dependencies are still installed together.
 | ------------------------------------------ | --------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
 | (root)                                     | Existing integrations or convenience imports        | All core, HTTP, onboarding, identity and telemetry exports                                                |
 | `/core`                                    | Host-owned authority and durable signing attempts   | `EmbeddedWalletService`, `WalletSigningProvider`, `createJournaledWalletProvider`, `WalletAttemptJournal` |
+| `/backend`                                 | Supplied lifecycle for existing stored-action hosts | `createStoredWalletBackend`, `createDurableSigningService`, trusted authority adapter contracts           |
 | `/http`                                    | OAuth authentication and HTTP composition           | `createServer`, `createAuthenticator`, `ServerOptions`, `ProviderPaths`                                   |
 | `/onboarding`                              | New user consent, provider review and access grants | `createOnboardingProvider`, `OnboardingPolicy`, owner login, stores and vendor adapters                   |
 | `/identity`                                | Existing host's OIDC Identity Assurance enrollment  | `EnrollmentService`, `createIdentityVerifier`                                                             |
@@ -136,7 +137,8 @@ one typed startup configuration. Supply credentials through a secret store or
 ignored local environment files. The example requires existing login/vendor
 integrations and is not the credential-free getting-started example.
 
-For an existing financial host, use the
+For an existing financial host, configure the [supplied stored-action backend](stored-backend.md)
+to reuse toolkit account recovery and durable signing dispatch. Alternatively use the
 [provider guide](provider-guide.md#compose-the-service) and
 [durable-attempt guide](durable-attempts.md). Your application supplies current
 owner/grant/KYC/consent checks, immutable approved actions, durable attempts and

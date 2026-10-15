@@ -11,7 +11,11 @@ default policy evaluation, owner consent, provider review, Didit/Sumsub adapters
 durable reference storage and journaled account creation. The interfaces below
 are for existing hosts and financial-action integration.
 
-You bring the signing backend and the application that decides who may use it.
+For an existing application, the [supplied stored-action backend](stored-backend.md)
+provides account recovery and durable signing dispatch through one configuration.
+Reuse it rather than rebuilding those mechanics in each host.
+
+You choose the signing backend and supply the application that decides who may use it.
 We call that application the **host**. It checks owner consent, current grants,
 Know Your Customer (KYC) status and revocation, and keeps persistent attempt
 records.

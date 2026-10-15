@@ -47,7 +47,11 @@
       "import": "./dist/providers/openzeppelin-relayer.js"
     },
     "./spec/provider-api.json": "./spec/provider-api.json",
-    "./spec/orchestration-draft.json": "./spec/orchestration-draft.json"
+    "./spec/orchestration-draft.json": "./spec/orchestration-draft.json",
+    "./backend": {
+      "types": "./dist/backend.d.ts",
+      "import": "./dist/backend.js"
+    }
   },
   "files": [
     "dist",
