@@ -29,6 +29,7 @@ lists the checks to run before pushing.
 ## When the branch merges
 
 The **Merge toolkit branch** workflow checks the PR after CI and review events.
+It also rechecks every fifteen minutes, including after review-thread resolution.
 It integrates only the maintainer's PR from this repository's `codex/toolkit`
 branch, and only when:
 
@@ -43,6 +44,10 @@ first; this workflow never merges them. You can pause your own PR by making it a
 draft or adding `hold` / `manual-review`. To disable the workflow, set the repository
 Actions variable `TOOLKIT_AUTO_MERGE` to `false` or remove it. Set it to `true` to
 enable it. You can also rerun it through **Actions → Merge toolkit branch → Run workflow**.
+
+The first installation must reach main before GitHub can run this trusted-main
+workflow. Its initial PR follows the same contribution, review and CI gates;
+pending contributions are not bypassed to bootstrap automation.
 
 ## Protected main
 
