@@ -108,11 +108,14 @@ remove it when a stable VitePress release supplies a patched dependency directly
 
 The published documentation is at
 [moovha.github.io/wallet-provider-kit](https://moovha.github.io/wallet-provider-kit/).
-GitHub Pages is configured to use GitHub Actions. Publication is separate from
-commits and package releases: for an approved documentation update, run
-**Actions → Publish documentation → Run workflow** on `main`. The workflow
-publishes only the documentation. No documentation deployment happens on a push
-or PR merge; npm publication remains disabled. See
+GitHub Pages is configured to use GitHub Actions. Toolkit documentation delivery
+includes publication to this existing site under the owner's standing
+authorization. After checks pass and changes reach `main` through the repository's
+merge process, run **Actions → Publish documentation → Run workflow** on `main`.
+Verify the workflow succeeds and the live pages contain the update before
+reporting documentation delivery complete. The workflow publishes only the
+documentation. It still requires dispatch after a push or PR merge; npm
+publication remains disabled. See
 [GitHub's Pages workflow guide](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages).
 
 ### Documentation branding and links

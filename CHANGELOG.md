@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased — documentation publication
+
+- Include GitHub Pages publication and live-page verification in Toolkit
+  documentation delivery under the owner's standing authorization.
+
 ## Unreleased — FormKit operator setup
 
 - Add a local, bundled FormKit wizard for supported wallet backends, login,
