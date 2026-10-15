@@ -40,3 +40,11 @@ production authority adapter; none is supplied here. The CLI starts unconfigured
 and the CDP adapter has offline test evidence only. Full operation orchestration,
 sponsorship, settlement and device recovery each need their own implementation
 and acceptance evidence.
+
+The [Relayer profile](openzeppelin-relayer.md) adds offline contract fixtures for
+configured-account binding, typed signing, transaction admission, provider-ID
+replay/status, fee-policy restrictions, cross-relayer denial and uncertain
+dispatch. These fixtures are not a running Relayer/Redis/RPC system. Prove the
+pinned daemon and real queue/recovery behavior before readiness. Its nonce-owning
+execution profile does not claim draft `SubmitTransactionAction` conformance or
+prove financial settlement.

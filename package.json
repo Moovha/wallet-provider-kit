@@ -12,7 +12,8 @@
   "exports": {
     ".": "./dist/index.js",
     "./cdp": "./dist/providers/cdp.js",
-    "./ows": "./dist/providers/ows.js"
+    "./ows": "./dist/providers/ows.js",
+    "./openzeppelin-relayer": "./dist/providers/openzeppelin-relayer.js"
   },
   "files": [
     "dist",

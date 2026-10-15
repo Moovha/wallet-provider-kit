@@ -17,6 +17,12 @@ Moovha user records, databases or settlement services.
   claims/results through a host-supplied storage port and current policy callback.
 - **Orchestrator:** coordinate approval, execution, sponsorship and settlement.
 
+The optional [Relayer integration](openzeppelin-relayer.md) adds the library-only
+path `verified host context → execution authority → journal → OpenZeppelin Relayer`.
+The host commits an approved call and budget; Relayer owns nonce allocation,
+queueing, broadcasting and provider status. Provider acceptance never establishes
+settlement.
+
 Knowing who made a request doesn't tell you whether they may spend. Authentication,
 account ownership, spending permission and transaction submission each need their
 own checks. OAuth scopes let a request reach your policy checks; your host must

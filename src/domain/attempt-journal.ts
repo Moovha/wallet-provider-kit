@@ -5,7 +5,7 @@ export interface WalletAttemptRequest {
   readonly namespace: string;
   readonly provider: string;
   readonly attemptId: string;
-  readonly kind: 'provision' | 'sign_typed_data';
+  readonly kind: 'provision' | 'sign_typed_data' | 'relay_transaction';
   readonly accountId: string;
   readonly resourceKey: string;
   readonly requestHash: string;
@@ -13,7 +13,8 @@ export interface WalletAttemptRequest {
 
 export type WalletAttemptResult =
   | { kind: 'provision'; account: EmbeddedAccount }
-  | { kind: 'sign_typed_data'; signature: string };
+  | { kind: 'sign_typed_data'; signature: string }
+  | { kind: 'relay_transaction'; transactionId: string };
 
 export interface WalletAttemptFailure {
   code: WalletProviderError['code'];

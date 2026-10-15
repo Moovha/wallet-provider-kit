@@ -105,7 +105,10 @@ own policy. No sample in-memory authority is shipped as a deployment option.
 The experimental [OWS adapter](ows-adapter.md) reuses local OWS wallet storage
 and signing behind the same approved-action boundary. Its profile requires the
 host journal wrapper and owner credential; read its control and recovery limits
-before choosing it. The default CLI does not activate either adapter.
+before choosing it. The [OpenZeppelin Relayer adapter](openzeppelin-relayer.md)
+binds preconfigured signers and adds a separate stored-action execution service.
+Relayer owns its nonce and broadcast workers; the host keeps spending authority
+and durable attempt identity. The default CLI does not activate any adapter.
 
 ### Current adapter profile
 

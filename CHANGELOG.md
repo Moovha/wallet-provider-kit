@@ -2,6 +2,12 @@
 
 ## 0.1.0 — unreleased
 
+- Add an optional OpenZeppelin Relayer HTTP integration for configured EIP-712
+  signers and a separate host-approved execution profile. Delegate nonce/queue/
+  broadcast work to Relayer; reuse the host journal for acceptance, replay and status.
+- Document the pinned API/source, signer/network bindings, recovery/fee limits,
+  separate service license and offline evidence.
+
 - Add an optional OWS 1.4.3 adapter for Base Sepolia EOA typed signing, with a
   required host journal and bounded child-process calls.
 - Prove provisioning, exact large/nested integer signing, replay, denial and

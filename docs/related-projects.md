@@ -6,8 +6,9 @@ service. Its focus is a provider-hosted HTTP boundary: your application checks
 the current owner, grant, consent and identity status before an approved stored
 action reaches a signing backend.
 
-The projects below overlap with parts of that work. OWS has an
-[experimental adapter](ows-adapter.md); the others are design references.
+The projects below overlap with parts of that work. OWS and OpenZeppelin Relayer
+have experimental [wallet](ows-adapter.md) and [relaying](openzeppelin-relayer.md)
+integrations; the others are design references.
 This comparison does not claim protocol compatibility.
 Sources reviewed on **15 October 2026**.
 
@@ -44,7 +45,7 @@ places to evaluate, not interchangeable production selections.
 
 This kit has a useful role if an integration needs its host-owned authorization
 and stored-action boundary as a separate service. It currently provides interfaces,
-guards, a journal wrapper and optional CDP/OWS adapters. The OWS flow is proved
+guards, a journal wrapper and optional CDP/OWS/Relayer adapters. The OWS flow is proved
 offline against the actual native engine; a durable production host integration
 hasn't been demonstrated. Prove that deployment before expanding the framework.
 If an existing project's adapter can meet the same requirements, prefer a
@@ -70,3 +71,6 @@ Apache-2.0. Review the relevant license before copying code or adding a dependen
 The optional OWS dependency is MIT licensed; it is pinned separately and tested
 through its public Node API. No code is copied from the compared projects and
 no compatibility certification is claimed.
+Relayer runs separately through HTTP, with its own license and deployment
+acceptance. The kit delegates nonce, queue and broadcast work rather than copying
+those implementations.

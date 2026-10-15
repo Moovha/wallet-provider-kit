@@ -18,6 +18,7 @@ pending; see [verification](docs/verification.md).
 - A [journal-backed provider wrapper](docs/durable-attempts.md) for persistent claims, results and retry handling.
 - Optional Coinbase CDP adapter for Base Sepolia typed signing.
 - Experimental [OWS adapter](docs/ows-adapter.md) reusing an existing open-source wallet engine.
+- Experimental [OpenZeppelin Relayer integration](docs/openzeppelin-relayer.md) for configured signers and host-approved queued transactions.
 - OpenTelemetry traces and metrics over OTLP/HTTP.
 
 ## Who controls what
@@ -64,12 +65,16 @@ The separate [orchestration draft](spec/orchestration-draft.json) supplies refer
 action types; full Moovha orchestration, sponsorship and settlement are not
 implemented here. Mainnet, contract accounts, WalletConnect and ERC-1271/4337/7702
 are unsupported.
+Relayer execution is a separate library profile; the draft's nonce-bound
+transaction actions and generic transaction HTTP routes remain unsupported.
 Use a local build or tarball while the package is unpublished.
 
 Prefer a maintained wallet engine that fits your custody and recovery needs.
 This kit supplies the host authorization boundary around it. The
 [OWS integration](docs/ows-adapter.md) demonstrates that approach with real offline
-signing; it still needs your reviewed persistent host integration before deployment.
+signing. The [Relayer integration](docs/openzeppelin-relayer.md) delegates queue,
+nonce and broadcast work to OpenZeppelin. Both need your reviewed persistent host
+integration before deployment.
 
 ## Why we're building this
 

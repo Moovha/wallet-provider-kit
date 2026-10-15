@@ -141,6 +141,12 @@ decorator; the new wrapper is an additive integration option. Its new 409 errors
 are recorded in the generated provider OpenAPI contract. No package is published
 and no production service is activated by this change.
 
+The optional [Relayer execution profile](openzeppelin-relayer.md) uses the same
+lifecycle with `kind: relay_transaction` and stores its verified provider
+`transactionId` as the acceptance result. Hosts enabling it must support that
+journal variant and a strictly read-only `read` method for status checks.
+Existing signing integrations need no execution capability.
+
 ### Checkpoint — 15 October 2026
 
 An independent checkout of the staged files installed from its own committed lock
