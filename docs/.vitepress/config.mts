@@ -41,6 +41,7 @@ export default defineConfig({
         text: 'Overview',
         items: [
           { text: 'What the kit does', link: '/' },
+          { text: 'Roles and terms', link: '/docs/concepts' },
           { text: 'Integration path', link: '/docs/' },
         ],
       },

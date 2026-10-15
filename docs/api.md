@@ -13,6 +13,26 @@ control, recovery, business authorization and transaction execution are distinct
 choices. The [architecture guide](architecture.md#applications-and-wallet-control)
 explains the provider API and its relationship to a business-operation host.
 
+## Names used by this API
+
+Your wallet service's server application is the **host**. An **account owner** is
+the user bound to an account in its records. A **connected application** requests
+access to that account; its OAuth registration is called a **client**. It is the
+requesting software, not the owner.
+
+Your **host authority** supplies current permission checks and trusted records.
+Your **wallet backend** creates or locates accounts and signs approved actions.
+The **journal** persistently records attempts and results so a retry can return
+an authorised saved result without repeating a backend call. These responsibilities
+appear as `authority`, `backend` and `journal` in the composition below.
+
+A **grant** is stored permission for an application to access an owner's account;
+**consent** is the owner's approval. **KYC** means Know Your Customer, the identity
+acceptance required by your provider policy. The host checks their current state.
+
+See [roles and terms](concepts.md) for their configuration/API representations,
+including [client IDs and owner-login registrations](concepts.md#what-does-client-mean).
+
 ## Choose a profile
 
 | Your application already has…                                                | Compose                                                                            | You still supply                                                                                                     |
@@ -56,10 +76,13 @@ complete runnable offline host. Your production application implements `authorit
 | `provider.findAccount(accountId)`                 | Reserved account UUIDv4                                 | Account or `null`        | Read-only backend lookup for recovery; does not create a replacement account                                            |
 | `createJournaledWalletProvider(backend, options)` | Signing backend and journal/current-authority callbacks | `WalletSigningProvider`  | Validates fingerprints/results, claims dispatch, stores terminal outcomes and replays only with current authorization   |
 
-`context` contains a `VerifiedPrincipal` and an `idempotencyKey`. A principal is
+`context` contains a `VerifiedPrincipal` and an `idempotencyKey`, the caller's
+stable key for retrying the same request. A principal is
 constructed by trusted authentication middleware and contains issuer, subject,
-client ID and scopes. An OAuth service-account subject need not be the wallet
-owner: your authority resolves its current client-bound grant to the actual owner.
+client ID and scopes (named access-token permissions). The subject identifies the
+user or service named by the issuer. An OAuth service-account subject need not be
+the account owner: your authority resolves its current client-bound grant, the
+stored access permission, to the actual owner.
 
 Your `EmbeddedWalletAuthority` implements two methods:
 
@@ -161,7 +184,7 @@ a generic 500. Avoid logging raw exceptions, identifiers, signatures or tokens.
 
 A successful signature is an authorization artifact, not settlement or a revoked
 artifact when a grant is later revoked. The [HTTP guide](http-api.md) maps status
-codes and explains how clients should respond.
+codes and explains how connected applications should respond.
 
 ## Compatibility and support
 

@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased — roles and terminology
+
+- Introduce account owners, connected applications, hosts, authority and wallet
+  backends before the README diagrams; explain attempts, journals and recovery.
+- Add a shared concepts guide mapping client registrations, token/API fields,
+  configuration and consent-screen names, with an example of a signing retry.
+- Add local explanations and concepts links to API, onboarding, backend and
+  example entry points; keep technical API names intact.
+
 ## Unreleased — documentation site and diagrams
 
 - Add README diagrams for the wallet owner/application/provider relationship and

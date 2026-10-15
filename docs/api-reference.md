@@ -5,7 +5,9 @@ Generated from the public package exports and TypeScript declarations. Run
 
 Start with the [API guide](api.md) for composition, ownership and errors, or the
 [runnable integration tutorial](integration-example.md). These declaration excerpts
-are a reference, not standalone programs. Supporting names and schema aliases
+are a reference, not standalone programs. Read [roles and terms](concepts.md)
+for owners, application clients, host authority, wallet backends and journals.
+Supporting names and schema aliases
 retain their source declaration names; follow the declaration link for their imports.
 
 The root `@moovha/wallet-provider-kit` re-exports core, HTTP, onboarding,

@@ -1,5 +1,13 @@
 # Keep provider attempts across retries and restarts
 
+A **journal** is a private, persistent record of attempts and their results.
+An **attempt** is one admitted execution of account creation or an approved signing
+action. Retrying the same request keeps that attempt's identity. Your **host**,
+the wallet service's server application, supplies the journal storage and current
+permission checks. The **backend** is the account/signing engine being called.
+See [roles and terms](concepts.md#actions-attempts-and-the-journal) for a worked
+retry example and the difference between an action, attempt and idempotency key.
+
 Wrap your signing backend with `createJournaledWalletProvider` when you compose
 `EmbeddedWalletService`. The wrapper commits a dispatch claim before calling the
 backend, verifies and stores the result, and returns that stored result on an
@@ -48,6 +56,12 @@ success. False denies; a thrown policy-store error prevents provider effects.
 A callback that always returns true is not a deployment implementation.
 
 ## Implement the transactional journal
+
+**Dispatch** means calling the backend to perform the effect. A **claim** is an
+exclusive, persisted permission for one worker to dispatch an attempt. Its
+**lease** has a token and deadline; **fencing** means checking that token when a
+worker records completion so a stale worker cannot overwrite the result. An
+expired lease after dispatch doesn't authorise another backend call.
 
 Implement `WalletAttemptJournal` through your selected durable store. Before a
 database-backed implementation, inspect that deployment's actual schema, roles

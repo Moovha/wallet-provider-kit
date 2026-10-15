@@ -5,6 +5,11 @@ wallet actions available to connected applications. You choose the backend and
 key-control model; the toolkit connects onboarding, application access and signing
 under your host's authority.
 
+New to these terms? Start with [roles and concepts](concepts.md): account owner,
+host authority, wallet backend, connected application/client, approved action and
+journal. It also shows how application registrations appear in configuration,
+tokens and the owner's consent screen.
+
 ## Follow the integration path
 
 1. **[Install the package](package.md).** Build a reviewed tarball, install it in

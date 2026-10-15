@@ -20,7 +20,9 @@ const app = await createOnboardingProvider({
     applications: [
       {
         issuer: 'https://applications.example.com',
+        // Connected application's OAuth registration; match its checked token's client_id.
         clientId: 'your-registered-application-client',
+        // Human-readable name shown to the account owner on the consent screen.
         name: 'Your Connected Application',
         permissions: ['account:read', 'operations:request'],
         // Add funding only after agreeing who pays, the cap and reimbursement terms.
@@ -37,6 +39,7 @@ const app = await createOnboardingProvider({
     jwksUrl: 'https://applications.example.com/jwks',
   },
   ownerLogin: {
+    // Separate OIDC registration: this wallet service uses it to sign owners in.
     issuer: 'https://your-existing-login.example.com',
     clientId: 'your-provider-login-client',
     clientSecret: secret('PROVIDER_LOGIN_SECRET'),

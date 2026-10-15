@@ -2,7 +2,7 @@
 
 After [installing the package](package.md) and running the
 [provider walkthrough](integration-example.md), [choose and connect your backend](backend-guide.md).
-This guide connects it to your application's authority, durable records and HTTP API.
+This guide connects it to your application's permission checks, persistent records and HTTP API.
 
 For new integrations, start with [onboarding and application access](onboarding.md)
 and its [single configuration example](provider.config.example.ts). It supplies
@@ -22,7 +22,13 @@ External orchestrators, including Moovha, request permitted actions without
 receiving keys through the kit. Your integration must explain who controls the
 backend and how recovery works.
 
-Use a dedicated OAuth audience, client registrations and network boundary.
+Connected applications have OAuth **client registrations**: entries at your
+trusted authorization server that identify requesting software. They are separate
+from account owners and from your provider's own owner-login registration. In
+bundled onboarding, `policy.applications[]` lists their issuer/client IDs and
+the names shown to owners. See [roles and terms](concepts.md#what-does-client-mean).
+
+Use a dedicated OAuth audience, application registrations and network boundary.
 Keep these separate from any orchestrator's public API or custody service;
 a provider grant must not authorize access to Moovha-held custody keys.
 

@@ -3,6 +3,12 @@
 Use the examples in order after [installing the package](../docs/package.md).
 They show the wallet/provider flow before you configure a real backend.
 
+The **host** is your wallet service's server application. Its **authority** decides
+who may use an account; the **backend** creates accounts and signs; the **journal**
+records attempts and results across retries. A connected application is called a
+**client** in OAuth configuration. Read [roles and terms](../docs/concepts.md)
+for the account owner's role and the corresponding API fields.
+
 | Example                                                        | Run from a source checkout                           | What you learn                                                                                        |
 | -------------------------------------------------------------- | ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
 | [Inspect the API](inspect-api.mjs)                             | `npm run build` then `node examples/inspect-api.mjs` | Liveness, default unavailable readiness and implemented OpenAPI                                       |

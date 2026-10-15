@@ -1,9 +1,16 @@
 # Architecture
 
+The wallet service receives requests from connected applications and checks them
+against the account owner's current permissions before calling its wallet backend.
+The **host** is the server application running this service; **host authority** is
+its permission-checking code and trusted records. Authentication produces a
+**verified principal**, the checked caller identity. See [roles and terms](concepts.md)
+for how these responsibilities appear in configuration and API types.
+
 `HTTP → verified principal → host authority → EmbeddedWalletService → signing provider`
 
-Your application supplies persistent authorization and a signing backend. We call
-it the host. The domain service works through interfaces, so HTTP handling and
+Your host supplies persistent authorization and a signing backend. The domain
+service works through interfaces, so HTTP handling and
 vendor-specific code stay in their adapters. The kit doesn't connect directly to
 Moovha user records, databases or settlement services.
 
