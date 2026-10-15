@@ -11,7 +11,7 @@ import { createFileOnboardingStore } from './file-store.js';
 import { createOwnerLogin, type OwnerLoginConfiguration } from './login.js';
 import { createOnboardingJournal } from './journal.js';
 import { OnboardingService } from './service.js';
-import type { OnboardingPolicy } from './types.js';
+import type { OnboardingPolicy, OnboardingStore } from './types.js';
 import { fingerprint } from './policy.js';
 import {
   createDiditIdentityAdapter,
@@ -22,8 +22,10 @@ import {
 
 export interface OnboardingProviderConfiguration {
   policy: OnboardingPolicy;
-  /** Private absolute directory on a persistent local POSIX filesystem. */
-  storageDirectory: string;
+  /** Existing file-store configuration. Use this or storage, exclusively. */
+  storageDirectory?: string;
+  /** Supplied database.onboardingStore or an equivalent transactional host store. */
+  storage?: OnboardingStore;
   oauth: OAuthConfiguration;
   ownerLogin: OwnerLoginConfiguration;
   reviewers: string[];
@@ -44,10 +46,15 @@ export async function createOnboardingProvider(
     config.reviewers.some((s) => !s || s.length > 256) ||
     !config.identity ||
     (!config.identity.didit && !config.identity.sumsub) ||
-    typeof config.ready !== 'function'
+    typeof config.ready !== 'function' ||
+    (config.storage === undefined) ===
+      (config.storageDirectory === undefined) ||
+    (config.storage !== undefined &&
+      (!config.storage || typeof config.storage.transaction !== 'function'))
   )
     throw new WalletProviderError('wallet_provider_configuration');
-  const store = createFileOnboardingStore(config.storageDirectory);
+  const store =
+    config.storage ?? createFileOnboardingStore(config.storageDirectory!);
   const identity = [
     ...(config.identity.didit
       ? [createDiditIdentityAdapter(config.identity.didit)]

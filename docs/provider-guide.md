@@ -14,6 +14,11 @@ For an existing application, the [supplied stored-action backend](stored-backend
 provides account recovery and durable signing dispatch through one configuration.
 Reuse it rather than rebuilding those mechanics in each host.
 
+The [built-in SQLite database](storage.md) can supply onboarding persistence,
+immutable financial approvals, bounded usage and signing/execution journals on
+one host. Its financial authority requires your current owner/grant/KYC/consent
+policy callback; database setup alone never enables signing.
+
 You choose the signing backend and supply the application that decides who may use it.
 We call that application the **host**. It checks owner consent, current grants,
 Know Your Customer (KYC) status and revocation, and keeps persistent attempt
@@ -126,8 +131,8 @@ They never accept a transaction payload from HTTP. The host must:
 4. Persist results and uncertain outcomes through a transactional dispatch journal.
    The [journal-backed provider wrapper](durable-attempts.md) implements claim,
    completion, exact-result replay and safe error handling through your
-   `WalletAttemptJournal`. You supply the actual durable storage and current
-   authorization callback. The authority port alone only admits work. Do not
+   `WalletAttemptJournal`. Use the built-in SQLite adapter or your own accepted
+   durable storage, with current authorization checks. The authority port alone only admits work. Do not
    mark readiness true until real storage, concurrency and recovery are demonstrated.
 5. Reconcile lost responses read-only before considering a retry. A 503 with
    `outcome: unknown` does not establish that no account/signature exists. Never

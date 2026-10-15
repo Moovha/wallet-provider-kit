@@ -1,5 +1,10 @@
 # Wallet service examples
 
+The installed `examples/sqlite-storage.mjs` is an offline SQLite storage check.
+It initializes a temporary database, records a fixture journal result and verifies
+restart replay and retained budget, then removes the database. It makes no
+provider/network calls. See [built-in database setup](../docs/storage.md) for host integration.
+
 Use the examples in order after [installing the package](../docs/package.md).
 They show the wallet/provider flow before you configure a real backend.
 

@@ -65,7 +65,12 @@ const guides = {
     'Host authority and signing attempts',
     'api.md#core-wallet-service',
   ],
+  './deployment': ['Configuration-first provider service', 'setup.md'],
   './backend': ['Supplied stored-action backend', 'stored-backend.md'],
+  './storage': [
+    'Built-in SQLite storage and financial authority',
+    'storage.md',
+  ],
   './http': [
     'HTTP composition and authentication',
     'api.md#http-and-authentication',
@@ -83,7 +88,7 @@ const guides = {
     'openzeppelin-relayer.md',
   ],
 };
-let markdown = `# TypeScript API reference\n\nGenerated from the public package exports and TypeScript declarations. Run\n\`npm run generate:docs\` after API changes; \`npm run check:docs\` rejects drift.\n\nStart with the [API guide](api.md) for composition, ownership and errors, or the\n[runnable integration tutorial](integration-example.md). These declaration excerpts\nare a reference, not standalone programs. Read [roles and terms](concepts.md)\nfor owners, application clients, host authority, wallet backends and journals.\nSupporting names and schema aliases\nretain their source declaration names; follow the declaration link for their imports.\n\nThe root \`@moovha/wallet-provider-kit\` re-exports core, HTTP, onboarding,\nidentity and telemetry. Provider adapters require their explicit subpaths.\n\n`;
+let markdown = `# TypeScript API reference\n\nGenerated from the public package exports and TypeScript declarations. Run\n\`npm run generate:docs\` after API changes; \`npm run check:docs\` rejects drift.\n\nStart with the [API guide](api.md) for composition, ownership and errors, or the\n[runnable integration tutorial](integration-example.md). These declaration excerpts\nare a reference, not standalone programs. Read [roles and terms](concepts.md)\nfor owners, application clients, host authority, wallet backends and journals.\nSupporting names and schema aliases\nretain their source declaration names; follow the declaration link for their imports.\n\nThe root \`@moovha/wallet-provider-kit\` re-exports core, HTTP, onboarding,\nidentity, telemetry and storage. Provider adapters require their explicit subpaths.\n\n`;
 for (const [path, target] of surfaces.filter(([path]) => path !== '.')) {
   const source = typed.getSourceFile(resolve(root, target.types));
   assert.ok(source, `Missing declarations for ${path}`);

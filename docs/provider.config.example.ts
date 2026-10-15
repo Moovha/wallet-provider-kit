@@ -2,6 +2,7 @@
 import { resolve } from 'node:path';
 import { createOnboardingProvider } from '@moovha/wallet-provider-kit/onboarding';
 import { createCdpWalletProvider } from '@moovha/wallet-provider-kit/cdp';
+import { openProviderDatabase } from '@moovha/wallet-provider-kit/storage';
 
 function secret(name: string): string {
   const value = process.env[name];
@@ -9,6 +10,8 @@ function secret(name: string): string {
   return value;
 }
 
+// Initialize once with initialize: true in operator setup; normal startup only opens it.
+const database = openProviderDatabase({ directory: resolve('.provider-data') });
 const app = await createOnboardingProvider({
   policy: {
     version: '1',
@@ -58,7 +61,7 @@ const app = await createOnboardingProvider({
     //   levelName: 'your-recipient-level', reusableKycShareEnabled: true,
     // },
   },
-  storageDirectory: resolve('.provider-data'),
+  storage: database.onboardingStore,
   walletBackend: createCdpWalletProvider({
     WALLET_SERVICE_MODE: 'provider',
     WALLET_BACKEND: 'cdp',
@@ -66,7 +69,8 @@ const app = await createOnboardingProvider({
     WALLET_CDP_API_KEY_SECRET: secret('WALLET_CDP_API_KEY_SECRET'),
     WALLET_CDP_WALLET_SECRET: secret('WALLET_CDP_WALLET_SECRET'),
   }),
-  ready: async () => false, // Replace after backend lifecycle/recovery acceptance; credentials alone are insufficient.
+  ready: async () => (await database.ready()) && false, // Replace false after backend lifecycle/recovery acceptance.
 });
 
+app.addHook('onClose', async () => database.close());
 await app.listen({ host: '127.0.0.1', port: 8080 });

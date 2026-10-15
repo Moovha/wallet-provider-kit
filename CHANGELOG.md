@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased — built-in SQLite persistence
+
+- Add opt-in, explicitly initialized SQLite storage for onboarding, login,
+  identity decisions, grants, financial approvals and optional enrollment.
+- Supply immutable exact-action authority, stable idempotent admissions, exact
+  integer budgets and a fenced signing/Relayer journal with atomic audit events.
+- Preserve unknown effects through restart, support evidence-based reconciliation
+  and read-only status lookup, and document private storage and backup/restore.
+- Keep file-store compatibility, required current host-policy checks and the
+  unconfigured CLI; no production database, backend or deployment is activated.
+
 ## Unreleased — published documentation
 
 - Publish the documentation site on GitHub Pages and make it the primary README

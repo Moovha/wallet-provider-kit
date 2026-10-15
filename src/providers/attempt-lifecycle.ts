@@ -56,6 +56,34 @@ function fingerprint(value: unknown): string {
   return createHash('sha256').update(serialized).digest('hex');
 }
 
+/** Shared exact request identity for durable host admission and provider dispatch. */
+export function createWalletAttemptRequest(
+  namespace: string,
+  provider: string,
+  kind: WalletAttemptRequest['kind'],
+  accountId: string,
+  attemptId: string,
+  resourceId: string,
+  exactInput: unknown,
+): WalletAttemptRequest {
+  if (
+    !identifier.test(namespace) ||
+    !identifier.test(provider) ||
+    !uuid.test(accountId) ||
+    !uuid.test(attemptId)
+  )
+    throw new WalletProviderError('wallet_provider_input');
+  return Object.freeze({
+    namespace,
+    provider,
+    attemptId,
+    kind,
+    accountId,
+    resourceKey: fingerprint({ namespace, provider, kind, resourceId }),
+    requestHash: fingerprint(exactInput),
+  });
+}
+
 /** Shared admission/completion mechanics; storage and current policy remain host-owned. */
 export function createAttemptLifecycle(
   providerNameInput: string,
@@ -86,22 +114,15 @@ export function createAttemptLifecycle(
     resourceId: string,
     exactInput: unknown,
   ): WalletAttemptRequest {
-    if (!uuid.test(accountId) || !uuid.test(attemptId))
-      throw new WalletProviderError('wallet_provider_input');
-    return Object.freeze({
+    return createWalletAttemptRequest(
       namespace,
-      provider: providerName,
-      attemptId,
+      providerName,
       kind,
       accountId,
-      resourceKey: fingerprint({
-        namespace,
-        provider: providerName,
-        kind,
-        resourceId,
-      }),
-      requestHash: fingerprint(exactInput),
-    });
+      attemptId,
+      resourceId,
+      exactInput,
+    );
   }
 
   async function authorize(attempt: WalletAttemptRequest): Promise<void> {

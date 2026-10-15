@@ -35,6 +35,12 @@ including [client IDs and owner-login registrations](concepts.md#what-does-clien
 
 ## Choose a profile
 
+The [built-in SQLite database](storage.md) supplies onboarding persistence,
+immutable approvals, financial admission/usage budgets and signing/execution
+journals for one host. Its financial authority still requires your current
+owner/grant/KYC/consent/dependency checks. Existing hosts can keep their own
+accepted persistence implementations.
+
 | Your application already has…                                                | Compose                                                                            | You still supply                                                                                                     |
 | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
 | Approved stored actions and trusted transactional authority ports            | `createStoredWalletBackend` from `/backend`                                        | Current owner/grant/KYC/consent policy and accepted persistent authority adapters                                    |

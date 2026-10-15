@@ -93,9 +93,10 @@ installed packages; runtime dependencies are still installed together.
 
 | Import after `@moovha/wallet-provider-kit` | Use it for                                          | Main exports                                                                                              |
 | ------------------------------------------ | --------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| (root)                                     | Existing integrations or convenience imports        | All core, HTTP, onboarding, identity and telemetry exports                                                |
+| (root)                                     | Existing integrations or convenience imports        | All core, HTTP, onboarding, identity, telemetry and storage exports                                       |
 | `/core`                                    | Host-owned authority and durable signing attempts   | `EmbeddedWalletService`, `WalletSigningProvider`, `createJournaledWalletProvider`, `WalletAttemptJournal` |
 | `/backend`                                 | Supplied lifecycle for existing stored-action hosts | `createStoredWalletBackend`, `createDurableSigningService`, trusted authority adapter contracts           |
+| `/storage`                                 | Built-in SQLite persistence and financial authority | `openProviderDatabase`, `FinancialApproval`, `FinancialAuthorization`                                     |
 | `/http`                                    | OAuth authentication and HTTP composition           | `createServer`, `createAuthenticator`, `ServerOptions`, `ProviderPaths`                                   |
 | `/onboarding`                              | New user consent, provider review and access grants | `createOnboardingProvider`, `OnboardingPolicy`, owner login, stores and vendor adapters                   |
 | `/identity`                                | Existing host's OIDC Identity Assurance enrollment  | `EnrollmentService`, `createIdentityVerifier`                                                             |
