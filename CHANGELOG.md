@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased — project introduction
+
+- Rewrite the README around wallet adoption, the provider/user/application
+  relationship and the toolkit's role in Moovha, followed by supported scope and
+  a runnable first integration. Keep technical setup details in the linked guides.
+
 ## Unreleased — API documentation and provider tutorial
 
 - Add task-oriented API and HTTP guides, generated public declaration/schema
