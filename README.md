@@ -14,6 +14,8 @@ pending; see [verification](docs/verification.md).
 
 - Fastify service with generated OpenAPI and Swagger UI.
 - OAuth access-token verification and owner/identity checks.
+- Optional [user enrollment](docs/enrollment.md) with verified identity evidence
+  and provider-controlled acceptance before wallet provisioning.
 - Pluggable account provisioning and EIP-712 signing interfaces.
 - A [journal-backed provider wrapper](docs/durable-attempts.md) for persistent claims, results and retry handling.
 - Optional Coinbase CDP adapter for Base Sepolia typed signing.
@@ -59,6 +61,9 @@ Your application supplies two interfaces:
 
 Wire both into `EmbeddedWalletService` and `createServer`. Start with the
 [provider guide](docs/provider-guide.md) and [acceptance requirements](docs/conformance.md).
+For an orchestrator requesting a wallet for a new user, add `EnrollmentService`
+and your durable `EnrollmentAuthority`. Identity evidence and user consent are
+checked before your provider accepts enrollment; acceptance grants no signing rights.
 
 [Provider OpenAPI](spec/provider-api.json) describes the implemented HTTP routes.
 The separate [orchestration draft](spec/orchestration-draft.json) supplies reference

@@ -15,6 +15,8 @@ Moovha user records, databases or settlement services.
 - **Signing provider:** provision/find accounts and sign authorized actions.
   The optional [journal-backed wrapper](durable-attempts.md) coordinates durable
   claims/results through a host-supplied storage port and current policy callback.
+- **Enrollment:** verify nonce/subject-bound identity evidence before your host
+  accepts a user; reserve account identity without creating a wallet or spend grant.
 - **Orchestrator:** coordinate approval, execution, sponsorship and settlement.
 
 The optional [Relayer integration](openzeppelin-relayer.md) adds the library-only
@@ -41,6 +43,10 @@ still authorize the action. See the [provider guide](provider-guide.md).
 
 Resource names, scopes and authorization rules are project-specific. These
 specifications establish neither certification, regulatory compliance nor an audit.
+The optional [enrollment profile](enrollment.md) uses OIDC Core ID-token validation
+and OpenID Connect for Identity Assurance `verified_claims`, separately from API
+access tokens. It leaves issuer login/code exchange, consent and acceptance policy
+with the host and provides no automatic KYC-status mapping.
 
 ## Contract ownership
 

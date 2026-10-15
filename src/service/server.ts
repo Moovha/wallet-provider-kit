@@ -6,6 +6,7 @@ import swaggerUi from '@fastify/swagger-ui';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import type { EmbeddedWalletService } from '../domain/embedded-wallet.js';
+import type { EnrollmentService } from '../domain/enrollment.js';
 import type { VerifiedPrincipal } from '../domain/principal.js';
 import { WalletProviderError } from '../domain/signing.js';
 import { AuthenticationError, type Authenticate } from './auth.js';
@@ -16,11 +17,16 @@ import {
   problemSchema,
   signatureSchema,
   uuidSchema,
+  enrollmentReceiptSchema,
+  enrollmentChallengeSchema,
+  enrollmentIdentitySchema,
 } from './schemas.js';
 
 export interface ServerOptions {
   authenticate?: Authenticate;
   service?: EmbeddedWalletService;
+  /** Enabling enrollment also gates the provisioning route on current provider acceptance. */
+  enrollment?: EnrollmentService;
   /** Must check durable authority/recovery dependencies; never infer readiness from env keys. */
   ready?: () => Promise<boolean>;
   documentation?: boolean;
@@ -111,6 +117,7 @@ export async function createServer(options: ServerOptions = {}) {
       status = 503;
       if (code === 'wallet_authorization_denied') status = 403;
       if (code === 'wallet_provider_input') status = 422;
+      if (code === 'wallet_identity_invalid') status = 422;
       if (
         code === 'wallet_attempt_conflict' ||
         code === 'wallet_attempt_pending'
@@ -199,18 +206,27 @@ export async function createServer(options: ServerOptions = {}) {
       await options.authenticate(request.headers.authorization, scope),
     );
   }
-  function mutationSchema(id: string, operationId: string, response: object) {
+  function mutationSchema(
+    id: string | undefined,
+    operationId: string,
+    response: object,
+    success = 200,
+  ) {
     return {
       operationId,
       security: [{ accessToken: [] }],
       description:
         'Requires current owner/grant/KYC authority and a durable attempt. Never retry an unknown outcome blindly. The body must be an empty object.',
-      params: {
-        type: 'object',
-        required: [id],
-        additionalProperties: false,
-        properties: { [id]: uuidSchema },
-      },
+      ...(id
+        ? {
+            params: {
+              type: 'object',
+              required: [id],
+              additionalProperties: false,
+              properties: { [id]: uuidSchema },
+            },
+          }
+        : {}),
       headers: {
         type: 'object',
         required: ['idempotency-key'],
@@ -218,7 +234,7 @@ export async function createServer(options: ServerOptions = {}) {
       },
       body: emptyBodySchema,
       response: {
-        200: response,
+        [success]: response,
         ...Object.fromEntries(
           [400, 401, 403, 409, 413, 415, 422, 429, 500, 503].map((status) => [
             status,
@@ -233,22 +249,124 @@ export async function createServer(options: ServerOptions = {}) {
       },
     };
   }
+  const enrollmentUnavailable = () =>
+    Object.assign(new Error('Unavailable'), { statusCode: 503 });
+  app.post<{ Body: { identity_subject: string } }>(
+    '/v1/enrollments',
+    {
+      schema: {
+        ...mutationSchema(
+          undefined,
+          'beginEnrollment',
+          enrollmentChallengeSchema,
+          201,
+        ),
+        description:
+          'Reserve an owner-enrollment challenge through current host policy and durable storage. No wallet is created.',
+        body: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['identity_subject'],
+          properties: {
+            identity_subject: { type: 'string', minLength: 1, maxLength: 255 },
+          },
+        },
+      },
+      onRequest: (request) => authorize(request, 'wallet:enroll'),
+    },
+    async (request, reply) => {
+      if (!(await isReady()) || !options.enrollment)
+        throw enrollmentUnavailable();
+      const result = await options.enrollment.begin(
+        {
+          principal: principals.get(request)!,
+          idempotencyKey: request.headers['idempotency-key'] as string,
+        },
+        request.body.identity_subject,
+      );
+      return reply
+        .code(201)
+        .header('location', `/v1/enrollments/${result.enrollment_id}`)
+        .send(result);
+    },
+  );
+  app.post<{ Params: { enrollmentId: string }; Body: { id_token: string } }>(
+    '/v1/enrollments/:enrollmentId/identity',
+    {
+      bodyLimit: 34816,
+      schema: {
+        ...mutationSchema(
+          'enrollmentId',
+          'submitEnrollmentIdentity',
+          enrollmentReceiptSchema,
+        ),
+        description:
+          'Submit a provider-nonce-bound OIDC Identity Assurance ID token. Provider policy decides acceptance; this never creates a wallet or spend grant.',
+        body: enrollmentIdentitySchema,
+      },
+      onRequest: (request) => authorize(request, 'wallet:enroll'),
+    },
+    async (request) => {
+      if (!(await isReady()) || !options.enrollment)
+        throw enrollmentUnavailable();
+      return options.enrollment.complete(
+        {
+          principal: principals.get(request)!,
+          idempotencyKey: request.headers['idempotency-key'] as string,
+        },
+        request.params.enrollmentId,
+        request.body.id_token,
+      );
+    },
+  );
+  const {
+    body: _readBody,
+    headers: _readHeaders,
+    ...enrollmentReadSchema
+  } = mutationSchema('enrollmentId', 'getEnrollment', enrollmentReceiptSchema);
+  app.get<{ Params: { enrollmentId: string } }>(
+    '/v1/enrollments/:enrollmentId',
+    {
+      schema: {
+        ...enrollmentReadSchema,
+        description:
+          'Read the current authorized enrollment receipt without identity attributes or the proof token.',
+      },
+      onRequest: (request) => authorize(request, 'wallet:enroll:read'),
+    },
+    async (request) => {
+      if (!(await isReady()) || !options.enrollment)
+        throw enrollmentUnavailable();
+      return options.enrollment.read(
+        { principal: principals.get(request)!, idempotencyKey: request.id },
+        request.params.enrollmentId,
+      );
+    },
+  );
   app.post<{ Params: { accountId: string } }>(
     '/v1/accounts/:accountId/provision',
     {
-      schema: mutationSchema('accountId', 'provisionAccount', accountSchema),
+      schema: {
+        ...mutationSchema('accountId', 'provisionAccount', accountSchema),
+        description:
+          'Provision a host-authorized account by stored ID with an empty body and durable attempt. When enrollment is configured, current provider acceptance for the same caller/account/owner is also required. Acceptance does not grant signing rights.',
+      },
       onRequest: (request) => authorize(request, 'wallet:provision'),
     },
     async (request) => {
       if (!(await isReady()))
         throw Object.assign(new Error('Unavailable'), { statusCode: 503 });
-      const account = await options.service!.provision(
-        {
-          principal: principals.get(request)!,
-          idempotencyKey: request.headers['idempotency-key'] as string,
-        },
-        request.params.accountId,
-      );
+      const context = {
+        principal: principals.get(request)!,
+        idempotencyKey: request.headers['idempotency-key'] as string,
+      };
+      const account = options.enrollment
+        ? await options.enrollment.provision(
+            options.service!,
+            context,
+            request.params.accountId,
+          )
+        : await options.service!.provision(context, request.params.accountId);
       return { account_id: account.accountId, address: account.address };
     },
   );

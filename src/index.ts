@@ -18,6 +18,21 @@ export type { ServerOptions } from './service/server.js';
 export { createAuthenticator } from './service/auth.js';
 export type { Authenticate, OAuthConfiguration } from './service/auth.js';
 export { startTelemetry } from './service/telemetry.js';
+export { EnrollmentService } from './domain/enrollment.js';
+export type {
+  EnrollmentAuthority,
+  EnrollmentChallenge,
+  EnrollmentRecord,
+  EnrollmentDecision,
+  EnrollmentStatus,
+} from './domain/enrollment.js';
+export { createIdentityVerifier } from './identity/oidc.js';
+export type {
+  IdentityConfiguration,
+  IdentityVerifier,
+  IdentityAttribute,
+  VerifiedIdentity,
+} from './identity/oidc.js';
 export type { paths as ProviderPaths } from './protocol/provider-api.generated.js';
 
 export { createJournaledWalletProvider } from './providers/journaled.js';

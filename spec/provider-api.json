@@ -43,10 +43,920 @@
         }
       }
     },
+    "/v1/enrollments": {
+      "post": {
+        "operationId": "beginEnrollment",
+        "description": "Reserve an owner-enrollment challenge through current host policy and durable storage. No wallet is created.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["identity_subject"],
+                "properties": {
+                  "identity_subject": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            },
+            "in": "header",
+            "name": "idempotency-key",
+            "required": true
+          }
+        ],
+        "security": [{ "accessToken": [] }],
+        "responses": {
+          "201": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "enrollment_id",
+                    "account_id",
+                    "status",
+                    "nonce",
+                    "expires_at",
+                    "identity_issuer",
+                    "identity_client_id",
+                    "required_claims"
+                  ],
+                  "properties": {
+                    "enrollment_id": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                    },
+                    "account_id": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "awaiting_identity",
+                        "accepted",
+                        "needs_verification",
+                        "rejected"
+                      ]
+                    },
+                    "nonce": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z0-9_-]{43}$"
+                    },
+                    "expires_at": { "type": "string", "format": "date-time" },
+                    "identity_issuer": { "type": "string" },
+                    "identity_client_id": { "type": "string" },
+                    "required_claims": {
+                      "type": "array",
+                      "items": { "type": "string" }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/enrollments/{enrollmentId}/identity": {
+      "post": {
+        "operationId": "submitEnrollmentIdentity",
+        "description": "Submit a provider-nonce-bound OIDC Identity Assurance ID token. Provider policy decides acceptance; this never creates a wallet or spend grant.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["id_token"],
+                "properties": {
+                  "id_token": {
+                    "type": "string",
+                    "maxLength": 32768,
+                    "pattern": "^[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+$"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            },
+            "in": "path",
+            "name": "enrollmentId",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            },
+            "in": "header",
+            "name": "idempotency-key",
+            "required": true
+          }
+        ],
+        "security": [{ "accessToken": [] }],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["enrollment_id", "account_id", "status"],
+                  "properties": {
+                    "enrollment_id": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                    },
+                    "account_id": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "awaiting_identity",
+                        "accepted",
+                        "needs_verification",
+                        "rejected"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/enrollments/{enrollmentId}": {
+      "get": {
+        "operationId": "getEnrollment",
+        "description": "Read the current authorized enrollment receipt without identity attributes or the proof token.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            },
+            "in": "path",
+            "name": "enrollmentId",
+            "required": true
+          }
+        ],
+        "security": [{ "accessToken": [] }],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["enrollment_id", "account_id", "status"],
+                  "properties": {
+                    "enrollment_id": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                    },
+                    "account_id": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "awaiting_identity",
+                        "accepted",
+                        "needs_verification",
+                        "rejected"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/accounts/{accountId}/provision": {
       "post": {
         "operationId": "provisionAccount",
-        "description": "Requires current owner/grant/KYC authority and a durable attempt. Never retry an unknown outcome blindly. The body must be an empty object.",
+        "description": "Provision a host-authorized account by stored ID with an empty body and durable attempt. When enrollment is configured, current provider acceptance for the same caller/account/owner is also required. Acceptance does not grant signing rights.",
         "requestBody": {
           "required": true,
           "content": {
