@@ -66,6 +66,10 @@ For your next step, [choose a backend](docs/backend-guide.md#choose-an-integrati
 
 ## A foundation for adopting teams
 
+Operators can run `wallet-provider-kit setup` to configure supported deployments
+through the [FormKit setup wizard](docs/setup-wizard.md), then export configuration
+and a deployment checklist. No application code is needed for this setup path.
+
 The standard path is **configure, deploy and consume the API**. Use one validated
 JSON configuration for supported login, identity, wallet backends and SQLite storage.
 The kit supplies consent, grants, account recovery, exact owner-approved transfer

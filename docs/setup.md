@@ -1,5 +1,9 @@
 # Configure, deploy and integrate
 
+For graphical setup, run `wallet-provider-kit setup` and follow the
+[FormKit operator wizard](setup-wizard.md). It exports this same validated
+configuration through forms, with supported backend logos and setup references.
+
 The standard adoption path is a configured wallet service. Supported setups need
 configuration, deployment and HTTP API consumption; they do not require a Node.js
 host application, authority callbacks, database adapters or journal implementations.

@@ -151,8 +151,24 @@ export async function setupCommand(args: string[]): Promise<boolean> {
   if (!args.length) return false;
   if (args.length === 1 && ['help', '--help', '-h'].includes(args[0])) {
     process.stdout.write(
-      'wallet-provider-kit init [file]\nwallet-provider-kit validate --config file\nwallet-provider-kit doctor --config file\nwallet-provider-kit init-storage --config file\nwallet-provider-kit run --config file\n',
+      'wallet-provider-kit setup [--port number] [--no-open]\nwallet-provider-kit init [file]\nwallet-provider-kit validate --config file\nwallet-provider-kit doctor --config file\nwallet-provider-kit init-storage --config file\nwallet-provider-kit run --config file\n',
     );
+    return true;
+  }
+  if (args[0] === 'setup') {
+    const remaining = args.slice(1);
+    const openBrowser = !remaining.includes('--no-open');
+    const flags = remaining.filter((arg) => arg !== '--no-open');
+    if (
+      (flags.length !== 0 && (flags.length !== 2 || flags[0] !== '--port')) ||
+      remaining.filter((arg) => arg === '--no-open').length > 1
+    )
+      throw new Error('Invalid setup command');
+    const port = flags.length ? Number(flags[1]) : 0;
+    if (!Number.isInteger(port) || port < 0 || port > 65535)
+      throw new Error('Invalid setup port');
+    const { startSetupWizard } = await import('./setup-server.js');
+    await startSetupWizard(port, openBrowser);
     return true;
   }
   if (args[0] === 'init' && args.length <= 2) {

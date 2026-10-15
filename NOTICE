@@ -8,3 +8,8 @@ standalone foundation. The source repository license is retained only as
 historical provenance in docs/LICENSE.source; it is not this project license.
 Third-party dependencies retain their own licenses. No contract implementation,
 customer data, production secret or source repository history was imported.
+
+The bundled FormKit/Vue operator interface includes MIT-licensed components;
+see dist/setup-ui/THIRD_PARTY_NOTICES.txt in built packages. Provider marks
+identify integrations, remain their owners' property and imply no endorsement;
+see dist/setup-ui/PROVIDER_ASSETS.txt for official sources.

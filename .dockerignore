@@ -11,3 +11,7 @@
 !spec/provider-config.schema.json
 !docs/
 !docs/provider.config.example.json
+!setup-ui/
+!setup-ui/**
+!scripts/
+!scripts/setup-notices.mjs

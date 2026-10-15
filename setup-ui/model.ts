@@ -1,0 +1,146 @@
+import type { ProviderConfiguration } from '../src/deployment/config.js';
+export type { ProviderConfiguration };
+export type Backend = Exclude<
+  ProviderConfiguration['backend'],
+  { kind: 'custom' }
+>;
+export type BackendKind = Backend['kind'];
+
+export const docs = 'https://moovha.github.io/wallet-provider-kit/docs/';
+export const backends = [
+  {
+    kind: 'cdp' as const,
+    name: 'Coinbase CDP',
+    image: 'coinbase.png',
+    description: 'Connect an existing Coinbase Developer Platform project.',
+    detail: 'Managed wallet API',
+    url: 'https://docs.cdp.coinbase.com/',
+    guide: `${docs}setup.html#select-a-built-in-backend`,
+  },
+  {
+    kind: 'ows' as const,
+    name: 'Open Wallet Standard',
+    image: 'ows.png',
+    description: 'Use a private, persistent wallet vault on your own host.',
+    detail: 'Local wallet engine',
+    url: 'https://docs.openwallet.sh/',
+    guide: `${docs}ows-adapter.html`,
+  },
+  {
+    kind: 'openzeppelin-relayer' as const,
+    name: 'OpenZeppelin Relayer',
+    image: 'openzeppelin.png',
+    description:
+      'Connect an existing Relayer and its preconfigured signer pool.',
+    detail: 'Self-hosted signing service',
+    url: 'https://docs.openzeppelin.com/relayer',
+    guide: `${docs}openzeppelin-relayer.html`,
+  },
+];
+
+export function newBackend(kind: BackendKind): Backend {
+  if (kind === 'ows')
+    return {
+      kind,
+      binding: '',
+      vaultDirectory: '.provider-vault',
+      passphrase: { env: 'OWS_OWNER_PASSPHRASE' },
+    };
+  if (kind === 'openzeppelin-relayer')
+    return {
+      kind,
+      binding: '',
+      url: '',
+      apiKey: { env: 'RELAYER_API_KEY' },
+      signers: [
+        { relayerId: '', signerId: '', address: '', bindingRevision: '1' },
+      ],
+    };
+  return {
+    kind,
+    binding: '',
+    apiKeyId: { env: 'WALLET_CDP_API_KEY_ID' },
+    apiKeySecret: { env: 'WALLET_CDP_API_KEY_SECRET' },
+    walletSecret: { env: 'WALLET_CDP_WALLET_SECRET' },
+  };
+}
+
+export function emptyConfiguration(
+  template: ProviderConfiguration,
+): ProviderConfiguration {
+  const config = structuredClone(template);
+  config.policy.provider = { name: '', origin: '', privacyUrl: '' };
+  config.policy.applications = [
+    { issuer: '', clientId: '', name: '', permissions: ['account:read'] },
+  ];
+  config.oauth = { issuer: '', audience: '', jwksUrl: '' };
+  config.ownerLogin.issuer = '';
+  config.ownerLogin.clientId = '';
+  config.reviewers = [''];
+  config.identity.didit!.workflowId = '';
+  config.backend = newBackend('cdp');
+  return config;
+}
+
+export function deploymentChecklist(
+  config: ProviderConfiguration,
+  environment: string[],
+  warnings: string[] = [],
+) {
+  const backend = backends.find((b) => b.kind === config.backend.kind)!;
+  const lines = [
+    '# Wallet provider deployment checklist',
+    '',
+    'Configuration validated locally. External integrations, recovery and token acceptance remain unverified.',
+    `Service activation in this export: ${config.activation.enabled ? 'enabled by operator attestation' : 'disabled'}.`,
+    '',
+    '## Configuration observations',
+    ...warnings.map((warning) => '- ' + warning),
+    '',
+    '## Register and prepare',
+    `- Backend: ${backend.name}. Follow ${backend.url} and ${backend.guide}`,
+    `- Register owner login callback: ${config.policy.provider.origin}/onboarding/callback`,
+    '- Enable OIDC code flow, PKCE S256, client_secret_post, RS256/ES256 ID tokens valid for at most ten minutes, and fresh auth_time at the login provider.',
+    '- Register connected application clients separately. Issue dedicated-audience RFC 9068 at+jwt API tokens with the required wallet scopes and a lifetime no longer than ten minutes.',
+    '- Configure the selected identity vendor workflows/levels and sharing agreements.',
+    '- Confirm identity vendor price bounds and application funding before paid work.',
+    '- Supply these environment variables through the deployment secret store: ' +
+      environment.join(', '),
+    '- Use one persistent POSIX host. Secure and back up its SQLite data directory; run as its owning unprivileged user.',
+    '- Put provider.config.json in a private deployment directory (mode 0600). Relative data/vault paths resolve beside this file.',
+  ];
+  if (config.backend.kind === 'ows')
+    lines.push(
+      '- Install @open-wallet-standard/core@1.4.3 and prepare a private vault (0700). Back up the vault AND SQLite. Supply an owner passphrase of 16–4096 characters, never an agent token. The reference Docker image omits the OWS engine.',
+    );
+  if (config.backend.kind === 'openzeppelin-relayer')
+    lines.push(
+      '- Provision and verify each Relayer/signer/address binding first. Retain assigned signers and stable backend binding across deployments; never replace them to recover an uncertain result.',
+    );
+  lines.push(
+    '',
+    '## Deploy',
+    'From the private deployment directory, with secrets supplied by your environment:',
+    '',
+    '```sh',
+    'npx --no-install wallet-provider-kit validate --config provider.config.json',
+    'npx --no-install wallet-provider-kit init-storage --config provider.config.json',
+    'npx --no-install wallet-provider-kit doctor --config provider.config.json',
+    'npx --no-install wallet-provider-kit run --config provider.config.json',
+    '```',
+    '',
+    'Initialize storage only for a new, empty deployment. Existing stores must retain their origin/backend binding.',
+    'Expose the service through HTTPS with restricted ingress. Configure container port binding deliberately if using Docker.',
+    'Doctor checks local prerequisites; it does not contact vendors or certify acceptance.',
+    'Record real backend and recovery acceptance before enabling activation. For financial signing, also record token acceptance.',
+    '',
+    '## Integrate',
+    `- Consume the implemented HTTP API: ${docs}http-api.html`,
+    `- Deployment instructions: ${docs}setup.html`,
+    '- Experimental Base Sepolia EOA profile only. Signing does not broadcast, sponsor gas or establish settlement.',
+    '- Configuration changes can revoke grants and invalidate approvals; review them before replacing a running deployment.',
+    '- Stop the local setup wizard with Ctrl+C when finished.',
+    '',
+  );
+  return lines.join('\n');
+}

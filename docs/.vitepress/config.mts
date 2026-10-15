@@ -54,6 +54,7 @@ export default defineConfig({
       {
         text: 'Get started',
         items: [
+          { text: 'Operator setup wizard', link: '/docs/setup-wizard' },
           { text: 'Configure and deploy', link: '/docs/setup' },
           { text: 'Understand the roles', link: '/docs/concepts' },
           {
@@ -114,6 +115,7 @@ export default defineConfig({
       {
         text: 'Build your wallet service',
         items: [
+          { text: 'Operator setup wizard', link: '/docs/setup-wizard' },
           { text: 'Configure and deploy', link: '/docs/setup' },
           { text: 'Custom adapters', link: '/docs/custom-adapters' },
           { text: '1. Install the package', link: '/docs/package' },
