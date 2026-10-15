@@ -547,6 +547,91 @@ describe('provider onboarding and access', () => {
 });
 
 describe('access renewal and recovery', () => {
+  it('finishes delayed identity review without granting expired access and reuses it on a fresh request', async () => {
+    const f = await setup();
+    await f.service.consent(f.receipt.request_id, f.identity, true);
+    await f.service.importIdentity(
+      f.ctx,
+      f.receipt.request_id,
+      'didit',
+      'opaque',
+    );
+    await f.store.transaction((s) => {
+      s.requests[f.receipt.request_id].expiresAt = Date.now() - 1;
+    });
+    expect((await f.service.reviews(staff)).map((r) => r.requestId)).toContain(
+      f.receipt.request_id,
+    );
+    const reviewed = await f.service.review(staff, f.receipt.request_id, {
+      decision: 'accept',
+      identity_matches_owner: true,
+      verified_at: new Date().toISOString(),
+    });
+    expect(reviewed.status).toBe('expired');
+    expect(reviewed).not.toHaveProperty('grant_id');
+    expect(await f.store.transaction((s) => Object.keys(s.grants))).toEqual([]);
+    const fresh = await f.service.request(
+      { ...f.ctx, idempotencyKey: randomUUID() },
+      requestInput(),
+    );
+    expect(
+      (await f.service.consent(fresh.request_id, f.identity, true)).status,
+    ).toBe('granted');
+    expect(f.adapter.importShared).toHaveBeenCalledTimes(1);
+  });
+  it('lets the owner cancel an expired pending review and rejects another owner', async () => {
+    const f = await setup();
+    await f.service.consent(f.receipt.request_id, f.identity, true);
+    await f.store.transaction((s) => {
+      s.requests[f.receipt.request_id].expiresAt = Date.now() - 1;
+    });
+    expect(
+      (await f.service.ownerRequests(f.identity)).map((r) => r.id),
+    ).toContain(f.receipt.request_id);
+    await expect(
+      f.service.cancelPending(f.receipt.request_id, owner('bob')),
+    ).rejects.toThrow('wallet_authorization_denied');
+    expect(
+      (await f.service.cancelPending(f.receipt.request_id, f.identity)).status,
+    ).toBe('denied');
+    expect(await f.service.ownerRequests(f.identity)).toEqual([]);
+    expect(await f.service.reviews(staff)).toEqual([]);
+    await expect(
+      f.service.review(staff, f.receipt.request_id, {
+        decision: 'accept',
+        identity_matches_owner: true,
+      }),
+    ).rejects.toThrow('wallet_authorization_denied');
+  });
+  it('retains an in-flight import result without creating access after owner cancellation', async () => {
+    const f = await setup();
+    let finish!: () => void;
+    let started!: () => void;
+    const dispatchStarted = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    const responseReady = new Promise<void>((resolve) => {
+      finish = resolve;
+    });
+    vi.mocked(f.adapter.importShared).mockImplementation(async (_token, id) => {
+      started();
+      await responseReady;
+      return f.evidence(id);
+    });
+    await f.service.consent(f.receipt.request_id, f.identity, true);
+    const pending = f.service.importIdentity(
+      f.ctx,
+      f.receipt.request_id,
+      'didit',
+      'opaque',
+    );
+    await dispatchStarted;
+    await f.service.cancelPending(f.receipt.request_id, f.identity);
+    finish();
+    expect((await pending).status).toBe('denied');
+    expect(await f.store.transaction((s) => Object.keys(s.grants))).toEqual([]);
+    expect(await f.service.reviews(staff)).toEqual([]);
+  });
   it('cannot replace a stale vendor verification date with the time of import or review', async () => {
     const f = await setup();
     vi.mocked(f.adapter.read).mockImplementation(async (_ref, id) => ({

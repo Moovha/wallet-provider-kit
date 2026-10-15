@@ -2,6 +2,8 @@
 
 ## Unreleased — onboarding and application access
 
+- Preserve delayed identity acceptance without granting expired access; owners can
+  cancel pending reviews and reuse accepted identity through a fresh access request.
 - Add one provider configuration with hosted OIDC login, owner consent, provider
   review, expiring access grants, revocation and account suspension.
 - Add recipient Didit and Sumsub Reusable KYC Share adapters, optional hosted fresh
