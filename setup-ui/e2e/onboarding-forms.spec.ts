@@ -11,15 +11,18 @@ import {
   createFileOnboardingStore,
 } from '../../dist/onboarding/index.js';
 
-test('browser consent, reviewer acceptance and revocation preserve Origin without leaking cross-origin referrers', async ({
+test('browser consent, verification handoff, review and revocation preserve Origin and withhold external referrers', async ({
   page,
 }) => {
   const origin = 'https://wallet.example.test';
   const issuer = 'https://issuer.example.test';
   const ownerSession = randomBytes(32).toString('base64url');
   const reviewerSession = randomBytes(32).toString('base64url');
+  const verificationOwnerSession = randomBytes(32).toString('base64url');
   const csrf = randomBytes(32).toString('base64url');
   const directory = await mkdtemp(join(tmpdir(), 'wpk-browser-forms-'));
+  const verificationUrl = 'https://verify.didit.me/session/offline-fixture';
+  let verificationStarts = 0;
   const principal = {
     issuer,
     subject: 'offline-application',
@@ -49,6 +52,14 @@ test('browser consent, reviewer acceptance and revocation preserve Origin withou
       {
         vendor: 'didit',
         price: { maximumMinor: 0, termsReference: 'offline-fixture' },
+        verificationPrice: {
+          maximumMinor: 0,
+          termsReference: 'offline-fixture',
+        },
+        startVerification: async () => {
+          verificationStarts++;
+          return { reference: randomUUID(), url: verificationUrl };
+        },
         importShared: async (_token, correlation) => ({
           vendor: 'didit',
           reference: correlation,
@@ -90,13 +101,22 @@ test('browser consent, reviewer acceptance and revocation preserve Origin withou
           throw new Error('Unexpected callback');
         },
         session: async (token) => {
-          if (![ownerSession, reviewerSession].includes(token))
+          if (
+            ![ownerSession, reviewerSession, verificationOwnerSession].includes(
+              token,
+            )
+          )
             throw new AuthenticationError(401);
           return {
             csrf,
             identity: {
               issuer,
-              subject: token === ownerSession ? 'owner' : 'reviewer',
+              subject:
+                token === ownerSession
+                  ? 'owner'
+                  : token === reviewerSession
+                    ? 'reviewer'
+                    : 'verification-owner',
               authenticatedAt: Date.now(),
             },
           };
@@ -110,6 +130,14 @@ test('browser consent, reviewer acceptance and revocation preserve Origin withou
     // Route browser traffic through the real HTTP handlers without network or TLS dependencies.
     await page.route('**/*', async (route) => {
       const request = route.request();
+      if (request.url() === verificationUrl) {
+        expect((await request.allHeaders()).referer).toBeUndefined();
+        return route.fulfill({
+          status: 200,
+          contentType: 'text/html',
+          body: 'Offline identity verification',
+        });
+      }
       if (request.url() === 'https://moovha.com/') {
         externalReferrer = (await request.allHeaders()).referer;
         return route.fulfill({
@@ -128,6 +156,10 @@ test('browser consent, reviewer acceptance and revocation preserve Origin withou
       });
       if (request.method() === 'POST')
         forms.push({ origin: headers.origin, status: response.statusCode });
+      if (new URL(request.url()).pathname.endsWith('/verify'))
+        expect(response.headers['content-security-policy']).toContain(
+          "form-action 'self'",
+        );
       await route.fulfill({
         status: response.statusCode,
         headers: response.headers as Record<string, string>,
@@ -196,6 +228,34 @@ test('browser consent, reviewer acceptance and revocation preserve Origin withou
     await page.getByRole('link', { name: 'Moovha', exact: true }).click();
     await expect(page.getByText('Offline destination')).toBeVisible();
     expect(externalReferrer).toBeUndefined();
+    const verificationRequest = await onboarding.request(
+      { principal, idempotencyKey: randomUUID() },
+      {
+        mode: 'create',
+        authorization_details: [
+          {
+            type: 'https://moovha.com/wallet/account-access',
+            actions: ['account:read'],
+          },
+        ],
+      },
+    );
+    await session(verificationOwnerSession);
+    await page.goto(origin + '/onboarding/' + verificationRequest.request_id);
+    await page.getByRole('button', { name: 'Allow requested access' }).click();
+    await page.getByRole('button', { name: 'Continue verification' }).click();
+    await expect(
+      page.getByRole('link', { name: 'Continue to identity verification' }),
+    ).toBeVisible();
+    await page.goto(origin + '/onboarding/' + verificationRequest.request_id);
+    await expect(
+      page.getByRole('link', { name: 'Continue to identity verification' }),
+    ).toBeVisible();
+    expect(verificationStarts).toBe(1);
+    await page
+      .getByRole('link', { name: 'Continue to identity verification' })
+      .click();
+    await expect(page.getByText('Offline identity verification')).toBeVisible();
   } finally {
     await app.close();
     await rm(directory, { recursive: true, force: true });

@@ -763,7 +763,7 @@ ${
 }
 <p>Access lasts up to ${view.durationDays} days. You can pause or revoke it at any time. Each financial action still needs the provider’s authorization.</p>
 <p>Your provider may receive identity evidence to review your account. The requesting application funds agreed verification costs. <a href="${escape(view.privacyUrl)}">Read the provider’s privacy notice</a>.</p>
-<p><strong>${escape(statusLabels[view.status] ?? 'Your provider will help with the next step.')}</strong>
+<p><strong>${escape(view.verificationUrl ? 'Your identity verification session is ready.' : (statusLabels[view.status] ?? 'Your provider will help with the next step.'))}</strong>
 </p>${
             view.status === 'consent_required'
               ? `<form method="post">
@@ -771,17 +771,19 @@ ${
 <button name="decision" value="approve">Allow requested access</button>
 <button name="decision" value="deny">Decline</button>
 </form>`
-              : view.status === 'verification_required'
-                ? `<p>Your application can share existing identity evidence. If you need a new check, choose a provider below. Verification starts only when an agreed budget covers it.</p>
+              : view.verificationUrl
+                ? `<p><a href="${escape(view.verificationUrl)}" rel="noreferrer">Continue to identity verification</a></p>`
+                : view.status === 'verification_required'
+                  ? `<p>Your application can share existing identity evidence. If you need a new check, choose a provider below. Verification starts only when an agreed budget covers it.</p>
 <form method="post" action="/onboarding/${request.params.requestId}/verify">
 <input type="hidden" name="csrf" value="${escape(current.csrf)}">
 <select name="vendor">${service()
-                    .verificationVendors()
-                    .map((v) => `<option>${v}</option>`)
-                    .join('')}</select>
+                      .verificationVendors()
+                      .map((v) => `<option>${v}</option>`)
+                      .join('')}</select>
 <button>Continue verification</button>
 </form>`
-                : '<p>You can return to your application. Your provider will complete any remaining review.</p>'
+                  : '<p>You can return to your application. Your provider will complete any remaining review.</p>'
           }`,
         );
       },
@@ -844,7 +846,14 @@ ${
           current.identity,
           request.body.vendor,
         );
-        if (result.url) return reply.redirect(result.url);
+        if (result.url)
+          return html(
+            reply,
+            'Continue identity verification',
+            `<p>Your identity verification session is ready. Continue at the verification provider, then return to your application while your provider reviews the result.</p>
+<p><a href="${escape(result.url)}" rel="noreferrer">Continue to identity verification</a></p>
+<a href="/onboarding/${request.params.requestId}">Back to your request</a>`,
+          );
         return html(
           reply,
           'Verification needs attention',

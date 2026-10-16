@@ -543,6 +543,27 @@ describe('provider onboarding and access', () => {
     expect(await f.store.transaction((s) => Object.values(s.budgets))).toEqual([
       33,
     ]);
+    expect(
+      (await service.consentView(f.receipt.request_id, f.identity))
+        .verificationUrl,
+    ).toBe(a.url);
+    await expect(
+      service.consentView(f.receipt.request_id, owner('bob')),
+    ).rejects.toThrow();
+    const changedPolicy = new OnboardingService(
+      { ...policy, version: '2' },
+      f.store,
+      [adapter],
+    );
+    await expect(
+      changedPolicy.consentView(f.receipt.request_id, f.identity),
+    ).rejects.toThrow();
+    await f.store.transaction((state) => {
+      state.requests[f.receipt.request_id].expiresAt = Date.now() - 1;
+    });
+    expect(
+      await service.consentView(f.receipt.request_id, f.identity),
+    ).not.toHaveProperty('verificationUrl');
   });
 });
 
