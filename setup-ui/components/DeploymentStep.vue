@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SetupField from './SetupField.vue';
 import ExplorerTokensStep from './ExplorerTokensStep.vue';
 import { computed } from 'vue';
 import type { ProviderConfiguration } from '../model';
@@ -27,15 +28,30 @@ function updateHttp(key: 'host' | 'port' | 'documentation', value: unknown) {
       deployment host.
     </p>
   </div>
-  <FormKit
+  <div class="callout step-orientation">
+    <strong>Prepare where the exported service will run</strong>
+    <p>
+      Your deployment host is the server that will run the wallet service. For a
+      native service behind an HTTPS gateway on the same server, the supplied
+      data folder, local listen address and port are a starting point.
+      Containers need the container listen address. The instructions beside each
+      field explain the choice.
+    </p>
+    <p>
+      The API testing tools are optional. Leave activation off for your first
+      deployment; test your integrations and recovery before enabling it.
+    </p>
+  </div>
+  <SetupField
+    guide="storage"
     v-model="model.storage.directory"
     type="text"
     label="Private data directory"
     validation="required|length:1,256"
-    help="Persistent local SQLite storage on one POSIX host. Relative paths resolve beside the configuration file."
   />
   <div class="field-grid">
-    <FormKit
+    <SetupField
+      guide="listenHost"
       type="select"
       label="Service listen address"
       :modelValue="http.host ?? '127.0.0.1'"
@@ -46,7 +62,8 @@ function updateHttp(key: 'host' | 'port' | 'documentation', value: unknown) {
         { label: 'All IPv6 · ::', value: '::' },
       ]"
       @update:modelValue="updateHttp('host', $event)"
-    /><FormKit
+    /><SetupField
+      guide="port"
       type="number"
       :number="true"
       label="Service port"
@@ -57,10 +74,10 @@ function updateHttp(key: 'host' | 'port' | 'documentation', value: unknown) {
       @update:modelValue="updateHttp('port', $event)"
     />
   </div>
-  <FormKit
+  <SetupField
+    guide="explorer"
     type="checkbox"
     label="Enable deployed API explorer and Try it out"
-    help="Serves Swagger at your HTTPS origin /docs/. Requests use real service authentication and can have real effects. Restart with the exported configuration to apply. Disabled by default."
     :modelValue="http.documentation ?? false"
     @update:modelValue="updateHttp('documentation', $event)"
   />
@@ -68,9 +85,10 @@ function updateHttp(key: 'host' | 'port' | 'documentation', value: unknown) {
   <div class="callout">
     <strong>Deployment still needs operational setup</strong>
     <p>
-      Provide secrets, private storage, HTTPS ingress and backups through your
-      deployment tooling. The exported checklist includes initialization and
-      diagnostic commands.
+      After export, put secret values in your private environment file, prepare
+      persistent storage, and connect your public address through an HTTPS
+      gateway. This gateway forwards encrypted web traffic to the service’s
+      internal port. The deployment guide walks through these tasks and backups.
     </p>
   </div>
   <h3>Activation</h3>
@@ -79,23 +97,27 @@ function updateHttp(key: 'host' | 'port' | 'documentation', value: unknown) {
     completed backend and recovery acceptance, plus token acceptance for
     transfer signing.
   </p>
-  <FormKit
+  <SetupField
+    guide="activation"
     v-model="model.activation.enabled"
     type="checkbox"
     label="Enable service activation in this export"
   />
   <template v-if="model.activation.enabled"
-    ><FormKit
+    ><SetupField
+      guide="backendEvidence"
       v-model="model.activation.backendAcceptance"
       type="text"
       label="Backend acceptance evidence reference"
       validation="required|length:1,256"
-    /><FormKit
+    /><SetupField
+      guide="recoveryEvidence"
       v-model="model.activation.recoveryAcceptance"
       type="text"
       label="Recovery acceptance evidence reference"
       validation="required|length:1,256"
-    /><FormKit
+    /><SetupField
+      guide="tokenEvidence"
       v-if="model.financial"
       v-model="model.activation.tokenAcceptance"
       type="text"

@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased — guided operator settings
+
+- Explain every wizard setting with a plain-language purpose, its source or
+  decision, examples and a relevant setup link. Add page orientation for first-time hosts.
+- Label the public service address and wallet environment name by their purpose;
+  distinguish chosen values, issued registrations, secret variable names and
+  optional features. Explain defaults, identity budgets, token units and evidence.
+- Keep detailed login/token compatibility requirements available in expandable
+  checklists. Explain the three export files and the deployment work that follows.
+- Preserve configuration contracts, validation, disabled initial activation and
+  offline setup behavior. Configuration guidance does not certify integrations.
+
 ## Unreleased — public writing review
 
 - Require an audience and purpose review before commits and pushes, covering

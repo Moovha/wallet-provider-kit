@@ -38,6 +38,39 @@ values and explicitly fictional free-test terms. They show the interface, not a
 vendor account, real commercial agreement or accepted deployment. Never copy their
 IDs, domains or zero prices into a live configuration.
 
+## Understand a setting before entering it
+
+Each page explains the decision you are making. Every setting has a short
+explanation beside it. Open **Why do I need this? Where do I get it?** for its
+purpose, the source of the value, examples and a link to the relevant instructions.
+You can open these explanations with a keyboard using Tab and Enter or Space.
+Opening help does not contact vendors or change your settings.
+
+Some values are yours to choose; others must match a registration elsewhere:
+
+| Kind of setting                | What to do                                                                                  | Examples                                                                   |
+| ------------------------------ | ------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| Your service details           | Choose a value for your own service.                                                        | Provider name; public address under a domain you control.                  |
+| Issued registration details    | Copy the exact value from the service that issued it.                                       | Login client ID; application API audience; Didit workflow ID.              |
+| Secret variable names          | Keep the supplied names for a first setup. Supply the actual values privately after export. | `PROVIDER_LOGIN_SECRET`; `DIDIT_API_KEY`.                                  |
+| Rules and agreement references | Decide the rule and record the real agreement or evidence behind it.                        | Identity cost cap; funding agreement; reviewer access; acceptance reports. |
+| Deployment settings            | Match how your server runs. Use the field instructions to assess the supplied values.       | Persistent data folder; internal listen address and port.                  |
+| Optional features              | Leave off unless you need and have prepared the feature.                                    | Transfer signing; deployed API testing; operator token controls.           |
+
+For example, **Public wallet service address** asks where you will host the wallet
+service. If you control `your-company.com`, you could choose
+`wallet.your-company.com`. Connect that hostname to your server through your domain
+provider’s DNS settings, then configure your hosting platform or HTTPS gateway to
+serve it securely. Enter `https://wallet.your-company.com` in the wizard. This
+scheme and hostname together are called an **HTTPS origin**. The kit needs it for
+login return addresses and application requests. It does not register the domain
+or configure hosting. Follow [publish through HTTPS](operator-deployment.md#publish-through-https)
+to complete those tasks before onboarding users.
+
+![Public wallet service address with expanded purpose and source instructions](public/screenshots/provider-guidance.webp)
+
+[Open full-size setting guidance screenshot](public/screenshots/provider-guidance.webp)
+
 ## Complete the six steps
 
 ### 1. Provider
@@ -46,8 +79,8 @@ IDs, domains or zero prices into a live configuration.
 
 [Open full-size Provider screenshot](public/screenshots/provider.webp)
 
-Enter your provider display name, exact public HTTPS **origin** and published
-privacy notice URL. The origin is where owners reach your deployed wallet service,
+Enter your provider display name, **Public wallet service address** and published
+privacy notice URL. The address is where owners reach your deployed wallet service,
 for example `https://wallet.your-company.com`, without a trailing slash or path.
 It is not the temporary local wizard address. The name appears on consent screens.
 Set up the [domain and notice](operator-services.md#provider-domain-and-privacy-notice)
@@ -61,8 +94,9 @@ before onboarding users. Changing the persisted origin later requires a migratio
 
 Choose **Coinbase CDP**, **Open Wallet Standard** or **OpenZeppelin Relayer**.
 Their logos identify the integration; the linked vendor guides explain the external
-service. Enter a stable backend binding, an operator-owned environment identifier
-that remains unchanged through restarts and credential rotation.
+service. Choose a **Wallet environment name** (the configuration’s backend binding),
+such as `acme-cdp-base-sepolia-01`. You create this name; no vendor issues it.
+Keep it unchanged through restarts and credential rotation.
 
 - **CDP:** keep or choose names for the API key ID, API key secret and wallet-secret
   environment variables. Get their actual values from the [CDP registration steps](operator-services.md#coinbase-cdp).

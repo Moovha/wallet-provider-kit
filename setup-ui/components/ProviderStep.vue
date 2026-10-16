@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import SetupField from './SetupField.vue';
+import { docs } from '../model';
 import type { ProviderConfiguration } from '../model';
 const model = defineModel<ProviderConfiguration>({ required: true });
 </script>
@@ -6,9 +8,32 @@ const model = defineModel<ProviderConfiguration>({ required: true });
   <div class="step-heading">
     <span class="eyebrow">Your service</span>
     <h2>Make it yours</h2>
-    <p>Set the name and address that account owners will recognise.</p>
+    <p>
+      Give your wallet service a name and a public web address. People will see
+      these when they sign in and approve access to their wallets.
+    </p>
   </div>
-  <FormKit
+  <div class="callout step-orientation">
+    <strong>Start with the address you plan to host</strong>
+    <p>
+      If your company website is acme.com, you could use wallet.acme.com for
+      this service. You choose that hostname under a domain you own, then
+      connect it to your server and add HTTPS during deployment.
+      <a
+        :href="docs + 'operator-deployment.html#publish-through-https'"
+        target="_blank"
+        rel="noopener noreferrer"
+        >How to prepare the address ↗</a
+      >
+    </p>
+    <p>
+      This local wizard only prepares configuration files. It does not buy a
+      domain or set up hosting. The supported service uses Base Sepolia, a
+      blockchain test network; production custody acceptance is pending.
+    </p>
+  </div>
+  <SetupField
+    guide="providerName"
     v-model="model.policy.provider.name"
     type="text"
     label="Provider name"
@@ -16,15 +41,16 @@ const model = defineModel<ProviderConfiguration>({ required: true });
     validation="required|length:1,100"
   />
   <div class="field-grid">
-    <FormKit
+    <SetupField
+      guide="origin"
       v-model="model.policy.provider.origin"
       type="url"
-      label="Service HTTPS origin"
+      label="Public wallet service address"
       placeholder="https://wallet.acme.com"
       validation="required|https_origin"
-      help="Your public wallet service origin, without a path."
     />
-    <FormKit
+    <SetupField
+      guide="privacy"
       v-model="model.policy.provider.privacyUrl"
       type="url"
       label="Privacy notice URL"
@@ -33,11 +59,18 @@ const model = defineModel<ProviderConfiguration>({ required: true });
     />
   </div>
   <div class="callout">
-    <strong>Existing services come first.</strong>
+    <strong>What you’ll connect next</strong>
     <p>
-      You will need a login provider, an identity verification vendor and a
-      supported wallet backend. Their setup links are included in the next
-      steps.
+      A wallet backend creates accounts and signs approved actions. A login
+      service signs people in. An identity verification service checks their
+      identity, and your staff review the evidence. Each step explains which
+      details to copy and which values you choose yourself.
     </p>
+    <a
+      :href="docs + 'operator-services.html'"
+      target="_blank"
+      rel="noopener noreferrer"
+      >Prepare the required services ↗</a
+    >
   </div>
 </template>

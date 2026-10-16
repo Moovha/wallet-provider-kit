@@ -61,6 +61,138 @@ async function exported(page: Page) {
   return JSON.parse(await readFile((await file.path())!, 'utf8'));
 }
 
+test('a first-time host can understand the address and open contextual instructions with a keyboard', async ({
+  page,
+}) => {
+  const requests: string[] = [];
+  page.on('request', (request) => requests.push(request.url()));
+  await expect(
+    page.getByText('Start with the address you plan to host'),
+  ).toBeVisible();
+  const address = page.getByLabel('Public wallet service address', {
+    exact: true,
+  });
+  const help = page.locator('[data-setting="origin"]');
+  await expect(help).toContainText('public web address');
+  await expect(address).toHaveAttribute(
+    'aria-describedby',
+    (await help.getAttribute('id'))!,
+  );
+  const explanation = help.locator('summary');
+  await explanation.focus();
+  await explanation.press('Enter');
+  await expect(help.locator('details')).toHaveAttribute('open', '');
+  await expect(help).toContainText(
+    'Choose a hostname under a domain you control',
+  );
+  await expect(help).toContainText('Login returns people to this address');
+  await expect(help.getByRole('link')).toHaveAttribute(
+    'href',
+    'https://moovha.github.io/wallet-provider-kit/docs/operator-deployment.html#publish-through-https',
+  );
+  await address.fill('https://wallet.example.test');
+  await explanation.press('Enter');
+  await expect(address).toHaveValue('https://wallet.example.test');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await explanation.press('Enter');
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+  await page.screenshot({
+    path: 'artifacts/setup-guidance-mobile.png',
+    animations: 'disabled',
+  });
+  await help.screenshot({
+    path: 'artifacts/setup-field-help-mobile.png',
+    animations: 'disabled',
+  });
+  expect(requests.filter((request) => !request.startsWith(url))).toEqual([]);
+});
+
+test('field guidance follows backend choices and explains service registrations, budgets and optional activation', async ({
+  page,
+}) => {
+  await imported(page);
+  await step(page, 'Backend');
+  const bindingHelp = page.locator('[data-setting="binding"]');
+  await bindingHelp.locator('summary').click();
+  await expect(bindingHelp).toContainText('No vendor issues this value');
+  await expect(bindingHelp).toContainText('Keep it unchanged');
+  await page
+    .getByRole('button', { name: 'Open Wallet Standard', exact: true })
+    .click();
+  await expect(page.locator('[data-setting="cdpKeyId"]')).toHaveCount(0);
+  await expect(page.locator('[data-setting="vault"]')).toContainText(
+    'private folder on your server',
+  );
+  await page
+    .getByRole('button', { name: 'OpenZeppelin Relayer', exact: true })
+    .click();
+  const relayerHelp = page.locator('[data-setting="relayerOrigin"]');
+  await relayerHelp.locator('summary').click();
+  await expect(relayerHelp).toContainText('does not install a Relayer');
+  await step(page, 'Services');
+  await expect(
+    page.getByText('People log in; applications use access tokens'),
+  ).toBeVisible();
+  const audienceHelp = page.locator('[data-setting="audience"]');
+  await audienceHelp.locator('summary').click();
+  await expect(audienceHelp).toContainText('Register a dedicated API/resource');
+  await expect(page.locator('.callout code')).toHaveText(
+    `${sample.policy.provider.origin}/onboarding/callback`,
+  );
+  await page
+    .getByText('Didit verification: configure an agreed price bound', {
+      exact: true,
+    })
+    .click();
+  const priceHelp = page.locator('[data-setting="priceMaximum"]');
+  await priceHelp.locator('summary').click();
+  await expect(priceHelp).toContainText('250 means USD 2.50');
+  await expect(priceHelp).toContainText('explicitly agreed free route');
+  await step(page, 'Policies');
+  const reviewerHelp = page.locator('[data-setting="reviewer"]');
+  await reviewerHelp.locator('summary').click();
+  await expect(reviewerHelp).toContainText('Do not enter an email');
+  await page
+    .getByText('Configure provider-authorized transfer signing', {
+      exact: true,
+    })
+    .click();
+  await expect(page.locator('[data-setting="tokenDecimals"]')).toContainText(
+    '1000000 base units means 1 token',
+  );
+  await step(page, 'Deployment');
+  await expect(
+    page.getByLabel('Enable service activation in this export', {
+      exact: true,
+    }),
+  ).not.toBeChecked();
+  const activationHelp = page.locator('[data-setting="activation"]');
+  await activationHelp.locator('summary').click();
+  await expect(activationHelp).toContainText(
+    'the service fails closed without it',
+  );
+  await page
+    .getByText('Enable service activation in this export', { exact: true })
+    .click();
+  const evidenceHelp = page.locator('[data-setting="backendEvidence"]');
+  await evidenceHelp.locator('summary').click();
+  await expect(evidenceHelp).toContainText('Do not invent a value');
+  await step(page, 'Export');
+  await expect(
+    page.getByRole('heading', { name: 'Review your configuration' }),
+  ).toBeVisible();
+  await expect(
+    page.getByText(
+      'it does not test your external services or deploy anything.',
+      { exact: false },
+    ),
+  ).toBeVisible();
+});
+
 test('an operator configures CDP without JSON, exports valid files, and editing invalidates export', async ({
   page,
 }) => {
@@ -73,7 +205,7 @@ test('an operator configures CDP without JSON, exports valid files, and editing 
   });
   await page.getByLabel('Provider name', { exact: true }).fill('Acme Wallets');
   await page
-    .getByLabel('Service HTTPS origin', { exact: true })
+    .getByLabel('Public wallet service address', { exact: true })
     .fill('https://wallet.acme.example');
   await page
     .getByLabel('Privacy notice URL', { exact: true })
@@ -83,7 +215,7 @@ test('an operator configures CDP without JSON, exports valid files, and editing 
     page.getByRole('heading', { name: 'Choose your wallet backend' }),
   ).toBeVisible();
   await page
-    .getByLabel('Stable backend binding', { exact: true })
+    .getByLabel('Wallet environment name', { exact: true })
     .fill('acme-sepolia');
   await step(page, 'Services');
   await page
@@ -167,11 +299,11 @@ test('OWS and Sumsub can be selected with their references and exported without 
     .getByRole('button', { name: 'Open Wallet Standard', exact: true })
     .click();
   await page
-    .getByLabel('Stable backend binding', { exact: true })
+    .getByLabel('Wallet environment name', { exact: true })
     .fill('acme-ows');
-  await expect(page.getByLabel('OWS vault directory')).toHaveValue(
-    '.provider-vault',
-  );
+  await expect(
+    page.getByLabel('OWS vault directory', { exact: true }),
+  ).toHaveValue('.provider-vault');
   await expect(
     page.getByRole('link', { name: 'Open Wallet Standard documentation' }),
   ).toHaveAttribute('href', 'https://docs.openwallet.sh/');
@@ -182,14 +314,20 @@ test('OWS and Sumsub can be selected with their references and exported without 
   await step(page, 'Services');
   await page.getByText('Use Didit', { exact: true }).click();
   await page.getByText('Use Sumsub', { exact: true }).click();
-  await page.getByLabel('Sumsub recipient level name').fill('recipient-level');
+  await page
+    .getByLabel('Sumsub recipient level name', { exact: true })
+    .fill('recipient-level');
   await page
     .getByText('Sumsub import: configure an agreed price bound', {
       exact: true,
     })
     .click();
-  await page.getByLabel('Sumsub import maximum (USD cents)').fill('25');
-  await page.getByLabel('Sumsub import terms reference').fill('contract-2026');
+  await page
+    .getByLabel('Sumsub import maximum (USD cents)', { exact: true })
+    .fill('25');
+  await page
+    .getByLabel('Sumsub import terms reference', { exact: true })
+    .fill('contract-2026');
   const config = await exported(page);
   expect(config.backend).toEqual({
     kind: 'ows',
@@ -213,10 +351,10 @@ test('Relayer signer pool, applications, financial policies and activation are c
     .getByRole('button', { name: 'OpenZeppelin Relayer', exact: true })
     .click();
   await page
-    .getByLabel('Stable backend binding', { exact: true })
+    .getByLabel('Wallet environment name', { exact: true })
     .fill('acme-relayer');
   await page
-    .getByLabel('Relayer HTTPS origin')
+    .getByLabel('Relayer HTTPS origin', { exact: true })
     .fill('https://relayer.acme.example');
   await page.getByLabel('Relayer ID', { exact: true }).fill('relayer-one');
   await page.getByLabel('Signer ID', { exact: true }).fill('signer-one');
@@ -234,7 +372,7 @@ test('Relayer signer pool, applications, financial policies and activation are c
     .fill('signer-two');
   await page
     .getByRole('group', { name: 'Signer 2', exact: true })
-    .getByLabel('Signer wallet address')
+    .getByLabel('Signer wallet address', { exact: true })
     .fill('0x2222222222222222222222222222222222222222');
   await page
     .getByRole('button', { name: 'Remove signer 1', exact: true })
@@ -249,8 +387,12 @@ test('Relayer signer pool, applications, financial policies and activation are c
       { exact: true },
     )
     .click();
-  await page.getByLabel('Funding agreement reference').fill('agreement-one');
-  await page.getByLabel('Monthly identity budget (USD cents)').fill('500');
+  await page
+    .getByLabel('Funding agreement reference', { exact: true })
+    .fill('agreement-one');
+  await page
+    .getByLabel('Monthly identity budget (USD cents)', { exact: true })
+    .fill('500');
   await page
     .getByRole('button', { name: 'Add application', exact: true })
     .click();
@@ -274,30 +416,38 @@ test('Relayer signer pool, applications, financial policies and activation are c
     })
     .click();
   await page
-    .getByLabel('Token contract address')
+    .getByLabel('Token contract address', { exact: true })
     .fill('0x3333333333333333333333333333333333333333');
-  await page.getByLabel('Token signing-domain name').fill('Example Token');
-  await page.getByLabel('Token signing-domain version').fill('1');
-  await page.getByLabel('Token symbol', { exact: true }).fill('TEST');
-  await page.getByLabel('Maximum per action (base units)').fill('1000000');
   await page
-    .getByLabel('Lifetime limit per account/token (base units)')
+    .getByLabel('Token signing-domain name', { exact: true })
+    .fill('Example Token');
+  await page
+    .getByLabel('Token signing-domain version', { exact: true })
+    .fill('1');
+  await page.getByLabel('Token symbol', { exact: true }).fill('TEST');
+  await page
+    .getByLabel('Maximum per action (base units)', { exact: true })
+    .fill('1000000');
+  await page
+    .getByLabel('Lifetime limit per account/token (base units)', {
+      exact: true,
+    })
     .fill('10000000');
   await page
-    .getByLabel('Recipient 1 address')
+    .getByLabel('Recipient 1 address', { exact: true })
     .fill('0x4444444444444444444444444444444444444444');
   await step(page, 'Deployment');
   await page
     .getByText('Enable service activation in this export', { exact: true })
     .click();
   await page
-    .getByLabel('Backend acceptance evidence reference')
+    .getByLabel('Backend acceptance evidence reference', { exact: true })
     .fill('review/backend');
   await page
-    .getByLabel('Recovery acceptance evidence reference')
+    .getByLabel('Recovery acceptance evidence reference', { exact: true })
     .fill('review/recovery');
   await page
-    .getByLabel('Token acceptance evidence reference')
+    .getByLabel('Token acceptance evidence reference', { exact: true })
     .fill('review/token');
   const config = await exported(page);
   expect(config.backend.signers).toEqual([
@@ -321,7 +471,9 @@ test('invalid policies block exports, imports round-trip, and custom adapters st
   expect(await exported(page)).toEqual(sample);
   await step(page, 'Policies');
   await page.getByRole('button', { name: 'Add reviewer', exact: true }).click();
-  await page.getByLabel('Reviewer 2 login subject').fill(sample.reviewers[0]);
+  await page
+    .getByLabel('Reviewer 2 login subject', { exact: true })
+    .fill(sample.reviewers[0]);
   await step(page, 'Export');
   await page
     .getByRole('button', { name: 'Validate configuration', exact: true })
@@ -351,6 +503,11 @@ test('mobile layout has usable controls and no horizontal page overflow', async 
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.getByLabel('Provider name', { exact: true })).toBeVisible();
+  const header = await page.locator('.topbar').boundingBox();
+  const actions = await page.locator('.topbar-actions').boundingBox();
+  expect(actions!.y + actions!.height).toBeLessThanOrEqual(
+    header!.y + header!.height,
+  );
   await step(page, 'Backend');
   await expect(
     page.getByRole('button', { name: 'Coinbase CDP', exact: true }),
@@ -376,16 +533,18 @@ test('step validation accepts variable names, shows HTTPS errors, and supports k
     page.getByRole('tab', { name: 'Services', exact: true }),
   ).toHaveAttribute('aria-selected', 'true');
   await page.getByLabel('Use Didit', { exact: true }).press('Space');
-  await expect(page.getByLabel('Didit workflow ID')).toHaveCount(0);
+  await expect(
+    page.getByLabel('Didit workflow ID', { exact: true }),
+  ).toHaveCount(0);
   await step(page, 'Provider');
   await page
-    .getByLabel('Service HTTPS origin', { exact: true })
+    .getByLabel('Public wallet service address', { exact: true })
     .fill('http://wallet.example.com');
   await page.getByRole('button', { name: 'Next', exact: true }).click();
   await page.getByRole('tab', { name: /^Provider/ }).click();
   await expect(
     page.getByText(
-      'Use only the HTTPS origin, without a trailing slash or path.',
+      'Enter https:// and your service hostname only, such as https://wallet.acme.com. Remove any trailing slash or page path.',
     ),
   ).toBeVisible();
 });
@@ -438,17 +597,22 @@ test('API reference follows the configuration, preserves edits, shows Swagger sc
   expect(spec.paths['/v1/enrollments']).toBeUndefined();
   expect(spec.paths['/v1/actions/{actionId}/sign']).toBeUndefined();
   expect(spec.servers).toEqual([{ url: sample.policy.provider.origin }]);
-  await page.getByLabel('Find an endpoint').fill('provision');
+  await page.getByLabel('Find an endpoint', { exact: true }).fill('provision');
   await expect(page.locator('.swagger-ui .opblock')).toHaveCount(1);
-  await expect(page.getByLabel('cURL request example')).toContainText(
-    'wallet.example.com/v1/accounts/',
-  );
-  await page.getByLabel('Find an endpoint').fill('');
+  await expect(
+    page.getByLabel('cURL request example', { exact: true }),
+  ).toContainText('wallet.example.com/v1/accounts/');
+  await page.getByLabel('Find an endpoint', { exact: true }).fill('');
   await page
-    .getByLabel('Show transfer APIs when the signing profile is not configured')
+    .getByLabel(
+      'Show transfer APIs when the signing profile is not configured',
+      { exact: true },
+    )
     .check();
   await expect(page.locator('.swagger-ui .opblock')).toHaveCount(9);
-  await page.getByLabel('Example endpoint').selectOption('signAction');
+  await page
+    .getByLabel('Example endpoint', { exact: true })
+    .selectOption('signAction');
   await expect(
     page.getByText('Transfer profile not configured', { exact: true }).first(),
   ).toBeVisible();
@@ -464,7 +628,7 @@ test('API reference follows the configuration, preserves edits, shows Swagger sc
     .getByRole('button', { name: 'API reference', exact: true })
     .click();
   await page
-    .getByLabel('Example endpoint')
+    .getByLabel('Example endpoint', { exact: true })
     .selectOption('requestAccountAccess');
   await expect(
     page.getByText('Application disabled', { exact: true }).first(),
@@ -499,13 +663,17 @@ test('API reference follows the configuration, preserves edits, shows Swagger sc
   });
   await imported(page, financial);
   await expect(page.locator('.swagger-ui .opblock')).toHaveCount(9);
-  await page.getByLabel('Example endpoint').selectOption('signAction');
+  await page
+    .getByLabel('Example endpoint', { exact: true })
+    .selectOption('signAction');
   await expect(
     page
       .getByText('Application permission not allowed', { exact: true })
       .first(),
   ).toBeVisible();
-  await page.getByLabel('Preview application').selectOption('1');
+  await page
+    .getByLabel('Preview application', { exact: true })
+    .selectOption('1');
   await expect(
     page.getByText('Configured; runtime checks apply', { exact: true }).first(),
   ).toBeVisible();
@@ -599,7 +767,7 @@ test('operator enables live testing in the draft, exports the setting and retain
   expect((await exported(page)).http.documentation).toBe(true);
   await step(page, 'Provider');
   await page
-    .getByLabel('Service HTTPS origin', { exact: true })
+    .getByLabel('Public wallet service address', { exact: true })
     .fill('https://second.example.test');
   await page
     .getByRole('button', { name: 'API reference', exact: true })
@@ -612,7 +780,7 @@ test('operator enables live testing in the draft, exports the setting and retain
     .getByRole('button', { name: 'Setup configuration', exact: true })
     .click();
   await page
-    .getByLabel('Service HTTPS origin', { exact: true })
+    .getByLabel('Public wallet service address', { exact: true })
     .fill('http://invalid.test');
   await page
     .getByRole('button', { name: 'API reference', exact: true })

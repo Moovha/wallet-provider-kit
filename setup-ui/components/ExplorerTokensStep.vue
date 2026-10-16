@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SetupField from './SetupField.vue';
 import { computed } from 'vue';
 import type { ProviderConfiguration } from '../model';
 import { apiTokenScopes } from '../../src/service/api-token-scopes.js';
@@ -41,20 +42,20 @@ function toggleClient(clientId: string, index: number, enabled: unknown) {
 <template>
   <section aria-label="Integrated application tokens">
     <h3>Get application tokens in the deployed GUI</h3>
-    <FormKit
+    <SetupField
+      guide="operatorControls"
       type="checkbox"
       label="Enable operator token controls"
       :modelValue="!!model.apiExplorer"
       @update:modelValue="toggle($event)"
-      help="Optional server-side client-credentials exchange. Operators sign in; application secrets remain in deployment variables. Enabling this also enables the deployed explorer."
     />
     <template v-if="model.apiExplorer">
-      <FormKit
+      <SetupField
+        guide="operators"
         v-model="operators"
         type="textarea"
         label="Token operator login subjects"
         validation="required"
-        help="One exact user sub per line from the owner-login issuer. These people may obtain the selected applications' tokens. Reviewer access alone does not grant this permission."
       />
       <p class="help-text">
         Select applications whose owners authorize operator testing, then limit
@@ -68,7 +69,8 @@ function toggleClient(clientId: string, index: number, enabled: unknown) {
         class="vendor-panel"
       >
         <legend>{{ application.name || `Application ${index + 1}` }}</legend>
-        <FormKit
+        <SetupField
+          guide="operatorApplication"
           type="checkbox"
           :label="`Allow GUI tokens for ${application.name || `application ${index + 1}`}`"
           :modelValue="!!client(application.clientId)"
@@ -76,15 +78,16 @@ function toggleClient(clientId: string, index: number, enabled: unknown) {
         />
         <template v-if="client(application.clientId)">
           <SecretField
+            guide="applicationSecret"
             v-model="client(application.clientId)!.clientSecret"
             label="Application client secret"
           />
-          <FormKit
+          <SetupField
+            guide="operatorScopes"
             v-model="client(application.clientId)!.scopes"
             type="checkbox"
             label="Allowed explorer token scopes"
             :options="[...apiTokenScopes]"
-            help="These must also be granted to the M2M client at your issuer. Select only scopes needed for the intended tests."
           />
         </template>
       </fieldset>

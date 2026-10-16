@@ -256,6 +256,49 @@ main {
   color: #61717e;
   font-size: 0.77rem;
 }
+.setting-help {
+  overflow-wrap: anywhere;
+}
+.setting-help p {
+  margin: 0.35rem 0;
+}
+.setting-help summary {
+  color: #215b75;
+  cursor: pointer;
+  font-weight: 550;
+  padding: 0.35rem 0;
+}
+.setting-help details[open] {
+  background: #f3f7fa;
+  border-left: 2px solid #b2cbd8;
+  padding: 0.4rem 0.75rem 0.75rem;
+  margin-top: 0.4rem;
+  border-radius: 4px;
+}
+.setting-help dl {
+  margin: 0.5rem 0;
+}
+.setting-help dt {
+  font-weight: 650;
+  color: #243f50;
+}
+.setting-help dd {
+  margin: 0.2rem 0 0.75rem;
+}
+.step-orientation {
+  margin: 0 0 1.5rem;
+}
+.compatibility-help {
+  margin: 1rem 0;
+  font-size: 0.85rem;
+}
+.export-file-guide {
+  padding-left: 1.2rem;
+  line-height: 1.6;
+}
+.export-file-guide li {
+  margin: 0.5rem 0;
+}
 .formkit-inner {
   box-shadow: none;
   border: 1px solid #cbd5dd;
@@ -598,9 +641,14 @@ footer img {
     font-size: 1rem;
   }
   .topbar {
-    height: 70px;
-    padding: 0 1rem;
+    height: auto;
+    min-height: 70px;
+    padding: 0.75rem 1rem;
     gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+  .topbar-actions {
+    width: 100%;
   }
   .badge {
     font-size: 0.6rem;
