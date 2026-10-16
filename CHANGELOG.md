@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — wallet service illustrations
+
+- Add an architecture illustration to the README and documentation landing page
+  showing the HTTP API, current policy checks, storage and wallet signing layers.
+- Use matching navy-and-cyan vector diagrams for application relationships and
+  approved signing, including durable attempts, permission rechecks and recovery.
+
 ## Unreleased — first-time setup guidance
 
 - Add identity and trust-agreement field explanations, immediate required-field
