@@ -88,6 +88,13 @@ export async function createSetupServer(options: {
   app.setErrorHandler((_error, _request, reply) => {
     void reply.code(400).send({ issues: ['Request unavailable or too large'] });
   });
+  const contract = JSON.parse(
+    await readFile(
+      new URL('../../spec/provider-api.json', import.meta.url),
+      'utf8',
+    ),
+  );
+  app.get('/api/openapi', async () => contract);
   app.get('/api/template', async () => ({ config: example }));
   app.post('/api/validate', async (request, reply) => {
     try {

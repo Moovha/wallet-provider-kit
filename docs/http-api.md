@@ -8,6 +8,13 @@ and response schemas. Swagger UI is available at `/docs/` in the inspection
 service; configured deployments disable it by default. See [service setup](setup.md)
 for configuration and API consumption without a custom host implementation.
 
+The local [setup wizard's API reference](setup-wizard.md#explore-the-provider-api)
+provides bundled Swagger schemas, example requests/responses and configuration
+prerequisites without sending calls. It is separate from deployed `/docs/` and
+works whether or not deployment documentation is enabled. Its exported reference
+is filtered to the displayed supported setup APIs; this guide covers advanced
+profiles as well.
+
 For a complete runnable request sequence without credentials, use the
 [integration example](integration-example.md). The snippets below show a real
 integration's request shape; their tokens and IDs are placeholders.

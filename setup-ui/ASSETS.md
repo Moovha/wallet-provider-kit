@@ -16,3 +16,9 @@ No remote images, fonts or scripts are requested by the wizard.
 | `public/moovha-logo.svg`            | Existing `docs/public/brand/moovha-logo.svg`                                                                                                  |
 
 Retrieved 2026-10-16. FormKit runtime/addons/themes are MIT licensed.
+
+The API reference bundles `swagger-ui-dist@5.32.6` from npm, maintained by the
+[Swagger UI project](https://github.com/swagger-api/swagger-ui). Its Apache-2.0
+LICENSE, NOTICE and bundled dependency notices are retained under
+`dist/setup-ui/reference/` and in `THIRD_PARTY_NOTICES.txt`. Renderer scripts and
+styles are local assets; no external validator, token entry or Try it out is enabled.

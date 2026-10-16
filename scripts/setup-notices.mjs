@@ -1,4 +1,4 @@
-import { readFile, writeFile, copyFile } from 'node:fs/promises';
+import { readFile, writeFile, copyFile, mkdir } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -44,11 +44,44 @@ for (const name of packages) {
   const { version } = JSON.parse(await readFile(manifest, 'utf8'));
   notices += `${name}@${version}\n${await readFile(join(dirname(manifest), 'LICENSE'), 'utf8')}\n\n`;
 }
-await writeFile(
-  new URL('../dist/setup-ui/THIRD_PARTY_NOTICES.txt', import.meta.url),
-  notices,
-);
 await copyFile(
   new URL('../setup-ui/ASSETS.md', import.meta.url),
   new URL('../dist/setup-ui/PROVIDER_ASSETS.txt', import.meta.url),
+);
+
+// Copy the pinned, maintained renderer; it remains a build dependency only.
+const swaggerFolder = dirname(
+  fileURLToPath(import.meta.resolve('swagger-ui-dist/package.json')),
+);
+const referenceFolder = new URL('../dist/setup-ui/reference/', import.meta.url);
+await mkdir(referenceFolder, { recursive: true });
+for (const name of [
+  'swagger-ui-bundle.js',
+  'swagger-ui.css',
+  'swagger-ui-bundle.js.LICENSE.txt',
+  'LICENSE',
+  'NOTICE',
+]) {
+  await copyFile(join(swaggerFolder, name), new URL(name, referenceFolder));
+}
+const swaggerPackage = JSON.parse(
+  await readFile(join(swaggerFolder, 'package.json'), 'utf8'),
+);
+await writeFile(
+  new URL('VERSION.txt', referenceFolder),
+  `swagger-ui-dist@${swaggerPackage.version}\n`,
+);
+
+await writeFile(
+  new URL('../dist/setup-ui/THIRD_PARTY_NOTICES.txt', import.meta.url),
+  notices +
+    `swagger-ui-dist@${swaggerPackage.version}\n` +
+    (await readFile(join(swaggerFolder, 'LICENSE'), 'utf8')) +
+    '\n' +
+    (await readFile(join(swaggerFolder, 'NOTICE'), 'utf8')) +
+    '\n' +
+    (await readFile(
+      join(swaggerFolder, 'swagger-ui-bundle.js.LICENSE.txt'),
+      'utf8',
+    )),
 );

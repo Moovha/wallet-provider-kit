@@ -1,5 +1,15 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from 'vue';
+import {
+  computed,
+  defineAsyncComponent,
+  nextTick,
+  onMounted,
+  ref,
+  shallowRef,
+  watch,
+} from 'vue';
+import type { ApiContract } from './api-reference';
+
 import {
   backends,
   deploymentChecklist,
@@ -13,6 +23,13 @@ import BackendStep from './components/BackendStep.vue';
 import ConnectionsStep from './components/ConnectionsStep.vue';
 import PolicyStep from './components/PolicyStep.vue';
 import DeploymentStep from './components/DeploymentStep.vue';
+
+const ApiReference = defineAsyncComponent(
+  () => import('./components/ApiReference.vue'),
+);
+const view = ref<'setup' | 'api'>('setup');
+const contract = shallowRef<ApiContract>();
+const referenceLoading = ref(false);
 
 // The token is delivered in the URL fragment, never in HTTP URLs/referrers.
 // Neither configuration nor access credentials are saved in browser storage.
@@ -77,6 +94,19 @@ async function request(path: string, body?: unknown) {
     );
   return result;
 }
+async function openReference() {
+  view.value = 'api';
+  if (contract.value || referenceLoading.value) return;
+  referenceLoading.value = true;
+  try {
+    contract.value = await request('/api/openapi');
+  } catch (error) {
+    showError(error);
+  } finally {
+    referenceLoading.value = false;
+  }
+}
+
 function showError(error: unknown) {
   try {
     issues.value = JSON.parse((error as Error).message);
@@ -215,7 +245,11 @@ function stepChanged(node: {
           configuration.
         </p>
       </div>
-      <ol class="step-list" aria-label="Setup progress">
+      <ol
+        v-show="view === 'setup'"
+        class="step-list"
+        aria-label="Setup progress"
+      >
         <li
           v-for="(name, key, index) in stepNames"
           :key="key"
@@ -226,6 +260,11 @@ function stepChanged(node: {
           >{{ name }}
         </li>
       </ol>
+      <p v-if="view === 'api'" class="api-sidebar-note">
+        API reference<br /><small
+          >Requests, responses and configuration prerequisites</small
+        >
+      </p>
       <div class="sidebar-bottom">
         <span class="status-dot"></span> Local configuration session
         <p>
@@ -243,7 +282,24 @@ function stepChanged(node: {
     <main>
       <header class="topbar">
         <span class="badge">Base Sepolia · experimental</span>
-        <div>
+        <div class="topbar-actions">
+          <div class="view-switch" role="group" aria-label="Workspace view">
+            <button
+              type="button"
+              :aria-pressed="view === 'setup'"
+              @click="view = 'setup'"
+            >
+              Setup configuration
+            </button>
+            <button
+              type="button"
+              :aria-pressed="view === 'api'"
+              :disabled="!config"
+              @click="openReference"
+            >
+              API reference
+            </button>
+          </div>
           <input
             ref="importInput"
             class="visually-hidden"
@@ -262,7 +318,11 @@ function stepChanged(node: {
         </div>
       </header>
       <div class="mobile-progress">
-        Step {{ stepNumber }} of 6 · {{ stepNames[activeStep] }}
+        {{
+          view === 'api'
+            ? 'API reference · configuration preview'
+            : `Step ${stepNumber} of 6 · ${stepNames[activeStep]}`
+        }}
       </div>
       <div class="workspace">
         <div v-if="notice" class="notice" role="status">{{ notice }}</div>
@@ -277,6 +337,7 @@ function stepChanged(node: {
         </div>
         <FormKit
           v-if="config"
+          v-show="view === 'setup'"
           :key="generation"
           type="form"
           :actions="false"
@@ -435,6 +496,13 @@ function stepChanged(node: {
         <p v-else-if="!issues.length" role="status">
           Opening your setup session…
         </p>
+        <p v-if="referenceLoading" role="status">Opening the API reference…</p>
+        <ApiReference
+          v-if="config && contract"
+          v-show="view === 'api'"
+          :config="config"
+          :contract="contract"
+        />
         <footer>
           <span
             >Built with

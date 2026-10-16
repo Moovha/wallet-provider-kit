@@ -66,12 +66,28 @@ describe('local operator setup boundary', () => {
   ])(
     'rejects foreign hosts, origins and unauthenticated local API access',
     async (requestHeaders) => {
-      expect(
-        (await app.inject({ url: '/api/template', headers: requestHeaders }))
-          .statusCode,
-      ).toBe(403);
+      for (const url of ['/api/template', '/api/openapi'])
+        expect(
+          (await app.inject({ url, headers: requestHeaders })).statusCode,
+        ).toBe(403);
     },
   );
+  it('serves only the canonical implemented contract through the authenticated local reference API', async () => {
+    const network = vi
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValue(new Error('Network forbidden'));
+    const reply = await app.inject({ url: '/api/openapi', headers });
+    const contract = JSON.parse(
+      await readFile(
+        new URL('../spec/provider-api.json', import.meta.url),
+        'utf8',
+      ),
+    );
+    expect(reply.statusCode).toBe(200);
+    expect(reply.json()).toEqual(contract);
+    expect(reply.body).not.toContain('orchestration-draft');
+    expect(network).not.toHaveBeenCalled();
+  });
   it('requires an exact browser Origin for POST and never enables CORS', async () => {
     const reply = await app.inject({
       method: 'POST',

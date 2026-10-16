@@ -73,7 +73,22 @@ try {
       animations: 'disabled',
     });
   }
-  console.log('Captured six offline wizard screens in artifacts/setup-docs.');
+  await page
+    .getByRole('button', { name: 'API reference', exact: true })
+    .click();
+  await page.locator('.swagger-ui .opblock').first().waitFor();
+  await page.screenshot({
+    path: new URL('api-reference.png', output).pathname,
+    fullPage: true,
+    animations: 'disabled',
+  });
+  await page.locator('.api-swagger').screenshot({
+    path: new URL('api-endpoints.png', output).pathname,
+    animations: 'disabled',
+  });
+  console.log(
+    'Captured six wizard steps and the API reference in artifacts/setup-docs.',
+  );
 } finally {
   await browser?.close();
   await app.close();

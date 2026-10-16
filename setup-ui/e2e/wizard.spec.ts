@@ -383,3 +383,184 @@ test('step validation accepts variable names, shows HTTPS errors, and supports k
     ),
   ).toBeVisible();
 });
+
+test('API reference follows the configuration, preserves edits, shows Swagger schemas and never dispatches requests', async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  const requests: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  page.on('request', (request) => requests.push(request.url()));
+  await imported(page);
+  await step(page, 'Provider');
+  await page
+    .getByLabel('Provider name', { exact: true })
+    .fill('Draft provider name');
+  await page
+    .getByRole('button', { name: 'API reference', exact: true })
+    .click();
+  await expect(
+    page.getByRole('heading', { name: 'Provider API reference', exact: true }),
+  ).toBeVisible();
+  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(6);
+  await expect(
+    page.getByText('Activation disabled', { exact: true }).first(),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Try it out', exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole('button', { name: 'Authorize', exact: true }),
+  ).toHaveCount(0);
+  await page
+    .locator('.opblock-summary-control')
+    .filter({ hasText: '/v1/access-requests' })
+    .first()
+    .click();
+  await expect(page.locator('.opblock.is-open')).toContainText('consent_url');
+  await expect(page.locator('.opblock.is-open')).toContainText(
+    'authorization_details',
+  );
+  await expect(page.locator('.opblock.is-open')).toContainText('wallet:access');
+  const download = page.waitForEvent('download');
+  await page
+    .getByRole('button', { name: 'Download displayed OpenAPI' })
+    .click();
+  const spec = JSON.parse(
+    await readFile((await (await download).path())!, 'utf8'),
+  );
+  expect(spec.paths['/v1/enrollments']).toBeUndefined();
+  expect(spec.paths['/v1/actions/{actionId}/sign']).toBeUndefined();
+  expect(spec.servers).toEqual([{ url: sample.policy.provider.origin }]);
+  await page.getByLabel('Find an endpoint').fill('provision');
+  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(1);
+  await expect(page.getByLabel('cURL request example')).toContainText(
+    'wallet.example.com/v1/accounts/',
+  );
+  await page.getByLabel('Find an endpoint').fill('');
+  await page
+    .getByLabel('Show transfer APIs when the signing profile is not configured')
+    .check();
+  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(9);
+  await page.getByLabel('Example endpoint').selectOption('signAction');
+  await expect(
+    page.getByText('Transfer profile not configured', { exact: true }).first(),
+  ).toBeVisible();
+  await page
+    .getByRole('button', { name: 'Setup configuration', exact: true })
+    .click();
+  await expect(page.getByLabel('Provider name', { exact: true })).toHaveValue(
+    'Draft provider name',
+  );
+  await step(page, 'Policies');
+  await page.getByText('Application access enabled', { exact: true }).click();
+  await page
+    .getByRole('button', { name: 'API reference', exact: true })
+    .click();
+  await page
+    .getByLabel('Example endpoint')
+    .selectOption('requestAccountAccess');
+  await expect(
+    page.getByText('Application disabled', { exact: true }).first(),
+  ).toBeVisible();
+  const financial = structuredClone(sample);
+  financial.financial = {
+    profile: 'owner-approved-erc3009-v1',
+    token: {
+      address: '0x1111111111111111111111111111111111111111',
+      name: 'Example Token',
+      version: '1',
+      symbol: 'TEST',
+      decimals: 6,
+    },
+    recipients: ['0x2222222222222222222222222222222222222222'],
+    maximumAmount: '100',
+    lifetimeAmount: '1000',
+    maxValiditySeconds: 300,
+  };
+  financial.activation = {
+    enabled: true,
+    backendAcceptance: 'offline-fixture/backend',
+    recoveryAcceptance: 'offline-fixture/recovery',
+    tokenAcceptance: 'offline-fixture/token',
+  };
+  financial.policy.applications[0].permissions = ['account:read'];
+  financial.policy.applications.push({
+    ...financial.policy.applications[0],
+    clientId: 'second-app',
+    name: 'Second App',
+    permissions: ['account:read', 'operations:request'],
+  });
+  await imported(page, financial);
+  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(9);
+  await page.getByLabel('Example endpoint').selectOption('signAction');
+  await expect(
+    page
+      .getByText('Application permission not allowed', { exact: true })
+      .first(),
+  ).toBeVisible();
+  await page.getByLabel('Preview application').selectOption('1');
+  await expect(
+    page.getByText('Configured; runtime checks apply', { exact: true }).first(),
+  ).toBeVisible();
+  await page
+    .getByRole('button', { name: 'Copy cURL example', exact: true })
+    .click();
+  await expect(
+    page
+      .getByRole('status')
+      .filter({ hasText: /Example copied|Clipboard unavailable/ }),
+  ).toBeVisible();
+  await page.screenshot({
+    path: 'artifacts/setup-api-reference.png',
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+  expect(
+    requests.filter(
+      (request) => !request.startsWith(url) && !request.startsWith('blob:'),
+    ),
+  ).toEqual([]);
+  expect(
+    requests.filter((request) => request.startsWith(url + '/v1/')),
+  ).toEqual([]);
+  expect(errors).toEqual([]);
+  expect(
+    await page.evaluate(() => [
+      localStorage.length,
+      sessionStorage.length,
+      location.hash,
+    ]),
+  ).toEqual([0, 0, '']);
+});
+
+test('API renderer can retry a failed bundled asset without losing setup', async ({
+  page,
+}) => {
+  await imported(page);
+  await page.route('**/reference/swagger-ui-bundle.js', (route) =>
+    route.abort(),
+  );
+  await page
+    .getByRole('button', { name: 'API reference', exact: true })
+    .click();
+  await expect(page.getByRole('alert')).toContainText(
+    'API renderer unavailable',
+  );
+  await page.unroute('**/reference/swagger-ui-bundle.js');
+  await page
+    .getByRole('button', { name: 'Retry API renderer', exact: true })
+    .click();
+  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(6);
+  await page
+    .getByRole('button', { name: 'Setup configuration', exact: true })
+    .click();
+  await expect(page.getByLabel('Provider name', { exact: true })).toHaveValue(
+    sample.policy.provider.name,
+  );
+});
