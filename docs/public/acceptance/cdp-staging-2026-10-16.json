@@ -1,0 +1,160 @@
+{
+  "status": "passed_with_external_integration_gaps",
+  "sourceRevision": "d542a1323298bb40727209477b63996873d3ec2c",
+  "environment": "isolated local HTTPS staging on macOS",
+  "provider": "real CDP API-key wallet v2",
+  "findingsFixed": [
+    "Browser form submissions denied because no-referrer nullified Origin; changed to same-origin with browser regression coverage.",
+    "CDP account name exceeded vendor maximum; changed to deterministic 35-character full-UUID name. Earlier HTTP 400 attempt retained separately and never redispatched."
+  ],
+  "limitations": [
+    "Advanced host composition, not wizard-export/configured-service acceptance.",
+    "Local synthetic OIDC issuer and test identities; real OIDC protocol/PKCE/JWKS/JWT verification is exercised.",
+    "Synthetic identity evidence adapter; no live Didit/Sumsub workflow or human identity check is claimed.",
+    "Locally generated certificate, scoped trust in Node and a Chromium certificate pin; public TLS/hosting not exercised.",
+    "No signing, funding, broadcasts, transfers or production deployment."
+  ],
+  "cases": [
+    {
+      "name": "disabled startup fails closed",
+      "status": "passed",
+      "liveness": 200,
+      "readiness": 503,
+      "providerMutations": 0
+    },
+    {
+      "name": "owner login, consent, synthetic evidence and separate reviewer acceptance",
+      "status": "passed",
+      "statusAfterReview": "granted",
+      "identityVendor": "synthetic",
+      "oidcProtocol": "code + S256 PKCE + signed ID token"
+    },
+    {
+      "name": "missing token, insufficient scope, cross-client and unknown object denied",
+      "status": "passed",
+      "unauthenticated": 401,
+      "otherDenials": 403,
+      "providerMutations": 0
+    },
+    {
+      "name": "real CDP unfunded provisioning, concurrent calls and replay",
+      "status": "passed",
+      "realProviderCreates": 1,
+      "replayReturnsOriginalAccount": true,
+      "concurrentStatuses": [200, 409]
+    },
+    {
+      "name": "application reads the provisioned account over HTTPS",
+      "status": "passed",
+      "sameAddress": true,
+      "tokenKeptServerSide": true,
+      "httpStatus": 200
+    },
+    {
+      "name": "onboarding-only authority denies signing despite signing scope",
+      "status": "passed",
+      "providerSignCalls": 0,
+      "httpStatus": 403
+    },
+    {
+      "name": "process restart retains grants, account and durable replay",
+      "status": "passed",
+      "replayReturnsOriginalAccount": true,
+      "additionalProviderCreates": 0
+    },
+    {
+      "name": "stopped database backup and restore retains original authority and account",
+      "status": "passed",
+      "sameAccountAfterRestore": true,
+      "additionalProviderCreates": 0,
+      "oneAuthoritativeService": true,
+      "cdpCredentialsRetained": true
+    },
+    {
+      "name": "second test owner receives separate consent and acceptance",
+      "status": "passed",
+      "distinctAccount": true
+    },
+    {
+      "name": "real CDP creation with lost response becomes unknown and cannot redispatch",
+      "status": "passed",
+      "initialStatus": 503,
+      "replayStatus": 503,
+      "replayAfterRestartStatus": 503,
+      "additionalProviderCreates": 0
+    },
+    {
+      "name": "reviewer reconciles original CDP wallet using read-only lookup",
+      "status": "passed",
+      "recoveredOriginalAttempt": true,
+      "providerLookup": "real authenticated GET",
+      "additionalProviderCreates": 0
+    },
+    {
+      "name": "idempotency key cannot be reused for another authorized account",
+      "status": "passed",
+      "httpStatus": 409
+    },
+    {
+      "name": "owner and reviewer isolation plus CSRF denial",
+      "status": "passed",
+      "noCrossOwnerGrant": true,
+      "ownerReviewDenied": true,
+      "csrfStatus": 403
+    },
+    {
+      "name": "paused grant denies reads and successful provision replay",
+      "status": "passed",
+      "additionalProviderCreates": 0,
+      "httpStatus": 403
+    },
+    {
+      "name": "fresh owner consent reconnects same wallet, revoked grant stays denied",
+      "status": "passed",
+      "newConsentRequired": true,
+      "sameWallet": true,
+      "additionalProviderCreates": 0
+    },
+    {
+      "name": "policy revision invalidates access and requires new consent and acceptance",
+      "status": "passed",
+      "staleGrantStatus": 403,
+      "newConsentRequired": true,
+      "additionalProviderCreates": 0
+    },
+    {
+      "name": "created CDP accounts have zero Base Sepolia native balance",
+      "status": "passed",
+      "accountsChecked": 2,
+      "chain": "Base Sepolia",
+      "nativeBalanceWei": "0",
+      "fundingCalls": 0
+    }
+  ],
+  "providerEffects": {
+    "createCalls": 2,
+    "successfulCreateResponses": 2,
+    "aggregateStatuses": [
+      {
+        "method": "POST",
+        "status": 201
+      },
+      {
+        "method": "POST",
+        "status": 201
+      },
+      {
+        "method": "GET",
+        "status": 200
+      }
+    ],
+    "signingCalls": 0,
+    "fundingCalls": 0
+  },
+  "completedAt": "2026-10-16T09:54:48.925Z",
+  "sourceRevisionState": "base revision plus browser-form and CDP-name fixes in the accompanying pull request",
+  "fullDeploymentAcceptance": false,
+  "workflow": "Custom advanced engineering harness; not the supported GUI-export/CLI deployment workflow",
+  "runtimeStatus": "stopped; wallets, original authority and recovery records retained",
+  "requiredFollowup": "Publish reviewed standard staging walkthrough before any full deployment run; use real registered login/application/identity dependencies and mark missing ones blocked."
+}

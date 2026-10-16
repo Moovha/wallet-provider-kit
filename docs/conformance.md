@@ -67,9 +67,45 @@ Offline tests cover the cases they exercise. The onboarding profile supplies a
 private single-host file store and provisioning journal; verify its filesystem,
 backup and crash behavior in your deployment. Existing financial hosts still
 supply their production authority and financial journal. The CLI starts unconfigured,
-and the CDP adapter has offline test evidence only. Full operation orchestration,
+and live CDP evidence is limited to the isolated exercise below. Full operation orchestration,
 sponsorship, settlement and device recovery each need their own implementation
 and acceptance evidence.
+
+## Isolated CDP staging exercise 16 October 2026
+
+This was an engineering harness, not the [supported staging operator workflow](staging-walkthrough.md).
+It has been stopped; its wallets and recovery records are retained. Full configured
+deployment acceptance remains incomplete. Do not use the results below to bypass
+the GUI export, supplied CLI or real dependency checks in that workflow.
+
+A local macOS HTTPS deployment using advanced host composition exercised the real
+CDP API and persistent toolkit SQLite storage. It created two unfunded accounts,
+confirmed zero Base Sepolia native balances, and tested application access,
+cross-client/object denial, missing tokens/scopes, owner/reviewer isolation, CSRF,
+pause/revocation, reconnection and changed-policy denial. Concurrent provisioning,
+durable replay, process restart and a stopped database backup/restore retained the
+original account without additional creation calls.
+
+For the second account, the acceptance transport deliberately discarded a successful
+CDP creation response. The unknown attempt stayed blocked across restart. A reviewer
+then recovered the original account through authenticated read-only CDP lookup;
+replaying the original attempt returned that account without another creation.
+
+The exercise found and fixed two defects: browser form submissions lost their
+`Origin` under `Referrer-Policy: no-referrer`, and CDP account names exceeded its
+36-character maximum. Browser regression coverage now exercises consent, provider
+review and revocation, while the CDP fixture checks the documented naming constraint.
+
+This is limited live provisioning/recovery evidence, **not provider certification**.
+Login used a synthetic local OIDC issuer with real code/PKCE/JWKS/token verification;
+identity evidence used an explicitly synthetic adapter. A Didit credential was found,
+but a configured test workflow and real identity acceptance were not established.
+External owner login/application registrations, live identity sharing/review,
+wizard-export deployment, public TLS/hosting, grant-expiry timing and live signing
+remain acceptance gaps. No signing, funding, broadcast, gas sponsorship or settlement
+was performed. Keep those checks separate from this result.
+
+[Download the sanitized acceptance record](./public/acceptance/cdp-staging-2026-10-16.json).
 
 The [Relayer profile](openzeppelin-relayer.md) adds offline contract fixtures for
 configured-account binding, typed signing, transaction admission, provider-ID

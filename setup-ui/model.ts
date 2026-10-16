@@ -92,6 +92,8 @@ export function deploymentChecklist(
     '# Wallet provider deployment checklist',
     '',
     'Configuration validated locally. External integrations, recovery and token acceptance remain unverified.',
+    `Supported staging path: configure/export in the GUI, deploy with the supplied CLI, then exercise deployed Swagger and owner/reviewer pages. Follow ${docs}staging-walkthrough.html`,
+    'Record missing real login, application, identity, HTTPS or recovery prerequisites as blocked. Custom hosts and synthetic identity adapters do not establish full deployment acceptance.',
     `Service activation in this export: ${config.activation.enabled ? 'enabled by operator attestation' : 'disabled'}.`,
     '',
     '## Configuration observations',

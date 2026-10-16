@@ -43,7 +43,9 @@ function accountName(accountId: string): string {
   if (!uuid.test(accountId))
     throw new WalletProviderError('wallet_provider_input');
   // Reserve this opaque ID durably BEFORE creation. Never send a phone/user ID.
-  return `moovha-${accountId}`;
+  // CDP allows at most 36 alphanumeric/hyphen characters. Keep every UUID bit
+  // in a deterministic 35-character name for creation and read-only recovery.
+  return `mw-${accountId.replaceAll('-', '')}`;
 }
 
 function requireAttempt(attemptId: string): void {

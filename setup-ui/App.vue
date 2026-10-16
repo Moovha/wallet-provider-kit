@@ -471,6 +471,17 @@ function enableDocumentation() {
                   Download all three files. The environment template contains
                   names only.
                 </p>
+                <p>
+                  <a
+                    :href="docs + 'staging-walkthrough.html'"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Run the staging walkthrough ↗
+                  </a>
+                  for deployment, unfunded account access, policy checks and
+                  recovery.
+                </p>
                 <div class="download-actions">
                   <button type="button" class="primary" @click="exportConfig">
                     Download configuration</button

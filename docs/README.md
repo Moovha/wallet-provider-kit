@@ -98,6 +98,12 @@ it, getting an application token, making a first request and interpreting real r
 [Integrated token controls](operator-tokens.md) let allowed operators obtain and
 renew application tokens in the deployed GUI without fetching/pasting them.
 
+Before a full deployment test, follow the [staging walkthrough](staging-walkthrough.md):
+configure/export in the GUI, deploy with the supplied CLI, then use deployed
+Swagger and owner/reviewer pages to prove unfunded provisioning, application
+access, policy denials and recovery. Record unavailable real dependencies as
+blocked; a custom harness or synthetic identity adapter does not complete this path.
+
 A successful export means configuration validation passed. It does not mean
 vendor connectivity, login, identity agreements or wallet recovery were tested.
 Do not enable activation merely because every wizard tab has been visited.

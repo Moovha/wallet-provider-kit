@@ -297,6 +297,10 @@ it('keeps owner consent separate from requester authentication and rejects CSRF,
       new URLSearchParams({ csrf: f.csrf, decision: 'approve' }).toString(),
     ],
     [
+      { ...formHeaders(), origin: 'null' },
+      new URLSearchParams({ csrf: f.csrf, decision: 'approve' }).toString(),
+    ],
+    [
       { ...formHeaders(), 'sec-fetch-site': 'cross-site' },
       new URLSearchParams({ csrf: f.csrf, decision: 'approve' }).toString(),
     ],

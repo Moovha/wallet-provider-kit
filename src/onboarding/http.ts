@@ -422,7 +422,9 @@ export async function registerOnboardingRoutes(
         'content-security-policy',
         "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
       );
-      reply.header('referrer-policy', 'no-referrer');
+      // no-referrer makes browser form POSTs send Origin: null, breaking the
+      // exact-origin CSRF check. Keep referrers private on cross-origin requests.
+      reply.header('referrer-policy', 'same-origin');
     });
     async function session(
       request: FastifyRequest,

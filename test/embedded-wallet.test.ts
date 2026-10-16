@@ -40,7 +40,10 @@ const environment = {
     .toString('base64'),
 };
 const account = { accountId, address: signer.address };
-const remoteAccount = { name: `moovha-${accountId}`, address: signer.address };
+const remoteAccount = {
+  name: 'mw-10000000000040008000000000000001',
+  address: signer.address,
+};
 
 function action(): TypedDataAction {
   const payload = {
@@ -133,8 +136,16 @@ describe('embedded wallet lifecycle behind Moovha authority', () => {
       'POST',
     ]);
     expect(JSON.parse(String(request.mock.calls[0][1]?.body))).toEqual({
-      name: `moovha-${accountId}`,
+      name: remoteAccount.name,
     });
+    // Vendor contract: 2–36 alphanumeric/hyphen characters. A UUID prefix
+    // must not make otherwise valid account IDs impossible to provision.
+    expect(remoteAccount.name).toMatch(
+      /^[A-Za-z0-9][A-Za-z0-9-]{0,34}[A-Za-z0-9]$/,
+    );
+    expect(request.mock.calls[1][0]).toBe(
+      `https://api.cdp.coinbase.com/platform/v2/evm/accounts/by-name/${remoteAccount.name}`,
+    );
     expect(authority.sign).toHaveBeenCalledWith(context, actionId);
     expect(JSON.stringify(request.mock.calls)).not.toContain(
       'verified-session',
