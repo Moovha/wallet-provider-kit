@@ -1,6 +1,8 @@
-# Onboard users and connect applications
+# Provider-hosted access (compatibility)
 
-For the standard deployment, [configure the service](setup.md) without host code.
+This guide covers the **provider-hosted compatibility flow**, with provider login, consent pages and staff identity review. The standard [application-led flow](application-access.md) keeps users in their application and grants access from trusted identity and consent attestations. Select `policy.access.mode: "hosted"` to use this guide; omitted mode in legacy configurations also retains hosted behavior.
+
+For this compatibility deployment, [configure the service](setup.md) with hosted access explicitly selected.
 The programmatic onboarding-only profile below remains available for advanced
 composition and deliberately denies signing; the configured service can add the
 provider-authorized transfer profile with explicit onboarding delegation.
@@ -10,7 +12,7 @@ which applications can use their account. Your provider keeps acceptance,
 authorization, signing and recovery under its control.
 
 After [installing the package](package.md), [choose a wallet backend](backend-guide.md)
-and start with [the single configuration example](provider.config.example.ts).
+and start with [the single configuration example](provider.config.hosted.example.ts).
 `createOnboardingProvider` supplies hosted consent, provider review, persistent
 grants and journaled wallet creation. You configure your provider, approved
 applications, existing identity service and selected wallet backend. There is
@@ -20,7 +22,7 @@ This is an experimental single-host reference integration. It has offline
 conformance evidence; real vendor accounts, identity-service setup and backend
 recovery still need acceptance testing before you enable it.
 
-The starter wizard and CLI default to [application-record evaluation](application-records.md):
+Hosted deployments can select [application-record evaluation](application-records.md):
 admitted applications submit required fields, owners consent and staff review
 each record before unfunded wallet access. That source does not establish
 externally verified KYC or permit financial signing. The vendor examples below

@@ -42,7 +42,7 @@ export interface ServerOptions {
   service?: EmbeddedWalletService;
   /** Enabling enrollment also gates the provisioning route on current provider acceptance. */
   enrollment?: EnrollmentService;
-  /** Hosted owner consent, provider review and application access. Independent of legacy OIDC enrollment. */
+  /** Application-led access or explicit hosted compatibility access. Independent of legacy OIDC enrollment. */
   onboarding?: OnboardingHttpOptions;
   /** Must check durable authority/recovery dependencies; never infer readiness from env keys. */
   ready?: () => Promise<boolean>;
@@ -85,7 +85,7 @@ export async function createServer(options: ServerOptions = {}) {
         title: 'Moovha Wallet Provider Service',
         version: '0.1.0',
         description:
-          'Experimental provider-hosted signing profile. Not the Moovha operation orchestration API.',
+          'Experimental wallet-provider API with application-led access and optional hosted compatibility. Not the Moovha operation orchestration API.',
       },
       components: {
         securitySchemes: {
@@ -129,6 +129,7 @@ export async function createServer(options: ServerOptions = {}) {
           document,
           !!options.configurationProfile,
           !!options.onboarding?.actions,
+          options.onboarding?.service.policy.access.mode,
         ),
       uiConfig: {
         layout: 'BaseLayout',

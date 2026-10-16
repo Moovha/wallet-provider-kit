@@ -68,6 +68,11 @@ export function operationStatus(
     return "Complete this application's registration in Policies and Services";
   if (app.enabled === false) return 'This application is disabled in Policies';
   if (
+    config.policy.access?.mode === 'application' &&
+    !app.assertionTrust?.agreement
+  )
+    return 'Record this application’s identity and consent trust agreement in Policies';
+  if (
     guide.permission &&
     !(app.permissions ?? ['account:read', 'operations:request']).includes(
       guide.permission,
@@ -101,6 +106,34 @@ export function requestExample(
   if (id === 'requestAccountAccess')
     return {
       mode: 'create',
+      ...(config.policy.access?.mode === 'application'
+        ? {
+            user: {
+              id: 'example-application-user',
+              identity: {
+                reference: 'example-identity-record',
+                level:
+                  config.policy.identity?.application?.verificationLevel ??
+                  'verified',
+                verified_at: '2030-01-01T00:00:00.000Z',
+                fields: Object.fromEntries(
+                  (
+                    config.policy.identity?.application?.requiredFields ?? []
+                  ).map((field) => [field, 'Example value']),
+                ),
+              },
+              consent: {
+                reference: 'example-consent-record',
+                granted_at: '2030-01-01T00:00:00.000Z',
+                expires_at: '2030-01-02T00:00:00.000Z',
+                policy_revision: 'a'.repeat(64),
+                ...(config.financial
+                  ? { transfer_policy_revision: 'b'.repeat(64) }
+                  : {}),
+              },
+            },
+          }
+        : {}),
       ...(config.policy.identity?.records
         ? { identity_record: identityRecord }
         : {}),
@@ -125,7 +158,12 @@ export function requestExample(
         '0x1111111111111111111111111111111111111111',
       amount: '1',
     };
-  if (id === 'provisionAccount' || id === 'signAction') return {};
+  if (
+    id === 'provisionAccount' ||
+    id === 'signAction' ||
+    id === 'revokeAccountAccess'
+  )
+    return {};
 }
 export function referenceOperations(
   contract: ApiContract,
@@ -135,7 +173,12 @@ export function referenceOperations(
   return Object.entries(contract.paths).flatMap(([path, methods]) =>
     Object.entries(methods).flatMap(([method, operation]) => {
       const guide = operationGuides[operation.operationId];
-      return guide
+      return guide &&
+        !(
+          config.policy.access?.mode === 'application' &&
+          (guide.records || guide.vendor)
+        ) &&
+        !(config.policy.access?.mode !== 'application' && guide.applicationLed)
         ? [
             {
               path,
@@ -156,7 +199,26 @@ export function referenceOperations(
 }
 export type ReferenceOperation = ReturnType<typeof referenceOperations>[number];
 /** Fictional, schema-checked bodies; never approvals, signatures or live results. */
-export function responseExample(id: string): object {
+export function responseExample(
+  id: string,
+  config?: ProviderConfiguration,
+  requestedPermissions?: string[],
+): object {
+  const applicationLed = config?.policy.access?.mode === 'application';
+  if (id === 'revokeAccountAccess')
+    return { grant_id: exampleId, status: 'revoked' };
+  if (
+    applicationLed &&
+    ['requestAccountAccess', 'getAccountAccessRequest'].includes(id)
+  )
+    return {
+      request_id: exampleId,
+      status: 'granted',
+      account_id: exampleId,
+      grant_id: exampleId,
+      permissions: requestedPermissions ?? ['account:read'],
+      expires_at: '2030-01-02T00:00:00.000Z',
+    };
   const address = '0x1111111111111111111111111111111111111111';
   const consent_url = `https://wallet.example.com/onboarding/${exampleId}`;
   if (id === 'getCapabilities')
@@ -167,12 +229,34 @@ export function responseExample(id: string): object {
     };
   if (id === 'getAccountAccessPolicy')
     return {
-      source: 'application_record',
-      evaluation_only: true,
-      required_fields: ['country', 'display_name'],
+      flow: applicationLed ? 'application' : 'hosted',
+      policy_revision: 'a'.repeat(64),
+      ...(applicationLed && config?.financial
+        ? {
+            transfer_policy_revision: 'b'.repeat(64),
+            transfer_terms: config.financial,
+          }
+        : {}),
+      ...(applicationLed
+        ? {
+            verification_level:
+              config!.policy.identity!.application!.verificationLevel,
+            max_identity_age_days: config!.policy.identity!.maxAgeDays ?? 365,
+            max_access_days: config!.policy.access!.maxAgeDays ?? 30,
+            provider_login_required: false,
+          }
+        : {}),
+      source: applicationLed ? 'application_attestation' : 'application_record',
+      evaluation_only: !applicationLed,
+      required_fields: applicationLed
+        ? config!.policy.identity!.application!.requiredFields
+        : (config?.policy.identity?.records?.requiredFields ?? [
+            'country',
+            'display_name',
+          ]),
       maximum_field_characters: 512,
       owner_consent_required: true,
-      provider_review_required: true,
+      provider_review_required: !applicationLed,
     };
   if (id === 'submitAccountAccessRecords')
     return {
@@ -283,7 +367,15 @@ export function referenceSpec(
     if (op.responses['200']) {
       op.responses['200'].description = item.guide.success;
       const body = op.responses['200'].content?.['application/json'];
-      if (body) body.example = responseExample(item.operation.operationId);
+      if (body)
+        body.example = responseExample(
+          item.operation.operationId,
+          config,
+          (
+            item.body as
+              { authorization_details?: [{ actions: string[] }] } | undefined
+          )?.authorization_details?.[0]?.actions,
+        );
     }
     (spec.paths[item.path] ??= {})[item.method] = op;
   }

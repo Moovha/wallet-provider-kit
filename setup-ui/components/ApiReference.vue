@@ -22,7 +22,7 @@ const liveUrl = computed(() =>
 const applicationIndex = ref(0);
 const search = ref('');
 const showUnconfigured = ref(false);
-const selectedOperation = ref('requestAccountAccess');
+const selectedOperation = ref('getAccountAccessPolicy');
 const canvas = ref<HTMLElement>();
 const loading = ref(true);
 const error = ref('');
@@ -274,16 +274,23 @@ async function copy() {
     </p>
     <div class="api-flow">
       <h3>Connect an application</h3>
-      <p>
-        Request access → owner signs in and consents → identity checks and staff
-        review → read the access status until granted → create the wallet → read
-        account details. Identity checks require an agreed price and funding.
-        With delegated transfer signing, the application requests a transfer,
-        your service authorizes it, then the application requests its signature.
-        Submitting the transaction, paying network fees and confirming
-        completion are separate steps.
+      <p v-if="config.policy.access?.mode === 'application'">
+        Read the access policy → collect identity evidence and wallet-access
+        consent in your application → submit the user assertion → receive a
+        grant when policy passes → create the wallet → read account details. No
+        provider user login or manual review is required. Use the revoke
+        endpoint when the user withdraws access.
       </p>
-      <p>
+      <p v-else>
+        Hosted compatibility flow: Request access → owner signs in and consents
+        → identity checks and staff review → read the access status until
+        granted → create the wallet → read account details. Identity checks
+        require an agreed price and funding. With delegated transfer signing,
+        the application requests a transfer, your service authorizes it, then
+        the application requests its signature. Submitting the transaction,
+        paying network fees and confirming completion are separate steps.
+      </p>
+      <p v-if="config.policy.access?.mode !== 'application'">
         Hosted login, consent, access management and provider review pages use
         the owner's or reviewer's browser login, not the application's API
         token. Open returned consent links as a full browser page rather than
@@ -323,7 +330,10 @@ async function copy() {
         IDs and any shared-identity token with values from your deployment. Use
         a new UUIDv4 idempotency key for a new POST request and keep the same
         key when retrying it. Transfer amounts are whole numbers of the token's
-        base units.
+        base units. For application-led requests, replace all example timestamps
+        and evidence references with current records, and use policy revisions
+        returned by GET /v1/access-policy. The application must already hold the
+        user’s consent.
       </p>
       <button type="button" class="secondary" @click="copy">
         Copy cURL example

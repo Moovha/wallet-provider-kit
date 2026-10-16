@@ -9,8 +9,6 @@
     "profile",
     "policy",
     "oauth",
-    "ownerLogin",
-    "reviewers",
     "identity",
     "backend",
     "storage",
@@ -113,6 +111,18 @@
                     "maximum": 9007199254740991
                   }
                 }
+              },
+              "assertionTrust": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["agreement"],
+                "properties": {
+                  "agreement": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  }
+                }
               }
             }
           }
@@ -143,6 +153,27 @@
               "type": "integer",
               "minimum": 1,
               "maximum": 365
+            },
+            "application": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["requiredFields", "verificationLevel"],
+              "properties": {
+                "requiredFields": {
+                  "type": "array",
+                  "maxItems": 16,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9_]{0,63}$"
+                  }
+                },
+                "verificationLevel": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                }
+              }
             }
           }
         },
@@ -155,6 +186,9 @@
               "type": "integer",
               "minimum": 1,
               "maximum": 365
+            },
+            "mode": {
+              "enum": ["application", "hosted"]
             }
           }
         }

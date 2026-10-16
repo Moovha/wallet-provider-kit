@@ -15,7 +15,7 @@ Base Sepolia only and is not approved for production custody.
 
 For a repeatable acceptance run, use the [standard staging walkthrough](staging-walkthrough.md).
 It specifies which work happens in the configuration GUI, deployment CLI and
-deployed browser pages, with expected results and a checklist for missing
+deployed API explorer, with expected results and a checklist for missing
 services or untested recovery cases.
 
 ## Prepare the host and files
@@ -63,8 +63,7 @@ an independent second provider or run two authoritative copies.
 Open `provider.env` with a local text editor or have your secret manager render it
 for the service account. Replace each empty value with the matching issued secret
 from the [credential guide](operator-services.md#put-references-in-the-wizard-values-in-the-deployment).
-For example, `PROVIDER_LOGIN_SECRET=` receives the login-client secret, while
-`DIDIT_API_KEY=` receives the Didit application's API key. Keep the names exactly
+For example, `WALLET_CDP_API_KEY_SECRET=` receives the CDP key secret. Login/vendor variables appear only when optional staff login or hosted compatibility features are configured. Keep the names exactly
 as exported. Do not put values in the wizard or JSON configuration.
 
 This file uses Node environment-file syntax: `NAME=value`, one entry per variable.
@@ -144,21 +143,19 @@ curl -i http://127.0.0.1:8080/health/ready
 ```
 
 Expected: liveness **200**, readiness **503** while activation is disabled. API
-mutations cannot dispatch. Startup still requires reachable compatible owner-login
-discovery; a failure here must be fixed with your identity administrator. The
+mutations cannot dispatch. Application-led startup needs no user-login discovery. Optional staff login or hosted compatibility requires its configured login service to be reachable. The
 setup wizard's browser port is unrelated to the deployed service's port.
 
 ## Publish through HTTPS
 
 An **ingress/reverse proxy** accepts public HTTPS and forwards requests to the
 private local service. A **TLS certificate** proves the hostname and encrypts the
-connection. The kit itself listens on HTTP; owners need the final HTTPS origin
-for login, cookies and consent checks.
+connection. The kit itself listens on HTTP; applications need the final HTTPS origin for authenticated API requests. Optional staff/hosted browser pages also require HTTPS cookies and origin checks.
 
 Have your host/domain administrator point the hostname's DNS A record (and AAAA
 only if IPv6 is served) to the ingress host. Route the entire hostname to the wallet
 service without adding/removing a path prefix. Keep port 8080 private. Permit
-outbound HTTPS to owner-login discovery/token/JWKS, application JWKS and the selected
+outbound HTTPS to application JWKS and the selected
 identity/wallet services; the service needs those external dependencies at runtime.
 
 For a simple single-host reference, install [Caddy](https://caddyserver.com/docs/install)
@@ -177,7 +174,7 @@ platform may already provide an equivalent managed ingress instead.
 Check `https://wallet.your-company.com/health/live` returns 200 with a trusted
 certificate. Readiness should still be 503 while disabled. Do not expose configuration,
 secret files, SQLite/vault files or proxy logs containing tokens/consent URLs.
-Do not frame the hosted consent/access pages; open them as top-level navigation.
+For hosted compatibility, do not frame the consent/access pages; open them as top-level navigation.
 
 ## Optional CDP/Relayer container path
 
@@ -217,12 +214,12 @@ file does not set one. HTTPS ingress remains necessary. Use
 
 Before admitting real traffic, retain reviewable evidence for your exact environment:
 
-| Evidence                     | What your team must establish                                                                                                                                                        |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Backend acceptance           | Supported network/account type, exact account binding, restart/replay, concurrent denial and uncertain-result handling for the selected backend                                      |
-| Recovery acceptance          | Restorable private records and backend/vault access, retained assignments/attempts, recovery of unknown outcomes without replacement effects                                         |
-| Token acceptance, if signing | Exact Base Sepolia ERC-3009 contract/domain, recipients, limits, delegation consent and independently verified signature behavior                                                    |
-| Service acceptance           | Compatible owner login/API tokens, selected identity source, staff review, consent, revocation and HTTPS operation; vendor routes also require workflow/sharing and identity funding |
+| Evidence                     | What your team must establish                                                                                                                                                            |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Backend acceptance           | Supported network/account type, exact account binding, restart/replay, concurrent denial and uncertain-result handling for the selected backend                                          |
+| Recovery acceptance          | Restorable private records and backend/vault access, retained assignments/attempts, recovery of unknown outcomes without replacement effects                                             |
+| Token acceptance, if signing | Exact Base Sepolia ERC-3009 contract/domain, recipients, limits, delegation consent and independently verified signature behavior                                                        |
+| Service acceptance           | Application API tokens, reviewed attestation trust, identity/consent evidence, isolation, revocation and HTTPS; hosted compatibility additionally tests login, review and vendor funding |
 
 Use the [conformance checklist](conformance.md), your selected backend guide and
 [Auth0 verification steps](auth0-setup.md#_6-confirm-the-tenant-works-before-admitting-traffic).
@@ -247,7 +244,7 @@ Use the wizard's **API reference → Try it out** controls to enable the deploye
 explorer, export and restart, then open your HTTPS origin at `/docs/`. Begin with
 public discovery; add a short-lived application token for protected calls.
 The [step-by-step live testing guide](http-api.md#try-deployed-apis) covers token
-issuance, actual responses, idempotency keys, required owner steps and troubleshooting.
+issuance, actual responses, idempotency keys, application evidence and troubleshooting.
 This is real API execution, including any admitted records, charges and signatures.
 Use your isolated acceptance deployment before wider admission.
 
@@ -258,28 +255,23 @@ secret belongs in the browser or plaintext configuration.
 
 ## Hand the API to the product developer
 
-Provide the final HTTPS origin, [implemented OpenAPI](../spec/provider-api.json),
-application client registration/token instructions, allowed permissions/scopes,
-identity funding agreement and supported token/recipient limits. Keep wallet/vendor
-and owner-login secrets with the provider operator.
+Provide the HTTPS API origin, registered application client and supported policy.
+The application obtains short-lived API tokens, reads `GET /v1/access-policy`,
+authenticates users and completes identity checks in its own platform. It records
+consent for the current policy, submits the user assertion and receives a grant
+when the provider's checks pass. It then provisions or reads the account and
+calls the grant-revocation endpoint when access is withdrawn. Follow
+[application-led access](application-access.md) for the exact contract and limits.
 
-The developer integrates these stages using [the HTTP guide](http-api.md),
-[request/response schemas](http-reference.md) and [configured service flow](setup.md#consume-the-api):
+No provider user-login page or manual review is part of this standard flow. Staff
+login is optional for operator tools. Hosted compatibility deployments separately
+follow [hosted onboarding](onboarding.md).
 
-1. Create an access request and open the returned provider consent URL in the
-   owner's top-level browser. Use its returned URL, not a guessed route.
-2. Complete owner login, consent and staff acceptance of the submitted record.
-   Vendor configurations also require funded identity verification/import. Poll for the accepted account/grant; do not assume instant approval.
-3. Provision the accepted account with an empty JSON body and retain its ID.
-4. If signing is configured, obtain `transfers:request` delegation during onboarding,
-   request an exact transfer authorization, then sign the provider-authorized
-   stored action. There is no additional owner approval URL or browser prompt.
-5. Arrange submission, gas and settlement separately. A signature is not a receipt.
-
-Use UUIDv4 `Idempotency-Key` values for mutation requests and preserve each original
-key across retries. OAuth authentication, application-access consent and exact
-provider transfer authorization are distinct. Owners manage access at `/onboarding/access`;
-staff use `/onboarding/review`. No adapter development is required for this flow.
+Test user isolation, stale evidence, wrong policy, revocation, idempotent replay
+and unknown-outcome recovery using the [staging walkthrough](staging-walkthrough.md).
+Application user IDs are scoped by issuer/client; cross-application wallet linking
+requires a separately verified integration. Applications arrange execution and
+gas separately from provider signing.
 
 ## Keep it operating
 

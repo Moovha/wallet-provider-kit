@@ -590,7 +590,7 @@ export interface ServerOptions {
   service?: EmbeddedWalletService;
   /** Enabling enrollment also gates the provisioning route on current provider acceptance. */
   enrollment?: EnrollmentService;
-  /** Hosted owner consent, provider review and application access. Independent of legacy OIDC enrollment. */
+  /** Application-led access or explicit hosted compatibility access. Independent of legacy OIDC enrollment. */
   onboarding?: OnboardingHttpOptions;
   /** Must check durable authority/recovery dependencies; never infer readiness from env keys. */
   ready?: () => Promise<boolean>;
@@ -608,10 +608,12 @@ export interface ServerOptions {
 
 Import from `@moovha/wallet-provider-kit/onboarding`. [Integration guide](onboarding.md).
 
+- [AccessInput](#accessinput)
 - [accessType](#accesstype)
 - [ApplicationIdentityRecord](#applicationidentityrecord)
 - [ApplicationPolicy](#applicationpolicy)
 - [ApplicationRecordPolicy](#applicationrecordpolicy)
+- [ApplicationUserAssertion](#applicationuserassertion)
 - [createDiditIdentityAdapter](#creatediditidentityadapter)
 - [createFileOnboardingStore](#createfileonboardingstore)
 - [createOnboardingJournal](#createonboardingjournal)
@@ -634,6 +636,25 @@ Import from `@moovha/wallet-provider-kit/onboarding`. [Integration guide](onboar
 - [ProviderState](#providerstate)
 - [SumsubConfiguration](#sumsubconfiguration)
 - [VendorPrice](#vendorprice)
+
+### AccessInput
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/onboarding/types.ts).
+
+```ts
+export interface AccessInput {
+  mode: 'create' | 'connect';
+  account_id?: string;
+  identity_record?: ApplicationIdentityRecord;
+  user?: ApplicationUserAssertion;
+  authorization_details: [
+    {
+      type: typeof accessType;
+      actions: Permission[];
+    },
+  ];
+}
+```
 
 ### accessType
 
@@ -665,6 +686,10 @@ export interface ApplicationPolicy {
   clientId: string;
   name: string;
   enabled?: boolean;
+  /** Explicit permission to attest user identity and consent; an OAuth scope alone is insufficient. */
+  assertionTrust?: {
+    agreement: string;
+  };
   permissions?: Permission[];
   /** Contractually agreed reimbursement, not a payment instruction or vendor price quote. */
   funding?: {
@@ -681,6 +706,30 @@ export interface ApplicationPolicy {
 ```ts
 export interface ApplicationRecordPolicy {
   requiredFields: string[];
+}
+```
+
+### ApplicationUserAssertion
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/onboarding/types.ts).
+
+```ts
+/** Attested by a registered application under an explicit provider trust agreement. */
+export interface ApplicationUserAssertion {
+  id: string;
+  identity: {
+    reference: string;
+    level: string;
+    verified_at: string;
+    fields: Record<string, string>;
+  };
+  consent: {
+    reference: string;
+    granted_at: string;
+    expires_at: string;
+    policy_revision: string;
+    transfer_policy_revision?: string;
+  };
 }
 ```
 
@@ -839,11 +888,16 @@ export interface OnboardingPolicy {
   applications: ApplicationPolicy[];
   identity?: {
     maxAgeDays?: number;
+    application?: {
+      requiredFields: string[];
+      verificationLevel: string;
+    };
     /** Explicit provider-reviewed record submission for unfunded, read-only evaluation. */
     records?: ApplicationRecordPolicy;
   };
   access?: {
     maxAgeDays?: number;
+    mode?: 'application' | 'hosted';
   };
 }
 ```
@@ -860,8 +914,8 @@ export interface OnboardingProviderConfiguration {
   /** Supplied database.onboardingStore or an equivalent transactional host store. */
   storage?: OnboardingStore;
   oauth: OAuthConfiguration;
-  ownerLogin: OwnerLoginConfiguration;
-  reviewers: string[];
+  ownerLogin?: OwnerLoginConfiguration;
+  reviewers?: string[];
   identity: {
     didit?: DiditConfiguration;
     sumsub?: SumsubConfiguration;
@@ -885,9 +939,14 @@ export declare class OnboardingService {
     identity: {
       maxAgeDays: number;
       records?: import('./types.js').ApplicationRecordPolicy;
+      application?: {
+        requiredFields: string[];
+        verificationLevel: string;
+      };
     };
     access: {
       maxAgeDays: number;
+      mode: 'application' | 'hosted';
     };
     version: string;
     provider: {
@@ -914,9 +973,9 @@ export declare class OnboardingService {
       | undefined;
     expires_at?: string | undefined;
     grant_id?: string | undefined;
+    consent_url?: string | undefined;
     request_id: string;
     status: string;
-    consent_url: string;
   }>;
   read(
     context: AuthorityContext,
@@ -928,9 +987,9 @@ export declare class OnboardingService {
       | undefined;
     expires_at?: string | undefined;
     grant_id?: string | undefined;
+    consent_url?: string | undefined;
     request_id: string;
     status: string;
-    consent_url: string;
   }>;
   accessPolicy(principal: VerifiedPrincipal): {
     source: string;
@@ -938,7 +997,14 @@ export declare class OnboardingService {
     required_fields: string[];
     maximum_field_characters: number;
     owner_consent_required: boolean;
+    provider_login_required: boolean;
     provider_review_required: boolean;
+    verification_level?: string | undefined;
+    max_identity_age_days: number;
+    max_access_days: number;
+    transfer_policy_revision?: string | undefined;
+    flow: 'application' | 'hosted';
+    policy_revision: string;
   };
   submitRecords(
     inputContext: AuthorityContext,
@@ -984,9 +1050,9 @@ export declare class OnboardingService {
       | undefined;
     expires_at?: string | undefined;
     grant_id?: string | undefined;
+    consent_url?: string | undefined;
     request_id: string;
     status: string;
-    consent_url: string;
   }>;
   importIdentity(
     inputContext: AuthorityContext,
@@ -1000,9 +1066,9 @@ export declare class OnboardingService {
       | undefined;
     expires_at?: string | undefined;
     grant_id?: string | undefined;
+    consent_url?: string | undefined;
     request_id: string;
     status: string;
-    consent_url: string;
   }>;
   verificationVendors(): Vendor[];
   startVerification(
@@ -1064,9 +1130,9 @@ export declare class OnboardingService {
       | undefined;
     expires_at?: string | undefined;
     grant_id?: string | undefined;
+    consent_url?: string | undefined;
     request_id: string;
     status: string;
-    consent_url: string;
   }>;
   authorize(
     principal: VerifiedPrincipal,
@@ -1079,9 +1145,17 @@ export declare class OnboardingService {
   ): Promise<{
     status: string;
     address?: string | undefined;
-    identity_source?: 'application_record' | undefined;
+    identity_source?:
+      'application_attestation' | 'application_record' | undefined;
     evaluation_only?: boolean | undefined;
     account_id: string;
+  }>;
+  revokeApplicationGrant(
+    context: AuthorityContext,
+    id: string,
+  ): Promise<{
+    grant_id: string;
+    status: 'revoked';
   }>;
   ownerRequests(identity: OwnerIdentity): Promise<
     {
@@ -1100,9 +1174,9 @@ export declare class OnboardingService {
       | undefined;
     expires_at?: string | undefined;
     grant_id?: string | undefined;
+    consent_url?: string | undefined;
     request_id: string;
     status: string;
-    consent_url: string;
   }>;
   ownerGrants(identity: OwnerIdentity): Promise<
     {
@@ -1234,6 +1308,7 @@ export interface ProviderState {
       provider: string;
       binding: string;
       activeRevision?: string;
+      accessMode?: 'application' | 'hosted';
     }
   >;
   requests: Record<string, AccessRequest>;
@@ -2296,13 +2371,13 @@ export interface ProviderConfiguration {
   policy: OnboardingPolicy;
   oauth: OAuthConfiguration;
   apiExplorer?: ExplorerTokensConfiguration;
-  ownerLogin: {
+  ownerLogin?: {
     issuer: string;
     clientId: string;
     clientSecret: SecretReference;
     idTokenAlgorithm?: 'RS256' | 'ES256';
   };
-  reviewers: string[];
+  reviewers?: string[];
   identity: {
     didit?: {
       apiKey: SecretReference;

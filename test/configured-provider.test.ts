@@ -92,7 +92,9 @@ beforeEach(() => {
 });
 async function template() {
   return validateProviderConfiguration(
-    JSON.parse(await readFile('docs/provider.config.example.json', 'utf8')),
+    JSON.parse(
+      await readFile('docs/provider.config.hosted.example.json', 'utf8'),
+    ),
   );
 }
 async function folder() {
@@ -188,12 +190,12 @@ async function fixture(
       return {
         csrf,
         identity: {
-          issuer: config.ownerLogin.issuer,
+          issuer: config.ownerLogin!.issuer,
           subject:
             token[0] === 'a'
               ? 'owner'
               : token[0] === 'b'
-                ? config.reviewers[0]
+                ? config.reviewers![0]
                 : 'other-owner',
           authenticatedAt: Date.now(),
         },
@@ -1004,4 +1006,118 @@ describe('configured API and provider transfer authorization', () => {
     });
     db.close();
   });
+});
+
+it('runs application-led policy, provisioning and delegated signing without user login, and fences hosted-store migration', async () => {
+  const f = await fixture();
+  const config = validateProviderConfiguration(
+    JSON.parse(await readFile('docs/provider.config.example.json', 'utf8')),
+  );
+  config.activation = f.config.activation;
+  config.financial = f.config.financial;
+  config.policy.applications[0].permissions = [
+    'account:read',
+    'operations:request',
+    'transfers:request',
+  ];
+  config.storage.directory = await folder();
+  const db = openProviderDatabase({
+    directory: config.storage.directory,
+    initialize: true,
+  });
+  db.close();
+  const app = await createConfiguredProvider(config);
+  servers.push(app);
+  const headers = {
+    authorization: await f.token(),
+    'idempotency-key': randomUUID(),
+  };
+  const policy = (
+    await app.inject({ url: '/v1/access-policy', headers })
+  ).json();
+  expect(policy).toMatchObject({
+    flow: 'application',
+    provider_login_required: false,
+    provider_review_required: false,
+    transfer_terms: config.financial,
+  });
+  const user = {
+    id: 'app-user',
+    identity: {
+      reference: 'test-evidence',
+      level: 'verified',
+      verified_at: new Date(Date.now() - 1000).toISOString(),
+      fields: { country: 'ZA' },
+    },
+    consent: {
+      reference: 'test-consent',
+      granted_at: new Date(Date.now() - 1000).toISOString(),
+      expires_at: new Date(Date.now() + 86400000).toISOString(),
+      policy_revision: policy.policy_revision,
+      transfer_policy_revision: policy.transfer_policy_revision,
+    },
+  };
+  const granted = await app.inject({
+    method: 'POST',
+    url: '/v1/access-requests',
+    headers,
+    payload: {
+      mode: 'create',
+      user,
+      authorization_details: [
+        {
+          type: 'https://moovha.com/wallet/account-access',
+          actions: ['account:read', 'operations:request', 'transfers:request'],
+        },
+      ],
+    },
+  });
+  expect(granted.statusCode).toBe(200);
+  expect(granted.json().status).toBe('granted');
+  expect(granted.json()).not.toHaveProperty('consent_url');
+  const accountId = granted.json().account_id;
+  const post = (url: string, payload: object) =>
+    app.inject({
+      method: 'POST',
+      url,
+      headers: { ...headers, 'idempotency-key': randomUUID() },
+      payload,
+    });
+  expect(
+    (await post('/v1/accounts/' + accountId + '/provision', {})).statusCode,
+  ).toBe(200);
+  const account = await app.inject({
+    url: '/v1/accounts/' + accountId,
+    headers,
+  });
+  expect(account.statusCode).toBe(200);
+  expect(account.json()).toMatchObject({
+    identity_source: 'application_attestation',
+    evaluation_only: false,
+  });
+  const action = await post('/v1/transfer-authorizations', {
+    account_id: accountId,
+    recipient: config.financial!.recipients[0],
+    amount: '1',
+  });
+  expect(action.statusCode).toBe(200);
+  expect(
+    (await post('/v1/actions/' + action.json().action_id + '/sign', {}))
+      .statusCode,
+  ).toBe(200);
+  expect(
+    (await post('/v1/access-grants/' + granted.json().grant_id + '/revoke', {}))
+      .statusCode,
+  ).toBe(200);
+  expect(
+    (await post('/v1/actions/' + action.json().action_id + '/sign', {}))
+      .statusCode,
+  ).toBe(403);
+  expect((await app.inject({ url: '/onboarding/access' })).statusCode).toBe(
+    404,
+  );
+  const changed = { ...config, storage: f.config.storage };
+  await expect(createConfiguredProvider(changed)).rejects.toThrow(
+    'Invalid provider configuration',
+  );
 });

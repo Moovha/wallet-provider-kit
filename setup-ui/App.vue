@@ -410,6 +410,9 @@ function enableDocumentation() {
                   <dd>
                     {{
                       [
+                        config.policy.access?.mode === 'application'
+                          ? 'Trusted application identity attestations'
+                          : '',
                         config.identity.didit ? 'Didit' : '',
                         config.policy.identity?.records
                           ? 'Application records · evaluation'
@@ -425,7 +428,12 @@ function enableDocumentation() {
                   <dt>Application access</dt>
                   <dd>
                     {{ config.policy.applications.length }} application(s) ·
-                    {{ config.reviewers.length }} reviewer(s)
+                    {{
+                      config.policy.access?.mode === 'application'
+                        ? 'Application-led · no provider user login or review'
+                        : (config.reviewers?.length ?? 0) +
+                          ' reviewer(s) · hosted compatibility'
+                    }}
                   </dd>
                 </div>
                 <div>

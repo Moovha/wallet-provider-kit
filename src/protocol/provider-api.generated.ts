@@ -166,6 +166,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/access-grants/{grantId}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["revokeAccountAccess"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/access-records": {
         parameters: {
             query?: never;
@@ -1768,6 +1784,28 @@ export interface operations {
                             [key: string]: string;
                         };
                     };
+                    /** @description Required in application-led mode. The explicitly trusted application attests its stable user identity and recorded consent; OAuth scopes alone do not establish these facts. */
+                    user?: {
+                        id: string;
+                        identity: {
+                            reference: string;
+                            level: string;
+                            /** Format: date-time */
+                            verified_at: string;
+                            fields: {
+                                [key: string]: string;
+                            };
+                        };
+                        consent: {
+                            reference: string;
+                            /** Format: date-time */
+                            granted_at: string;
+                            /** Format: date-time */
+                            expires_at: string;
+                            policy_revision: string;
+                            transfer_policy_revision?: string;
+                        };
+                    };
                     authorization_details: {
                         /** @enum {string} */
                         type: "https://moovha.com/wallet/account-access";
@@ -1787,8 +1825,11 @@ export interface operations {
                         request_id: string;
                         /** @enum {string} */
                         status: "consent_required" | "verification_required" | "funding_approval_required" | "identity_pending" | "reconciliation_required" | "provider_review_required" | "granted" | "denied" | "expired" | "suspended" | "revoked" | "policy_changed";
-                        /** Format: uri */
-                        consent_url: string;
+                        /**
+                         * Format: uri
+                         * @description Hosted compatibility only. Application-led grants have no provider user redirect.
+                         */
+                        consent_url?: string;
                         grant_id?: string;
                         account_id?: string;
                         permissions?: ("account:read" | "operations:request" | "transfers:request")[];
@@ -1986,14 +2027,36 @@ export interface operations {
                 content: {
                     "application/json": {
                         /** @enum {string} */
-                        source: "application_record" | "vendor_verification";
+                        source: "application_record" | "vendor_verification" | "application_attestation";
                         evaluation_only: boolean;
                         required_fields: string[];
                         maximum_field_characters: number;
                         /** @enum {boolean} */
                         owner_consent_required: true;
-                        /** @enum {boolean} */
-                        provider_review_required: true;
+                        provider_review_required: boolean;
+                        provider_login_required?: boolean;
+                        /** @enum {string} */
+                        flow?: "application" | "hosted";
+                        policy_revision?: string;
+                        transfer_policy_revision?: string;
+                        transfer_terms?: {
+                            /** @enum {unknown} */
+                            profile: "provider-authorized-erc3009-v1";
+                            token: {
+                                address: string;
+                                name: string;
+                                version: string;
+                                symbol: string;
+                                decimals: number;
+                            };
+                            recipients: string[];
+                            maximumAmount: string;
+                            lifetimeAmount: string;
+                            maxValiditySeconds: number;
+                        };
+                        max_identity_age_days?: number;
+                        max_access_days?: number;
+                        verification_level?: string;
                     };
                 };
             };
@@ -2169,6 +2232,157 @@ export interface operations {
             };
         };
     };
+    revokeAccountAccess: {
+        parameters: {
+            query?: never;
+            header: {
+                "idempotency-key": string;
+            };
+            path: {
+                grantId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        grant_id: string;
+                        /** @enum {string} */
+                        status: "revoked";
+                    };
+                };
+            };
+            /** @description Default Response */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+        };
+    };
     submitAccountAccessRecords: {
         parameters: {
             query?: never;
@@ -2207,8 +2421,11 @@ export interface operations {
                                 request_id: string;
                                 /** @enum {string} */
                                 status: "consent_required" | "verification_required" | "funding_approval_required" | "identity_pending" | "reconciliation_required" | "provider_review_required" | "granted" | "denied" | "expired" | "suspended" | "revoked" | "policy_changed";
-                                /** Format: uri */
-                                consent_url: string;
+                                /**
+                                 * Format: uri
+                                 * @description Hosted compatibility only. Application-led grants have no provider user redirect.
+                                 */
+                                consent_url?: string;
                                 grant_id?: string;
                                 account_id?: string;
                                 permissions?: ("account:read" | "operations:request" | "transfers:request")[];
@@ -2412,8 +2629,11 @@ export interface operations {
                         request_id: string;
                         /** @enum {string} */
                         status: "consent_required" | "verification_required" | "funding_approval_required" | "identity_pending" | "reconciliation_required" | "provider_review_required" | "granted" | "denied" | "expired" | "suspended" | "revoked" | "policy_changed";
-                        /** Format: uri */
-                        consent_url: string;
+                        /**
+                         * Format: uri
+                         * @description Hosted compatibility only. Application-led grants have no provider user redirect.
+                         */
+                        consent_url?: string;
                         grant_id?: string;
                         account_id?: string;
                         permissions?: ("account:read" | "operations:request" | "transfers:request")[];
@@ -2625,8 +2845,11 @@ export interface operations {
                         request_id: string;
                         /** @enum {string} */
                         status: "consent_required" | "verification_required" | "funding_approval_required" | "identity_pending" | "reconciliation_required" | "provider_review_required" | "granted" | "denied" | "expired" | "suspended" | "revoked" | "policy_changed";
-                        /** Format: uri */
-                        consent_url: string;
+                        /**
+                         * Format: uri
+                         * @description Hosted compatibility only. Application-led grants have no provider user redirect.
+                         */
+                        consent_url?: string;
                         grant_id?: string;
                         account_id?: string;
                         permissions?: ("account:read" | "operations:request" | "transfers:request")[];
@@ -2827,9 +3050,8 @@ export interface operations {
                     "application/json": {
                         account_id: string;
                         /** @enum {string} */
-                        identity_source?: "application_record";
-                        /** @enum {boolean} */
-                        evaluation_only?: true;
+                        identity_source?: "application_record" | "application_attestation";
+                        evaluation_only?: boolean;
                         /** @enum {string} */
                         status: "accepted" | "provisioned";
                         address?: string;

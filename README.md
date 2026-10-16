@@ -9,20 +9,21 @@ teams building and operating blockchain wallets for their users. Rooted in Moovh
 work with blockchain payments and decentralised finance (DeFi), it makes access
 to on-chain assets such as USDC and ZARP easier to integrate into everyday products.
 It brings account creation,
-user onboarding, application access and approved-action signing into one toolkit. You choose the system that
+application-led access, account provisioning and approved-action signing into one toolkit. You choose the system that
 creates wallet accounts and signs approved actions, define who may use an account,
 and retain responsibility for key control and recovery.
 
-During onboarding, an application such as Moovha requests wallet access on the
-user's behalf. The user signs in and grants application-access consent. After the
-required identity verification (KYC) and provider acceptance, your service records
-a limited, revocable access grant. The application then submits transaction
-requests under that grant. Your service checks the stored grant, current identity
-status, the exact approved action and provider policies before authorising signing.
-Application-access consent is not requested again for each transaction. Your team
-keeps control of its signing integration;
-the application receives the results of permitted actions without receiving
-private keys or seed phrases.
+In the standard application-led flow, users remain in the connected application.
+That application authenticates them, completes the required identity checks and
+records their wallet-access consent. It requests access on their behalf using
+its authenticated API client and a user assertion. Under an explicit trust agreement,
+the provider checks identity evidence, consent, current policy and permission limits,
+then stores a revocable grant. It does not require a second user login or routine
+staff review. Applications never receive private keys or seed phrases.
+
+Read the [application-led access contract](docs/application-access.md) for user
+binding, evidence, permissions, revocation and limits. Required fields or an OAuth
+scope alone do not establish identity or spending authority.
 
 Connected applications are expected to cover the blockchain network fees, often
 called **gas**, for the supported actions they request. When a provider connects
@@ -67,24 +68,19 @@ is not available. See [getting started](docs/README.md) for installation help.
 _Example configuration only. Validation checks the configuration; it does not test
 vendor services or certify readiness. Initial activation remains disabled._
 
-1. **[Prepare services](docs/operator-services.md):** domain, wallet backend, login,
-   application token issuer and reviewers. Use application records for an
-   unfunded evaluation, or prepare vendor verification and its funding agreements.
-   Each ID/secret is explained with its source. The [Auth0 recipe](docs/auth0-setup.md)
-   gives a dashboard-based reference for login and compatible API tokens.
+1. **[Prepare services](docs/operator-services.md):** domain, wallet backend and
+   application token issuer. Review which applications may attest user identity
+   and consent, and the evidence your policy requires.
 2. **[Configure the six screens](docs/setup-wizard.md):** Provider, Backend, Services,
-   Policies, Deployment and Export. Enter secret **variable names**, not values.
-   Download configuration, the empty variable template and deployment checklist.
-   The starter [application-record workflow](docs/application-records.md) lets an
-   admitted application submit policy-required fields for provider review without
-   a KYC vendor account. Use fictional records and unfunded wallets; choose an
-   external vendor when your identity policy requires verified evidence.
-3. **[Deploy and accept](docs/operator-deployment.md):** fill secrets privately,
-   prepare persistent storage, initialize once, diagnose, add HTTPS, prove backend
-   and recovery behavior, then explicitly activate. The wizard does not deploy.
-4. **[Connect your product](docs/operator-deployment.md#hand-the-api-to-the-product-developer):**
-   its developer consumes the HTTP API and integrates owner access/approval. The
-   application separately arranges submission, gas and settlement.
+   Policies, Deployment and Export. Application-led access is selected by default.
+   Record application trust agreements and enter secret variable names, not values.
+3. **[Deploy and accept](docs/operator-deployment.md):** supply secrets privately,
+   initialize new persistent storage once, add HTTPS, test authority, backend and
+   recovery behavior, then explicitly activate. The wizard does not deploy.
+4. **[Connect your product](docs/application-access.md):** read access policy,
+   submit current identity and consent evidence, receive a grant, create the wallet
+   and revoke access when the user withdraws. Submission, gas and settlement remain
+   the application's responsibility.
 
 The GUI's **API reference** uses bundled Swagger UI to show each supported endpoint,
 required scope, configuration prerequisites, request/response schemas and illustrative
@@ -101,19 +97,12 @@ remain single-host and Base Sepolia EOA only; production custody acceptance is p
 
 ## Who takes part
 
-<figure class="wallet-visual">
-  <img src="./docs/public/diagrams/service-boundary.webp" alt="Diagram: owner consent and application requests enter the provider service; authority checks precede backend signing and only permitted results return." width="1536" height="1024" loading="lazy" decoding="async">
-  <figcaption>The provider checks current authority; the connected application receives permitted results without receiving wallet keys.</figcaption>
-</figure>
-
-[View full-size diagram](docs/public/diagrams/service-boundary.webp)
-
 Your team is the **wallet provider**: it operates the wallet service for its users.
 The server application in which you run the toolkit is called the **host**.
 
 | Term                      | What it means here                                                                                                                                                                                                                  |
 | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Account owner**         | The user your service records as owning a wallet account. They sign in and approve application access. Also called the wallet owner; this doesn't by itself say who holds the private keys.                                         |
+| **Account owner**         | The user your service records as owning a wallet account. They sign in and approve wallet access within the connected application. Also called the wallet owner; this doesn't by itself say who holds the private keys.             |
 | **Connected application** | Software, such as Moovha, that requests access to an owner's account through your wallet service. In OAuth configuration and API authentication, its registration is called a **[client](docs/concepts.md#what-does-client-mean)**. |
 | **Host authority**        | Your host's permission-checking code and stored records. Together they decide which owner and application may use an account, and which exact action is approved now.                                                               |
 | **Wallet backend**        | The wallet engine or signing service your host connects to. It creates or locates accounts and signs approved actions; its key-control and recovery model determines custody.                                                       |
@@ -132,22 +121,22 @@ through the [FormKit setup wizard](docs/setup-wizard.md), then export configurat
 and a deployment checklist. No application code is needed for this setup path.
 
 The standard path is **configure, deploy and consume the API**. Use one validated
-JSON configuration for supported login, identity, wallet backends and SQLite storage.
+JSON configuration for application trust, identity requirements, wallet backends and SQLite storage.
 The kit supplies consent, grants, account recovery, provider-authorized transfers
 and durable signing coordination. Start with [service setup](docs/setup.md).
 Custom backend adapters and embedded host composition are the advanced path.
 
 The kit is for a team that wants to provide wallets as part of its own product,
 or make its wallet service available to other applications. Your users interact
-with your login, consent and approval experience. Your host decides which
+with the connected application’s login, identity and consent experience. Your host decides which
 connected applications can request access, which accounts they can use and which
 actions they may perform.
 
-You can start with the bundled onboarding profile for owner login, identity
-review, consent and revocable application access. If your product already has
-those systems, you can connect its existing authority and records through the
-public interfaces. Both approaches leave the wallet backend and the business
-rules under your team's control.
+The supplied service defaults to application-led access. Provider-hosted login,
+consent and review remain an explicit [compatibility profile](docs/onboarding.md).
+Existing hosted configurations retain their behavior; switching an occupied store
+requires a reviewed ownership migration. Backend and business rules remain under
+your team's control.
 
 Deploy the configured provider service and connect your product through its API.
 The toolkit can also be embedded as a Node.js package for advanced integrations.
@@ -156,9 +145,9 @@ Its OpenAPI contract also lets applications written in other languages use the i
 ```mermaid
 flowchart TB
     accTitle: Account owner, connected application and provider control
-    accDescr: The owner approves access through the host. Applications request actions from the toolkit, which checks host authority and calls the chosen backend. Only permitted results return to the application.
-    walletOwner["Account owner"] -->|"Login and application-access consent"|authority
-    connectedApp["Connected application"] -->|"Authenticated action request"|kit
+    accDescr: The user approves access in the application, which attests identity and consent to the provider. Applications request actions from the toolkit, which checks host authority and calls the chosen backend. Only permitted results return to the application.
+    walletOwner["Wallet user"] -->|"Login, identity checks and consent"|connectedApp
+    connectedApp["Connected application"] -->|"User assertion or authorized action request"|kit
     subgraph walletService["Your wallet service"]
         kit["Wallet Provider Kit"] -->|"Check current permission"|authority["Your host authority"]
         kit -->|"Admitted action only"|backend["Your chosen wallet backend"]
@@ -173,22 +162,13 @@ application doesn't transfer the wallet's keys to it.
 
 ## How wallet access works
 
-<figure class="wallet-visual">
-  <img src="./docs/public/diagrams/action-authority.webp" alt="Diagram: token verification, current owner authority, exact action approval and durable admission precede signing, verification and result persistence." width="1536" height="1024" loading="lazy" decoding="async">
-  <figcaption>Authentication identifies the caller. Current authority, an exact approved action and a durable attempt are also required.</figcaption>
-</figure>
-
-[View full-size diagram](docs/public/diagrams/action-authority.webp)
-
-The application starts an access request, and the user signs in to the provider
-and grants application-access consent. Required identity checks and provider
-acceptance establish eligibility for a stored access grant with specific
-permissions and an expiry. An accepted user's identity can be reused when they
-connect another application without repeating KYC, while that new application
-still requires access consent. Subsequent transaction requests use the stored
-grant without repeating application-access consent. The user can pause or revoke
-access; reconnection, renewal or changed permissions require a new access request
-and consent.
+The application reads the provider's access policy and submits its stable user ID,
+accepted identity evidence and recorded consent for the current policy revision.
+The provider grants access only to an explicitly trusted application when those
+checks pass. Grants have specific permissions and an expiry. User IDs are scoped
+to the application: matching names or IDs in different applications do not link
+wallets. The application implements withdrawal and calls the grant-revocation API.
+See [application-led access](docs/application-access.md).
 
 When an application requests an action, the host resolves the caller to the
 account owner and checks current access, consent and identity-verification
@@ -200,7 +180,7 @@ the backend is called. The application references a stored action;
 it doesn't submit arbitrary bytes for the service to sign.
 
 In the bundled transfer profile, the user grants `transfers:request` delegation
-during onboarding. The consent screen shows the token, recipients and limits.
+in the application for the exact transfer policy revision. The application must show the token, recipients and limits to the user.
 The application requests transfers on the user's behalf; the provider authorises
 and stores each exact action under that delegation and its current policies,
 without another user approval prompt. Ordinary access or `operations:request`
@@ -284,7 +264,7 @@ recover the chosen backend. Explain that control and recovery model to your user
 ## What is available today
 
 The package includes a wallet service and signing interfaces, a journal-backed
-provider wrapper, provider-hosted onboarding and access management, OAuth token
+provider wrapper, application-led access management and optional hosted compatibility onboarding, OAuth token
 verification, generated OpenAPI and optional OpenTelemetry monitoring.
 
 Experimental adapters connect [Coinbase CDP](docs/provider-guide.md#current-adapter-profile),

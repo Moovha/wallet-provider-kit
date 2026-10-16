@@ -16,7 +16,10 @@ const identityDays = computed({
 const accessDays = computed({
   get: () => model.value.policy.access?.maxAgeDays ?? 30,
   set: (value: number) => {
-    model.value.policy.access = { maxAgeDays: value };
+    model.value.policy.access = {
+      ...model.value.policy.access,
+      maxAgeDays: value,
+    };
   },
 });
 function financial(enabled: unknown) {
@@ -37,18 +40,29 @@ function financial(enabled: unknown) {
     <span class="eyebrow">Access and limits</span>
     <h2>Set your policies</h2>
     <p>
-      Decide which applications can request access, who reviews identity, and
-      which actions are supported.
+      Decide which applications can request access, which identity evidence to
+      accept, and which actions are supported.
     </p>
   </div>
   <div class="callout step-orientation">
-    <strong>Decide who can use the service and who pays</strong>
-    <p>
+    <strong>{{
+      model.policy.access?.mode === 'application'
+        ? 'Define application trust and permissions'
+        : 'Decide who can use the service and who pays'
+    }}</strong>
+    <p v-if="model.policy.access?.mode === 'application'">
+      Each application authenticates its users, completes identity checks and
+      records wallet-access consent. Record the reviewed agreement that permits
+      its attestations, then set the allowed permissions and age limits. The
+      provider checks these requirements before granting access.
+    </p>
+    <p v-else>
       A connected application is a product that calls your wallet API. Add its
-      registration below and name the staff who review submitted records or
-      identity evidence. Vendor verification also needs an agreement about who
-      covers its costs. Agree these rules with the people operating the
-      connected applications.
+      registration below and record the agreement that permits it to attest
+      identity and consent. Hosted compatibility mode also needs identity
+      reviewers. Vendor verification also needs an agreement about who covers
+      its costs. Agree these rules with the people operating the connected
+      applications.
     </p>
     <p>
       Transfer signing is optional. Leave it off if you only need wallet
@@ -99,6 +113,9 @@ function financial(enabled: unknown) {
           issuer: model.oauth.issuer,
           clientId: '',
           name: '',
+          ...(model.policy.access?.mode === 'application'
+            ? { assertionTrust: { agreement: '' } }
+            : {}),
           permissions: ['account:read'],
         })
       "
@@ -159,7 +176,10 @@ function financial(enabled: unknown) {
       validation="required"
     />
     <SetupField
-      v-if="!model.policy.identity?.records"
+      v-if="
+        model.policy.access?.mode !== 'application' &&
+        !model.policy.identity?.records
+      "
       guide="fundingEnabled"
       type="checkbox"
       label="Record an identity funding agreement for this application"
@@ -171,7 +191,11 @@ function financial(enabled: unknown) {
       "
     />
     <div
-      v-if="!model.policy.identity?.records && application.funding"
+      v-if="
+        model.policy.access?.mode !== 'application' &&
+        !model.policy.identity?.records &&
+        application.funding
+      "
       class="field-grid"
     >
       <SetupField
@@ -191,6 +215,14 @@ function financial(enabled: unknown) {
         validation="required|min:0|max:9007199254740991"
       />
     </div>
+    <FormKit
+      v-if="model.policy.access?.mode === 'application'"
+      type="text"
+      v-model="application.assertionTrust!.agreement"
+      label="Application identity and consent trust agreement"
+      validation="required|length:1,256"
+      help="Reference your reviewed agreement with this application. It authorizes identity and consent attestations; a token scope alone does not."
+    />
     <SetupField
       guide="applicationEnabled"
       type="checkbox"
@@ -207,28 +239,36 @@ function financial(enabled: unknown) {
       Remove application {{ index + 1 }}
     </button>
   </fieldset>
-  <div class="section-heading">
-    <h3>Provider identity reviewers</h3>
-    <button type="button" class="secondary" @click="model.reviewers.push('')">
-      Add reviewer
-    </button>
-  </div>
-  <div v-for="(_, index) in model.reviewers" :key="index" class="inline-row">
-    <SetupField
-      guide="reviewer"
-      v-model="model.reviewers[index]"
-      type="text"
-      :label="'Reviewer ' + (index + 1) + ' account ID (sub)'"
-      validation="required|length:1,256"
-    /><button
-      type="button"
-      class="text-button"
-      :disabled="model.reviewers.length === 1"
-      @click="model.reviewers.splice(index, 1)"
-    >
-      Remove reviewer {{ index + 1 }}
-    </button>
-  </div>
+  <template
+    v-if="model.policy.access?.mode !== 'application' && model.reviewers"
+  >
+    <div class="section-heading">
+      <h3>Provider identity reviewers</h3>
+      <button
+        type="button"
+        class="secondary"
+        @click="model.reviewers!.push('')"
+      >
+        Add reviewer
+      </button>
+    </div>
+    <div v-for="(_, index) in model.reviewers" :key="index" class="inline-row">
+      <SetupField
+        guide="reviewer"
+        v-model="model.reviewers![index]"
+        type="text"
+        :label="'Reviewer ' + (index + 1) + ' account ID (sub)'"
+        validation="required|length:1,256"
+      /><button
+        type="button"
+        class="text-button"
+        :disabled="model.reviewers!.length === 1"
+        @click="model.reviewers!.splice(index, 1)"
+      >
+        Remove reviewer {{ index + 1 }}
+      </button>
+    </div>
+  </template>
   <div class="feature-panel">
     <h3>Optional delegated transfer signing</h3>
     <p v-if="model.policy.identity?.records" class="help-text">
@@ -238,9 +278,9 @@ function financial(enabled: unknown) {
     </p>
     <p>
       Allow applications to request token transfers within limits that owners
-      accept during onboarding. Your service checks each transfer and signs its
-      authorization without asking the owner again. The application submits the
-      transaction separately.
+      accept in the application (or on the consent page in hosted mode). Your
+      service checks each transfer and signs its authorization without asking
+      the owner again. The application submits the transaction separately.
     </p>
     <SetupField
       guide="financialEnabled"

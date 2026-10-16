@@ -27,8 +27,8 @@ export interface OnboardingProviderConfiguration {
   /** Supplied database.onboardingStore or an equivalent transactional host store. */
   storage?: OnboardingStore;
   oauth: OAuthConfiguration;
-  ownerLogin: OwnerLoginConfiguration;
-  reviewers: string[];
+  ownerLogin?: OwnerLoginConfiguration;
+  reviewers?: string[];
   identity: { didit?: DiditConfiguration; sumsub?: SumsubConfiguration };
   walletBackend: WalletSigningProvider;
   /** Prove the selected backend's lifecycle and recovery before enabling provisioning. */
@@ -41,13 +41,20 @@ export async function createOnboardingProvider(
   if (
     process.env.GAE_SERVICE === 'exchange' ||
     process.env.NODE_TLS_REJECT_UNAUTHORIZED === '0' ||
-    !Array.isArray(config.reviewers) ||
-    !config.reviewers.length ||
-    config.reviewers.some((s) => !s || s.length > 256) ||
+    (config.policy.access?.mode !== 'application' &&
+      (!config.ownerLogin ||
+        !Array.isArray(config.reviewers) ||
+        !config.reviewers.length)) ||
+    (config.reviewers !== undefined &&
+      (!Array.isArray(config.reviewers) ||
+        config.reviewers.some(
+          (s) => typeof s !== 'string' || !s || s.length > 256,
+        ))) ||
     !config.identity ||
     (!config.identity.didit &&
       !config.identity.sumsub &&
-      !config.policy.identity?.records) ||
+      !config.policy.identity?.records &&
+      config.policy.access?.mode !== 'application') ||
     typeof config.ready !== 'function' ||
     (config.storage === undefined) ===
       (config.storageDirectory === undefined) ||
@@ -71,11 +78,13 @@ export async function createOnboardingProvider(
     identity,
     config.walletBackend,
   );
-  const login = await createOwnerLogin(
-    config.ownerLogin,
-    onboarding.policy.provider.origin,
-    store,
-  );
+  const login = config.ownerLogin
+    ? await createOwnerLogin(
+        config.ownerLogin,
+        onboarding.policy.provider.origin,
+        store,
+      )
+    : undefined;
   const backend = createJournaledWalletProvider(config.walletBackend, {
     namespace:
       'onboarding-' +
@@ -92,7 +101,7 @@ export async function createOnboardingProvider(
     onboarding: {
       service: onboarding,
       login,
-      reviewers: [...config.reviewers],
+      reviewers: [...(config.reviewers ?? [])],
     },
     ready: async () =>
       (await config.ready()) && (await store.transaction(() => true)),

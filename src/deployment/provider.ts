@@ -78,6 +78,7 @@ export async function createConfiguredProvider(
         origin: config.policy.provider.origin,
         provider: backend.provider,
         binding: config.backend.binding,
+        accessMode: config.policy.access?.mode ?? 'hosted',
       };
       const previous = state.deploymentBindings?.['service-v1'];
       if (
@@ -86,6 +87,7 @@ export async function createConfiguredProvider(
               origin: previous.origin,
               provider: previous.provider,
               binding: previous.binding,
+              accessMode: previous.accessMode ?? 'hosted',
             }) !== fingerprint(expected)
           : occupied
       )
@@ -126,21 +128,23 @@ export async function createConfiguredProvider(
       backend,
       config.financial ? fingerprint(config.financial) : undefined,
     );
-    const login = await createOwnerLogin(
-      {
-        ...config.ownerLogin,
-        clientSecret: resolveSecret(config.ownerLogin.clientSecret),
-      },
-      config.policy.provider.origin,
-      database.onboardingStore,
-    );
+    const login = config.ownerLogin
+      ? await createOwnerLogin(
+          {
+            ...config.ownerLogin,
+            clientSecret: resolveSecret(config.ownerLogin.clientSecret),
+          },
+          config.policy.provider.origin,
+          database.onboardingStore,
+        )
+      : undefined;
     activeRevision = fingerprint([
       onboarding!.policy.revision,
       config.financial ?? null,
       config.backend,
       config.reviewers,
-      config.ownerLogin.issuer,
-      config.ownerLogin.clientId,
+      config.ownerLogin?.issuer,
+      config.ownerLogin?.clientId,
       config.activation.enabled,
       ...(config.apiExplorer ? [config.apiExplorer, config.oauth] : []),
     ]);
@@ -208,8 +212,8 @@ export async function createConfiguredProvider(
       documentationTokens: config.apiExplorer
         ? {
             origin: config.policy.provider.origin,
-            issuer: config.ownerLogin.issuer,
-            login,
+            issuer: config.ownerLogin!.issuer,
+            login: login!,
             operators: config.apiExplorer.operators,
             applications: config.apiExplorer.clients.map((entry) => ({
               clientId: entry.clientId,
@@ -230,7 +234,7 @@ export async function createConfiguredProvider(
         service: onboarding,
         login,
         apiExplorerLogin: !!config.apiExplorer,
-        reviewers: config.reviewers,
+        reviewers: config.reviewers ?? [],
         currentConfiguration: () =>
           database.onboardingStore.transaction(
             (state) =>

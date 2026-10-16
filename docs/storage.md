@@ -5,16 +5,16 @@ onboarding, signing and Relayer execution profiles. It runs inside your Node.js
 process and requires no database server or additional npm dependency. Use it on
 one host with a private directory on persistent local POSIX storage.
 
-| Records                                                                                      | Built-in implementation                                    |
-| -------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
-| Access requests, owner consent, identity references/review, accounts and grants              | `database.onboardingStore` with `OnboardingService`        |
-| Login sessions, OIDC state/nonces and short-lived PKCE verifiers                             | The same onboarding store with `createOwnerLogin`          |
-| Identity-vendor cost reservations and onboarding audit                                       | The same onboarding store                                  |
-| Exact approved signing and execution actions, caller/owner bindings and revocation           | `approveAction`, `revokeAction` and `financialAuthority`   |
-| Stable attempts, HTTP idempotency bindings, exact request fingerprints and usage budgets     | Financial authority admission and the database journal     |
-| Dispatch claims, fencing tokens, signatures, provider transaction IDs and uncertain outcomes | `database.journal`, including read-only status lookup      |
-| Financial audit events and reconciliation evidence fingerprints                              | Committed with the corresponding state transition          |
-| Alternative OIDC Identity Assurance enrollment                                               | `database.enrollmentAuthority`, with host policy callbacks |
+| Records                                                                                             | Built-in implementation                                    |
+| --------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| Access requests, application-attested consent/identity, optional hosted review, accounts and grants | `database.onboardingStore` with `OnboardingService`        |
+| Login sessions, OIDC state/nonces and short-lived PKCE verifiers                                    | The same onboarding store with `createOwnerLogin`          |
+| Identity-vendor cost reservations and onboarding audit                                              | The same onboarding store                                  |
+| Exact approved signing and execution actions, caller/owner bindings and revocation                  | `approveAction`, `revokeAction` and `financialAuthority`   |
+| Stable attempts, HTTP idempotency bindings, exact request fingerprints and usage budgets            | Financial authority admission and the database journal     |
+| Dispatch claims, fencing tokens, signatures, provider transaction IDs and uncertain outcomes        | `database.journal`, including read-only status lookup      |
+| Financial audit events and reconciliation evidence fingerprints                                     | Committed with the corresponding state transition          |
+| Alternative OIDC Identity Assurance enrollment                                                      | `database.enrollmentAuthority`, with host policy callbacks |
 
 SQLite stores the records needed by these profiles. It
 does not implement the orchestration draft, on-chain settlement, a relayer's nonce
@@ -66,6 +66,8 @@ path from replacement by other users. Close the database after stopping all work
 that uses it; a host that supplies the store owns its lifetime.
 
 ## Use it for onboarding
+
+Standard [application-led access](application-access.md) uses these same transactional collections and journals. Its assertion/grant fields are additive JSON records, with no SQLite schema migration. Login sessions and vendor reservations are used only when their optional hosted/staff features are configured.
 
 Pass `storage: database.onboardingStore` to `createOnboardingProvider` instead of
 `storageDirectory`. Supply exactly one of those fields. The existing file-store

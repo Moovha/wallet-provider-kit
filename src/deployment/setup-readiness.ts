@@ -24,6 +24,7 @@ export function setupWarnings(config: ProviderConfiguration): string[] {
   for (const [index, application] of config.policy.applications.entries()) {
     if (config.policy.identity?.records) continue;
     if (application.enabled === false) continue;
+    if (config.policy.access?.mode === 'application') continue;
     if (!application.funding)
       warnings.push(
         `Application ${index + 1}: identity checks and imports are unavailable. In Policies, record its funding agreement and monthly identity budget in USD cents.`,
