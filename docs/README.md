@@ -27,6 +27,14 @@ vendor accounts or replace infrastructure and product integration work.
 
 ## Install and open the local wizard
 
+The wizard builds a local configuration draft. Its fields define the backend,
+application trust, policy and server settings your deployment will use. You
+finish with three files: `provider.config.json` for the server,
+`provider.env.example` for private secret setup and `provider-setup.md` for the
+deployment checklist. Validation checks completeness and consistency; deployment
+and integration testing follow afterward. Changes take effect only when you
+deploy the reviewed configuration and restart the service.
+
 Install [Node.js](https://nodejs.org/en/download) **24.22.0**, npm **11.11.1** and
 [Git](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git) for your OS.
 Open a terminal (macOS Terminal or your Linux terminal), then check:

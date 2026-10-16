@@ -47,6 +47,29 @@ The configuration uses:
 - `policy.identity.application.verificationLevel` and `requiredFields`.
 - `policy.applications[].assertionTrust.agreement` for every registered application.
 
+The GUI supports these built-in policy controls:
+
+| Wizard setting                                  | Scope and effect                                                                                                                                                                               |
+| ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Services → Required identity level              | All applications must attest this exact agreed level. The provider does not rank levels or perform the underlying verification itself.                                                         |
+| Services → Required identity fields             | All applications must submit nonempty values for these names. This checks presence, not country eligibility or other allowed-value rules.                                                      |
+| Policies → Maximum age of identity checks       | A shared limit of 1–365 days from the asserted verification time. Expired evidence cannot support access.                                                                                      |
+| Policies → Maximum access duration              | A shared limit of 1–365 days. Consent expiry must fit that period; identity expiry can shorten a grant further.                                                                                |
+| Policies → Connected applications               | Each exact issuer/client ID has its own reviewed trust-agreement reference, allowed permissions and enabled switch. Disabling an application denies its current access.                        |
+| Policies → Configure delegated transfer signing | Optional shared token, recipient allowlist, per-transfer and lifetime limits, and signature validity. Applications still need transfer permission and the user's consent to these exact terms. |
+| Policies → Policy version                       | Your label for a reviewed policy. The service also derives a revision from policy content; keeping the label does not preserve grants when rules change.                                       |
+
+These controls are configuration, not a general-purpose policy editor. Per-country
+eligibility, risk scoring, arbitrary conditions and separate identity-age rules
+per application require an advanced host integration. See the
+[host authority guide](provider-guide.md). Required field names and a trust-agreement
+reference do not implement or prove an application's KYC process.
+
+Validate and export the configuration, then deploy it and restart the service to
+apply the rules. The wizard does not update a running server. Policy changes
+invalidate existing grants; applications must read `GET /v1/access-policy`,
+present the current terms and obtain consent before requesting fresh access.
+
 No `ownerLogin`, reviewers, identity-vendor credentials or vendor funding agreement
 is needed. Optional API token controls require a separate **staff** login configuration;
 that sign-in is not part of the user's wallet-access flow. Backend credentials,

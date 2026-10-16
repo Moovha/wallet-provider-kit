@@ -56,6 +56,12 @@ function financial(enabled: unknown) {
       its attestations, then set the allowed permissions and age limits. The
       provider checks these requirements before granting access.
     </p>
+    <p v-if="model.policy.access?.mode === 'application'">
+      Identity level and required fields are set in Services. The age limits
+      below apply to all applications; permissions and trust agreements are set
+      separately for each application. Users consent to the requested
+      permissions inside that application.
+    </p>
     <p v-else>
       A connected application is a product that calls your wallet API. Add its
       registration below and record the agreement that permits it to attest
@@ -66,8 +72,8 @@ function financial(enabled: unknown) {
     </p>
     <p>
       Transfer signing is optional. Leave it off if you only need wallet
-      onboarding and account access. Keep the starting policy version for a
-      first setup; review the access periods against your own requirements.
+      creation and account access. Keep the starting policy version for a first
+      setup; review the access periods against your own requirements.
     </p>
   </div>
   <SetupField
@@ -101,6 +107,31 @@ function financial(enabled: unknown) {
       max="365"
       validation="required|between:1,365"
     />
+  </div>
+  <div v-if="model.policy.access?.mode === 'application'" class="callout">
+    <strong>How the provider uses these rules</strong>
+    <p>
+      A trusted application must submit identity evidence at the required level,
+      with every required field, checked within {{ identityDays }} days. It can
+      request only its allowed permissions with the user’s current consent.
+      Access lasts at most {{ accessDays }} days and ends sooner if identity
+      evidence or consent expires, or access is revoked.
+    </p>
+    <details>
+      <summary>Need different policy rules?</summary>
+      <p>
+        The wizard configures the built-in rules shown here and in Services,
+        including optional transfer limits below. Required fields check that
+        values are present; they do not restrict countries or evaluate risk
+        scores. Custom decision rules require an advanced host integration.
+        <a
+          :href="docs + 'application-access.html#configure-the-trust-policy'"
+          target="_blank"
+          rel="noopener noreferrer"
+          >Policy controls and limits ↗</a
+        >
+      </p>
+    </details>
   </div>
   <div class="section-heading">
     <h3>Connected applications</h3>

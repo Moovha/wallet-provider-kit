@@ -288,6 +288,13 @@ main {
 .step-orientation {
   margin: 0 0 1.5rem;
 }
+.setup-journey {
+  padding-left: 1.2rem;
+  margin: 0.5rem 0;
+}
+.setup-journey li {
+  margin: 0.6rem 0;
+}
 .compatibility-help {
   margin: 1rem 0;
   font-size: 0.85rem;

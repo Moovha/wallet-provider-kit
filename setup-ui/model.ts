@@ -102,7 +102,9 @@ export function deploymentChecklist(
   const lines = [
     '# Wallet provider deployment checklist',
     '',
-    'The configuration passed local checks. Before enabling wallet operations, test your external services, wallet recovery and token signing where configured.',
+    'Your local configuration draft passed completeness and consistency checks. This checklist is the handoff from the wizard to your deployment host; no service has been deployed or updated by the wizard.',
+    'Keep provider.config.json (service settings and policy), provider.env.example (secret variable names) and this provider-setup.md checklist together privately. Supply secret values on the deployment host or through its secret manager. Validation has not tested your credentials or external integrations.',
+    'Before enabling wallet operations, test your external services, wallet recovery and token signing where configured.',
     `Configure and export in the wizard, deploy with the CLI, then test application-led access through the deployed API explorer. Hosted compatibility deployments also test their owner/reviewer pages. Follow ${docs}staging-walkthrough.html`,
     'If a required login, application, identity or HTTPS service is unavailable, mark the corresponding test as blocked. Offline fixtures cannot validate that external service or your recovery process.',
     `Service activation in this export: ${config.activation.enabled ? 'enabled in this configuration' : 'disabled'}.`,
@@ -165,7 +167,7 @@ export function deploymentChecklist(
     `- Consume the implemented HTTP API: ${docs}http-api.html`,
     `- Deployment instructions: ${docs}setup.html`,
     '- Experimental Base Sepolia EOA profile only. Signing does not broadcast, sponsor gas or establish settlement.',
-    '- Configuration changes can revoke grants and invalidate approvals; review them before replacing a running deployment.',
+    '- To update settings, import your saved configuration in the wizard, edit, validate and export again. Deploy the reviewed files and restart the service. Policy changes invalidate previous grants and approvals; applications need consent to the current terms before requesting fresh access.',
     '- Stop the local setup wizard with Ctrl+C when finished.',
     '',
   );

@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — setup purpose and policy guidance
+
+- Explain the wizard's configuration, export and deployment stages before the
+  first field, and identify each exported file and its next use.
+- Show how identity, application trust, permission and expiry settings affect
+  access requests. Document the GUI's built-in policy controls and customization
+  limits, including how reviewed changes reach a running service.
+
 ## Unreleased — application-led access
 
 - Make the wizard, CLI template and standard guides use application-led access:
