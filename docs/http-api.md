@@ -242,18 +242,27 @@ Do not put returned signatures into application logs.
 
 ## Signing and transaction submission
 
-| Step                                             | Responsibility                                                                                              | Result                                                                                                         |
-| ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `POST /v1/transfer-authorizations`               | Provider checks delegated access and exact transfer policy                                                  | Stored action ID and ERC-3009 typed payload; no signature or broadcast                                         |
-| `POST /v1/actions/{actionId}/sign`               | Provider rechecks authority and the durable signing attempt                                                 | Signature for the exact authorization; no broadcast or gas payment                                             |
-| Submit the transaction                           | Connected application arranges gas and submits the token-contract call with the authorization and signature | A transaction hash identifies a submission; verify the receipt, exact transfer effects and finality separately |
-| `POST /v1/actions/{actionId}/transaction-events` | Application reports its observation to the provider                                                         | Durable **unverified** report; no settlement decision                                                          |
+| Operation                                        | Result                                                                                                                      |
+| ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
+| `POST /v1/transfer-authorizations`               | Stores the exact provider-authorized ERC-3009 transfer under current delegated authority.                                   |
+| `POST /v1/actions/{actionId}/sign`               | Returns a verified signature for that stored authorization; no broadcast.                                                   |
+| `GET /v1/execution-capabilities`                 | Discovers the optional execution profile, revision and activation state without exposing private sponsor/RPC configuration. |
+| `POST /v1/actions/{actionId}/execute`            | Signs internally and coordinates one durable submission through the application's configured gas sponsor.                   |
+| `GET /v1/actions/{actionId}/execution`           | Reads independently verified receipt, canonicality and finality; current authority is required.                             |
+| `GET /v1/actions/{actionId}/execution-events`    | Reads retained CloudEvents observation transitions with a resumable sequence cursor.                                        |
+| `POST /v1/actions/{actionId}/transaction-events` | Stores an application's **unverified** report; no settlement decision.                                                      |
 
-There is **no transaction-submission HTTP endpoint** in the provider kit.
-The [OpenZeppelin Relayer executor](openzeppelin-relayer.md) is a separate
-TypeScript library integration with host-owned action and attempt authority.
-Neither a signature nor a reported confirmation establishes settlement.
-The orchestration reference is a separate draft, not an implemented submission API.
+Execution routes require `Execution-Profile: erc3009-relayer-v1` and
+`Execution-Profile-Revision: 1`. The execute route requires both `wallet:execute`
+and `wallet:sign`, a UUIDv4 `Idempotency-Key` and an empty `{}` body. Reads require
+`wallet:execute:read`; event reads accept `?after=0` and return explicit cursor-gap
+metadata. OAuth scopes never replace current financial authority checks.
+
+Execution is optional and disabled by default. Signing-only applications use their
+own accepted submission rail. Neither a signature, a Relayer acceptance ID nor a
+reported confirmation establishes settlement. Read the
+[execution and recovery contract](execution.md) before integrating. The separate
+orchestration reference remains an unimplemented business API draft.
 
 ## Report transaction submission and confirmation
 

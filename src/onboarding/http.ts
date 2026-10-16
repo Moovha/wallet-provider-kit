@@ -1,4 +1,11 @@
 import providerConfigurationSchema from '../../spec/provider-config.schema.json' with { type: 'json' };
+import type { TransferExecutionCoordinator } from '../execution/coordinator.js';
+import {
+  executionHeaders,
+  executionReceiptSchema,
+  executionCapabilitiesSchema,
+  executionEventsSchema,
+} from '../execution/schemas.js';
 import { formatUnits } from 'ethers';
 import type {
   SupportedActions,
@@ -36,6 +43,7 @@ export interface OnboardingHttpOptions {
   apiExplorerLogin?: boolean;
   /** Configuration-first provider-authorized transfers; absent in the onboarding-only profile. */
   actions?: SupportedActions;
+  execution?: TransferExecutionCoordinator;
   /** Fence superseded configured-service instances, including browser authority writers. */
   currentConfiguration?: () => Promise<boolean>;
 }
@@ -266,6 +274,120 @@ export async function registerOnboardingRoutes(
       actions().read(
         (await context(request, 'wallet:actions:read')).principal,
         request.params.actionId,
+      ),
+  );
+  const execution = () => options?.execution ?? unavailable();
+  app.get(
+    '/v1/execution-capabilities',
+    {
+      schema: {
+        operationId: 'getExecutionCapabilities',
+        description:
+          'Public versioned execution discovery. Profile implementation, configuration and service readiness do not establish live-provider certification or production custody acceptance. Clients must select an exact supported ID/revision and ignore unknown profiles.',
+        response: { 200: executionCapabilitiesSchema },
+      },
+    },
+    async () => ({
+      contract_version: '1',
+      profiles: [
+        {
+          id: 'erc3009-relayer-v1',
+          revision: '1',
+          implemented: true,
+          configured: !!options?.execution,
+          ready: !!options?.execution && (await ready()),
+          chain_id: 'eip155:84532',
+          account_type: 'eoa',
+          signing: 'eip-712',
+          token_authorization: 'erc-3009',
+          submission: 'openzeppelin-relayer-1.8.0',
+          verification: 'rpc-quorum',
+          finality: 'finalized',
+          minimum_rpc_sources: 2,
+          execute_scopes: ['wallet:execute', 'wallet:sign'],
+          read_scopes: ['wallet:execute:read'],
+        },
+      ],
+    }),
+  );
+  const executionDescription =
+    'Optional fixed ERC-3009 transfer execution with exact version selection, current owner/grant/identity/consent/approval checks, durable signing and submission authority, application gas sponsorship and independent RPC receipt/finality verification. Unknown submission outcomes never permit redispatch. No arbitrary transaction payload is accepted.';
+  const executeSchema = schema(
+    'executeTransfer',
+    { type: 'object', additionalProperties: false },
+    actionParams,
+  );
+  app.post<{ Params: { actionId: string } }>(
+    '/v1/actions/:actionId/execute',
+    {
+      schema: {
+        ...executeSchema,
+        headers: {
+          ...executionHeaders,
+          required: [...executionHeaders.required, 'idempotency-key'],
+          properties: {
+            ...executionHeaders.properties,
+            'idempotency-key': uuidSchema,
+          },
+        },
+        description: executionDescription,
+        response: { ...executeSchema.response, 200: executionReceiptSchema },
+      },
+    },
+    async (request) =>
+      execution().execute(
+        await context(request, 'wallet:execute'),
+        request.params.actionId,
+      ),
+  );
+  const readExecutionSchema = schema(
+    'getTransferExecution',
+    undefined,
+    actionParams,
+  );
+  app.get<{ Params: { actionId: string } }>(
+    '/v1/actions/:actionId/execution',
+    {
+      schema: {
+        ...readExecutionSchema,
+        headers: executionHeaders,
+        description: executionDescription,
+        response: {
+          ...readExecutionSchema.response,
+          200: executionReceiptSchema,
+        },
+      },
+    },
+    async (request) =>
+      execution().read(
+        (await context(request, 'wallet:execute:read')).principal,
+        request.params.actionId,
+      ),
+  );
+  const executionEvents = schema('getExecutionEvents', undefined, actionParams);
+  app.get<{ Params: { actionId: string }; Querystring: { after?: string } }>(
+    '/v1/actions/:actionId/execution-events',
+    {
+      schema: {
+        ...executionEvents,
+        headers: executionHeaders,
+        querystring: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            after: { type: 'string', pattern: '^(0|[1-9][0-9]{0,15})$' },
+          },
+        },
+        description:
+          'Authenticated CloudEvents 1.0 execution observations with a monotonic sequence in the active store. At most 64 transitions are retained per execution; history_truncated signals a cursor gap requiring verified-status resynchronization. Reports never become verified events without RPC evidence. This endpoint does not refresh, submit or release budgets.',
+        response: { ...executionEvents.response, 200: executionEventsSchema },
+      },
+    },
+    async (request) =>
+      execution().events(
+        (await context(request, 'wallet:execute:read')).principal,
+        request.params.actionId,
+        request.query.after,
       ),
   );
   const eventDescription =

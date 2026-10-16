@@ -5,6 +5,43 @@ function setting(summary: string, why: string, source: string, guide: string) {
 }
 
 export const settings = {
+  executionEnabled: setting(
+    'Add the fixed approved-transfer execution profile and RPC verification.',
+    'The provider signs and dispatches only stored approved transfers under current authority. A separate application sponsor covers gas; observation does not confer spending authority.',
+    'Configure transfer signing first. Use the execution guide to prepare a dedicated Relayer sponsor and two independent RPC sources. Keep activation off until execution, chain checks and lost-response recovery have deployment-specific acceptance evidence.',
+    'execution.html',
+  ),
+  executionRpc: setting(
+    'Trusted RPC sources and bounded read-only transaction observation.',
+    'The service checks chain ID and accepted genesis, requires agreement from all configured sources, and separates inclusion, safe blocks and finality. RPC agreement is trusted node evidence, not a cryptographic light-client proof.',
+    'Enter environment variable names for complete HTTPS RPC endpoints; never paste URLs or credentials into exported JSON. Use different origins operated independently. Obtain the genesis hash from trusted chain records. Choose a 5–300 second observation interval and a 100–10000 block search limit for recovery and provider quotas.',
+    'execution.html#configure-and-accept-execution',
+  ),
+  executionToken: setting(
+    'The keccak256 hash of the accepted token contract runtime bytecode.',
+    'Simulation and receipt verification check this hash. A proxy runtime hash alone does not pin its implementation or establish token behavior.',
+    'Obtain deployed runtime bytecode through independent trusted RPC sources and record its keccak256 hash in your token acceptance evidence. Verify the exact token, EIP-712 domain, ERC-3009 behavior and proxy upgrade controls before activation.',
+    'execution.html#configure-and-accept-execution',
+  ),
+  executionSponsor: setting(
+    'A preconfigured application-funded Relayer signer and explicit funding agreement.',
+    'Sponsors are selected by the authenticated application, never by an API body. Sponsor queues and signers must be separate from owner-wallet signing bindings.',
+    'Create and fund the dedicated sponsor outside the toolkit using your approved process. Copy its Relayer ID, signer ID, address and binding revision. Record the application funding agreement; API scopes and owner wallet consent do not authorize sponsor funding. Use an HTTPS Relayer origin and an environment variable name for its API key.',
+    'execution.html#configure-and-accept-execution',
+  ),
+  executionGas: setting(
+    'Exact decimal gas and native-fee admission limits in wei.',
+    'A durable dispatch reserves gas limit × maximum fee per gas plus the L1 reserve against the application lifetime budget. Unknown and failed work retains reservations; a new policy does not reset them.',
+    'Set limits from measured staging transactions and your reviewed funding budget. Configure Relayer gas_limit_estimation=false and a positive gas_price_cap no greater than the approved maximum. Account separately for actual L1 fees and recovery/cancellation costs; the admission reservation is not a hard bound on every upstream cost.',
+    'execution.html#configure-and-accept-execution',
+  ),
+  executionEvidence: setting(
+    'Reference to completed execution, RPC and recovery acceptance evidence.',
+    'Offline validation does not prove a deployed sponsor, RPC chain, token, durable queue or recovery path works.',
+    'Test the exact deployment, including lost submission responses, restart, revocation, RPC disagreement, wrong effects and finality/reorg handling. Record the reviewed report or ticket reference. The wizard does not verify the evidence.',
+    'execution.html#configure-and-accept-execution',
+  ),
+
   identityLevel: setting(
     'The exact label applications must use for accepted identity checks. The starting label is verified.',
     'The provider matches this label exactly; it does not rank verification levels or perform the application’s checks.',

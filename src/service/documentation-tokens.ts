@@ -131,7 +131,7 @@ export async function registerDocumentationTokens(
               scopes: {
                 type: 'array',
                 minItems: 1,
-                maxItems: 9,
+                maxItems: apiTokenScopes.length,
                 uniqueItems: true,
                 items: { type: 'string', enum: apiTokenScopes },
               },

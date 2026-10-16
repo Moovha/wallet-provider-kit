@@ -17,7 +17,7 @@ one host with a private directory on persistent local POSIX storage.
 | Alternative OIDC Identity Assurance enrollment                                                      | `database.enrollmentAuthority`, with host policy callbacks |
 
 SQLite stores the records needed by these profiles. It
-does not implement the orchestration draft, on-chain settlement, a relayer's nonce
+does not implement the business orchestration draft, a relayer's nonce
 database, vendor key storage or a user's recovery vault. Your chosen wallet
 backend continues to own keys. No private keys, seed phrases, API tokens, identity
 tokens or identity documents belong in this database. Login references and
@@ -257,3 +257,17 @@ uncertainty, online backup/restore, enrollment and the Relayer HTTP profile.
 They do not establish power-loss behavior on your filesystem, live-provider
 acceptance or production financial authorization. Keep host readiness false
 until those deployment-specific checks pass.
+
+## Configured transfer execution records
+
+The optional [execution coordinator](execution.md) stores its immutable plan,
+execution and signing identities, scan cursor, verified observations and bounded
+CloudEvents feed inside the existing version-1 onboarding state. It reuses the
+financial attempt journal and integer budget tables; no database DDL or schema
+reinitialization is needed. Private plans contain signatures and must receive the
+same storage and backup protection as signing results.
+
+Online backup/restore fixtures preserve execution identity, gas reservation and
+event IDs after dispatch without another submission. Single-active-host failover
+requires external fencing and reconciliation of the backup-loss window; see the
+[recovery runbook](execution.md#single-active-host-recovery-and-failover).

@@ -36,8 +36,9 @@ The standard user experience remains inside the connected application. The provi
   its admitted operations; Moovha is the sponsor for Moovha operations. The
   [assets and gas guide](assets-and-gas.md) explains the rail and activation boundary.
 
-The optional [Relayer integration](openzeppelin-relayer.md) adds the library-only
-path `verified host context → execution authority → journal → OpenZeppelin Relayer`.
+The optional [configured execution coordinator](execution.md) supplies transfer
+submission and independently verified token status over HTTP. The advanced
+[Relayer integration](openzeppelin-relayer.md) also supplies the library path `verified host context → execution authority → journal → OpenZeppelin Relayer`.
 The host commits an approved call and budget; Relayer owns nonce allocation,
 queueing, broadcasting and provider status. Provider acceptance never establishes
 settlement.
@@ -59,7 +60,7 @@ There are two different API directions:
 
 | Surface                         | Caller and responsibility                                                                                                               |
 | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| Implemented provider API        | An application calls your provider for access, owner-bound provisioning and approved stored-action signing                              |
+| Implemented provider API        | An application calls your provider for access, owner-bound provisioning, approved signing and optional transfer execution/status        |
 | Separate business-operation API | A provider/application coordinates account linking, operation preparation, execution, sponsorship and settlement with its business host |
 
 This package implements the provider side. Its signing routes are not a business

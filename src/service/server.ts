@@ -85,7 +85,7 @@ export async function createServer(options: ServerOptions = {}) {
         title: 'Moovha Wallet Provider Service',
         version: '0.1.0',
         description:
-          'Experimental wallet-provider API with application-led access and optional hosted compatibility. Signing returns an approved EIP-712 signature; it does not submit a transaction or pay gas. Application transaction-event reports remain unverified and do not establish settlement. No transaction-submission HTTP endpoint is implemented. Not the Moovha operation orchestration API.',
+          'Experimental wallet-provider API with application-led access and optional hosted compatibility. Signing returns an approved EIP-712 signature; it does not submit a transaction or pay gas. Optional approved-transfer execution coordinates signing, simulation and sponsored submission through a durable attempt; independent RPC checks verify transfer effects and finality. Application transaction-event reports remain unverified and do not establish settlement. No arbitrary transaction-submission endpoint is exposed. Not the Moovha operation orchestration API.',
       },
       components: {
         securitySchemes: {
@@ -129,6 +129,7 @@ export async function createServer(options: ServerOptions = {}) {
           onboarding: !!options.onboarding,
           enrollment: !!options.enrollment,
           financial: !!options.onboarding?.actions,
+          execution: !!options.onboarding?.execution,
           signing:
             !!options.onboarding?.actions ||
             (!!options.service && !options.configurationProfile),

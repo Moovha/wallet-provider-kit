@@ -610,7 +610,7 @@ test('API reference follows the configuration, preserves edits, shows Swagger sc
   await expect(
     page.getByRole('heading', { name: 'Provider API reference', exact: true }),
   ).toBeVisible();
-  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(17);
+  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(21);
   await expect(
     page
       .getByText('Not enabled: Wallet operations are disabled in Deployment', {
@@ -652,7 +652,7 @@ test('API reference follows the configuration, preserves edits, shows Swagger sc
     page.getByLabel('cURL request example', { exact: true }),
   ).toContainText('wallet.example.com/v1/accounts/');
   await page.getByLabel('Find an endpoint', { exact: true }).fill('');
-  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(17);
+  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(21);
   await page
     .getByLabel('Example endpoint', { exact: true })
     .selectOption('signAction');
@@ -711,7 +711,7 @@ test('API reference follows the configuration, preserves edits, shows Swagger sc
     permissions: ['account:read', 'transfers:request'],
   });
   await imported(page, financial);
-  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(17);
+  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(21);
   await page
     .getByLabel('Example endpoint', { exact: true })
     .selectOption('signAction');
@@ -794,7 +794,7 @@ test('API renderer can retry a failed bundled asset without losing setup', async
   await page
     .getByRole('button', { name: 'Reload API reference', exact: true })
     .click();
-  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(17);
+  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(21);
   await page
     .getByRole('button', { name: 'Setup configuration', exact: true })
     .click();
@@ -973,4 +973,87 @@ test('hosted compatibility supports unfunded record evaluation without vendor cr
       exact: true,
     }),
   ).toBeVisible();
+});
+
+test('optional execution sponsor settings survive wizard import, edits and export without secrets', async ({
+  page,
+}) => {
+  const config = structuredClone(sample);
+  config.financial = {
+    profile: 'provider-authorized-erc3009-v1',
+    token: {
+      address: '0x1111111111111111111111111111111111111111',
+      name: 'Example Token',
+      version: '1',
+      symbol: 'TEST',
+      decimals: 6,
+    },
+    recipients: ['0x2222222222222222222222222222222222222222'],
+    maximumAmount: '100',
+    lifetimeAmount: '1000',
+    maxValiditySeconds: 300,
+  };
+  config.policy.applications[0].permissions = [
+    'account:read',
+    'transfers:request',
+  ];
+  config.activation.enabled = false;
+  await imported(page, config);
+  await step(page, 'Deployment');
+  await page
+    .getByText('Configure transfer execution and RPC verification', {
+      exact: true,
+    })
+    .click();
+  await page
+    .getByLabel('Execution Relayer HTTPS origin', { exact: true })
+    .fill('https://sponsor.example.test');
+  await page
+    .getByLabel('Accepted Base Sepolia genesis hash', { exact: true })
+    .fill('0x' + '1'.repeat(64));
+  await page
+    .getByLabel('Accepted token runtime code hash', { exact: true })
+    .fill('0x' + '2'.repeat(64));
+  await page
+    .getByLabel('Sponsor Relayer ID 1', { exact: true })
+    .fill('sponsor');
+  await page
+    .getByLabel('Sponsor signer ID 1', { exact: true })
+    .fill('sponsor-signer');
+  await page
+    .getByLabel('Sponsor address 1', { exact: true })
+    .fill('0x3333333333333333333333333333333333333333');
+  await page
+    .getByLabel('Gas funding agreement reference 1', { exact: true })
+    .fill('reviewed-offline-funding-agreement');
+  await page
+    .getByLabel('Maximum fee per gas in wei 1', { exact: true })
+    .fill('3000000000');
+  await page
+    .getByLabel('Maximum priority fee per gas in wei 1', { exact: true })
+    .fill('1000000000');
+  await page
+    .getByLabel('L1 fee reserve in wei 1', { exact: true })
+    .fill('1000000000000');
+  await page
+    .getByLabel('Lifetime gas budget in wei 1', { exact: true })
+    .fill('10000000000000000');
+  const first = await exported(page);
+  expect(first.execution.profile).toBe('erc3009-relayer-v1');
+  expect(first.execution.sponsors[0].gasLimit).toBe('150000');
+  expect(first.execution.sponsors[0].maxFeePerGas).toBe('3000000000');
+  expect(first.execution.rpc.endpoints).toEqual([
+    { env: 'EXECUTION_RPC_PRIMARY_URL' },
+    { env: 'EXECUTION_RPC_SECONDARY_URL' },
+  ]);
+  expect(first.activation.enabled).toBe(false);
+  await imported(page, first);
+  expect((await exported(page)).execution).toEqual(first.execution);
+  const download = page.waitForEvent('download');
+  await page
+    .getByRole('button', { name: 'Download variable template', exact: true })
+    .click();
+  const variables = await readFile((await (await download).path())!, 'utf8');
+  expect(variables).toContain('EXECUTION_RELAYER_API_KEY=\n');
+  expect(variables).toContain('EXECUTION_RPC_PRIMARY_URL=\n');
 });

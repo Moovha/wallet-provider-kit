@@ -1,8 +1,9 @@
 import { randomUUID } from 'node:crypto';
+import { DatabaseSync, backup } from 'node:sqlite';
 import { createRequire } from 'node:module';
 import type { Permission, ProviderState } from '../src/onboarding/types.js';
 import * as financialStorage from '../src/storage/financial.js';
-import { mkdtemp, rm, readFile, writeFile } from 'node:fs/promises';
+import { mkdtemp, rm, readFile, writeFile, chmod } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -15,6 +16,8 @@ import {
 } from 'ethers';
 import { generateKeyPair, SignJWT } from 'jose';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { executionFixture } from './helpers/execution.js';
+import { fingerprint } from '../src/onboarding/policy.js';
 import { SupportedActions } from '../src/deployment/actions.js';
 import { createConfiguredProvider } from '../src/deployment/provider.js';
 import {
@@ -122,6 +125,8 @@ function cli(args: string[], cwd: string) {
 async function fixture(
   backend?: ProviderConfiguration['backend'],
   accessPermissions: Permission[] = ['account:read', 'transfers:request'],
+  enableExecution = false,
+  executionBudget?: string,
 ) {
   const config = await template();
   config.policy.applications[0].permissions = [
@@ -156,6 +161,25 @@ async function fixture(
     lifetimeAmount: '150',
     maxValiditySeconds: 300,
   };
+  const execution = enableExecution
+    ? executionFixture(
+        config.policy.applications[0].clientId,
+        config.financial.token.address,
+        config.financial.token.name,
+        config.financial.token.version,
+      )
+    : undefined;
+  if (execution) {
+    if (executionBudget)
+      execution.configuration.sponsors[0].lifetimeBudgetWei = executionBudget;
+    config.execution = execution.configuration;
+    config.activation.executionAcceptance =
+      'ephemeral-offline-execution-evidence';
+    vi.stubEnv('EXECUTION_RELAYER_API_KEY', 'ephemeral-offline-api-token');
+    vi.stubEnv('EXECUTION_RPC_PRIMARY_URL', 'https://primary.example.test');
+    vi.stubEnv('EXECUTION_RPC_SECONDARY_URL', 'https://secondary.example.test');
+    vi.stubGlobal('fetch', execution.request);
+  }
   const database = openProviderDatabase({
     directory: config.storage.directory,
     initialize: true,
@@ -205,7 +229,7 @@ async function fixture(
   const keys = await generateKeyPair('ES256');
   injected.keys = async () => keys.publicKey;
   async function token(
-    scope = 'wallet:access wallet:access:read wallet:provision wallet:account:read wallet:actions wallet:actions:read wallet:sign wallet:events wallet:events:read',
+    scope = 'wallet:access wallet:access:read wallet:provision wallet:account:read wallet:actions wallet:actions:read wallet:sign wallet:events wallet:events:read wallet:execute wallet:execute:read',
     client = config.policy.applications[0].clientId,
     subject = 'application-service',
   ) {
@@ -229,7 +253,16 @@ async function fixture(
     app.inject({
       method: 'POST',
       url,
-      headers: { authorization, 'idempotency-key': key },
+      headers: {
+        authorization,
+        'idempotency-key': key,
+        ...(url.endsWith('/execute')
+          ? {
+              'execution-profile': 'erc3009-relayer-v1',
+              'execution-profile-revision': '1',
+            }
+          : {}),
+      },
       payload: body,
     });
   const form = (
@@ -308,6 +341,7 @@ async function fixture(
   ).toBe(200);
   return {
     config,
+    execution,
     wallet,
     recipient,
     api,
@@ -469,6 +503,463 @@ describe('configured API and provider transfer authorization', () => {
     await f.restart();
     expect((await f.api(signPath, {})).json()).toEqual(signed.json());
     expect(injected.backend!.signTypedData).toHaveBeenCalledTimes(1);
+  });
+  it('coordinates one sponsored transfer, persists replay and verifies its exact finalized effect', async () => {
+    const f = await fixture(undefined, undefined, true);
+    const action = (await f.request('100')).json();
+    const url = '/v1/actions/' + action.action_id + '/execute';
+    const key = randomUUID();
+    const executed = await f.api(url, {}, key);
+    expect(executed.statusCode).toBe(200);
+    expect(executed.json()).toMatchObject({
+      profile: 'erc3009-relayer-v1',
+      dispatch_status: 'accepted',
+      verification: 'unverified',
+      settlement: 'pending',
+    });
+    expect(executed.json()).not.toHaveProperty('signature');
+    expect(executed.json()).not.toHaveProperty('data');
+    expect(f.execution!.state.posts).toBe(1);
+    const token = await f.token('wallet:execute:read');
+    const read = () =>
+      f.app.inject({
+        url: '/v1/actions/' + action.action_id + '/execution',
+        headers: {
+          authorization: token,
+          'execution-profile': 'erc3009-relayer-v1',
+          'execution-profile-revision': '1',
+        },
+      });
+    f.execution!.state.included = true;
+    for (const phase of ['included', 'safe', 'finalized'] as const) {
+      f.execution!.state.finality = phase;
+      const response = await read();
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toMatchObject({
+        chain_status: phase,
+        verification: 'rpc-quorum',
+        outcome: 'succeeded',
+        settlement: phase === 'finalized' ? 'succeeded' : 'pending',
+      });
+    }
+    await f.restart();
+    const replay = await f.api(url, {}, key);
+    expect(replay.statusCode).toBe(200);
+    expect(replay.json().execution_id).toBe(executed.json().execution_id);
+    expect(replay.json().settlement).toBe('succeeded');
+    expect((await f.api(url, {})).json().execution_id).toBe(
+      executed.json().execution_id,
+    );
+    expect(f.execution!.state.posts).toBe(1);
+    expect(injected.backend!.signTypedData).toHaveBeenCalledTimes(1);
+    const db = openProviderDatabase({ directory: f.config.storage.directory });
+    const budgetId = fingerprint([
+      'execution-gas',
+      f.config.policy.provider.origin,
+      f.config.oauth.issuer,
+      f.config.policy.applications[0].clientId,
+    ]);
+    expect((await db.budget(budgetId))?.reserved).toBe('451000000000000');
+    db.close();
+    const discovery = (await f.app.inject('/v1/execution-capabilities')).json();
+    expect(discovery.profiles[0]).toMatchObject({
+      configured: true,
+      ready: true,
+      revision: '1',
+      finality: 'finalized',
+    });
+  });
+  it('restores execution identity, gas reservations and CloudEvents from an online backup without dispatch', async () => {
+    const f = await fixture(undefined, undefined, true);
+    const action = (await f.request('1')).json();
+    const path = '/v1/actions/' + action.action_id;
+    const executed = (await f.api(path + '/execute', {})).json();
+    f.execution!.state.included = true;
+    const headers = {
+      authorization: await f.token('wallet:execute:read'),
+      'execution-profile': 'erc3009-relayer-v1',
+      'execution-profile-revision': '1',
+    };
+    const status = () => f.app.inject({ url: path + '/execution', headers });
+    await status();
+    await status();
+    const first = (
+      await f.app.inject({ url: path + '/execution-events', headers })
+    ).json();
+    expect(first.events).toHaveLength(1);
+    expect(first.events[0]).toMatchObject({
+      specversion: '1.0',
+      sequence: 1,
+      data: { chain_status: 'included', settlement: 'pending' },
+    });
+    expect(
+      (
+        await f.app.inject({ url: path + '/execution-events?after=1', headers })
+      ).json().events,
+    ).toEqual([]);
+    expect(
+      (await f.app.inject({ url: path + '/execution-events?after=2', headers }))
+        .statusCode,
+    ).toBe(409);
+    expect(
+      (
+        await f.app.inject({
+          url: path + '/execution-events?after=-1',
+          headers,
+        })
+      ).statusCode,
+    ).toBe(400);
+    const destination = await folder();
+    const source = new DatabaseSync(
+      join(f.config.storage.directory, 'provider.sqlite'),
+      { readOnly: true },
+    );
+    await backup(source, join(destination, 'provider.sqlite'));
+    source.close();
+    await chmod(join(destination, 'provider.sqlite'), 0o600);
+    await f.app.close();
+    const restored = await createConfiguredProvider({
+      ...f.config,
+      storage: { ...f.config.storage, directory: destination },
+    });
+    servers.push(restored);
+    expect(
+      (
+        await restored.inject({ url: path + '/execution-events', headers })
+      ).json(),
+    ).toEqual(first);
+    const replay = await restored.inject({
+      method: 'POST',
+      url: path + '/execute',
+      headers: {
+        ...headers,
+        authorization: await f.token('wallet:execute wallet:sign'),
+        'idempotency-key': randomUUID(),
+      },
+      payload: {},
+    });
+    expect(replay.json().execution_id).toBe(executed.execution_id);
+    f.execution!.state.finality = 'finalized';
+    expect(
+      (await restored.inject({ url: path + '/execution', headers })).json()
+        .settlement,
+    ).toBe('succeeded');
+    const feed = (
+      await restored.inject({
+        url: path + '/execution-events?after=1',
+        headers,
+      })
+    ).json();
+    expect(feed.events).toHaveLength(1);
+    expect(feed.events[0].sequence).toBe(2);
+    expect(feed.events[0].id).not.toBe(first.events[0].id);
+    expect(f.execution!.state.posts).toBe(1);
+    expect(injected.backend!.signTypedData).toHaveBeenCalledTimes(1);
+    const db = openProviderDatabase({ directory: destination });
+    const budgetId = fingerprint([
+      'execution-gas',
+      f.config.policy.provider.origin,
+      f.config.oauth.issuer,
+      f.config.policy.applications[0].clientId,
+    ]);
+    expect((await db.budget(budgetId))?.reserved).toBe('451000000000000');
+    // Retention loss is explicit; consumers resynchronize from the current receipt.
+    await db.onboardingStore.transaction((state) => {
+      const execution = state.supportedActions![action.action_id].execution!;
+      execution.events = [execution.events![1]];
+    });
+    expect(
+      (
+        await restored.inject({ url: path + '/execution-events', headers })
+      ).json().history_truncated,
+    ).toBe(true);
+    db.close();
+  });
+  it('denies invalid sponsor configuration and fails closed when execution is absent', async () => {
+    const f = await fixture(undefined, undefined, true);
+    for (const change of [
+      (config: ProviderConfiguration) => {
+        delete config.activation.executionAcceptance;
+      },
+      (config: ProviderConfiguration) => {
+        config.execution!.sponsors[0].lifetimeBudgetWei = '1';
+      },
+      (config: ProviderConfiguration) => {
+        config.execution!.sponsors[0].clientId = 'untrusted-app';
+      },
+      (config: ProviderConfiguration) => {
+        config.execution!.sponsors[0].maxPriorityFeePerGas = '4000000000';
+      },
+      (config: ProviderConfiguration) => {
+        config.execution!.rpc.endpoints[1] = config.execution!.rpc.endpoints[0];
+      },
+    ]) {
+      const config = structuredClone(f.config);
+      change(config);
+      expect(() => validateProviderConfiguration(config)).toThrow();
+    }
+    const config = structuredClone(f.config);
+    delete config.execution;
+    const action = (await f.request('1')).json();
+    const other = await createConfiguredProvider(config);
+    servers.push(other);
+    expect(
+      (await other.inject('/v1/execution-capabilities')).json().profiles[0]
+        .configured,
+    ).toBe(false);
+    const response = await other.inject({
+      method: 'POST',
+      url: '/v1/actions/' + action.action_id + '/execute',
+      headers: {
+        authorization: await f.token('wallet:execute wallet:sign'),
+        'idempotency-key': randomUUID(),
+        'execution-profile': 'erc3009-relayer-v1',
+        'execution-profile-revision': '1',
+      },
+      payload: {},
+    });
+    expect(response.statusCode).toBe(503);
+    expect(f.execution!.state.posts).toBe(0);
+  });
+  it('never redispatches an unknown submission and recovers a lost provider ID from exact chain logs', async () => {
+    const f = await fixture(undefined, undefined, true);
+    const action = (await f.request('1')).json();
+    const url = '/v1/actions/' + action.action_id + '/execute';
+    f.execution!.state.lostResponse = true;
+    const first = await f.api(url, {});
+    expect(first.statusCode).toBe(503);
+    expect(first.json().outcome).toBe('unknown');
+    await f.restart();
+    const retry = await f.api(url, {});
+    expect(retry.statusCode).toBe(200);
+    expect(retry.json()).toMatchObject({
+      dispatch_status: 'unknown',
+      settlement: 'pending',
+    });
+    expect(f.execution!.state.posts).toBe(1);
+    f.execution!.state.included = true;
+    f.execution!.state.finality = 'finalized';
+    const status = await f.app.inject({
+      url: '/v1/actions/' + action.action_id + '/execution',
+      headers: {
+        authorization: await f.token('wallet:execute:read'),
+        'execution-profile': 'erc3009-relayer-v1',
+        'execution-profile-revision': '1',
+      },
+    });
+    expect(status.statusCode).toBe(200);
+    expect(status.json()).toMatchObject({
+      dispatch_status: 'unknown',
+      chain_status: 'finalized',
+      verification: 'rpc-quorum',
+      settlement: 'succeeded',
+    });
+    await f.api(url, {});
+    expect(f.execution!.state.posts).toBe(1);
+  });
+  it('retains gas admission after dispatch and rejects a second action when the sponsor budget is exhausted', async () => {
+    const f = await fixture(undefined, undefined, true, '451000000000000');
+    const first = (await f.request('1')).json();
+    const second = (await f.request('1')).json();
+    expect(
+      (await f.api('/v1/actions/' + first.action_id + '/execute', {}))
+        .statusCode,
+    ).toBe(200);
+    const denied = await f.api(
+      '/v1/actions/' + second.action_id + '/execute',
+      {},
+    );
+    expect(denied.statusCode).toBe(503);
+    expect(f.execution!.state.posts).toBe(1);
+    await f.restart();
+    await f.api('/v1/actions/' + second.action_id + '/execute', {});
+    expect(f.execution!.state.posts).toBe(1);
+  });
+  it('continues authorized status recovery after signing expiry and fences a finalized-head regression', async () => {
+    const f = await fixture(undefined, undefined, true);
+    const first = (await f.request('1')).json();
+    const unstarted = (await f.request('1')).json();
+    const path = '/v1/actions/' + first.action_id;
+    await f.api(path + '/execute', {});
+    vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 301000);
+    expect(
+      (await f.api('/v1/actions/' + unstarted.action_id + '/execute', {}))
+        .statusCode,
+    ).toBe(403);
+    f.execution!.state.included = true;
+    f.execution!.state.finality = 'finalized';
+    const headers = {
+      authorization: await f.token('wallet:execute:read'),
+      'execution-profile': 'erc3009-relayer-v1',
+      'execution-profile-revision': '1',
+    };
+    const read = () => f.app.inject({ url: path + '/execution', headers });
+    expect((await read()).json().settlement).toBe('succeeded');
+    expect((await f.api(path + '/execute', {})).json().settlement).toBe(
+      'succeeded',
+    );
+    f.execution!.state.finality = 'included';
+    expect((await read()).statusCode).toBe(503);
+    expect(f.execution!.state.posts).toBe(1);
+  });
+  it('serializes two coordinators against the same durable action and sponsor budget', async () => {
+    const f = await fixture(undefined, undefined, true);
+    const action = (await f.request('1')).json();
+    const other = await createConfiguredProvider(f.config);
+    servers.push(other);
+    const url = '/v1/actions/' + action.action_id + '/execute';
+    const responses = await Promise.all([
+      f.api(url, {}),
+      other.inject({
+        method: 'POST',
+        url,
+        headers: {
+          authorization: await f.token('wallet:execute wallet:sign'),
+          'idempotency-key': randomUUID(),
+          'execution-profile': 'erc3009-relayer-v1',
+          'execution-profile-revision': '1',
+        },
+        payload: {},
+      }),
+    ]);
+    expect(
+      responses.every((response) => [200, 409].includes(response.statusCode)),
+    ).toBe(true);
+    expect(f.execution!.state.posts).toBe(1);
+    expect(injected.backend!.signTypedData).toHaveBeenCalledTimes(1);
+  });
+  it('requires exact execution profile selection, both write scopes and an empty body', async () => {
+    const f = await fixture(undefined, undefined, true);
+    const action = (await f.request('1')).json();
+    const url = '/v1/actions/' + action.action_id + '/execute';
+    const authorization = await f.token('wallet:execute wallet:sign');
+    const headers = {
+      authorization,
+      'idempotency-key': randomUUID(),
+      'execution-profile': 'erc3009-relayer-v1',
+      'execution-profile-revision': '1',
+    };
+    expect(
+      (
+        await f.app.inject({
+          method: 'POST',
+          url,
+          headers: { authorization, 'idempotency-key': randomUUID() },
+          payload: {},
+        })
+      ).statusCode,
+    ).toBe(400);
+    expect(
+      (
+        await f.app.inject({
+          method: 'POST',
+          url,
+          headers: { ...headers, 'execution-profile-revision': '2' },
+          payload: {},
+        })
+      ).statusCode,
+    ).toBe(400);
+    expect(
+      (
+        await f.app.inject({
+          method: 'POST',
+          url,
+          headers: {
+            ...headers,
+            authorization: await f.token('wallet:execute'),
+          },
+          payload: {},
+        })
+      ).statusCode,
+    ).toBe(403);
+    expect(
+      (
+        await f.app.inject({
+          method: 'POST',
+          url,
+          headers,
+          payload: { data: '0x' },
+        })
+      ).statusCode,
+    ).toBe(400);
+    expect(f.execution!.state.posts).toBe(0);
+    expect(injected.backend!.signTypedData).not.toHaveBeenCalled();
+  });
+  it('rechecks revocation after simulation before dispatch and protects status responses', async () => {
+    const f = await fixture(undefined, undefined, true);
+    const action = (await f.request('1')).json();
+    const db = openProviderDatabase({ directory: f.config.storage.directory });
+    f.execution!.state.before = async (method) => {
+      if (method === 'eth_call')
+        await db.onboardingStore.transaction((state) => {
+          state.grants[f.grant.grant_id].state = 'revoked';
+        });
+    };
+    expect(
+      (await f.api('/v1/actions/' + action.action_id + '/execute', {}))
+        .statusCode,
+    ).toBe(403);
+    expect(f.execution!.state.posts).toBe(0);
+    const status = await f.app.inject({
+      url: '/v1/actions/' + action.action_id + '/execution',
+      headers: {
+        authorization: await f.token('wallet:execute:read'),
+        'execution-profile': 'erc3009-relayer-v1',
+        'execution-profile-revision': '1',
+      },
+    });
+    expect(status.statusCode).toBe(403);
+    db.close();
+  });
+  it('does not accept reported confirmation as settlement and fences contradictions to finalized evidence', async () => {
+    const f = await fixture(undefined, undefined, true);
+    const action = (await f.request('1')).json();
+    expect(
+      (await f.api('/v1/actions/' + action.action_id + '/execute', {}))
+        .statusCode,
+    ).toBe(200);
+    expect(
+      (
+        await f.api('/v1/actions/' + action.action_id + '/transaction-events', {
+          event: 'confirmed',
+          chain_id: 'eip155:84532',
+          transaction_hash: f.execution!.transactionHash,
+          observed_at: new Date().toISOString(),
+        })
+      ).statusCode,
+    ).toBe(200);
+    const read = () =>
+      f.app.inject({
+        url: '/v1/actions/' + action.action_id + '/execution',
+        headers: {
+          authorization: '',
+          'execution-profile': 'erc3009-relayer-v1',
+          'execution-profile-revision': '1',
+        },
+      });
+    const authorization = await f.token('wallet:execute:read');
+    const status = () =>
+      f.app.inject({
+        url: '/v1/actions/' + action.action_id + '/execution',
+        headers: {
+          authorization,
+          'execution-profile': 'erc3009-relayer-v1',
+          'execution-profile-revision': '1',
+        },
+      });
+    expect((await status()).json().settlement).toBe('pending');
+    f.execution!.state.included = true;
+    f.execution!.state.finality = 'finalized';
+    expect((await status()).json().settlement).toBe('succeeded');
+    f.execution!.state.mutate = (method, value) =>
+      method === 'eth_getBlockByNumber' && (value as any).number === '0x65'
+        ? { ...(value as object), hash: '0x' + 'f'.repeat(64) }
+        : value;
+    expect((await status()).statusCode).toBe(503);
+    f.execution!.state.mutate = undefined;
+    expect((await status()).statusCode).toBe(503);
+    expect(f.execution!.state.posts).toBe(1);
+    expect((await read()).statusCode).toBe(401);
   });
   it('records concurrent idempotent transaction reports durably without altering signing or budgets', async () => {
     const f = await fixture();

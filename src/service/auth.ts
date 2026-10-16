@@ -69,6 +69,7 @@ export function createAuthenticator(
         typeof payload.jti !== 'string' ||
         !payload.jti ||
         typeof payload.scope !== 'string' ||
+        payload.cnf !== undefined ||
         typeof payload.exp !== 'number' ||
         typeof payload.iat !== 'number' ||
         payload.exp <= payload.iat ||

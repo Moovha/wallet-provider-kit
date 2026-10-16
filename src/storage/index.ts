@@ -3,7 +3,7 @@ import type {
   WalletAttemptResult,
 } from '../domain/attempt-journal.js';
 import { WalletProviderError } from '../domain/signing.js';
-import { text } from '../onboarding/policy.js';
+import { text, fingerprint } from '../onboarding/policy.js';
 import {
   StorageConnection,
   type ProviderDatabaseOptions,
@@ -16,7 +16,11 @@ import {
   units,
   type AttemptAdmission,
 } from './journal.js';
-import { sqliteFinancialAuthority, storeApproval } from './financial.js';
+import {
+  sqliteFinancialAuthority,
+  storeApproval,
+  loadApproval,
+} from './financial.js';
 import {
   sqliteEnrollmentAuthority,
   type DatabaseEnrollmentOptions,
@@ -89,6 +93,15 @@ export function openProviderDatabase(options: ProviderDatabaseOptions) {
     },
     async approveAction(approval: FinancialApproval) {
       return storeApproval(connection, approval);
+    },
+    /** Read current immutable approval and revocation without admitting a financial attempt. */
+    async isApprovedAction(approval: FinancialApproval, allowExpired = false) {
+      const id =
+        approval.action.kind === 'sign_typed_data'
+          ? approval.action.action_id
+          : approval.action.actionId;
+      const current = loadApproval(connection, id, !allowExpired);
+      return current !== null && fingerprint(current) === fingerprint(approval);
     },
     async revokeAction(id: string) {
       connection.transaction(() => {

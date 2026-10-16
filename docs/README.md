@@ -7,8 +7,9 @@ embedded composition are the advanced path.
 
 This guide starts from an empty operator workstation. The current service is
 experimental, single-host and Base Sepolia EOA only. Mainnet and production custody
-acceptance remain pending. Signing does not submit transactions, sponsor gas or
-establish settlement. Read [roles and terms](concepts.md) if wallet provider,
+acceptance remain pending. Signing returns an authorization without broadcasting. The optional
+[execution coordinator](execution.md) submits through a pre-funded application
+sponsor and verifies token-transfer finality. Read [roles and terms](concepts.md) if wallet provider,
 application, owner, grant or journal are new to you.
 
 Users remain in the connected application, which authenticates them, performs identity checks and records wallet-access consent. The provider evaluates that application’s attestations under an explicit trust agreement. Start with the [application-led access contract](application-access.md). Provider-hosted login and staff review are optional compatibility features.

@@ -134,6 +134,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/execution-capabilities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Public versioned execution discovery. Profile implementation, configuration and service readiness do not establish live-provider certification or production custody acceptance. Clients must select an exact supported ID/revision and ignore unknown profiles. */
+        get: operations["getExecutionCapabilities"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/actions/{actionId}/execute": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Optional fixed ERC-3009 transfer execution with exact version selection, current owner/grant/identity/consent/approval checks, durable signing and submission authority, application gas sponsorship and independent RPC receipt/finality verification. Unknown submission outcomes never permit redispatch. No arbitrary transaction payload is accepted. */
+        post: operations["executeTransfer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/actions/{actionId}/execution": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Optional fixed ERC-3009 transfer execution with exact version selection, current owner/grant/identity/consent/approval checks, durable signing and submission authority, application gas sponsorship and independent RPC receipt/finality verification. Unknown submission outcomes never permit redispatch. No arbitrary transaction payload is accepted. */
+        get: operations["getTransferExecution"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/actions/{actionId}/execution-events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Authenticated CloudEvents 1.0 execution observations with a monotonic sequence in the active store. At most 64 transitions are retained per execution; history_truncated signals a cursor gap requiring verified-status resynchronization. Reports never become verified events without RPC evidence. This endpoint does not refresh, submit or release budgets. */
+        get: operations["getExecutionEvents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/actions/{actionId}/transaction-events": {
         parameters: {
             query?: never;
@@ -1606,6 +1674,892 @@ export interface operations {
                                 nonce: string;
                             };
                         };
+                    };
+                };
+            };
+            /** @description Default Response */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+        };
+    };
+    getExecutionCapabilities: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        contract_version: "1";
+                        profiles: {
+                            id: string;
+                            revision: string;
+                            implemented: boolean;
+                            configured: boolean;
+                            ready: boolean;
+                            chain_id: string;
+                            account_type: string;
+                            signing: string;
+                            token_authorization: string;
+                            submission: string;
+                            verification: string;
+                            finality: string;
+                            minimum_rpc_sources: number;
+                            execute_scopes: string[];
+                            read_scopes: string[];
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    executeTransfer: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Select the exact execution contract from GET /v1/execution-capabilities. */
+                "execution-profile": "erc3009-relayer-v1";
+                /** @description Unknown revisions are rejected; the server never substitutes a different execution contract. */
+                "execution-profile-revision": "1";
+                "idempotency-key": string;
+            };
+            path: {
+                actionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        profile: "erc3009-relayer-v1";
+                        /** @enum {string} */
+                        profile_revision: "1";
+                        action_id: string;
+                        execution_id: string;
+                        /**
+                         * @description Durable submission state. Accepted identifies a Relayer queue record; it is not chain inclusion or settlement.
+                         * @enum {string}
+                         */
+                        dispatch_status: "not_started" | "pending" | "accepted" | "unknown" | "failed";
+                        observation_revision: number;
+                        next_poll_after_ms: number;
+                        /** @enum {string} */
+                        chain_status: "unobserved" | "pending" | "included" | "safe" | "finalized" | "reorged";
+                        /**
+                         * @description RPC quorum means agreement of all configured trusted RPC sources on exact receipt effects and canonical block evidence, not a cryptographic light-client proof.
+                         * @enum {string}
+                         */
+                        verification: "unverified" | "rpc-quorum";
+                        /** @enum {string} */
+                        outcome: "unknown" | "succeeded" | "reverted";
+                        /**
+                         * @description The supported token transfer reaches succeeded/reverted settlement only after matching finalized chain evidence. This is not a claim of general business-operation completion.
+                         * @enum {string}
+                         */
+                        settlement: "pending" | "succeeded" | "reverted";
+                        /** Format: date-time */
+                        observed_at: string;
+                        transaction_hash?: string;
+                        block_hash?: string;
+                        block_number?: string;
+                        /**
+                         * @description An external party can relay the same ERC-3009 authorization. Only its exact verified token effect can establish success.
+                         * @enum {string}
+                         */
+                        execution_origin?: "sponsor" | "external";
+                    } & ({
+                        /** @enum {unknown} */
+                        verification?: "unverified";
+                        /** @enum {unknown} */
+                        chain_status?: "unobserved" | "pending" | "reorged";
+                        /** @enum {unknown} */
+                        outcome?: "unknown";
+                        /** @enum {unknown} */
+                        settlement?: "pending";
+                    } | {
+                        /** @enum {unknown} */
+                        verification?: "rpc-quorum";
+                        /** @enum {unknown} */
+                        chain_status?: "included" | "safe";
+                        /** @enum {unknown} */
+                        outcome?: "succeeded" | "reverted";
+                        /** @enum {unknown} */
+                        settlement?: "pending";
+                    } | {
+                        /** @enum {unknown} */
+                        verification?: "rpc-quorum";
+                        /** @enum {unknown} */
+                        chain_status?: "finalized";
+                        /** @enum {unknown} */
+                        outcome?: "succeeded";
+                        /** @enum {unknown} */
+                        settlement?: "succeeded";
+                    } | {
+                        /** @enum {unknown} */
+                        verification?: "rpc-quorum";
+                        /** @enum {unknown} */
+                        chain_status?: "finalized";
+                        /** @enum {unknown} */
+                        outcome?: "reverted";
+                        /** @enum {unknown} */
+                        settlement?: "reverted";
+                    });
+                };
+            };
+            /** @description Default Response */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+        };
+    };
+    getTransferExecution: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Select the exact execution contract from GET /v1/execution-capabilities. */
+                "execution-profile": "erc3009-relayer-v1";
+                /** @description Unknown revisions are rejected; the server never substitutes a different execution contract. */
+                "execution-profile-revision": "1";
+            };
+            path: {
+                actionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        profile: "erc3009-relayer-v1";
+                        /** @enum {string} */
+                        profile_revision: "1";
+                        action_id: string;
+                        execution_id: string;
+                        /**
+                         * @description Durable submission state. Accepted identifies a Relayer queue record; it is not chain inclusion or settlement.
+                         * @enum {string}
+                         */
+                        dispatch_status: "not_started" | "pending" | "accepted" | "unknown" | "failed";
+                        observation_revision: number;
+                        next_poll_after_ms: number;
+                        /** @enum {string} */
+                        chain_status: "unobserved" | "pending" | "included" | "safe" | "finalized" | "reorged";
+                        /**
+                         * @description RPC quorum means agreement of all configured trusted RPC sources on exact receipt effects and canonical block evidence, not a cryptographic light-client proof.
+                         * @enum {string}
+                         */
+                        verification: "unverified" | "rpc-quorum";
+                        /** @enum {string} */
+                        outcome: "unknown" | "succeeded" | "reverted";
+                        /**
+                         * @description The supported token transfer reaches succeeded/reverted settlement only after matching finalized chain evidence. This is not a claim of general business-operation completion.
+                         * @enum {string}
+                         */
+                        settlement: "pending" | "succeeded" | "reverted";
+                        /** Format: date-time */
+                        observed_at: string;
+                        transaction_hash?: string;
+                        block_hash?: string;
+                        block_number?: string;
+                        /**
+                         * @description An external party can relay the same ERC-3009 authorization. Only its exact verified token effect can establish success.
+                         * @enum {string}
+                         */
+                        execution_origin?: "sponsor" | "external";
+                    } & ({
+                        /** @enum {unknown} */
+                        verification?: "unverified";
+                        /** @enum {unknown} */
+                        chain_status?: "unobserved" | "pending" | "reorged";
+                        /** @enum {unknown} */
+                        outcome?: "unknown";
+                        /** @enum {unknown} */
+                        settlement?: "pending";
+                    } | {
+                        /** @enum {unknown} */
+                        verification?: "rpc-quorum";
+                        /** @enum {unknown} */
+                        chain_status?: "included" | "safe";
+                        /** @enum {unknown} */
+                        outcome?: "succeeded" | "reverted";
+                        /** @enum {unknown} */
+                        settlement?: "pending";
+                    } | {
+                        /** @enum {unknown} */
+                        verification?: "rpc-quorum";
+                        /** @enum {unknown} */
+                        chain_status?: "finalized";
+                        /** @enum {unknown} */
+                        outcome?: "succeeded";
+                        /** @enum {unknown} */
+                        settlement?: "succeeded";
+                    } | {
+                        /** @enum {unknown} */
+                        verification?: "rpc-quorum";
+                        /** @enum {unknown} */
+                        chain_status?: "finalized";
+                        /** @enum {unknown} */
+                        outcome?: "reverted";
+                        /** @enum {unknown} */
+                        settlement?: "reverted";
+                    });
+                };
+            };
+            /** @description Default Response */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+        };
+    };
+    getExecutionEvents: {
+        parameters: {
+            query?: {
+                after?: string;
+            };
+            header: {
+                /** @description Select the exact execution contract from GET /v1/execution-capabilities. */
+                "execution-profile": "erc3009-relayer-v1";
+                /** @description Unknown revisions are rejected; the server never substitutes a different execution contract. */
+                "execution-profile-revision": "1";
+            };
+            path: {
+                actionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        profile: "erc3009-relayer-v1";
+                        /** @enum {string} */
+                        profile_revision: "1";
+                        action_id: string;
+                        oldest_sequence: number;
+                        next_sequence: number;
+                        /** @description An explicit cursor gap requires resynchronization through verified execution status. The bounded feed is not a complete historical chain ledger. */
+                        history_truncated: boolean;
+                        events: {
+                            /** @enum {string} */
+                            specversion: "1.0";
+                            id: string;
+                            /** Format: uri */
+                            source: string;
+                            /** @enum {string} */
+                            type: "com.moovha.wallet-provider.execution.observed.v1";
+                            subject: string;
+                            /** Format: date-time */
+                            time: string;
+                            /** @enum {string} */
+                            datacontenttype: "application/json";
+                            sequence: number;
+                            data: {
+                                /** @enum {string} */
+                                profile: "erc3009-relayer-v1";
+                                /** @enum {string} */
+                                profile_revision: "1";
+                                action_id: string;
+                                execution_id: string;
+                                /**
+                                 * @description Durable submission state. Accepted identifies a Relayer queue record; it is not chain inclusion or settlement.
+                                 * @enum {string}
+                                 */
+                                dispatch_status: "not_started" | "pending" | "accepted" | "unknown" | "failed";
+                                observation_revision: number;
+                                next_poll_after_ms: number;
+                                /** @enum {string} */
+                                chain_status: "unobserved" | "pending" | "included" | "safe" | "finalized" | "reorged";
+                                /**
+                                 * @description RPC quorum means agreement of all configured trusted RPC sources on exact receipt effects and canonical block evidence, not a cryptographic light-client proof.
+                                 * @enum {string}
+                                 */
+                                verification: "unverified" | "rpc-quorum";
+                                /** @enum {string} */
+                                outcome: "unknown" | "succeeded" | "reverted";
+                                /**
+                                 * @description The supported token transfer reaches succeeded/reverted settlement only after matching finalized chain evidence. This is not a claim of general business-operation completion.
+                                 * @enum {string}
+                                 */
+                                settlement: "pending" | "succeeded" | "reverted";
+                                /** Format: date-time */
+                                observed_at: string;
+                                transaction_hash?: string;
+                                block_hash?: string;
+                                block_number?: string;
+                                /**
+                                 * @description An external party can relay the same ERC-3009 authorization. Only its exact verified token effect can establish success.
+                                 * @enum {string}
+                                 */
+                                execution_origin?: "sponsor" | "external";
+                            } & ({
+                                /** @enum {unknown} */
+                                verification?: "unverified";
+                                /** @enum {unknown} */
+                                chain_status?: "unobserved" | "pending" | "reorged";
+                                /** @enum {unknown} */
+                                outcome?: "unknown";
+                                /** @enum {unknown} */
+                                settlement?: "pending";
+                            } | {
+                                /** @enum {unknown} */
+                                verification?: "rpc-quorum";
+                                /** @enum {unknown} */
+                                chain_status?: "included" | "safe";
+                                /** @enum {unknown} */
+                                outcome?: "succeeded" | "reverted";
+                                /** @enum {unknown} */
+                                settlement?: "pending";
+                            } | {
+                                /** @enum {unknown} */
+                                verification?: "rpc-quorum";
+                                /** @enum {unknown} */
+                                chain_status?: "finalized";
+                                /** @enum {unknown} */
+                                outcome?: "succeeded";
+                                /** @enum {unknown} */
+                                settlement?: "succeeded";
+                            } | {
+                                /** @enum {unknown} */
+                                verification?: "rpc-quorum";
+                                /** @enum {unknown} */
+                                chain_status?: "finalized";
+                                /** @enum {unknown} */
+                                outcome?: "reverted";
+                                /** @enum {unknown} */
+                                settlement?: "reverted";
+                            });
+                        }[];
                     };
                 };
             };

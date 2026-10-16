@@ -51,7 +51,8 @@ export function explainIssue(issue: string) {
             ? 'Policies'
             : issue.startsWith('/financial')
               ? 'Policies'
-              : issue.startsWith('/activation') ||
+              : issue.startsWith('/execution') ||
+                  issue.startsWith('/activation') ||
                   issue.startsWith('/apiExplorer') ||
                   issue.startsWith('/http') ||
                   issue.startsWith('/storage')
@@ -84,6 +85,8 @@ export function explainIssue(issue: string) {
       'Enable the deployed API explorer, select enabled applications registered in Policies, and remove duplicate application entries.',
     'backendAcceptance and recoveryAcceptance are required when enabled; financial setup also requires tokenAcceptance':
       'Add the wallet backend and recovery test report references. Transfer signing also needs a token signing test report reference.',
+    'transfer signing and separate execution acceptance are required':
+      'Configure delegated transfer signing, then complete the separate execution/RPC/recovery report before enabling operations.',
     'must be an HTTPS origin':
       'Enter https:// and the Relayer hostname only, without a trailing slash or page path.',
     'duplicate addresses, relayers or signers are not allowed':
@@ -140,6 +143,9 @@ function fieldLabel(path: string): string {
     '/oauth/audience': 'Wallet API audience',
     '/oauth/jwksUrl': 'Token verification keys URL (JWKS)',
     '/identity': 'Identity verification services',
+    '/execution': 'Transfer execution and RPC verification',
+    '/activation/executionAcceptance':
+      'Execution, RPC and submission recovery test report reference',
     '/financial': 'Delegated transfer signing',
     '/financial/token/address': 'Token contract address',
     '/financial/token/name': 'Token signing-domain name',

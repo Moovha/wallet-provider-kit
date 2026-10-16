@@ -271,10 +271,13 @@ async function copy() {
       <p>
         POST /v1/transfer-authorizations authorizes an exact transfer. POST
         /v1/actions/{actionId}/sign returns its signature; it does not submit a
-        transaction. The connected application arranges gas, submits the
-        token-contract transaction and checks its receipt and finality. There is
-        no transaction-submission HTTP endpoint. OpenZeppelin Relayer execution
-        is available through a separate TypeScript library integration.
+        transaction. With execution configured, POST
+        /v1/actions/{actionId}/execute coordinates the approved transfer with an
+        admitted gas sponsor. GET /v1/actions/{actionId}/execution verifies
+        chain effects and finality through independent RPC sources. Discover and
+        select the exact contract through GET /v1/execution-capabilities.
+        Applications can still submit separately when coordination is absent.
+        Arbitrary transaction submission is unavailable.
       </p>
       <p>
         POST /v1/actions/{actionId}/transaction-events records application

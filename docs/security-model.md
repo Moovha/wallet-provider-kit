@@ -164,3 +164,19 @@ roles or spending permission confer no authority. The profile rejects external
 vendor adapters, operational/transfer permissions and financial signing. Existing
 vendor profiles retain their evidence checks; record acceptance cannot satisfy
 a later external-verification policy. See [application records](application-records.md).
+
+## Optional execution trust boundary
+
+The [transfer coordinator](execution.md) preserves current owner, grant, KYC,
+consent, exact action and durable attempt checks before provider effects. It
+accepts no arbitrary transaction bytes. Sponsor funding is explicit and separate
+from owner keys; an uncertain dispatch never creates another attempt. RPC quorum
+requires independently operated trusted sources and verifies exact receipt
+effects and finality; it is not cryptographic consensus proof. Proxy upgrades
+and actual L1/vendor recovery costs require operator controls.
+
+The bounded CloudEvents feed is an authorized observation history, not an
+exhaustive accounting ledger. Single-active-host failover requires external
+fencing and reconciliation of effects missing from a backup. Sender-constrained
+OAuth proofs are not implemented: access tokens containing `cnf` are rejected.
+See the [enterprise v1 release gates](v1-standards.md).

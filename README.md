@@ -104,8 +104,10 @@ vendor services or certify readiness. Initial activation remains disabled._
    deployments follow the [deployment guide](docs/operator-deployment.md).
 4. **[Connect your product](docs/application-access.md):** read access policy,
    submit current identity and consent evidence, receive a grant, create the wallet
-   and revoke access when the user withdraws. Submission, gas and settlement remain
-   the application's responsibility.
+   and revoke access when the user withdraws. Select the optional
+   [execution coordinator](docs/execution.md) or an accepted application submission
+   rail. Applications arrange sponsor funding; verified chain status is separate
+   from business settlement.
 
 The GUI's **API reference** uses bundled Swagger UI to show each supported endpoint,
 required scope, configuration prerequisites, request/response schemas and illustrative
@@ -237,7 +239,7 @@ the stored result; a pending or unknown attempt requires reconciliation.
 
 <figure class="wallet-visual">
   <img src="./docs/public/diagrams/assets-and-gas.webp" alt="Diagram: the provider checks and signs an approved action; the connected application separately budgets gas, arranges funding and coordinates execution." width="1536" height="1024" loading="lazy" decoding="async">
-  <figcaption>Sponsorship and execution belong to the connected application; a signing result alone does not establish settlement.</figcaption>
+  <figcaption>Applications arrange sponsor funding and select an execution rail. The optional coordinator verifies chain status; a signature alone does not establish settlement.</figcaption>
 </figure>
 
 [View full-size diagram](docs/public/diagrams/assets-and-gas.webp)
@@ -295,8 +297,11 @@ configured token contract and signing domain need independent verification.
 Production custody acceptance remains pending. Mainnet, contract accounts,
 WalletConnect and ERC-1271/4337/7702 are unsupported. The separate
 [orchestration draft](spec/orchestration-draft.json) is a reference for Moovha's
-business API; those orchestration, sponsorship and settlement routes aren't
-implemented here. The sponsorship commitment belongs to the connected application's
+business API; those business orchestration routes aren't implemented here. The
+optional [execution coordinator](docs/execution.md) supplies dedicated sponsor
+submission and verified token-transfer status. See the
+[enterprise v1 standards and release gates](docs/v1-standards.md) for extension
+boundaries and pending acceptance. The sponsorship commitment belongs to the connected application's
 execution rail; installing the kit or approving access does not activate it.
 Use the [acceptance requirements](docs/conformance.md) to assess your integration.
 

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import SetupField from './SetupField.vue';
+import ExecutionStep from './ExecutionStep.vue';
 import ExplorerTokensStep from './ExplorerTokensStep.vue';
 import { computed } from 'vue';
 import type { ProviderConfiguration } from '../model';
@@ -97,6 +98,7 @@ function updateHttp(key: 'host' | 'port' | 'documentation', value: unknown) {
       tasks and backups.
     </p>
   </div>
+  <ExecutionStep v-model="model" />
   <h3>Enable wallet operations</h3>
   <p class="help-text">
     Leave this off for your first deployment. Complete wallet backend and
@@ -128,6 +130,14 @@ function updateHttp(key: 'host' | 'port' | 'documentation', value: unknown) {
       v-model="model.activation.tokenAcceptance"
       type="text"
       label="Token signing test report reference"
+      validation="required|length:1,256"
+    />
+    <SetupField
+      v-if="model.execution"
+      guide="executionEvidence"
+      v-model="model.activation.executionAcceptance"
+      type="text"
+      label="Execution, RPC and submission recovery test report reference"
       validation="required|length:1,256"
     />
     <p class="help-text">

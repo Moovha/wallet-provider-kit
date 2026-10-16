@@ -500,6 +500,16 @@ function enableDocumentation() {
                     }}
                   </dd>
                 </div>
+                <div>
+                  <dt>Transfer execution</dt>
+                  <dd>
+                    {{
+                      config.execution
+                        ? 'Dedicated application gas sponsors and RPC-quorum verification'
+                        : 'Not configured; applications submit separately'
+                    }}
+                  </dd>
+                </div>
                 <div v-if="config.policy.access?.mode === 'application'">
                   <dt>Identity requirements</dt>
                   <dd>
