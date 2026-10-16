@@ -6,9 +6,9 @@ standard staging acceptance path. It uses the same exported configuration and
 runtime as an adopter, without a custom host, injected login, synthetic identity
 acceptance or edited database records.
 
-Publish the reviewed implementation and this runbook before starting a full
-deployment acceptance run. Record the source revision, exported configuration
-revision and runbook version privately with the results. A wizard preview, mock
+Use a reviewed toolkit revision and the matching walkthrough for your staging
+deployment. Record the source revision, exported configuration revision and
+runbook version privately with the results. A wizard preview, mock
 test or advanced developer harness cannot stand in for this run.
 
 ## 1. Check prerequisites and record gaps

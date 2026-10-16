@@ -30,7 +30,7 @@ listen port. The wizard keeps your draft and sends no tokens or test requests.
 2. Validate and download configuration again. Follow the
    [deployment instructions](operator-deployment.md), replacing the service's
    configuration and restarting it with its existing private storage and binding.
-   There is no hot reload. Use a build/package containing this change.
+   There is no hot reload. Use a toolkit build that supports `http.documentation`.
 3. Open the link on your real HTTPS domain. A 404 normally means documentation is
    disabled in the running configuration or ingress is not forwarding `/docs/`
    and its assets. Check the running config and restart; exporting alone changes

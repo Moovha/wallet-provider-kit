@@ -16,7 +16,14 @@ git fetch origin
 git merge origin/main
 ```
 
-Make and verify your change, commit with a DCO sign-off, then push:
+Make and verify your change. Before committing, review the staged diff and
+proposed commit message using the [public writing guide](public-writing.md).
+Before each push, review all outgoing commit messages and public text, plus the
+PR title/body prepared for that push. Each must state its purpose clearly to a
+reader without the development conversation. Fix wording before publication;
+passing CI does not replace this review. Record the review in the PR checklist.
+
+Commit with a DCO sign-off, then push:
 
 ```sh
 git push origin codex/toolkit

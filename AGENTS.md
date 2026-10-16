@@ -33,6 +33,19 @@ https://github.com/Moovha/wallet-provider-kit. Keep npm publication disabled unt
 deployment, funds movement or credential rotation. Keep secrets only in ignored
 local environment files or a secret store.
 
+Before every commit and push, apply docs/public-writing.md to all new or changed
+public language, including walkthroughs, examples, UI text, code comments,
+generated descriptions, changelog entries, commit messages and PR titles/bodies.
+Identify each artifact's audience and purpose, then read it as someone without
+this chat, local workspace or development history. Rewrite session narration,
+owner/agent instructions and vague change-relative wording into self-contained
+tasks, contracts or concrete changes. Preserve accurate security and capability
+limits; do not imply certification or readiness from fixtures. Edit generator
+sources rather than generated prose alone. Review the staged diff and proposed
+commit message before committing; review outgoing commits and the final PR text
+before pushing or publishing. Record the audience/purpose review in the PR's
+Evidence checklist. Formatting and automated checks do not replace this review.
+
 Toolkit documentation delivery includes updating the existing GitHub Pages site.
 The owner has given standing authorization for that documentation publication.
 After checks pass and the changes reach main through the repository's merge

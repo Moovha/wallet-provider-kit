@@ -196,6 +196,7 @@ export default defineConfig({
         collapsed: true,
         items: [
           { text: 'Contributor guide', link: '/CONTRIBUTING' },
+          { text: 'Public writing guide', link: '/docs/public-writing' },
           { text: 'Report a vulnerability', link: '/SECURITY' },
           { text: 'Governance', link: '/GOVERNANCE' },
           { text: 'Code of conduct', link: '/CODE_OF_CONDUCT' },

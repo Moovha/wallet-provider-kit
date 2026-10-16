@@ -158,11 +158,10 @@ restoration, live provider idempotency or deployment authorization.
 
 Run the same scenarios against your real adapter, including two processes,
 network/storage outages and restore/reconciliation, before returning readiness.
-The default CLI, raw backend interface and existing host compositions are
-unchanged. Existing hosts can continue supplying their own reviewed provider
-decorator; the new wrapper is an additive integration option. Its new 409 errors
-are recorded in the generated provider OpenAPI contract. No package is published
-and no production service is activated by this change.
+For embedded integrations, hosts can supply their own reviewed provider decorator or use the optional
+journal-backed wrapper. Its 409 conflict responses are recorded in the generated
+provider OpenAPI contract. Configure authority and durable storage before using
+the wrapper; the default CLI remains unconfigured.
 
 The optional [Relayer execution profile](openzeppelin-relayer.md) uses the same
 lifecycle with `kind: relay_transaction` and stores its verified provider

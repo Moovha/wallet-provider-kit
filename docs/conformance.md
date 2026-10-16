@@ -98,8 +98,8 @@ review and revocation, while the CDP fixture checks the documented naming constr
 
 This is limited live provisioning/recovery evidence, **not provider certification**.
 Login used a synthetic local OIDC issuer with real code/PKCE/JWKS/token verification;
-identity evidence used an explicitly synthetic adapter. A Didit credential was found,
-but a configured test workflow and real identity acceptance were not established.
+identity evidence used an explicitly synthetic adapter. The exercise did not
+establish a configured Didit test workflow or real identity acceptance.
 External owner login/application registrations, live identity sharing/review,
 wizard-export deployment, public TLS/hosting, grant-expiry timing and live signing
 remain acceptance gaps. No signing, funding, broadcast, gas sponsorship or settlement

@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — public writing review
+
+- Require an audience and purpose review before commits and pushes, covering
+  documentation, walkthroughs, examples, UI text, comments, generated descriptions
+  and commit/PR wording.
+- Add artifact-specific writing guidance and a PR evidence checkpoint; clarify
+  operator instructions and integration limits without development-session context.
+
 ## Unreleased — provider-authorized delegated transfers
 
 - Replace the bundled owner-approval transfer flow with application requests on
@@ -15,8 +23,8 @@
 
 ## Unreleased — documentation publication
 
-- Include GitHub Pages publication and live-page verification in Toolkit
-  documentation delivery under the owner's standing authorization.
+- Include GitHub Pages publication and live-page verification in the documentation
+  delivery workflow after changes merge to main.
 
 ## Unreleased — FormKit operator setup
 
