@@ -25,7 +25,7 @@ beforeEach(async () => {
   );
   example = JSON.parse(
     await readFile(
-      new URL('../docs/provider.config.example.json', import.meta.url),
+      new URL('../docs/provider.config.hosted.example.json', import.meta.url),
       'utf8',
     ),
   );
@@ -51,7 +51,7 @@ describe('local operator setup boundary', () => {
     expect(
       (
         await app.inject({
-          url: '/%2e%2e/docs/provider.config.example.json',
+          url: '/%2e%2e/docs/provider.config.hosted.example.json',
           headers,
         })
       ).statusCode,

@@ -1,6 +1,8 @@
-# Try onboarding with application-supplied records
+# Hosted application-record evaluation
 
-The starter wizard and CLI template use **application-record evaluation**. An
+This is an **unfunded hosted compatibility evaluation**, not the standard application-led access contract. It deliberately requires provider user login and staff review. For applications that already authenticate users and complete KYC, use [application-led access](application-access.md), including its explicit application trust agreement and consent evidence.
+
+Hosted compatibility mode offers **application-record evaluation**. The standard wizard and CLI template use [application-led access](application-access.md). An
 application you admit can discover your required fields and submit its records
 without a KYC vendor account, API key, workflow or verification budget. Complete
 records receive owner-consent requests; your staff review them before account
@@ -15,8 +17,8 @@ retain their selected source.
 ## Configure the starter workflow
 
 Complete the normal [login, API and backend preparation](operator-services.md).
-In FormKit **Services**, keep **Use application-supplied records for an unfunded
-evaluation** selected. Under **Required record fields**, enter one name per line.
+In FormKit **Services**, first select **Provider-hosted access (compatibility)**, then enable **Use application-supplied records for an unfunded
+evaluation**. Under **Required record fields**, enter one name per line.
 The initial fields are `display_name` and `country`; choose the minimum fields
 needed for your evaluation.
 

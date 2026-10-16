@@ -1,3 +1,4 @@
+import providerConfigurationSchema from '../../spec/provider-config.schema.json' with { type: 'json' };
 import { formatUnits } from 'ethers';
 import type { SupportedActions, TransferInput } from '../deployment/actions.js';
 import { transferReceiptSchema } from '../deployment/schemas.js';
@@ -19,7 +20,7 @@ import type { OnboardingService } from './service.js';
 
 export interface OnboardingHttpOptions {
   service: OnboardingService;
-  login: OwnerLogin;
+  login?: OwnerLogin;
   /** Provider IdP subjects allowed to review; applications cannot grant themselves staff access. */
   reviewers: readonly string[];
   /** Allow the fixed operator-login return target only when integrated API tokens are configured. */
@@ -32,7 +33,7 @@ export interface OnboardingHttpOptions {
 export const accessReceiptSchema = {
   type: 'object',
   additionalProperties: false,
-  required: ['request_id', 'status', 'consent_url'],
+  required: ['request_id', 'status'],
   properties: {
     request_id: uuidSchema,
     status: {
@@ -52,7 +53,12 @@ export const accessReceiptSchema = {
         'policy_changed',
       ],
     },
-    consent_url: { type: 'string', format: 'uri' },
+    consent_url: {
+      type: 'string',
+      format: 'uri',
+      description:
+        'Hosted compatibility only. Application-led grants have no provider user redirect.',
+    },
     grant_id: uuidSchema,
     account_id: uuidSchema,
     permissions: {
@@ -164,8 +170,10 @@ export async function registerOnboardingRoutes(
   const service = () => options?.service ?? unavailable();
   async function context(request: FastifyRequest, scope: string) {
     if (!authenticate || !options || !(await ready())) return unavailable();
+    const principal = await authenticate(request.headers.authorization, scope);
+    if (!(await ready())) return unavailable();
     return {
-      principal: await authenticate(request.headers.authorization, scope),
+      principal,
       idempotencyKey:
         (request.headers['idempotency-key'] as string) ?? request.id,
     };
@@ -269,6 +277,58 @@ export async function registerOnboardingRoutes(
           mode: { type: 'string', enum: ['create', 'connect'] },
           account_id: uuidSchema,
           identity_record: applicationRecordSchema,
+          user: {
+            description:
+              'Required in application-led mode. The explicitly trusted application attests its stable user identity and recorded consent; OAuth scopes alone do not establish these facts.',
+            type: 'object',
+            additionalProperties: false,
+            required: ['id', 'identity', 'consent'],
+            properties: {
+              id: { type: 'string', minLength: 1, maxLength: 256 },
+              identity: {
+                type: 'object',
+                additionalProperties: false,
+                required: ['reference', 'level', 'verified_at', 'fields'],
+                properties: {
+                  reference: { type: 'string', minLength: 1, maxLength: 256 },
+                  level: { type: 'string', minLength: 1, maxLength: 100 },
+                  verified_at: { type: 'string', format: 'date-time' },
+                  fields: {
+                    type: 'object',
+                    maxProperties: 16,
+                    additionalProperties: {
+                      type: 'string',
+                      minLength: 1,
+                      maxLength: 512,
+                    },
+                  },
+                },
+              },
+              consent: {
+                type: 'object',
+                additionalProperties: false,
+                required: [
+                  'reference',
+                  'granted_at',
+                  'expires_at',
+                  'policy_revision',
+                ],
+                properties: {
+                  reference: { type: 'string', minLength: 1, maxLength: 256 },
+                  granted_at: { type: 'string', format: 'date-time' },
+                  expires_at: { type: 'string', format: 'date-time' },
+                  policy_revision: {
+                    type: 'string',
+                    pattern: '^[a-f0-9]{64}$',
+                  },
+                  transfer_policy_revision: {
+                    type: 'string',
+                    pattern: '^[a-f0-9]{64}$',
+                  },
+                },
+              },
+            },
+          },
           authorization_details: {
             type: 'array',
             minItems: 1,
@@ -316,21 +376,74 @@ export async function registerOnboardingRoutes(
             properties: {
               source: {
                 type: 'string',
-                enum: ['application_record', 'vendor_verification'],
+                enum: [
+                  'application_record',
+                  'vendor_verification',
+                  'application_attestation',
+                ],
               },
               evaluation_only: { type: 'boolean' },
               required_fields: { type: 'array', items: { type: 'string' } },
               maximum_field_characters: { type: 'integer' },
               owner_consent_required: { type: 'boolean', enum: [true] },
-              provider_review_required: { type: 'boolean', enum: [true] },
+              provider_review_required: { type: 'boolean' },
+              provider_login_required: { type: 'boolean' },
+              flow: { type: 'string', enum: ['application', 'hosted'] },
+              policy_revision: { type: 'string' },
+              transfer_policy_revision: { type: 'string' },
+              transfer_terms: providerConfigurationSchema.properties.financial,
+              max_identity_age_days: { type: 'integer' },
+              max_access_days: { type: 'integer' },
+              verification_level: { type: 'string' },
             },
           },
         },
       },
     },
-    async (request) =>
-      service().accessPolicy(
+    async (request) => ({
+      ...service().accessPolicy(
         (await context(request, 'wallet:access:read')).principal,
+      ),
+      ...(options?.actions
+        ? { transfer_terms: options.actions.consentTerms() }
+        : {}),
+    }),
+  );
+  app.post<{ Params: { grantId: string }; Body: Record<string, never> }>(
+    '/v1/access-grants/:grantId/revoke',
+    {
+      schema: {
+        ...schema(
+          'revokeAccountAccess',
+          { type: 'object', additionalProperties: false },
+          {
+            type: 'object',
+            required: ['grantId'],
+            properties: { grantId: uuidSchema },
+          },
+        ),
+        response: {
+          200: {
+            type: 'object',
+            required: ['grant_id', 'status'],
+            properties: {
+              grant_id: uuidSchema,
+              status: { type: 'string', enum: ['revoked'] },
+            },
+          },
+          ...Object.fromEntries(
+            [400, 401, 403, 409, 422, 429, 503].map((code) => [
+              code,
+              problemSchema,
+            ]),
+          ),
+        },
+      },
+    },
+    async (request) =>
+      service().revokeApplicationGrant(
+        await context(request, 'wallet:access'),
+        request.params.grantId,
       ),
   );
   app.post<{ Body: { records: ApplicationIdentityRecord[] } }>(
@@ -443,8 +556,11 @@ export async function registerOnboardingRoutes(
             required: ['account_id', 'status'],
             properties: {
               account_id: uuidSchema,
-              identity_source: { type: 'string', enum: ['application_record'] },
-              evaluation_only: { type: 'boolean', enum: [true] },
+              identity_source: {
+                type: 'string',
+                enum: ['application_record', 'application_attestation'],
+              },
+              evaluation_only: { type: 'boolean' },
               status: { type: 'string', enum: ['accepted', 'provisioned'] },
               address: { type: 'string', pattern: '^0x[0-9a-fA-F]{40}$' },
             },
@@ -526,6 +642,16 @@ export async function registerOnboardingRoutes(
       },
     );
     ui.addHook('onRequest', async (_request, reply) => {
+      if (!options) return unavailable();
+      if (
+        !options?.login ||
+        (options.service.policy.access.mode === 'application' &&
+          _request.url.split('?')[0] !== '/onboarding/callback')
+      ) {
+        return reply
+          .code(404)
+          .send({ message: 'Use the application to manage wallet access.' });
+      }
       if (
         options?.currentConfiguration &&
         !(await options.currentConfiguration())
@@ -546,7 +672,7 @@ export async function registerOnboardingRoutes(
     ) {
       if (!options) return unavailable();
       try {
-        return await options.login.session(
+        return await options.login!.session(
           cookie(request, '__Host-wpk-session'),
         );
       } catch (error) {
@@ -554,7 +680,7 @@ export async function registerOnboardingRoutes(
         const browser =
           cookie(request, '__Host-wpk-browser') ||
           randomBytes(32).toString('base64url');
-        const url = await options.login.start(target, browser);
+        const url = await options.login!.start(target, browser);
         setCookie(reply, '__Host-wpk-browser', browser);
         reply.redirect(url);
         return null;
@@ -567,7 +693,7 @@ export async function registerOnboardingRoutes(
         request.headers['sec-fetch-site'] === 'cross-site'
       )
         deny();
-      const current = await options.login.session(
+      const current = await options.login!.session(
         cookie(request, '__Host-wpk-session'),
       );
       if (
@@ -594,7 +720,7 @@ export async function registerOnboardingRoutes(
       async (request, reply) => {
         if (!options) return unavailable();
         const url = new URL(request.raw.url!, service().policy.provider.origin);
-        const result = await options.login.finish(
+        const result = await options.login!.finish(
           url,
           cookie(request, '__Host-wpk-browser'),
         );

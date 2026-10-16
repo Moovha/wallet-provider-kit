@@ -10,7 +10,7 @@ import {
 import { createAuthenticator } from '../src/service/auth.js';
 const sample = JSON.parse(
   await readFile(
-    new URL('../docs/provider.config.example.json', import.meta.url),
+    new URL('../docs/provider.config.hosted.example.json', import.meta.url),
     'utf8',
   ),
 );

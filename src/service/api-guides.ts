@@ -3,6 +3,7 @@ export interface OperationGuide {
   group: string;
   scope?: string;
   financial?: boolean;
+  applicationLed?: boolean;
   records?: boolean;
   vendor?: boolean;
   permission?: 'account:read' | 'operations:request' | 'transfers:request';
@@ -24,18 +25,18 @@ export const operationGuides: Record<string, OperationGuide> = {
     group: 'Application access',
     scope: 'wallet:access',
     prerequisite:
-      'Register and enable the calling application. Read GET /v1/access-policy for its required record fields. In application-record evaluation mode, include identity_record; no vendor credentials or verification budget are needed. Vendor checks require agreed pricing and application funding. Open consent_url so the owner can sign in and consent.',
+      'Standard application-led access: read GET /v1/access-policy, then include user with the application’s stable user ID, accepted identity evidence and recorded consent for the returned policy revision. The provider must explicitly trust this application’s attestations. Users stay in the application. Hosted compatibility deployments instead return consent_url and require provider login/review.',
     success:
-      '200: a request ID, consent link and status. Wait for owner consent and provider review before using the account; this response does not create a wallet.',
+      '200: request ID and policy outcome. granted includes account_id, grant_id, permissions and expiry; it does not create the wallet. A consent_url appears only in hosted compatibility mode. Missing, stale or unauthorized attestations are rejected before access is granted.',
   },
   getAccountAccessPolicy: {
-    title: 'Read required record fields',
+    title: 'Read access policy and evidence requirements',
     group: 'Application access',
     scope: 'wallet:access:read',
     prerequisite:
       'Use an enabled application registration and its API token. The response identifies the provider’s identity source and required submission fields without returning customer records.',
     success:
-      '200: the selected source, required field names and consent/review requirements. Application records support unfunded evaluation and do not establish externally verified KYC.',
+      '200: flow, policy_revision, required_fields, verification_level, age limits and provider login/review requirements. If transfer signing is configured, transfer_policy_revision identifies its exact terms. Record the user’s consent to those terms in your application before requesting transfer access.',
   },
   submitAccountAccessRecords: {
     records: true,
@@ -47,12 +48,22 @@ export const operationGuides: Record<string, OperationGuide> = {
     success:
       '200: an indexed result for each record. Complete records receive their own access request and consent URL; incomplete or duplicate records are marked invalid. Replaying the original batch resumes its requests without duplicate creation. Submission makes no wallet or vendor call. Owner consent and explicit provider review are still required.',
   },
+  revokeAccountAccess: {
+    applicationLed: true,
+    title: 'Revoke application wallet access',
+    group: 'Application access',
+    scope: 'wallet:access',
+    prerequisite:
+      'Use the grant_id returned to this application and the same caller. Send an empty JSON body. Your application must provide the user’s access-revocation control and call this endpoint when consent is withdrawn.',
+    success:
+      '200: revoked. Current wallet access and subsequent signing are denied. Already issued signatures are not cancelled. A renewed grant requires fresh consent evidence and a new request.',
+  },
   getAccountAccessRequest: {
     title: 'Read access request status',
     group: 'Application access',
     scope: 'wallet:access:read',
     prerequisite:
-      'Use the returned request_id and a token for the same application and caller. The owner must complete consent and identity checks, and provider staff must accept the evidence.',
+      'Use the returned request_id and a token for the same application and caller. Application-led access is decided from the trusted application’s submitted identity and consent evidence. Hosted compatibility mode requires its separate browser steps.',
     success:
       '200: the current request status. granted includes account and access-grant details. For funding_approval_required, arrange identity funding; for provider_review_required, wait for staff review; for reconciliation_required, ask the operator to investigate the original attempt.',
   },
@@ -92,7 +103,7 @@ export const operationGuides: Record<string, OperationGuide> = {
     financial: true,
     permission: 'transfers:request',
     prerequisite:
-      'Configure ERC-3009 transfer signing, create the wallet and obtain the owner’s transfers:request delegation during onboarding. The provider checks current owner access, identity, consent, recipient and amount limits for each request without another owner prompt.',
+      'Configure ERC-3009 transfer signing, create the wallet and obtain the owner’s transfers:request delegation in the application for the exact transfer_policy_revision (or through hosted consent in compatibility mode). The provider checks current owner access, identity, consent, recipient and amount limits for each request without another owner prompt.',
     success:
       '200: authorized with the exact stored payload and expiry. Signing, submission and settlement are separate.',
   },

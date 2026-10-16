@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased — application-led access
+
+- Make the wizard, CLI template and standard guides use application-led access:
+  users stay in their application, which attests identity and consent under an
+  explicit provider trust agreement. Policy acceptance creates a revocable grant
+  without a provider user-login redirect or routine manual review.
+- Bind users and evidence to the authenticated application, enforce current
+  identity/consent dates and policy revisions, and expose grant revocation and
+  exact transfer terms through the API. Wallet effects retain current authority,
+  immutable action and durable attempt checks.
+- Retain hosted login/review and unfunded record evaluation as explicit compatibility
+  options. Existing configurations without an access mode remain hosted; changing
+  an occupied deployment's mode requires a reviewed migration. No automatic
+  cross-application wallet linking or ownership migration is provided.
+- Align the README, operator/developer guides, wizard help, API examples and public
+  screenshots with the standard flow. Configuration and HTTP changes are additive;
+  the toolkit-owned SQLite schema and backend interfaces are unchanged.
+
 ## Unreleased — configured staging evidence
 
 - Record a live hosted consent/review rehearsal with application records, Auth0,

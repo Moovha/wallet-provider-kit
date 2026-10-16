@@ -1,336 +1,188 @@
-# Set up through the operator wizard
+# Configure your wallet service in the wizard
 
-The FormKit wizard configures the supported provider service through labelled
-forms. Operators do not implement callbacks, policies in code, database adapters
-or signing journals. Product developers still consume the HTTP API. Unsupported
-backends use the separate [custom adapter path](custom-adapters.md).
+The wizard prepares configuration for the supplied service. Application-led access
+is the standard flow: users sign in, complete identity checks and approve access
+inside the connected application. The provider accepts its attestations only under
+an explicit trust agreement and current policy. The wizard does not deploy the
+service or test external integrations.
 
 ## Open the wizard
 
-Install a [reviewed package](package.md), then run:
+Use Node 24.22.0 and npm 11.11.1. From the repository:
 
 ```sh
-npx --no-install wallet-provider-kit setup
+npm ci
+npm run build
+npm start -- setup
 ```
 
-From a source checkout, run `npm ci`, `npm run build`, then
-`npm start -- setup`. The command opens the default browser on macOS/Linux, or
-prints a local URL to open manually. Use `setup --no-open` to print the URL only,
-or `setup --port 4319 --no-open` to choose an available port. The URL includes a
-private, temporary setup-session token. Do not share it.
-
-Run this on your operator workstation. The wizard always binds to `127.0.0.1`,
-regardless of `HOST`, `PORT` or the provider service's listen settings. The session
-expires after one hour; press Ctrl+C when finished. It is a separate local tool,
-not an unauthenticated administrative screen on the deployed provider API.
+Keep the terminal running and open its complete local session link. The wizard is
+bundled and needs no FormKit Pro subscription. The service remains experimental,
+single-host and Base Sepolia EOA only, with production custody acceptance pending.
 
 ## Before you begin
 
-Use [getting started](README.md#install-and-open-the-local-wizard) if Node, npm,
-Git or the terminal commands are new to you. Prepare the accounts and policy
-inputs in [Services, registrations and secrets](operator-services.md). For a fresh
-login/token service use the [Auth0 dashboard recipe](auth0-setup.md). Those guides
-explain each required ID, secret, URL, agreement and reviewer subject, including
-where to obtain it. You can explore with placeholders, but they cannot run a service.
-
-The screenshots below are captured from the actual wizard with invented example
-values and explicitly fictional free-test terms. They show the interface, not a
-vendor account, real commercial agreement or accepted deployment. Never copy their
-IDs, domains or zero prices into a live configuration.
+Prepare a provider hostname and privacy notice, a wallet backend and application
+token issuer. Agree which applications may attest identity and consent, what checks
+they must perform and which fields your policy needs. See
+[services and credentials](operator-services.md). No provider user login, reviewer
+account or identity-vendor credential is needed for application-led access.
 
 ## Understand a setting before entering it
 
-Each page explains the decision you are making. Every setting has a short
-explanation beside it. Open **Why do I need this? Where do I get it?** for its
-purpose, the source of the value, examples and a link to the relevant instructions.
-You can open these explanations with a keyboard using Tab and Enter or Space.
-Opening help does not contact vendors or change your settings.
+Fields explain the expected value and its source. Expand **Why do I need this?
+Where do I get it?** for more detail. Secret fields take deployment variable names,
+not secret values. Download your configuration to save progress; page refresh
+loses unsaved edits.
 
-Some values are yours to choose; others must match a registration elsewhere:
-
-| Kind of setting                | What to do                                                                                  | Examples                                                                   |
-| ------------------------------ | ------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| Your service details           | Choose a value for your own service.                                                        | Provider name; public address under a domain you control.                  |
-| Issued registration details    | Copy the exact value from the service that issued it.                                       | Login client ID; application API audience; Didit workflow ID.              |
-| Secret variable names          | Keep the supplied names for a first setup. Supply the actual values privately after export. | `PROVIDER_LOGIN_SECRET`; `DIDIT_API_KEY`.                                  |
-| Rules and agreement references | Decide the rule and record the real agreement or evidence behind it.                        | Identity cost cap; funding agreement; reviewer access; acceptance reports. |
-| Deployment settings            | Match how your server runs. Use the field instructions to assess the supplied values.       | Persistent data folder; internal listen address and port.                  |
-| Optional features              | Leave off unless you need and have prepared the feature.                                    | Transfer signing; deployed API testing; operator token controls.           |
-
-For example, **Public wallet service address** asks where you will host the wallet
-service. If you control `your-company.com`, you could choose
-`wallet.your-company.com`. Connect that hostname to your server through your domain
-provider’s DNS settings, then configure your hosting platform or HTTPS gateway to
-serve it securely. Enter `https://wallet.your-company.com` in the wizard. This
-scheme and hostname together are called an **HTTPS origin**. The kit needs it for
-login return addresses and application requests. It does not register the domain
-or configure hosting. Follow [publish through HTTPS](operator-deployment.md#publish-through-https)
-to complete those tasks before onboarding users.
-
-![Public wallet service address with expanded purpose and source instructions](public/screenshots/provider-guidance.webp)
-
-[Open full-size setting guidance screenshot](public/screenshots/provider-guidance.webp)
+![Provider setting instructions](public/screenshots/provider-guidance.webp)
 
 ## Complete the six steps
 
 ### 1. Provider
 
-![Provider name, origin and privacy fields](public/screenshots/provider.webp)
+Enter your service name, stable public HTTPS origin and privacy notice. Users
+remain in the application; the provider origin is the address that application
+calls. A hostname is not created or hosted by the wizard.
 
-[Open full-size Provider screenshot](public/screenshots/provider.webp)
-
-Enter your provider display name, **Public wallet service address** and published
-privacy notice URL. The address is where owners reach your deployed wallet service,
-for example `https://wallet.your-company.com`, without a trailing slash or path.
-It is not the temporary local wizard address. The name appears on consent screens.
-Set up the [domain and notice](operator-services.md#provider-domain-and-privacy-notice)
-before onboarding users. Changing the persisted origin later requires a migration review.
+![Provider settings](public/screenshots/provider.webp)
 
 ### 2. Backend
 
-![Backend selection with CDP, OWS and OpenZeppelin logos and secret variable fields](public/screenshots/backend.webp)
+Choose Coinbase CDP, Open Wallet Standard or OpenZeppelin Relayer. Supply the stable
+environment binding and secret variable names. OWS requires a separately installed
+native engine and private vault. Relayer requires verified, distinct signer entries.
+Follow the corresponding [backend preparation](operator-services.md#choose-one-wallet-backend).
+Never replace an assigned signer or binding to retry an uncertain operation.
 
-[Open full-size Backend screenshot](public/screenshots/backend.webp)
-
-Choose **Coinbase CDP**, **Open Wallet Standard** or **OpenZeppelin Relayer**.
-Their logos identify the integration; the linked vendor guides explain the external
-service. Choose a **Wallet environment name** (the configuration’s backend binding),
-such as `acme-cdp-base-sepolia-01`. You create this name; no vendor issues it.
-Keep it unchanged through restarts and credential rotation.
-
-- **CDP:** keep or choose names for the API key ID, API key secret and wallet-secret
-  environment variables. Get their actual values from the [CDP registration steps](operator-services.md#coinbase-cdp).
-- **OWS:** set a persistent private vault path and owner-passphrase variable name.
-  Prepare the [engine and vault](operator-deployment.md#prepare-the-optional-ows-vault)
-  on the deployment host. The reference container does not include them.
-- **Relayer:** enter its HTTPS origin and API-key variable name, then add the existing
-  pool's Relayer IDs, Signer IDs, addresses and revision `1`. Follow
-  [signer-pool preparation](operator-services.md#openzeppelin-relayer); a pool entry
-  supports one account and cannot be reused for another owner.
-
-**Enter variable names only**, never keys, secret values or seed phrases. Changing
-the selected backend discards the prior backend fields. It does not migrate an
-existing deployment or its accounts.
+![Wallet backend configuration](public/screenshots/backend.webp)
 
 ### 3. Services
 
-![Owner login, API authentication and Didit price-bound fields](public/screenshots/services.webp)
+Keep **Access flow → Application-led access (standard)**. Set **Required identity
+level** and **Required identity fields (one per line)**. Use the exact level agreed
+with applications and lowercase field names such as `country`. Field presence is
+not proof of KYC; the trust agreement defines the application's verification duties.
 
-[Open full-size Services screenshot](public/screenshots/services.webp)
+Configure **Application token issuer**, **Wallet API audience** and **Token verification
+keys URL (JWKS)**. Use separate registered application clients and short-lived
+RFC 9068 API tokens. An application token authenticates the caller; the user assertion
+establishes the application-scoped user and attests their identity and consent.
 
-Configure the owner-login issuer, confidential client ID, client-secret variable
-name and matching ID-token algorithm. Register the exact callback displayed in the
-callout. Configure the application's token issuer, dedicated API audience and public
-JWKS URL separately. These can use the same compatible issuer but have different
-registrations. Follow the [Auth0 field mapping](auth0-setup.md#_5-copy-the-values-into-formkit)
-or [issuer requirements](operator-services.md#register-owner-login); URLs alone are insufficient.
+There are no mandatory wallet-user login fields, vendor accounts or review steps.
+If optional staff token controls are enabled in Deployment, return to Services to
+configure **Optional staff login**. That login is only for token operators.
 
-New drafts select [application-record evaluation](application-records.md).
-Keep that option to submit fictional records containing your required fields,
-without a vendor key or verification budget. Owners still consent and staff review
-each record before unfunded account access. Choose required field names one per
-line; only those fields are retained.
+![Application-led services and identity policy](public/screenshots/services.webp)
 
-When your policy requires external verification, select Didit, Sumsub or both.
-That selection replaces the record source. Enter your recipient workflow ID/level and credential
-variable names. For each intended route, enable its **agreed price limit**, supply
-the maximum in USD cents and reference the actual terms. Import and new verification
-have separate price limits. Even free work needs an explicit agreed zero. Obtain these
-from the [identity/vendor setup guide](operator-services.md#prepare-identity-verification).
-Sumsub requires Reusable KYC Share to be enabled externally; selecting it does not
-turn on that product. Provider staff still decide identity acceptance.
+For a legacy deployment, explicitly select **Provider-hosted access (compatibility)**.
+This reveals owner login, hosted identity-vendor/evaluation settings and reviewer
+requirements. It is a separate flow; see [hosted access](onboarding.md). Changing
+flow clears incompatible identity settings. Review your export before deployment.
 
 ### 4. Policies
 
-![Application permissions, funding agreement and staff reviewer configuration](public/screenshots/policies.webp)
+Register the exact issuer/client ID and name of each application. Set its permitted
+actions and **Application identity and consent trust agreement** reference. Review
+that agreement before enabling the application: it grants permission to attest
+facts about users, not unrestricted wallet or spending access.
 
-[Open full-size Policies screenshot](public/screenshots/policies.webp)
+Set maximum identity age and access duration. Grants are also bounded by submitted
+consent expiry. Different applications' user IDs cannot claim the same wallet;
+cross-application linking needs a separately verified integration.
 
-Set a deliberate **policy version**, plus identity-acceptance and application-access
-ages in days (1–365). The former bounds how old accepted identity may be; the latter
-bounds an application's access grant. The example's 90/7 values are examples, not
-a recommendation for your compliance policy. Publish a new version deliberately;
-policy changes can invalidate grants and approvals.
+**Configure delegated transfer signing** is optional. Supply the verified token,
+recipients, limits and validity. The application must present those exact terms to
+the user and attest consent to the returned transfer-policy revision. Signing does
+not broadcast, pay network fees or confirm completion.
 
-For each connected application, enter its display name and registered API client
-ID. Its issuer inherits Services. Choose **Read wallet accounts** and, where needed,
-**Request transfers on behalf of users** (`transfers:request`) for the configured
-transfer profile. **Request wallet operations (advanced hosts)** remains available
-for custom financial hosts. These consent permissions differ from the
-[token scopes](operator-services.md#register-the-application-api-and-clients).
-Keep access enabled only for admitted applications. A client ID is not an owner ID.
-
-Enable the application's identity funding agreement, enter its real agreement
-reference and monthly USD-cent cap. Without it, new identity verification/import
-pauses even when a route's configured price is zero. Enter each staff reviewer's
-exact login subject from the owner-login issuer. The
-[funding](operator-services.md#prices-terms-and-application-funding) and
-[reviewer instructions](operator-services.md#identify-reviewers) explain their sources.
-
-Leave **Configure delegated transfer signing** off for onboarding/provisioning
-only. If required, use the [token policy preparation](operator-services.md#optional-token-signing-policy)
-to supply the verified Base Sepolia contract/domain, symbol, decimals, recipient
-allowlist, integer base-unit limits and 60–3600-second validity. Users explicitly
-consent to transfer delegation during onboarding. The provider then authorises
-each exact application request against those terms without a second user prompt.
-Ordinary account access and `operations:request` do not grant this delegation.
-Changed transfer terms require renewed delegation consent.
+![Application registrations and access policy](public/screenshots/policies.webp)
 
 ### 5. Deployment
 
-![Private storage, HTTP listen settings and disabled activation](public/screenshots/deployment.webp)
+Choose private persistent storage and HTTP listen settings. Keep **Enable wallet
+operations in this configuration** off until real backend, authority and recovery
+tests pass. References to completed test reports do not cause the wizard to run or
+verify those tests.
 
-[Open full-size Deployment screenshot](public/screenshots/deployment.webp)
+**Enable deployed API explorer and Try it out** is optional. Optional staff token
+controls use a separately configured staff login and explicit operator allowlist.
+They do not create a wallet-user onboarding step.
 
-Choose private persistent SQLite storage. Relative paths resolve beside the exported
-configuration on the deployment host. For native deployment behind a local proxy,
-use `127.0.0.1`, port `8080`. For the reference Compose deployment, use `0.0.0.0`,
-port `8080`, data directory `.provider-data`. The
-[deployment guide](operator-deployment.md) supplies private directory and volume setup.
-The **Enable deployed API explorer and Try it out** checkbox exposes Swagger on the deployed
-service; it is separate from this setup wizard and the public documentation site.
-
-Keep **Enable wallet operations in this configuration** off initially. Activation requires
-real backend and recovery acceptance evidence; signing also requires token evidence.
-These are references to reviewed reports/tickets, not automatically issued codes
-or tests performed by the wizard. Follow [acceptance and activation](operator-deployment.md#acceptance-and-explicit-activation)
-before enabling an export. Disabled readiness is expected during preparation.
+![Deployment settings](public/screenshots/deployment.webp)
 
 ### 6. Export
 
-![Validated export, activation warning, secret variable list and three download buttons](public/screenshots/export.webp)
+Validate the settings and resolve any errors shown beside the named step and field.
+Review the access flow, application trust policy, backend and activation state.
+Download `provider.config.json`, `provider.env.example` and `provider-setup.md`.
+Configuration validation makes no wallet or identity-vendor call.
 
-[Open full-size Export screenshot](public/screenshots/export.webp)
-
-Click **Validate configuration**. The service applies its strict schema and semantic
-checks to all steps. Correct reported errors, then review observations and the
-summary. Every edit invalidates the prior validation. Validation does not test
-credentials, initialize storage, contact services, create wallets or deploy.
-
-Download **configuration**, **variable template** and **checklist**. A warning that
-activation is disabled is expected initially. Missing prices or funding are useful
-configuration observations: a valid export can still lack those operational inputs.
-Use the [next-stage deployment walkthrough](operator-deployment.md), not only the
-fact that the download buttons are available, to determine readiness.
-
-Step tabs allow returning to any section. Their position indicates navigation,
-not proof of operational readiness. Every edit invalidates the validated export.
-The final validator catches cross-field errors, duplicate bindings, missing
-required configuration and financial bounds; frontend validation alone cannot
-approve an export.
-
-The wizard distinguishes a structurally valid configuration from a usable
-onboarding flow. Missing vendor prices or application funding pause new identity
-work. Disabled applications, read-only permissions, unavailable secrets, unprepared
-storage and incompatible external services can also prevent the intended flow.
-The review screen and checklist call out configuration prerequisites; they do not
-claim to test services remotely.
+![Validated configuration and exports](public/screenshots/export.webp)
 
 ## Explore the provider API
 
-Choose **API reference** in the top bar at any point. **Setup configuration** returns
-to the same form without losing edits or its current step. The viewer uses bundled
-[Swagger UI](https://swagger.io/tools/swagger-ui/) and the kit's implemented OpenAPI,
-with explanatory notes and fictional, schema-checked examples. It does not use the
-separate orchestration draft or expose vendor APIs as provider endpoints.
+Choose **API reference**. The local preview uses your settings and sends no API
+calls. Application-led deployments show policy discovery, access requests, grant
+revocation, account reads, provisioning and optional transfer endpoints. Hosted
+batch-record and vendor-import endpoints are not part of the standard preview.
 
-![Local provider API reference with application selection, cURL example and Swagger endpoint groups](public/screenshots/api-reference.webp)
+Begin with **Read access policy and evidence requirements**. The application obtains
+the current policy revision and required evidence, records the user's consent in
+its own platform, submits a user assertion, receives a grant when policy passes,
+then creates or accesses the wallet. See the complete
+[application-led contract](application-access.md), including fictional JSON examples.
 
-[Open full-size API reference screenshot](public/screenshots/api-reference.webp)
+Example revisions, timestamps, IDs and evidence are placeholders. Replace them
+with current records before testing. Schemas and example responses are not live
+service results or approvals.
 
-Select an application to preview its configured permissions, then search by endpoint,
-action or OAuth scope. Onboarding-only setups initially show six endpoints; enabling
-the transfer profile adds its three endpoints. Use the checkbox to inspect those
-three while they are not configured. Each operation explains its required scope,
-activation/permission prerequisites, owner/grant/identity checks and successful
-response. Expand a Swagger row to see parameters, required headers, example JSON,
-response status codes and schemas.
+![Local API preview](public/screenshots/api-reference.webp)
 
-The viewer shows the API origin, application token issuer and audience. **Copy cURL
-example** copies an illustrative request; replace its token, IDs, any share token
-and the mutation's UUIDv4 idempotency key before using it in your application tooling.
-Preserve the original key when retrying that same mutation. **Download displayed
-OpenAPI** exports the currently displayed endpoints and their reference notes;
-search and the transfer visibility checkbox affect that export. It is a reference
-snapshot, not a runtime capability or acceptance report.
+The **Open deployed Try it out** link opens the actual service's `/docs/` page.
+Enable documentation, export and deploy before using it. Execute sends a real request:
+POSTs may create records, create wallets or issue usable signatures. Start with
+public discovery, then read policy with an application token. Preserve the original
+idempotency key for retries and investigate unknown outcomes before repeating work.
+See [HTTP testing](http-api.md#try-deployed-apis).
 
-This is a **local preview of possibly unsaved and unvalidated configuration**.
-It does not inspect live tokens, stored grants, deployed readiness or vendor status.
-No provider request is executed: Try it out and token-entry controls are disabled.
-The setup-session token is never an application credential. Example responses,
-consent URLs, hashes and signatures are fictional and confer no authority.
-For real responses after deployment, use the **Try it out · real service responses**
-card. Enable the deployed explorer in your draft, validate/export it and restart
-the service, then choose **Open deployed Try it out**. This opens Swagger on your
-configured HTTPS domain in a separate tab. No local configuration, credential or
-application permission preview is sent with the link. It does not check deployment
-status. The [live testing guide](http-api.md#try-deployed-apis) explains enabling
-`/docs/`, obtaining a token, the first request, real effects and troubleshooting.
-
-![Deployed Swagger shows an actual discovery response from an offline local fixture](public/screenshots/api-live.webp)
-
-This screenshot uses a local offline fixture with readiness closed. It demonstrates
-response rendering, not vendor connectivity or an accepted deployment.
+![Actual discovery response from an offline fixture](public/screenshots/api-live.webp)
 
 ### Optional application token controls
 
-Deployment also offers **Enable application token controls for staff**. Enter allowed token
-operator login subjects, select the registered applications, set secret variable
-names and limit scopes. The [operator token guide](operator-tokens.md) explains
-what each identifier/secret means, where to obtain it, deployment and the signed-in
-Get token/Renew token flow. Reviewers are not implicitly token operators. The local
-wizard does not fetch or store application tokens.
+Deployment offers **Enable application token controls for staff**. Configure optional
+staff login in Services, allowed staff account IDs, applications, secret variable
+names and scopes. The deployed **Application tokens** panel can get or renew tokens
+without exposing client secrets. These controls still enforce ordinary application
+trust and current wallet authority. See [operator tokens](operator-tokens.md).
 
 ## Use the exported files
 
-- `provider.config.json`: version-1 provider service configuration.
-- `provider.env.example`: required variable names with empty values. Supply actual
-  values through your deployment's secret store; the CLI does not automatically
-  load an environment file.
-- `provider-setup.md`: selected backend instructions, login callback, outstanding
-  configuration observations, initialization, diagnostics and run commands.
-
-Move the files to your private deployment directory and follow the checklist and
-[deployment walkthrough](operator-deployment.md). Relative data/vault paths resolve beside the config
-on the deployment host. A container must use an appropriate listen address and
-volume mapping; the [reference Compose file](../ops/provider.compose.yaml) has
-explicit private mounts and UID/GID inputs. It omits the optional OWS engine/vault.
-
-For a new empty deployment, run `init-storage`, then `doctor`, then `run --config`
-using the exported configuration. For an existing store, preserve its origin,
-backend binding and signer assignments; follow reviewed migration procedures
-instead of reinitializing or replacing wallets. The wizard does not apply config
-to a running service, initialize storage, deploy containers or create wallets.
+Supply secret values privately on your deployment host. Initialize new storage
+once, diagnose local prerequisites, publish through HTTPS and perform acceptance
+tests before activation. Follow [deployment](operator-deployment.md) and the
+[staging walkthrough](staging-walkthrough.md). No application deployment or package
+publication occurs when you export configuration.
 
 ## Resume and privacy
 
-Use **Import configuration** to review a saved, valid supported configuration.
-Unknown fields, plaintext credentials, oversized files and custom adapter modules
-are rejected. Import never executes a module. Imported activation settings are
-preserved; review acceptance again before deploying any changes.
+Import the saved configuration to resume. An existing hosted export remains hosted;
+import does not migrate its user ownership or grants. Do not change an occupied
+deployment's access mode or reinitialize it to bypass the migration fence. Refer to
+[compatibility and migration](application-access.md#hosted-compatibility-and-migration).
 
-The wizard holds edits in browser memory. It does not save them in localStorage,
-sessionStorage, cookies or server files, and does not request external scripts,
-fonts, analytics or logos. Refreshing discards edits; reopen the terminal's full
-setup link to start again. Download configuration before closing to retain work.
-Local API access requires the session token and exact local host/origin. Assets
-are bundled with the installable package; no FormKit Pro subscription is needed.
-Third-party marks identify integrations and do not imply endorsement. Asset
-sources are recorded in the source checkout's `setup-ui/ASSETS.md`.
+Keep exports private. They contain policy and variable names, not secret values.
+Do not share API explorer screenshots containing tokens, personal data or signatures.
 
 ## Verification and limits
 
-The wizard validates configuration structure and policy. Before activation,
-verify vendor registration, login compatibility, identity-sharing agreements,
-wallet recovery and token acceptance on your deployment using the
-[staging walkthrough](staging-walkthrough.md) and [integration checks](conformance.md).
-Offline UI and package tests do not establish those external properties.
-
-The configured service is experimental, single-host and Base Sepolia EOA only.
-Signing does not broadcast, sponsor gas or establish settlement.
+Offline unit and browser tests cover the wizard, contracts and authority boundaries.
+They do not establish acceptance of a real application, its identity checks, wallet
+backend or deployment recovery. The current standard isolates users by application;
+it does not automatically link wallets across applications.
 
 ## Screenshot maintenance
 
-The screenshots use fictional settings and offline fixtures to illustrate the
-interface. To update them, follow the
-[contributor screenshot instructions](../CONTRIBUTING.md#maintain-wizard-screenshots).
+The screenshots use fictional settings and offline fixtures. Follow the
+[contributor screenshot instructions](../CONTRIBUTING.md#maintain-wizard-screenshots)
+to recreate them after UI changes.

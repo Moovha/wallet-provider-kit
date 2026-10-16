@@ -1,6 +1,6 @@
 # Security model
 
-The [onboarding profile](onboarding.md) keeps application authentication, provider
+The optional [hosted compatibility profile](onboarding.md) keeps application authentication, provider
 owner login, identity evidence, customer acceptance and account access as distinct
 records. Share tokens never authenticate an owner. Provider reviewers explicitly
 match evidence to the authenticated owner; no vendor result automatically grants
@@ -75,10 +75,29 @@ adapter with transactional uniqueness, fencing and audit/result persistence.
 Your deployment must protect stored data and verify recovery. Offline fixtures
 are not deployment storage, and readiness remains the host's responsibility.
 
+## Application-led access trust boundary
+
+The standard service authenticates an explicitly registered application, then
+checks its user assertion under a recorded trust agreement. Required fields alone
+are not KYC. The application attests the agreed verification level, verification
+time and recorded user consent; the provider checks freshness, current policy and
+exact transfer terms before storing authority. No provider user login or staff
+review is required in this flow. The provider relies on the application's truthful
+performance and retention of those checks; it does not independently fetch vendor
+evidence in application-led mode.
+
+User IDs are namespaced by issuer/client and cannot link accounts across applications.
+The machine subject remains the API caller, not the user. Current grants, account
+status, expiry and policy are checked again before dispatch and replay. Applications
+must communicate withdrawals through grant revocation. Old consent cannot restore
+revoked grants; new consent and current identity evidence are required. Hosted
+compatibility retains its separate login, consent and staff acceptance boundary.
+Changing an occupied deployment's access mode requires a reviewed migration.
+
 ## Optional operator application tokens
 
 The deployed explorer can use an explicitly configured server-side
-client-credentials broker. It is disabled by default. Fresh owner-login sessions
+client-credentials broker. It is disabled by default. Fresh staff-login sessions
 must match a separate exact-issuer/subject operator allowlist, and each client
 must be an enabled provider registration with explicit scope limits. Client
 secrets are environment references; only the server exchanges them with the
@@ -97,7 +116,7 @@ lifetime of already-issued tokens after sign-out.
 
 ## Application-record evaluation
 
-The starter profile accepts assertions from admitted applications solely for
+The hosted compatibility evaluation profile accepts assertions from admitted applications solely for
 unfunded account evaluation. It retains provider-required fields and requires
 separate owner consent and provider review. Application claims of KYC approval,
 roles or spending permission confer no authority. The profile rejects external

@@ -52,7 +52,35 @@ export function defineOnboardingPolicy(
   try {
     keys(policy, ['version', 'provider', 'applications', 'identity', 'access']);
     keys(policy.provider, ['name', 'origin', 'privacyUrl']);
-    if (policy.identity) keys(policy.identity, ['maxAgeDays', 'records']);
+    if (policy.identity)
+      keys(policy.identity, ['maxAgeDays', 'records', 'application']);
+    const appIdentity = policy.identity?.application;
+    if (appIdentity) {
+      keys(appIdentity, ['requiredFields', 'verificationLevel']);
+      if (
+        !text(appIdentity.verificationLevel, 100) ||
+        !Array.isArray(appIdentity.requiredFields) ||
+        appIdentity.requiredFields.length > 16 ||
+        new Set(appIdentity.requiredFields).size !==
+          appIdentity.requiredFields.length ||
+        appIdentity.requiredFields.some(
+          (field) =>
+            typeof field !== 'string' ||
+            !/^[a-z][a-z0-9_]{0,63}$/.test(field) ||
+            ['constructor', 'prototype'].includes(field),
+        )
+      )
+        throw new Error();
+      appIdentity.requiredFields.sort();
+    }
+    const mode = policy.access?.mode ?? 'hosted';
+    if (
+      !['application', 'hosted'].includes(mode) ||
+      (mode === 'application'
+        ? !appIdentity || !!policy.identity?.records
+        : !!appIdentity)
+    )
+      throw new Error();
     const records = policy.identity?.records;
     if (records) {
       keys(records, ['requiredFields']);
@@ -72,7 +100,7 @@ export function defineOnboardingPolicy(
         throw new Error();
       records.requiredFields.sort();
     }
-    if (policy.access) keys(policy.access, ['maxAgeDays']);
+    if (policy.access) keys(policy.access, ['maxAgeDays', 'mode']);
     if (!text(policy.version) || !text(policy.provider.name, 100))
       throw new Error();
     const origin = trustedHttpsUrl(policy.provider.origin);
@@ -93,7 +121,13 @@ export function defineOnboardingPolicy(
         'enabled',
         'permissions',
         'funding',
+        'assertionTrust',
       ]);
+      if (app.assertionTrust) {
+        keys(app.assertionTrust, ['agreement']);
+        if (!text(app.assertionTrust.agreement)) throw new Error();
+      }
+      if (mode === 'application' && !app.assertionTrust) throw new Error();
       if (app.funding) keys(app.funding, ['agreement', 'monthlyLimitMinor']);
       trustedHttpsUrl(app.issuer);
       if (
@@ -131,12 +165,21 @@ export function defineOnboardingPolicy(
     const identity = {
       maxAgeDays: policy.identity?.maxAgeDays ?? 365,
       ...(records ? { records } : {}),
+      ...(appIdentity ? { application: appIdentity } : {}),
     };
-    const access = { maxAgeDays: policy.access?.maxAgeDays ?? 30 };
+    const access = {
+      maxAgeDays: policy.access?.maxAgeDays ?? 30,
+      mode: mode as 'application' | 'hosted',
+    };
     for (const days of [identity.maxAgeDays, access.maxAgeDays])
       if (!Number.isInteger(days) || days < 1 || days > 365) throw new Error();
     const resolved = { ...policy, identity, access };
-    return freeze({ ...resolved, revision: fingerprint(resolved) });
+    // Preserve the revision of legacy hosted policies that did not declare a mode.
+    const revisionInput =
+      policy.access?.mode === undefined
+        ? { ...resolved, access: { maxAgeDays: access.maxAgeDays } }
+        : resolved;
+    return freeze({ ...resolved, revision: fingerprint(revisionInput) });
   } catch {
     throw new WalletProviderError('wallet_provider_configuration');
   }
@@ -158,6 +201,7 @@ export function normalizeInput(
   value: AccessInput,
   app: ApplicationPolicy,
   records?: ApplicationRecordPolicy,
+  applicationLed = false,
 ): AccessInput {
   if (
     !value ||
@@ -169,6 +213,7 @@ export function normalizeInput(
           'account_id',
           'authorization_details',
           'identity_record',
+          'user',
         ].includes(k),
     )
   )
@@ -227,7 +272,9 @@ export function normalizeInput(
       ),
     };
   } else if (value.identity_record !== undefined) invalid();
+  if (!applicationLed && value.user !== undefined) invalid();
   return {
+    ...(applicationLed ? { user: value.user } : {}),
     mode: value.mode,
     ...(value.account_id ? { account_id: value.account_id } : {}),
     ...(identityRecord ? { identity_record: identityRecord } : {}),

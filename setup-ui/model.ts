@@ -71,17 +71,23 @@ export function emptyConfiguration(
   const config = structuredClone(template);
   config.policy.provider = { name: '', origin: '', privacyUrl: '' };
   config.policy.applications = [
-    { issuer: '', clientId: '', name: '', permissions: ['account:read'] },
+    {
+      issuer: '',
+      clientId: '',
+      name: '',
+      permissions: ['account:read'],
+      assertionTrust: { agreement: '' },
+    },
   ];
   config.oauth = { issuer: '', audience: '', jwksUrl: '' };
-  config.ownerLogin.issuer = '';
-  config.ownerLogin.clientId = '';
-  config.reviewers = [''];
+  delete config.ownerLogin;
+  delete config.reviewers;
   config.identity = {};
   config.policy.identity = {
     maxAgeDays: 90,
-    records: { requiredFields: ['display_name', 'country'] },
+    application: { requiredFields: ['country'], verificationLevel: 'verified' },
   };
+  config.policy.access = { mode: 'application', maxAgeDays: 7 };
   delete config.financial;
   config.backend = newBackend('cdp');
   return config;
@@ -97,7 +103,7 @@ export function deploymentChecklist(
     '# Wallet provider deployment checklist',
     '',
     'The configuration passed local checks. Before enabling wallet operations, test your external services, wallet recovery and token signing where configured.',
-    `Configure and export in the wizard, deploy with the CLI, then test through the deployed API explorer and owner/reviewer pages. Follow ${docs}staging-walkthrough.html`,
+    `Configure and export in the wizard, deploy with the CLI, then test application-led access through the deployed API explorer. Hosted compatibility deployments also test their owner/reviewer pages. Follow ${docs}staging-walkthrough.html`,
     'If a required login, application, identity or HTTPS service is unavailable, mark the corresponding test as blocked. Offline fixtures cannot validate that external service or your recovery process.',
     `Service activation in this export: ${config.activation.enabled ? 'enabled in this configuration' : 'disabled'}.`,
     '',
@@ -106,17 +112,25 @@ export function deploymentChecklist(
     '',
     '## Register and prepare',
     `- Backend: ${backend.name}. Follow ${backend.url} and ${backend.guide}`,
-    `- Register owner login callback: ${config.policy.provider.origin}/onboarding/callback`,
-    '- Enable OIDC code flow, PKCE S256, client_secret_post, RS256/ES256 ID tokens valid for at most ten minutes, and fresh auth_time at the login provider.',
-    '- Register connected application clients separately. Issue dedicated-audience RFC 9068 at+jwt API tokens with the required wallet scopes and a lifetime no longer than ten minutes.',
-    ...(config.policy.identity?.records
+    ...(config.ownerLogin
       ? [
-          '- Application-record evaluation: submit only the configured required fields, obtain owner consent and complete provider review. No vendor key or verification budget is required. Do not fund these wallets or enable financial signing.',
+          `- Register staff/hosted login callback: ${config.policy.provider.origin}/onboarding/callback`,
+          '- Configure OIDC code flow, PKCE S256, client_secret_post and fresh signed ID tokens for staff/hosted login.',
         ]
-      : [
-          '- Configure the selected identity vendor workflows/levels and sharing agreements.',
-          '- Confirm the agreed price limit for each identity route and the application’s funding agreement, including for free routes.',
-        ]),
+      : []),
+    '- Register connected application clients separately. Issue dedicated-audience RFC 9068 at+jwt API tokens with the required wallet scopes and a lifetime no longer than ten minutes.',
+    ...(config.policy.access?.mode === 'application'
+      ? [
+          '- Review each application trust agreement. Test identity and consent attestations, user isolation, revocation and stale evidence through the access API. Users remain in the application.',
+        ]
+      : config.policy.identity?.records
+        ? [
+            '- Application-record evaluation: submit only the configured required fields, obtain owner consent and complete provider review. No vendor key or verification budget is required. Do not fund these wallets or enable financial signing.',
+          ]
+        : [
+            '- Configure the selected identity vendor workflows/levels and sharing agreements.',
+            '- Confirm the agreed price limit for each identity route and the application’s funding agreement, including for free routes.',
+          ]),
     '- Supply these environment variables through the deployment secret store: ' +
       environment.join(', '),
     '- Use one persistent POSIX host. Secure and back up its SQLite data directory; run as its owning unprivileged user.',

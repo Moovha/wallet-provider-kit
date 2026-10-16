@@ -1,5 +1,7 @@
 # Enroll a user before creating their wallet
 
+This is the **advanced OIDC enrollment profile**. The standard configured service uses [application-led access](application-access.md) and accepts explicitly trusted application identity and consent attestations. OIDC enrollment is a separate integration, not a required second sign-in for that standard flow.
+
 For a ready-made flow with hosted consent, provider review, Didit/Sumsub evidence
 and access grants, use [onboarding and application access](onboarding.md). This
 guide describes the separate OIDC Identity Assurance profile for existing hosts.

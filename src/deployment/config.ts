@@ -24,13 +24,13 @@ export interface ProviderConfiguration {
   policy: OnboardingPolicy;
   oauth: OAuthConfiguration;
   apiExplorer?: ExplorerTokensConfiguration;
-  ownerLogin: {
+  ownerLogin?: {
     issuer: string;
     clientId: string;
     clientSecret: SecretReference;
     idTokenAlgorithm?: 'RS256' | 'ES256';
   };
-  reviewers: string[];
+  reviewers?: string[];
   identity: {
     didit?: {
       apiKey: SecretReference;
@@ -111,7 +111,25 @@ export function validateProviderConfiguration(
   const config = structuredClone(input) as unknown as ProviderConfiguration;
   try {
     defineOnboardingPolicy(config.policy);
-    if (config.policy.identity?.records) {
+    const applicationLed = config.policy.access?.mode === 'application';
+    if ((!applicationLed || config.apiExplorer) && !config.ownerLogin)
+      throw new ConfigurationError([
+        '/ownerLogin: login configuration is required for hosted access or staff token controls',
+      ]);
+    if (!applicationLed && !config.reviewers?.length)
+      throw new ConfigurationError([
+        '/reviewers: hosted access requires reviewers',
+      ]);
+    if (applicationLed) {
+      if (
+        config.identity.didit ||
+        config.identity.sumsub ||
+        config.policy.identity?.records
+      )
+        throw new ConfigurationError([
+          '/identity: application-led access uses trusted application attestations, not hosted verification',
+        ]);
+    } else if (config.policy.identity?.records) {
       if (config.identity.didit || config.identity.sumsub || config.financial)
         throw new ConfigurationError([
           '/policy/identity/records: application records are an unfunded evaluation source; vendor verification and financial signing require a separate profile',
@@ -121,7 +139,7 @@ export function validateProviderConfiguration(
         '/identity: select application records or an identity vendor',
       ]);
     createAuthenticator(config.oauth);
-    trustedHttpsUrl(config.ownerLogin.issuer);
+    if (config.ownerLogin) trustedHttpsUrl(config.ownerLogin.issuer);
     if (
       config.policy.applications.some(
         (app) => app.issuer !== config.oauth.issuer,
@@ -226,7 +244,7 @@ export function secretReferences(
   config: ProviderConfiguration,
 ): SecretReference[] {
   return [
-    config.ownerLogin.clientSecret,
+    ...(config.ownerLogin ? [config.ownerLogin.clientSecret] : []),
     ...(config.apiExplorer?.clients.map((entry) => entry.clientSecret) ?? []),
     ...(config.identity.didit ? [config.identity.didit.apiKey] : []),
     ...(config.identity.sumsub

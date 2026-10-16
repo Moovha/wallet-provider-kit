@@ -9,8 +9,8 @@ const model = defineModel<ProviderConfiguration>({ required: true });
     <span class="eyebrow">Your service</span>
     <h2>Name your wallet service</h2>
     <p>
-      Give your wallet service a name and a public web address. People will see
-      these when they sign in and approve access to their wallets.
+      Give your wallet service a name and a public web address. Connected
+      applications use these to identify your service and request wallet access.
     </p>
   </div>
   <div class="callout step-orientation">
@@ -62,11 +62,11 @@ const model = defineModel<ProviderConfiguration>({ required: true });
   <div class="callout">
     <strong>What you’ll connect next</strong>
     <p>
-      A wallet backend creates accounts and signs approved actions. A login
-      service signs people in. Start with application-supplied records for an
-      unfunded evaluation, or connect a vendor for external identity checks.
-      Your staff review the submitted records or evidence. Each step explains
-      which details to copy and which values you choose yourself.
+      A wallet backend creates accounts and signs approved actions. Connected
+      applications authenticate users, complete identity checks and record
+      wallet-access consent. Your provider evaluates their evidence under the
+      trust agreements and policy you configure. Users remain in the
+      application.
     </p>
     <a
       :href="docs + 'operator-services.html'"

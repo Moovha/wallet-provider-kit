@@ -13,14 +13,22 @@
         "issuer": "https://applications.example.com",
         "clientId": "your-registered-application-client",
         "name": "Your Connected Application",
-        "permissions": ["account:read", "operations:request"]
+        "permissions": ["account:read", "operations:request"],
+        "assertionTrust": {
+          "agreement": "your-reviewed-application-trust-agreement"
+        }
       }
     ],
     "identity": {
-      "maxAgeDays": 90
+      "maxAgeDays": 90,
+      "application": {
+        "requiredFields": ["country"],
+        "verificationLevel": "verified"
+      }
     },
     "access": {
-      "maxAgeDays": 7
+      "maxAgeDays": 7,
+      "mode": "application"
     }
   },
   "oauth": {
@@ -28,22 +36,7 @@
     "audience": "your-wallet-provider",
     "jwksUrl": "https://applications.example.com/jwks"
   },
-  "ownerLogin": {
-    "issuer": "https://login.example.com",
-    "clientId": "your-provider-login-client",
-    "clientSecret": {
-      "env": "PROVIDER_LOGIN_SECRET"
-    }
-  },
-  "reviewers": ["your-provider-reviewer-oidc-subject"],
-  "identity": {
-    "didit": {
-      "apiKey": {
-        "env": "DIDIT_API_KEY"
-      },
-      "workflowId": "00000000-0000-4000-8000-000000000001"
-    }
-  },
+  "identity": {},
   "backend": {
     "kind": "cdp",
     "apiKeyId": {

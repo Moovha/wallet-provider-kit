@@ -17,7 +17,7 @@ const contract: ApiContract = JSON.parse(
 );
 const sample = JSON.parse(
   await readFile(
-    new URL('../docs/provider.config.example.json', import.meta.url),
+    new URL('../docs/provider.config.hosted.example.json', import.meta.url),
     'utf8',
   ),
 );
@@ -38,7 +38,10 @@ describe('operator API reference', () => {
         .sort(),
     ).toEqual(Object.keys(operationGuides).sort());
     expect(operations.map((item) => item.operation.operationId).sort()).toEqual(
-      Object.keys(operationGuides).sort(),
+      Object.entries(operationGuides)
+        .filter(([, guide]) => !guide.applicationLed)
+        .map(([id]) => id)
+        .sort(),
     );
     const spec = referenceSpec(contract, config, operations);
     for (const item of operations) {
@@ -159,4 +162,45 @@ describe('operator API reference', () => {
       'https://wallet.example.com',
     );
   });
+});
+
+it('previews application-led policy and grants with schema-valid evidence examples and no hosted endpoints', async () => {
+  const config = validateProviderConfiguration(
+    JSON.parse(await readFile('docs/provider.config.example.json', 'utf8')),
+  );
+  const operations = referenceOperations(contract, config, 0);
+  expect(
+    operations.some((item) => item.guide.records || item.guide.vendor),
+  ).toBe(false);
+  expect(
+    operations.some(
+      (item) => item.operation.operationId === 'revokeAccountAccess',
+    ),
+  ).toBe(true);
+  const spec = referenceSpec(contract, config, operations);
+  const ajv = new Ajv({ strict: false, formats: fullFormats });
+  for (const item of operations) {
+    const op = spec.paths[item.path][item.method];
+    const response = op.responses['200'].content!['application/json'];
+    expect(
+      ajv.validate(response.schema, response.example),
+      JSON.stringify(ajv.errors),
+    ).toBe(true);
+    if (op.requestBody) {
+      const body = op.requestBody.content['application/json'];
+      expect(
+        ajv.validate(body.schema, body.example),
+        JSON.stringify(ajv.errors),
+      ).toBe(true);
+    }
+  }
+  expect(responseExample('getAccountAccessPolicy', config)).toMatchObject({
+    flow: 'application',
+    required_fields: ['country'],
+    provider_review_required: false,
+    max_access_days: 7,
+  });
+  expect(responseExample('requestAccountAccess', config)).not.toHaveProperty(
+    'consent_url',
+  );
 });

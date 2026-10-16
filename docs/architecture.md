@@ -15,18 +15,12 @@ Embedded integrations supply their own host composition. The domain service
 uses interfaces to keep HTTP handling and vendor-specific code in their adapters.
 Moovha user records, databases and settlement services are separate integrations.
 
+The standard user experience remains inside the connected application. The provider accepts its assertions only under a reviewed trust agreement; an API token or matching fields alone do not establish authority. See [application-led access](application-access.md) for the implemented contract and migration limits.
+
 ## Responsibilities
 
-<figure class="wallet-visual">
-  <img src="./public/diagrams/service-boundary.webp" alt="Diagram: host authority and the wallet backend are inside the provider service; owners and connected applications remain separate callers." width="1536" height="1024" loading="lazy" decoding="async">
-  <figcaption>The service boundary contains permission checks and the selected wallet backend, rather than the connected application.</figcaption>
-</figure>
-
-[View full-size diagram](public/diagrams/service-boundary.webp)
-
-- **Onboarding/access profile:** approved applications, hosted provider login and
-  owner consent, identity-vendor adapters, provider review, private persistent
-  records and expiring/revocable account grants. The profile supports SQLite or
+- **Standard access profile:** explicitly trusted applications attest their users’ identity and consent. The provider checks current policy, evidence freshness and application-scoped ownership, then stores expiring, revocable grants without a user redirect or staff review.
+- **Hosted compatibility profile:** provider login, consent pages, identity-vendor adapters and staff review remain explicitly selectable. The profile supports SQLite or
   the bundled file store and a provisioning-only journal. The configured transfer
   profile adds financial-action authorization separately.
 - **HTTP service:** validate requests/tokens and dispatch account/action references.

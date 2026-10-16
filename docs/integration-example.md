@@ -202,8 +202,7 @@ signing work must remain blocked when that evidence isn't available.
 
 Keep the composition and public interfaces. Replace the fixture pieces with:
 
-1. Your existing OAuth issuer and owner login/consent path, with distinct client
-   and owner identities and dedicated provider audience.
+1. Your OAuth issuer and application identity/consent attestation integration (or an explicitly chosen hosted login flow), with distinct caller and user identities and a dedicated provider audience.
 2. Durable current owner/grant/KYC/consent/proof authority and immutable reviewed
    actions. Resolve service principals through their actual owner grants.
 3. Transactional idempotency/attempt admission and a persistent journal with

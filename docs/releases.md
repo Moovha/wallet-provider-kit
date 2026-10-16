@@ -7,6 +7,8 @@ publication requires separate maintainer authorization.
 
 ## Verify the candidate
 
+Access-mode changes require explicit compatibility review. Standard templates select application-led access; omitted mode in existing configurations remains hosted. An occupied deployment cannot switch modes without a reviewed ownership migration. Preserve backend bindings, accounts, grants and uncertain attempts. No automatic cross-application account linking or ownership migration is supplied.
+
 1. Start from a clean checkout with the pinned Node/npm versions and `npm ci`.
    Run `npm run verify`, `npm run build`, `npm run check:package`, `npm audit`
    and `npm pack --dry-run`. Review the package contents and confirm the standalone

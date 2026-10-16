@@ -24,9 +24,18 @@ const operators = computed({
 });
 function toggle(enabled: unknown) {
   if (enabled) {
+    model.value.ownerLogin ??= {
+      issuer: '',
+      clientId: '',
+      clientSecret: { env: 'PROVIDER_LOGIN_SECRET' },
+    };
     model.value.http = { ...model.value.http, documentation: true };
     model.value.apiExplorer = { operators: [], clients: [] };
-  } else delete model.value.apiExplorer;
+  } else {
+    delete model.value.apiExplorer;
+    if (model.value.policy.access?.mode === 'application')
+      delete model.value.ownerLogin;
+  }
 }
 function client(clientId: string) {
   return model.value.apiExplorer?.clients.find(
@@ -57,6 +66,10 @@ function toggleClient(clientId: string, index: number, enabled: unknown) {
       @update:modelValue="toggle($event)"
     />
     <template v-if="model.apiExplorer">
+      <p class="help-text">
+        Configure staff login in Services before exporting. This login is for
+        token operators, not wallet users.
+      </p>
       <SetupField
         guide="operators"
         v-model="operators"

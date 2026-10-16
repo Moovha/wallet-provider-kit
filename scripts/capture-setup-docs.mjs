@@ -16,18 +16,7 @@ sample.policy.provider.origin = 'https://wallet.acme.example';
 sample.policy.provider.privacyUrl = 'https://acme.example/privacy';
 sample.policy.applications[0].name = 'Acme App';
 sample.policy.applications[0].clientId = 'acme-app';
-sample.policy.applications[0].funding = {
-  agreement: 'example-agreement-not-live',
-  monthlyLimitMinor: 10000,
-};
-sample.reviewers = ['example-reviewer-subject'];
 sample.backend.binding = 'acme-cdp-base-sepolia-01';
-for (const route of ['importPrice', 'verificationPrice']) {
-  sample.identity.didit[route] = {
-    maximumMinor: 0,
-    termsReference: 'example-free-test-terms-not-live',
-  };
-}
 const output = new URL('../artifacts/setup-docs/', import.meta.url);
 await mkdir(output, { recursive: true });
 const token = 'offline-documentation-session';
@@ -213,6 +202,30 @@ try {
     .waitFor();
   await tokenPanel.screenshot({
     path: new URL('operator-tokens.png', output).pathname,
+    animations: 'disabled',
+  });
+  const hostedRecords = JSON.parse(
+    await readFile(
+      new URL('../docs/provider.config.records.example.json', import.meta.url),
+      'utf8',
+    ),
+  );
+  await page.goto(`${url}/#${token}`);
+  await page
+    .getByLabel('Import provider configuration', { exact: true })
+    .setInputFiles({
+      name: 'provider.config.json',
+      mimeType: 'application/json',
+      buffer: Buffer.from(JSON.stringify(hostedRecords)),
+    });
+  await page
+    .getByRole('status')
+    .filter({ hasText: 'Configuration imported' })
+    .waitFor();
+  await page.getByRole('tab', { name: 'Services', exact: true }).click();
+  await page.screenshot({
+    path: new URL('application-record-services.png', output).pathname,
+    fullPage: true,
     animations: 'disabled',
   });
   console.log(

@@ -1,5 +1,12 @@
 # Reference login and API setup with Auth0
 
+For standard application-led access, configure the API and calling application
+registrations in steps 3–4, then map issuer/audience/JWKS in step 5. Users sign in
+within the application; no wallet-provider user-login registration or reviewer
+account is required. Steps 1–2 apply only to optional staff token controls or
+[hosted compatibility](onboarding.md). Staff token operators need their own allowed
+subjects; reviewer registration is not required for application-led access.
+
 Use this recipe if you do not already have compatible login/token services.
 Auth0 is the reference choice because its managed dashboard exposes confidential
 web-client authentication and the RFC 9068 API token profile required by the kit.
@@ -16,7 +23,7 @@ current service limits and charges with Auth0. Record the tenant domain shown in
 application settings. Use that domain consistently throughout this initial setup.
 Custom domains need their own Auth0 configuration and issuer review.
 
-## 1. Register the wallet service's owner login
+## 1. Optional staff or hosted owner login
 
 In **Applications → Applications → Create Application**, create a **Regular Web
 Application**, named for example “Acme wallet owner login”. This is the wallet
@@ -52,7 +59,7 @@ and enable it for this application. Follow the
 Configure registration, MFA, recovery and staff access according to your operating
 policy before accepting users; those functions belong to Auth0, not the kit.
 
-## 2. Create reviewer accounts
+## 2. Hosted compatibility reviewer accounts
 
 In **User Management → Users**, create or locate each staff reviewer in the enabled
 connection. Auth0's [user creation guide](https://auth0.com/docs/manage-users/user-accounts/create-users)
@@ -98,8 +105,7 @@ the provider server. That feature has separate operator and scope allowlists.
 Follow [machine-to-machine registration](https://auth0.com/docs/get-started/auth0-overview/create-applications/machine-to-machine-apps).
 
 This reference uses server-to-server client credentials. The API caller's subject
-represents the application, while the wallet owner separately signs in through
-the provider's hosted flow. For a browser/mobile application that calls directly,
+represents the application. The user ID and identity/consent evidence arrive in the application-led user assertion; provider-hosted sign-in is only a compatibility option. For a browser/mobile application that calls directly,
 its developer must instead configure an appropriate public client and Authorization
 Code with PKCE through [Auth0's PKCE guide](https://auth0.com/docs/get-started/authentication-and-authorization-flow/authorization-code-flow-with-pkce).
 Never embed the machine-to-machine secret in a public application.
@@ -162,14 +168,14 @@ short-lived token and confirm its header/claims against the
 Use an approved local tool that does not upload or log tokens. Confirm the service
 accepts an authorized request and denies a missing/wrong scope and unlisted client.
 
-After your team's backend/recovery acceptance permits an isolated activated test
-configuration, start a test access request and open its returned consent URL in a
-top-level browser. Confirm fresh Auth0 login returns to the exact provider callback,
-then confirm the reviewer can reach `/onboarding/review`. Exercise KYC, consent,
-review, revocation and restart with vendor-approved test identities; do not send
-real customer evidence as a setup probe. Record these results with your acceptance
-evidence. `doctor` does not remotely test Auth0, and successful token issuance does
-not establish owner permission or production readiness.
+After backend/recovery acceptance permits an isolated activated test, follow the
+[application-led staging walkthrough](staging-walkthrough.md): discover policy,
+submit approved test identity and consent evidence, obtain a grant, provision an
+unfunded wallet, revoke access and test denials/restart. No provider user-login
+redirect or reviewer account is needed. If optional staff controls or hosted access
+are configured, test their Auth0 callback and session boundaries separately.
+`doctor` does not remotely test Auth0. Token issuance alone does not establish user
+permission or production readiness.
 
 Continue with [identity/backend preparation](operator-services.md), the
 [wizard walkthrough](setup-wizard.md) and [deployment](operator-deployment.md).

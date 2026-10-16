@@ -11,14 +11,16 @@ acceptance remain pending. Signing does not submit transactions, sponsor gas or
 establish settlement. Read [roles and terms](concepts.md) if wallet provider,
 application, owner, grant or journal are new to you.
 
+Users remain in the connected application, which authenticates them, performs identity checks and records wallet-access consent. The provider evaluates that application’s attestations under an explicit trust agreement. Start with the [application-led access contract](application-access.md). Provider-hosted login and staff review are optional compatibility features.
+
 ## Choose who does each part
 
-| Role                               | Work                                                                                                           |
-| ---------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| Provider operator                  | Register external services, configure policies, store secrets, deploy, back up and operate the service         |
-| Identity administrator / reviewers | Configure login/token issuance; staff independently accept identity evidence                                   |
-| Connected application's developer  | Obtain scoped API tokens; integrate owner access, provisioning and approval/signing; arrange execution and gas |
-| Advanced integration developer     | Implement an unsupported backend, custom financial actions or embedded host behavior                           |
+| Role                               | Work                                                                                                                                 |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Provider operator                  | Register external services, configure policies, store secrets, deploy, back up and operate the service                               |
+| Application identity administrator | Configure token issuance and the application’s identity/consent evidence contract                                                    |
+| Connected application's developer  | Obtain scoped API tokens; integrate application-led access, revocation, provisioning and approval/signing; arrange execution and gas |
+| Advanced integration developer     | Implement an unsupported backend, custom financial actions or embedded host behavior                                                 |
 
 You may wear several roles. The GUI removes provider setup code; it does not create
 vendor accounts or replace infrastructure and product integration work.
@@ -73,8 +75,8 @@ with your own prepared configuration; the screenshot is not a deployable setup._
 ## Follow the operator path
 
 1. **[Prepare services and credentials](operator-services.md).** Choose a backend,
-   domain, identity vendor and funding arrangements. Learn what each client ID,
-   secret, issuer, audience and reviewer subject means and where it comes from.
+   domain, application token issuer and identity/consent trust agreements. Learn what each client ID,
+   secret, issuer, audience and evidence requirement means and where it comes from.
    For a fresh login/token setup use the [Auth0 dashboard recipe](auth0-setup.md).
 2. **[Complete the six wizard screens](setup-wizard.md#complete-the-six-steps).**
    Configure Provider, Backend, Services, Policies and Deployment. Validate under
@@ -84,8 +86,9 @@ with your own prepared configuration; the screenshot is not a deployable setup._
    HTTPS. Complete acceptance, explicitly activate and retain recovery evidence.
 4. **[Hand the API to your product developer](operator-deployment.md#hand-the-api-to-the-product-developer).**
    Supply the origin, OpenAPI, client/token details and supported policies.
-   Owners use provider-hosted login, access-consent and access-management pages.
-   Configured transfers require delegation at onboarding; the provider authorises
+   Users stay in the application. It submits accepted identity and consent evidence,
+   receives a policy grant and communicates withdrawal through the revocation API.
+   Configured transfers require delegation to the exact transfer policy; the provider authorises
    each transfer request under that delegation without another owner prompt.
 5. **[Operate and recover](operator-deployment.md#keep-it-operating).** Supervise the
    process, monitor readiness, preserve storage/bindings and test encrypted backups.
@@ -102,7 +105,7 @@ renew application tokens in the deployed GUI without fetching/pasting them.
 
 Before a full deployment test, follow the [staging walkthrough](staging-walkthrough.md):
 configure/export in the GUI, deploy with the supplied CLI, then use deployed
-Swagger and owner/reviewer pages to prove unfunded provisioning, application
+Swagger and the application’s user experience to prove unfunded provisioning, application
 access, policy denials and recovery. Mark a step blocked when its required service
 is unavailable. Offline fixtures do not validate that service's live integration.
 
@@ -158,7 +161,7 @@ Use [Contributing](../CONTRIBUTING.md), [security reporting](../SECURITY.md),
 | `src/storage/`                               | Toolkit-owned SQLite storage, approvals and financial journals         |
 | `src/domain/`                                | Wallet authority, signing, enrollment and execution contracts          |
 | `src/service/`                               | HTTP composition, authentication, schemas and telemetry                |
-| `src/onboarding/`, `src/identity/`           | Owner access, consent, review and identity verification                |
+| `src/onboarding/`, `src/identity/`           | Application-led access and optional hosted identity/consent/review     |
 | `src/providers/`                             | Backend adapters and attempt handling                                  |
 | `src/protocol/`, `spec/`                     | Generated types, implemented API and separate reference action schemas |
 | `examples/`                                  | Runnable offline examples with replaceable backend/host fixtures       |

@@ -13,13 +13,6 @@ the provider/application responsibilities and current supported scope.
 
 ## The people and systems
 
-<figure class="wallet-visual">
-  <img src="./public/diagrams/service-boundary.webp" alt="Diagram: an account owner approves access, an application requests actions, and the provider checks authority before calling its wallet backend." width="1536" height="1024" loading="lazy" decoding="async">
-  <figcaption>Account ownership, application identity, host authority and backend key control are separate responsibilities.</figcaption>
-</figure>
-
-[View full-size diagram](public/diagrams/service-boundary.webp)
-
 The **wallet provider** is the team operating the wallet service. Its **host** is
 the server application where the toolkit runs. For supported deployments, use
 the configured service's supplied startup, persistence and permission checks.
@@ -35,7 +28,7 @@ depends on the chosen backend and recovery arrangement.
 
 A **connected application** requests access to an account and uses the permitted
 API operations. Moovha is one possible connected application. The owner approves
-its access through the wallet provider. Your own product can also be a connected
+its access within the application. The application attests that consent and identity evidence to the provider under an explicit trust agreement. Your own product can also be a connected
 application; it still needs the host's permission to use an account.
 
 The **wallet backend** is the engine or service that creates or locates wallet
@@ -76,18 +69,25 @@ The same registration appears in several places:
 | The application's access token           | The `client_id` claim, checked by `createAuthenticator`                             | Authenticate the caller using the configured issuer, audience and trusted verification keys. A body field cannot substitute for this checked token value. |
 | Host code after authentication           | `VerifiedPrincipal.clientId` alongside `issuer`, `subject` and `scopes`             | Resolve the caller's current access to the actual account owner.                                                                                          |
 | Bundled onboarding configuration         | `policy.applications[]` entries with `issuer`, `clientId`, `name` and `permissions` | Allow the registered application and define its display name and permitted access.                                                                        |
-| The owner's consent screen               | The configured application name, requested permissions and access duration          | Let the owner understand which application is asking and approve or decline access. They don't need to recognise an OAuth client ID.                      |
+| Hosted compatibility consent screen      | The configured application name, requested permissions and access duration          | Let the owner understand which application is asking and approve or decline access. They don't need to recognise an OAuth client ID.                      |
 
 For example, the [configuration template](provider.config.example.ts) pairs
 `clientId: 'your-registered-application-client'` with
 `name: 'Your Connected Application'`. The first is the technical registration
-identifier; the second is the name presented to the owner. The issuer/client ID
+identifier; the second is the display name in operator tools and hosted consent pages. The issuer/client ID
 must match the authenticated application. A display name alone grants no access.
 
-`ownerLogin.clientId` in that template is a **different registration**: your wallet
-service's login integration with the identity service that signs owners in. It
+`ownerLogin.clientId`, when optional staff login or hosted compatibility is configured, is a **different registration**: your wallet
+service's login integration for staff or hosted wallet owners. It
 doesn't identify a connected application requesting wallet access. Keep the
 owner-login registration and application API registrations separate.
+
+In standard [application-led access](application-access.md), the user identifier
+is private to the calling issuer/client. The machine token authenticates the
+application, not the wallet user. A user assertion supplies stable user binding,
+identity evidence and consent for the current provider policy. Another application
+cannot claim an existing wallet by copying that user ID. Provider login/reviewer
+terms in this guide refer to hosted compatibility or optional staff tools.
 
 ## Caller identity and permission
 

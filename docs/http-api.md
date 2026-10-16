@@ -1,6 +1,6 @@
 # Use the provider HTTP API
 
-This is the toolkit's **provider-hosted** API. Use a base URL chosen by the
+This is the toolkit’s **provider-operated** API. Standard access is application-led. Use a base URL chosen by the
 wallet provider operating the service. It is distinct from Moovha's planned
 business-operation API; see [the application/provider boundary](architecture.md#applications-and-wallet-control). The
 [generated schema reference](http-reference.md) records all implemented request
@@ -99,13 +99,17 @@ refuses cross-origin requests and redirects. The manual Authorize control does n
 
 ### Test protected flows and understand failures
 
-Use the real IDs returned by this deployment. Follow the
-[access, identity, review, provisioning and approval sequence](operator-deployment.md#hand-the-api-to-the-product-developer).
-Owners complete login and access consent in the returned top-level browser URL;
-reviewers separately accept identity evidence. Configured transfers use the
-delegation granted at onboarding and have no per-transfer owner approval page.
-Supply the operation's inputs in Swagger, choose Try it out and Execute, then
-inspect Server response. Swagger does not impersonate owners or reviewers.
+Use real IDs returned by this deployment. First read `GET /v1/access-policy`,
+then submit the application's stable user reference, accepted identity evidence
+and recorded consent for its returned policy revision. Expect a grant when policy
+passes, with no provider user-login redirect or staff-review step. Provision the
+wallet separately. Use the grant-revocation endpoint when the user withdraws access.
+See [application-led access](application-access.md) for payloads, evidence freshness,
+user binding, renewal and delegated transfer terms.
+
+Hosted compatibility deployments instead return consent URLs and use the separate
+[hosted browser flow](onboarding.md). Staff login in optional token controls does
+not establish user authority.
 
 Every distinct POST needs a fresh UUIDv4 `Idempotency-Key` (generate one with
 `node -p "require('node:crypto').randomUUID()"`). Record that key with the intended
@@ -164,8 +168,8 @@ The checked token's `client_id` identifies the connected application's registrat
 Its `sub` identifies the caller's user or service identity and may differ from the
 account owner. The host resolves the application's stored access grant to the
 owner. For bundled onboarding, the issuer and client ID must match an allowed
-`policy.applications[]` entry; its `name` is shown on the consent screen. The
-separate `ownerLogin.clientId` configures the provider's own login integration.
+`policy.applications[]` entry; its `name` identifies it in operator tools (and the hosted consent screen when selected). The
+optional `ownerLogin.clientId` configures staff login or hosted compatibility, not a standard user-access requirement.
 
 | Method and path                                 | Required scope        | Required configured profile                                                                                |
 | ----------------------------------------------- | --------------------- | ---------------------------------------------------------------------------------------------------------- |
@@ -176,7 +180,8 @@ separate `ownerLogin.clientId` configures the provider's own login integration.
 | `GET /v1/transfer-authorizations/{actionId}`    | `wallet:actions:read` | Configured provider-authorized transfer profile                                                            |
 | `POST /v1/access-requests`                      | `wallet:access`       | Onboarding                                                                                                 |
 | `GET /v1/access-requests/{requestId}`           | `wallet:access:read`  | Onboarding                                                                                                 |
-| `POST /v1/access-requests/{requestId}/identity` | `wallet:access`       | Onboarding, owner consent and agreed vendor policy                                                         |
+| `POST /v1/access-grants/{grantId}/revoke`       | `wallet:access`       | Standard application-led withdrawal, same caller, current application trust                                |
+| `POST /v1/access-requests/{requestId}/identity` | `wallet:access`       | Hosted compatibility only: owner consent and agreed vendor policy                                          |
 | `GET /v1/accounts/{accountId}`                  | `wallet:account:read` | Onboarding with current `account:read` grant                                                               |
 | `POST /v1/enrollments`                          | `wallet:enroll`       | Lower-level enrollment                                                                                     |
 | `POST /v1/enrollments/{enrollmentId}/identity`  | `wallet:enroll`       | Lower-level enrollment                                                                                     |
