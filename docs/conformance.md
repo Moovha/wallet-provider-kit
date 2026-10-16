@@ -104,3 +104,29 @@ dispatch. These fixtures are not a running Relayer/Redis/RPC system. Prove the
 pinned daemon and real queue/recovery behavior before readiness. Its nonce-owning
 execution profile does not claim draft `SubmitTransactionAction` conformance or
 prove financial settlement.
+
+## Configured-service record rehearsal 16 October 2026
+
+A separate deployment exercised the hosted consent/review profile integrated in
+[revision `1da430e`](https://github.com/Moovha/wallet-provider-kit/commit/1da430e94f3d2e8d0962bc23c70d66b0af063a71).
+Configuration came from the FormKit GUI; the supplied CLI ran the service on one
+HTTPS host with persistent SQLite storage. Real Auth0 owner/staff logins and
+application tokens, application-supplied fictional records, explicit provider
+review and live CDP provisioning produced one unfunded wallet.
+
+Application reads, concurrent/restart replay, incomplete-record handling,
+caller/scope/owner isolation, pause, fresh consent/review on reconnect, revocation
+and policy-version denial passed. A consistent encrypted backup was restored
+with dispatchers stopped and one authority retained; the CLI checked the store,
+and the reviewer’s read-only CDP lookup found the original wallet. Its native
+Base Sepolia balance remained zero. No funds moved, no financial signatures were
+issued and no transactions were broadcast.
+
+Full deployment acceptance remains **incomplete**: natural one-day expiry needs
+real elapsed time, and a lost provider response after dispatch needs a reviewed
+host fault mechanism. Planned restore and known-result lookup do not establish
+that uncertain-outcome case or abrupt power-loss recovery. External KYC and later
+application-led profiles were not accepted by this rehearsal. The deployment is
+stopped with private state and encrypted backup retained.
+
+[Download the sanitized case-by-case record](./public/acceptance/configured-records-staging-2026-10-16.json).

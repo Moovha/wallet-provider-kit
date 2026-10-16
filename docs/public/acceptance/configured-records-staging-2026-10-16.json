@@ -1,0 +1,181 @@
+{
+  "exercise": "Configured-service application-record rehearsal",
+  "date": "2026-10-16",
+  "sourceRevision": "d28cfc042dccffcb3bd03322498190739b7f158e",
+  "integratedMainRevision": "1da430e94f3d2e8d0962bc23c70d66b0af063a71",
+  "profile": "Hosted owner consent and explicit provider review with application-supplied records",
+  "identitySource": "application_record",
+  "externalKycVerified": false,
+  "fullDeploymentAcceptance": false,
+  "runtimeStatus": "stopped; private authority state and encrypted backup retained",
+  "topology": "Single Fly Machine with encrypted persistent volume and HTTPS ingress",
+  "realWalletsCreated": 1,
+  "nativeBalance": "0",
+  "fundsMoved": false,
+  "financialSignatures": 0,
+  "broadcastTransactions": 0,
+  "cases": [
+    {
+      "case": "gui_configuration_export",
+      "status": "passed",
+      "method": "FormKit GUI",
+      "evidence": "Record source, required fields, read-only application permissions and six secret references; no vendor key."
+    },
+    {
+      "case": "disabled_service",
+      "status": "passed",
+      "method": "Deployed Swagger and supplied CLI",
+      "evidence": "Liveness 200, readiness 503 and authenticated submission 503; zero accounts before activation."
+    },
+    {
+      "case": "registered_login_and_tokens",
+      "status": "passed",
+      "method": "Auth0 login and GUI token controls",
+      "evidence": "Real owner/staff logins and dedicated-audience RFC 9068 application tokens, with 600-second lifetime."
+    },
+    {
+      "case": "required_field_discovery",
+      "status": "passed",
+      "method": "Application HTTP client",
+      "evidence": "Admitted application received the required fields and evaluation-only source."
+    },
+    {
+      "case": "batch_validation",
+      "status": "passed",
+      "method": "Deployed Swagger",
+      "evidence": "Complete record submitted; incomplete record invalid; only one new consent request."
+    },
+    {
+      "case": "consent_and_review",
+      "status": "passed",
+      "method": "Owner/reviewer GUI and application HTTP",
+      "evidence": "Owner consent alone left provider review pending and provisioning denied; independent staff acceptance granted access."
+    },
+    {
+      "case": "unfunded_cdp_account",
+      "status": "passed",
+      "method": "Application HTTP client",
+      "evidence": "One real CDP wallet provisioned; account reads identified application_record and evaluation_only."
+    },
+    {
+      "case": "gui_provision_replay",
+      "status": "passed",
+      "method": "Deployed Swagger",
+      "evidence": "Original provisioning key returned the same account/address."
+    },
+    {
+      "case": "concurrent_provision_replay",
+      "status": "passed",
+      "method": "Application HTTP client",
+      "evidence": "Concurrent original-key requests returned the same wallet."
+    },
+    {
+      "case": "application_access",
+      "status": "passed",
+      "method": "Separate application HTTP client",
+      "evidence": "Server-held application credentials read the granted account."
+    },
+    {
+      "case": "authentication_denial",
+      "status": "passed",
+      "method": "Application HTTP client",
+      "evidence": "Missing authorization returned 401."
+    },
+    {
+      "case": "scope_denial",
+      "status": "passed",
+      "method": "Auth0 grant editor and application HTTP client",
+      "evidence": "A genuinely reduced client grant issued a signed token without account-read scope; API returned 403 insufficient_scope."
+    },
+    {
+      "case": "caller_isolation",
+      "status": "passed",
+      "method": "Application HTTP client",
+      "evidence": "A different full-scope client could not read the account or access request."
+    },
+    {
+      "case": "batch_retry_and_conflict",
+      "status": "passed",
+      "method": "Application HTTP client after restore",
+      "evidence": "Concurrent batch replay retained the original request; a changed required field under the same key returned 409."
+    },
+    {
+      "case": "encrypted_restore",
+      "status": "passed",
+      "method": "Host maintenance and supplied doctor CLI",
+      "evidence": "All dispatchers stopped; AES-GCM backup restored into the same binding with no backup gap and one authoritative process. Catalog/integrity checks and original replay passed."
+    },
+    {
+      "case": "read_only_provider_reconciliation",
+      "status": "passed",
+      "method": "Reviewer GUI Check wallet creation",
+      "evidence": "Live CDP lookup found the original wallet and restored its receipt. This was a known successful outcome, not a lost-provider-response exercise."
+    },
+    {
+      "case": "pause",
+      "status": "passed",
+      "method": "Owner GUI and application HTTP client",
+      "evidence": "Suspension denied account reads and original provisioning replay."
+    },
+    {
+      "case": "reconnect",
+      "status": "passed",
+      "method": "Application HTTP, owner consent and reviewer GUI",
+      "evidence": "Fresh consent and review were required; accepted reconnection retained the wallet."
+    },
+    {
+      "case": "wrong_owner",
+      "status": "passed",
+      "method": "Fresh isolated browser login",
+      "evidence": "Another authenticated test owner was denied access to the bound request."
+    },
+    {
+      "case": "revocation",
+      "status": "passed",
+      "method": "Owner GUI and application HTTP client",
+      "evidence": "Revocation denied reads and original provisioning replay."
+    },
+    {
+      "case": "policy_revision",
+      "status": "passed",
+      "method": "FormKit export, CLI deployment and application HTTP",
+      "evidence": "Changing the policy version marked old access policy_changed and denied reads/replay; a fresh reviewed grant used the new policy."
+    },
+    {
+      "case": "unsupported_transfer_permission",
+      "status": "passed",
+      "method": "Application HTTP client",
+      "evidence": "Transfer permission in the record profile was rejected with 422 before provider effects."
+    },
+    {
+      "case": "zero_balance",
+      "status": "passed",
+      "method": "Read-only Base Sepolia RPC",
+      "evidence": "Chain ID verified and native balance zero before and after recovery and policy tests."
+    },
+    {
+      "case": "natural_expiry",
+      "status": "pending",
+      "method": "Real elapsed time",
+      "evidence": "Final current-policy grant expires at 2026-10-17T12:06:35.637Z; no simulated clock or database expiry edit used."
+    },
+    {
+      "case": "lost_provider_response",
+      "status": "blocked",
+      "method": "Host fault mechanism unavailable",
+      "evidence": "No reviewed mechanism discarded a provider response after dispatch in this configured deployment. Client retries and known-result lookup do not establish this case."
+    },
+    {
+      "case": "power_loss_and_commit_crash",
+      "status": "not_run",
+      "method": "Separate host-level testing required",
+      "evidence": "Planned maintenance/restore does not establish abrupt power-loss or crash-during-commit behavior."
+    }
+  ],
+  "limits": [
+    "Fictional test records and dedicated staging users; no real customer identity data.",
+    "Didit/Sumsub and financial signing were not selected or accepted by this exercise.",
+    "Later application-led profiles require a separate deployment test.",
+    "No claim of production custody approval, vendor certification or completed full deployment acceptance."
+  ]
+}

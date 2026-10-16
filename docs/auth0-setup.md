@@ -113,6 +113,25 @@ provides the exact request and error handling. The API's dashboard Test tab can
 help inspect the request; do not paste secrets or resulting tokens into shared
 screenshots, logs, issues or online JWT decoders.
 
+### Check issued scopes, not just the requested scope string
+
+Auth0 M2M tokens can include every permission in the application's client grant,
+even when the request asks for fewer. Inspect the issued `scope` claim privately;
+a requested subset does not prove that a token lacks a permission. See
+[Auth0’s M2M scope limitation](https://support.auth0.com/center/s/article/Not-possible-to-remove-the-scopes-in-the-token-for-Machine-To-Machine-applications-inside-an-credentials-exchange-Action).
+
+The toolkit’s GUI token broker requires the issued scopes to match the operator’s
+selection and fails closed if the issuer returns extras. Use purpose-specific
+client grants and matching GUI scope selections. Tenant-supported scope
+customization requires its own verification; Auth0 documents newer transaction
+scope controls as [Early Access](https://auth0.com/docs/actions/reference/credentials-exchange/credentials-exchange-api-object#api-transaction).
+
+For a missing-scope staging test, obtain a genuinely reduced grant/token and
+expect `403 insufficient_scope`. A cross-application isolation test instead needs
+a different client with the required API scope, so its denial tests wallet
+authority rather than only token scope. You can narrow an isolated test client's
+grant after its isolation test; update its GUI token settings to match.
+
 ## 5. Copy the values into FormKit
 
 For a tenant domain `your-tenant.us.auth0.com`, the mapping is:
