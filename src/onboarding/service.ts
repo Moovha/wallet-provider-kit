@@ -1156,6 +1156,20 @@ export class OnboardingService {
       this.activeGrant(state, principal, accountId, permission),
     );
   }
+  /** Run synchronous trusted storage work in the same transaction as current account-access checks. */
+  async withAccountAccess<T>(
+    principal: VerifiedPrincipal,
+    accountId: string,
+    permission: Permission,
+    operation: (state: ProviderState, grant: AccessGrant) => T,
+  ): Promise<T> {
+    return this.store.transaction((state) =>
+      operation(
+        state,
+        this.activeGrant(state, principal, accountId, permission),
+      ),
+    );
+  }
   async account(principal: VerifiedPrincipal, accountId: string) {
     return this.store.transaction((state) => {
       this.activeGrant(state, principal, accountId, 'account:read');

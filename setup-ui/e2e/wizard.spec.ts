@@ -610,10 +610,10 @@ test('API reference follows the configuration, preserves edits, shows Swagger sc
   await expect(
     page.getByRole('heading', { name: 'Provider API reference', exact: true }),
   ).toBeVisible();
-  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(8);
+  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(17);
   await expect(
     page
-      .getByText('Wallet operations are disabled in Deployment', {
+      .getByText('Not enabled: Wallet operations are disabled in Deployment', {
         exact: true,
       })
       .first(),
@@ -641,8 +641,10 @@ test('API reference follows the configuration, preserves edits, shows Swagger sc
   const spec = JSON.parse(
     await readFile((await (await download).path())!, 'utf8'),
   );
-  expect(spec.paths['/v1/enrollments']).toBeUndefined();
-  expect(spec.paths['/v1/actions/{actionId}/sign']).toBeUndefined();
+  expect(spec.paths['/v1/enrollments'].post.summary).toContain('[Not enabled]');
+  expect(spec.paths['/v1/actions/{actionId}/sign'].post.summary).toContain(
+    '[Not enabled]',
+  );
   expect(spec.servers).toEqual([{ url: sample.policy.provider.origin }]);
   await page.getByLabel('Find an endpoint', { exact: true }).fill('provision');
   await expect(page.locator('.swagger-ui .opblock')).toHaveCount(1);
@@ -650,18 +652,15 @@ test('API reference follows the configuration, preserves edits, shows Swagger sc
     page.getByLabel('cURL request example', { exact: true }),
   ).toContainText('wallet.example.com/v1/accounts/');
   await page.getByLabel('Find an endpoint', { exact: true }).fill('');
-  await page
-    .getByLabel('Show transfer APIs even when transfer signing is off', {
-      exact: true,
-    })
-    .check();
-  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(11);
+  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(17);
   await page
     .getByLabel('Example endpoint', { exact: true })
     .selectOption('signAction');
   await expect(
     page
-      .getByText('Transfer signing is off in Policies', { exact: true })
+      .getByText('Not enabled: Transfer signing is off in Policies', {
+        exact: true,
+      })
       .first(),
   ).toBeVisible();
   await page
@@ -712,7 +711,7 @@ test('API reference follows the configuration, preserves edits, shows Swagger sc
     permissions: ['account:read', 'transfers:request'],
   });
   await imported(page, financial);
-  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(11);
+  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(17);
   await page
     .getByLabel('Example endpoint', { exact: true })
     .selectOption('signAction');
@@ -742,6 +741,14 @@ test('API reference follows the configuration, preserves edits, shows Swagger sc
       .getByRole('status')
       .filter({ hasText: /Example copied|Clipboard unavailable/ }),
   ).toBeVisible();
+  const expandedOperations = page.locator(
+    '.opblock.is-open .opblock-summary-control',
+  );
+  while (await expandedOperations.count())
+    await expandedOperations.first().click();
+  await page
+    .locator('.swagger-ui')
+    .screenshot({ path: 'artifacts/setup-api-endpoints.png' });
   await page.screenshot({
     path: 'artifacts/setup-api-reference.png',
     fullPage: true,
@@ -787,7 +794,7 @@ test('API renderer can retry a failed bundled asset without losing setup', async
   await page
     .getByRole('button', { name: 'Reload API reference', exact: true })
     .click();
-  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(8);
+  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(17);
   await page
     .getByRole('button', { name: 'Setup configuration', exact: true })
     .click();

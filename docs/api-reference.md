@@ -1139,6 +1139,13 @@ export declare class OnboardingService {
     accountId: string,
     permission: Permission,
   ): Promise<AccessGrant>;
+  /** Run synchronous trusted storage work in the same transaction as current account-access checks. */
+  withAccountAccess<T>(
+    principal: VerifiedPrincipal,
+    accountId: string,
+    permission: Permission,
+    operation: (state: ProviderState, grant: AccessGrant) => T,
+  ): Promise<T>;
   account(
     principal: VerifiedPrincipal,
     accountId: string,
@@ -2310,6 +2317,8 @@ Import from `@moovha/wallet-provider-kit/deployment`. [Integration guide](setup.
 - [loadProviderConfiguration](#loadproviderconfiguration)
 - [ProviderConfiguration](#providerconfiguration)
 - [SecretReference](#secretreference)
+- [TransactionEventInput](#transactioneventinput)
+- [TransactionEventReport](#transactioneventreport)
 - [TransferInput](#transferinput)
 - [TransferPolicy](#transferpolicy)
 - [validateProviderConfiguration](#validateproviderconfiguration)
@@ -2447,6 +2456,31 @@ export interface ProviderConfiguration {
 ```ts
 export interface SecretReference {
   env: string;
+}
+```
+
+### TransactionEventInput
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/deployment/actions.ts).
+
+```ts
+export interface TransactionEventInput {
+  event: 'submitted' | 'confirmed' | 'failed';
+  chain_id: 'eip155:84532';
+  transaction_hash: string;
+  observed_at: string;
+}
+```
+
+### TransactionEventReport
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/deployment/actions.ts).
+
+```ts
+export interface TransactionEventReport extends TransactionEventInput {
+  report_id: string;
+  recorded_at: string;
+  verification: 'unverified';
 }
 ```
 

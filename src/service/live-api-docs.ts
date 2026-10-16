@@ -1,11 +1,14 @@
-import { operationGuides } from './api-guides.js';
+import {
+  operationGuides,
+  operationUnavailableReason,
+  transactionBoundaryDescription,
+  type ApiFeatures,
+} from './api-guides.js';
 
 /** A presentation-only view: the canonical contract and route handlers stay intact. */
 export function liveApiSpecification<T extends object>(
   document: T,
-  configuredProfile: boolean,
-  financial: boolean,
-  flow?: 'application' | 'hosted',
+  features: ApiFeatures,
 ): T {
   const result = structuredClone(document);
   const api = result as {
@@ -27,6 +30,10 @@ export function liveApiSpecification<T extends object>(
   api.info.title = 'Provider API · Live testing';
   api.info.description = `**Live service: Execute sends a real request to this domain.**
 
+All implemented provider API endpoints are listed, including unavailable profiles. **Not enabled** identifies a missing configuration prerequisite; **Configured** does not establish current access or readiness.
+
+${transactionBoundaryDescription}
+
 Start with GET /v1/capabilities without authorization. configured=false means the service is not ready for wallet operations. A 200 discovery response does not confirm that wallet creation, identity checks or recovery work.
 
 For protected calls, use the Application tokens panel when enabled: sign in as an allowed operator, choose a calling application and the API permissions (scopes) you need, then Get token or Renew token. Otherwise choose Authorize and paste a short-lived application access token without the Bearer prefix. Never enter client secrets, vendor keys, owner ID tokens or the local wizard session token. Tokens are kept in page memory; reload or Logout to clear authorization. Do not share screenshots containing tokens, cURL commands, personal data or signatures.
@@ -41,20 +48,19 @@ See [operator testing instructions](https://moovha.github.io/wallet-provider-kit
   for (const [path, methods] of Object.entries(api.paths)) {
     for (const [method, operation] of Object.entries(methods)) {
       const guide = operationGuides[operation.operationId ?? ''];
-      if (
-        configuredProfile &&
-        (!guide ||
-          (guide.financial && !financial) ||
-          (flow === 'application' && (guide.records || guide.vendor)) ||
-          (flow === 'hosted' && guide.applicationLed))
-      ) {
-        delete methods[method];
-        continue;
-      }
       if (!guide) continue;
-      operation.summary = guide.title;
+      const reason = operationUnavailableReason(
+        operation.operationId!,
+        features,
+      );
+      operation.summary = `[${reason ? 'Not enabled' : guide.scope ? 'Configured' : 'Public'}] ${guide.title}`;
       operation.tags = [guide.group];
       operation.description = [
+        reason
+          ? `**Not enabled:** ${reason}. Visibility does not enable this operation.`
+          : guide.scope
+            ? '**Configured:** Current authentication, authority and service readiness are still required.'
+            : '**Public:** No token is required. Discovery reports readiness without enabling wallet operations.',
         guide.scope
           ? `Required application scope: **${guide.scope}**. Scopes alone do not grant account or spending authority.`
           : 'Public discovery; no access token required.',

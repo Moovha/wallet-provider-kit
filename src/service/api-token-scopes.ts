@@ -6,6 +6,8 @@ export const apiTokenScopes = [
   'wallet:provision',
   'wallet:actions',
   'wallet:actions:read',
+  'wallet:events',
+  'wallet:events:read',
   'wallet:sign',
 ] as const;
 
@@ -20,5 +22,7 @@ export const apiTokenScopeLabels: Record<
   'wallet:provision': 'Create an accepted account’s wallet',
   'wallet:actions': 'Request transfer authorization',
   'wallet:actions:read': 'Read transfer authorization status',
+  'wallet:events': 'Report unverified transaction events',
+  'wallet:events:read': 'Read reported transaction events',
   'wallet:sign': 'Sign an authorized transfer',
 };

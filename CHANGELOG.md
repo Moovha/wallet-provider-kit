@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased — API visibility and transaction reports
+
+- List all documented provider API operations in local and deployed Swagger,
+  labeling unavailable profiles with their configuration prerequisites.
+- Explain that signing returns an authorization signature and that transaction
+  submission, gas and settlement verification belong to the connected application.
+- Add authenticated, idempotent transaction event reporting and reads for stored
+  transfers. Persist at most 32 unverified application observations per action,
+  recheck current access and keep reports separate from financial authority,
+  budget reservations, settlement and exported request metrics/traces.
+
 ## Unreleased — local runtime installation
 
 - Detect Docker, Compose, the image builder and local engine availability before

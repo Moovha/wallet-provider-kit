@@ -134,6 +134,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/actions/{actionId}/transaction-events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Record or read unverified application transaction observations for an existing authorized transfer. Current caller, owner, grant, identity, consent and policy checks apply even after signing expiry. Reports never broadcast, reconcile attempts, verify settlement or release budgets. */
+        get: operations["getTransactionEvents"];
+        put?: never;
+        /** @description Record or read unverified application transaction observations for an existing authorized transfer. Current caller, owner, grant, identity, consent and policy checks apply even after signing expiry. Reports never broadcast, reconcile attempts, verify settlement or release budgets. */
+        post: operations["reportTransactionEvent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/access-requests": {
         parameters: {
             query?: never;
@@ -1588,6 +1606,449 @@ export interface operations {
                                 nonce: string;
                             };
                         };
+                    };
+                };
+            };
+            /** @description Default Response */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+        };
+    };
+    getTransactionEvents: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                actionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        action_id: string;
+                        events: {
+                            /**
+                             * @description Application observation only; confirmed is not provider-verified settlement.
+                             * @enum {string}
+                             */
+                            event: "submitted" | "confirmed" | "failed";
+                            /** @enum {string} */
+                            chain_id: "eip155:84532";
+                            transaction_hash: string;
+                            /** Format: date-time */
+                            observed_at: string;
+                            report_id: string;
+                            /** Format: date-time */
+                            recorded_at: string;
+                            /**
+                             * @description No chain receipt, transfer effect or finality verification is performed.
+                             * @enum {string}
+                             */
+                            verification: "unverified";
+                        }[];
+                    };
+                };
+            };
+            /** @description Default Response */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+        };
+    };
+    reportTransactionEvent: {
+        parameters: {
+            query?: never;
+            header: {
+                "idempotency-key": string;
+            };
+            path: {
+                actionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /**
+                     * @description Application observation only; confirmed is not provider-verified settlement.
+                     * @enum {string}
+                     */
+                    event: "submitted" | "confirmed" | "failed";
+                    /** @enum {string} */
+                    chain_id: "eip155:84532";
+                    transaction_hash: string;
+                    /** Format: date-time */
+                    observed_at: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /**
+                         * @description Application observation only; confirmed is not provider-verified settlement.
+                         * @enum {string}
+                         */
+                        event: "submitted" | "confirmed" | "failed";
+                        /** @enum {string} */
+                        chain_id: "eip155:84532";
+                        transaction_hash: string;
+                        /** Format: date-time */
+                        observed_at: string;
+                        report_id: string;
+                        /** Format: date-time */
+                        recorded_at: string;
+                        /**
+                         * @description No chain receipt, transfer effect or finality verification is performed.
+                         * @enum {string}
+                         */
+                        verification: "unverified";
+                        action_id: string;
                     };
                 };
             };

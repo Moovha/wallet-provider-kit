@@ -3,6 +3,7 @@ export interface OperationGuide {
   group: string;
   scope?: string;
   financial?: boolean;
+  enrollment?: boolean;
   applicationLed?: boolean;
   records?: boolean;
   vendor?: boolean;
@@ -118,8 +119,60 @@ export const operationGuides: Record<string, OperationGuide> = {
     success:
       '200: authorizing, authorized or denied. authorized means the provider has stored the approved transfer; signing, submission and completion are separate steps.',
   },
+  reportTransactionEvent: {
+    title: 'Report a transaction event',
+    group: 'Transaction telemetry',
+    scope: 'wallet:events',
+    financial: true,
+    permission: 'transfers:request',
+    prerequisite:
+      'Use an existing authorized action_id for the same application, caller, owner and current transfer delegation. Report submitted, confirmed or failed with the Base Sepolia transaction hash and observation time. Keep the original idempotency key for retries. Reports may arrive after signing authorization expires; current access and policy must still pass.',
+    success:
+      '200: a durable application report marked unverified. Recording a report does not broadcast, verify a receipt, establish settlement, reconcile a signing attempt or release a budget reservation. At most 32 reports are retained per action; reports can arrive out of order and do not form an authoritative transaction status.',
+  },
+  getTransactionEvents: {
+    title: 'Read reported transaction events',
+    group: 'Transaction telemetry',
+    scope: 'wallet:events:read',
+    financial: true,
+    permission: 'transfers:request',
+    prerequisite:
+      'Use an action_id belonging to the same application and caller with current owner access, identity and transfer delegation. Signing expiry does not prevent report reads; revoked access or changed policy denies them.',
+    success:
+      '200: application reports in recording order, each marked unverified. An empty list is not proof that no transaction was submitted. Confirm settlement independently from chain receipts, exact transfer effects and your finality policy.',
+  },
+  beginEnrollment: {
+    title: 'Begin advanced OIDC enrollment',
+    group: 'Advanced OIDC enrollment',
+    scope: 'wallet:enroll',
+    enrollment: true,
+    prerequisite:
+      'Compose the separate EnrollmentService with host-owned durable authority and OIDC identity verification. This profile is unavailable in the configured setup service and cannot be combined with application access onboarding.',
+    success:
+      '201: reserved enrollment/account IDs and a nonce-bound identity challenge. No wallet or spending grant is created.',
+  },
+  submitEnrollmentIdentity: {
+    title: 'Submit advanced enrollment identity',
+    group: 'Advanced OIDC enrollment',
+    scope: 'wallet:enroll',
+    enrollment: true,
+    prerequisite:
+      'Complete the provider-owned OIDC flow using the reserved nonce. Submit a provider-audience OIDC Identity Assurance ID token only to this identity endpoint; the HTTP Authorization header still requires an application access token.',
+    success:
+      '200: the provider enrollment decision. A verified identity token does not grant wallet access or spending authority.',
+  },
+  getEnrollment: {
+    title: 'Read advanced enrollment status',
+    group: 'Advanced OIDC enrollment',
+    scope: 'wallet:enroll:read',
+    enrollment: true,
+    prerequisite:
+      'Use the reserved enrollment ID with the original authorized caller and current host permission.',
+    success:
+      '200: the current enrollment receipt without identity attributes or proof tokens.',
+  },
   signAction: {
-    title: 'Sign an authorized transfer',
+    title: 'Sign an approved action (no submission)',
     group: 'Provider-authorized transfers',
     scope: 'wallet:sign',
     financial: true,
@@ -130,3 +183,46 @@ export const operationGuides: Record<string, OperationGuide> = {
       '200: a verified signature, or the saved signature for a permitted retry. The application must submit the transaction and arrange network fees separately. A signature can remain usable until its on-chain expiry even if access is later revoked.',
   },
 };
+
+export interface ApiFeatures {
+  onboarding: boolean;
+  enrollment: boolean;
+  financial: boolean;
+  signing?: boolean;
+  wallet: boolean;
+  flow?: 'application' | 'hosted';
+  records?: boolean;
+  vendor?: boolean;
+}
+
+/** Configuration availability only; current authentication, authority and readiness still apply. */
+export function operationUnavailableReason(
+  id: string,
+  features: ApiFeatures,
+): string | undefined {
+  const guide = operationGuides[id];
+  if (!guide || id === 'getCapabilities') return undefined;
+  if (guide.enrollment)
+    return features.enrollment
+      ? undefined
+      : 'Advanced OIDC enrollment is not configured';
+  if (id === 'signAction' && features.signing && features.wallet)
+    return undefined;
+  if (guide.financial && !features.financial)
+    return 'Transfer signing is off in Policies';
+  if (['provisionAccount', 'signAction'].includes(id))
+    return features.wallet ? undefined : 'Wallet authority is not configured';
+  if (!features.onboarding)
+    return 'Application access onboarding is not configured';
+  if (guide.applicationLed && features.flow !== 'application')
+    return 'Requires application-led access';
+  if ((guide.records || guide.vendor) && features.flow === 'application')
+    return 'Requires hosted compatibility access';
+  if (guide.records && !features.records)
+    return 'Select application records in Policies to use batch submission';
+  if (guide.vendor && !features.vendor)
+    return 'Select an identity vendor in Services to import verification';
+  return undefined;
+}
+
+export const transactionBoundaryDescription = `Signing, submission and transaction reports are separate steps. POST /v1/transfer-authorizations stores an exact authorized ERC-3009 transfer; POST /v1/actions/{actionId}/sign returns its signature and does not broadcast or pay gas. The connected application arranges network fees, submits the token-contract transaction and verifies its receipt and finality. No transaction-submission HTTP endpoint is implemented. OpenZeppelin Relayer execution is a separate TypeScript library integration. POST /v1/actions/{actionId}/transaction-events records an application's submitted, confirmed or failed report as unverified; it does not prove settlement or change financial authority. Monitoring metrics and traces are exported separately to an OTLP collector.`;

@@ -21,7 +21,6 @@ const liveUrl = computed(() =>
 );
 const applicationIndex = ref(0);
 const search = ref('');
-const showUnconfigured = ref(false);
 const selectedOperation = ref('getAccountAccessPolicy');
 const canvas = ref<HTMLElement>();
 const loading = ref(true);
@@ -32,14 +31,10 @@ const operations = computed(() =>
   referenceOperations(props.contract, props.config, applicationIndex.value),
 );
 const shown = computed(() =>
-  operations.value.filter(
-    (item) =>
-      (showUnconfigured.value ||
-        !item.guide.financial ||
-        props.config.financial) &&
-      `${item.method} ${item.path} ${item.guide.title} ${item.guide.scope ?? ''}`
-        .toLowerCase()
-        .includes(search.value.toLowerCase().trim()),
+  operations.value.filter((item) =>
+    `${item.method} ${item.path} ${item.guide.title} ${item.guide.scope ?? ''}`
+      .toLowerCase()
+      .includes(search.value.toLowerCase().trim()),
   ),
 );
 const spec = computed(() =>
@@ -263,15 +258,32 @@ async function copy() {
           aria-label="Find an endpoint"
       /></label>
     </div>
-    <label class="api-toggle"
-      ><input v-model="showUnconfigured" type="checkbox" /> Show transfer APIs
-      even when transfer signing is off</label
-    >
     <p class="help-text">
-      {{ shown.length }} endpoint(s). All wallet backends expose the same wallet
-      API. A vendor's own API and custom enrollment or transaction-execution
-      integrations are separate.
+      {{ shown.length }} endpoint(s). All implemented provider API endpoints are
+      shown by default, including advanced profiles.
+      <strong>Not enabled</strong>
+      marks missing configuration; showing an endpoint does not enable it or
+      grant access. The search field filters the displayed reference and its
+      download.
     </p>
+    <div class="callout">
+      <h3>Signing, submission and transaction reports</h3>
+      <p>
+        POST /v1/transfer-authorizations authorizes an exact transfer. POST
+        /v1/actions/{actionId}/sign returns its signature; it does not submit a
+        transaction. The connected application arranges gas, submits the
+        token-contract transaction and checks its receipt and finality. There is
+        no transaction-submission HTTP endpoint. OpenZeppelin Relayer execution
+        is available through a separate TypeScript library integration.
+      </p>
+      <p>
+        POST /v1/actions/{actionId}/transaction-events records application
+        reports of submission, confirmation or failure. GET on the same path
+        reads them. Reports remain unverified and do not establish settlement or
+        change signing authority or budgets. Request metrics and traces are
+        exported separately to a monitoring collector.
+      </p>
+    </div>
     <div class="api-flow">
       <h3>Connect an application</h3>
       <p v-if="config.policy.access?.mode === 'application'">
@@ -330,10 +342,11 @@ async function copy() {
         IDs and any shared-identity token with values from your deployment. Use
         a new UUIDv4 idempotency key for a new POST request and keep the same
         key when retrying it. Transfer amounts are whole numbers of the token's
-        base units. For application-led requests, replace all example timestamps
-        and evidence references with current records, and use policy revisions
-        returned by GET /v1/access-policy. The application must already hold the
-        user’s consent.
+        base units. Replace observation timestamps with current records. For
+        application-led requests, replace all example timestamps and evidence
+        references with current records, and use policy revisions returned by
+        GET /v1/access-policy. The application must already hold the user’s
+        consent.
       </p>
       <button type="button" class="secondary" @click="copy">
         Copy cURL example

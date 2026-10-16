@@ -737,6 +737,207 @@ Success response schema:
 }
 ```
 
+## POST /v1/actions/{actionId}/transaction-events
+
+Operation: `reportTransactionEvent`.
+
+Record or read unverified application transaction observations for an existing authorized transfer. Current caller, owner, grant, identity, consent and policy checks apply even after signing expiry. Reports never broadcast, reconcile attempts, verify settlement or release budgets.
+
+| Parameter         | Location | Required | Schema                                                                                                |
+| ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
+| `actionId`        | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+| `idempotency-key` | header   | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+
+Request body (application/json):
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["event", "chain_id", "transaction_hash", "observed_at"],
+  "properties": {
+    "event": {
+      "type": "string",
+      "enum": ["submitted", "confirmed", "failed"],
+      "description": "Application observation only; confirmed is not provider-verified settlement."
+    },
+    "chain_id": {
+      "type": "string",
+      "enum": ["eip155:84532"]
+    },
+    "transaction_hash": {
+      "type": "string",
+      "pattern": "^0x[0-9a-f]{64}$"
+    },
+    "observed_at": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{3})?Z$"
+    }
+  }
+}
+```
+
+| Status | Content type             | Description      |
+| ------ | ------------------------ | ---------------- |
+| 200    | application/json         | Default Response |
+| 400    | application/problem+json | Default Response |
+| 401    | application/problem+json | Default Response |
+| 403    | application/problem+json | Default Response |
+| 409    | application/problem+json | Default Response |
+| 413    | application/problem+json | Default Response |
+| 415    | application/problem+json | Default Response |
+| 422    | application/problem+json | Default Response |
+| 429    | application/problem+json | Default Response |
+| 500    | application/problem+json | Default Response |
+| 503    | application/problem+json | Default Response |
+
+Success response schema:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "event",
+    "chain_id",
+    "transaction_hash",
+    "observed_at",
+    "report_id",
+    "recorded_at",
+    "verification",
+    "action_id"
+  ],
+  "properties": {
+    "event": {
+      "type": "string",
+      "enum": ["submitted", "confirmed", "failed"],
+      "description": "Application observation only; confirmed is not provider-verified settlement."
+    },
+    "chain_id": {
+      "type": "string",
+      "enum": ["eip155:84532"]
+    },
+    "transaction_hash": {
+      "type": "string",
+      "pattern": "^0x[0-9a-f]{64}$"
+    },
+    "observed_at": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{3})?Z$"
+    },
+    "report_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "recorded_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "verification": {
+      "type": "string",
+      "enum": ["unverified"],
+      "description": "No chain receipt, transfer effect or finality verification is performed."
+    },
+    "action_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    }
+  }
+}
+```
+
+## GET /v1/actions/{actionId}/transaction-events
+
+Operation: `getTransactionEvents`.
+
+Record or read unverified application transaction observations for an existing authorized transfer. Current caller, owner, grant, identity, consent and policy checks apply even after signing expiry. Reports never broadcast, reconcile attempts, verify settlement or release budgets.
+
+| Parameter  | Location | Required | Schema                                                                                                |
+| ---------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
+| `actionId` | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+
+| Status | Content type             | Description      |
+| ------ | ------------------------ | ---------------- |
+| 200    | application/json         | Default Response |
+| 400    | application/problem+json | Default Response |
+| 401    | application/problem+json | Default Response |
+| 403    | application/problem+json | Default Response |
+| 409    | application/problem+json | Default Response |
+| 413    | application/problem+json | Default Response |
+| 415    | application/problem+json | Default Response |
+| 422    | application/problem+json | Default Response |
+| 429    | application/problem+json | Default Response |
+| 500    | application/problem+json | Default Response |
+| 503    | application/problem+json | Default Response |
+
+Success response schema:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["action_id", "events"],
+  "properties": {
+    "action_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "events": {
+      "type": "array",
+      "maxItems": 32,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "event",
+          "chain_id",
+          "transaction_hash",
+          "observed_at",
+          "report_id",
+          "recorded_at",
+          "verification"
+        ],
+        "properties": {
+          "event": {
+            "type": "string",
+            "enum": ["submitted", "confirmed", "failed"],
+            "description": "Application observation only; confirmed is not provider-verified settlement."
+          },
+          "chain_id": {
+            "type": "string",
+            "enum": ["eip155:84532"]
+          },
+          "transaction_hash": {
+            "type": "string",
+            "pattern": "^0x[0-9a-f]{64}$"
+          },
+          "observed_at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{3})?Z$"
+          },
+          "report_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "recorded_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "verification": {
+            "type": "string",
+            "enum": ["unverified"],
+            "description": "No chain receipt, transfer effect or finality verification is performed."
+          }
+        }
+      }
+    }
+  }
+}
+```
+
 ## POST /v1/access-requests
 
 Operation: `requestAccountAccess`.
