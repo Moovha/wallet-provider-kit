@@ -60,7 +60,7 @@ export function operationStatus(
   if (guide.financial && !config.financial)
     return 'Transfer signing is off in Policies';
   if (guide.records && !config.policy.identity?.records)
-    return 'Select application records in Services to use batch submission';
+    return 'Select application records in Policies to use batch submission';
   if (guide.vendor && config.policy.identity?.records)
     return 'Select an identity vendor in Services to import verification';
   const app = config.policy.applications[applicationIndex];

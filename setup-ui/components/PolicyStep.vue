@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import SetupField from './SetupField.vue';
+import AccessPolicyFields from './AccessPolicyFields.vue';
+import PriceFields from './PriceFields.vue';
 import { computed } from 'vue';
 import { docs } from '../model';
 import type { ProviderConfiguration } from '../model';
@@ -57,18 +59,15 @@ function financial(enabled: unknown) {
       provider checks these requirements before granting access.
     </p>
     <p v-if="model.policy.access?.mode === 'application'">
-      Identity level and required fields are set in Services. The age limits
-      below apply to all applications; permissions and trust agreements are set
-      separately for each application. Users consent to the requested
-      permissions inside that application.
+      Identity requirements and age limits below apply to all applications;
+      permissions and trust agreements are set separately for each application.
+      Users consent to the requested permissions inside that application.
     </p>
     <p v-else>
-      A connected application is a product that calls your wallet API. Add its
-      registration below and record the agreement that permits it to attest
-      identity and consent. Hosted compatibility mode also needs identity
-      reviewers. Vendor verification also needs an agreement about who covers
-      its costs. Agree these rules with the people operating the connected
-      applications.
+      Register the applications allowed to call your wallet API and the staff
+      allowed to review identity evidence. Hosted vendor verification also
+      requires agreed route prices and an application funding agreement.
+      Configure those rules below and connect the vendors in Services.
     </p>
     <p>
       Transfer signing is optional. Leave it off if you only need wallet
@@ -76,6 +75,7 @@ function financial(enabled: unknown) {
       setup; review the access periods against your own requirements.
     </p>
   </div>
+  <AccessPolicyFields v-model="model" />
   <SetupField
     guide="policyVersion"
     v-model="model.policy.version"
@@ -120,10 +120,10 @@ function financial(enabled: unknown) {
     <details>
       <summary>Need different policy rules?</summary>
       <p>
-        The wizard configures the built-in rules shown here and in Services,
-        including optional transfer limits below. Required fields check that
-        values are present; they do not restrict countries or evaluate risk
-        scores. Custom decision rules require an advanced host integration.
+        The wizard configures the built-in rules shown on this page, including
+        optional transfer limits below. Required fields check that values are
+        present; they do not restrict countries or evaluate risk scores. Custom
+        decision rules require an advanced host integration.
         <a
           :href="docs + 'application-access.html#configure-the-trust-policy'"
           target="_blank"
@@ -300,12 +300,45 @@ function financial(enabled: unknown) {
       </button>
     </div>
   </template>
+  <section
+    v-if="
+      model.policy.access?.mode !== 'application' &&
+      !model.policy.identity?.records
+    "
+  >
+    <h3>Hosted verification price limits</h3>
+    <p class="help-text">
+      Each route you offer needs an agreed price and an application funding
+      agreement, even when it is free. Connect your identity vendors in Services
+      to configure their route limits here.
+    </p>
+    <template v-if="model.identity.didit">
+      <PriceFields
+        v-model="model.identity.didit.importPrice"
+        label="Didit import"
+      />
+      <PriceFields
+        v-model="model.identity.didit.verificationPrice"
+        label="Didit verification"
+      />
+    </template>
+    <template v-if="model.identity.sumsub">
+      <PriceFields
+        v-model="model.identity.sumsub.importPrice"
+        label="Sumsub import"
+      />
+      <PriceFields
+        v-model="model.identity.sumsub.verificationPrice"
+        label="Sumsub verification"
+      />
+    </template>
+  </section>
   <div class="feature-panel">
     <h3>Optional delegated transfer signing</h3>
     <p v-if="model.policy.identity?.records" class="help-text">
       Application-record evaluation keeps wallets unfunded and permits reads
-      only. Select external identity verification in Services before configuring
-      transfers.
+      only. Turn off record evaluation here and connect an identity vendor in
+      Services before configuring transfers.
     </p>
     <p>
       Allow applications to request token transfers within limits that owners

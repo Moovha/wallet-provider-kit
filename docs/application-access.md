@@ -33,7 +33,7 @@ sequenceDiagram
 
 ## Configure the trust policy
 
-Use the wizard's **Services → Access flow → Application-led access (standard)**.
+Use the wizard's **Policies → Access flow → Application-led access (standard)**.
 Set the required identity level and field names. In **Policies**, register each
 application's exact issuer/client ID, allowed permissions and reviewed identity
 and consent trust-agreement reference. Configure maximum identity age and access
@@ -51,8 +51,8 @@ The GUI supports these built-in policy controls:
 
 | Wizard setting                                  | Scope and effect                                                                                                                                                                               |
 | ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Services → Required identity level              | All applications must attest this exact agreed level. The provider does not rank levels or perform the underlying verification itself.                                                         |
-| Services → Required identity fields             | All applications must submit nonempty values for these names. This checks presence, not country eligibility or other allowed-value rules.                                                      |
+| Policies → Required identity level              | All applications must attest this exact agreed level. The provider does not rank levels or perform the underlying verification itself.                                                         |
+| Policies → Required identity fields             | All applications must submit nonempty values for these names. This checks presence, not country eligibility or other allowed-value rules.                                                      |
 | Policies → Maximum age of identity checks       | A shared limit of 1–365 days from the asserted verification time. Expired evidence cannot support access.                                                                                      |
 | Policies → Maximum access duration              | A shared limit of 1–365 days. Consent expiry must fit that period; identity expiry can shorten a grant further.                                                                                |
 | Policies → Connected applications               | Each exact issuer/client ID has its own reviewed trust-agreement reference, allowed permissions and enabled switch. Disabling an application denies its current access.                        |

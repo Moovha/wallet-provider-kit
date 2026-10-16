@@ -19,9 +19,10 @@ cannot certify your real application assertions, backend or recovery.
 
 ## 2. Configure and export in the GUI
 
-Choose **Application-led access (standard)** in Services. Set identity level and
-required fields, token issuer/audience/JWKS, application registrations, trust-agreement
-references, allowed permissions, identity age and access duration. Choose a backend
+Configure token issuer/audience/JWKS in Services. In Policies, choose
+**Application-led access (standard)** and set identity level, required fields,
+application registrations, trust-agreement references, allowed permissions,
+identity age and access duration. Choose a backend
 and private storage. Keep wallet operations disabled initially. Enable the deployed
 API explorer if needed, then validate and download all three files.
 

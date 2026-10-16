@@ -24,15 +24,24 @@ test('a new operator configures application-led access without user login, vendo
       .getByLabel('Wallet environment name', { exact: true })
       .fill('offline-example');
     await page.getByRole('tab', { name: 'Services', exact: true }).click();
-    await expect(page.getByLabel('Access flow', { exact: true })).toHaveValue(
-      'application',
-    );
+    const services = page.getByRole('tabpanel', {
+      name: 'Services',
+      exact: true,
+    });
+    await expect(
+      services.getByLabel('Access flow', { exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      services.getByLabel('Required identity level', { exact: true }),
+    ).toHaveCount(0);
     await expect(
       page.getByLabel('Login service issuer URL', { exact: true }),
     ).toHaveCount(0);
     await expect(page.getByLabel('Use Didit', { exact: true })).toHaveCount(0);
     await expect(
-      page.getByText('Users stay in the application', { exact: true }),
+      page
+        .getByText('Users stay in the application.', { exact: false })
+        .first(),
     ).toBeVisible();
     await page
       .getByLabel('Application token issuer', { exact: true })
@@ -44,6 +53,15 @@ test('a new operator configures application-led access without user login, vendo
       .getByLabel('Token verification keys URL (JWKS)', { exact: true })
       .fill('https://apps.example.test/jwks');
     await page.getByRole('tab', { name: 'Policies', exact: true }).click();
+    await expect(page.getByLabel('Access flow', { exact: true })).toHaveValue(
+      'application',
+    );
+    await page
+      .getByLabel('Required identity level', { exact: true })
+      .fill('enhanced');
+    await page
+      .getByLabel('Required identity fields (one per line)', { exact: true })
+      .fill('country\ncustomer_type');
     await page
       .getByLabel('Maximum access duration (days)', { exact: true })
       .fill('3');
@@ -84,6 +102,10 @@ test('a new operator configures application-led access without user login, vendo
     expect(config.policy.access.mode).toBe('application');
     expect(config.policy.access.maxAgeDays).toBe(3);
     expect(config.policy.identity.maxAgeDays).toBe(30);
+    expect(config.policy.identity.application).toEqual({
+      verificationLevel: 'enhanced',
+      requiredFields: ['country', 'customer_type'],
+    });
     expect(config.ownerLogin).toBeUndefined();
     expect(config.reviewers).toBeUndefined();
     expect(config.identity).toEqual({});

@@ -222,9 +222,9 @@ try {
     .getByRole('status')
     .filter({ hasText: 'Configuration imported' })
     .waitFor();
-  await page.getByRole('tab', { name: 'Services', exact: true }).click();
+  await page.getByRole('tab', { name: 'Policies', exact: true }).click();
   await page.screenshot({
-    path: new URL('application-record-services.png', output).pathname,
+    path: new URL('application-record-policies.png', output).pathname,
     fullPage: true,
     animations: 'disabled',
   });

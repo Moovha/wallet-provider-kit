@@ -28,7 +28,7 @@ Agree each application's authority to attest its users, verification level,
 required fields, evidence freshness, consent terms and withdrawal process.
 Record `policy.applications[].assertionTrust.agreement` in Policies. Choose stable
 user IDs scoped to that application; names and email addresses cannot link wallets
-across applications. Configure `policy.identity.application` in Services. An API
+across applications. Configure `policy.identity.application` in Policies. An API
 scope or a set of populated fields cannot replace this trust agreement.
 
 The application records consent for the provider's current policy revision, obtained
@@ -335,7 +335,7 @@ These settings cover provider-initiated vendor work in hosted mode. They are not
 
 Obtain confirmed maximum charges from the vendor/your contract for **new
 verification** and **shared identity import** separately, for each selected
-workflow/level. In Services, enable each route's agreed price limit, enter its
+workflow/level. In Policies, enable each route's agreed price limit, enter its
 maximum in **USD cents**, and enter an internal contract/ticket reference for the
 terms. `250` means USD 2.50; it is not a token amount or gas budget.
 

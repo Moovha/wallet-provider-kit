@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — consolidated policy setup
+
+- Keep access flow, identity requirements, application trust and permissions,
+  expiry limits and transfer rules together in Policies. Hosted record
+  requirements and verification price limits also live there.
+- Focus Services on token, login and identity-vendor connections. Update field
+  error destinations, operator guides and screenshots to match the layout.
+
 ## Unreleased — setup purpose and policy guidance
 
 - Explain the wizard's configuration, export and deployment stages before the

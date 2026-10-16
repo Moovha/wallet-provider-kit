@@ -22,22 +22,26 @@ export function explainIssue(issue: string) {
   const reason = issue.slice(separator + 2);
   const area = issue.startsWith('/policy/provider')
     ? 'Provider'
-    : issue.startsWith('/backend')
-      ? 'Backend'
-      : issue.startsWith('/ownerLogin') ||
-          issue.startsWith('/oauth') ||
-          issue.startsWith('/identity')
-        ? 'Services'
-        : issue.startsWith('/policy') || issue.startsWith('/reviewers')
-          ? 'Policies'
-          : issue.startsWith('/financial')
+    : /^\/identity\/(didit|sumsub)\/(importPrice|verificationPrice)(?:\/|$)/.test(
+          path,
+        )
+      ? 'Policies'
+      : issue.startsWith('/backend')
+        ? 'Backend'
+        : issue.startsWith('/ownerLogin') ||
+            issue.startsWith('/oauth') ||
+            issue.startsWith('/identity')
+          ? 'Services'
+          : issue.startsWith('/policy') || issue.startsWith('/reviewers')
             ? 'Policies'
-            : issue.startsWith('/activation') ||
-                issue.startsWith('/apiExplorer') ||
-                issue.startsWith('/http') ||
-                issue.startsWith('/storage')
-              ? 'Deployment'
-              : 'Configuration';
+            : issue.startsWith('/financial')
+              ? 'Policies'
+              : issue.startsWith('/activation') ||
+                  issue.startsWith('/apiExplorer') ||
+                  issue.startsWith('/http') ||
+                  issue.startsWith('/storage')
+                ? 'Deployment'
+                : 'Configuration';
   const hints: Record<string, string> = {
     required: 'Complete this setting using the instructions beside the field.',
     uniqueItems: 'Remove duplicate entries.',
@@ -58,7 +62,7 @@ export function explainIssue(issue: string) {
     'hosted access requires reviewers':
       'In Policies, add the staff account IDs allowed to review hosted requests.',
     'application-led access uses trusted application attestations, not hosted verification':
-      'Keep application-led access selected in Services and remove hosted identity-vendor settings. Configure application identity requirements and trust agreements instead.',
+      'Keep application-led access selected in Policies and remove hosted identity-vendor settings. Configure application identity requirements and trust agreements instead.',
     'issuers must match /oauth/issuer':
       'Use the same token issuer for each application as in Services.',
     'documentation and enabled registered clients are required; duplicate clients are not allowed':
@@ -112,6 +116,7 @@ function fieldLabel(path: string): string {
     '/backend/signers': 'Relayer signer entries',
     '/ownerLogin': 'Staff or hosted login',
     '/policy/identity/application': 'Application identity requirements',
+    '/policy/identity/records/requiredFields': 'Required record fields',
     '/ownerLogin/issuer': 'Login service issuer URL',
     '/ownerLogin/clientId': 'Wallet login client ID',
     '/ownerLogin/clientSecret': 'Wallet login client secret variable name',

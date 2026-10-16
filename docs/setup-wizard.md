@@ -58,14 +58,14 @@ loses unsaved edits.
 
 ## Complete the six steps
 
-| Step       | Decision you are making                                                                   |
-| ---------- | ----------------------------------------------------------------------------------------- |
-| Provider   | How applications identify and reach your service.                                         |
-| Backend    | Which existing service or engine creates wallets and signs approved actions.              |
-| Services   | How the provider authenticates applications and what identity evidence it requires.       |
-| Policies   | Which applications are trusted, which permissions they may request and what limits apply. |
-| Deployment | Where the server listens and stores private records, and which features it enables.       |
-| Export     | Whether the draft is consistent and which files to take to your server.                   |
+| Step       | Decision you are making                                                                                  |
+| ---------- | -------------------------------------------------------------------------------------------------------- |
+| Provider   | How applications identify and reach your service.                                                        |
+| Backend    | Which existing service or engine creates wallets and signs approved actions.                             |
+| Services   | How the provider connects to token, login and identity-vendor services.                                  |
+| Policies   | Which access flow and identity requirements apply, which applications are trusted and what limits apply. |
+| Deployment | Where the server listens and stores private records, and which features it enables.                      |
+| Export     | Whether the draft is consistent and which files to take to your server.                                  |
 
 ### 1. Provider
 
@@ -87,28 +87,30 @@ Never replace an assigned signer or binding to retry an uncertain operation.
 
 ### 3. Services
 
-Keep **Access flow → Application-led access (standard)**. Set **Required identity
-level** and **Required identity fields (one per line)**. Use the exact level agreed
-with applications and lowercase field names such as `country`. Field presence is
-not proof of KYC; the trust agreement defines the application's verification duties.
-
 Configure **Application token issuer**, **Wallet API audience** and **Token verification
 keys URL (JWKS)**. Use separate registered application clients and short-lived
 RFC 9068 API tokens. An application token authenticates the caller; the user assertion
 establishes the application-scoped user and attests their identity and consent.
 
-There are no mandatory wallet-user login fields, vendor accounts or review steps.
+The standard application-led flow needs no wallet-user login or identity-vendor
+connection. Choose its access flow and identity requirements in Policies.
 If optional staff token controls are enabled in Deployment, return to Services to
 configure **Optional staff login**. That login is only for token operators.
 
-![Application-led services and identity policy](public/screenshots/services.webp)
-
-For a legacy deployment, explicitly select **Provider-hosted access (compatibility)**.
-This reveals owner login, hosted identity-vendor/evaluation settings and reviewer
-requirements. It is a separate flow; see [hosted access](onboarding.md). Changing
-flow clears incompatible identity settings. Review your export before deployment.
+![Application token service connections](public/screenshots/services.webp)
 
 ### 4. Policies
+
+Keep **Access flow → Application-led access (standard)**. Set **Required identity
+level** and **Required identity fields (one per line)**. Use the exact level agreed
+with applications and lowercase field names such as `country`. Field presence is
+not proof of KYC; the trust agreement defines the application's verification duties.
+
+For a legacy deployment, explicitly select **Provider-hosted access (compatibility)**.
+Configure hosted login and identity-vendor connections in Services. Keep record
+evaluation, required fields, vendor route price limits and reviewer settings in
+Policies. It is a separate flow; see [hosted access](onboarding.md). Changing flow
+clears incompatible identity settings. Review your export before deployment.
 
 Register the exact issuer/client ID and name of each application. Set its permitted
 actions and **Application identity and consent trust agreement** reference. Review
@@ -125,8 +127,8 @@ applications. Each application has its own trust agreement, permissions and
 enabled switch. The [policy controls table](application-access.md#configure-the-trust-policy)
 maps these settings to their effects and describes the customization limits.
 
-For example, keep `verified` and `country` in Services, set identity age to 30
-days and access duration to three days in Policies, then allow one trusted
+For example, in Policies keep `verified` and `country`, set identity age to 30
+days and access duration to three days, then allow one trusted
 application to **Read wallet accounts**. It must attest a `verified` check less
 than 30 days old, a nonempty `country` value and current user consent. Access ends
 within three days, sooner if identity evidence or consent expires. A request
