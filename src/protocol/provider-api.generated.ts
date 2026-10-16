@@ -109,7 +109,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Fixed Base Sepolia ERC-3009 transfer authorization. Current application access and separate exact owner approval are required. No broadcast or settlement. */
+        /** @description Fixed Base Sepolia ERC-3009 transfer authorization. Explicit transfer delegation, current owner-bound access, identity and provider policy authorization are required. No per-transfer owner prompt. No broadcast or settlement. */
         post: operations["requestTransferAuthorization"];
         delete?: never;
         options?: never;
@@ -124,7 +124,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Fixed Base Sepolia ERC-3009 transfer authorization. Current application access and separate exact owner approval are required. No broadcast or settlement. */
+        /** @description Fixed Base Sepolia ERC-3009 transfer authorization. Explicit transfer delegation, current owner-bound access, identity and provider policy authorization are required. No per-transfer owner prompt. No broadcast or settlement. */
         get: operations["getTransferAuthorization"];
         put?: never;
         post?: never;
@@ -233,7 +233,7 @@ export interface operations {
                         configured: boolean;
                         /** @enum {string} */
                         configuration_profile?: "provider-service-v1";
-                        action_profiles?: "owner-approved-erc3009-v1"[];
+                        action_profiles?: "provider-authorized-erc3009-v1"[];
                     };
                 };
             };
@@ -1280,9 +1280,7 @@ export interface operations {
                         action_id: string;
                         account_id: string;
                         /** @enum {string} */
-                        status: "approval_required" | "approved" | "denied";
-                        /** Format: uri */
-                        approval_url: string;
+                        status: "authorizing" | "authorized" | "denied";
                         /** Format: date-time */
                         expires_at: string;
                         payload_hash: string;
@@ -1510,9 +1508,7 @@ export interface operations {
                         action_id: string;
                         account_id: string;
                         /** @enum {string} */
-                        status: "approval_required" | "approved" | "denied";
-                        /** Format: uri */
-                        approval_url: string;
+                        status: "authorizing" | "authorized" | "denied";
                         /** Format: date-time */
                         expires_at: string;
                         payload_hash: string;
@@ -1737,7 +1733,7 @@ export interface operations {
                     authorization_details: {
                         /** @enum {string} */
                         type: "https://moovha.com/wallet/account-access";
-                        actions: ("account:read" | "operations:request")[];
+                        actions: ("account:read" | "operations:request" | "transfers:request")[];
                     }[];
                 };
             };
@@ -1757,7 +1753,7 @@ export interface operations {
                         consent_url: string;
                         grant_id?: string;
                         account_id?: string;
-                        permissions?: ("account:read" | "operations:request")[];
+                        permissions?: ("account:read" | "operations:request" | "transfers:request")[];
                         /** Format: date-time */
                         expires_at?: string;
                     };
@@ -1960,7 +1956,7 @@ export interface operations {
                         consent_url: string;
                         grant_id?: string;
                         account_id?: string;
-                        permissions?: ("account:read" | "operations:request")[];
+                        permissions?: ("account:read" | "operations:request" | "transfers:request")[];
                         /** Format: date-time */
                         expires_at?: string;
                     };
@@ -2173,7 +2169,7 @@ export interface operations {
                         consent_url: string;
                         grant_id?: string;
                         account_id?: string;
-                        permissions?: ("account:read" | "operations:request")[];
+                        permissions?: ("account:read" | "operations:request" | "transfers:request")[];
                         /** Format: date-time */
                         expires_at?: string;
                     };

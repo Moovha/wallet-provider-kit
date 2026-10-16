@@ -36,7 +36,7 @@ including [client IDs and owner-login registrations](concepts.md#what-does-clien
 ## Choose a profile
 
 For supported setups, use [declarative service configuration](setup.md) and the
-HTTP API. The kit supplies current authority, exact owner approval and durable
+HTTP API. The kit supplies current authority, provider authorization of each exact transfer and durable
 journals; no adopter callbacks are required. The composition profiles below are
 advanced integrations for custom behavior and existing hosts.
 

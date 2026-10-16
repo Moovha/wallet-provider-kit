@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased — provider-authorized delegated transfers
+
+- Replace the bundled owner-approval transfer flow with application requests on
+  behalf of users and provider authorization under configured financial policy.
+- Require explicit `transfers:request` consent at onboarding, bound to the token,
+  recipients and limits; retain current owner/grant/KYC/consent checks, immutable
+  actions, durable budgets, dispatch fencing, replay and unknown-outcome handling.
+- Use `provider-authorized-erc3009-v1`, return `authorized` without `approval_url`,
+  and remove per-transfer browser approval routes. Existing request-only grants
+  are not upgraded; changed financial terms require renewed delegation consent.
+- Update generated contracts, operator setup/API guidance and offline denial,
+  recovery, concurrency and policy-change coverage. No database schema change.
+
 ## Unreleased — documentation publication
 
 - Include GitHub Pages publication and live-page verification in Toolkit

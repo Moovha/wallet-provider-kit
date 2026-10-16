@@ -41,7 +41,7 @@ export interface ServerOptions {
   ready?: () => Promise<boolean>;
   documentation?: boolean;
   configurationProfile?: 'provider-service-v1';
-  actionProfiles?: readonly 'owner-approved-erc3009-v1'[];
+  actionProfiles?: readonly 'provider-authorized-erc3009-v1'[];
   /** Release host-owned resources when the service closes. Registered before ready. */
   onClose?: () => Promise<void>;
 }
@@ -224,7 +224,10 @@ export async function createServer(options: ServerOptions = {}) {
               },
               action_profiles: {
                 type: 'array',
-                items: { type: 'string', enum: ['owner-approved-erc3009-v1'] },
+                items: {
+                  type: 'string',
+                  enum: ['provider-authorized-erc3009-v1'],
+                },
               },
             },
           },
@@ -453,7 +456,9 @@ export async function createServer(options: ServerOptions = {}) {
               const grant = await options.onboarding!.service.authorize(
                 context.principal,
                 accountId,
-                'operations:request',
+                options.onboarding!.actions
+                  ? 'transfers:request'
+                  : 'operations:request',
               );
               if (grant.owner !== owner)
                 throw new WalletProviderError('wallet_authorization_denied');

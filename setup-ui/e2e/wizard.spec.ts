@@ -265,7 +265,13 @@ test('Relayer signer pool, applications, financial policies and activation are c
     .getByLabel('Application client ID', { exact: true })
     .fill('second-app');
   await page
-    .getByText('Configure owner-approved transfer signing', { exact: true })
+    .getByRole('group', { name: 'Application 1', exact: true })
+    .getByText('Request transfers on behalf of users', { exact: true })
+    .click();
+  await page
+    .getByText('Configure provider-authorized transfer signing', {
+      exact: true,
+    })
     .click();
   await page
     .getByLabel('Token contract address')
@@ -465,7 +471,7 @@ test('API reference follows the configuration, preserves edits, shows Swagger sc
   ).toBeVisible();
   const financial = structuredClone(sample);
   financial.financial = {
-    profile: 'owner-approved-erc3009-v1',
+    profile: 'provider-authorized-erc3009-v1',
     token: {
       address: '0x1111111111111111111111111111111111111111',
       name: 'Example Token',
@@ -489,7 +495,7 @@ test('API reference follows the configuration, preserves edits, shows Swagger sc
     ...financial.policy.applications[0],
     clientId: 'second-app',
     name: 'Second App',
-    permissions: ['account:read', 'operations:request'],
+    permissions: ['account:read', 'transfers:request'],
   });
   await imported(page, financial);
   await expect(page.locator('.swagger-ui .opblock')).toHaveCount(9);

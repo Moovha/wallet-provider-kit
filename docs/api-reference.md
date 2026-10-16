@@ -596,7 +596,7 @@ export interface ServerOptions {
   ready?: () => Promise<boolean>;
   documentation?: boolean;
   configurationProfile?: 'provider-service-v1';
-  actionProfiles?: readonly 'owner-approved-erc3009-v1'[];
+  actionProfiles?: readonly 'provider-authorized-erc3009-v1'[];
   /** Release host-owned resources when the service closes. Registered before ready. */
   onClose?: () => Promise<void>;
 }
@@ -873,13 +873,16 @@ export declare class OnboardingService {
     store: OnboardingStore,
     adapters?: IdentityAdapter[],
     walletReader?: Pick<WalletSigningProvider, 'findAccount'> | undefined,
+    transferPolicyRevision?: string | undefined,
   );
   request(
     inputContext: AuthorityContext,
     value: AccessInput,
   ): Promise<{
     account_id?: string | undefined;
-    permissions?: ('account:read' | 'operations:request')[] | undefined;
+    permissions?:
+      | ('account:read' | 'operations:request' | 'transfers:request')[]
+      | undefined;
     expires_at?: string | undefined;
     grant_id?: string | undefined;
     request_id: string;
@@ -891,7 +894,9 @@ export declare class OnboardingService {
     id: string,
   ): Promise<{
     account_id?: string | undefined;
-    permissions?: ('account:read' | 'operations:request')[] | undefined;
+    permissions?:
+      | ('account:read' | 'operations:request' | 'transfers:request')[]
+      | undefined;
     expires_at?: string | undefined;
     grant_id?: string | undefined;
     request_id: string;
@@ -905,7 +910,9 @@ export declare class OnboardingService {
     application: string;
     provider: string;
     privacyUrl: string;
-    permissions: ('account:read' | 'operations:request')[];
+    permissions: (
+      'account:read' | 'operations:request' | 'transfers:request'
+    )[];
     mode: 'create' | 'connect';
     durationDays: number;
     status: string;
@@ -916,7 +923,9 @@ export declare class OnboardingService {
     approve: boolean,
   ): Promise<{
     account_id?: string | undefined;
-    permissions?: ('account:read' | 'operations:request')[] | undefined;
+    permissions?:
+      | ('account:read' | 'operations:request' | 'transfers:request')[]
+      | undefined;
     expires_at?: string | undefined;
     grant_id?: string | undefined;
     request_id: string;
@@ -930,7 +939,9 @@ export declare class OnboardingService {
     token: string,
   ): Promise<{
     account_id?: string | undefined;
-    permissions?: ('account:read' | 'operations:request')[] | undefined;
+    permissions?:
+      | ('account:read' | 'operations:request' | 'transfers:request')[]
+      | undefined;
     expires_at?: string | undefined;
     grant_id?: string | undefined;
     request_id: string;
@@ -990,7 +1001,9 @@ export declare class OnboardingService {
     },
   ): Promise<{
     account_id?: string | undefined;
-    permissions?: ('account:read' | 'operations:request')[] | undefined;
+    permissions?:
+      | ('account:read' | 'operations:request' | 'transfers:request')[]
+      | undefined;
     expires_at?: string | undefined;
     grant_id?: string | undefined;
     request_id: string;
@@ -1022,7 +1035,9 @@ export declare class OnboardingService {
     identity: OwnerIdentity,
   ): Promise<{
     account_id?: string | undefined;
-    permissions?: ('account:read' | 'operations:request')[] | undefined;
+    permissions?:
+      | ('account:read' | 'operations:request' | 'transfers:request')[]
+      | undefined;
     expires_at?: string | undefined;
     grant_id?: string | undefined;
     request_id: string;
@@ -1033,7 +1048,9 @@ export declare class OnboardingService {
     {
       id: string;
       application: string;
-      permissions: ('account:read' | 'operations:request')[];
+      permissions: (
+        'account:read' | 'operations:request' | 'transfers:request'
+      )[];
       state: 'revoked' | 'suspended' | 'active';
       expiresAt: number;
     }[]
@@ -2021,7 +2038,7 @@ export interface DatabaseEnrollmentOptions {
 [Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/storage/types.ts).
 
 ```ts
-/** Insert only from the host's trusted exact-action approval flow, never an HTTP body. */
+/** Insert only from the host's trusted exact-action authorization flow, never an HTTP body. */
 export interface FinancialApproval {
   ownerSubject: string;
   caller: Pick<VerifiedPrincipal, 'issuer' | 'subject' | 'clientId'>;
@@ -2310,7 +2327,7 @@ export interface TransferInput {
 
 ```ts
 export interface TransferPolicy {
-  profile: 'owner-approved-erc3009-v1';
+  profile: 'provider-authorized-erc3009-v1';
   token: {
     address: string;
     name: string;

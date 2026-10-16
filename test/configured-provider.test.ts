@@ -1,4 +1,7 @@
 import { randomUUID } from 'node:crypto';
+import { createRequire } from 'node:module';
+import type { Permission, ProviderState } from '../src/onboarding/types.js';
+import * as financialStorage from '../src/storage/financial.js';
 import { mkdtemp, rm, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -102,7 +105,7 @@ function cli(args: string[], cwd: string) {
     process.execPath,
     [
       '--import',
-      import.meta.resolve('tsx'),
+      createRequire(import.meta.url).resolve('tsx'),
       join(process.cwd(), 'src/main.ts'),
       ...args,
     ],
@@ -114,8 +117,16 @@ function cli(args: string[], cwd: string) {
     },
   );
 }
-async function fixture(backend?: ProviderConfiguration['backend']) {
+async function fixture(
+  backend?: ProviderConfiguration['backend'],
+  accessPermissions: Permission[] = ['account:read', 'transfers:request'],
+) {
   const config = await template();
+  config.policy.applications[0].permissions = [
+    'account:read',
+    'operations:request',
+    'transfers:request',
+  ];
   if (backend) config.backend = backend;
   config.storage.directory = await folder();
   config.activation = {
@@ -130,7 +141,7 @@ async function fixture(backend?: ProviderConfiguration['backend']) {
   };
   const recipient = Wallet.createRandom().address;
   config.financial = {
-    profile: 'owner-approved-erc3009-v1',
+    profile: 'provider-authorized-erc3009-v1',
     token: {
       address: Wallet.createRandom().address,
       name: 'Test Token',
@@ -169,7 +180,7 @@ async function fixture(backend?: ProviderConfiguration['backend']) {
     start: vi.fn(async () => 'https://login.example.com/authorize'),
     finish: vi.fn(async () => ({
       sessionToken: 'a'.repeat(43),
-      requestId: 'actions/' + randomUUID(),
+      requestId: 'access',
     })),
     session: async (token) => {
       if (!['a'.repeat(43), 'b'.repeat(43), 'd'.repeat(43)].includes(token))
@@ -239,12 +250,23 @@ async function fixture(backend?: ProviderConfiguration['backend']) {
     authorization_details: [
       {
         type: 'https://moovha.com/wallet/account-access',
-        actions: ['account:read', 'operations:request'],
+        actions: accessPermissions,
       },
     ],
   });
   expect(request.statusCode).toBe(200);
   const requestId = request.json().request_id;
+  if (accessPermissions.includes('transfers:request')) {
+    const consentPage = await app.inject({
+      url: '/onboarding/' + requestId,
+      headers: { cookie: '__Host-wpk-session=' + 'a'.repeat(43) },
+    });
+    expect(consentPage.body).toContain(
+      'without asking you to approve each transfer again',
+    );
+    expect(consentPage.body).toContain(recipient);
+    expect(consentPage.body).toContain('0.0001 TEST');
+  }
   expect(
     (await form('/onboarding/' + requestId, { decision: 'approve' }))
       .statusCode,
@@ -367,7 +389,7 @@ describe('configuration convention and CLI', () => {
   });
 });
 
-describe('configured API and hosted owner approval', () => {
+describe('configured API and provider transfer authorization', () => {
   it('loads only versioned local custom adapters at run time', async () => {
     const config = await template();
     const dir = await folder();
@@ -400,48 +422,34 @@ describe('configured API and hosted owner approval', () => {
     expect(f.config.backend.kind).toBe('cdp');
   });
 
-  it('constructs fixed typed data, requires exact owner approval, signs once and replays after restart', async () => {
+  it('authorizes the application request under policy without another owner prompt, signs once and replays after restart', async () => {
     const f = await fixture();
     const key = randomUUID();
     const receipt = (await f.request('100', key)).json();
-    expect(receipt.status).toBe('approval_required');
+    expect(receipt.status).toBe('authorized');
+    expect(receipt).not.toHaveProperty('approval_url');
     expect((await f.request('100', key)).json()).toEqual(receipt);
     expect((await f.request('99', key)).statusCode).toBe(409);
     const signPath = '/v1/actions/' + receipt.action_id + '/sign';
-    expect((await f.api(signPath, {})).statusCode).toBe(403);
     expect(
-      (
-        await f.form(
-          '/onboarding/actions/' + receipt.action_id,
-          { decision: 'approve' },
-          'd',
-        )
-      ).statusCode,
-    ).toBe(403);
-    expect(
-      (
-        await f.form(
-          '/onboarding/actions/' + receipt.action_id,
-          { decision: 'approve' },
-          'a',
-          'https://attacker.example',
-        )
-      ).statusCode,
-    ).toBe(403);
-    const page = await f.app.inject({
-      url: '/onboarding/actions/' + receipt.action_id,
-      headers: { cookie: '__Host-wpk-session=' + 'a'.repeat(43) },
-    });
-    expect(page.statusCode).toBe(200);
-    expect(page.body).toContain(f.recipient);
-    expect(page.body).toContain('0.0001 TEST');
+      (await f.app.inject('/onboarding/actions/' + receipt.action_id))
+        .statusCode,
+    ).toBe(404);
     expect(
       (
         await f.form('/onboarding/actions/' + receipt.action_id, {
           decision: 'approve',
         })
       ).statusCode,
-    ).toBe(200);
+    ).toBe(404);
+    const db = openProviderDatabase({ directory: f.config.storage.directory });
+    const saved = await db.onboardingStore.transaction(
+      (state) => state.supportedActions![receipt.action_id],
+    );
+    expect(saved.approval.consentReference).toBe(f.grant.request_id);
+    expect(saved.approval.caller.subject).toBe('application-service');
+    expect(saved.approval.ownerSubject).not.toBe('application-service');
+    db.close();
     const signed = await f.api(signPath, {});
     expect(signed.statusCode, signed.body).toBe(200);
     expect(recoverAddress(receipt.payload_hash, signed.json().signature)).toBe(
@@ -458,6 +466,167 @@ describe('configured API and hosted owner approval', () => {
     await f.restart();
     expect((await f.api(signPath, {})).json()).toEqual(signed.json());
     expect(injected.backend!.signTypedData).toHaveBeenCalledTimes(1);
+  });
+  it('does not turn a request-only access grant or an OAuth scope into transfer delegation', async () => {
+    const f = await fixture(undefined, ['account:read', 'operations:request']);
+    expect((await f.request('1')).statusCode).toBe(403);
+    expect(injected.backend!.signTypedData).not.toHaveBeenCalled();
+    const old = structuredClone(f.config);
+    (old.financial as unknown as { profile: string }).profile =
+      'owner-approved-erc3009-v1';
+    expect(() => validateProviderConfiguration(old)).toThrow(
+      'Invalid provider configuration',
+    );
+  });
+  it.each([
+    'consent',
+    'delegation terms',
+    'grant expiry',
+    'KYC expiry',
+    'owner binding',
+    'paused access',
+    'caller binding',
+  ])(
+    'denies new requests and signing when current %s is invalid',
+    async (condition) => {
+      const f = await fixture();
+      const receipt = (await f.request('1')).json();
+      const db = openProviderDatabase({
+        directory: f.config.storage.directory,
+      });
+      await db.onboardingStore.transaction((state: ProviderState) => {
+        const grant = state.grants[f.grant.grant_id];
+        const source = state.requests[grant.requestId];
+        const account = state.accounts[grant.accountId];
+        switch (condition) {
+          case 'consent':
+            delete source.consent;
+            break;
+          case 'delegation terms':
+            grant.transferPolicyRevision = 'superseded';
+            break;
+          case 'grant expiry':
+            grant.expiresAt = Date.now() - 1;
+            break;
+          case 'KYC expiry':
+            account.acceptedUntil = Date.now() - 1;
+            break;
+          case 'owner binding':
+            account.owner = 'another-owner';
+            break;
+          case 'paused access':
+            grant.state = 'suspended';
+            break;
+          case 'caller binding':
+            source.caller = {
+              ...source.caller,
+              subject: 'another-application-subject',
+            };
+            break;
+        }
+      });
+      db.close();
+      expect((await f.request('1')).statusCode).toBe(403);
+      expect(
+        (await f.api('/v1/actions/' + receipt.action_id + '/sign', {}))
+          .statusCode,
+      ).toBe(403);
+      expect(injected.backend!.signTypedData).not.toHaveBeenCalled();
+    },
+  );
+  it('resumes an interrupted authorization with the same immutable action before signing', async () => {
+    const f = await fixture();
+    const key = randomUUID();
+    const store = financialStorage.storeApproval;
+    vi.spyOn(financialStorage, 'storeApproval').mockImplementationOnce(
+      (connection, approval) => {
+        store(connection, approval);
+        throw new Error('interrupted after durable approval');
+      },
+    );
+    expect((await f.request('1', key)).statusCode).toBe(500);
+    const db = openProviderDatabase({ directory: f.config.storage.directory });
+    const partial = await db.onboardingStore.transaction(
+      (state) => Object.values(state.supportedActions!)[0],
+    );
+    expect(partial.status).toBe('authorizing');
+    expect(
+      (
+        await f.api(
+          '/v1/actions/' + partial.approval.action.action_id + '/sign',
+          {},
+        )
+      ).statusCode,
+    ).toBe(403);
+    const receipt = (await f.request('1', key)).json();
+    expect(receipt.status).toBe('authorized');
+    expect(receipt.action_id).toBe(partial.approval.action.action_id);
+    expect(receipt.payload_hash).toBe(partial.approval.action.payload_hash);
+    expect(
+      (await f.api('/v1/actions/' + receipt.action_id + '/sign', {}))
+        .statusCode,
+    ).toBe(200);
+    expect(injected.backend!.signTypedData).toHaveBeenCalledTimes(1);
+    db.close();
+  });
+  it('coalesces concurrent application requests and records one provider authorization', async () => {
+    const f = await fixture();
+    const key = randomUUID();
+    const receipts = await Promise.all([
+      f.request('1', key),
+      f.request('1', key),
+    ]);
+    expect(receipts.every((r) => r.statusCode === 200)).toBe(true);
+    expect(receipts[0].json()).toEqual(receipts[1].json());
+    const db = openProviderDatabase({ directory: f.config.storage.directory });
+    const events = await db.onboardingStore.transaction((state) =>
+      state.audit.filter((e) => e.event === 'action_provider_authorized'),
+    );
+    expect(events).toHaveLength(1);
+    expect(injected.backend!.signTypedData).not.toHaveBeenCalled();
+    db.close();
+  });
+  it('requires new transfer consent after changed policy terms and reuses current accepted KYC', async () => {
+    const f = await fixture();
+    const db = openProviderDatabase({ directory: f.config.storage.directory });
+    const before = await db.onboardingStore.transaction(
+      (state) => state.accounts[f.grant.account_id],
+    );
+    const changed = structuredClone(f.config);
+    changed.financial!.maximumAmount = '99';
+    await f.restart(changed);
+    expect((await f.request('1')).statusCode).toBe(403);
+    const request = (
+      await f.api('/v1/access-requests', {
+        mode: 'connect',
+        account_id: f.grant.account_id,
+        authorization_details: [
+          {
+            type: 'https://moovha.com/wallet/account-access',
+            actions: ['account:read', 'transfers:request'],
+          },
+        ],
+      })
+    ).json();
+    expect(request.status).toBe('consent_required');
+    expect(
+      (
+        await f.form('/onboarding/' + request.request_id, {
+          decision: 'approve',
+        })
+      ).statusCode,
+    ).toBe(302);
+    const after = await db.onboardingStore.transaction(
+      (state) => state.accounts[f.grant.account_id],
+    );
+    expect(after).toEqual(before);
+    const receipt = (await f.request('1')).json();
+    expect(receipt.status).toBe('authorized');
+    expect(
+      (await f.api('/v1/actions/' + receipt.action_id + '/sign', {}))
+        .statusCode,
+    ).toBe(200);
+    db.close();
   });
   it('denies changed payload fields, unapproved recipients, exceeded amount/lifetime caps and scope-only callers', async () => {
     const f = await fixture();
@@ -501,10 +670,6 @@ describe('configured API and hosted owner approval', () => {
     ).toBe(403);
     for (const count of [1, 2]) {
       const id = (await f.request()).json().action_id;
-      expect(
-        (await f.form('/onboarding/actions/' + id, { decision: 'approve' }))
-          .statusCode,
-      ).toBe(200);
       expect((await f.api('/v1/actions/' + id + '/sign', {})).statusCode).toBe(
         count === 1 ? 200 : 503,
       );
@@ -514,7 +679,6 @@ describe('configured API and hosted owner approval', () => {
   it('blocks replay after grant revocation and invalidates approvals after policy changes', async () => {
     const f = await fixture();
     const id = (await f.request()).json().action_id;
-    await f.form('/onboarding/actions/' + id, { decision: 'approve' });
     expect((await f.api('/v1/actions/' + id + '/sign', {})).statusCode).toBe(
       200,
     );
@@ -538,7 +702,6 @@ describe('configured API and hosted owner approval', () => {
   it('retains unknown attempts across restart and never dispatches another signature', async () => {
     const f = await fixture();
     const id = (await f.request()).json().action_id;
-    await f.form('/onboarding/actions/' + id, { decision: 'approve' });
     injected.backend!.signTypedData = vi.fn(async () => {
       throw new Error('lost response');
     });
@@ -567,30 +730,29 @@ describe('configured API and hosted owner approval', () => {
       403,
     );
   });
-  it('preserves action records, denies expired/declined work and prevents database reuse with another provider binding', async () => {
+  it('preserves action records, denies expired/revoked work and prevents database reuse with another provider binding', async () => {
     const f = await fixture();
     const receipt = (await f.request('1')).json();
     const capabilities = (await f.app.inject('/v1/capabilities')).json();
     expect(capabilities.configuration_profile).toBe('provider-service-v1');
-    expect(capabilities.action_profiles).toEqual(['owner-approved-erc3009-v1']);
-    await f.form('/onboarding/actions/' + receipt.action_id, {
-      decision: 'deny',
-    });
+    expect(capabilities.action_profiles).toEqual([
+      'provider-authorized-erc3009-v1',
+    ]);
+    const db = openProviderDatabase({ directory: f.config.storage.directory });
+    await db.revokeAction(receipt.action_id);
+    db.close();
     await f.restart();
     const read = await f.app.inject({
       url: '/v1/transfer-authorizations/' + receipt.action_id,
       headers: { authorization: await f.token() },
     });
     expect(read.statusCode).toBe(200);
-    expect(read.json().status).toBe('denied');
+    expect(read.json().status).toBe('authorized');
     expect(
       (await f.api('/v1/actions/' + receipt.action_id + '/sign', {}))
         .statusCode,
     ).toBe(403);
     const expired = (await f.request('1')).json();
-    await f.form('/onboarding/actions/' + expired.action_id, {
-      decision: 'approve',
-    });
     vi.spyOn(Date, 'now').mockReturnValue(Date.parse(expired.expires_at) + 1);
     expect(
       (await f.api('/v1/actions/' + expired.action_id + '/sign', {}))
@@ -612,7 +774,6 @@ describe('configured API and hosted owner approval', () => {
   it('allows one signature dispatch under concurrent API calls', async () => {
     const f = await fixture();
     const id = (await f.request('1')).json().action_id;
-    await f.form('/onboarding/actions/' + id, { decision: 'approve' });
     const responses = await Promise.all([
       f.api('/v1/actions/' + id + '/sign', {}),
       f.api('/v1/actions/' + id + '/sign', {}),
@@ -626,7 +787,6 @@ describe('configured API and hosted owner approval', () => {
   it('rechecks revocation after durable claim before calling the signer', async () => {
     const f = await fixture();
     const id = (await f.request('1')).json().action_id;
-    await f.form('/onboarding/actions/' + id, { decision: 'approve' });
     const authorize = SupportedActions.prototype.authorize;
     let checks = 0;
     vi.spyOn(SupportedActions.prototype, 'authorize').mockImplementation(
@@ -652,7 +812,6 @@ describe('configured API and hosted owner approval', () => {
   it('fences older running configurations and does not revive approvals on policy rollback', async () => {
     const f = await fixture();
     const id = (await f.request('1')).json().action_id;
-    await f.form('/onboarding/actions/' + id, { decision: 'approve' });
     const next = structuredClone(f.config);
     next.financial!.maximumAmount = '99';
     const replacement = await createConfiguredProvider(next);
@@ -683,9 +842,6 @@ describe('configured API and hosted owner approval', () => {
       passphrase: { env: 'OWS_OWNER_PASSPHRASE' },
     });
     const receipt = (await f.request('1')).json();
-    await f.form('/onboarding/actions/' + receipt.action_id, {
-      decision: 'approve',
-    });
     const signed = await f.api(
       '/v1/actions/' + receipt.action_id + '/sign',
       {},
@@ -755,9 +911,6 @@ describe('configured API and hosted owner approval', () => {
       signers: [signer],
     });
     const receipt = (await f.request('1')).json();
-    await f.form('/onboarding/actions/' + receipt.action_id, {
-      decision: 'approve',
-    });
     const signed = await f.api(
       '/v1/actions/' + receipt.action_id + '/sign',
       {},

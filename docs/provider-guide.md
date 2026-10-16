@@ -57,6 +57,21 @@ See [assets and gas sponsorship](assets-and-gas.md) for the coverage contract
 and implementation status. The provider kit does not itself supply live Moovha
 sponsorship or settlement.
 
+## Configured transfer delegation
+
+The supported `provider-authorized-erc3009-v1` profile accepts transfer requests
+from admitted applications on behalf of the account owner. Explicitly configure
+and obtain `transfers:request` consent during onboarding. The provider checks the
+stored delegation and consent terms, current owner/grant/KYC, token/recipient/amount
+policy, immutable exact action and durable budget/attempt authority. It authorises
+signing without a second owner approval prompt. The application is trusted to
+request transfers within that delegation; OAuth scopes alone are insufficient.
+Changed financial terms revoke old transfer delegations and require renewed consent,
+while still-current accepted KYC can be reused. See [setup and migration](setup.md#supported-financial-policy).
+
+The advanced interfaces below retain host-owned exact-action authorization; they
+do not automatically turn request-only grants into spending authority.
+
 ## Compose the service
 
 Wire together `createServer`, `createAuthenticator`, `EmbeddedWalletService` and

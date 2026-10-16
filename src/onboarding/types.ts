@@ -8,7 +8,16 @@ import type {
 } from '../domain/attempt-journal.js';
 
 export const accessType = 'https://moovha.com/wallet/account-access';
-export const permissions = ['account:read', 'operations:request'] as const;
+export const permissions = [
+  'account:read',
+  'operations:request',
+  'transfers:request',
+] as const;
+/** Transfer delegation must be explicitly enabled; it is never a default permission. */
+export const defaultPermissions: readonly Permission[] = [
+  'account:read',
+  'operations:request',
+];
 export type Permission = (typeof permissions)[number];
 export type Vendor = 'didit' | 'sumsub';
 export interface AccessInput {
@@ -80,6 +89,8 @@ export interface AccessRequest {
   owner?: string;
   ownerIdentity?: Pick<OwnerIdentity, 'issuer' | 'subject'>;
   consent?: { at: number; revision: string; privacyUrl: string };
+  /** Financial-policy terms explicitly consented to for delegated transfers. */
+  transferPolicyRevision?: string;
   denied?: boolean;
   fundingRequired?: boolean;
   evidence?: IdentityEvidence;
@@ -110,6 +121,7 @@ export interface AccountRecord {
   address?: string;
 }
 export interface AccessGrant {
+  transferPolicyRevision?: string;
   id: string;
   requestId: string;
   accountId: string;

@@ -1,4 +1,5 @@
 import { getAddress } from 'ethers';
+import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { JournaledProviderOptions } from '../domain/attempt-journal.js';
@@ -52,7 +53,7 @@ export async function createConfiguredBackend(
 ): Promise<ConfiguredBackend> {
   if (config.kind === 'ows') {
     try {
-      import.meta.resolve('@open-wallet-standard/core');
+      createRequire(import.meta.url).resolve('@open-wallet-standard/core');
     } catch {
       throw new ConfigurationError([
         '/backend: install the pinned optional OWS engine',

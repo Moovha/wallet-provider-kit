@@ -269,13 +269,13 @@ async function copy() {
       <p>
         Request access → owner login and consent → funded identity and staff
         review → poll for a grant → provision → read account. With transfer
-        signing: request exact approval → owner approves → poll → sign.
+        signing: application requests transfer → provider authorizes → sign.
         Submission, gas and settlement follow separately.
       </p>
       <p>
-        Hosted login, consent, reviewer and approval pages use browser sessions,
-        not application bearer tokens. Open returned consent/approval URLs as
-        top-level navigation.
+        Hosted login, consent, access management and provider review pages use
+        browser sessions, not application bearer tokens. Open returned consent
+        URLs as top-level navigation.
       </p>
       <a
         :href="docs + 'http-api.html'"

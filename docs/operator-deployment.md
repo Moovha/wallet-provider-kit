@@ -171,8 +171,8 @@ using its [service instructions](https://caddyserver.com/docs/running). Your hos
 platform may already provide an equivalent managed ingress instead.
 Check `https://wallet.your-company.com/health/live` returns 200 with a trusted
 certificate. Readiness should still be 503 while disabled. Do not expose configuration,
-secret files, SQLite/vault files or proxy logs containing tokens/approval URLs.
-Do not frame the hosted consent/approval pages; open them as top-level navigation.
+secret files, SQLite/vault files or proxy logs containing tokens/consent URLs.
+Do not frame the hosted consent/access pages; open them as top-level navigation.
 
 ## Optional CDP/Relayer container path
 
@@ -216,7 +216,7 @@ Before admitting real traffic, retain reviewable evidence for your exact environ
 | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
 | Backend acceptance           | Supported network/account type, exact account binding, restart/replay, concurrent denial and uncertain-result handling for the selected backend |
 | Recovery acceptance          | Restorable private records and backend/vault access, retained assignments/attempts, recovery of unknown outcomes without replacement effects    |
-| Token acceptance, if signing | Exact Base Sepolia ERC-3009 contract/domain, recipients, limits, owner approval and independently verified signature behavior                   |
+| Token acceptance, if signing | Exact Base Sepolia ERC-3009 contract/domain, recipients, limits, delegation consent and independently verified signature behavior               |
 | Service acceptance           | Compatible owner login/API tokens, vendor test workflow/sharing, funded identity costs, staff review, consent, revocation and HTTPS operation   |
 
 Use the [conformance checklist](conformance.md), your selected backend guide and
@@ -261,13 +261,14 @@ The developer integrates these stages using [the HTTP guide](http-api.md),
 2. Complete owner login, consent, funded identity verification/import and staff
    acceptance. Poll for the accepted account/grant; do not assume instant approval.
 3. Provision the accepted account with an empty JSON body and retain its ID.
-4. If signing is configured, request an exact transfer authorization, send the owner
-   to its returned approval URL, poll approval, then sign the approved stored action.
+4. If signing is configured, obtain `transfers:request` delegation during onboarding,
+   request an exact transfer authorization, then sign the provider-authorized
+   stored action. There is no additional owner approval URL or browser prompt.
 5. Arrange submission, gas and settlement separately. A signature is not a receipt.
 
 Use UUIDv4 `Idempotency-Key` values for mutation requests and preserve each original
 key across retries. OAuth authentication, application-access consent and exact
-transfer approval are distinct. Owners manage access at `/onboarding/access`;
+provider transfer authorization are distinct. Owners manage access at `/onboarding/access`;
 staff use `/onboarding/review`. No adapter development is required for this flow.
 
 ## Keep it operating
@@ -321,7 +322,7 @@ sudo systemctl status wallet-provider
 
 For maintenance use `sudo systemctl stop wallet-provider`; after a reviewed config
 replacement use `sudo systemctl start wallet-provider`. Restrict access to the
-service's journal/logs and avoid proxy request logging of approval/token URLs.
+service's journal/logs and avoid proxy request logging of consent/token URLs.
 See [systemd service behavior](https://www.freedesktop.org/software/systemd/man/latest/systemd.service.html).
 On macOS or a managed host, use its supported process supervisor with the same
 account, absolute command and persistent directories; this Linux unit is not portable.
@@ -362,7 +363,8 @@ See [storage recovery](storage.md#recovery-backup-and-operations) and
 For later changes, import the prior configuration, preserve the public origin and
 backend binding, and review policy consequences. Policy/workflow changes may revoke
 grants and invalidate approvals; changing financial policy also invalidates prior
-approvals. Never reinitialize storage, replace assigned signers, clear unknown
+authorizations and revokes transfer delegations tied to old terms; renew consent
+while reusing still-current KYC. Never reinitialize storage, replace assigned signers, clear unknown
 attempts or roll back policy to force a retry. Uncertain financial reconciliation
 currently needs the advanced trusted storage interface and independently verified
 evidence; there is no operator wizard button for it.

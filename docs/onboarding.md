@@ -3,7 +3,7 @@
 For the standard deployment, [configure the service](setup.md) without host code.
 The programmatic onboarding-only profile below remains available for advanced
 composition and deliberately denies signing; the configured service can add the
-separate owner-approved transfer profile.
+provider-authorized transfer profile with explicit onboarding delegation.
 
 Give users one clear path to open a wallet, share identity evidence and choose
 which applications can use their account. Your provider keeps acceptance,
@@ -73,7 +73,7 @@ configuration modules from HTTP input.
 | Identity           | Provider review is required; importing an approved vendor profile never accepts a customer automatically.                        |
 | Freshness          | Identity evidence no older than 365 days; configure a shorter period for your product.                                           |
 | Access duration    | At most 30 days, also bounded by the provider's identity acceptance expiry.                                                      |
-| Permissions        | `account:read` and `operations:request`, separately requested and checked.                                                       |
+| Permissions        | `account:read`, `operations:request` and optional `transfers:request`, separately requested and checked.                         |
 | Verification costs | Requester-funded under an agreed contract and monthly cap. Missing prices or agreements pause paid work.                         |
 | Wallet creation    | Separate authorized request after acceptance and consent, with one durable attempt per account.                                  |
 | Signing            | No signing in the ready-made onboarding profile. An exact-action authority and its financial journal are a separate integration. |
@@ -159,6 +159,15 @@ is granted. No name, document, evidence reference or login subject is returned.
 | `POST /v1/access-requests/{id}/identity` | `wallet:access`       | Submit `vendor` (`didit`/`sumsub`) and opaque `share_token`, after owner consent.             |
 | `GET /v1/accounts/{id}`                  | `wallet:account:read` | Read address/status through a current `account:read` grant.                                   |
 | `POST /v1/accounts/{id}/provision`       | `wallet:provision`    | Create the accepted account's wallet through current access and a durable journal.            |
+
+The configured transfer profile uses `transfers:request`: an explicit owner
+consent for the application to request transfers on their behalf under the
+provider's financial policy. The onboarding screen shows token/domain, recipients
+and limits. Consent is stored with the financial-policy revision and reused for
+subsequent requests. The provider authorises each exact immutable action and
+rechecks current access, KYC, consent, policy and budget before signing. There is
+no per-transfer owner prompt. Changed financial terms revoke the old delegation;
+new consent can reuse still-current accepted KYC.
 
 `operations:request` means an application may ask the financial host to prepare
 an operation. It is never unrestricted signing permission. The ready-made

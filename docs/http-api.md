@@ -155,20 +155,20 @@ owner. For bundled onboarding, the issuer and client ID must match an allowed
 `policy.applications[]` entry; its `name` is shown on the consent screen. The
 separate `ownerLogin.clientId` configures the provider's own login integration.
 
-| Method and path                                 | Required scope        | Required configured profile                                                                           |
-| ----------------------------------------------- | --------------------- | ----------------------------------------------------------------------------------------------------- |
-| `GET /v1/capabilities`                          | None                  | None; `configured` reflects readiness                                                                 |
-| `POST /v1/accounts/{accountId}/provision`       | `wallet:provision`    | Financial host or accepted onboarding/enrollment host                                                 |
-| `POST /v1/actions/{actionId}/sign`              | `wallet:sign`         | Configured owner-approved transfer profile or advanced financial host; onboarding-only denies signing |
-| `POST /v1/transfer-authorizations`              | `wallet:actions`      | Configured owner-approved transfer profile                                                            |
-| `GET /v1/transfer-authorizations/{actionId}`    | `wallet:actions:read` | Configured owner-approved transfer profile                                                            |
-| `POST /v1/access-requests`                      | `wallet:access`       | Onboarding                                                                                            |
-| `GET /v1/access-requests/{requestId}`           | `wallet:access:read`  | Onboarding                                                                                            |
-| `POST /v1/access-requests/{requestId}/identity` | `wallet:access`       | Onboarding, owner consent and agreed vendor policy                                                    |
-| `GET /v1/accounts/{accountId}`                  | `wallet:account:read` | Onboarding with current `account:read` grant                                                          |
-| `POST /v1/enrollments`                          | `wallet:enroll`       | Lower-level enrollment                                                                                |
-| `POST /v1/enrollments/{enrollmentId}/identity`  | `wallet:enroll`       | Lower-level enrollment                                                                                |
-| `GET /v1/enrollments/{enrollmentId}`            | `wallet:enroll:read`  | Lower-level enrollment                                                                                |
+| Method and path                                 | Required scope        | Required configured profile                                                                                |
+| ----------------------------------------------- | --------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `GET /v1/capabilities`                          | None                  | None; `configured` reflects readiness                                                                      |
+| `POST /v1/accounts/{accountId}/provision`       | `wallet:provision`    | Financial host or accepted onboarding/enrollment host                                                      |
+| `POST /v1/actions/{actionId}/sign`              | `wallet:sign`         | Configured provider-authorized transfer profile or advanced financial host; onboarding-only denies signing |
+| `POST /v1/transfer-authorizations`              | `wallet:actions`      | Configured provider-authorized transfer profile                                                            |
+| `GET /v1/transfer-authorizations/{actionId}`    | `wallet:actions:read` | Configured provider-authorized transfer profile                                                            |
+| `POST /v1/access-requests`                      | `wallet:access`       | Onboarding                                                                                                 |
+| `GET /v1/access-requests/{requestId}`           | `wallet:access:read`  | Onboarding                                                                                                 |
+| `POST /v1/access-requests/{requestId}/identity` | `wallet:access`       | Onboarding, owner consent and agreed vendor policy                                                         |
+| `GET /v1/accounts/{accountId}`                  | `wallet:account:read` | Onboarding with current `account:read` grant                                                               |
+| `POST /v1/enrollments`                          | `wallet:enroll`       | Lower-level enrollment                                                                                     |
+| `POST /v1/enrollments/{enrollmentId}/identity`  | `wallet:enroll`       | Lower-level enrollment                                                                                     |
+| `GET /v1/enrollments/{enrollmentId}`            | `wallet:enroll:read`  | Lower-level enrollment                                                                                     |
 
 Optional routes appear in OpenAPI even when unavailable. Choose onboarding or
 enrollment, not both. Hosted `/onboarding/*` login/consent/review pages are
@@ -253,7 +253,7 @@ logging request bodies, authorization headers or raw URLs.
 | --------------- | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
 | 400 / 413 / 415 | `invalid_request`                                          | Fix schema, body size or content type                                                                       |
 | 401             | `invalid_token`                                            | Obtain an appropriate access token from the trusted issuer                                                  |
-| 403             | `insufficient_scope`, `wallet_authorization_denied`        | Obtain required access or owner approval; don't retry a denied spend automatically                          |
+| 403             | `insufficient_scope`, `wallet_authorization_denied`        | Obtain required delegation or policy authorization; don't retry a denied spend automatically                |
 | 409             | `wallet_attempt_conflict`, `wallet_attempt_pending`        | Correct request identity or inspect the original pending attempt; don't generate a fresh financial identity |
 | 422             | `wallet_provider_input`, `wallet_identity_invalid`         | Correct host action/evidence/profile compatibility                                                          |
 | 429             | `rate_limited`                                             | Respect service quotas; financial budget/admission remains separate                                         |

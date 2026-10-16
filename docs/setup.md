@@ -205,26 +205,27 @@ An application written in any language uses the
 [implemented OpenAPI](../spec/provider-api.json) with its scoped access token. `GET /v1/capabilities` reports readiness and the
 configured action profiles.
 POST requests require a UUIDv4 `Idempotency-Key`; keep it when retrying the same
-request. Application credentials do not represent the account owner's approval.
+request. Application credentials alone do not establish owner consent or transfer delegation.
 
 1. `POST /v1/access-requests` to create/connect; open its provider consent URL in
    the user's browser. The provider owns login, consent and identity-review pages.
 2. Poll `GET /v1/access-requests/{id}` for the approved account/grant and expiry.
 3. `POST /v1/accounts/{id}/provision` with `{}`; the kit creates the account once
    and stores its result. `GET /v1/accounts/{id}` reads the current account.
-4. When the configured financial profile is present, request a transfer, send the
-   user to exact-action approval, then sign the stored action as described below.
+4. When the financial profile is present, include `transfers:request` in onboarding
+   consent. Request a transfer on the user's behalf; the provider authorises its
+   exact details against policy. Sign the stored action without another owner prompt.
 
 Users pause/revoke access at `/onboarding/access`; staff review identity and
 reconcile uncertain account creation at `/onboarding/review`. These hosted pages
 can be linked from your product. Frame embedding is blocked; use browser navigation
-and server-side API consumption. Callback state and the approval URLs contain no
+and server-side API consumption. Callback state and the consent URLs contain no
 private keys. Your product may return users through its own navigation after polling;
 there is no arbitrary caller-supplied return URL.
 
 ## Supported financial policy
 
-The optional `owner-approved-erc3009-v1` profile builds an exact
+The optional `provider-authorized-erc3009-v1` profile builds an exact
 [ERC-3009 TransferWithAuthorization](https://eips.ethereum.org/EIPS/eip-3009) EIP-712
 message on **Base Sepolia, chain 84532**. Clients supply only account, recipient and
 integer atomic-unit amount. They cannot supply a digest, nonce, domain, arbitrary
@@ -236,7 +237,7 @@ your independently verified test-token configuration:
 
 ```json
 {
-  "profile": "owner-approved-erc3009-v1",
+  "profile": "provider-authorized-erc3009-v1",
   "token": {
     "address": "0x1111111111111111111111111111111111111111",
     "name": "Your verified token domain name",
@@ -255,10 +256,17 @@ your independently verified test-token configuration:
 reserved atomic units per account/token across all applications, including dispatched pending,
 failed and unknown dispatches. It does not reset on policy revisions or restart;
 it is not an on-chain balance, daily spending counter or settlement ledger. The
-validity window must be 60–3600 seconds and begins when requested, so approval must
-finish before expiry. A fresh request needs fresh owner approval.
+validity window must be 60–3600 seconds and begins when requested. Signing and
+submission must finish before expiry.
 
-Request with `wallet:actions` scope and a current `operations:request` grant:
+Explicitly allow `transfers:request` in the application's configured `permissions`
+and request it in the onboarding `authorization_details[0].actions`. The owner
+consents once to the delegation: the consent screen shows token/domain, network,
+recipients, per-transfer/lifetime limits and signature validity. Accepted KYC and
+provider acceptance are also required. `operations:request`, an access token or
+an account-read grant alone cannot authorise this transfer profile.
+
+Request with `wallet:actions` scope and a current `transfers:request` grant:
 
 ```http
 POST /v1/transfer-authorizations
@@ -269,25 +277,41 @@ Content-Type: application/json
 {"account_id":"<approved-account-uuid>","recipient":"<allowed-address>","amount":"1000000"}
 ```
 
-The receipt contains `action_id`, `approval_url`, approval `status`, expiry,
-`payload_hash` and the generated `payload`. Open `approval_url`; only the current
-account owner with a recent provider login can approve. The screen displays the
-application, amount, recipient, source, token/domain, network and expiry. Staff or
-application tokens cannot approve it. Owner form submissions require session CSRF
-and exact origin checks.
+The provider resolves the application/caller and account to the stored owner-bound
+transfer delegation, checks its consent and policy revision, current KYC, account
+binding, recipient and amount, then persists the exact immutable action and its
+financial authorization. The receipt contains `action_id`, `status: authorized`,
+expiry, `payload_hash` and generated `payload`. There is no `approval_url` or
+per-transfer owner login/approval. The application is trusted to request transfers
+on behalf of the user within this explicit delegation; the provider does not
+independently prove the user's interaction with the application's UI.
 
-Poll `GET /v1/transfer-authorizations/{actionId}` with `wallet:actions:read`. Once
-approved, call `POST /v1/actions/{actionId}/sign` with `wallet:sign`, a UUIDv4
-idempotency key and `{}`. The response contains the verified signature. Approval
-status is not a dispatch or settlement status. Current owner/grant/KYC/consent,
+Call `POST /v1/actions/{actionId}/sign` with `wallet:sign`, a UUIDv4 idempotency
+key and `{}`. The response contains the verified signature. The financial journal
+atomically reserves the lifetime budget at signing admission; an authorized receipt
+alone does not reserve budget, dispatch, submit or settle a transfer.
+`GET /v1/transfer-authorizations/{actionId}` with `wallet:actions:read` reads the
+stored status (`authorizing`, `authorized` or `denied`). A persistence interruption
+can leave `authorizing`; retry the original request with its original idempotency
+key and content to resume the same action and nonce. Such an action cannot sign
+until provider authorization is durably complete. Current owner/grant/KYC/consent,
 account binding, exact stored approval and policy revision are checked before
 admission, dispatch and successful-result replay. Retries use the original attempt
 and stored signature; concurrent requests cannot dispatch twice. Changed financial
-policy invalidates earlier action approvals; onboarding policy/vendor workflow
-changes also invalidate affected grants. Credential rotation does not. Policy activation is recorded in the database:
+policy invalidates earlier action authorizations and revokes transfer-delegation
+grants tied to the old terms. Reconnect and obtain new delegation consent; current
+accepted KYC can be reused when only financial terms changed. Onboarding
+policy/vendor workflow changes also invalidate affected grants. Credential rotation does not. Policy activation is recorded in the database:
 older running instances fail readiness, and superseded action approvals remain
 denied even if an earlier configuration is restored. Stop old instances before
 activating a new configuration; no configuration file is hot-reloaded.
+
+**Migration:** the former `owner-approved-erc3009-v1` configuration is rejected.
+Select `provider-authorized-erc3009-v1`, explicitly allow `transfers:request`, and
+establish a new owner-consented delegation. Old request-only grants and stored
+owner-approved actions are not upgraded into delegated spending authority. The
+old `/onboarding/actions/{actionId}` approval endpoints have been removed. The
+SQLite schema is unchanged; do not reinitialize existing storage.
 
 Signing can authorize movement when submitted to the token contract. Revoking
 application access or declining later work cannot invalidate an already-issued

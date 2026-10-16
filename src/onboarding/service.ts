@@ -65,6 +65,7 @@ export class OnboardingService {
     readonly store: OnboardingStore,
     adapters: IdentityAdapter[] = [],
     private readonly walletReader?: Pick<WalletSigningProvider, 'findAccount'>,
+    private readonly transferPolicyRevision?: string,
   ) {
     const resolved = defineOnboardingPolicy(input);
     this.policy = Object.freeze({
@@ -115,7 +116,12 @@ export class OnboardingService {
     if (
       !request ||
       request.revision !== this.policy.revision ||
-      (!allowExpired && request.expiresAt <= Date.now())
+      (!allowExpired && request.expiresAt <= Date.now()) ||
+      (request.input.authorization_details[0].actions.includes(
+        'transfers:request',
+      ) &&
+        (!this.transferPolicyRevision ||
+          request.transferPolicyRevision !== this.transferPolicyRevision))
     )
       deny();
     application(this.policy, { ...request.caller, scopes: [] });
@@ -139,7 +145,14 @@ export class OnboardingService {
   }
   private stateOf(state: ProviderState, request: AccessRequest) {
     if (request.denied) return 'denied';
-    if (request.revision !== this.policy.revision) return 'policy_changed';
+    if (
+      request.revision !== this.policy.revision ||
+      (request.input.authorization_details[0].actions.includes(
+        'transfers:request',
+      ) &&
+        request.transferPolicyRevision !== this.transferPolicyRevision)
+    )
+      return 'policy_changed';
     if (request.grantId) {
       const grant = state.grants[request.grantId];
       if (grant.state !== 'active') return grant.state;
@@ -191,6 +204,9 @@ export class OnboardingService {
       structuredClone(value),
       application(this.policy, context.principal),
     );
+    const delegatesTransfers =
+      input.authorization_details[0].actions.includes('transfers:request');
+    if (delegatesTransfers && !this.transferPolicyRevision) deny();
     const key = fingerprint([
       context.principal.issuer,
       context.principal.subject,
@@ -198,7 +214,9 @@ export class OnboardingService {
       'request',
       context.idempotencyKey,
     ]);
-    const hash = fingerprint(input);
+    const hash = delegatesTransfers
+      ? fingerprint([input, this.transferPolicyRevision])
+      : fingerprint(input);
     return this.store.transaction((state) => {
       const previous = state.idempotency[key];
       if (previous) {
@@ -214,6 +232,9 @@ export class OnboardingService {
         },
         input,
         revision: this.policy.revision,
+        ...(delegatesTransfers
+          ? { transferPolicyRevision: this.transferPolicyRevision }
+          : {}),
         createdAt: Date.now(),
         expiresAt: Date.now() + day,
         accountId: input.account_id ?? randomUUID(),
@@ -284,6 +305,9 @@ export class OnboardingService {
       owner: request.owner,
       caller: request.caller,
       permissions: [...request.input.authorization_details[0].actions],
+      ...(request.transferPolicyRevision
+        ? { transferPolicyRevision: request.transferPolicyRevision }
+        : {}),
       revision: this.policy.revision,
       expiresAt: Math.min(
         Date.now() + this.policy.access.maxAgeDays * day,
@@ -807,6 +831,33 @@ export class OnboardingService {
         (!permission || g.permissions.includes(permission)),
     );
     if (!grant) deny();
+    if (permission === 'transfers:request') {
+      const request = state.requests[grant.requestId];
+      const consent = request?.consent;
+      if (
+        !this.transferPolicyRevision ||
+        grant.transferPolicyRevision !== this.transferPolicyRevision ||
+        request?.transferPolicyRevision !== this.transferPolicyRevision ||
+        !consent ||
+        !Number.isFinite(consent.at) ||
+        consent.at > Date.now() ||
+        consent.revision !== this.policy.revision ||
+        request.revision !== this.policy.revision ||
+        request.denied ||
+        request.grantId !== grant.id ||
+        request.accountId !== accountId ||
+        request.owner !== grant.owner ||
+        !sameCaller(request.caller, principal) ||
+        !request.input.authorization_details[0].actions.includes(
+          'transfers:request',
+        ) ||
+        !application(this.policy, {
+          ...principal,
+          scopes: [],
+        }).permissions?.includes('transfers:request')
+      )
+        deny();
+    }
     return grant;
   }
   async authorize(

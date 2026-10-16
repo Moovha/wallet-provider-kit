@@ -2,7 +2,7 @@
 
 The default path is [configuration, deployment and API consumption](setup.md).
 A custom backend adapter replaces the wallet engine while retaining toolkit-owned
-login, grants, exact owner approval, financial policy and durable journals.
+login, grants, exact provider authorization, financial policy and durable journals.
 
 ## Versioned startup module
 

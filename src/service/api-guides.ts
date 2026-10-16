@@ -3,7 +3,7 @@ export interface OperationGuide {
   group: string;
   scope?: string;
   financial?: boolean;
-  permission?: 'account:read' | 'operations:request';
+  permission?: 'account:read' | 'operations:request' | 'transfers:request';
   prerequisite: string;
   success: string;
 }
@@ -63,35 +63,35 @@ export const operationGuides: Record<string, OperationGuide> = {
       '200: account_id and address, including authorized replay. This does not approve spending.',
   },
   requestTransferAuthorization: {
-    title: 'Request exact transfer approval',
-    group: 'Owner-approved transfers',
+    title: 'Request provider transfer authorization',
+    group: 'Provider-authorized transfers',
     scope: 'wallet:actions',
     financial: true,
-    permission: 'operations:request',
+    permission: 'transfers:request',
     prerequisite:
-      'Configured ERC-3009 profile, provisioned account and current operations:request grant. Recipient and integer base-unit amount must fit policy. Open the returned approval_url for separate owner approval.',
+      'Configured ERC-3009 profile, provisioned account and explicit transfers:request delegation recorded during onboarding. The provider checks current owner, identity, consent, recipient and amount limits without a second owner prompt.',
     success:
-      '200: approval_required with the exact payload and expiry. Neither approval nor this response submits a transaction.',
+      '200: authorized with the exact stored payload and expiry. Signing, submission and settlement are separate.',
   },
   getTransferAuthorization: {
-    title: 'Read transfer approval status',
-    group: 'Owner-approved transfers',
+    title: 'Read transfer authorization status',
+    group: 'Provider-authorized transfers',
     scope: 'wallet:actions:read',
     financial: true,
-    permission: 'operations:request',
+    permission: 'transfers:request',
     prerequisite:
       'Use the returned action_id with the authorized application/caller. Current owner/grant/identity and policy checks still apply.',
     success:
-      '200: approval_required, approved or denied. An approved action is not a signing or settlement receipt.',
+      '200: authorizing, authorized or denied. An authorized action is not a signing or settlement receipt.',
   },
   signAction: {
-    title: 'Sign the approved stored action',
-    group: 'Owner-approved transfers',
+    title: 'Sign the authorized stored action',
+    group: 'Provider-authorized transfers',
     scope: 'wallet:sign',
     financial: true,
-    permission: 'operations:request',
+    permission: 'transfers:request',
     prerequisite:
-      'Exact stored owner approval, current grant/identity/consent, unchanged policy and durable attempt authority. Empty JSON body. Preserve the original idempotency key, including after timeouts.',
+      'Exact stored provider authorization, current transfer delegation/identity/consent, unchanged policy, budget and durable attempt authority. Empty JSON body. Preserve the original idempotency key, including after timeouts.',
     success:
       '200: verified signature, including authorized replay. Submission, gas and settlement are separate; a signature may remain executable until its on-chain expiry.',
   },
