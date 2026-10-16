@@ -199,15 +199,15 @@ and durable attempt identity. The default CLI does not activate any adapter.
 
 ### Current adapter profile
 
-| Capability   | CDP adapter                                                                                  |
-| ------------ | -------------------------------------------------------------------------------------------- |
-| Network      | Base Sepolia, chain 84532 only.                                                              |
-| Account type | Externally owned account (EOA), revision 1. Contract accounts are unsupported.               |
-| Signing      | Exact approved EIP-712 typed data; digest, domain and recovered signer checked.              |
-| Key control  | App-controlled CDP API-key wallets; no keys or seed phrases exposed by the kit interface.    |
-| Recovery     | Read-only account lookup by stable opaque ID; the host supplies the durable attempt journal. |
-| Submission   | No broadcast, gas sponsorship or settlement implementation.                                  |
-| Evidence     | Offline adapter/service tests; live lifecycle and recovery remain unverified.                |
+| Capability   | CDP adapter                                                                                                                                                                                       |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Network      | Base Sepolia, chain 84532 only.                                                                                                                                                                   |
+| Account type | Externally owned account (EOA), revision 1. Contract accounts are unsupported.                                                                                                                    |
+| Signing      | Exact approved EIP-712 typed data; digest, domain and recovered signer checked.                                                                                                                   |
+| Key control  | App-controlled CDP API-key wallets; no keys or seed phrases exposed by the kit interface.                                                                                                         |
+| Recovery     | Read-only account lookup by stable opaque ID; the host supplies the durable attempt journal.                                                                                                      |
+| Submission   | No broadcast, gas sponsorship or settlement implementation.                                                                                                                                       |
+| Evidence     | Offline tests plus [limited live CDP staging](conformance.md#isolated-cdp-staging-exercise-16-october-2026) for provisioning and recovery. External login/KYC and live signing remain unverified. |
 
 Use this supported profile when evaluating your integration; a backend SDK
 method or vendor feature alone does not establish account compatibility.
@@ -223,8 +223,12 @@ signature cannot trigger subsequent gas funding.
 
 The CDP adapter uses the vendor's public authentication helper, fixed vendor URL,
 explicit credentials, ten-second HTTP timeout, bounded response bytes, no
-redirects and no automatic mutation retries. Its name is `moovha-<opaque UUID>`;
-phone numbers and customer identifiers never go to the vendor as names. It checks
+redirects and no automatic mutation retries. Its name is `mw-<opaque UUID without hyphens>`
+(35 characters, within CDP's 36-character limit); every UUID bit is retained for
+deterministic read-only recovery. Never rename an existing account or reset a durable
+attempt to adopt this format. Previously rejected attempts remain rejected;
+uncertain attempts require reconciliation before any further provider effects.
+Phone numbers and customer identifiers never go to the vendor as names. It checks
 Base Sepolia chain 84532, EOA revision 1, a 32 KiB
 payload, expiry, matching domain, primary type, CAIP-10 address and digest, then
 verifies the returned signature.

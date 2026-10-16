@@ -13,6 +13,10 @@ isolated evaluation. A hosted deployment needs HTTPS, service supervision and
 backups in addition to the exported files. The profile remains experimental and
 Base Sepolia only; this guide does not approve production custody.
 
+For a repeatable acceptance run, use the [standard staging walkthrough](staging-walkthrough.md).
+It specifies which work happens in the configuration GUI, deployment CLI and
+deployed browser pages, and how to record real dependency/recovery gaps.
+
 ## Prepare the host and files
 
 Install Node **24.22.0**, npm **11.11.1** and Git. Follow the
