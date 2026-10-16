@@ -86,7 +86,11 @@ export async function createSetupServer(options: {
     }
   });
   app.setErrorHandler((_error, _request, reply) => {
-    void reply.code(400).send({ issues: ['Request unavailable or too large'] });
+    void reply.code(400).send({
+      issues: [
+        'The setup request could not be read. Use valid configuration JSON no larger than 64 KiB (65,536 bytes), then try again.',
+      ],
+    });
   });
   const contract = JSON.parse(
     await readFile(
@@ -117,7 +121,9 @@ export async function createSetupServer(options: {
         issues:
           error instanceof ConfigurationError
             ? error.issues
-            : ['Configuration could not be validated'],
+            : [
+                'The configuration could not be checked. Reload the wizard and import your saved configuration. If the problem continues, restart the setup command.',
+              ],
       });
     }
   });

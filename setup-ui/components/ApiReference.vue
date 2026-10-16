@@ -104,12 +104,14 @@ async function renderReference() {
         }),
       ],
       requestInterceptor: () => {
-        throw new Error('Reference only: requests are disabled.');
+        throw new Error(
+          'This is a local preview. Open the deployed API explorer to send a request.',
+        );
       },
     });
   } catch {
     error.value =
-      'API renderer unavailable. Retry loading it or restart the setup command.';
+      'The API reference could not be loaded. Choose Reload API reference to try again. If it still fails, restart the setup command and import your saved configuration.';
   } finally {
     loading.value = false;
   }
@@ -143,18 +145,18 @@ async function copy() {
       <span class="eyebrow">Explore the interface</span>
       <h2>Provider API reference</h2>
       <p>
-        See what your configuration supports, how an application calls it, and
-        the responses it can receive.
+        Explore requests and example responses for your current settings. Choose
+        an application to see which permissions you have configured for it.
       </p>
     </div>
     <div class="callout">
       <strong>Local preview · no API calls are sent</strong>
       <p>
-        This view follows your current, possibly unsaved and unvalidated
-        settings. It does not inspect a deployed service, validate a token or
-        grant access. Activation, vendor acceptance and current owner/grant/KYC
-        checks still apply. Use application access tokens, never the local
-        setup-session token or vendor secrets.
+        This preview uses the settings in this wizard, including unsaved edits.
+        It does not check your deployed service or give an application access.
+        Your deployed service still checks its configuration, application
+        tokens, owner consent, identity status and permissions before allowing a
+        request.
       </p>
     </div>
     <section class="callout api-live" aria-label="Try deployed APIs">
@@ -187,15 +189,17 @@ async function copy() {
         ><br /><code>{{ liveUrl }}</code>
       </p>
       <p v-else>
-        Set a valid Service HTTPS origin in Provider to create the deployment
-        link.
+        Enter your Public wallet service address in Provider, starting with
+        https:// and without a trailing slash or page path, to create this link.
       </p>
       <p>
-        Start with GET /v1/capabilities without a token. For protected APIs, use
-        the Application tokens panel when operator token controls are
-        configured, or Authorize with a short-lived application access token.
-        POST requests can create records, incur vendor charges or produce usable
-        signatures.
+        Start with GET /v1/capabilities without a token. For protected
+        endpoints, use the Application tokens panel when operator token controls
+        are configured, or Authorize with a short-lived application access
+        token. POST requests can create records, incur vendor charges or issue
+        signatures that can authorize later transactions. Use an application
+        access token, never a vendor secret or this wizard's local session
+        token.
       </p>
       <a
         :href="docs + 'http-api.html#try-deployed-apis'"
@@ -219,8 +223,10 @@ async function copy() {
         <dd>{{ config.oauth.audience || 'Set in Services' }}</dd>
       </div>
       <div>
-        <dt>Token profile</dt>
-        <dd>RFC 9068 at+jwt · RS256/ES256 · at most 600 seconds</dd>
+        <dt>Required access-token format</dt>
+        <dd>
+          RFC 9068 JWT (at+jwt) · RS256 or ES256 · valid for at most 10 minutes
+        </dd>
       </div>
     </dl>
     <p class="help-text">
@@ -235,9 +241,9 @@ async function copy() {
     </p>
     <div class="field-grid api-controls">
       <label
-        >Preview application<select
+        >Application to preview<select
           v-model="applicationIndex"
-          aria-label="Preview application"
+          aria-label="Application to preview"
         >
           <option
             v-for="(app, index) in config.policy.applications"
@@ -259,25 +265,29 @@ async function copy() {
     </div>
     <label class="api-toggle"
       ><input v-model="showUnconfigured" type="checkbox" /> Show transfer APIs
-      when the signing profile is not configured</label
+      even when transfer signing is off</label
     >
     <p class="help-text">
-      {{ shown.length }} endpoint(s). All wallet backends expose the same
-      provider API; vendor APIs and advanced enrollment/orchestration profiles
-      are separate.
+      {{ shown.length }} endpoint(s). All wallet backends expose the same wallet
+      API. A vendor's own API and custom enrollment or transaction-execution
+      integrations are separate.
     </p>
     <div class="api-flow">
-      <h3>Application integration order</h3>
+      <h3>Connect an application</h3>
       <p>
-        Request access → owner login and consent → funded identity and staff
-        review → poll for a grant → provision → read account. With transfer
-        signing: application requests transfer → provider authorizes → sign.
-        Submission, gas and settlement follow separately.
+        Request access → owner signs in and consents → identity checks and staff
+        review → read the access status until granted → create the wallet → read
+        account details. Identity checks require an agreed price and funding.
+        With delegated transfer signing, the application requests a transfer,
+        your service authorizes it, then the application requests its signature.
+        Submitting the transaction, paying network fees and confirming
+        completion are separate steps.
       </p>
       <p>
         Hosted login, consent, access management and provider review pages use
-        browser sessions, not application bearer tokens. Open returned consent
-        URLs as top-level navigation.
+        the owner's or reviewer's browser login, not the application's API
+        token. Open returned consent links as a full browser page rather than
+        embedding them.
       </p>
       <a
         :href="docs + 'http-api.html'"
@@ -309,9 +319,11 @@ async function copy() {
       <p>{{ selected.guide.prerequisite }}</p>
       <p>{{ selected.guide.success }}</p>
       <p class="help-text">
-        Illustrative request. Replace token, object IDs, share token and
-        idempotency key with your application's values. The transfer amount is
-        in integer base units. Reuse each original mutation key on retries.
+        This request is an example. Replace the token, account/request/action
+        IDs and any shared-identity token with values from your deployment. Use
+        a new UUIDv4 idempotency key for a new POST request and keep the same
+        key when retrying it. Transfer amounts are whole numbers of the token's
+        base units.
       </p>
       <button type="button" class="secondary" @click="copy">
         Copy cURL example
@@ -335,17 +347,20 @@ async function copy() {
       >.
     </p>
     <p>
-      Expand an endpoint for parameters, JSON request examples, response codes
-      and schemas. Example values are illustrative, not live results. 401 means
-      token authentication failed; 403 means scope or current authority was
-      denied; 409 requires conflict/retry review; 503 means unavailable. An
-      unknown effect must be reconciled, not replaced with a new attempt.
+      Expand an endpoint to see its inputs, JSON examples, response codes and
+      schemas. These are examples, not responses from your service. For a 401,
+      check the access token. For a 403, check the required scope and current
+      account permission. For a 409, inspect the original request before
+      retrying. For a 503, check service readiness and the returned outcome. If
+      an outcome is unknown, establish what happened to the original attempt
+      before trying again; a new idempotency key does not make it safe to repeat
+      the operation.
     </p>
-    <p v-if="loading" role="status">Loading bundled Swagger UI…</p>
+    <p v-if="loading" role="status">Loading endpoint details…</p>
     <p v-if="error" role="alert">
       {{ error }}
       <button type="button" class="secondary" @click="renderReference">
-        Retry API renderer
+        Reload API reference
       </button>
     </p>
     <p v-if="!shown.length">No endpoints match this filter.</p>

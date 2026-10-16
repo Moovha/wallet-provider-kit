@@ -106,10 +106,12 @@ test('operator gets and renews tokens without paste, Execute renews near expiry,
       secure: true,
     },
   ]);
-  await panel.getByRole('button', { name: 'Check operator login' }).click();
-  await expect(panel.getByRole('status')).toContainText('Operator signed in');
+  await panel.getByRole('button', { name: 'Check sign-in' }).click();
+  await expect(panel.getByRole('status')).toContainText(
+    'Signed in to token controls',
+  );
   await panel
-    .getByRole('checkbox', { name: 'wallet:provision', exact: true })
+    .getByRole('checkbox', { name: /\(wallet:provision\)$/, exact: true })
     .check();
   await panel.getByRole('button', { name: 'Get token', exact: true }).click();
   await expect(panel.getByRole('status')).toContainText(
@@ -152,7 +154,7 @@ test('operator gets and renews tokens without paste, Execute renews near expiry,
   await page.clock.fastForward(600000);
   await provision.getByRole('button', { name: 'Execute', exact: true }).click();
   await expect(panel.getByRole('status')).toContainText(
-    'Sign in with an allowed token-operator account again',
+    'Sign in again with an account allowed to use token controls',
   );
   expect(apiCalls).toBe(3);
   expect(issued).toBe(4);
@@ -189,9 +191,11 @@ test('clearing during issuance discards the arriving token and never silently ch
   const panel = page.getByRole('region', {
     name: 'Application token controls',
   });
-  await expect(panel.getByRole('status')).toContainText('Operator signed in');
+  await expect(panel.getByRole('status')).toContainText(
+    'Signed in to token controls',
+  );
   await panel
-    .getByRole('checkbox', { name: 'wallet:provision', exact: true })
+    .getByRole('checkbox', { name: /\(wallet:provision\)$/, exact: true })
     .check();
   const before = issued;
   await panel.getByRole('button', { name: 'Get token', exact: true }).click();

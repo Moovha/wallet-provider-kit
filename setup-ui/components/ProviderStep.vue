@@ -7,7 +7,7 @@ const model = defineModel<ProviderConfiguration>({ required: true });
 <template>
   <div class="step-heading">
     <span class="eyebrow">Your service</span>
-    <h2>Make it yours</h2>
+    <h2>Name your wallet service</h2>
     <p>
       Give your wallet service a name and a public web address. People will see
       these when they sign in and approve access to their wallets.
@@ -29,7 +29,8 @@ const model = defineModel<ProviderConfiguration>({ required: true });
     <p>
       This local wizard only prepares configuration files. It does not buy a
       domain or set up hosting. The supported service uses Base Sepolia, a
-      blockchain test network; production custody acceptance is pending.
+      blockchain test network. It is experimental and is not approved for
+      production custody.
     </p>
   </div>
   <SetupField

@@ -86,11 +86,11 @@ export const settings = {
   signerAddress: setting(
     'The existing 0x wallet address controlled by this signer on the Base Sepolia test network.',
     'The kit checks that signing uses the address allocated to the account. This profile requires an externally owned account, meaning an account controlled by a signing key.',
-    'Ask the Relayer administrator to verify the address, signer ID, active status and Base Sepolia chain 84532 together. Do not invent an address or copy an example. Binding revision remains 1.',
+    'Copy the verified address from your Relayer inventory. Ask its administrator to confirm the signer ID, active status and Base Sepolia chain 84532 together. Use binding revision 1 for this profile.',
     'operator-services.html#openzeppelin-relayer',
   ),
   loginIssuer: setting(
-    'The address of the login service that signs in wallet owners and your staff. “Issuer” means the service that proves who signed in.',
+    'The address of the login service that signs in wallet owners and your staff. “Issuer” identifies the service that proves who signed in.',
     'The kit verifies login results against this trusted service. Your login provider also handles passwords, extra login checks and account recovery.',
     'Copy the exact HTTPS issuer from your login provider’s OpenID Connect settings or ask its administrator. Do not use a login-page URL or append /.well-known/openid-configuration. The Auth0 recipe gives one setup path.',
     'auth0-setup.html',
@@ -194,7 +194,7 @@ export const settings = {
   policyVersion: setting(
     'A label for the rules in this configuration. Keep the supplied value for a first setup.',
     'Stored access and approvals are tied to policy. Deliberate policy updates can invalidate existing grants and approvals.',
-    'Choose and record a new version when publishing changed policy, following your review process. Do not change it just to retry a failed operation.',
+    'Choose and record a new version when deploying changed rules, following your review process. Keep the current version when investigating a failed operation.',
     'setup.html',
   ),
   identityAge: setting(
@@ -379,26 +379,26 @@ export const settings = {
   ),
   activation: setting(
     'Leave off for the initial deployment. Turn on only after you have tested your real integrations and recovery.',
-    'An exported configuration is not evidence that wallet operations or recovery work. Activation requires your recorded acceptance; the service fails closed without it.',
+    'Configuration checks do not test wallet operations or recovery. The deployed service refuses wallet operations until activation is enabled and the required test references are recorded.',
     'Deploy with activation disabled, follow the acceptance walkthrough, then record the evidence below before exporting an activated configuration.',
     'operator-deployment.html',
   ),
   backendEvidence: setting(
     'Your reference to completed tests of the real wallet backend.',
-    'It records your attestation that the configured backend meets the required behavior. The wizard does not verify or certify that evidence.',
-    'Use a real test report or reviewed ticket reference from your staging acceptance. Do not invent a value just to enable activation.',
+    'It links this configuration to the tests you completed for wallet creation, signing where enabled, retries and recovery. The wizard does not run those tests or verify the report.',
+    'Complete the staging tests first, then enter the reference to their report or reviewed ticket. The report must cover this deployment and the selected wallet backend.',
     'operator-deployment.html',
   ),
   recoveryEvidence: setting(
     'Your reference to completed backup, restore and uncertain-operation recovery tests.',
     'Losing records or repeating an uncertain operation can break account recovery or duplicate effects. Backend success alone is insufficient.',
-    'Record the results of your deployment’s recovery exercises in a report or ticket, then enter its reference. Mock tests do not establish acceptance.',
+    'Record this deployment’s recovery tests in a report or reviewed ticket, then enter its reference. Offline tests do not confirm that your server can restore its records and wallets.',
     'operator-deployment.html',
   ),
   tokenEvidence: setting(
     'Your reference to completed acceptance of the exact token contract and signing profile.',
     'Transfer signing requires verified contract, domain, limits and recovery behavior in addition to backend acceptance.',
-    'Use the reviewed report from your token integration specialist’s tests. This is your attestation, not vendor certification or a value supplied by the wizard.',
+    'Enter the reference to the reviewed report from your token specialist’s tests. The wizard does not issue this reference or verify the report.',
     'operator-services.html#optional-token-signing-policy',
   ),
 } as const;

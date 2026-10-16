@@ -56,22 +56,23 @@ export function operationStatus(
   config: ProviderConfiguration,
   applicationIndex: number,
 ) {
-  if (!guide.scope) return 'Public discovery';
+  if (!guide.scope) return 'No access token needed';
   if (guide.financial && !config.financial)
-    return 'Transfer profile not configured';
+    return 'Transfer signing is off in Policies';
   const app = config.policy.applications[applicationIndex];
   if (!app?.clientId || !app.issuer || app.issuer !== config.oauth.issuer)
-    return 'Application registration incomplete';
-  if (app.enabled === false) return 'Application disabled';
+    return "Complete this application's registration in Policies and Services";
+  if (app.enabled === false) return 'This application is disabled in Policies';
   if (
     guide.permission &&
     !(app.permissions ?? ['account:read', 'operations:request']).includes(
       guide.permission,
     )
   )
-    return 'Application permission not allowed';
-  if (!config.activation.enabled) return 'Activation disabled';
-  return 'Configured; runtime checks apply';
+    return 'Select the required permission for this application in Policies';
+  if (!config.activation.enabled)
+    return 'Wallet operations are disabled in Deployment';
+  return 'Settings are present; deployed access has not been checked';
 }
 export function requestExample(
   id: string,
@@ -207,9 +208,9 @@ export function referenceSpec(
   const spec = structuredClone(contract);
   spec.info = {
     ...spec.info,
-    title: 'Configured provider API reference',
+    title: 'Wallet API reference · local preview',
     description:
-      'Local configuration preview. Examples are illustrative, not live responses. Actual access requires deployed readiness, a compatible scoped token and current provider authority.',
+      'Explore your current wizard settings and example responses. No API requests are sent. Deployed requests still require a ready service, a valid application token and current account permission.',
   };
   spec.servers = [{ url: referenceOrigin(config.policy.provider.origin) }];
   spec.paths = {};

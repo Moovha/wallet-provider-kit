@@ -2,8 +2,15 @@
 import SetupField from './SetupField.vue';
 import { computed } from 'vue';
 import type { ProviderConfiguration } from '../model';
-import { apiTokenScopes } from '../../src/service/api-token-scopes.js';
+import {
+  apiTokenScopes,
+  apiTokenScopeLabels,
+} from '../../src/service/api-token-scopes.js';
 import SecretField from './SecretField.vue';
+const scopeOptions = apiTokenScopes.map((scope) => ({
+  value: scope,
+  label: `${apiTokenScopeLabels[scope]} (${scope})`,
+}));
 const model = defineModel<ProviderConfiguration>({ required: true });
 const operators = computed({
   get: () => model.value.apiExplorer?.operators.join('\n') ?? '',
@@ -41,11 +48,11 @@ function toggleClient(clientId: string, index: number, enabled: unknown) {
 </script>
 <template>
   <section aria-label="Integrated application tokens">
-    <h3>Get application tokens in the deployed GUI</h3>
+    <h3>Application tokens for API testing</h3>
     <SetupField
       guide="operatorControls"
       type="checkbox"
-      label="Enable operator token controls"
+      label="Enable application token controls for staff"
       :modelValue="!!model.apiExplorer"
       @update:modelValue="toggle($event)"
     />
@@ -54,7 +61,7 @@ function toggleClient(clientId: string, index: number, enabled: unknown) {
         guide="operators"
         v-model="operators"
         type="textarea"
-        label="Token operator login subjects"
+        label="Token operator account IDs (sub)"
         validation="required"
       />
       <p class="help-text">
@@ -72,7 +79,7 @@ function toggleClient(clientId: string, index: number, enabled: unknown) {
         <SetupField
           guide="operatorApplication"
           type="checkbox"
-          :label="`Allow GUI tokens for ${application.name || `application ${index + 1}`}`"
+          :label="`Allow staff to get tokens for ${application.name || `application ${index + 1}`}`"
           :modelValue="!!client(application.clientId)"
           @update:modelValue="toggleClient(application.clientId, index, $event)"
         />
@@ -86,19 +93,19 @@ function toggleClient(clientId: string, index: number, enabled: unknown) {
             guide="operatorScopes"
             v-model="client(application.clientId)!.scopes"
             type="checkbox"
-            label="Allowed explorer token scopes"
-            :options="[...apiTokenScopes]"
+            label="Allowed API permissions (scopes)"
+            :options="scopeOptions"
           />
         </template>
       </fieldset>
       <div class="callout">
-        <strong>Renew in the GUI</strong>
+        <strong>Get and renew tokens on your deployed service</strong>
         <p>
           After export and deployment, sign in at the explorer, select scopes
           and choose Get token or Renew token. Execute renews a token nearing
-          expiry before sending. Operator sessions last at most five minutes;
-          sign in again when requested. No background renewal or automatic API
-          retries.
+          expiry before sending the request. Your staff login lasts at most five
+          minutes; sign in again when asked. Tokens are not renewed in the
+          background, and API requests are never retried automatically.
         </p>
       </div>
     </template>

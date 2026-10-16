@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — operator interface language
+
+- Clarify setup labels, field guidance, validation messages and export steps for
+  operators, including secret variable names and deployment test report references.
+- Explain application token scopes and API examples in plain language, with
+  actionable token errors and a clear boundary between preview and live requests.
+- Keep documentation labels and offline UI screenshots aligned with the interface.
+
 ## Unreleased — identity verification handoff
 
 - Open a prepared identity verification session through an explicit navigation

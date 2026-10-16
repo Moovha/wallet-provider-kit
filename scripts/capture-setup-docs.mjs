@@ -140,13 +140,13 @@ try {
     .waitFor();
   await page.getByRole('tab', { name: 'Deployment', exact: true }).click();
   await page
-    .getByText('Enable operator token controls', { exact: true })
+    .getByText('Enable application token controls for staff', { exact: true })
     .click();
   await page
-    .getByLabel('Token operator login subjects', { exact: true })
+    .getByLabel('Token operator account IDs (sub)', { exact: true })
     .fill('auth0|example-operator');
   await page
-    .getByText('Allow GUI tokens for Acme App', {
+    .getByText('Allow staff to get tokens for Acme App', {
       exact: true,
     })
     .click();
@@ -202,7 +202,7 @@ try {
     name: 'Application token controls',
   });
   await tokenPanel
-    .getByRole('checkbox', { name: 'wallet:account:read', exact: true })
+    .getByRole('checkbox', { name: /\(wallet:account:read\)$/, exact: true })
     .check();
   await tokenPanel
     .getByRole('button', { name: 'Get token', exact: true })

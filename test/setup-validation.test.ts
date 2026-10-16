@@ -1,0 +1,38 @@
+import { expect, it } from 'vitest';
+import { explainIssue } from '../setup-ui/validation.js';
+
+it('points operators to the visible step and repeated field instead of a JSON path', () => {
+  const message = explainIssue(
+    '/policy/applications/1/funding/monthlyLimitMinor: maximum',
+  );
+  expect(message).toContain('Policies');
+  expect(message).toContain(
+    'Application 2 monthly identity budget (USD cents)',
+  );
+  expect(message).not.toContain('/policy');
+  expect(message).not.toContain('monthlyLimitMinor');
+});
+
+it('explains conflicting transfer limits without exposing configuration property names', () => {
+  const message = explainIssue(
+    '/financial/maximumAmount: must not exceed lifetimeAmount',
+  );
+  expect(message).toContain(
+    'maximum per transfer cannot exceed the total limit',
+  );
+  expect(message).not.toContain('lifetimeAmount');
+});
+
+it('does not reflect unknown imported fields or unexpected diagnostic text into the UI', () => {
+  const unknownField = explainIssue(
+    '/identity/didit/private-fixture-reference: additionalProperties',
+  );
+  expect(unknownField).toContain('unsupported field');
+  expect(unknownField).not.toContain('private-fixture-reference');
+  const unknownReason = explainIssue(
+    '/backend/private-fixture-reference: unexpected-fixture-value',
+  );
+  expect(unknownReason).toContain('field instructions');
+  expect(unknownReason).not.toContain('private-fixture-reference');
+  expect(unknownReason).not.toContain('unexpected-fixture-value');
+});

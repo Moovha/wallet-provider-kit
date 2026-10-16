@@ -88,7 +88,7 @@ async function request(path: string, body?: unknown) {
     throw new Error(
       JSON.stringify(
         result.issues ?? [
-          'Local session unavailable. Restart the setup command and open its printed URL.',
+          'This setup session has expired or cannot be opened. Restart the setup command, open the full link printed in your terminal, and import your last saved configuration.',
         ],
       ),
     );
@@ -112,7 +112,7 @@ function showError(error: unknown) {
     issues.value = JSON.parse((error as Error).message);
   } catch {
     issues.value = [
-      'The local setup service is unavailable. Restart the setup command.',
+      'Cannot reach the setup wizard. Check that its terminal is still running. If needed, restart the setup command, open the full printed link and import your last saved configuration.',
     ];
   }
 }
@@ -134,7 +134,8 @@ async function check() {
     const result = await request('/api/validate', JSON.parse(snapshot));
     if (JSON.stringify(config.value) === snapshot) {
       validated.value = result;
-      notice.value = 'Configuration valid. Ready to export.';
+      notice.value =
+        'Configuration valid. Download your files, then complete the deployment checks before enabling wallet operations.';
     }
   } catch (error) {
     showError(error);
@@ -152,7 +153,11 @@ async function importFile(event: Event) {
   issues.value = [];
   try {
     if (file.size > 65536)
-      throw new Error(JSON.stringify(['Configuration exceeds 64 KiB.']));
+      throw new Error(
+        JSON.stringify([
+          'This file is too large. Choose a provider configuration JSON file no larger than 64 KiB (65,536 bytes).',
+        ]),
+      );
     const result = await request(
       '/api/validate',
       JSON.parse(await file.text()),
@@ -165,7 +170,9 @@ async function importFile(event: Event) {
       'Configuration imported. Review the settings, then validate again before exporting.';
   } catch (error) {
     if (error instanceof SyntaxError)
-      issues.value = ['Choose a valid provider configuration JSON file.'];
+      issues.value = [
+        'This file is not valid JSON. Choose the provider.config.json file downloaded from the wizard, or correct its JSON syntax before importing it.',
+      ];
     else showError(error);
   } finally {
     busy.value = false;
@@ -272,8 +279,9 @@ function enableDocumentation() {
       <div class="sidebar-bottom">
         <span class="status-dot"></span> Local configuration session
         <p>
-          Settings stay in memory until you download them. Refreshing discards
-          edits; reopen the printed setup link to start again.
+          Download your configuration to save your work. Refreshing or closing
+          this page discards unsaved edits. Reopen the full link from your
+          terminal and import your saved file to continue.
         </p>
         <a
           :href="docs + 'setup-wizard.html'"
@@ -337,7 +345,10 @@ function enableDocumentation() {
               {{ explainIssue(issue) }}
             </li>
           </ul>
-          <p>Use the step tabs to return to the relevant settings.</p>
+          <p v-if="config">
+            For a setting error, open the named step and follow the field
+            instructions.
+          </p>
         </div>
         <FormKit
           v-if="config"
@@ -415,7 +426,7 @@ function enableDocumentation() {
                   </dd>
                 </div>
                 <div>
-                  <dt>Financial profile</dt>
+                  <dt>Transfer signing</dt>
                   <dd>
                     {{
                       config.financial
@@ -425,25 +436,26 @@ function enableDocumentation() {
                   </dd>
                 </div>
                 <div>
-                  <dt>Activation</dt>
+                  <dt>Wallet operations after deployment</dt>
                   <dd>
                     {{
                       config.activation.enabled
-                        ? 'Enabled by operator attestation'
-                        : 'Disabled'
+                        ? 'Enabled in this configuration'
+                        : 'Disabled in this configuration'
                     }}
                   </dd>
                 </div>
               </dl>
               <div class="callout">
                 <strong
-                  >Validation checks configuration, not vendor
-                  acceptance.</strong
+                  >Test your services before enabling wallet operations.</strong
                 >
                 <p>
                   No wallet is created and no external service is called. Your
-                  deployment still needs secrets, private storage, HTTPS and
-                  verified backend/recovery acceptance.
+                  server still needs secret values, private storage and HTTPS.
+                  Test wallet creation, signing where enabled, backup and
+                  recovery using the deployment guide before enabling
+                  operations.
                 </p>
               </div>
               <button
@@ -463,8 +475,8 @@ function enableDocumentation() {
                     </li>
                   </ul>
                   <p>
-                    These are configuration observations. External integrations
-                    have not been tested.
+                    These checks use your settings only. Test external services
+                    on your deployment before allowing users to connect.
                   </p>
                 </div>
                 <h3>Your deployment files</h3>
@@ -551,7 +563,7 @@ function enableDocumentation() {
             :href="docs + 'custom-adapters.html'"
             target="_blank"
             rel="noopener noreferrer"
-            >Advanced: custom adapters ↗</a
+            >Developer guide: custom wallet backends ↗</a
           >
         </footer>
       </div>

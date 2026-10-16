@@ -302,7 +302,7 @@ those capabilities are unavailable, do not select this integration as ready.
 
 Obtain confirmed maximum charges from the vendor/your contract for **new
 verification** and **shared identity import** separately, for each selected
-workflow/level. In Services, enable each route's agreed price bound, enter its
+workflow/level. In Services, enable each route's agreed price limit, enter its
 maximum in **USD cents**, and enter an internal contract/ticket reference for the
 terms. `250` means USD 2.50; it is not a token amount or gas budget.
 

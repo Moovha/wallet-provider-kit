@@ -48,14 +48,14 @@ Choose those subjects and limits accordingly.
 
 In the local wizard, import your saved configuration and open **Deployment**:
 
-1. Check **Enable operator token controls**. It also enables the deployed explorer.
-2. In **Token operator login subjects**, enter one exact subject per line from the
+1. Check **Enable application token controls for staff**. It also enables the deployed explorer.
+2. In **Token operator account IDs (sub)**, enter one exact subject per line from the
    owner-login issuer. At least one is required.
-3. For each intended application, check **Allow GUI tokens for …**. Enter its
-   **Application client secret variable** name. The suggested name is
+3. For each intended application, check **Allow staff to get tokens for …**. Enter its
+   **Application client secret variable name**. The suggested name is
    `WALLET_EXPLORER_APP_1_SECRET`, numbered by the wizard's application list.
    This is only the deployment variable's name; do not enter the secret value.
-4. Select **Allowed explorer token scopes**. These are the maximum scopes the
+4. Select **Allowed API permissions (scopes)**. These are the maximum scopes the
    GUI may request, and must also be granted at your issuer. Read scopes are
    initially selected. Add mutation/signing scopes only for the intended tests.
    A scope is API admission, not owner consent or permission to bypass policy.
@@ -83,9 +83,9 @@ Open the wizard's **Open deployed Try it out** link, or your provider's HTTPS
 origin followed by `/docs/`. The local setup wizard remains an offline editor;
 token issuance happens only on the deployed provider.
 
-1. In **Application tokens**, choose **Sign in as token operator**. Complete
+1. In **Application tokens**, choose **Sign in to token controls**. Complete
    your configured login/MFA. The existing login flow returns you to Swagger.
-   If you signed in elsewhere, **Check operator login** checks the current session.
+   If you signed in elsewhere, **Check sign-in** checks the current session.
 2. Select the **Calling application**, then select only the required scopes.
    Choose **Get token**. The panel shows the application and expiry countdown;
    it does not display the token or require a paste operation.
@@ -129,7 +129,7 @@ the service does not trust forwarded client-IP headers.
 response/cURL blocks can still contain request tokens; reload to clear that page
 state. Reload also clears managed tokens and
 API response state; no token or secret is stored in localStorage/sessionStorage.
-**Sign out operator** clears this browser's provider login cookie and the managed
+**Sign out of token controls** clears this browser's provider login cookie and the managed
 token; it does not sign out your central identity provider or revoke already-issued
 JWTs. Those expire normally. Browser sessions are used only for operator controls;
 API requests continue to omit browser cookies. Do not share screenshots or copied

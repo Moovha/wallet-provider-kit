@@ -83,7 +83,7 @@ function updateHttp(key: 'host' | 'port' | 'documentation', value: unknown) {
   />
   <ExplorerTokensStep v-model="model" />
   <div class="callout">
-    <strong>Deployment still needs operational setup</strong>
+    <strong>Next, prepare your server</strong>
     <p>
       After export, put secret values in your private environment file, prepare
       persistent storage, and connect your public address through an HTTPS
@@ -91,42 +91,42 @@ function updateHttp(key: 'host' | 'port' | 'documentation', value: unknown) {
       internal port. The deployment guide walks through these tasks and backups.
     </p>
   </div>
-  <h3>Activation</h3>
+  <h3>Enable wallet operations</h3>
   <p class="help-text">
-    Leave activation disabled for initial deployment. Enabling it requires your
-    completed backend and recovery acceptance, plus token acceptance for
-    transfer signing.
+    Leave this off for your first deployment. Complete wallet backend and
+    recovery tests, then record their report references below. Transfer signing
+    also requires tests of the exact token contract and signing settings.
   </p>
   <SetupField
     guide="activation"
     v-model="model.activation.enabled"
     type="checkbox"
-    label="Enable service activation in this export"
+    label="Enable wallet operations in this configuration"
   />
   <template v-if="model.activation.enabled"
     ><SetupField
       guide="backendEvidence"
       v-model="model.activation.backendAcceptance"
       type="text"
-      label="Backend acceptance evidence reference"
+      label="Wallet backend test report reference"
       validation="required|length:1,256"
     /><SetupField
       guide="recoveryEvidence"
       v-model="model.activation.recoveryAcceptance"
       type="text"
-      label="Recovery acceptance evidence reference"
+      label="Recovery test report reference"
       validation="required|length:1,256"
     /><SetupField
       guide="tokenEvidence"
       v-if="model.financial"
       v-model="model.activation.tokenAcceptance"
       type="text"
-      label="Token acceptance evidence reference"
+      label="Token signing test report reference"
       validation="required|length:1,256"
     />
     <p class="help-text">
-      These references record your attestation. Wizard validation does not
-      certify provider, recovery or token acceptance.
+      Enter references to completed test reports or reviewed tickets. The wizard
+      does not run these tests or verify the reports.
     </p></template
   >
 </template>

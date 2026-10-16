@@ -43,8 +43,8 @@ function financial(enabled: unknown) {
     <p>
       A connected application is a product that calls your wallet API. Add its
       registration below, agree who covers identity checks, and name the staff
-      who review identity evidence. These are your business decisions, not extra
-      credentials to buy.
+      who review identity evidence. Agree these rules and costs with the people
+      operating the connected applications.
     </p>
     <p>
       Transfer signing is optional. Leave it off if you only need wallet
@@ -65,7 +65,7 @@ function financial(enabled: unknown) {
       v-model="identityDays"
       type="number"
       :number="true"
-      label="Identity acceptance age (days)"
+      label="Maximum age of identity checks (days)"
       min="1"
       max="365"
       validation="required|between:1,365"
@@ -74,7 +74,7 @@ function financial(enabled: unknown) {
       v-model="accessDays"
       type="number"
       :number="true"
-      label="Application access age (days)"
+      label="Maximum access duration (days)"
       min="1"
       max="365"
       validation="required|between:1,365"
@@ -149,7 +149,7 @@ function financial(enabled: unknown) {
     <SetupField
       guide="fundingEnabled"
       type="checkbox"
-      label="Configure an application funding agreement for identity costs"
+      label="Record an identity funding agreement for this application"
       :modelValue="!!application.funding"
       @update:modelValue="
         application.funding = $event
@@ -202,7 +202,7 @@ function financial(enabled: unknown) {
       guide="reviewer"
       v-model="model.reviewers[index]"
       type="text"
-      :label="'Reviewer ' + (index + 1) + ' login subject'"
+      :label="'Reviewer ' + (index + 1) + ' account ID (sub)'"
       validation="required|length:1,256"
     /><button
       type="button"
@@ -214,16 +214,17 @@ function financial(enabled: unknown) {
     </button>
   </div>
   <div class="feature-panel">
-    <h3>Optional transfer authorization</h3>
+    <h3>Optional delegated transfer signing</h3>
     <p>
-      Enable provider-authorized ERC-3009 signing. Users delegate transfer
-      requests during onboarding; the provider checks each exact request against
-      its policies without another user approval prompt.
+      Allow applications to request token transfers within limits that owners
+      accept during onboarding. Your service checks each transfer and signs its
+      authorization without asking the owner again. The application submits the
+      transaction separately.
     </p>
     <SetupField
       guide="financialEnabled"
       type="checkbox"
-      label="Configure provider-authorized transfer signing"
+      label="Configure delegated transfer signing"
       :modelValue="!!model.financial"
       @update:modelValue="financial($event)"
     />
@@ -238,9 +239,9 @@ function financial(enabled: unknown) {
       >
     </p>
     <p class="callout">
-      Base Sepolia EOA signing only. Select an independently verified ERC-3009
-      token. This service does not broadcast transactions, sponsor gas or settle
-      transfers.
+      Use an independently verified ERC-3009 token and a key-controlled wallet
+      account (EOA) on Base Sepolia. Signing does not send the transaction, pay
+      network fees or confirm that a transfer completed.
     </p>
     <SetupField
       guide="tokenAddress"
@@ -284,13 +285,13 @@ function financial(enabled: unknown) {
         guide="maximumAmount"
         v-model="model.financial.maximumAmount"
         type="text"
-        label="Maximum per action (base units)"
+        label="Maximum per transfer (base units)"
         :validation="[['required'], ['matches', /^[1-9][0-9]{0,77}$/]]"
       /><SetupField
         guide="lifetimeAmount"
         v-model="model.financial.lifetimeAmount"
         type="text"
-        label="Lifetime limit per account/token (base units)"
+        label="Total limit per account and token (base units)"
         :validation="[['required'], ['matches', /^[1-9][0-9]{0,77}$/]]"
       />
     </div>
@@ -299,7 +300,7 @@ function financial(enabled: unknown) {
       v-model="model.financial.maxValiditySeconds"
       type="number"
       :number="true"
-      label="Authorization validity (seconds)"
+      label="Time to use a signed authorization (seconds)"
       min="60"
       max="3600"
       validation="required|between:60,3600"

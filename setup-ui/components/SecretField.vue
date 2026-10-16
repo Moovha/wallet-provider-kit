@@ -9,7 +9,7 @@ defineProps<{ label: string; guide: SettingKey }>();
     :guide="guide"
     v-model="model.env"
     type="text"
-    :label="label + ' variable'"
+    :label="label + ' variable name'"
     :validation="[['required'], ['matches', /^[A-Z][A-Z0-9_]{0,127}$/]]"
     autocomplete="off"
     spellcheck="false"

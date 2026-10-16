@@ -202,7 +202,7 @@ describe('local operator setup boundary', () => {
 it('distinguishes valid configuration from usable new-user identity and financial paths', () => {
   let config = validateProviderConfiguration(example);
   expect(setupWarnings(config).join()).toContain(
-    'new hosted identity verification is blocked',
+    'new identity checks are unavailable',
   );
   expect(setupWarnings(config).join()).toContain('funding agreement');
   config.activation = {
