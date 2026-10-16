@@ -26,44 +26,146 @@ not an unauthenticated administrative screen on the deployed provider API.
 
 ## Before you begin
 
-Have these registrations or plans available. The wizard links to each selected
-vendor's documentation; it cannot create those external accounts for you.
+Use [getting started](README.md#install-and-open-the-local-wizard) if Node, npm,
+Git or the terminal commands are new to you. Prepare the accounts and policy
+inputs in [Services, registrations and secrets](operator-services.md). For a fresh
+login/token service use the [Auth0 dashboard recipe](auth0-setup.md). Those guides
+explain each required ID, secret, URL, agreement and reviewer subject, including
+where to obtain it. You can explore with placeholders, but they cannot run a service.
 
-| Input            | What the provider must prepare                                                                                                                                                                                                                                      |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Provider         | Public HTTPS origin, display name and privacy notice.                                                                                                                                                                                                               |
-| Wallet backend   | CDP project credentials, a pinned OWS engine/private vault, or an existing OpenZeppelin Relayer signer pool.                                                                                                                                                        |
-| Owner login      | A compatible confidential OIDC client with the exact `/onboarding/callback` redirect, code flow, PKCE S256, `client_secret_post`, RS256/ES256 ID tokens, a lifetime no greater than ten minutes and fresh `auth_time`. The IdP owns registration, MFA and recovery. |
-| Application API  | A dedicated OAuth audience, HTTPS issuer/JWKS and separate application registrations. Tokens must meet the kit's RFC 9068 `at+jwt`, claims, scopes and ten-minute lifetime requirements. Not every IdP's default token profile is compatible.                       |
-| Identity         | Didit recipient workflow and credentials, Sumsub recipient level/credentials with reusable KYC Share enabled, or both.                                                                                                                                              |
-| Identity funding | Confirmed import/verification upper bounds in USD cents and terms references, plus each requesting application's reimbursement agreement and monthly USD-cent cap. Even a free workflow needs an explicit agreed zero bound.                                        |
-| Reviewers        | Provider staff subject IDs from the configured owner-login issuer, with a process to check identity evidence, freshness and owner correspondence.                                                                                                                   |
-| Deployment       | One persistent POSIX host, a secret store, private SQLite storage, HTTPS ingress and recovery/backups.                                                                                                                                                              |
-
-These values are configuration. Provisioning vendor accounts, choosing identity
-requirements, agreeing reimbursement and proving recovery remain operational
-responsibilities. A provider with incompatible login or unsupported infrastructure
-needs an advanced integration; entering its URL does not make it supported.
+The screenshots below are captured from the actual wizard with invented example
+values and explicitly fictional free-test terms. They show the interface, not a
+vendor account, real commercial agreement or accepted deployment. Never copy their
+IDs, domains or zero prices into a live configuration.
 
 ## Complete the six steps
 
-1. **Provider:** set the service's public identity and origin.
-2. **Backend:** choose CDP, OWS or OpenZeppelin Relayer and name its stable binding.
-   Changing the backend discards the previous backend settings. Enter only secret
-   **environment variable names**, never credential values, keys or seed phrases.
-3. **Services:** configure owner login, API authentication and identity vendors.
-   Application policy issuers inherit the API token issuer. Configure agreed
-   identity price bounds for the verification/import routes you intend to use.
-4. **Policies:** add applications, permissions, identity funding, reviewers and
-   freshness periods. Optionally configure exact owner-approved ERC-3009 token,
-   recipient and integer base-unit limits. There is no arbitrary signing policy.
-5. **Deployment:** choose private data storage and service listen settings. Keep
-   activation disabled until backend/recovery acceptance is complete. Financial
-   activation also needs token acceptance evidence. Those references are operator
-   attestations, not certification performed by the wizard.
-6. **Export:** validate the entire configuration using the service's existing
-   strict JSON Schema and semantic checks. Review the configuration observations,
-   then download configuration, deployment checklist and environment template.
+### 1. Provider
+
+![Provider name, origin and privacy fields](public/screenshots/provider.webp)
+
+[Open full-size Provider screenshot](public/screenshots/provider.webp)
+
+Enter your provider display name, exact public HTTPS **origin** and published
+privacy notice URL. The origin is where owners reach your deployed wallet service,
+for example `https://wallet.your-company.com`, without a trailing slash or path.
+It is not the temporary local wizard address. The name appears on consent screens.
+Set up the [domain and notice](operator-services.md#provider-domain-and-privacy-notice)
+before onboarding users. Changing the persisted origin later requires a migration review.
+
+### 2. Backend
+
+![Backend selection with CDP, OWS and OpenZeppelin logos and secret variable fields](public/screenshots/backend.webp)
+
+[Open full-size Backend screenshot](public/screenshots/backend.webp)
+
+Choose **Coinbase CDP**, **Open Wallet Standard** or **OpenZeppelin Relayer**.
+Their logos identify the integration; the linked vendor guides explain the external
+service. Enter a stable backend binding, an operator-owned environment identifier
+that remains unchanged through restarts and credential rotation.
+
+- **CDP:** keep or choose names for the API key ID, API key secret and wallet-secret
+  environment variables. Get their actual values from the [CDP registration steps](operator-services.md#coinbase-cdp).
+- **OWS:** set a persistent private vault path and owner-passphrase variable name.
+  Prepare the [engine and vault](operator-deployment.md#prepare-the-optional-ows-vault)
+  on the deployment host. The reference container does not include them.
+- **Relayer:** enter its HTTPS origin and API-key variable name, then add the existing
+  pool's Relayer IDs, Signer IDs, addresses and revision `1`. Follow
+  [signer-pool preparation](operator-services.md#openzeppelin-relayer); a pool entry
+  supports one account and cannot be reused for another owner.
+
+**Enter variable names only**, never keys, secret values or seed phrases. Changing
+the selected backend discards the prior backend fields. It does not migrate an
+existing deployment or its accounts.
+
+### 3. Services
+
+![Owner login, API authentication and Didit price-bound fields](public/screenshots/services.webp)
+
+[Open full-size Services screenshot](public/screenshots/services.webp)
+
+Configure the owner-login issuer, confidential client ID, client-secret variable
+name and matching ID-token algorithm. Register the exact callback displayed in the
+callout. Configure the application's token issuer, dedicated API audience and public
+JWKS URL separately. These can use the same compatible issuer but have different
+registrations. Follow the [Auth0 field mapping](auth0-setup.md#_5-copy-the-values-into-formkit)
+or [issuer requirements](operator-services.md#register-owner-login); URLs alone are insufficient.
+
+Select Didit, Sumsub or both. Enter your recipient workflow ID/level and credential
+variable names. For each intended route, enable its **agreed price bound**, supply
+the maximum in USD cents and reference the actual terms. Import and new verification
+have separate bounds. Even free work needs an explicit agreed zero. Obtain these
+from the [identity/vendor setup guide](operator-services.md#prepare-identity-verification).
+Sumsub requires Reusable KYC Share to be enabled externally; selecting it does not
+turn on that product. Provider staff still decide identity acceptance.
+
+### 4. Policies
+
+![Application permissions, funding agreement and staff reviewer configuration](public/screenshots/policies.webp)
+
+[Open full-size Policies screenshot](public/screenshots/policies.webp)
+
+Set a deliberate **policy version**, plus identity-acceptance and application-access
+ages in days (1–365). The former bounds how old accepted identity may be; the latter
+bounds an application's access grant. The example's 90/7 values are examples, not
+a recommendation for your compliance policy. Publish a new version deliberately;
+policy changes can invalidate grants and approvals.
+
+For each connected application, enter its display name and registered API client
+ID. Its issuer inherits Services. Choose **Read wallet accounts** and, where needed,
+**Request owner-approved actions**. These consent permissions differ from the
+[token scopes](operator-services.md#register-the-application-api-and-clients).
+Keep access enabled only for admitted applications. A client ID is not an owner ID.
+
+Enable the application's identity funding agreement, enter its real agreement
+reference and monthly USD-cent cap. Without it, new identity verification/import
+pauses even when a route's configured price is zero. Enter each staff reviewer's
+exact login subject from the owner-login issuer. The
+[funding](operator-services.md#prices-terms-and-application-funding) and
+[reviewer instructions](operator-services.md#identify-reviewers) explain their sources.
+
+Leave **Configure owner-approved transfer signing** off for onboarding/provisioning
+only. If required, use the [token policy preparation](operator-services.md#optional-token-signing-policy)
+to supply the verified Base Sepolia contract/domain, symbol, decimals, recipient
+allowlist, integer base-unit limits and 60–3600-second validity. An application-access
+grant does not approve spending: each exact transfer requires separate owner approval.
+
+### 5. Deployment
+
+![Private storage, HTTP listen settings and disabled activation](public/screenshots/deployment.webp)
+
+[Open full-size Deployment screenshot](public/screenshots/deployment.webp)
+
+Choose private persistent SQLite storage. Relative paths resolve beside the exported
+configuration on the deployment host. For native deployment behind a local proxy,
+use `127.0.0.1`, port `8080`. For the reference Compose deployment, use `0.0.0.0`,
+port `8080`, data directory `.provider-data`. The
+[deployment guide](operator-deployment.md) supplies private directory and volume setup.
+The optional documentation checkbox exposes API documentation on the deployed
+service; it is separate from this setup wizard and the public documentation site.
+
+Keep **Enable service activation in this export** off initially. Activation requires
+real backend and recovery acceptance evidence; signing also requires token evidence.
+These are references to reviewed reports/tickets, not automatically issued codes
+or tests performed by the wizard. Follow [acceptance and activation](operator-deployment.md#acceptance-and-explicit-activation)
+before enabling an export. Disabled readiness is expected during preparation.
+
+### 6. Export
+
+![Validated export, activation warning, secret variable list and three download buttons](public/screenshots/export.webp)
+
+[Open full-size Export screenshot](public/screenshots/export.webp)
+
+Click **Validate configuration**. The service applies its strict schema and semantic
+checks to all steps. Correct reported errors, then review observations and the
+summary. Every edit invalidates the prior validation. Validation does not test
+credentials, initialize storage, contact services, create wallets or deploy.
+
+Download **configuration**, **variable template** and **checklist**. A warning that
+activation is disabled is expected initially. Missing prices or funding are useful
+configuration observations: a valid export can still lack those operational inputs.
+Use the [next-stage deployment walkthrough](operator-deployment.md), not only the
+fact that the download buttons are available, to determine readiness.
 
 Step tabs allow returning to any section. Their position indicates navigation,
 not proof of operational readiness. Every edit invalidates the validated export.
@@ -88,7 +190,7 @@ claim to test services remotely.
   configuration observations, initialization, diagnostics and run commands.
 
 Move the files to your private deployment directory and follow the checklist and
-[deployment guide](setup.md). Relative data/vault paths resolve beside the config
+[deployment walkthrough](operator-deployment.md). Relative data/vault paths resolve beside the config
 on the deployment host. A container must use an appropriate listen address and
 volume mapping; the [reference Compose file](../ops/provider.compose.yaml) has
 explicit private mounts and UID/GID inputs. It omits the optional OWS engine/vault.
@@ -130,3 +232,13 @@ agreements, wallet recovery or token acceptance. The current configured service
 remains experimental, single-host and Base Sepolia EOA only. Signing does not
 broadcast, sponsor gas or establish settlement. Complete the provider acceptance
 and deployment process independently before enabling it.
+
+## Screenshot maintenance
+
+The six images use the example configuration with invented Acme settings and no
+secret values. Maintainers can rebuild and capture them with
+`npm run build` and `node scripts/capture-setup-docs.mjs` after installing the
+repository's Playwright Chromium. The script uses only a loopback setup server,
+performs no vendor calls and writes PNGs under ignored `artifacts/setup-docs/`.
+The published WebP copies live in `docs/public/screenshots/`; inspect them when the
+UI changes. They are interface documentation, not acceptance evidence.

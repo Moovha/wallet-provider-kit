@@ -1,54 +1,106 @@
-# Build your blockchain wallet service
+# Get started: configure and operate a wallet service
 
-Read these guides with grouped navigation and search on the
-[documentation site](https://moovha.github.io/wallet-provider-kit/).
+The supported path is **prepare services → configure in FormKit → deploy → connect
+applications over HTTP**. An operator does not write policy callbacks, a database
+adapter or signing code. Product developers consume the API; custom adapters and
+embedded composition are the advanced path.
 
-Wallet Provider Kit helps your team operate blockchain wallets for users and make approved
-on-chain actions available to connected applications. Its DeFi roots include
-assets such as USDC and ZARP. You choose the backend and
-key-control model; the toolkit connects onboarding, application access and signing
-under your host's authority.
+This guide starts from an empty operator workstation. The current service is
+experimental, single-host and Base Sepolia EOA only. Mainnet and production custody
+acceptance remain pending. Signing does not submit transactions, sponsor gas or
+establish settlement. Read [roles and terms](concepts.md) if wallet provider,
+application, owner, grant or journal are new to you.
 
-Read [blockchain assets and gas sponsorship](assets-and-gas.md) for the project's
-asset context and the connected application's obligation to cover eligible
-network fees. Moovha takes that sponsorship role for admitted Moovha operations;
-the guide distinguishes the planned rail from today's provider implementation.
+## Choose who does each part
 
-New to these terms? Start with [roles and concepts](concepts.md): account owner,
-host authority, wallet backend, connected application/client, approved action and
-journal. It also shows how application registrations appear in configuration,
-tokens and the owner's consent screen.
+| Role                               | Work                                                                                                           |
+| ---------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Provider operator                  | Register external services, configure policies, store secrets, deploy, back up and operate the service         |
+| Identity administrator / reviewers | Configure login/token issuance; staff independently accept identity evidence                                   |
+| Connected application's developer  | Obtain scoped API tokens; integrate owner access, provisioning and approval/signing; arrange execution and gas |
+| Advanced integration developer     | Implement an unsupported backend, custom financial actions or embedded host behavior                           |
 
-## Follow the integration path
+You may wear several roles. The GUI removes provider setup code; it does not create
+vendor accounts or replace infrastructure and product integration work.
 
-<figure class="wallet-visual">
-  <img src="./public/diagrams/service-setup.webp" alt="Diagram: install a reviewed package, configure integrations, validate offline, initialize empty storage, activate explicitly and consume the HTTP API." width="1536" height="1024" loading="lazy" decoding="async">
-  <figcaption>Follow the configured-service path before choosing an advanced embedded integration.</figcaption>
-</figure>
+## Install and open the local wizard
 
-[View full-size diagram](public/diagrams/service-setup.webp)
+Install [Node.js](https://nodejs.org/en/download) **24.22.0**, npm **11.11.1** and
+[Git](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git) for your OS.
+Open a terminal (macOS Terminal or your Linux terminal), then check:
 
-For supported setups, follow [Configure, deploy and integrate](setup.md): one JSON
-configuration, deployment commands and API consumption. Use [custom adapters](custom-adapters.md)
-or the embedded library guides below only when your integration needs custom code.
+```sh
+node --version
+npm --version
+```
 
-1. **[Install the package](package.md).** Build a reviewed tarball, install it in
-   your application and inspect the unconfigured API.
-2. **[Run the provider walkthrough](integration-example.md).** Follow an authenticated
-   request through account creation, signing, replay, revocation and recovery limits.
-   The [examples index](../examples/README.md) distinguishes runnable fixtures from
-   configuration templates.
-3. **[Connect your wallet backend](backend-guide.md).** Choose an existing adapter
-   or implement the signing interface. Identify which component owns the journal.
-4. **[Integrate your host](provider-guide.md).** Existing stored-action hosts can use
-   the [supplied backend lifecycle](stored-backend.md). Connect current owner, grant,
-   consent and KYC policy, approved actions, durable storage and recovery.
-   If you need a new-user access flow, use [onboarding](onboarding.md) and its
-   [typed configuration](provider.config.example.ts).
-5. **[Check your integration](conformance.md).** Exercise denial, concurrency,
-   restart and uncertain-result behavior before enabling a backend.
-6. **[Run and monitor the service](operations.md).** Configure HTTP lifecycle,
-   ingress, readiness, telemetry and operational recovery.
+If Node has a different version, select 24.22.0 using your installation/version
+manager before proceeding. Node installers include npm; if its version differs,
+install the required npm version using your Node installation's package manager
+permissions, then check it again:
+
+```sh
+npm install --global npm@11.11.1 --ignore-scripts
+npm --version
+```
+
+Do not run the wallet service as root to solve an installation-permission problem.
+
+From a folder where you keep software, run:
+
+```sh
+git clone https://github.com/Moovha/wallet-provider-kit.git
+cd wallet-provider-kit
+npm ci
+npm run build
+npm start -- setup
+```
+
+`npm ci` installs the locked dependencies; `build` compiles the service and bundled
+wizard. `setup` opens a temporary local browser session or prints a URL to open.
+No external credentials are needed to explore the forms. Keep the terminal open;
+Ctrl+C stops the session. If you already installed a reviewed tarball, use
+`npx --no-install wallet-provider-kit setup` in that installation instead. The
+[package guide](package.md) explains tarballs; the package is not published to npm.
+
+![Provider setup screen with example values and all six steps](public/screenshots/provider.webp)
+
+[Open full-size screenshot](public/screenshots/provider.webp)
+
+_Real wizard screenshot using invented example values. Replace every placeholder
+with your own prepared configuration; the screenshot is not a deployable setup._
+
+## Follow the operator path
+
+1. **[Prepare services and credentials](operator-services.md).** Choose a backend,
+   domain, identity vendor and funding arrangements. Learn what each client ID,
+   secret, issuer, audience and reviewer subject means and where it comes from.
+   For a fresh login/token setup use the [Auth0 dashboard recipe](auth0-setup.md).
+2. **[Complete the six wizard screens](setup-wizard.md#complete-the-six-steps).**
+   Configure Provider, Backend, Services, Policies and Deployment. Validate under
+   Export and download all three files. Enter secret variable names only.
+3. **[Deploy the export](operator-deployment.md).** Supply actual secrets, prepare
+   private persistent storage, initialize once, diagnose, start disabled and add
+   HTTPS. Complete acceptance, explicitly activate and retain recovery evidence.
+4. **[Hand the API to your product developer](operator-deployment.md#hand-the-api-to-the-product-developer).**
+   Supply the origin, OpenAPI, client/token details and supported policies.
+   Owners use provider-hosted login, consent and transfer approval pages.
+5. **[Operate and recover](operator-deployment.md#keep-it-operating).** Supervise the
+   process, monitor readiness, preserve storage/bindings and test encrypted backups.
+
+A successful export means configuration validation passed. It does not mean
+vendor connectivity, login, identity agreements or wallet recovery were tested.
+Do not enable activation merely because every wizard tab has been visited.
+
+## Advanced integrations
+
+Start here only if supported configuration cannot meet your requirements:
+[custom adapters](custom-adapters.md), [backend integration](backend-guide.md),
+[embedded host authority](provider-guide.md) and [durable attempts](durable-attempts.md).
+The [offline integration tutorial](integration-example.md) explains those interfaces
+with ephemeral fixtures. It is useful for developers but is not an operator setup
+prerequisite. The [technical configuration reference](setup.md) describes the JSON
+and financial profile exported by the GUI.
 
 ## API reference
 

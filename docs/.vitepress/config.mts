@@ -54,8 +54,11 @@ export default defineConfig({
       {
         text: 'Get started',
         items: [
+          { text: 'Operator getting started', link: '/docs/' },
+          { text: 'Services and credentials', link: '/docs/operator-services' },
+          { text: 'Auth0 dashboard setup', link: '/docs/auth0-setup' },
           { text: 'Operator setup wizard', link: '/docs/setup-wizard' },
-          { text: 'Configure and deploy', link: '/docs/setup' },
+          { text: 'Deploy the export', link: '/docs/operator-deployment' },
           { text: 'Understand the roles', link: '/docs/concepts' },
           {
             text: 'Install the package',
@@ -109,25 +112,38 @@ export default defineConfig({
           { text: 'What the kit does', link: '/' },
           { text: 'Roles and terms', link: '/docs/concepts' },
           { text: 'Assets and gas sponsorship', link: '/docs/assets-and-gas' },
-          { text: 'Integration path', link: '/docs/' },
+          { text: 'Getting started', link: '/docs/' },
         ],
       },
       {
-        text: 'Build your wallet service',
+        text: 'Operator setup',
         items: [
-          { text: 'Operator setup wizard', link: '/docs/setup-wizard' },
-          { text: 'Configure and deploy', link: '/docs/setup' },
-          { text: 'Custom adapters', link: '/docs/custom-adapters' },
-          { text: '1. Install the package', link: '/docs/package' },
+          { text: '1. Get started', link: '/docs/' },
           {
-            text: '2. Run the integration example',
+            text: '2. Services and credentials',
+            link: '/docs/operator-services',
+          },
+          { text: 'Auth0 dashboard setup', link: '/docs/auth0-setup' },
+          { text: '3. FormKit wizard', link: '/docs/setup-wizard' },
+          { text: '4. Deploy and activate', link: '/docs/operator-deployment' },
+          { text: 'Configuration reference', link: '/docs/setup' },
+          { text: 'Built-in SQLite storage', link: '/docs/storage' },
+          { text: 'Acceptance checklist', link: '/docs/conformance' },
+          { text: 'Operations reference', link: '/docs/operations' },
+        ],
+      },
+      {
+        text: 'Advanced development',
+        collapsed: true,
+        items: [
+          { text: 'Custom adapters', link: '/docs/custom-adapters' },
+          { text: 'Package and imports', link: '/docs/package' },
+          {
+            text: 'Offline integration example',
             link: '/docs/integration-example',
           },
-          { text: '3. Connect your backend', link: '/docs/backend-guide' },
-          { text: '4. Supply host authority', link: '/docs/provider-guide' },
-          { text: 'Built-in SQLite storage', link: '/docs/storage' },
-          { text: '5. Validate your integration', link: '/docs/conformance' },
-          { text: '6. Operate the service', link: '/docs/operations' },
+          { text: 'Backend integration', link: '/docs/backend-guide' },
+          { text: 'Embedded host authority', link: '/docs/provider-guide' },
         ],
       },
       {
