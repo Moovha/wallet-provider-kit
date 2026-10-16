@@ -809,6 +809,37 @@ describe('configured API and provider transfer authorization', () => {
     expect(checks).toBeGreaterThanOrEqual(3);
     expect(injected.backend!.signTypedData).not.toHaveBeenCalled();
   });
+  it('fences stale configured budget writers in the same transaction as the budget update', async () => {
+    const f = await fixture();
+    const receipt = (await f.request('1')).json();
+    const db = openProviderDatabase({ directory: f.config.storage.directory });
+    const previous = await db.onboardingStore.transaction((state) => ({
+      revision: state.deploymentBindings!['service-v1'].activeRevision!,
+      budgetId: state.supportedActions![receipt.action_id].approval.budgetId,
+    }));
+    const next = structuredClone(f.config);
+    next.financial!.maximumAmount = '99';
+    next.financial!.lifetimeAmount = '100';
+    await f.restart(next);
+    const revision = await db.onboardingStore.transaction(
+      (state) => state.deploymentBindings!['service-v1'].activeRevision!,
+    );
+    await db.setBudget(previous.budgetId, '100', revision);
+    // A request admitted by the older instance may still reach its budget write.
+    await expect(
+      db.setBudget(previous.budgetId, '150', previous.revision),
+    ).rejects.toThrow();
+    expect(await db.budget(previous.budgetId)).toEqual({
+      maximum: '100',
+      reserved: '0',
+    });
+    expect(
+      (await f.api('/v1/actions/' + receipt.action_id + '/sign', {}))
+        .statusCode,
+    ).toBe(403);
+    expect(injected.backend!.signTypedData).not.toHaveBeenCalled();
+    db.close();
+  });
   it('fences older running configurations and does not revive approvals on policy rollback', async () => {
     const f = await fixture();
     const id = (await f.request('1')).json().action_id;

@@ -46,10 +46,24 @@ export function openProviderDatabase(options: ProviderDatabaseOptions) {
         UNION ALL SELECT 1 FROM budgets UNION ALL SELECT 1 FROM approvals UNION ALL SELECT 1 FROM admissions
         UNION ALL SELECT 1 FROM attempts UNION ALL SELECT 1 FROM financial_audit UNION ALL SELECT 1 FROM enrollments LIMIT 1`);
     },
-    async setBudget(id: string, maximum: string) {
+    /** Configured writers must fence budget changes against the active service revision. */
+    async setBudget(id: string, maximum: string, configuredRevision?: string) {
       if (!text(id)) throw new WalletProviderError('wallet_provider_input');
       const limit = units(maximum);
       connection.transaction(() => {
+        if (configuredRevision !== undefined) {
+          const binding = connection.get(
+            'SELECT record FROM onboarding_records WHERE collection=? AND id=?',
+            'deploymentBindings',
+            'service-v1',
+          );
+          if (
+            !binding ||
+            JSON.parse(String(binding.record)).activeRevision !==
+              configuredRevision
+          )
+            throw new WalletProviderError('wallet_authorization_denied');
+        }
         const previous = connection.get(
           'SELECT reserved FROM budgets WHERE id=?',
           id,

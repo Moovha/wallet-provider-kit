@@ -302,7 +302,8 @@ policy invalidates earlier action authorizations and revokes transfer-delegation
 grants tied to the old terms. Reconnect and obtain new delegation consent; current
 accepted KYC can be reused when only financial terms changed. Onboarding
 policy/vendor workflow changes also invalidate affected grants. Credential rotation does not. Policy activation is recorded in the database:
-older running instances fail readiness, and superseded action approvals remain
+older running instances fail readiness and their budget writes are fenced inside
+the database transaction. Superseded action approvals remain
 denied even if an earlier configuration is restored. Stop old instances before
 activating a new configuration; no configuration file is hot-reloaded.
 

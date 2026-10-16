@@ -307,6 +307,7 @@ export class SupportedActions {
       await this.database.setBudget(
         record.approval.budgetId,
         this.policy.lifetimeAmount,
+        this.revision,
       );
       await this.database.approveAction(record.approval);
       await this.permitted(context.principal, record);

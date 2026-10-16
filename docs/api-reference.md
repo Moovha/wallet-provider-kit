@@ -2107,7 +2107,12 @@ export declare function openProviderDatabase(
   close: () => void;
   /** Read-only ownership guard before assigning an empty toolkit store to a configured service. */
   hasStoredRecords(): Promise<boolean>;
-  setBudget(id: string, maximum: string): Promise<void>;
+  /** Configured writers must fence budget changes against the active service revision. */
+  setBudget(
+    id: string,
+    maximum: string,
+    configuredRevision?: string,
+  ): Promise<void>;
   budget(id: string): Promise<{
     maximum: string;
     reserved: string;
