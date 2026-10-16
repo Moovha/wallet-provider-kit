@@ -8,6 +8,7 @@ import {
   shallowRef,
   watch,
 } from 'vue';
+import type { FormKitNode } from '@formkit/core';
 import type { ApiContract } from './api-reference';
 
 import {
@@ -23,6 +24,7 @@ import BackendStep from './components/BackendStep.vue';
 import ConnectionsStep from './components/ConnectionsStep.vue';
 import PolicyStep from './components/PolicyStep.vue';
 import DeploymentStep from './components/DeploymentStep.vue';
+import { defaultPermissions } from '../src/onboarding/types';
 
 const ApiReference = defineAsyncComponent(
   () => import('./components/ApiReference.vue'),
@@ -47,6 +49,13 @@ const validated = ref<{
 }>();
 const importInput = ref<HTMLInputElement>();
 const review = ref<HTMLElement>();
+let setupSteps: FormKitNode | undefined;
+const connectionsReturnStep = ref<'policies' | 'deployment'>();
+const permissionNames: Record<string, string> = {
+  'account:read': 'Read wallet accounts',
+  'operations:request': 'Request wallet operations (advanced hosts)',
+  'transfers:request': 'Request transfers on behalf of users',
+};
 const selectedBackend = computed(() =>
   backends.find((b) => b.kind === config.value?.backend.kind),
 );
@@ -165,6 +174,7 @@ async function importFile(event: Event) {
     config.value = result.config;
     generation.value++;
     activeStep.value = 'provider';
+    connectionsReturnStep.value = undefined;
     await nextTick();
     notice.value =
       'Configuration imported. Review the settings, then validate again before exporting.';
@@ -215,9 +225,8 @@ function exportEnvironment() {
         '\n',
     );
 }
-function stepChanged(node: {
-  on: (event: string, callback: (event: { payload: string }) => void) => void;
-}) {
+function stepChanged(node: FormKitNode) {
+  setupSteps = node;
   node.on('prop:activeStep', ({ payload }) => {
     activeStep.value = payload;
     nextTick(() => {
@@ -230,6 +239,13 @@ function stepChanged(node: {
       }
     });
   });
+}
+function goToStep(step: 'connections' | 'policies' | 'deployment') {
+  if (setupSteps) setupSteps.props.activeStep = step;
+}
+function configureServices(returnStep: 'policies' | 'deployment') {
+  connectionsReturnStep.value = returnStep;
+  goToStep('connections');
 }
 function enableDocumentation() {
   if (config.value)
@@ -279,9 +295,10 @@ function enableDocumentation() {
       <div class="sidebar-bottom">
         <span class="status-dot"></span> Local configuration session
         <p>
-          Download your configuration to save your work. Refreshing or closing
-          this page discards unsaved edits. Reopen the full link from your
-          terminal and import your saved file to continue.
+          Keep this session open while completing the fields. Downloads become
+          available after validation in Export; incomplete drafts cannot be
+          saved. Refreshing or closing this page discards unsaved edits. Import
+          a previously exported configuration to resume.
         </p>
         <a
           :href="docs + 'setup-wizard.html'"
@@ -374,13 +391,26 @@ function enableDocumentation() {
               ><BackendStep v-model="config"
             /></FormKit>
             <FormKit type="step" name="connections" label="Services"
-              ><ConnectionsStep v-model="config"
+              ><ConnectionsStep
+                v-model="config"
+                :return-label="
+                  connectionsReturnStep
+                    ? stepNames[connectionsReturnStep]
+                    : undefined
+                "
+                @return-to-step="
+                  connectionsReturnStep && goToStep(connectionsReturnStep)
+                "
             /></FormKit>
             <FormKit type="step" name="policies" label="Policies"
-              ><PolicyStep v-model="config"
+              ><PolicyStep
+                v-model="config"
+                @configure-services="configureServices('policies')"
             /></FormKit>
             <FormKit type="step" name="deployment" label="Deployment"
-              ><DeploymentStep v-model="config"
+              ><DeploymentStep
+                v-model="config"
+                @configure-services="configureServices('deployment')"
             /></FormKit>
             <FormKit type="step" name="review" label="Export">
               <div ref="review" tabindex="-1" class="step-heading">
@@ -443,7 +473,7 @@ function enableDocumentation() {
                     {{
                       config.financial
                         ? 'Delegated token transfer signing'
-                        : 'Wallet creation and account access'
+                        : 'Not configured'
                     }}
                   </dd>
                 </div>
@@ -479,6 +509,30 @@ function enableDocumentation() {
                   </dd>
                 </div>
               </dl>
+              <h3>Application permissions to review</h3>
+              <ul class="export-file-guide">
+                <li
+                  v-for="(application, index) in config.policy.applications"
+                  :key="index"
+                >
+                  <strong
+                    >{{
+                      application.name || `Application ${index + 1}`
+                    }}:</strong
+                  >
+                  {{
+                    application.enabled === false
+                      ? 'access disabled'
+                      : 'access enabled'
+                  }}
+                  ·
+                  {{
+                    (application.permissions ?? defaultPermissions)
+                      .map((permission) => permissionNames[permission])
+                      .join(', ')
+                  }}
+                </li>
+              </ul>
               <div class="callout">
                 <strong
                   >Test your services before enabling wallet operations.</strong
@@ -501,7 +555,7 @@ function enableDocumentation() {
               </button>
               <div v-if="validated" class="export-panel">
                 <div v-if="validated.warnings.length" class="readiness-panel">
-                  <h3>Before this setup can serve users</h3>
+                  <h3>Deployment reminders</h3>
                   <ul>
                     <li v-for="warning in validated.warnings" :key="warning">
                       {{ warning }}
@@ -531,22 +585,6 @@ function enableDocumentation() {
                     the deployment guide. The wizard exports names only.
                   </li>
                 </ul>
-                <p>
-                  Next, take these files to your deployment host and follow the
-                  checklist. Downloads save your work; they do not apply it to a
-                  running service.
-                </p>
-                <p>
-                  <a
-                    :href="docs + 'staging-walkthrough.html'"
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    Run the staging walkthrough ↗
-                  </a>
-                  for deployment, unfunded account access, policy checks and
-                  recovery.
-                </p>
                 <div class="download-actions">
                   <button type="button" class="primary" @click="exportConfig">
                     Download configuration</button
@@ -564,6 +602,48 @@ function enableDocumentation() {
                     Download variable template
                   </button>
                 </div>
+                <h3>What to do after downloading</h3>
+                <ol class="setup-journey">
+                  <li>
+                    Build the same toolkit revision on your deployment host.
+                    Copy all three files into a private directory outside the
+                    checkout. Rename provider.env.example to provider.env and
+                    supply secret values there or through your secret manager.
+                  </li>
+                  <li>
+                    Follow provider-setup.md to validate, initialize new storage
+                    once and start the service with wallet operations disabled.
+                    Add HTTPS and follow the staging walkthrough for backend,
+                    access-policy and recovery tests. Some checks need explicit
+                    activation in an isolated test deployment with reviewed
+                    evidence. Disabled readiness is expected during initial
+                    setup.
+                  </li>
+                  <li>
+                    Before admitting wider traffic, import the saved
+                    configuration here, record completed test report references
+                    in Deployment and enable wallet operations. Validate and
+                    export again, then replace the server configuration and
+                    restart with the same storage and backend binding.
+                  </li>
+                </ol>
+                <p>
+                  <a
+                    :href="docs + 'operator-deployment.html'"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Open the deployment guide ↗
+                  </a>
+                  for host preparation, exact commands and HTTPS. Use the
+                  <a
+                    :href="docs + 'staging-walkthrough.html'"
+                    target="_blank"
+                    rel="noreferrer"
+                    >staging walkthrough ↗</a
+                  >
+                  for acceptance testing.
+                </p>
                 <details>
                   <summary>Preview configuration</summary>
                   <pre>{{ JSON.stringify(validated.config, null, 2) }}</pre>

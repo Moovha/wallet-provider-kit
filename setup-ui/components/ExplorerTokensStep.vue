@@ -12,6 +12,7 @@ const scopeOptions = apiTokenScopes.map((scope) => ({
   label: `${apiTokenScopeLabels[scope]} (${scope})`,
 }));
 const model = defineModel<ProviderConfiguration>({ required: true });
+const emit = defineEmits<{ 'configure-services': [] }>();
 const operators = computed({
   get: () => model.value.apiExplorer?.operators.join('\n') ?? '',
   set: (value) => {
@@ -70,6 +71,13 @@ function toggleClient(clientId: string, index: number, enabled: unknown) {
         Configure staff login in Services before exporting. This login is for
         token operators, not wallet users.
       </p>
+      <button
+        type="button"
+        class="secondary step-shortcut"
+        @click="emit('configure-services')"
+      >
+        Configure staff login in Services
+      </button>
       <SetupField
         guide="operators"
         v-model="operators"

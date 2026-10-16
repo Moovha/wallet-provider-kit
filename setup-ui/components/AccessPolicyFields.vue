@@ -4,6 +4,7 @@ import SetupField from './SetupField.vue';
 import { docs } from '../model';
 import type { ProviderConfiguration } from '../model';
 const model = defineModel<ProviderConfiguration>({ required: true });
+const emit = defineEmits<{ 'configure-services': [] }>();
 const recordFields = computed({
   get: () =>
     model.value.policy.identity?.records?.requiredFields.join('\n') ?? '',
@@ -99,18 +100,19 @@ const requiredFields = computed({
       rel="noopener noreferrer"
       >Application-led access contract ↗</a
     >
-    <FormKit
+    <SetupField
+      guide="identityLevel"
       type="text"
       v-model="model.policy.identity!.application!.verificationLevel"
       label="Required identity level"
       validation="required|length:1,100"
-      help="Use the exact verification level agreed with your trusted applications."
     />
-    <FormKit
+    <SetupField
+      guide="identityFields"
       type="textarea"
       v-model="requiredFields"
       label="Required identity fields (one per line)"
-      help="Use lowercase names. Leave empty when the policy needs no additional identity fields."
+      validation="identity_fields"
     />
     <p>
       Use lowercase field names such as country. Matching fields do not prove
@@ -125,6 +127,13 @@ const requiredFields = computed({
       select unfunded record evaluation here; users consent and staff review
       those records before access.
     </p>
+    <button
+      type="button"
+      class="secondary step-shortcut"
+      @click="emit('configure-services')"
+    >
+      Configure hosted connections in Services
+    </button>
     <fieldset class="vendor-panel">
       <legend>Application records · starter evaluation</legend>
       <SetupField
@@ -140,7 +149,7 @@ const requiredFields = computed({
         type="textarea"
         label="Required record fields"
         v-model="recordFields"
-        validation="required"
+        validation="required|identity_fields"
       />
     </fieldset>
   </template>

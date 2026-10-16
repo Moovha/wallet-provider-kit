@@ -4,6 +4,7 @@ import ExplorerTokensStep from './ExplorerTokensStep.vue';
 import { computed } from 'vue';
 import type { ProviderConfiguration } from '../model';
 const model = defineModel<ProviderConfiguration>({ required: true });
+const emit = defineEmits<{ 'configure-services': [] }>();
 const http = computed({
   get: () =>
     model.value.http ?? {
@@ -81,7 +82,10 @@ function updateHttp(key: 'host' | 'port' | 'documentation', value: unknown) {
     :modelValue="http.documentation ?? false"
     @update:modelValue="updateHttp('documentation', $event)"
   />
-  <ExplorerTokensStep v-model="model" />
+  <ExplorerTokensStep
+    v-model="model"
+    @configure-services="emit('configure-services')"
+  />
   <div class="callout">
     <strong>Next, prepare your server</strong>
     <p>

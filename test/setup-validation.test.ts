@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { explainIssue } from '../setup-ui/validation.js';
+import { explainIssue, identityFields } from '../setup-ui/validation.js';
 
 it('routes policy requirements and vendor price errors to Policies while connection errors stay in Services', () => {
   for (const path of [
@@ -54,4 +54,19 @@ it('does not reflect unknown imported fields or unexpected diagnostic text into 
   expect(unknownReason).toContain('field instructions');
   expect(unknownReason).not.toContain('private-fixture-reference');
   expect(unknownReason).not.toContain('unexpected-fixture-value');
+});
+
+it('accepts agreed field lists and rejects invalid, duplicate, reserved or excessive requirements before export', () => {
+  expect(identityFields({ value: '' })).toBe(true);
+  expect(identityFields({ value: 'country\ncustomer_type' })).toBe(true);
+  for (const value of [
+    'Country',
+    'country\ncountry',
+    'constructor',
+    'prototype',
+    'a'.repeat(65),
+    Array.from({ length: 17 }, (_, i) => `field_${i}`).join('\n'),
+  ]) {
+    expect(identityFields({ value })).toBe(false);
+  }
 });

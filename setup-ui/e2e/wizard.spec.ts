@@ -137,7 +137,15 @@ test('field guidance follows backend choices and explains service registrations,
   await expect(relayerHelp).toContainText('does not install a Relayer');
   await step(page, 'Policies');
   await page.getByLabel('Access flow', { exact: true }).selectOption('hosted');
-  await step(page, 'Services');
+  await page
+    .getByRole('button', {
+      name: 'Configure hosted connections in Services',
+      exact: true,
+    })
+    .click();
+  await expect(
+    page.getByRole('tab', { name: 'Services', exact: true }),
+  ).toHaveAttribute('aria-selected', 'true');
   await expect(
     page.getByRole('heading', {
       name: 'Access tokens for connected applications',
@@ -150,7 +158,9 @@ test('field guidance follows backend choices and explains service registrations,
     `${sample.policy.provider.origin}/onboarding/callback`,
   );
   await page.getByText('Use Didit', { exact: true }).click();
-  await step(page, 'Policies');
+  await page
+    .getByRole('button', { name: 'Continue in Policies', exact: true })
+    .click();
   await page
     .getByText('Didit verification: set an agreed price limit', {
       exact: true,
@@ -843,6 +853,23 @@ test('operator configures GUI token issuance with explicit subjects, clients, sc
   await page
     .getByText('Enable application token controls for staff', { exact: true })
     .click();
+  await page
+    .getByRole('button', {
+      name: 'Configure staff login in Services',
+      exact: true,
+    })
+    .click();
+  await expect(
+    page.getByRole('tab', { name: 'Services', exact: true }),
+  ).toHaveAttribute('aria-selected', 'true');
+  await page
+    .getByRole('button', { name: 'Continue in Deployment', exact: true })
+    .click();
+  await expect(
+    page.getByLabel('Enable application token controls for staff', {
+      exact: true,
+    }),
+  ).toBeChecked();
   await page
     .getByLabel('Token operator account IDs (sub)', { exact: true })
     .fill('auth0|offline-operator');

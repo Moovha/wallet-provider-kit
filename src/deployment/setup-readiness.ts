@@ -9,16 +9,16 @@ export function setupWarnings(config: ProviderConfiguration): string[] {
     );
   if (!config.activation.enabled)
     warnings.push(
-      'Wallet operations are disabled. Complete the wallet backend and recovery tests, then enable operations in Deployment, export and restart the service.',
+      'Wallet operations are disabled, as expected for a first deployment. Deploy with this setting off, complete the wallet backend and recovery tests, then enable operations in Deployment, export and restart the service.',
     );
   for (const [vendor, settings] of Object.entries(config.identity)) {
     if (!settings.verificationPrice)
       warnings.push(
-        `${vendor === 'didit' ? 'Didit' : 'Sumsub'}: new identity checks are unavailable. In Services, set the agreed verification price limit, including 0 for an agreed free workflow.`,
+        `${vendor === 'didit' ? 'Didit' : 'Sumsub'}: new identity checks are unavailable. In Policies, set the agreed verification price limit, including 0 for an agreed free workflow.`,
       );
     if (!settings.importPrice)
       warnings.push(
-        `${vendor === 'didit' ? 'Didit' : 'Sumsub'}: shared identity import is unavailable. In Services, set the agreed import price limit.`,
+        `${vendor === 'didit' ? 'Didit' : 'Sumsub'}: shared identity import is unavailable. In Policies, set the agreed import price limit.`,
       );
   }
   for (const [index, application] of config.policy.applications.entries()) {
@@ -39,7 +39,7 @@ export function setupWarnings(config: ProviderConfiguration): string[] {
       )
     )
       warnings.push(
-        `Application ${index + 1}: its monthly identity budget is smaller than a vendor's per-request price limit. Review the agreed budget in Policies and prices in Services.`,
+        `Application ${index + 1}: its monthly identity budget is smaller than a vendor's per-request price limit. Review the agreed budget and route prices in Policies.`,
       );
   }
   if (

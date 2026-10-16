@@ -5,6 +5,8 @@ import { computed, watch } from 'vue';
 import type { ProviderConfiguration } from '../model';
 import SecretField from './SecretField.vue';
 const model = defineModel<ProviderConfiguration>({ required: true });
+defineProps<{ returnLabel?: string }>();
+const emit = defineEmits<{ 'return-to-step': [] }>();
 watch(
   () => model.value.oauth.issuer,
   (issuer) => {
@@ -279,4 +281,12 @@ const flow = computed(() => model.value.policy.access?.mode ?? 'hosted');
       </p>
     </template>
   </template>
+  <button
+    v-if="returnLabel"
+    type="button"
+    class="secondary step-shortcut"
+    @click="emit('return-to-step')"
+  >
+    Continue in {{ returnLabel }}
+  </button>
 </template>

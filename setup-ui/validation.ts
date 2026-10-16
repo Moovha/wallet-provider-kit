@@ -15,6 +15,21 @@ export function httpsUrl(node: { value: unknown }) {
 export function httpsOrigin(node: { value: unknown }) {
   return httpsUrl(node) && new URL(String(node.value)).origin === node.value;
 }
+export function identityFields(node: { value: unknown }) {
+  const fields = String(node.value ?? '')
+    .split(/\r?\n/)
+    .map((field) => field.trim())
+    .filter(Boolean);
+  return (
+    fields.length <= 16 &&
+    new Set(fields).size === fields.length &&
+    fields.every(
+      (field) =>
+        /^[a-z][a-z0-9_]{0,63}$/.test(field) &&
+        !['constructor', 'prototype'].includes(field),
+    )
+  );
+}
 export function explainIssue(issue: string) {
   const separator = issue.indexOf(': ');
   if (!issue.startsWith('/') || separator < 0) return issue;
