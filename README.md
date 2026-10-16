@@ -13,6 +13,13 @@ application-led access, account provisioning and approved-action signing into on
 creates wallet accounts and signs approved actions, define who may use an account,
 and retain responsibility for key control and recovery.
 
+<figure class="wallet-visual">
+  <img src="./docs/public/diagrams/service-composition.svg" alt="Wallet service architecture: the HTTP API authenticates requests, the policy layer checks current authority against durable storage, and the wallet backend signs only admitted actions after a recorded attempt and permission recheck." width="1200" height="820" decoding="async">
+  <figcaption>The HTTP API, policy, storage and signing layers work together to protect wallet operations. OAuth scopes alone never authorize spending.</figcaption>
+</figure>
+
+[View full-size architecture](docs/public/diagrams/service-composition.svg)
+
 In the standard application-led flow, users remain in the connected application.
 That application authenticates them, completes the required identity checks and
 records their wallet-access consent. It requests access on their behalf using
@@ -151,18 +158,12 @@ Deploy the configured provider service and connect your product through its API.
 The toolkit can also be embedded as a Node.js package for advanced integrations.
 Its OpenAPI contract also lets applications written in other languages use the implemented service routes.
 
-```mermaid
-flowchart TB
-    accTitle: Account owner, connected application and provider control
-    accDescr: The user approves access in the application, which attests identity and consent to the provider. Applications request actions from the toolkit, which checks host authority and calls the chosen backend. Only permitted results return to the application.
-    walletOwner["Wallet user"] -->|"Login, identity checks and consent"|connectedApp
-    connectedApp["Connected application"] -->|"User assertion or authorized action request"|kit
-    subgraph walletService["Your wallet service"]
-        kit["Wallet Provider Kit"] -->|"Check current permission"|authority["Your host authority"]
-        kit -->|"Admitted action only"|backend["Your chosen wallet backend"]
-    end
-    kit -->|"Permitted result"|connectedApp
-```
+<figure class="wallet-visual">
+  <img src="./docs/public/diagrams/application-relationship.svg" alt="The account owner approves access within the connected application. The application sends authenticated requests and user evidence to provider policy checks; the chosen backend creates accounts and signs approved actions without sharing keys." width="1200" height="830" loading="lazy" decoding="async">
+  <figcaption>The application handles the user experience; the provider service enforces access and keeps durable authority records.</figcaption>
+</figure>
+
+[View full-size relationship diagram](docs/public/diagrams/application-relationship.svg)
 
 Your team configures the authority and backend shown inside the service boundary.
 For supported profiles, the kit supplies the permission checks and durable records.
@@ -215,26 +216,12 @@ and [security model](docs/security-model.md) explain that contract.
 The signing path below shows a new successful attempt. An authorised retry uses
 the stored result; a pending or unknown attempt requires reconciliation.
 
-```mermaid
-sequenceDiagram
-    accTitle: A successful approved signing attempt
-    accDescr: The host verifies current authority, loads an approved action, claims a durable attempt, rechecks permission, calls the backend, verifies and persists the result, then returns it.
-    participant Application
-    participant Host
-    participant Journal
-    participant Backend
-    Application->>Host: Request stored action with access token
-    Host->>Host: Verify caller and current owner authority
-    Host->>Host: Load exact approved action
-    Host->>Journal: Admit and claim durable attempt
-    Journal-->>Host: Exclusive dispatch claim
-    Host->>Host: Recheck current permission
-    Host->>Backend: Sign admitted action
-    Backend-->>Host: Signing result
-    Host->>Host: Verify exact digest and signer
-    Host->>Journal: Persist verified result
-    Host-->>Application: Return permitted result
-```
+<figure class="wallet-visual">
+  <img src="./docs/public/diagrams/approved-signing.svg" alt="Successful signing: authenticate the caller, authorize the exact stored action, claim a durable attempt, recheck permission, sign and verify, then persist and return the permitted result. Pending or unknown attempts require reconciliation." width="1200" height="962" loading="lazy" decoding="async">
+  <figcaption>Current authority and a durable dispatch claim protect signing. Retries preserve the original attempt and recheck permission.</figcaption>
+</figure>
+
+[View full-size signing diagram](docs/public/diagrams/approved-signing.svg)
 
 ## Where it fits in Moovha
 
