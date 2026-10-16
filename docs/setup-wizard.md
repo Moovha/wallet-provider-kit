@@ -210,7 +210,9 @@ then creates or accesses the wallet. See the complete
 Example revisions, timestamps, IDs and evidence are placeholders. Replace them
 with current records before testing. Schemas and example responses are not live
 service results or approvals. Signing returns an authorization signature; the
-connected application submits the transaction and arranges gas separately.
+connected application arranges sponsor funding and selects its execution rail. The
+optional [execution coordinator](execution.md), configured in Deployment, signs
+internally, submits once and independently verifies chain status.
 Transaction event reports remain unverified observations. See
 [signing, submission and event reporting](http-api.md#signing-and-transaction-submission).
 

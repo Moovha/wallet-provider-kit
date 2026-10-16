@@ -65,7 +65,8 @@ funding rail. Agree submission ownership, bounded budgets and uncertain-outcome
 recovery before enabling it. Access consent alone cannot trigger funding.
 See [assets and gas sponsorship](assets-and-gas.md) for the coverage contract
 and implementation status. The provider kit does not itself supply live Moovha
-sponsorship or settlement.
+funding or business settlement. The optional [configured execution profile](execution.md)
+coordinates a dedicated application sponsor and verifies token-transfer finality.
 
 ## Configured transfer delegation
 

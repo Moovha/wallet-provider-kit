@@ -1,4 +1,6 @@
 import { randomBytes, randomUUID } from 'node:crypto';
+import type { TransferExecutionRecord } from '../execution/types.js';
+import type { ProviderState } from '../onboarding/types.js';
 import { getAddress, TypedDataEncoder } from 'ethers';
 import type {
   AuthorityContext,
@@ -46,6 +48,7 @@ export interface TransactionEventReport extends TransactionEventInput {
   verification: 'unverified';
 }
 export interface TransferRecord {
+  execution?: TransferExecutionRecord;
   transactionEvents?: TransactionEventReport[];
   approval: FinancialApproval & { action: TypedDataAction };
   revision: string;
@@ -373,6 +376,43 @@ export class SupportedActions {
       if (!record) deny();
       return record;
     });
+  }
+  /** Current exact transfer authority, checked again inside the storage transaction. */
+  async withAuthorizedTransfer<T>(
+    principal: VerifiedPrincipal,
+    id: string,
+    operation: (state: ProviderState, record: TransferRecord) => T,
+    allowExpired = false,
+  ): Promise<T> {
+    principal = structuredClone(principal);
+    const before = await this.load(id);
+    const grant = await this.permitted(principal, before, false, allowExpired);
+    if (
+      before.status !== 'authorized' ||
+      !(await this.database.isApprovedAction(before.approval, allowExpired))
+    )
+      deny();
+    return this.onboarding.withAccountAccess(
+      principal,
+      before.approval.account.accountId,
+      'transfers:request',
+      (state, currentGrant) => {
+        const latest = state.supportedActions?.[id];
+        if (
+          !latest ||
+          latest.status !== 'authorized' ||
+          fingerprint(latest.approval) !== fingerprint(before.approval) ||
+          fingerprint(grant) !== fingerprint(currentGrant) ||
+          state.accounts[grant.accountId]?.address?.toLowerCase() !==
+            before.approval.account.address.toLowerCase() ||
+          state.deploymentBindings?.['service-v1']?.activeRevision !==
+            this.revision
+        )
+          deny();
+        this.current(latest, false, allowExpired);
+        return operation(state, latest);
+      },
+    );
   }
   /** Store caller observations separately from signing authority and verified settlement. */
   async reportTransactionEvent(

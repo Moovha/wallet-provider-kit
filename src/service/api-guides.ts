@@ -4,6 +4,7 @@ export interface OperationGuide {
   scope?: string;
   financial?: boolean;
   enrollment?: boolean;
+  execution?: boolean;
   applicationLed?: boolean;
   records?: boolean;
   vendor?: boolean;
@@ -119,6 +120,50 @@ export const operationGuides: Record<string, OperationGuide> = {
     success:
       '200: authorizing, authorized or denied. authorized means the provider has stored the approved transfer; signing, submission and completion are separate steps.',
   },
+  getExecutionCapabilities: {
+    title: 'Discover execution profiles and verification requirements',
+    group: 'Execution coordination',
+    prerequisite:
+      'Public discovery. Read the exact profile ID and revision before requesting execution. Implemented, configured and ready are distinct; none establishes provider certification or production custody acceptance.',
+    success:
+      '200: the supported ERC-3009 Base Sepolia EOA execution contract, profile revision, required scopes and finalized RPC-quorum verification policy. Unsupported wallet/account standards are not advertised as executable capabilities.',
+  },
+  executeTransfer: {
+    title: 'Execute an approved transfer with a gas sponsor',
+    group: 'Execution coordination',
+    scope: 'wallet:execute',
+    financial: true,
+    execution: true,
+    permission: 'transfers:request',
+    prerequisite:
+      'Also require wallet:sign. Configure dedicated application sponsors, admitted gas budgets, two independent RPC origins, the accepted genesis/token runtime hashes and execution acceptance. Send {} with Execution-Profile: erc3009-relayer-v1, Execution-Profile-Revision: 1 and a UUIDv4 Idempotency-Key. The provider keeps its current owner, grant, identity, consent, exact approval and durable signing/dispatch checks. Callers cannot supply calldata, signatures, fees, sponsors or transaction nonces.',
+    success:
+      '200: durable execution/dispatch status, not a settlement guarantee. One execution identity per action survives retries and restart. A lost submission response remains unknown and is never dispatched again. Read execution status to obtain independently checked chain effects and finality. Gas reservations and signing exposure are not refunded automatically.',
+  },
+  getTransferExecution: {
+    title: 'Read RPC-verified transfer execution and finality',
+    group: 'Execution coordination',
+    scope: 'wallet:execute:read',
+    financial: true,
+    execution: true,
+    permission: 'transfers:request',
+    prerequisite:
+      'Use the original action ID and exact Execution-Profile/Execution-Profile-Revision headers. Current caller, owner, transfer access, identity, consent and approval must still pass; reads remain possible after signing expiry. The observer checks receipts, canonical blocks, token runtime code and exact authorization/transfer logs through all configured RPC sources.',
+    success:
+      '200: separate dispatch, chain, outcome and settlement fields. Only finalized matching effects have settlement succeeded or reverted. Relayer acceptance, application reports and inclusion alone do not establish settlement. RPC outages return unavailable; contradictory finalized evidence fences the execution for operator investigation.',
+  },
+  getExecutionEvents: {
+    title: 'Read durable CloudEvents execution observations',
+    group: 'Execution coordination',
+    scope: 'wallet:execute:read',
+    financial: true,
+    execution: true,
+    permission: 'transfers:request',
+    prerequisite:
+      'Use the exact execution profile headers and current owner-bound transfer access. Pass the last next_sequence as the after query parameter. Event data uses the pinned execution profile revision; the envelope uses CloudEvents specversion 1.0. Reading this feed never refreshes or dispatches a transaction.',
+    success:
+      '200: up to 64 durable observed transitions. Persist event IDs for deduplication. history_truncated requires resynchronization through verified execution status; a cursor beyond stored history returns 409. Events distinguish unverified observations, inclusion and finalized effects and do not form an exhaustive chain or accounting ledger.',
+  },
   reportTransactionEvent: {
     title: 'Report a transaction event',
     group: 'Transaction telemetry',
@@ -188,6 +233,7 @@ export interface ApiFeatures {
   onboarding: boolean;
   enrollment: boolean;
   financial: boolean;
+  execution?: boolean;
   signing?: boolean;
   wallet: boolean;
   flow?: 'application' | 'hosted';
@@ -201,7 +247,10 @@ export function operationUnavailableReason(
   features: ApiFeatures,
 ): string | undefined {
   const guide = operationGuides[id];
-  if (!guide || id === 'getCapabilities') return undefined;
+  if (!guide || id === 'getCapabilities' || id === 'getExecutionCapabilities')
+    return undefined;
+  if (guide.execution && !features.execution)
+    return 'Execution coordination and RPC verification are not configured';
   if (guide.enrollment)
     return features.enrollment
       ? undefined
@@ -225,4 +274,4 @@ export function operationUnavailableReason(
   return undefined;
 }
 
-export const transactionBoundaryDescription = `Signing, submission and transaction reports are separate steps. POST /v1/transfer-authorizations stores an exact authorized ERC-3009 transfer; POST /v1/actions/{actionId}/sign returns its signature and does not broadcast or pay gas. The connected application arranges network fees, submits the token-contract transaction and verifies its receipt and finality. No transaction-submission HTTP endpoint is implemented. OpenZeppelin Relayer execution is a separate TypeScript library integration. POST /v1/actions/{actionId}/transaction-events records an application's submitted, confirmed or failed report as unverified; it does not prove settlement or change financial authority. Monitoring metrics and traces are exported separately to an OTLP collector.`;
+export const transactionBoundaryDescription = `Signing, execution and transaction reports are separate contracts. POST /v1/transfer-authorizations stores an exact authorized ERC-3009 transfer; POST /v1/actions/{actionId}/sign returns its signature without broadcasting. With the optional erc3009-relayer-v1 profile, POST /v1/actions/{actionId}/execute coordinates signing, simulation, gas-budget admission and one durable Relayer dispatch. GET /v1/actions/{actionId}/execution independently checks chain effects through configured RPC sources and separates inclusion, safe and finalized status. Applications can still arrange submission separately when coordination is absent. Transaction-event reports remain unverified and never determine settlement or release budgets. Monitoring metrics and traces are exported separately to an OTLP collector.`;

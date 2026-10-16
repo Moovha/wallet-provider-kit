@@ -370,7 +370,8 @@ six decimals, `1000000` means one token. The lifetime limit must be at least the
 per-action limit; uncertain attempts keep reservations. Authorization validity
 is 60–3600 seconds. Already-issued signatures can remain executable until their
 on-chain expiry even after application access is revoked. The kit does not cancel,
-broadcast or settle them. Read the [financial profile](setup.md#supported-financial-policy)
+broadcast them unless the optional [execution coordinator](execution.md) is configured.
+Verified token-transfer finality does not establish downstream business settlement. Read the [financial profile](setup.md#supported-financial-policy)
 and record token acceptance before activation.
 
 ## Ready to open the wizard

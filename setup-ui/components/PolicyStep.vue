@@ -35,7 +35,10 @@ function financial(enabled: unknown) {
       lifetimeAmount: '',
       maxValiditySeconds: 300,
     };
-  else delete model.value.financial;
+  else {
+    delete model.value.financial;
+    delete model.value.execution;
+  }
 }
 </script>
 <template>

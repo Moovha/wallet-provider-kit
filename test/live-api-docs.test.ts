@@ -24,7 +24,7 @@ describe('live API explorer boundaries', () => {
     });
     expect(
       Object.values(live.paths).flatMap((methods) => Object.values(methods)),
-    ).toHaveLength(17);
+    ).toHaveLength(21);
     for (const [path, methods] of Object.entries(live.paths)) {
       for (const [method, operation] of Object.entries(
         methods as Record<string, any>,
@@ -74,7 +74,7 @@ describe('live API explorer boundaries', () => {
         live.paths['/v1/access-grants/{grantId}/revoke'].post.summary,
       ).toContain(flow === 'application' ? '[Configured]' : '[Not enabled]');
       expect(live.info.description).toContain(
-        'No transaction-submission HTTP endpoint',
+        'POST /v1/actions/{actionId}/execute',
       );
     }
     const embedded = liveApiSpecification(contract, {

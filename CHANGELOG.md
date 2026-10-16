@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased execution foundation
+
+- Add optional, explicitly versioned ERC-3009 execution through dedicated
+  application gas sponsors, retaining current financial authority checks and one
+  durable dispatch identity across retries and restarts.
+- Verify exact token effects, canonical receipt blocks and safe/finalized status
+  across configured RPC sources; recover lost submission responses without
+  another dispatch.
+- Expose execution capability discovery, authenticated status and a retained
+  CloudEvents observation feed in the API and setup wizard.
+- Reject sender-bound OAuth tokens until their proof mechanism is supported.
+  Document single-active-host recovery and enterprise v1 standards/release gates.
+- Execution evidence remains offline; Base Sepolia EOA scope and experimental
+  release status remain in effect.
+
 ## Unreleased — API visibility and transaction reports
 
 - List all documented provider API operations in local and deployed Swagger,

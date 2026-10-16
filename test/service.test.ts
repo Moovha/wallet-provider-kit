@@ -103,6 +103,8 @@ describe('OAuth RFC 9068 resource server', () => {
     { exp: 1 },
     { iat: Math.floor(Date.now() / 1000) + 600 },
     { client_id: null },
+    { cnf: { jkt: 'unsupported-token-binding' } },
+    { cnf: { 'x5t#S256': 'unsupported-certificate-binding' } },
     { jti: '' },
     { scope: ['wallet:sign'] },
     { exp: Math.floor(Date.now() / 1000) + 3600 },
@@ -169,7 +171,7 @@ describe('provider HTTP boundary', () => {
     });
     servers.push(app);
     const live = (await app.inject('/docs/json')).json();
-    expect(Object.keys(live.paths)).toHaveLength(16);
+    expect(Object.keys(live.paths)).toHaveLength(20);
     expect(live.paths['/v1/enrollments'].post.summary).toContain(
       '[Not enabled]',
     );

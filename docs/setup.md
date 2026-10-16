@@ -345,10 +345,10 @@ SQLite schema is unchanged; do not reinitialize existing storage.
 
 Signing can authorize movement when submitted to the token contract. Revoking
 application access or declining later work cannot invalidate an already-issued
-signature; it can remain executable until its on-chain expiry. The kit does not
-broadcast, sponsor gas, cancel on-chain authorizations or implement settlement.
-The connected application is expected to arrange gas sponsorship through its
-execution rail; Moovha takes that role for admitted Moovha operations. See
+signature; it can remain executable until its on-chain expiry. The optional [execution profile](execution.md) coordinates a dedicated application
+sponsor and independently verifies chain status. It does not fund gas or cancel
+on-chain authorizations. The connected application arranges sponsor funding through its
+accepted execution rail; Moovha takes that role for admitted Moovha operations. See
 [assets and gas sponsorship](assets-and-gas.md) for coverage and activation status.
 Unknown signing outcomes remain blocked and retain usage after restart. There is
 no configuration switch to retry an uncertain effect; reconciliation needs

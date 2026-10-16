@@ -24,8 +24,9 @@ the same amount of its underlying asset.
 
 The current configured financial profile is an experimental **Base Sepolia**
 test-network transfer authorization for an independently verified ERC-3009 token.
-It signs the approved instruction; it does not submit a transaction or establish
-settlement. USDC, ZARP, swaps and vaults explain the project's use cases, rather
+It signs the approved instruction. The optional [execution coordinator](execution.md)
+submits through a dedicated application sponsor and independently verifies token-transfer
+finality; business settlement requires its own evidence. USDC, ZARP, swaps and vaults explain the project's use cases, rather
 than a list of production capabilities included in this profile. See
 [configured financial policy](setup.md#supported-financial-policy) and
 [backend profiles](backend-guide.md#choose-an-integration).
@@ -34,7 +35,7 @@ than a list of production capabilities included in this profile. See
 
 <figure class="wallet-visual">
   <img src="./public/diagrams/assets-and-gas.webp" alt="Diagram: the wallet provider authorizes signing while the application arranges a separate network-fee budget, payer, execution and reconciliation." width="1536" height="1024" loading="lazy" decoding="async">
-  <figcaption>The sponsor funds eligible network fees; the provider retains wallet authority. Live sponsorship is outside this kit.</figcaption>
+  <figcaption>The sponsor funds eligible network fees; the provider retains wallet authority. The optional coordinator uses a pre-existing application-funded sponsor; live acceptance remains pending.</figcaption>
 </figure>
 
 [View full-size diagram](public/diagrams/assets-and-gas.webp)
@@ -94,8 +95,9 @@ private-key control, recovery and owner approval with their existing holders.
 ## Implementation and activation
 
 The toolkit implements provider onboarding, access and approved-action signing.
-Its optional Relayer execution integration is a separate library profile; it does
-not by itself implement Moovha's sponsorship promise.
+Its optional [execution coordinator](execution.md) uses a dedicated application
+sponsor and verifies token-transfer finality. An advanced Relayer library profile
+is also available. Neither supplies Moovha's funding rail or sponsorship promise.
 
 Moovha's business-operation API owns the sponsorship and execution rail. The
 packaged [orchestration draft](../spec/orchestration-draft.json) describes that

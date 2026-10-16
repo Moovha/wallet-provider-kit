@@ -95,3 +95,16 @@ and measure costs under your expected workload.
 
 [Official Grafana OTEL LGTM development image](https://github.com/grafana/docker-otel-lgtm)
 provides the local stack; operators own production authentication and retention.
+
+## Execution observation operations
+
+For configured transfer execution, use the [verified status and CloudEvents feed](execution.md).
+Check RPC availability and independence, finality lag, unknown dispatches, retained
+budget usage and integrity failures. App-reported confirmation is unverified.
+Keep private RPC paths, sponsor credentials, signatures and action bodies out of
+logs. Background polling is read-only and cannot clear uncertain attempts.
+
+Rehearse single-host recovery with external fencing and a SQLite-aware backup.
+Do not activate independent writable copies or infer that an attempt missing from
+a backup never dispatched. The [enterprise v1 gates](v1-standards.md) distinguish
+implemented contracts from deployment acceptance and future standards support.

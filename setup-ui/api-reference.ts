@@ -67,6 +67,7 @@ export function operationStatus(
     enrollment: false,
     wallet: true,
     financial: !!config.financial,
+    execution: !!config.execution,
     flow: config.policy.access?.mode ?? 'hosted',
     records: !!config.policy.identity?.records,
     vendor: !!config.identity.didit || !!config.identity.sumsub,
@@ -181,7 +182,8 @@ export function requestExample(
   if (
     id === 'provisionAccount' ||
     id === 'signAction' ||
-    id === 'revokeAccountAccess'
+    id === 'revokeAccountAccess' ||
+    id === 'executeTransfer'
   )
     return {};
 }
@@ -252,6 +254,54 @@ export function responseExample(
             required_claims: ['given_name'],
           }
         : {}),
+    };
+  if (id === 'getExecutionCapabilities')
+    return {
+      contract_version: '1',
+      profiles: [
+        {
+          id: 'erc3009-relayer-v1',
+          revision: '1',
+          implemented: true,
+          configured: !!config?.execution,
+          ready: false,
+          chain_id: 'eip155:84532',
+          account_type: 'eoa',
+          signing: 'eip-712',
+          token_authorization: 'erc-3009',
+          submission: 'openzeppelin-relayer-1.8.0',
+          verification: 'rpc-quorum',
+          finality: 'finalized',
+          minimum_rpc_sources: 2,
+          execute_scopes: ['wallet:execute', 'wallet:sign'],
+          read_scopes: ['wallet:execute:read'],
+        },
+      ],
+    };
+  if (id === 'getExecutionEvents')
+    return {
+      profile: 'erc3009-relayer-v1',
+      profile_revision: '1',
+      action_id: exampleId,
+      events: [],
+      oldest_sequence: 0,
+      next_sequence: 0,
+      history_truncated: false,
+    };
+  if (id === 'executeTransfer' || id === 'getTransferExecution')
+    return {
+      profile: 'erc3009-relayer-v1',
+      profile_revision: '1',
+      action_id: exampleId,
+      execution_id: exampleId,
+      dispatch_status: 'accepted',
+      observation_revision: 1,
+      next_poll_after_ms: 15000,
+      chain_status: 'unobserved',
+      verification: 'unverified',
+      outcome: 'unknown',
+      settlement: 'pending',
+      observed_at: '2030-01-01T00:00:00.000Z',
     };
   if (['reportTransactionEvent', 'getTransactionEvents'].includes(id)) {
     const report = {
@@ -441,6 +491,11 @@ export function curlExample(item: ReferenceOperation, origin: string) {
   const lines = [
     `curl --request ${item.method.toUpperCase()} ${shellQuote(referenceOrigin(origin) + item.path.replace(/\{[^}]+\}/g, exampleId))}`,
   ];
+  if (item.guide.execution)
+    lines.push(
+      "  --header 'Execution-Profile: erc3009-relayer-v1'",
+      "  --header 'Execution-Profile-Revision: 1'",
+    );
   if (item.guide.scope)
     lines.push("  --header 'Authorization: Bearer <APPLICATION_ACCESS_TOKEN>'");
   if (item.body !== undefined)

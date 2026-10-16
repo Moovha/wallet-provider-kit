@@ -22,6 +22,7 @@ function records(enabled: unknown) {
     identity.records = { requiredFields: ['display_name', 'country'] };
     model.value.identity = {};
     delete model.value.financial;
+    delete model.value.execution;
     for (const app of model.value.policy.applications) {
       app.permissions = ['account:read'];
       delete app.funding;

@@ -1,3 +1,4 @@
+import type { ExecutionConfiguration } from '../execution/types.js';
 import type { ExplorerTokensConfiguration } from './explorer-tokens.js';
 import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
@@ -80,8 +81,10 @@ export interface ProviderConfiguration {
     backendAcceptance?: string;
     recoveryAcceptance?: string;
     tokenAcceptance?: string;
+    executionAcceptance?: string;
   };
   financial?: TransferPolicy;
+  execution?: ExecutionConfiguration;
   http?: {
     host?: '127.0.0.1' | '0.0.0.0' | '::1' | '::';
     port?: number;
@@ -203,6 +206,84 @@ export function validateProviderConfiguration(
       for (const signer of signers)
         if (/^0x0{40}$/i.test(getAddress(signer.address))) throw new Error();
     }
+    if (config.execution) {
+      const execution = config.execution;
+      if (
+        !config.financial ||
+        config.policy.identity?.records ||
+        (config.activation.enabled && !config.activation.executionAcceptance)
+      )
+        throw new ConfigurationError([
+          '/execution: transfer signing and separate execution acceptance are required',
+        ]);
+      if (trustedHttpsUrl(execution.relayer.url).pathname !== '/')
+        throw new Error();
+      if (
+        new Set(execution.rpc.endpoints.map((entry) => entry.env)).size !==
+          execution.rpc.endpoints.length ||
+        /^0x0{64}$/.test(execution.rpc.genesisHash) ||
+        /^0x0{64}$/.test(execution.rpc.tokenCodeHash)
+      )
+        throw new Error();
+      for (const field of ['clientId', 'accountId'] as const)
+        if (
+          new Set(execution.sponsors.map((entry) => entry[field])).size !==
+          execution.sponsors.length
+        )
+          throw new Error();
+      for (const field of ['relayerId', 'signerId', 'address'] as const)
+        if (
+          new Set(
+            execution.sponsors.map((entry) =>
+              entry.binding[field].toLowerCase(),
+            ),
+          ).size !== execution.sponsors.length
+        )
+          throw new Error();
+      for (const sponsor of execution.sponsors) {
+        const app = config.policy.applications.find(
+          (candidate) =>
+            candidate.clientId === sponsor.clientId &&
+            candidate.enabled !== false &&
+            candidate.permissions?.includes('transfers:request'),
+        );
+        if (
+          !app ||
+          sponsor.fundingAgreement.trim().length === 0 ||
+          BigInt(sponsor.gasLimit) < 21000n ||
+          BigInt(sponsor.gasLimit) > 1000000n ||
+          BigInt(sponsor.maxFeePerGas) === 0n ||
+          BigInt(sponsor.maxPriorityFeePerGas) > BigInt(sponsor.maxFeePerGas) ||
+          [sponsor.maxFeePerGas, sponsor.maxPriorityFeePerGas].some(
+            (value) => BigInt(value) > BigInt(Number.MAX_SAFE_INTEGER),
+          ) ||
+          BigInt(sponsor.l1FeeReserveWei) === 0n ||
+          BigInt(sponsor.lifetimeBudgetWei) <
+            BigInt(sponsor.gasLimit) * BigInt(sponsor.maxFeePerGas) +
+              BigInt(sponsor.l1FeeReserveWei)
+        )
+          throw new Error();
+        const binding = sponsor.binding;
+        sponsor.binding = {
+          relayerId: binding.relayerId,
+          signerId: binding.signerId,
+          address: getAddress(binding.address),
+          bindingRevision: binding.bindingRevision,
+        };
+        if (
+          /^0x0{40}$/i.test(sponsor.binding.address) ||
+          (config.backend.kind === 'openzeppelin-relayer' &&
+            config.backend.signers.some(
+              (signer) =>
+                signer.address.toLowerCase() ===
+                  sponsor.binding.address.toLowerCase() ||
+                signer.relayerId === sponsor.binding.relayerId ||
+                signer.signerId === sponsor.binding.signerId,
+            ))
+        )
+          throw new Error();
+      }
+    }
     if (config.financial) {
       const p = config.financial;
       if (amount(p.maximumAmount) > amount(p.lifetimeAmount))
@@ -244,6 +325,9 @@ export function secretReferences(
   config: ProviderConfiguration,
 ): SecretReference[] {
   return [
+    ...(config.execution
+      ? [config.execution.relayer.apiKey, ...config.execution.rpc.endpoints]
+      : []),
     ...(config.ownerLogin ? [config.ownerLogin.clientSecret] : []),
     ...(config.apiExplorer?.clients.map((entry) => entry.clientSecret) ?? []),
     ...(config.identity.didit ? [config.identity.didit.apiKey] : []),

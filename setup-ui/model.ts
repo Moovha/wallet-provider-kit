@@ -89,6 +89,8 @@ export function emptyConfiguration(
   };
   config.policy.access = { mode: 'application', maxAgeDays: 7 };
   delete config.financial;
+  delete config.execution;
+  delete config.activation.executionAcceptance;
   config.backend = newBackend('cdp');
   return config;
 }
@@ -146,6 +148,10 @@ export function deploymentChecklist(
     lines.push(
       '- Provision and verify each Relayer/signer/address binding first. Retain assigned signers and stable backend binding across deployments; never replace them to recover an uncertain result.',
     );
+  if (config.execution)
+    lines.push(
+      `- Configure the dedicated application gas sponsors, private RPC endpoint variables and independent receipt verification described in ${docs}execution.html. Test lost-response recovery and record execution acceptance before activation. Gas admission reservations do not guarantee a hard cap on Relayer recovery or L1 costs.`,
+    );
   lines.push(
     '',
     '## Prepare the deployment host and files',
@@ -187,7 +193,7 @@ export function deploymentChecklist(
     '## Integrate',
     `- Consume the implemented HTTP API: ${docs}http-api.html`,
     `- Deployment instructions: ${docs}operator-deployment.html`,
-    '- Experimental Base Sepolia EOA profile only. Signing does not broadcast, sponsor gas or establish settlement.',
+    '- Experimental Base Sepolia EOA profile only. Signing alone does not submit a transaction. Optional execution requires a dedicated sponsor and independent RPC acceptance; otherwise the application owns submission and settlement verification.',
     '- To update settings, import your saved configuration in the wizard, edit, validate and export again. Deploy the reviewed files and restart the service. Policy changes invalidate previous grants and approvals; applications need consent to the current terms before requesting fresh access.',
     '- Stop the local setup wizard with Ctrl+C when finished.',
     '',

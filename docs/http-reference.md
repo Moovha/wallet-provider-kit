@@ -737,6 +737,927 @@ Success response schema:
 }
 ```
 
+## GET /v1/execution-capabilities
+
+Operation: `getExecutionCapabilities`.
+
+Public versioned execution discovery. Profile implementation, configuration and service readiness do not establish live-provider certification or production custody acceptance. Clients must select an exact supported ID/revision and ignore unknown profiles.
+
+| Status | Content type     | Description      |
+| ------ | ---------------- | ---------------- |
+| 200    | application/json | Default Response |
+
+Success response schema:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contract_version", "profiles"],
+  "properties": {
+    "contract_version": {
+      "type": "string",
+      "enum": ["1"]
+    },
+    "profiles": {
+      "type": "array",
+      "maxItems": 32,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "revision",
+          "implemented",
+          "configured",
+          "ready",
+          "chain_id",
+          "account_type",
+          "signing",
+          "token_authorization",
+          "submission",
+          "verification",
+          "finality",
+          "minimum_rpc_sources",
+          "execute_scopes",
+          "read_scopes"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9._-]{0,63}$"
+          },
+          "revision": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,19}$"
+          },
+          "implemented": {
+            "type": "boolean"
+          },
+          "configured": {
+            "type": "boolean"
+          },
+          "ready": {
+            "type": "boolean"
+          },
+          "chain_id": {
+            "type": "string"
+          },
+          "account_type": {
+            "type": "string"
+          },
+          "signing": {
+            "type": "string"
+          },
+          "token_authorization": {
+            "type": "string"
+          },
+          "submission": {
+            "type": "string"
+          },
+          "verification": {
+            "type": "string"
+          },
+          "finality": {
+            "type": "string"
+          },
+          "minimum_rpc_sources": {
+            "type": "integer",
+            "minimum": 2
+          },
+          "execute_scopes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "read_scopes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+## POST /v1/actions/{actionId}/execute
+
+Operation: `executeTransfer`.
+
+Optional fixed ERC-3009 transfer execution with exact version selection, current owner/grant/identity/consent/approval checks, durable signing and submission authority, application gas sponsorship and independent RPC receipt/finality verification. Unknown submission outcomes never permit redispatch. No arbitrary transaction payload is accepted.
+
+| Parameter                    | Location | Required | Schema                                                                                                |
+| ---------------------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
+| `actionId`                   | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+| `execution-profile`          | header   | yes      | `{"type":"string","enum":["erc3009-relayer-v1"]}`                                                     |
+| `execution-profile-revision` | header   | yes      | `{"type":"string","enum":["1"]}`                                                                      |
+| `idempotency-key`            | header   | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+
+Request body (application/json):
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false
+}
+```
+
+| Status | Content type             | Description      |
+| ------ | ------------------------ | ---------------- |
+| 200    | application/json         | Default Response |
+| 400    | application/problem+json | Default Response |
+| 401    | application/problem+json | Default Response |
+| 403    | application/problem+json | Default Response |
+| 409    | application/problem+json | Default Response |
+| 413    | application/problem+json | Default Response |
+| 415    | application/problem+json | Default Response |
+| 422    | application/problem+json | Default Response |
+| 429    | application/problem+json | Default Response |
+| 500    | application/problem+json | Default Response |
+| 503    | application/problem+json | Default Response |
+
+Success response schema:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "profile",
+    "profile_revision",
+    "action_id",
+    "execution_id",
+    "dispatch_status",
+    "observation_revision",
+    "next_poll_after_ms",
+    "chain_status",
+    "verification",
+    "outcome",
+    "settlement",
+    "observed_at"
+  ],
+  "properties": {
+    "profile": {
+      "type": "string",
+      "enum": ["erc3009-relayer-v1"]
+    },
+    "profile_revision": {
+      "type": "string",
+      "enum": ["1"]
+    },
+    "action_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "execution_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "dispatch_status": {
+      "type": "string",
+      "enum": ["not_started", "pending", "accepted", "unknown", "failed"],
+      "description": "Durable submission state. Accepted identifies a Relayer queue record; it is not chain inclusion or settlement."
+    },
+    "observation_revision": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "next_poll_after_ms": {
+      "type": "integer",
+      "minimum": 5000,
+      "maximum": 300000
+    },
+    "chain_status": {
+      "type": "string",
+      "enum": [
+        "unobserved",
+        "pending",
+        "included",
+        "safe",
+        "finalized",
+        "reorged"
+      ]
+    },
+    "verification": {
+      "type": "string",
+      "enum": ["unverified", "rpc-quorum"],
+      "description": "RPC quorum means agreement of all configured trusted RPC sources on exact receipt effects and canonical block evidence, not a cryptographic light-client proof."
+    },
+    "outcome": {
+      "type": "string",
+      "enum": ["unknown", "succeeded", "reverted"]
+    },
+    "settlement": {
+      "type": "string",
+      "enum": ["pending", "succeeded", "reverted"],
+      "description": "The supported token transfer reaches succeeded/reverted settlement only after matching finalized chain evidence. This is not a claim of general business-operation completion."
+    },
+    "observed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "transaction_hash": {
+      "type": "string",
+      "pattern": "^0x[0-9a-f]{64}$"
+    },
+    "block_hash": {
+      "type": "string",
+      "pattern": "^0x[0-9a-f]{64}$"
+    },
+    "block_number": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,77})$"
+    },
+    "execution_origin": {
+      "type": "string",
+      "enum": ["sponsor", "external"],
+      "description": "An external party can relay the same ERC-3009 authorization. Only its exact verified token effect can establish success."
+    }
+  },
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "verification": {
+          "enum": ["unverified"]
+        },
+        "chain_status": {
+          "enum": ["unobserved", "pending", "reorged"]
+        },
+        "outcome": {
+          "enum": ["unknown"]
+        },
+        "settlement": {
+          "enum": ["pending"]
+        }
+      },
+      "not": {
+        "anyOf": [
+          {
+            "type": "object",
+            "required": ["transaction_hash"]
+          },
+          {
+            "type": "object",
+            "required": ["block_hash"]
+          },
+          {
+            "type": "object",
+            "required": ["block_number"]
+          },
+          {
+            "type": "object",
+            "required": ["execution_origin"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "transaction_hash",
+        "block_hash",
+        "block_number",
+        "execution_origin"
+      ],
+      "properties": {
+        "verification": {
+          "enum": ["rpc-quorum"]
+        },
+        "chain_status": {
+          "enum": ["included", "safe"]
+        },
+        "outcome": {
+          "enum": ["succeeded", "reverted"]
+        },
+        "settlement": {
+          "enum": ["pending"]
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "transaction_hash",
+        "block_hash",
+        "block_number",
+        "execution_origin"
+      ],
+      "properties": {
+        "verification": {
+          "enum": ["rpc-quorum"]
+        },
+        "chain_status": {
+          "enum": ["finalized"]
+        },
+        "outcome": {
+          "enum": ["succeeded"]
+        },
+        "settlement": {
+          "enum": ["succeeded"]
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "transaction_hash",
+        "block_hash",
+        "block_number",
+        "execution_origin"
+      ],
+      "properties": {
+        "verification": {
+          "enum": ["rpc-quorum"]
+        },
+        "chain_status": {
+          "enum": ["finalized"]
+        },
+        "outcome": {
+          "enum": ["reverted"]
+        },
+        "settlement": {
+          "enum": ["reverted"]
+        }
+      }
+    }
+  ]
+}
+```
+
+## GET /v1/actions/{actionId}/execution
+
+Operation: `getTransferExecution`.
+
+Optional fixed ERC-3009 transfer execution with exact version selection, current owner/grant/identity/consent/approval checks, durable signing and submission authority, application gas sponsorship and independent RPC receipt/finality verification. Unknown submission outcomes never permit redispatch. No arbitrary transaction payload is accepted.
+
+| Parameter                    | Location | Required | Schema                                                                                                |
+| ---------------------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
+| `actionId`                   | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+| `execution-profile`          | header   | yes      | `{"type":"string","enum":["erc3009-relayer-v1"]}`                                                     |
+| `execution-profile-revision` | header   | yes      | `{"type":"string","enum":["1"]}`                                                                      |
+
+| Status | Content type             | Description      |
+| ------ | ------------------------ | ---------------- |
+| 200    | application/json         | Default Response |
+| 400    | application/problem+json | Default Response |
+| 401    | application/problem+json | Default Response |
+| 403    | application/problem+json | Default Response |
+| 409    | application/problem+json | Default Response |
+| 413    | application/problem+json | Default Response |
+| 415    | application/problem+json | Default Response |
+| 422    | application/problem+json | Default Response |
+| 429    | application/problem+json | Default Response |
+| 500    | application/problem+json | Default Response |
+| 503    | application/problem+json | Default Response |
+
+Success response schema:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "profile",
+    "profile_revision",
+    "action_id",
+    "execution_id",
+    "dispatch_status",
+    "observation_revision",
+    "next_poll_after_ms",
+    "chain_status",
+    "verification",
+    "outcome",
+    "settlement",
+    "observed_at"
+  ],
+  "properties": {
+    "profile": {
+      "type": "string",
+      "enum": ["erc3009-relayer-v1"]
+    },
+    "profile_revision": {
+      "type": "string",
+      "enum": ["1"]
+    },
+    "action_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "execution_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "dispatch_status": {
+      "type": "string",
+      "enum": ["not_started", "pending", "accepted", "unknown", "failed"],
+      "description": "Durable submission state. Accepted identifies a Relayer queue record; it is not chain inclusion or settlement."
+    },
+    "observation_revision": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "next_poll_after_ms": {
+      "type": "integer",
+      "minimum": 5000,
+      "maximum": 300000
+    },
+    "chain_status": {
+      "type": "string",
+      "enum": [
+        "unobserved",
+        "pending",
+        "included",
+        "safe",
+        "finalized",
+        "reorged"
+      ]
+    },
+    "verification": {
+      "type": "string",
+      "enum": ["unverified", "rpc-quorum"],
+      "description": "RPC quorum means agreement of all configured trusted RPC sources on exact receipt effects and canonical block evidence, not a cryptographic light-client proof."
+    },
+    "outcome": {
+      "type": "string",
+      "enum": ["unknown", "succeeded", "reverted"]
+    },
+    "settlement": {
+      "type": "string",
+      "enum": ["pending", "succeeded", "reverted"],
+      "description": "The supported token transfer reaches succeeded/reverted settlement only after matching finalized chain evidence. This is not a claim of general business-operation completion."
+    },
+    "observed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "transaction_hash": {
+      "type": "string",
+      "pattern": "^0x[0-9a-f]{64}$"
+    },
+    "block_hash": {
+      "type": "string",
+      "pattern": "^0x[0-9a-f]{64}$"
+    },
+    "block_number": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,77})$"
+    },
+    "execution_origin": {
+      "type": "string",
+      "enum": ["sponsor", "external"],
+      "description": "An external party can relay the same ERC-3009 authorization. Only its exact verified token effect can establish success."
+    }
+  },
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "verification": {
+          "enum": ["unverified"]
+        },
+        "chain_status": {
+          "enum": ["unobserved", "pending", "reorged"]
+        },
+        "outcome": {
+          "enum": ["unknown"]
+        },
+        "settlement": {
+          "enum": ["pending"]
+        }
+      },
+      "not": {
+        "anyOf": [
+          {
+            "type": "object",
+            "required": ["transaction_hash"]
+          },
+          {
+            "type": "object",
+            "required": ["block_hash"]
+          },
+          {
+            "type": "object",
+            "required": ["block_number"]
+          },
+          {
+            "type": "object",
+            "required": ["execution_origin"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "transaction_hash",
+        "block_hash",
+        "block_number",
+        "execution_origin"
+      ],
+      "properties": {
+        "verification": {
+          "enum": ["rpc-quorum"]
+        },
+        "chain_status": {
+          "enum": ["included", "safe"]
+        },
+        "outcome": {
+          "enum": ["succeeded", "reverted"]
+        },
+        "settlement": {
+          "enum": ["pending"]
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "transaction_hash",
+        "block_hash",
+        "block_number",
+        "execution_origin"
+      ],
+      "properties": {
+        "verification": {
+          "enum": ["rpc-quorum"]
+        },
+        "chain_status": {
+          "enum": ["finalized"]
+        },
+        "outcome": {
+          "enum": ["succeeded"]
+        },
+        "settlement": {
+          "enum": ["succeeded"]
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "transaction_hash",
+        "block_hash",
+        "block_number",
+        "execution_origin"
+      ],
+      "properties": {
+        "verification": {
+          "enum": ["rpc-quorum"]
+        },
+        "chain_status": {
+          "enum": ["finalized"]
+        },
+        "outcome": {
+          "enum": ["reverted"]
+        },
+        "settlement": {
+          "enum": ["reverted"]
+        }
+      }
+    }
+  ]
+}
+```
+
+## GET /v1/actions/{actionId}/execution-events
+
+Operation: `getExecutionEvents`.
+
+Authenticated CloudEvents 1.0 execution observations with a monotonic sequence in the active store. At most 64 transitions are retained per execution; history_truncated signals a cursor gap requiring verified-status resynchronization. Reports never become verified events without RPC evidence. This endpoint does not refresh, submit or release budgets.
+
+| Parameter                    | Location | Required | Schema                                                                                                |
+| ---------------------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
+| `after`                      | query    | no       | `{"type":"string","pattern":"^(0\|[1-9][0-9]{0,15})$"}`                                               |
+| `actionId`                   | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+| `execution-profile`          | header   | yes      | `{"type":"string","enum":["erc3009-relayer-v1"]}`                                                     |
+| `execution-profile-revision` | header   | yes      | `{"type":"string","enum":["1"]}`                                                                      |
+
+| Status | Content type             | Description      |
+| ------ | ------------------------ | ---------------- |
+| 200    | application/json         | Default Response |
+| 400    | application/problem+json | Default Response |
+| 401    | application/problem+json | Default Response |
+| 403    | application/problem+json | Default Response |
+| 409    | application/problem+json | Default Response |
+| 413    | application/problem+json | Default Response |
+| 415    | application/problem+json | Default Response |
+| 422    | application/problem+json | Default Response |
+| 429    | application/problem+json | Default Response |
+| 500    | application/problem+json | Default Response |
+| 503    | application/problem+json | Default Response |
+
+Success response schema:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "profile",
+    "profile_revision",
+    "action_id",
+    "events",
+    "oldest_sequence",
+    "next_sequence",
+    "history_truncated"
+  ],
+  "properties": {
+    "profile": {
+      "type": "string",
+      "enum": ["erc3009-relayer-v1"]
+    },
+    "profile_revision": {
+      "type": "string",
+      "enum": ["1"]
+    },
+    "action_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "oldest_sequence": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "next_sequence": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "history_truncated": {
+      "type": "boolean",
+      "description": "An explicit cursor gap requires resynchronization through verified execution status. The bounded feed is not a complete historical chain ledger."
+    },
+    "events": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "specversion",
+          "id",
+          "source",
+          "type",
+          "subject",
+          "time",
+          "datacontenttype",
+          "sequence",
+          "data"
+        ],
+        "properties": {
+          "specversion": {
+            "type": "string",
+            "enum": ["1.0"]
+          },
+          "id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "source": {
+            "type": "string",
+            "format": "uri"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["com.moovha.wallet-provider.execution.observed.v1"]
+          },
+          "subject": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "time": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "datacontenttype": {
+            "type": "string",
+            "enum": ["application/json"]
+          },
+          "sequence": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "data": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "profile",
+              "profile_revision",
+              "action_id",
+              "execution_id",
+              "dispatch_status",
+              "observation_revision",
+              "next_poll_after_ms",
+              "chain_status",
+              "verification",
+              "outcome",
+              "settlement",
+              "observed_at"
+            ],
+            "properties": {
+              "profile": {
+                "type": "string",
+                "enum": ["erc3009-relayer-v1"]
+              },
+              "profile_revision": {
+                "type": "string",
+                "enum": ["1"]
+              },
+              "action_id": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+              },
+              "execution_id": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+              },
+              "dispatch_status": {
+                "type": "string",
+                "enum": [
+                  "not_started",
+                  "pending",
+                  "accepted",
+                  "unknown",
+                  "failed"
+                ],
+                "description": "Durable submission state. Accepted identifies a Relayer queue record; it is not chain inclusion or settlement."
+              },
+              "observation_revision": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "next_poll_after_ms": {
+                "type": "integer",
+                "minimum": 5000,
+                "maximum": 300000
+              },
+              "chain_status": {
+                "type": "string",
+                "enum": [
+                  "unobserved",
+                  "pending",
+                  "included",
+                  "safe",
+                  "finalized",
+                  "reorged"
+                ]
+              },
+              "verification": {
+                "type": "string",
+                "enum": ["unverified", "rpc-quorum"],
+                "description": "RPC quorum means agreement of all configured trusted RPC sources on exact receipt effects and canonical block evidence, not a cryptographic light-client proof."
+              },
+              "outcome": {
+                "type": "string",
+                "enum": ["unknown", "succeeded", "reverted"]
+              },
+              "settlement": {
+                "type": "string",
+                "enum": ["pending", "succeeded", "reverted"],
+                "description": "The supported token transfer reaches succeeded/reverted settlement only after matching finalized chain evidence. This is not a claim of general business-operation completion."
+              },
+              "observed_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "transaction_hash": {
+                "type": "string",
+                "pattern": "^0x[0-9a-f]{64}$"
+              },
+              "block_hash": {
+                "type": "string",
+                "pattern": "^0x[0-9a-f]{64}$"
+              },
+              "block_number": {
+                "type": "string",
+                "pattern": "^(0|[1-9][0-9]{0,77})$"
+              },
+              "execution_origin": {
+                "type": "string",
+                "enum": ["sponsor", "external"],
+                "description": "An external party can relay the same ERC-3009 authorization. Only its exact verified token effect can establish success."
+              }
+            },
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "verification": {
+                    "enum": ["unverified"]
+                  },
+                  "chain_status": {
+                    "enum": ["unobserved", "pending", "reorged"]
+                  },
+                  "outcome": {
+                    "enum": ["unknown"]
+                  },
+                  "settlement": {
+                    "enum": ["pending"]
+                  }
+                },
+                "not": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "required": ["transaction_hash"]
+                    },
+                    {
+                      "type": "object",
+                      "required": ["block_hash"]
+                    },
+                    {
+                      "type": "object",
+                      "required": ["block_number"]
+                    },
+                    {
+                      "type": "object",
+                      "required": ["execution_origin"]
+                    }
+                  ]
+                }
+              },
+              {
+                "type": "object",
+                "required": [
+                  "transaction_hash",
+                  "block_hash",
+                  "block_number",
+                  "execution_origin"
+                ],
+                "properties": {
+                  "verification": {
+                    "enum": ["rpc-quorum"]
+                  },
+                  "chain_status": {
+                    "enum": ["included", "safe"]
+                  },
+                  "outcome": {
+                    "enum": ["succeeded", "reverted"]
+                  },
+                  "settlement": {
+                    "enum": ["pending"]
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "required": [
+                  "transaction_hash",
+                  "block_hash",
+                  "block_number",
+                  "execution_origin"
+                ],
+                "properties": {
+                  "verification": {
+                    "enum": ["rpc-quorum"]
+                  },
+                  "chain_status": {
+                    "enum": ["finalized"]
+                  },
+                  "outcome": {
+                    "enum": ["succeeded"]
+                  },
+                  "settlement": {
+                    "enum": ["succeeded"]
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "required": [
+                  "transaction_hash",
+                  "block_hash",
+                  "block_number",
+                  "execution_origin"
+                ],
+                "properties": {
+                  "verification": {
+                    "enum": ["rpc-quorum"]
+                  },
+                  "chain_status": {
+                    "enum": ["finalized"]
+                  },
+                  "outcome": {
+                    "enum": ["reverted"]
+                  },
+                  "settlement": {
+                    "enum": ["reverted"]
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
+}
+```
+
 ## POST /v1/actions/{actionId}/transaction-events
 
 Operation: `reportTransactionEvent`.

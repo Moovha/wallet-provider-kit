@@ -94,6 +94,8 @@ export default defineConfig({
             link: '/docs/http-api#authentication-and-profiles',
           },
           { text: 'HTTP schemas', link: '/docs/http-reference' },
+          { text: 'Transfer execution', link: '/docs/execution' },
+          { text: 'Enterprise v1 standards', link: '/docs/v1-standards' },
         ],
       },
       { text: 'Moovha', link: 'https://moovha.com/' },
@@ -165,6 +167,8 @@ export default defineConfig({
           { text: 'TypeScript declarations', link: '/docs/api-reference' },
           { text: 'HTTP guide', link: '/docs/http-api' },
           { text: 'HTTP schemas', link: '/docs/http-reference' },
+          { text: 'Transfer execution', link: '/docs/execution' },
+          { text: 'Enterprise v1 standards', link: '/docs/v1-standards' },
         ],
       },
       {

@@ -18,6 +18,9 @@ import {
   resolveSecret,
   validateProviderConfiguration,
 } from './config.js';
+import { TransferExecutionCoordinator } from '../execution/coordinator.js';
+import { QuorumTransferObserver } from '../execution/chain.js';
+import { createTransferExecutionProvider } from '../execution/relayer.js';
 import { SupportedActions } from './actions.js';
 
 /** Compose the supported configured service with built-in authority and journals; activation remains explicit. */
@@ -146,6 +149,7 @@ export async function createConfiguredProvider(
       config.ownerLogin?.issuer,
       config.ownerLogin?.clientId,
       config.activation.enabled,
+      ...(config.execution ? [config.execution] : []),
       ...(config.apiExplorer ? [config.apiExplorer, config.oauth] : []),
     ]);
     await database.onboardingStore.transaction((state) => {
@@ -202,6 +206,26 @@ export async function createConfiguredProvider(
       },
       backend,
     );
+    const execution =
+      config.execution && actions
+        ? new TransferExecutionCoordinator(
+            actions,
+            database,
+            service,
+            config.execution,
+            createTransferExecutionProvider(
+              config.execution,
+              resolveSecret(config.execution.relayer.apiKey),
+            ),
+            new QuorumTransferObserver(
+              config.execution.rpc.endpoints.map((entry) =>
+                resolveSecret(entry),
+              ),
+              config.execution.rpc.genesisHash,
+              config.execution.maxLogRange,
+            ),
+          )
+        : undefined;
     const currentConfiguration = () =>
       database.onboardingStore.transaction(
         (state) =>
@@ -242,8 +266,12 @@ export async function createConfiguredProvider(
               activeRevision,
           ),
         actions,
+        execution,
       },
-      onClose: async () => database.close(),
+      onClose: async () => {
+        await execution?.close();
+        database.close();
+      },
       ready: async () =>
         config.activation.enabled &&
         (await database.ready()) &&
@@ -254,6 +282,7 @@ export async function createConfiguredProvider(
         )),
       documentation: config.http?.documentation ?? false,
     });
+    if (config.activation.enabled) execution?.start();
     return app;
   } catch (error) {
     database.close();

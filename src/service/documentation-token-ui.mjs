@@ -21,6 +21,10 @@
     'wallet:events': 'Report unverified transaction events',
     'wallet:events:read': 'Read reported transaction events',
     'wallet:sign': 'Sign an authorized transfer',
+    'wallet:execute':
+      'Execute an approved transfer with an admitted gas sponsor',
+    'wallet:execute:read':
+      'Read independently verified transfer execution status',
   };
   const message = (text) => {
     panel.querySelector('[role="status"]').textContent = text;

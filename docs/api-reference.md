@@ -2260,6 +2260,11 @@ export declare function openProviderDatabase(
     reserved: string;
   } | null>;
   approveAction(approval: FinancialApproval): Promise<string>;
+  /** Read current immutable approval and revocation without admitting a financial attempt. */
+  isApprovedAction(
+    approval: FinancialApproval,
+    allowExpired?: boolean,
+  ): Promise<boolean>;
   revokeAction(id: string): Promise<void>;
   financialAuthority: (configuration: FinancialAuthorityOptions) => {
     authority: import('../core.js').EmbeddedWalletAuthority;
@@ -2312,17 +2317,47 @@ export interface ProviderDatabaseOptions {
 
 Import from `@moovha/wallet-provider-kit/deployment`. [Integration guide](setup.md).
 
+- [ChainObservation](#chainobservation)
 - [ConfigurationError](#configurationerror)
 - [createConfiguredProvider](#createconfiguredprovider)
+- [createTransferExecutionProvider](#createtransferexecutionprovider)
+- [ExecutionCloudEvent](#executioncloudevent)
+- [ExecutionConfiguration](#executionconfiguration)
+- [ExecutionObserver](#executionobserver)
+- [ExecutionProvider](#executionprovider)
+- [ExecutionReceipt](#executionreceipt)
+- [ExecutionSponsor](#executionsponsor)
 - [loadProviderConfiguration](#loadproviderconfiguration)
 - [ProviderConfiguration](#providerconfiguration)
+- [QuorumTransferObserver](#quorumtransferobserver)
 - [SecretReference](#secretreference)
 - [TransactionEventInput](#transactioneventinput)
 - [TransactionEventReport](#transactioneventreport)
+- [TransferExecutionCoordinator](#transferexecutioncoordinator)
+- [TransferExecutionPlan](#transferexecutionplan)
 - [TransferInput](#transferinput)
 - [TransferPolicy](#transferpolicy)
 - [validateProviderConfiguration](#validateproviderconfiguration)
 - [WalletBackendAdapterV1](#walletbackendadapterv1)
+
+### ChainObservation
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/types.ts).
+
+```ts
+export interface ChainObservation {
+  chain_status:
+    'unobserved' | 'pending' | 'included' | 'safe' | 'finalized' | 'reorged';
+  verification: 'unverified' | 'rpc-quorum';
+  outcome: 'unknown' | 'succeeded' | 'reverted';
+  settlement: 'pending' | 'succeeded' | 'reverted';
+  observed_at: string;
+  transaction_hash?: string;
+  block_hash?: string;
+  block_number?: string;
+  execution_origin?: 'sponsor' | 'external';
+}
+```
 
 ### ConfigurationError
 
@@ -2356,6 +2391,132 @@ export declare function createConfiguredProvider(
     import('fastify').FastifyTypeProviderDefault
   >
 >;
+```
+
+### createTransferExecutionProvider
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/relayer.ts).
+
+```ts
+/** Dedicated sponsor queue. The token, zero native value and calldata come only from the stored plan. */
+export declare function createTransferExecutionProvider(
+  configuration: ExecutionConfiguration,
+  apiKey: string,
+  request?: typeof fetch,
+): ExecutionProvider;
+```
+
+### ExecutionCloudEvent
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/types.ts).
+
+```ts
+/** CloudEvents 1.0 envelope; data semantics are pinned by the execution profile revision. */
+export interface ExecutionCloudEvent {
+  specversion: '1.0';
+  id: string;
+  source: string;
+  type: 'com.moovha.wallet-provider.execution.observed.v1';
+  subject: string;
+  time: string;
+  datacontenttype: 'application/json';
+  sequence: number;
+  data: ExecutionReceipt;
+}
+```
+
+### ExecutionConfiguration
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/types.ts).
+
+```ts
+/** Optional fixed-profile execution. Secrets and RPC addresses remain server configuration. */
+export interface ExecutionConfiguration {
+  profile: typeof executionProfile;
+  relayer: {
+    url: string;
+    apiKey: SecretReference;
+  };
+  rpc: {
+    endpoints: SecretReference[];
+    genesisHash: string;
+    tokenCodeHash: string;
+  };
+  sponsors: ExecutionSponsor[];
+  pollIntervalSeconds: number;
+  maxLogRange: number;
+}
+```
+
+### ExecutionObserver
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/types.ts).
+
+```ts
+export interface ExecutionObserver {
+  anchor(): Promise<string>;
+  preflight(plan: TransferExecutionPlan): Promise<void>;
+  observe(
+    plan: TransferExecutionPlan,
+    candidates: string[],
+    ownHash?: string,
+    scanFromBlock?: string,
+  ): Promise<
+    ChainObservation & {
+      scanNextBlock?: string;
+    }
+  >;
+}
+```
+
+### ExecutionProvider
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/types.ts).
+
+```ts
+export interface ExecutionProvider {
+  prepare(plan: TransferExecutionPlan): Promise<void>;
+  submit(plan: TransferExecutionPlan): Promise<string>;
+  transactionHash(
+    plan: TransferExecutionPlan,
+    transactionId: string,
+  ): Promise<string | undefined>;
+}
+```
+
+### ExecutionReceipt
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/types.ts).
+
+```ts
+export interface ExecutionReceipt extends ChainObservation {
+  profile: typeof executionProfile;
+  profile_revision: '1';
+  action_id: string;
+  execution_id: string;
+  dispatch_status:
+    'not_started' | 'pending' | 'accepted' | 'unknown' | 'failed';
+  observation_revision: number;
+  next_poll_after_ms: number;
+}
+```
+
+### ExecutionSponsor
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/types.ts).
+
+```ts
+export interface ExecutionSponsor {
+  clientId: string;
+  accountId: string;
+  binding: RelayerBinding;
+  fundingAgreement: string;
+  gasLimit: string;
+  maxFeePerGas: string;
+  maxPriorityFeePerGas: string;
+  l1FeeReserveWei: string;
+  lifetimeBudgetWei: string;
+}
 ```
 
 ### loadProviderConfiguration
@@ -2439,13 +2600,43 @@ export interface ProviderConfiguration {
     backendAcceptance?: string;
     recoveryAcceptance?: string;
     tokenAcceptance?: string;
+    executionAcceptance?: string;
   };
   financial?: TransferPolicy;
+  execution?: ExecutionConfiguration;
   http?: {
     host?: '127.0.0.1' | '0.0.0.0' | '::1' | '::';
     port?: number;
     documentation?: boolean;
   };
+}
+```
+
+### QuorumTransferObserver
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/chain.ts).
+
+```ts
+/** Agreement of configured RPC providers is trusted node evidence, not a light-client proof. */
+export declare class QuorumTransferObserver implements ExecutionObserver {
+  constructor(
+    endpoints: string[],
+    genesisHash: string,
+    maxLogRange: number,
+    request?: typeof fetch,
+  );
+  anchor(): Promise<string>;
+  preflight(plan: TransferExecutionPlan): Promise<void>;
+  observe(
+    plan: TransferExecutionPlan,
+    candidates: string[],
+    ownHash?: string,
+    scanFromBlock?: string,
+  ): Promise<
+    ChainObservation & {
+      scanNextBlock?: string;
+    }
+  >;
 }
 ```
 
@@ -2481,6 +2672,64 @@ export interface TransactionEventReport extends TransactionEventInput {
   report_id: string;
   recorded_at: string;
   verification: 'unverified';
+}
+```
+
+### TransferExecutionCoordinator
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/coordinator.ts).
+
+```ts
+/** One immutable execution per approved transfer; uncertain attempts are never dispatched again. */
+export declare class TransferExecutionCoordinator {
+  readonly actions: SupportedActions;
+  readonly configurationHash: string;
+  constructor(
+    actions: SupportedActions,
+    database: ProviderDatabase,
+    wallet: EmbeddedWalletService,
+    configuration: ExecutionConfiguration,
+    provider: ExecutionProvider,
+    observer: ExecutionObserver,
+  );
+  execute(input: AuthorityContext, id: string): Promise<ExecutionReceipt>;
+  read(principal: VerifiedPrincipal, id: string): Promise<ExecutionReceipt>;
+  events(
+    principal: VerifiedPrincipal,
+    id: string,
+    after?: string,
+  ): Promise<{
+    profile: 'erc3009-relayer-v1';
+    profile_revision: string;
+    action_id: string;
+    events: import('./types.js').ExecutionCloudEvent[];
+    oldest_sequence: number;
+    next_sequence: number;
+    history_truncated: boolean;
+  }>;
+  /** Trusted read-only observer entry point. It never signs, claims, submits or releases reservations. */
+  refresh(id: string): Promise<void>;
+  start(): void;
+  close(): Promise<void>;
+}
+```
+
+### TransferExecutionPlan
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/types.ts).
+
+```ts
+/** Immutable private plan. HTTP callers never supply calldata, signatures or a sponsor. */
+export interface TransferExecutionPlan {
+  profile: typeof executionProfile;
+  revision: '1';
+  action: TypedDataAction;
+  sponsor: ExecutionSponsor;
+  configurationHash: string;
+  genesisHash: string;
+  tokenCodeHash: string;
+  data: string;
+  scanFromBlock: string;
 }
 ```
 
