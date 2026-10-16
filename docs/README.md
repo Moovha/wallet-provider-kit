@@ -34,6 +34,18 @@ node --version
 npm --version
 ```
 
+If Node has a different version, select 24.22.0 using your installation/version
+manager before proceeding. Node installers include npm; if its version differs,
+install the required npm version using your Node installation's package manager
+permissions, then check it again:
+
+```sh
+npm install --global npm@11.11.1 --ignore-scripts
+npm --version
+```
+
+Do not run the wallet service as root to solve an installation-permission problem.
+
 From a folder where you keep software, run:
 
 ```sh
