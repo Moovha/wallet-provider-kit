@@ -169,9 +169,13 @@ describe('provider HTTP boundary', () => {
     });
     servers.push(app);
     const live = (await app.inject('/docs/json')).json();
-    expect(Object.keys(live.paths)).toHaveLength(9);
-    expect(live.paths).not.toHaveProperty('/v1/enrollments');
-    expect(live.paths).not.toHaveProperty('/v1/actions/{actionId}/sign');
+    expect(Object.keys(live.paths)).toHaveLength(16);
+    expect(live.paths['/v1/enrollments'].post.summary).toContain(
+      '[Not enabled]',
+    );
+    expect(live.paths['/v1/actions/{actionId}/sign'].post.summary).toContain(
+      '[Not enabled]',
+    );
     expect(live.servers).toEqual([{ url: '/' }]);
     expect(live.info.description).toContain('Execute sends a real request');
     expect(

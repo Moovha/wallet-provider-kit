@@ -1,5 +1,7 @@
 import {
   operationGuides,
+  operationUnavailableReason,
+  transactionBoundaryDescription,
   type OperationGuide,
 } from '../src/service/api-guides.js';
 export { operationGuides } from '../src/service/api-guides.js';
@@ -57,12 +59,19 @@ export function operationStatus(
   applicationIndex: number,
 ) {
   if (!guide.scope) return 'No access token needed';
-  if (guide.financial && !config.financial)
-    return 'Transfer signing is off in Policies';
-  if (guide.records && !config.policy.identity?.records)
-    return 'Select application records in Policies to use batch submission';
-  if (guide.vendor && config.policy.identity?.records)
-    return 'Select an identity vendor in Services to import verification';
+  const id =
+    Object.entries(operationGuides).find(([, entry]) => entry === guide)?.[0] ??
+    '';
+  const unavailable = operationUnavailableReason(id, {
+    onboarding: true,
+    enrollment: false,
+    wallet: true,
+    financial: !!config.financial,
+    flow: config.policy.access?.mode ?? 'hosted',
+    records: !!config.policy.identity?.records,
+    vendor: !!config.identity.didit || !!config.identity.sumsub,
+  });
+  if (unavailable) return `Not enabled: ${unavailable}`;
   const app = config.policy.applications[applicationIndex];
   if (!app?.clientId || !app.issuer || app.issuer !== config.oauth.issuer)
     return "Complete this application's registration in Policies and Services";
@@ -80,7 +89,7 @@ export function operationStatus(
   )
     return 'Select the required permission for this application in Policies';
   if (!config.activation.enabled)
-    return 'Wallet operations are disabled in Deployment';
+    return 'Not enabled: Wallet operations are disabled in Deployment';
   return 'Settings are present; deployed access has not been checked';
 }
 export function requestExample(
@@ -88,6 +97,17 @@ export function requestExample(
   config: ProviderConfiguration,
   applicationIndex: number,
 ): object | undefined {
+  if (id === 'beginEnrollment')
+    return { identity_subject: 'example-provider-subject' };
+  if (id === 'submitEnrollmentIdentity')
+    return { id_token: 'e30.e30.Zml4dHVyZQ' };
+  if (id === 'reportTransactionEvent')
+    return {
+      event: 'submitted',
+      chain_id: 'eip155:84532',
+      transaction_hash: '0x' + '1'.repeat(64),
+      observed_at: '2030-01-01T00:00:00.000Z',
+    };
   const identityRecord = {
     reference: 'evaluation-owner-001',
     fields: Object.fromEntries(
@@ -173,12 +193,7 @@ export function referenceOperations(
   return Object.entries(contract.paths).flatMap(([path, methods]) =>
     Object.entries(methods).flatMap(([method, operation]) => {
       const guide = operationGuides[operation.operationId];
-      return guide &&
-        !(
-          config.policy.access?.mode === 'application' &&
-          (guide.records || guide.vendor)
-        ) &&
-        !(config.policy.access?.mode !== 'application' && guide.applicationLed)
+      return guide
         ? [
             {
               path,
@@ -219,6 +234,39 @@ export function responseExample(
       permissions: requestedPermissions ?? ['account:read'],
       expires_at: '2030-01-02T00:00:00.000Z',
     };
+  if (
+    ['beginEnrollment', 'submitEnrollmentIdentity', 'getEnrollment'].includes(
+      id,
+    )
+  )
+    return {
+      enrollment_id: exampleId,
+      account_id: exampleId,
+      status: 'awaiting_identity',
+      ...(id === 'beginEnrollment'
+        ? {
+            nonce: 'a'.repeat(43),
+            expires_at: '2030-01-01T00:00:00.000Z',
+            identity_issuer: 'https://identity.example.com',
+            identity_client_id: 'provider-identity-client',
+            required_claims: ['given_name'],
+          }
+        : {}),
+    };
+  if (['reportTransactionEvent', 'getTransactionEvents'].includes(id)) {
+    const report = {
+      event: 'submitted',
+      chain_id: 'eip155:84532',
+      transaction_hash: '0x' + '1'.repeat(64),
+      observed_at: '2030-01-01T00:00:00.000Z',
+      report_id: exampleId,
+      recorded_at: '2030-01-01T00:00:01.000Z',
+      verification: 'unverified',
+    };
+    return id === 'getTransactionEvents'
+      ? { action_id: exampleId, events: [report] }
+      : { action_id: exampleId, ...report };
+  }
   const address = '0x1111111111111111111111111111111111111111';
   const consent_url = `https://wallet.example.com/onboarding/${exampleId}`;
   if (id === 'getCapabilities')
@@ -339,13 +387,14 @@ export function referenceSpec(
     ...spec.info,
     title: 'Wallet API reference · local preview',
     description:
-      'Explore your current wizard settings and example responses. No API requests are sent. Deployed requests still require a ready service, a valid application token and current account permission.',
+      'All implemented provider API endpoints are shown by default, including unavailable profiles. Not enabled identifies missing configuration; draft settings do not prove live access. No API requests are sent.\n\n' +
+      transactionBoundaryDescription,
   };
   spec.servers = [{ url: referenceOrigin(config.policy.provider.origin) }];
   spec.paths = {};
   for (const item of operations) {
     const op = structuredClone(item.operation);
-    op.summary = item.guide.title;
+    op.summary = `[${item.status === 'No access token needed' ? 'Public' : item.status.startsWith('Settings are present') ? 'Configured in draft' : 'Not enabled'}] ${item.guide.title}`;
     op.tags = [item.guide.group];
     op.description = [
       `**Configuration preview:** ${item.status}.`,
@@ -364,9 +413,13 @@ export function referenceSpec(
     }
     if (op.requestBody?.content['application/json'])
       op.requestBody.content['application/json'].example = item.body;
-    if (op.responses['200']) {
-      op.responses['200'].description = item.guide.success;
-      const body = op.responses['200'].content?.['application/json'];
+    const success =
+      op.responses[
+        item.operation.operationId === 'beginEnrollment' ? '201' : '200'
+      ];
+    if (success) {
+      success.description = item.guide.success;
+      const body = success.content?.['application/json'];
       if (body)
         body.example = responseExample(
           item.operation.operationId,

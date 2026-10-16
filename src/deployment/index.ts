@@ -6,4 +6,9 @@ export {
   ConfigurationError,
 } from './config.js';
 export type { ProviderConfiguration, SecretReference } from './config.js';
-export type { TransferPolicy, TransferInput } from './actions.js';
+export type {
+  TransferPolicy,
+  TransferInput,
+  TransactionEventInput,
+  TransactionEventReport,
+} from './actions.js';

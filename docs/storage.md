@@ -67,6 +67,11 @@ that uses it; a host that supplies the store owns its lifetime.
 
 ## Use it for onboarding
 
+Configured transaction event reports are stored as additive JSON fields in the
+existing `supportedActions` entries of `onboarding_records`. The version 1 table
+and catalog definitions stay unchanged. Reports are bounded to 32 per action,
+remain unverified and never change financial approvals, attempts or reservations.
+
 Standard [application-led access](application-access.md) uses these same transactional collections and journals. Its assertion/grant fields are additive JSON records, with no SQLite schema migration. Login sessions and vendor reservations are used only when their optional hosted/staff features are configured.
 
 Pass `storage: database.onboardingStore` to `createOnboardingProvider` instead of

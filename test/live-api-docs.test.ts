@@ -13,12 +13,18 @@ const contract: ApiContract = JSON.parse(
 );
 afterEach(() => vi.unstubAllGlobals());
 describe('live API explorer boundaries', () => {
-  it('shows configured financial operations without modifying schemas or the canonical document', () => {
+  it('shows all operations without modifying schemas or the canonical document', () => {
     const before = structuredClone(contract);
-    const live = liveApiSpecification(contract, true, true);
+    const live = liveApiSpecification(contract, {
+      onboarding: true,
+      enrollment: false,
+      financial: true,
+      wallet: true,
+      flow: 'application',
+    });
     expect(
       Object.values(live.paths).flatMap((methods) => Object.values(methods)),
-    ).toHaveLength(12);
+    ).toHaveLength(17);
     for (const [path, methods] of Object.entries(live.paths)) {
       for (const [method, operation] of Object.entries(
         methods as Record<string, any>,
@@ -38,6 +44,55 @@ describe('live API explorer boundaries', () => {
       }
     }
     expect(contract).toEqual(before);
+  });
+  it('labels missing profiles while retaining every endpoint in every configuration', () => {
+    for (const flow of ['application', 'hosted'] as const) {
+      const live = liveApiSpecification(contract, {
+        onboarding: true,
+        enrollment: false,
+        financial: false,
+        wallet: true,
+        flow,
+        records: flow === 'hosted',
+      });
+      expect(Object.keys(live.paths).sort()).toEqual(
+        Object.keys(contract.paths).sort(),
+      );
+      for (const path of [
+        '/v1/transfer-authorizations',
+        '/v1/actions/{actionId}/sign',
+        '/v1/actions/{actionId}/transaction-events',
+        '/v1/enrollments',
+      ]) {
+        expect(live.paths[path].post.summary).toContain('[Not enabled]');
+        expect(live.paths[path].post.description).toContain('Not enabled');
+      }
+      expect(live.paths['/v1/access-requests'].post.summary).toContain(
+        '[Configured]',
+      );
+      expect(
+        live.paths['/v1/access-grants/{grantId}/revoke'].post.summary,
+      ).toContain(flow === 'application' ? '[Configured]' : '[Not enabled]');
+      expect(live.info.description).toContain(
+        'No transaction-submission HTTP endpoint',
+      );
+    }
+    const embedded = liveApiSpecification(contract, {
+      onboarding: false,
+      enrollment: true,
+      financial: false,
+      wallet: true,
+      signing: true,
+    });
+    expect(embedded.paths['/v1/enrollments'].post.summary).toContain(
+      '[Configured]',
+    );
+    expect(
+      embedded.paths['/v1/actions/{actionId}/sign'].post.summary,
+    ).toContain('[Configured]');
+    expect(embedded.paths['/v1/access-requests'].post.summary).toContain(
+      '[Not enabled]',
+    );
   });
   it('never falls back to an example or unsafe live destination for incomplete drafts', () => {
     expect(deployedExplorerUrl('https://wallet.example.test')).toBe(

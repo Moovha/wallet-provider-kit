@@ -194,9 +194,12 @@ session's configuration; existing-service changes use reviewed maintenance.
 ## Explore the provider API
 
 Choose **API reference**. The local preview uses your settings and sends no API
-calls. Application-led deployments show policy discovery, access requests, grant
-revocation, account reads, provisioning and optional transfer endpoints. Hosted
-batch-record and vendor-import endpoints are not part of the standard preview.
+calls. All documented JSON provider API endpoints are visible by default, including
+transfer signing, transaction event reports, hosted compatibility and advanced OIDC
+enrollment. **Not enabled** marks missing configuration and explains the prerequisite;
+showing an endpoint does not enable it. Search by path, action or scope to narrow
+the view and its OpenAPI download. The configured setup service does not enable
+the separate advanced OIDC enrollment profile.
 
 Begin with **Read access policy and evidence requirements**. The application obtains
 the current policy revision and required evidence, records the user's consent in
@@ -206,7 +209,10 @@ then creates or accesses the wallet. See the complete
 
 Example revisions, timestamps, IDs and evidence are placeholders. Replace them
 with current records before testing. Schemas and example responses are not live
-service results or approvals.
+service results or approvals. Signing returns an authorization signature; the
+connected application submits the transaction and arranges gas separately.
+Transaction event reports remain unverified observations. See
+[signing, submission and event reporting](http-api.md#signing-and-transaction-submission).
 
 ![Local API preview](public/screenshots/api-reference.webp)
 

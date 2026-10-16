@@ -85,7 +85,7 @@ export async function createServer(options: ServerOptions = {}) {
         title: 'Moovha Wallet Provider Service',
         version: '0.1.0',
         description:
-          'Experimental wallet-provider API with application-led access and optional hosted compatibility. Not the Moovha operation orchestration API.',
+          'Experimental wallet-provider API with application-led access and optional hosted compatibility. Signing returns an approved EIP-712 signature; it does not submit a transaction or pay gas. Application transaction-event reports remain unverified and do not establish settlement. No transaction-submission HTTP endpoint is implemented. Not the Moovha operation orchestration API.',
       },
       components: {
         securitySchemes: {
@@ -125,12 +125,19 @@ export async function createServer(options: ServerOptions = {}) {
           }
         : {}),
       transformSpecification: (document) =>
-        liveApiSpecification(
-          document,
-          !!options.configurationProfile,
-          !!options.onboarding?.actions,
-          options.onboarding?.service.policy.access.mode,
-        ),
+        liveApiSpecification(document, {
+          onboarding: !!options.onboarding,
+          enrollment: !!options.enrollment,
+          financial: !!options.onboarding?.actions,
+          signing:
+            !!options.onboarding?.actions ||
+            (!!options.service && !options.configurationProfile),
+          wallet:
+            !!options.service && !!options.authenticate && !!options.ready,
+          flow: options.onboarding?.service.policy.access.mode,
+          records: !!options.onboarding?.service.policy.identity?.records,
+          vendor: !!options.onboarding?.service.verificationVendors().length,
+        }),
       uiConfig: {
         layout: 'BaseLayout',
         ...(options.documentationTokens

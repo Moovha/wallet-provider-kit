@@ -53,7 +53,7 @@ test('deployed Swagger executes same-origin HTTP and displays real success/auth/
   await expect(
     page.getByRole('heading', { name: /Provider API · Live testing/ }),
   ).toBeVisible();
-  await expect(page.locator('.opblock')).toHaveCount(9);
+  await expect(page.locator('.opblock')).toHaveCount(17);
   const discovery = page.locator('#operations-Discovery-getCapabilities');
   await discovery.locator('.opblock-summary-control').click();
   await discovery

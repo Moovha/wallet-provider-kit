@@ -1,7 +1,16 @@
 import providerConfigurationSchema from '../../spec/provider-config.schema.json' with { type: 'json' };
 import { formatUnits } from 'ethers';
-import type { SupportedActions, TransferInput } from '../deployment/actions.js';
-import { transferReceiptSchema } from '../deployment/schemas.js';
+import type {
+  SupportedActions,
+  TransferInput,
+  TransactionEventInput,
+} from '../deployment/actions.js';
+import {
+  transferReceiptSchema,
+  transactionEventInputSchema,
+  transactionEventReceiptSchema,
+  transactionEventsSchema,
+} from '../deployment/schemas.js';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { AuthenticationError, type Authenticate } from '../service/auth.js';
@@ -256,6 +265,49 @@ export async function registerOnboardingRoutes(
     async (request) =>
       actions().read(
         (await context(request, 'wallet:actions:read')).principal,
+        request.params.actionId,
+      ),
+  );
+  const eventDescription =
+    'Record or read unverified application transaction observations for an existing authorized transfer. Current caller, owner, grant, identity, consent and policy checks apply even after signing expiry. Reports never broadcast, reconcile attempts, verify settlement or release budgets.';
+  app.post<{ Params: { actionId: string }; Body: TransactionEventInput }>(
+    '/v1/actions/:actionId/transaction-events',
+    {
+      schema: {
+        ...schema(
+          'reportTransactionEvent',
+          transactionEventInputSchema,
+          actionParams,
+        ),
+        description: eventDescription,
+        response: {
+          ...schema('reportTransactionEvent').response,
+          200: transactionEventReceiptSchema,
+        },
+      },
+    },
+    async (request) =>
+      actions().reportTransactionEvent(
+        await context(request, 'wallet:events'),
+        request.params.actionId,
+        request.body,
+      ),
+  );
+  app.get<{ Params: { actionId: string } }>(
+    '/v1/actions/:actionId/transaction-events',
+    {
+      schema: {
+        ...schema('getTransactionEvents', undefined, actionParams),
+        description: eventDescription,
+        response: {
+          ...schema('getTransactionEvents').response,
+          200: transactionEventsSchema,
+        },
+      },
+    },
+    async (request) =>
+      actions().transactionEvents(
+        (await context(request, 'wallet:events:read')).principal,
         request.params.actionId,
       ),
   );

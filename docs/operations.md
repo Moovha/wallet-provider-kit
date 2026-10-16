@@ -52,6 +52,11 @@ do not establish those runtime properties.
 
 ## Use your existing monitoring
 
+For application reports of transaction submission, confirmation or failure, use
+the authenticated [transaction event API](http-api.md#report-transaction-submission-and-confirmation).
+These private, durable reports remain unverified and have no authority over
+signing, budgets or settlement. They are separate from request monitoring below.
+
 Set `OTEL_EXPORTER_OTLP_ENDPOINT` to a trusted HTTPS collector base URL; the SDK
 adds `/v1/traces` and `/v1/metrics`. Export is disabled when unset. Use a local
 sidecar/collector for authentication, tenant routing, TLS and retry/buffering; do

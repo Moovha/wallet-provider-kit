@@ -205,8 +205,9 @@ async function fixture(
   const keys = await generateKeyPair('ES256');
   injected.keys = async () => keys.publicKey;
   async function token(
-    scope = 'wallet:access wallet:access:read wallet:provision wallet:account:read wallet:actions wallet:actions:read wallet:sign',
+    scope = 'wallet:access wallet:access:read wallet:provision wallet:account:read wallet:actions wallet:actions:read wallet:sign wallet:events wallet:events:read',
     client = config.policy.applications[0].clientId,
+    subject = 'application-service',
   ) {
     return (
       'Bearer ' +
@@ -214,7 +215,7 @@ async function fixture(
         .setProtectedHeader({ alg: 'ES256', typ: 'at+jwt' })
         .setIssuer(config.oauth.issuer)
         .setAudience(config.oauth.audience)
-        .setSubject('application-service')
+        .setSubject(subject)
         .setJti(randomUUID())
         .setIssuedAt()
         .setExpirationTime('5m')
@@ -469,6 +470,181 @@ describe('configured API and provider transfer authorization', () => {
     expect((await f.api(signPath, {})).json()).toEqual(signed.json());
     expect(injected.backend!.signTypedData).toHaveBeenCalledTimes(1);
   });
+  it('records concurrent idempotent transaction reports durably without altering signing or budgets', async () => {
+    const f = await fixture();
+    const receipt = (await f.request('100')).json();
+    const path = '/v1/actions/' + receipt.action_id + '/transaction-events';
+    expect(
+      (await f.api('/v1/actions/' + receipt.action_id + '/sign', {}))
+        .statusCode,
+    ).toBe(200);
+    const body = {
+      event: 'confirmed',
+      chain_id: 'eip155:84532',
+      transaction_hash: '0x' + '1'.repeat(64),
+      observed_at: new Date().toISOString(),
+    };
+    const key = randomUUID();
+    const results = await Promise.all([
+      f.api(path, body, key),
+      f.api(path, body, key),
+    ]);
+    expect(results.map((r) => r.statusCode)).toEqual([200, 200]);
+    expect(results[0].json()).toEqual(results[1].json());
+    expect(results[0].json()).toMatchObject({
+      action_id: receipt.action_id,
+      verification: 'unverified',
+      ...body,
+    });
+    expect(
+      (await f.api(path, { ...body, event: 'failed' }, key)).statusCode,
+    ).toBe(409);
+    const other = (await f.request('1')).json();
+    expect(
+      (
+        await f.api(
+          '/v1/actions/' + other.action_id + '/transaction-events',
+          body,
+          key,
+        )
+      ).statusCode,
+    ).toBe(409);
+    await f.restart();
+    expect((await f.api(path, body, key)).json()).toEqual(results[0].json());
+    const read = await f.app.inject({
+      url: path,
+      headers: { authorization: await f.token('wallet:events:read') },
+    });
+    expect(read.statusCode).toBe(200);
+    expect(read.json().events).toHaveLength(1);
+    expect(read.json().events[0].verification).toBe('unverified');
+    const db = openProviderDatabase({ directory: f.config.storage.directory });
+    const saved = await db.onboardingStore.transaction(
+      (state) => state.supportedActions![receipt.action_id],
+    );
+    expect(saved.status).toBe('authorized');
+    expect(await db.budget(saved.approval.budgetId)).toEqual({
+      maximum: '150',
+      reserved: '100',
+    });
+    db.close();
+    expect(injected.backend!.signTypedData).toHaveBeenCalledTimes(1);
+  });
+  it('requires report scopes and the original caller, validates bounded input and remains unverified', async () => {
+    const f = await fixture();
+    const receipt = (await f.request('1')).json();
+    const path = '/v1/actions/' + receipt.action_id + '/transaction-events';
+    const body = {
+      event: 'submitted',
+      chain_id: 'eip155:84532',
+      transaction_hash: '0x' + '2'.repeat(64),
+      observed_at: new Date().toISOString(),
+    };
+    const post = (authorization?: string, payload = body) =>
+      f.app.inject({
+        method: 'POST',
+        url: path,
+        headers: {
+          ...(authorization ? { authorization } : {}),
+          'idempotency-key': randomUUID(),
+        },
+        payload,
+      });
+    expect((await post()).statusCode).toBe(401);
+    expect((await post(await f.token('wallet:sign'))).statusCode).toBe(403);
+    expect(
+      (await post(await f.token('wallet:events', 'another-client'))).statusCode,
+    ).toBe(403);
+    expect(
+      (
+        await post(
+          await f.token(
+            'wallet:events',
+            f.config.policy.applications[0].clientId,
+            'another-caller',
+          ),
+        )
+      ).statusCode,
+    ).toBe(403);
+    expect(
+      (
+        await f.app.inject({
+          url: path,
+          headers: { authorization: await f.token('wallet:events') },
+        })
+      ).statusCode,
+    ).toBe(403);
+    for (const invalid of [
+      { ...body, chain_id: 'eip155:1' },
+      { ...body, transaction_hash: 'invalid' },
+      { ...body, signature: 'must-not-be-stored' },
+      { ...body, verification: 'verified' },
+      { ...body, observed_at: 'invalid' },
+      { ...body, observed_at: '2037-02-30T12:00:00Z' },
+    ])
+      expect((await f.api(path, invalid)).statusCode).toBe(400);
+    expect(
+      (
+        await f.api(path, {
+          ...body,
+          observed_at: new Date(Date.now() + 120000).toISOString(),
+        })
+      ).statusCode,
+    ).toBe(422);
+    expect(
+      (await f.api('/v1/actions/' + randomUUID() + '/transaction-events', body))
+        .statusCode,
+    ).toBe(403);
+    for (let index = 0; index < 32; index++)
+      expect((await f.api(path, body)).statusCode).toBe(200);
+    expect((await f.api(path, body)).statusCode).toBe(409);
+    expect(injected.backend!.signTypedData).not.toHaveBeenCalled();
+  });
+  it('accepts late observations after signing expiry without reopening signing and denies revoked access', async () => {
+    const f = await fixture();
+    const receipt = (await f.request('1')).json();
+    const path = '/v1/actions/' + receipt.action_id + '/transaction-events';
+    const expired = Date.parse(receipt.expires_at) + 1000;
+    const now = vi.spyOn(Date, 'now').mockReturnValue(expired);
+    const body = {
+      event: 'confirmed',
+      chain_id: 'eip155:84532',
+      transaction_hash: '0x' + '3'.repeat(64),
+      observed_at: new Date(expired).toISOString(),
+    };
+    expect((await f.api(path, body)).statusCode).toBe(200);
+    expect(
+      (
+        await f.app.inject({
+          url: path,
+          headers: { authorization: await f.token('wallet:events:read') },
+        })
+      ).statusCode,
+    ).toBe(200);
+    expect(
+      (await f.api('/v1/actions/' + receipt.action_id + '/sign', {}))
+        .statusCode,
+    ).toBe(422);
+    now.mockRestore();
+    const db = openProviderDatabase({ directory: f.config.storage.directory });
+    await db.onboardingStore.transaction((state) => {
+      state.grants[f.grant.grant_id].state = 'revoked';
+    });
+    db.close();
+    expect(
+      (await f.api(path, { ...body, observed_at: new Date().toISOString() }))
+        .statusCode,
+    ).toBe(403);
+    expect(
+      (
+        await f.app.inject({
+          url: path,
+          headers: { authorization: await f.token('wallet:events:read') },
+        })
+      ).statusCode,
+    ).toBe(403);
+    expect(injected.backend!.signTypedData).not.toHaveBeenCalled();
+  });
   it('does not turn a request-only access grant or an OAuth scope into transfer delegation', async () => {
     const f = await fixture(undefined, ['account:read', 'operations:request']);
     expect((await f.request('1')).statusCode).toBe(403);
@@ -532,6 +708,26 @@ describe('configured API and provider transfer authorization', () => {
       expect(
         (await f.api('/v1/actions/' + receipt.action_id + '/sign', {}))
           .statusCode,
+      ).toBe(403);
+      const eventPath =
+        '/v1/actions/' + receipt.action_id + '/transaction-events';
+      expect(
+        (
+          await f.api(eventPath, {
+            event: 'submitted',
+            chain_id: 'eip155:84532',
+            transaction_hash: '0x' + '4'.repeat(64),
+            observed_at: new Date().toISOString(),
+          })
+        ).statusCode,
+      ).toBe(403);
+      expect(
+        (
+          await f.app.inject({
+            url: eventPath,
+            headers: { authorization: await f.token('wallet:events:read') },
+          })
+        ).statusCode,
       ).toBe(403);
       expect(injected.backend!.signTypedData).not.toHaveBeenCalled();
     },

@@ -34,7 +34,19 @@ export interface TransferInput {
   recipient: string;
   amount: string;
 }
+export interface TransactionEventInput {
+  event: 'submitted' | 'confirmed' | 'failed';
+  chain_id: 'eip155:84532';
+  transaction_hash: string;
+  observed_at: string;
+}
+export interface TransactionEventReport extends TransactionEventInput {
+  report_id: string;
+  recorded_at: string;
+  verification: 'unverified';
+}
 export interface TransferRecord {
+  transactionEvents?: TransactionEventReport[];
   approval: FinancialApproval & { action: TypedDataAction };
   revision: string;
   status: 'authorizing' | 'authorized' | 'denied';
@@ -86,7 +98,11 @@ export class SupportedActions {
   consentTerms() {
     return structuredClone(this.policy);
   }
-  private current(record: TransferRecord, includeDenied = false) {
+  private current(
+    record: TransferRecord,
+    includeDenied = false,
+    allowExpired = false,
+  ) {
     try {
       const { action, account, units } = record.approval;
       const { domain, message, types, primaryType } = action.payload;
@@ -100,7 +116,7 @@ export class SupportedActions {
       if (
         record.revision !== this.revision ||
         !Number.isFinite(expiry) ||
-        expiry <= Date.now() ||
+        (!allowExpired && expiry <= Date.now()) ||
         expiry > Date.now() + this.policy.maxValiditySeconds * 1000 ||
         (record.status === 'denied' && !includeDenied) ||
         primaryType !== 'TransferWithAuthorization' ||
@@ -156,8 +172,9 @@ export class SupportedActions {
     principal: VerifiedPrincipal,
     record: TransferRecord,
     includeDenied = false,
+    allowExpired = false,
   ) {
-    this.current(record, includeDenied);
+    this.current(record, includeDenied, allowExpired);
     const approval = record.approval;
     if (!sameCaller(principal, approval.caller)) deny();
     const { grant, account } = await this.binding(
@@ -356,6 +373,122 @@ export class SupportedActions {
       if (!record) deny();
       return record;
     });
+  }
+  /** Store caller observations separately from signing authority and verified settlement. */
+  async reportTransactionEvent(
+    inputContext: AuthorityContext,
+    id: string,
+    input: TransactionEventInput,
+  ) {
+    const context = structuredClone(inputContext);
+    input = structuredClone(input);
+    if (
+      !context.principal.scopes.includes('wallet:events') ||
+      !uuid.test(context.idempotencyKey)
+    )
+      deny();
+    if (
+      Object.keys(input).sort().join(',') !==
+        'chain_id,event,observed_at,transaction_hash' ||
+      !['submitted', 'confirmed', 'failed'].includes(input.event) ||
+      input.chain_id !== 'eip155:84532' ||
+      !/^0x[0-9a-f]{64}$/.test(input.transaction_hash) ||
+      typeof input.observed_at !== 'string' ||
+      !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/.test(
+        input.observed_at,
+      ) ||
+      !Number.isFinite(Date.parse(input.observed_at)) ||
+      new Date(input.observed_at).toISOString().replace('.000Z', 'Z') !==
+        input.observed_at.replace('.000Z', 'Z') ||
+      Date.parse(input.observed_at) > Date.now() + 60000
+    )
+      invalid();
+    const record = await this.load(id);
+    const grant = await this.permitted(context.principal, record, false, true);
+    const key = fingerprint([
+      'transaction-event',
+      context.principal.issuer,
+      context.principal.subject,
+      context.principal.clientId,
+      context.idempotencyKey,
+    ]);
+    const hash = fingerprint([id, input]);
+    return this.onboarding.withAccountAccess(
+      context.principal,
+      record.approval.account.accountId,
+      'transfers:request',
+      (state, currentGrant) => {
+        const latest = state.supportedActions?.[id];
+        if (
+          !latest ||
+          latest.status !== 'authorized' ||
+          fingerprint(latest.approval) !== fingerprint(record.approval) ||
+          fingerprint(currentGrant) !== fingerprint(grant) ||
+          state.accounts[grant.accountId]?.owner !== grant.owner ||
+          state.accounts[grant.accountId]?.address?.toLowerCase() !==
+            record.approval.account.address.toLowerCase() ||
+          state.deploymentBindings?.['service-v1']?.activeRevision !==
+            this.revision
+        )
+          deny();
+        this.current(latest, false, true);
+        const events = (latest.transactionEvents ??= []);
+        const previous = state.idempotency[key];
+        if (previous) {
+          const report = events.find(
+            (event) => event.report_id === previous.id,
+          );
+          if (previous.hash !== hash || !report)
+            throw new WalletProviderError('wallet_attempt_conflict');
+          return { action_id: id, ...report };
+        }
+        if (events.length >= 32)
+          throw new WalletProviderError('wallet_attempt_conflict');
+        const report: TransactionEventReport = {
+          ...input,
+          report_id: randomUUID(),
+          recorded_at: new Date(Date.now()).toISOString(),
+          verification: 'unverified',
+        };
+        events.push(report);
+        state.idempotency[key] = { hash, id: report.report_id };
+        state.audit.push({
+          at: Date.now(),
+          event: 'transaction_event_reported',
+          resource: id,
+          revision: this.revision,
+        });
+        return { action_id: id, ...report };
+      },
+    );
+  }
+  async transactionEvents(principal: VerifiedPrincipal, id: string) {
+    principal = structuredClone(principal);
+    if (!principal.scopes.includes('wallet:events:read')) deny();
+    const record = await this.load(id);
+    const originalGrant = await this.permitted(principal, record, false, true);
+    if (record.status !== 'authorized') deny();
+    return this.onboarding.withAccountAccess(
+      principal,
+      record.approval.account.accountId,
+      'transfers:request',
+      (state, grant) => {
+        const latest = state.supportedActions?.[id];
+        if (
+          !latest ||
+          latest.status !== 'authorized' ||
+          fingerprint(latest.approval) !== fingerprint(record.approval) ||
+          fingerprint(grant) !== fingerprint(originalGrant) ||
+          state.accounts[grant.accountId]?.address?.toLowerCase() !==
+            record.approval.account.address.toLowerCase() ||
+          state.deploymentBindings?.['service-v1']?.activeRevision !==
+            this.revision
+        )
+          deny();
+        this.current(latest, false, true);
+        return { action_id: id, events: latest.transactionEvents ?? [] };
+      },
+    );
   }
   async authorize(
     context: AuthorityContext,

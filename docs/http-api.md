@@ -11,9 +11,12 @@ for configuration and API consumption without a custom host implementation.
 The local [setup wizard's API reference](setup-wizard.md#explore-the-provider-api)
 provides bundled Swagger schemas, example requests/responses and configuration
 prerequisites without sending calls. It is separate from deployed `/docs/` and
-works whether or not deployment documentation is enabled. Its exported reference
-is filtered to the displayed supported setup APIs; this guide covers advanced
-profiles as well.
+works whether or not deployment documentation is enabled. Both explorers list all
+documented JSON provider API operations by default,
+including advanced profiles. **Not enabled** identifies a missing configuration
+prerequisite; showing an endpoint does not enable it. The local search filters
+the displayed reference and its download. Browser login/review pages, health
+probes and explorer controls remain separate from this application API.
 
 ## Try deployed APIs
 
@@ -41,9 +44,11 @@ The deployed explorer is public when enabled; its API calls still enforce normal
 authentication, scopes, owner grants and readiness. Restrict `/docs` at ingress
 if your operator access policy requires it. You can disable the checkbox, export
 and restart after testing. `/openapi.json` remains the full implemented contract;
-configured `/docs/json` presents the supported setup profile and omits transfer
-operations when the signing profile is absent. This filtering does not grant
-permission or alter routes. The local application's permission preview does not
+configured `/docs/json` retains every documented operation and adds availability
+labels. **Configured** means the profile is present, not that the service is
+activated or the caller has permission. Readiness and current authorization still
+apply, and unavailable endpoints continue to deny calls. The local application's
+permission preview does not
 carry over as proof of live access.
 
 ### First test: no credential or code needed
@@ -171,21 +176,23 @@ owner. For bundled onboarding, the issuer and client ID must match an allowed
 `policy.applications[]` entry; its `name` identifies it in operator tools (and the hosted consent screen when selected). The
 optional `ownerLogin.clientId` configures staff login or hosted compatibility, not a standard user-access requirement.
 
-| Method and path                                 | Required scope        | Required configured profile                                                                                |
-| ----------------------------------------------- | --------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `GET /v1/capabilities`                          | None                  | None; `configured` reflects readiness                                                                      |
-| `POST /v1/accounts/{accountId}/provision`       | `wallet:provision`    | Financial host or accepted onboarding/enrollment host                                                      |
-| `POST /v1/actions/{actionId}/sign`              | `wallet:sign`         | Configured provider-authorized transfer profile or advanced financial host; onboarding-only denies signing |
-| `POST /v1/transfer-authorizations`              | `wallet:actions`      | Configured provider-authorized transfer profile                                                            |
-| `GET /v1/transfer-authorizations/{actionId}`    | `wallet:actions:read` | Configured provider-authorized transfer profile                                                            |
-| `POST /v1/access-requests`                      | `wallet:access`       | Onboarding                                                                                                 |
-| `GET /v1/access-requests/{requestId}`           | `wallet:access:read`  | Onboarding                                                                                                 |
-| `POST /v1/access-grants/{grantId}/revoke`       | `wallet:access`       | Standard application-led withdrawal, same caller, current application trust                                |
-| `POST /v1/access-requests/{requestId}/identity` | `wallet:access`       | Hosted compatibility only: owner consent and agreed vendor policy                                          |
-| `GET /v1/accounts/{accountId}`                  | `wallet:account:read` | Onboarding with current `account:read` grant                                                               |
-| `POST /v1/enrollments`                          | `wallet:enroll`       | Lower-level enrollment                                                                                     |
-| `POST /v1/enrollments/{enrollmentId}/identity`  | `wallet:enroll`       | Lower-level enrollment                                                                                     |
-| `GET /v1/enrollments/{enrollmentId}`            | `wallet:enroll:read`  | Lower-level enrollment                                                                                     |
+| Method and path                                  | Required scope        | Required configured profile                                                                                |
+| ------------------------------------------------ | --------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `GET /v1/capabilities`                           | None                  | None; `configured` reflects readiness                                                                      |
+| `POST /v1/accounts/{accountId}/provision`        | `wallet:provision`    | Financial host or accepted onboarding/enrollment host                                                      |
+| `POST /v1/actions/{actionId}/sign`               | `wallet:sign`         | Configured provider-authorized transfer profile or advanced financial host; onboarding-only denies signing |
+| `POST /v1/transfer-authorizations`               | `wallet:actions`      | Configured provider-authorized transfer profile                                                            |
+| `GET /v1/transfer-authorizations/{actionId}`     | `wallet:actions:read` | Configured provider-authorized transfer profile                                                            |
+| `POST /v1/actions/{actionId}/transaction-events` | `wallet:events`       | Configured transfer profile and current owner-bound transfer delegation                                    |
+| `GET /v1/actions/{actionId}/transaction-events`  | `wallet:events:read`  | Configured transfer profile and current owner-bound transfer delegation                                    |
+| `POST /v1/access-requests`                       | `wallet:access`       | Onboarding                                                                                                 |
+| `GET /v1/access-requests/{requestId}`            | `wallet:access:read`  | Onboarding                                                                                                 |
+| `POST /v1/access-grants/{grantId}/revoke`        | `wallet:access`       | Standard application-led withdrawal, same caller, current application trust                                |
+| `POST /v1/access-requests/{requestId}/identity`  | `wallet:access`       | Hosted compatibility only: owner consent and agreed vendor policy                                          |
+| `GET /v1/accounts/{accountId}`                   | `wallet:account:read` | Onboarding with current `account:read` grant                                                               |
+| `POST /v1/enrollments`                           | `wallet:enroll`       | Lower-level enrollment                                                                                     |
+| `POST /v1/enrollments/{enrollmentId}/identity`   | `wallet:enroll`       | Lower-level enrollment                                                                                     |
+| `GET /v1/enrollments/{enrollmentId}`             | `wallet:enroll:read`  | Lower-level enrollment                                                                                     |
 
 Optional routes appear in OpenAPI even when unavailable. Choose onboarding or
 enrollment, not both. Hosted `/onboarding/*` login/consent/review pages are
@@ -232,6 +239,82 @@ including its `0x` prefix. The journal wrapper verifies the returned signature
 against the exact digest/account before completing. The HTTP route itself doesn't
 create or approve actions, broadcast transactions, fund gas or settle an operation.
 Do not put returned signatures into application logs.
+
+## Signing and transaction submission
+
+| Step                                             | Responsibility                                                                                              | Result                                                                                                         |
+| ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `POST /v1/transfer-authorizations`               | Provider checks delegated access and exact transfer policy                                                  | Stored action ID and ERC-3009 typed payload; no signature or broadcast                                         |
+| `POST /v1/actions/{actionId}/sign`               | Provider rechecks authority and the durable signing attempt                                                 | Signature for the exact authorization; no broadcast or gas payment                                             |
+| Submit the transaction                           | Connected application arranges gas and submits the token-contract call with the authorization and signature | A transaction hash identifies a submission; verify the receipt, exact transfer effects and finality separately |
+| `POST /v1/actions/{actionId}/transaction-events` | Application reports its observation to the provider                                                         | Durable **unverified** report; no settlement decision                                                          |
+
+There is **no transaction-submission HTTP endpoint** in the provider kit.
+The [OpenZeppelin Relayer executor](openzeppelin-relayer.md) is a separate
+TypeScript library integration with host-owned action and attempt authority.
+Neither a signature nor a reported confirmation establishes settlement.
+The orchestration reference is a separate draft, not an implemented submission API.
+
+## Report transaction submission and confirmation
+
+The configured transfer profile exposes:
+
+| Method and path                                  | Scope                | Purpose                                                            |
+| ------------------------------------------------ | -------------------- | ------------------------------------------------------------------ |
+| `POST /v1/actions/{actionId}/transaction-events` | `wallet:events`      | Record an application's submitted, confirmed or failed observation |
+| `GET /v1/actions/{actionId}/transaction-events`  | `wallet:events:read` | Read the reports in server recording order                         |
+
+Register these scopes at your token issuer and, if used, in the operator token
+panel's application scope allowlist. Scopes alone do not authorize reporting.
+The action must be an authorized transfer stored for the same application and
+caller. The provider rechecks current owner binding, accepted identity, transfer
+delegation, consent and policy. Revoked access or superseded policy denies both
+writes and reads, including replay. Signing authorization may have expired;
+late reports do not renew it. Reports do not require a succeeded signing journal
+entry: an uncertain signing response must remain uncertain until independently
+reconciled, and even an unsigned action can receive an unverified observation.
+
+```http
+POST /v1/actions/<action-uuid>/transaction-events
+Authorization: Bearer <application-access-token>
+Idempotency-Key: <uuid-v4>
+Content-Type: application/json
+
+{
+  "event": "submitted",
+  "chain_id": "eip155:84532",
+  "transaction_hash": "0x1111111111111111111111111111111111111111111111111111111111111111",
+  "observed_at": "2026-10-16T12:00:00.000Z"
+}
+```
+
+Replace the example ID, hash and UTC observation time with your application's
+records. Use `confirmed` or `failed` for subsequent observations with their own
+idempotency keys. Hashes must be lowercase `0x`-prefixed 32-byte hex values on
+Base Sepolia. UTC observation times use seconds and optional three-digit
+milliseconds, with no more than 60 seconds of future clock skew. Extra fields,
+free-form messages, signatures and arbitrary payloads are rejected.
+
+A successful POST returns 200 with the submitted fields, `action_id`,
+`report_id`, server `recorded_at` and `verification: unverified`. Exact retries
+with the same caller and key return the original report, including after restart.
+Changing its action or body returns 409. GET returns `{ action_id, events }`;
+an empty list is not proof that nothing was submitted.
+
+Up to 32 reports are retained per action; a new report beyond that bound returns
+409, while exact retries still work. Reports are appended in recording order,
+may refer to different hashes and may arrive late, out of order or in conflict.
+The service does not turn them into a single authoritative transaction status,
+fetch chain receipts or verify that a hash executed the authorized transfer.
+It does not change approvals, reconcile attempts, release budget reservations,
+authorize retries or mark an operation settled. Applications must verify chain
+receipts, exact transfer effects, reorg handling and finality independently.
+
+Reports are stored privately as additive fields of the existing transfer records;
+no database schema migration is required. They are distinct from
+[OTLP request metrics and traces](operations.md#use-your-existing-monitoring),
+which the service exports to a collector. The wallet service is not an OTLP
+collector and does not accept arbitrary monitoring payloads.
 
 ## Idempotency and validation
 

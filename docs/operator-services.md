@@ -273,6 +273,8 @@ client secret in a browser or mobile app.
 | Request provider transfer authorization          | `wallet:actions`      |
 | Read transfer authorization status               | `wallet:actions:read` |
 | Sign an authorized transfer                      | `wallet:sign`         |
+| Report transaction observations                  | `wallet:events`       |
+| Read transaction event reports                   | `wallet:events:read`  |
 
 Authorize only needed scopes. Do not give connected apps staff review authority.
 The wizard's **Read wallet accounts** (`account:read`) and **Request transfers on

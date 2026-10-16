@@ -25,21 +25,19 @@ function fixture() {
   return validateProviderConfiguration(structuredClone(sample));
 }
 describe('operator API reference', () => {
-  it('uses canonical request/response contracts, excludes advanced profiles and does not mutate them', () => {
+  it('uses canonical request/response contracts, includes unavailable advanced profiles and does not mutate them', () => {
     const config = fixture();
     const operations = referenceOperations(contract, config, 0);
-    expect(operations).toHaveLength(11);
+    expect(operations).toHaveLength(17);
     expect(
       Object.values(contract.paths)
         .flatMap((methods) =>
           Object.values(methods).map((operation) => operation.operationId),
         )
-        .filter((id) => !id.toLowerCase().includes('enrollment'))
         .sort(),
     ).toEqual(Object.keys(operationGuides).sort());
     expect(operations.map((item) => item.operation.operationId).sort()).toEqual(
       Object.entries(operationGuides)
-        .filter(([, guide]) => !guide.applicationLed)
         .map(([id]) => id)
         .sort(),
     );
@@ -47,9 +45,13 @@ describe('operator API reference', () => {
     for (const item of operations) {
       const preview = spec.paths[item.path][item.method];
       expect(
-        preview.responses['200'].content?.['application/json'].schema,
+        preview.responses[
+          item.operation.operationId === 'beginEnrollment' ? '201' : '200'
+        ].content?.['application/json'].schema,
       ).toEqual(
-        item.operation.responses['200'].content?.['application/json'].schema,
+        item.operation.responses[
+          item.operation.operationId === 'beginEnrollment' ? '201' : '200'
+        ].content?.['application/json'].schema,
       );
       expect(preview.requestBody?.content['application/json'].schema).toEqual(
         item.operation.requestBody?.content['application/json'].schema,
@@ -60,7 +62,7 @@ describe('operator API reference', () => {
     }
     expect(
       Object.keys(spec.paths).some((path) => path.includes('enrollment')),
-    ).toBe(false);
+    ).toBe(true);
     expect(contract.info.title).toBe('Moovha Wallet Provider Service');
     expect(contract.paths['/v1/access-requests'].post.summary).toBeUndefined();
   });
@@ -76,11 +78,11 @@ describe('operator API reference', () => {
       operations.find(
         (item) => item.operation.operationId === 'requestAccountAccess',
       )?.status,
-    ).toBe('Wallet operations are disabled in Deployment');
+    ).toBe('Not enabled: Wallet operations are disabled in Deployment');
     expect(
       operations.find((item) => item.operation.operationId === 'signAction')
         ?.status,
-    ).toBe('Transfer signing is off in Policies');
+    ).toBe('Not enabled: Transfer signing is off in Policies');
     config.financial = {
       profile: 'provider-authorized-erc3009-v1',
       token: {
@@ -113,8 +115,9 @@ describe('operator API reference', () => {
       enabled: false,
     });
     expect(
-      referenceOperations(contract, config, 1).find((item) => item.guide.scope)
-        ?.status,
+      referenceOperations(contract, config, 1).find(
+        (item) => item.operation.operationId === 'requestAccountAccess',
+      )?.status,
     ).toBe('This application is disabled in Policies');
     delete config.policy.applications[0].permissions;
     expect(
@@ -130,7 +133,9 @@ describe('operator API reference', () => {
     for (const item of operations) {
       expect(
         ajv.validate(
-          item.operation.responses['200'].content!['application/json'].schema,
+          item.operation.responses[
+            item.operation.operationId === 'beginEnrollment' ? '201' : '200'
+          ].content!['application/json'].schema,
           responseExample(item.operation.operationId),
         ),
         JSON.stringify(ajv.errors),
@@ -164,14 +169,19 @@ describe('operator API reference', () => {
   });
 });
 
-it('previews application-led policy and grants with schema-valid evidence examples and no hosted endpoints', async () => {
+it('previews application-led policy and grants with schema-valid evidence examples and unavailable hosted endpoints', async () => {
   const config = validateProviderConfiguration(
     JSON.parse(await readFile('docs/provider.config.example.json', 'utf8')),
   );
   const operations = referenceOperations(contract, config, 0);
   expect(
     operations.some((item) => item.guide.records || item.guide.vendor),
-  ).toBe(false);
+  ).toBe(true);
+  expect(
+    operations
+      .filter((item) => item.guide.records || item.guide.vendor)
+      .every((item) => item.status.startsWith('Not enabled:')),
+  ).toBe(true);
   expect(
     operations.some(
       (item) => item.operation.operationId === 'revokeAccountAccess',
@@ -181,7 +191,10 @@ it('previews application-led policy and grants with schema-valid evidence exampl
   const ajv = new Ajv({ strict: false, formats: fullFormats });
   for (const item of operations) {
     const op = spec.paths[item.path][item.method];
-    const response = op.responses['200'].content!['application/json'];
+    const response =
+      op.responses[
+        item.operation.operationId === 'beginEnrollment' ? '201' : '200'
+      ].content!['application/json'];
     expect(
       ajv.validate(response.schema, response.example),
       JSON.stringify(ajv.errors),

@@ -3,7 +3,7 @@
   "info": {
     "title": "Moovha Wallet Provider Service",
     "version": "0.1.0",
-    "description": "Experimental wallet-provider API with application-led access and optional hosted compatibility. Not the Moovha operation orchestration API."
+    "description": "Experimental wallet-provider API with application-led access and optional hosted compatibility. Signing returns an approved EIP-712 signature; it does not submit a transaction or pay gas. Application transaction-event reports remain unverified and do not establish settlement. No transaction-submission HTTP endpoint is implemented. Not the Moovha operation orchestration API."
   },
   "components": {
     "securitySchemes": {
@@ -2104,6 +2104,667 @@
                               "type": "string",
                               "pattern": "^0x[0-9a-f]{64}$"
                             }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Default Response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Default Response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Default Response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Default Response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Default Response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Default Response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Default Response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/actions/{actionId}/transaction-events": {
+      "post": {
+        "operationId": "reportTransactionEvent",
+        "description": "Record or read unverified application transaction observations for an existing authorized transfer. Current caller, owner, grant, identity, consent and policy checks apply even after signing expiry. Reports never broadcast, reconcile attempts, verify settlement or release budgets.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "event",
+                  "chain_id",
+                  "transaction_hash",
+                  "observed_at"
+                ],
+                "properties": {
+                  "event": {
+                    "type": "string",
+                    "enum": ["submitted", "confirmed", "failed"],
+                    "description": "Application observation only; confirmed is not provider-verified settlement."
+                  },
+                  "chain_id": { "type": "string", "enum": ["eip155:84532"] },
+                  "transaction_hash": {
+                    "type": "string",
+                    "pattern": "^0x[0-9a-f]{64}$"
+                  },
+                  "observed_at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{3})?Z$"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            },
+            "in": "path",
+            "name": "actionId",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            },
+            "in": "header",
+            "name": "idempotency-key",
+            "required": true
+          }
+        ],
+        "security": [{ "accessToken": [] }],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "event",
+                    "chain_id",
+                    "transaction_hash",
+                    "observed_at",
+                    "report_id",
+                    "recorded_at",
+                    "verification",
+                    "action_id"
+                  ],
+                  "properties": {
+                    "event": {
+                      "type": "string",
+                      "enum": ["submitted", "confirmed", "failed"],
+                      "description": "Application observation only; confirmed is not provider-verified settlement."
+                    },
+                    "chain_id": { "type": "string", "enum": ["eip155:84532"] },
+                    "transaction_hash": {
+                      "type": "string",
+                      "pattern": "^0x[0-9a-f]{64}$"
+                    },
+                    "observed_at": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{3})?Z$"
+                    },
+                    "report_id": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                    },
+                    "recorded_at": { "type": "string", "format": "date-time" },
+                    "verification": {
+                      "type": "string",
+                      "enum": ["unverified"],
+                      "description": "No chain receipt, transfer effect or finality verification is performed."
+                    },
+                    "action_id": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Default Response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Default Response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Default Response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Default Response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Default Response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Default Response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Default Response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "getTransactionEvents",
+        "description": "Record or read unverified application transaction observations for an existing authorized transfer. Current caller, owner, grant, identity, consent and policy checks apply even after signing expiry. Reports never broadcast, reconcile attempts, verify settlement or release budgets.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            },
+            "in": "path",
+            "name": "actionId",
+            "required": true
+          }
+        ],
+        "security": [{ "accessToken": [] }],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["action_id", "events"],
+                  "properties": {
+                    "action_id": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                    },
+                    "events": {
+                      "type": "array",
+                      "maxItems": 32,
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "event",
+                          "chain_id",
+                          "transaction_hash",
+                          "observed_at",
+                          "report_id",
+                          "recorded_at",
+                          "verification"
+                        ],
+                        "properties": {
+                          "event": {
+                            "type": "string",
+                            "enum": ["submitted", "confirmed", "failed"],
+                            "description": "Application observation only; confirmed is not provider-verified settlement."
+                          },
+                          "chain_id": {
+                            "type": "string",
+                            "enum": ["eip155:84532"]
+                          },
+                          "transaction_hash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "observed_at": {
+                            "type": "string",
+                            "format": "date-time",
+                            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{3})?Z$"
+                          },
+                          "report_id": {
+                            "type": "string",
+                            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                          },
+                          "recorded_at": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "verification": {
+                            "type": "string",
+                            "enum": ["unverified"],
+                            "description": "No chain receipt, transfer effect or finality verification is performed."
                           }
                         }
                       }
