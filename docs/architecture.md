@@ -37,7 +37,10 @@ The standard user experience remains inside the connected application. The provi
   [assets and gas guide](assets-and-gas.md) explains the rail and activation boundary.
 
 The optional [configured execution coordinator](execution.md) supplies transfer
-submission and independently verified token status over HTTP. The advanced
+submission and independently verified token status over HTTP. The
+[designated executor](execution-service.md) runs separately, authenticates immutable
+handoffs and owns its provider dispatch journal. It calls back for fresh wallet
+authority before effects; the wallet independently verifies chain evidence. The advanced
 [Relayer integration](openzeppelin-relayer.md) also supplies the library path `verified host context → execution authority → journal → OpenZeppelin Relayer`.
 The host commits an approved call and budget; Relayer owns nonce allocation,
 queueing, broadcasting and provider status. Provider acceptance never establishes
@@ -110,3 +113,7 @@ hosts and OAuth audiences separate.
 
 Snapshot updates require an upstream revision record, compatibility review,
 generated types and fixture/conformance checks.
+
+## General approved execution
+
+The [approved-action envelope](approved-contract-calls.md) separates operation policy, account execution mechanism, authenticated submission and outcome verification. The Safe mechanism executes approved calls from the bound account; configured providers submit the immutable outer transaction. Transfers, swaps, vault deposits and general calls retain current host authority and both durable journals. General call success establishes execution; specific adapters require their own asset evidence.

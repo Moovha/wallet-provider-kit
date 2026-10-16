@@ -610,7 +610,7 @@ test('API reference follows the configuration, preserves edits, shows Swagger sc
   await expect(
     page.getByRole('heading', { name: 'Provider API reference', exact: true }),
   ).toBeVisible();
-  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(21);
+  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(23);
   await expect(
     page
       .getByText('Not enabled: Wallet operations are disabled in Deployment', {
@@ -652,7 +652,7 @@ test('API reference follows the configuration, preserves edits, shows Swagger sc
     page.getByLabel('cURL request example', { exact: true }),
   ).toContainText('wallet.example.com/v1/accounts/');
   await page.getByLabel('Find an endpoint', { exact: true }).fill('');
-  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(21);
+  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(23);
   await page
     .getByLabel('Example endpoint', { exact: true })
     .selectOption('signAction');
@@ -711,7 +711,7 @@ test('API reference follows the configuration, preserves edits, shows Swagger sc
     permissions: ['account:read', 'transfers:request'],
   });
   await imported(page, financial);
-  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(21);
+  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(23);
   await page
     .getByLabel('Example endpoint', { exact: true })
     .selectOption('signAction');
@@ -794,7 +794,7 @@ test('API renderer can retry a failed bundled asset without losing setup', async
   await page
     .getByRole('button', { name: 'Reload API reference', exact: true })
     .click();
-  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(21);
+  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(23);
   await page
     .getByRole('button', { name: 'Setup configuration', exact: true })
     .click();
@@ -1006,6 +1006,9 @@ test('optional execution sponsor settings survive wizard import, edits and expor
     })
     .click();
   await page
+    .getByLabel('Execution submission service', { exact: true })
+    .selectOption('erc3009-relayer-v1');
+  await page
     .getByLabel('Execution Relayer HTTPS origin', { exact: true })
     .fill('https://sponsor.example.test');
   await page
@@ -1056,4 +1059,212 @@ test('optional execution sponsor settings survive wizard import, edits and expor
   const variables = await readFile((await (await download).path())!, 'utf8');
   expect(variables).toContain('EXECUTION_RELAYER_API_KEY=\n');
   expect(variables).toContain('EXECUTION_RPC_PRIMARY_URL=\n');
+});
+
+test('designated execution configuration preserves provider selection, service-key references and neutral sponsor bindings', async ({
+  page,
+}) => {
+  const config = structuredClone(sample);
+  config.financial = {
+    profile: 'provider-authorized-erc3009-v1',
+    token: {
+      address: '0x1111111111111111111111111111111111111111',
+      name: 'Example Token',
+      version: '1',
+      symbol: 'TEST',
+      decimals: 6,
+    },
+    recipients: ['0x2222222222222222222222222222222222222222'],
+    maximumAmount: '100',
+    lifetimeAmount: '1000',
+    maxValiditySeconds: 300,
+  };
+  config.policy.applications[0].permissions = [
+    'account:read',
+    'transfers:request',
+  ];
+  config.policy.applications.push({
+    ...config.policy.applications[0],
+    clientId: 'second-app',
+    name: 'Second App',
+  });
+  config.activation.enabled = false;
+  config.execution = {
+    profile: 'erc3009-executor-v1',
+    service: {
+      url: 'https://executor.example.test',
+      providerId: 'application-sponsor',
+      providerRevision: '1',
+      signing: {
+        id: 'wallet-2026',
+        privateKey: { env: 'WALLET_SERVICE_PRIVATE' },
+      },
+      keys: [
+        { id: 'executor-2026', publicKey: { env: 'EXECUTOR_SERVICE_PUBLIC' } },
+      ],
+    },
+    rpc: {
+      endpoints: [
+        { env: 'EXECUTION_RPC_PRIMARY_URL' },
+        { env: 'EXECUTION_RPC_SECONDARY_URL' },
+      ],
+      genesisHash: '0x' + '1'.repeat(64),
+      tokenCodeHash: '0x' + '2'.repeat(64),
+    },
+    sponsors: [
+      {
+        clientId: config.policy.applications[0].clientId,
+        accountId: '10000000-0000-4000-8000-000000000001',
+        binding: {
+          address: '0x3333333333333333333333333333333333333333',
+          bindingRevision: '1',
+        },
+        fundingAgreement: 'offline-reviewed-agreement',
+        gasLimit: '150000',
+        maxFeePerGas: '3000000000',
+        maxPriorityFeePerGas: '1000000000',
+        l1FeeReserveWei: '1000000000000',
+        lifetimeBudgetWei: '10000000000000000',
+      },
+    ],
+    pollIntervalSeconds: 15,
+    maxLogRange: 10000,
+  };
+  await imported(page, config);
+  await step(page, 'Deployment');
+  await expect(
+    page.getByLabel('Execution submission service', { exact: true }),
+  ).toHaveValue('erc3009-executor-v1');
+  await expect(
+    page.getByLabel('Sponsor Relayer ID 1', { exact: true }),
+  ).toHaveCount(0);
+  await page
+    .getByLabel('Execution provider revision', { exact: true })
+    .fill('2');
+  await page
+    .getByRole('button', { name: 'Add application gas sponsor', exact: true })
+    .click();
+  await page
+    .getByLabel('Execution application 2', { exact: true })
+    .selectOption('second-app');
+  await page
+    .getByLabel('Sponsor address 2', { exact: true })
+    .fill('0x4444444444444444444444444444444444444444');
+  await page
+    .getByLabel('Gas funding agreement reference 2', { exact: true })
+    .fill('offline-second-agreement');
+  await page
+    .getByLabel('Maximum fee per gas in wei 2', { exact: true })
+    .fill('3000000000');
+  await page
+    .getByLabel('Maximum priority fee per gas in wei 2', { exact: true })
+    .fill('1000000000');
+  await page
+    .getByLabel('L1 fee reserve in wei 2', { exact: true })
+    .fill('1000000000000');
+  await page
+    .getByLabel('Lifetime gas budget in wei 2', { exact: true })
+    .fill('10000000000000000');
+  const result = await exported(page);
+  expect(Object.keys(result.execution.sponsors[1].binding).sort()).toEqual([
+    'address',
+    'bindingRevision',
+  ]);
+  expect(result.execution.service.providerRevision).toBe('2');
+  expect(result.execution.sponsors[0].binding).toEqual(
+    config.execution.sponsors[0].binding,
+  );
+  expect(result.execution.relayer).toBeUndefined();
+  const download = page.waitForEvent('download');
+  await page
+    .getByRole('button', { name: 'Download variable template', exact: true })
+    .click();
+  const variables = await readFile((await (await download).path())!, 'utf8');
+  expect(variables).toContain('WALLET_SERVICE_PRIVATE=\n');
+  expect(variables).toContain('EXECUTOR_SERVICE_PUBLIC=\n');
+  await page
+    .getByRole('button', { name: 'API reference', exact: true })
+    .click();
+  await page
+    .getByLabel('Example endpoint', { exact: true })
+    .selectOption('executeTransfer');
+  await expect(page.getByLabel('cURL request example')).toContainText(
+    'Execution-Profile: erc3009-executor-v1',
+  );
+  await page
+    .getByLabel('Example endpoint', { exact: true })
+    .selectOption('checkExecutionAuthority');
+  await expect(page.getByLabel('cURL request example')).toContainText(
+    'SIGNED_SERVICE_REQUEST_PROOF',
+  );
+});
+
+test('operators can configure and export contract-only execution policies without transfer signing', async ({
+  page,
+}) => {
+  const config = JSON.parse(
+    await readFile(
+      new URL(
+        '../../docs/provider.config.contracts.example.json',
+        import.meta.url,
+      ),
+      'utf8',
+    ),
+  );
+  await imported(page, config);
+  await step(page, 'Deployment');
+  await expect(
+    page.getByLabel('Execution submission service', { exact: true }),
+  ).toHaveValue('approved-evm-executor-v1');
+  await expect(
+    page.getByLabel('Enable approved contract-call policy', { exact: true }),
+  ).toBeChecked();
+  await expect(
+    page.getByLabel('Accepted token runtime code hash', { exact: true }),
+  ).toHaveCount(0);
+  await page
+    .getByLabel('Maximum native value per operation (wei)', { exact: true })
+    .fill('5');
+  await page
+    .getByLabel('Permitted function selectors (comma separated)', {
+      exact: true,
+    })
+    .fill('0x12345678,0x87654321');
+  await page
+    .getByText('Permitted target uses an ERC-1967 implementation', {
+      exact: true,
+    })
+    .click();
+  await page
+    .getByLabel('Permitted target implementation address', { exact: true })
+    .fill('0xcccccccccccccccccccccccccccccccccccccccc');
+  await page
+    .getByLabel('Permitted target implementation runtime code hash', {
+      exact: true,
+    })
+    .fill('0x' + '2'.repeat(64));
+  const saved = await exported(page);
+  expect(saved).not.toHaveProperty('financial');
+  expect(saved.execution.rpc).not.toHaveProperty('tokenCodeHash');
+  expect(saved.approvedCalls.policy.maximumNativeValueWei).toBe('5');
+  expect(saved.approvedCalls.policy.contracts[0].selectors).toEqual([
+    '0x12345678',
+    '0x87654321',
+  ]);
+  expect(saved.approvedCalls.policy.contracts[0].implementation.codeHash).toBe(
+    '0x' + '2'.repeat(64),
+  );
+  expect(saved.approvedCalls.policy.swaps[0].maximumInput).toBe('1000000');
+  expect(saved.approvedCalls.policy.vaults[0].maximumAssets).toBe('1000000');
+  await step(page, 'Deployment');
+  await page
+    .getByRole('heading', {
+      name: 'Approved contract calls, swaps and vault deposits',
+      exact: true,
+    })
+    .scrollIntoViewIfNeeded();
+  await page.screenshot({
+    path: 'artifacts/setup-approved-calls.png',
+    fullPage: true,
+  });
 });

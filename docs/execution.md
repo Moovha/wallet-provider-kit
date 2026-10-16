@@ -1,11 +1,15 @@
 # Coordinate transfers and verify their status
 
-The optional `erc3009-relayer-v1` execution profile coordinates one approved
-Base Sepolia EOA token transfer through a dedicated OpenZeppelin Relayer sponsor.
+The optional execution profiles coordinate one approved Base Sepolia EOA token
+transfer through a dedicated application sponsor. Use `erc3009-executor-v1` for
+the [separately deployed designated service](execution-service.md), or retain
+`erc3009-relayer-v1` for direct OpenZeppelin Relayer compatibility.
 It keeps the existing owner, application grant, identity, consent, immutable
 approval and durable attempt checks. Execution is disabled unless configured and
 explicitly accepted. Offline fixtures exercise the contract; live execution,
 operational recovery and production custody acceptance remain pending.
+
+General contract calls, swaps and vault deposits use the same execution and recovery foundation through `approved-evm-executor-v1`. They require separate contract delegation and explicitly bound Safe accounts; see [approved contract calls](approved-contract-calls.md). The steps below describe the ERC-3009 transfer operation.
 
 ## Standard application flow
 
@@ -17,7 +21,7 @@ operational recovery and production custody acceptance remain pending.
 3. Request `POST /v1/transfer-authorizations`. The service stores the exact token,
    recipient, amount, nonce and expiry under the current delegated policy.
 4. Send `POST /v1/actions/{actionId}/execute` with `{}`, a UUIDv4
-   `Idempotency-Key`, `Execution-Profile: erc3009-relayer-v1` and
+   `Idempotency-Key`, the selected `Execution-Profile` and
    `Execution-Profile-Revision: 1`. The token needs both `wallet:execute` and
    `wallet:sign`. The service chooses the application's configured sponsor;
    callers cannot supply calldata, a signature, a sponsor or a replacement nonce.
@@ -60,7 +64,7 @@ sequenceDiagram
 ERC-3009 authorization. It neither broadcasts nor pays gas. Use it when an
 application operates its own accepted execution rail. The optional `/execute`
 route performs that signing step internally and submits the stored call through
-the configured sponsor. Applications should choose one execution owner for an
+the configured direct provider or designated service. Applications should choose one execution owner for an
 action. A signature already returned to an application remains usable on chain
 until its token-contract expiry, even after API access is revoked.
 
@@ -99,7 +103,10 @@ failed and unknown attempts retain that reservation. There is no automatic budge
 refund, attempt reset, replacement authorization or resubmission after a timeout.
 The application's lifetime gas budget does not reset on configuration revisions.
 
-A lost submission response returns HTTP 503 with `outcome: unknown`. Retry the
+A lost submission response returns HTTP 503 with `outcome: unknown`. The
+designated-service profile can resume the same authenticated handoff identity
+under fresh wallet authority; its separate provider journal still forbids another
+dispatch after an uncertain upstream effect. Retry the
 same action to obtain its current dispatch receipt, then read status; never
 request a fresh action as a blind retry. The observer can recover the exact
 transfer from authorization logs even if the provider transaction ID was lost.
@@ -118,7 +125,8 @@ evidence; there is no public reset or reconciliation mutation.
 
 In the wizard's **Deployment** screen, enable **Configure transfer execution and
 RPC verification** after enabling delegated transfer signing in **Policies**.
-Supply these deployment-specific values:
+For the designated service, follow its [two-service configuration guide](execution-service.md).
+For direct Relayer compatibility, supply these deployment-specific values:
 
 - A private HTTPS Relayer origin and API key environment variable, with a
   pre-existing dedicated Base Sepolia EVM sponsor signer for each application.

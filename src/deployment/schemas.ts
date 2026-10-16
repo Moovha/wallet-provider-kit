@@ -1,7 +1,11 @@
+import {
+  approvedCallIntentSchema,
+  safePayloadSchema,
+} from '../execution/call-schemas.js';
 import { uuidSchema } from '../service/schemas.js';
 const address = { type: 'string', pattern: '^0x[0-9a-fA-F]{40}$' };
 const integer = { type: 'string', pattern: '^(0|[1-9][0-9]{0,77})$' };
-export const transferReceiptSchema = {
+const legacyTransferReceiptSchema = {
   type: 'object',
   additionalProperties: false,
   required: [
@@ -95,6 +99,21 @@ export const transferReceiptSchema = {
       },
     },
   },
+};
+
+export const transferReceiptSchema = {
+  oneOf: [
+    legacyTransferReceiptSchema,
+    {
+      ...legacyTransferReceiptSchema,
+      required: [...legacyTransferReceiptSchema.required, 'intent'],
+      properties: {
+        ...legacyTransferReceiptSchema.properties,
+        intent: approvedCallIntentSchema,
+        payload: safePayloadSchema,
+      },
+    },
+  ],
 };
 
 export const transactionEventInputSchema = {

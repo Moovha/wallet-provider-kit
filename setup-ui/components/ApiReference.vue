@@ -336,7 +336,12 @@ async function copy() {
       >
       <p>
         <strong>{{ selected.status }}</strong> · Required scope:
-        <code>{{ selected.guide.scope || 'None' }}</code>
+        <code>{{
+          selected.guide.scope ||
+          (selected.guide.serviceAuthenticated
+            ? 'Signed service request'
+            : 'None')
+        }}</code>
       </p>
       <p>{{ selected.guide.prerequisite }}</p>
       <p>{{ selected.guide.success }}</p>

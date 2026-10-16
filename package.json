@@ -60,7 +60,9 @@
       "types": "./dist/deployment/index.d.ts",
       "import": "./dist/deployment/index.js"
     },
-    "./spec/provider-config.schema.json": "./spec/provider-config.schema.json"
+    "./spec/provider-config.schema.json": "./spec/provider-config.schema.json",
+    "./spec/execution-api.json": "./spec/execution-api.json",
+    "./spec/execution-service.config.schema.json": "./spec/execution-service.config.schema.json"
   },
   "files": [
     "dist",

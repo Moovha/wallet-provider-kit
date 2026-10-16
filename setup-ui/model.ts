@@ -148,6 +148,10 @@ export function deploymentChecklist(
     lines.push(
       '- Provision and verify each Relayer/signer/address binding first. Retain assigned signers and stable backend binding across deployments; never replace them to recover an uncertain result.',
     );
+  if (config.execution?.service)
+    lines.push(
+      `- Deploy and accept the separate execution service using ${docs}execution-service.html. Match provider/sponsor policy and service public keys on both sides; keep owner signing keys outside the executor. Back up and recover both stores without replacing execution identities.`,
+    );
   if (config.execution)
     lines.push(
       `- Configure the dedicated application gas sponsors, private RPC endpoint variables and independent receipt verification described in ${docs}execution.html. Test lost-response recovery and record execution acceptance before activation. Gas admission reservations do not guarantee a hard cap on Relayer recovery or L1 costs.`,

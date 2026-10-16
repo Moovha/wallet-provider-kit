@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased approved execution foundation
+
+- Generalize designated dispatch to immutable approved EVM actions, retaining current owner, grant, identity, consent, budget, attempt and recovery checks.
+- Add separate contract delegation and configuration for approved calls, original Uniswap V3 exact-input swaps and bounded ERC-4626 router deposits through explicitly bound single-owner Safe 1.4.1 accounts on Base Sepolia.
+- Reserve exact Safe nonces, retain contract-call signatures for coordinated execution, validate code/proxy pins and verify operation-specific outcomes independently of provider acceptance.
+- Add graphical policy controls, generated API contracts and operator guidance. Safe signatures have no native expiry; live mechanism/vendor acceptance and production custody remain pending.
+
+## Unreleased designated execution service
+
+- Add a separate execution-service process with an operator-configured provider
+  registry, OpenZeppelin adapter and versioned custom adapter contract.
+- Authenticate exact dispatch and authority callbacks with pinned, short-lived
+  ES256 request/response proofs while preserving current wallet owner, grant, KYC,
+  consent, approval and attempt checks.
+- Preserve stable handoffs and independent provider attempts through response loss,
+  concurrent requests, restart, key rotation and backup recovery. Unknown provider
+  effects never dispatch again.
+- Add the explicitly selected `erc3009-executor-v1` profile, operator configuration,
+  separate generated executor OpenAPI and deployment/recovery instructions.
+  Base Sepolia EOA scope and experimental acceptance limits remain in effect.
+
 ## Unreleased execution foundation
 
 - Add optional, explicitly versioned ERC-3009 execution through dedicated

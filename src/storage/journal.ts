@@ -184,12 +184,14 @@ function checkedResult(
 
 export function sqliteJournal(
   connection: StorageConnection,
+  beforeClaim?: () => void,
 ): RelayerAttemptJournal {
   return {
     async claim(input) {
       const request = structuredClone(input);
       validateRequest(request);
       return connection.transaction(() => {
+        beforeClaim?.();
         const previous = claimed(connection, request);
         if (previous) {
           if (

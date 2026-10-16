@@ -22,14 +22,13 @@ base units in API requests. Vault shares and the assets they represent are
 different tokens with different units; a share balance must not be presented as
 the same amount of its underlying asset.
 
-The current configured financial profile is an experimental **Base Sepolia**
-test-network transfer authorization for an independently verified ERC-3009 token.
-It signs the approved instruction. The optional [execution coordinator](execution.md)
-submits through a dedicated application sponsor and independently verifies token-transfer
-finality; business settlement requires its own evidence. USDC, ZARP, swaps and vaults explain the project's use cases, rather
-than a list of production capabilities included in this profile. See
-[configured financial policy](setup.md#supported-financial-policy) and
-[backend profiles](backend-guide.md#choose-an-integration).
+The experimental Base Sepolia profiles support ERC-3009 transfer authorizations
+and separately approved Safe contract calls, original Uniswap V3 swaps and
+bounded ERC-4626 router deposits. The optional coordinator uses a configured
+application sponsor and verifies the evidence required for each operation.
+These are test-network capabilities, not production acceptance for USDC, ZARP or
+any particular protocol. See [transfer execution](execution.md) and
+[approved contract calls](approved-contract-calls.md).
 
 ## The application covers gas
 
@@ -60,6 +59,52 @@ requiring users to buy and maintain a gas token for those operations.
 Approving application access does not itself approve a spend or release gas
 funding. The exact operation must pass current owner, grant, consent, identity,
 capability and sponsor-budget checks before financial effects.
+
+## Where sponsorship happens in the implemented flow
+
+The application and operator arrange funding for a pre-existing sponsor account
+before `/execute`. The operator configures its address, funding agreement, limits
+and submission provider against the application's authenticated client ID.
+Sponsor submission credentials stay in the executor's secret store. The caller
+cannot select another payer or supply credentials in an execution request.
+
+1. The application requests a policy-approved action and retains its action ID.
+2. At `/execute`, the wallet chooses the registered sponsor, simulates the exact
+   operation, checks its native ETH balance and admits a durable gas reservation.
+   The designated executor independently checks funding and reserves its own
+   provider attempt. Neither reservation transfers money or pays a second fee.
+3. The sponsor submits the outer transaction. Network inclusion charges that
+   account for execution and applicable chain fees, including a reverted
+   transaction. Read-only simulation does not itself spend network gas.
+4. The application consumes verified execution status and reconciles actual costs
+   through chain receipts and provider billing. Wallet status is not a gas
+   invoice, reimbursement record or automatic debit of the application.
+
+| Operation                                                | Outer transaction paid by the sponsor                         | Principal assets                                  |
+| -------------------------------------------------------- | ------------------------------------------------------------- | ------------------------------------------------- |
+| ERC-3009 token transfer                                  | Token authorization call                                      | Tokens from the owner's EOA                       |
+| Safe swap                                                | Safe execution containing approval, swap and cleanup calls    | Input tokens held by the Safe                     |
+| Safe vault deposit                                       | Safe execution containing approval, deposit and cleanup calls | Underlying assets held by the Safe                |
+| Approved contract calls, including Safe ERC-20 transfers | Safe execution of the approved call or batch                  | Tokens and any native call value held by the Safe |
+
+A batch has one outer transaction; internal approvals and calls contribute to its
+cost. Gas funding does not provide swap inputs, deposit assets or native value
+transferred to a contract. Applications arrange and maintain sponsor funding,
+obtain the owner's required delegation, request approved actions, call `/execute`
+with their stored IDs and stable idempotency keys, then consume status/events.
+The coordinated path does not require the application to broadcast transactions.
+
+Each service reserves `gasLimit × maxFeePerGas + l1FeeReserveWei` against a
+lifetime admission budget. A funded account can still be denied when that budget
+is exhausted. Reservations remain after success, failure and uncertainty; there
+is no automatic release, top-up or public budget-reset endpoint. The reservation
+is an admission control, not a guarantee that all actual L1 or vendor recovery
+costs stay below it. Review budget changes and provider charges with the operator.
+
+The toolkit supplies neither automatic sponsor funding nor application billing.
+Applications can fund a sponsor directly or arrange funding through their accepted
+operator/vendor agreement. Installing the kit or obtaining an access grant does
+not establish that commercial arrangement.
 
 ## What providers should expect from the rail
 
@@ -96,7 +141,7 @@ private-key control, recovery and owner approval with their existing holders.
 
 The toolkit implements provider onboarding, access and approved-action signing.
 Its optional [execution coordinator](execution.md) uses a dedicated application
-sponsor and verifies token-transfer finality. An advanced Relayer library profile
+sponsor and verifies operation-specific execution and asset effects. An advanced Relayer library profile
 is also available. Neither supplies Moovha's funding rail or sponsorship promise.
 
 Moovha's business-operation API owns the sponsorship and execution rail. The

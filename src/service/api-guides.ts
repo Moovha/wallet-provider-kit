@@ -2,18 +2,36 @@ export interface OperationGuide {
   title: string;
   group: string;
   scope?: string;
+  serviceAuthenticated?: boolean;
   financial?: boolean;
+  approvedAction?: boolean;
   enrollment?: boolean;
   execution?: boolean;
   applicationLed?: boolean;
   records?: boolean;
   vendor?: boolean;
-  permission?: 'account:read' | 'operations:request' | 'transfers:request';
+  permission?:
+    | 'account:read'
+    | 'operations:request'
+    | 'transfers:request'
+    | 'contracts:request';
   prerequisite: string;
   success: string;
 }
 // Shared operator guidance. Runtime authentication and authority remain authoritative.
 export const operationGuides: Record<string, OperationGuide> = {
+  requestContractCall: {
+    title: 'Approve contract calls, swaps or vault deposits',
+    group: 'Approved contract calls',
+    scope: 'wallet:actions',
+    financial: true,
+    execution: true,
+    permission: 'contracts:request',
+    prerequisite:
+      'Enable approved-evm-executor-v1 and the contract-call policy. Obtain contracts:request consent to the exact policy revision and use an explicitly bound Safe 1.4.1 account. Contract targets/functions, swap routes and vault routes are operator policies. Callers cannot supply signing data, a nonce or provider identity.',
+    success:
+      '200: the immutable action, exact calls and Safe authorization. Execute by stored action ID. Contract-call signatures are retained for coordinated dispatch; /sign does not export them. Execution success alone does not establish an arbitrary business outcome.',
+  },
   getCapabilities: {
     title: 'Discover this provider',
     group: 'Discovery',
@@ -38,7 +56,7 @@ export const operationGuides: Record<string, OperationGuide> = {
     prerequisite:
       'Use an enabled application registration and its API token. The response identifies the provider’s identity source and required submission fields without returning customer records.',
     success:
-      '200: flow, policy_revision, required_fields, verification_level, age limits and provider login/review requirements. If transfer signing is configured, transfer_policy_revision identifies its exact terms. Record the user’s consent to those terms in your application before requesting transfer access.',
+      '200: flow, policy_revision, required_fields, verification_level, age limits and provider login/review requirements. action_policy_revision identifies the configured transfer and contract terms; transfer_policy_revision remains a compatibility alias. Record the user’s consent to those terms in your application before requesting transfer access.',
   },
   submitAccountAccessRecords: {
     records: true,
@@ -110,15 +128,23 @@ export const operationGuides: Record<string, OperationGuide> = {
       '200: authorized with the exact stored payload and expiry. Signing, submission and settlement are separate.',
   },
   getTransferAuthorization: {
-    title: 'Read transfer authorization status',
+    title: 'Read a stored approved action',
     group: 'Provider-authorized transfers',
     scope: 'wallet:actions:read',
-    financial: true,
-    permission: 'transfers:request',
+    approvedAction: true,
     prerequisite:
       'Use the returned action_id with a token for the authorized application and caller. The provider rechecks current owner access, identity and policy.',
     success:
-      '200: authorizing, authorized or denied. authorized means the provider has stored the approved transfer; signing, submission and completion are separate steps.',
+      '200: authorizing, authorized or denied. authorized means the provider has stored the approved action; signing, submission and completion are separate steps.',
+  },
+  checkExecutionAuthority: {
+    title: 'Recheck wallet authority for the designated executor',
+    group: 'Execution service authority',
+    serviceAuthenticated: true,
+    prerequisite:
+      'Only the configured executor may call this read-only endpoint using a short-lived request-bound service proof. Application OAuth tokens are rejected. The stored execution plan, original caller and durable attempt must match, with an unexpired handoff lease. Current owner, grant, identity, consent and exact approval checks remain mandatory.',
+    success:
+      '200: signed permission for the exact current execution callback. This response does not create an action, sign a payload, dispatch a transaction or renew a handoff lease.',
   },
   getExecutionCapabilities: {
     title: 'Discover execution profiles and verification requirements',
@@ -126,29 +152,27 @@ export const operationGuides: Record<string, OperationGuide> = {
     prerequisite:
       'Public discovery. Read the exact profile ID and revision before requesting execution. Implemented, configured and ready are distinct; none establishes provider certification or production custody acceptance.',
     success:
-      '200: the supported ERC-3009 Base Sepolia EOA execution contract, profile revision, required scopes and finalized RPC-quorum verification policy. Unsupported wallet/account standards are not advertised as executable capabilities.',
+      '200: implemented transfer and approved EVM execution profiles on Base Sepolia, their revisions, required scopes and finalized RPC-quorum verification policy. Unsupported wallet/account standards are not advertised as executable capabilities.',
   },
   executeTransfer: {
-    title: 'Execute an approved transfer with a gas sponsor',
+    title: 'Execute an approved action with a gas sponsor',
     group: 'Execution coordination',
     scope: 'wallet:execute',
-    financial: true,
+    approvedAction: true,
     execution: true,
-    permission: 'transfers:request',
     prerequisite:
-      'Also require wallet:sign. Configure dedicated application sponsors, admitted gas budgets, two independent RPC origins, the accepted genesis/token runtime hashes and execution acceptance. Send {} with Execution-Profile: erc3009-relayer-v1, Execution-Profile-Revision: 1 and a UUIDv4 Idempotency-Key. The provider keeps its current owner, grant, identity, consent, exact approval and durable signing/dispatch checks. Callers cannot supply calldata, signatures, fees, sponsors or transaction nonces.',
+      'Also require wallet:sign. Configure dedicated application sponsors, admitted gas budgets, two independent RPC origins, the accepted genesis and operation-specific runtime hashes and execution acceptance. Send {} with the explicitly configured Execution-Profile (erc3009-relayer-v1, erc3009-executor-v1 or approved-evm-executor-v1), Execution-Profile-Revision: 1 and a UUIDv4 Idempotency-Key. The provider keeps its current owner, grant, identity, consent, exact approval and durable signing/dispatch checks. Callers cannot supply calldata, signatures, fees, sponsors or transaction nonces.',
     success:
       '200: durable execution/dispatch status, not a settlement guarantee. One execution identity per action survives retries and restart. A lost submission response remains unknown and is never dispatched again. Read execution status to obtain independently checked chain effects and finality. Gas reservations and signing exposure are not refunded automatically.',
   },
   getTransferExecution: {
-    title: 'Read RPC-verified transfer execution and finality',
+    title: 'Read independently verified execution and finality',
     group: 'Execution coordination',
     scope: 'wallet:execute:read',
-    financial: true,
+    approvedAction: true,
     execution: true,
-    permission: 'transfers:request',
     prerequisite:
-      'Use the original action ID and exact Execution-Profile/Execution-Profile-Revision headers. Current caller, owner, transfer access, identity, consent and approval must still pass; reads remain possible after signing expiry. The observer checks receipts, canonical blocks, token runtime code and exact authorization/transfer logs through all configured RPC sources.',
+      'Use the original action ID and exact Execution-Profile/Execution-Profile-Revision headers. Current caller, owner, action delegation, identity, consent and approval must still pass; reads remain possible after signing expiry. The observer checks receipts, canonical blocks, code pins and operation-specific execution/asset evidence through all configured RPC sources.',
     success:
       '200: separate dispatch, chain, outcome and settlement fields. Only finalized matching effects have settlement succeeded or reverted. Relayer acceptance, application reports and inclusion alone do not establish settlement. RPC outages return unavailable; contradictory finalized evidence fences the execution for operator investigation.',
   },
@@ -156,11 +180,10 @@ export const operationGuides: Record<string, OperationGuide> = {
     title: 'Read durable CloudEvents execution observations',
     group: 'Execution coordination',
     scope: 'wallet:execute:read',
-    financial: true,
+    approvedAction: true,
     execution: true,
-    permission: 'transfers:request',
     prerequisite:
-      'Use the exact execution profile headers and current owner-bound transfer access. Pass the last next_sequence as the after query parameter. Event data uses the pinned execution profile revision; the envelope uses CloudEvents specversion 1.0. Reading this feed never refreshes or dispatches a transaction.',
+      'Use the exact execution profile headers and current owner-bound access for the action. Pass the last next_sequence as the after query parameter. Event data uses the pinned execution profile revision; the envelope uses CloudEvents specversion 1.0. Reading this feed never refreshes or dispatches a transaction.',
     success:
       '200: up to 64 durable observed transitions. Persist event IDs for deduplication. history_truncated requires resynchronization through verified execution status; a cursor beyond stored history returns 409. Events distinguish unverified observations, inclusion and finalized effects and do not form an exhaustive chain or accounting ledger.',
   },
@@ -168,10 +191,9 @@ export const operationGuides: Record<string, OperationGuide> = {
     title: 'Report a transaction event',
     group: 'Transaction telemetry',
     scope: 'wallet:events',
-    financial: true,
-    permission: 'transfers:request',
+    approvedAction: true,
     prerequisite:
-      'Use an existing authorized action_id for the same application, caller, owner and current transfer delegation. Report submitted, confirmed or failed with the Base Sepolia transaction hash and observation time. Keep the original idempotency key for retries. Reports may arrive after signing authorization expires; current access and policy must still pass.',
+      'Use an existing authorized action_id for the same application, caller, owner and current delegation for the action. Report submitted, confirmed or failed with the Base Sepolia transaction hash and observation time. Keep the original idempotency key for retries. Reports may arrive after signing authorization expires; current access and policy must still pass.',
     success:
       '200: a durable application report marked unverified. Recording a report does not broadcast, verify a receipt, establish settlement, reconcile a signing attempt or release a budget reservation. At most 32 reports are retained per action; reports can arrive out of order and do not form an authoritative transaction status.',
   },
@@ -179,8 +201,7 @@ export const operationGuides: Record<string, OperationGuide> = {
     title: 'Read reported transaction events',
     group: 'Transaction telemetry',
     scope: 'wallet:events:read',
-    financial: true,
-    permission: 'transfers:request',
+    approvedAction: true,
     prerequisite:
       'Use an action_id belonging to the same application and caller with current owner access, identity and transfer delegation. Signing expiry does not prevent report reads; revoked access or changed policy denies them.',
     success:
@@ -223,7 +244,7 @@ export const operationGuides: Record<string, OperationGuide> = {
     financial: true,
     permission: 'transfers:request',
     prerequisite:
-      'Use the stored action_id and an empty JSON body: {}. The provider rechecks its exact authorization, the owner’s current transfer delegation, identity, consent, policy, budget and recorded attempt before signing. Keep the original idempotency key when retrying, including after a timeout.',
+      'Transfer signature export only; contract calls use coordinated execution. Use the stored action_id and an empty JSON body: {}. The provider rechecks its exact authorization, the owner’s current delegation for the action, identity, consent, policy, budget and recorded attempt before signing. Keep the original idempotency key when retrying, including after a timeout.',
     success:
       '200: a verified signature, or the saved signature for a permitted retry. The application must submit the transaction and arrange network fees separately. A signature can remain usable until its on-chain expiry even if access is later revoked.',
   },
@@ -234,6 +255,8 @@ export interface ApiFeatures {
   enrollment: boolean;
   financial: boolean;
   execution?: boolean;
+  executionService?: boolean;
+  contractCalls?: boolean;
   signing?: boolean;
   wallet: boolean;
   flow?: 'application' | 'hosted';
@@ -249,6 +272,10 @@ export function operationUnavailableReason(
   const guide = operationGuides[id];
   if (!guide || id === 'getCapabilities' || id === 'getExecutionCapabilities')
     return undefined;
+  if (id === 'requestContractCall' && !features.contractCalls)
+    return 'Approved contract-call policy and execution mechanism are not configured';
+  if (guide.serviceAuthenticated && !features.executionService)
+    return 'The designated execution service is not configured';
   if (guide.execution && !features.execution)
     return 'Execution coordination and RPC verification are not configured';
   if (guide.enrollment)
@@ -257,6 +284,8 @@ export function operationUnavailableReason(
       : 'Advanced OIDC enrollment is not configured';
   if (id === 'signAction' && features.signing && features.wallet)
     return undefined;
+  if (guide.approvedAction && !features.financial && !features.contractCalls)
+    return 'Approved-action policy is not configured';
   if (guide.financial && !features.financial)
     return 'Transfer signing is off in Policies';
   if (['provisionAccount', 'signAction'].includes(id))
@@ -274,4 +303,4 @@ export function operationUnavailableReason(
   return undefined;
 }
 
-export const transactionBoundaryDescription = `Signing, execution and transaction reports are separate contracts. POST /v1/transfer-authorizations stores an exact authorized ERC-3009 transfer; POST /v1/actions/{actionId}/sign returns its signature without broadcasting. With the optional erc3009-relayer-v1 profile, POST /v1/actions/{actionId}/execute coordinates signing, simulation, gas-budget admission and one durable Relayer dispatch. GET /v1/actions/{actionId}/execution independently checks chain effects through configured RPC sources and separates inclusion, safe and finalized status. Applications can still arrange submission separately when coordination is absent. Transaction-event reports remain unverified and never determine settlement or release budgets. Monitoring metrics and traces are exported separately to an OTLP collector.`;
+export const transactionBoundaryDescription = `Signing, execution and transaction reports are separate contracts. POST /v1/transfer-authorizations stores an exact authorized ERC-3009 transfer; POST /v1/actions/{actionId}/sign returns its transfer signature without broadcasting. POST /v1/actions/contract-calls stores exact policy-approved contract calls, swaps or vault deposits for an explicitly bound Safe account; those signatures remain private to coordinated execution. With an optional explicitly selected execution profile, POST /v1/actions/{actionId}/execute coordinates signing, simulation, gas-budget admission and one durable direct-provider dispatch or authenticated designated-service handoff. The designated service has its own provider journal and calls back for fresh wallet authority. GET /v1/actions/{actionId}/execution independently checks chain effects through configured RPC sources and separates inclusion, safe and finalized status. Applications can still arrange submission separately when coordination is absent. Transaction-event reports remain unverified and never determine settlement or release budgets. Monitoring metrics and traces are exported separately to an OTLP collector.`;

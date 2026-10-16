@@ -1,3 +1,22 @@
+import {
+  approvedCallInputSchema,
+  approvedCallIntentSchema,
+  safePayloadSchema,
+} from '../execution/call-schemas.js';
+import type {
+  ApprovedCallInput,
+  SafeAccountBinding,
+} from '../execution/approved-calls.js';
+import {
+  canonicalServiceBody,
+  canonicalServiceJson,
+  type ServiceIdentity,
+} from '../executor/auth.js';
+import {
+  authoritySchema,
+  authorityReceiptSchema,
+} from '../executor/schemas.js';
+import type { ExecutionAuthorityRequest } from '../executor/protocol.js';
 import providerConfigurationSchema from '../../spec/provider-config.schema.json' with { type: 'json' };
 import type { TransferExecutionCoordinator } from '../execution/coordinator.js';
 import {
@@ -34,6 +53,19 @@ import { WalletProviderError } from '../domain/signing.js';
 import type { OwnerLogin } from './login.js';
 import type { OnboardingService } from './service.js';
 
+const callTermsSchema = structuredClone(
+  providerConfigurationSchema.properties.approvedCalls,
+) as {
+  properties: {
+    policy: { required: string[]; properties: Record<string, unknown> };
+  };
+};
+delete callTermsSchema.properties.policy.properties.accounts;
+callTermsSchema.properties.policy.required =
+  callTermsSchema.properties.policy.required.filter(
+    (field) => field !== 'accounts',
+  );
+
 export interface OnboardingHttpOptions {
   service: OnboardingService;
   login?: OwnerLogin;
@@ -44,6 +76,11 @@ export interface OnboardingHttpOptions {
   /** Configuration-first provider-authorized transfers; absent in the onboarding-only profile. */
   actions?: SupportedActions;
   execution?: TransferExecutionCoordinator;
+  executionIdentity?: ServiceIdentity;
+  contractNonce?: (
+    binding: SafeAccountBinding,
+    owner: string,
+  ) => Promise<string>;
   /** Fence superseded configured-service instances, including browser authority writers. */
   currentConfiguration?: () => Promise<boolean>;
 }
@@ -115,6 +152,8 @@ const permissionLabels = {
   'account:read': 'Read your wallet address and account status',
   'operations:request':
     'Request wallet operations, subject to your provider’s approvals',
+  'contracts:request':
+    'Request approved contract calls under the configured target, function and operation limits.',
   'transfers:request':
     'Request transfers on your behalf under the provider’s limits, without asking you to approve each transfer again',
 };
@@ -276,7 +315,95 @@ export async function registerOnboardingRoutes(
         request.params.actionId,
       ),
   );
-  const execution = () => options?.execution ?? unavailable();
+  app.post<{ Body: ApprovedCallInput }>(
+    '/v1/actions/contract-calls',
+    {
+      schema: {
+        ...schema('requestContractCall', approvedCallInputSchema),
+        description:
+          'Request an immutable approved contract call, Uniswap V3 exact-input swap or bounded ERC-4626 router deposit. Requires separately consented contracts:request delegation, current owner/grant/KYC/consent and configured target policies. The service constructs the Safe transaction and reserves its nonce; callers never supply signatures or a signing payload.',
+        response: {
+          200: {
+            type: 'object',
+            additionalProperties: false,
+            required: [
+              'action_id',
+              'account_id',
+              'status',
+              'expires_at',
+              'payload_hash',
+              'payload',
+              'intent',
+            ],
+            properties: {
+              action_id: uuidSchema,
+              account_id: uuidSchema,
+              status: { type: 'string' },
+              expires_at: { type: 'string', format: 'date-time' },
+              payload_hash: { type: 'string' },
+              payload: safePayloadSchema,
+              intent: approvedCallIntentSchema,
+            },
+          },
+        },
+      },
+    },
+    async (request) => {
+      if (!options?.contractNonce) return unavailable();
+      return actions().requestCalls(
+        await context(request, 'wallet:actions'),
+        request.body,
+        options.contractNonce,
+      );
+    },
+  );
+  const execution = (request?: FastifyRequest) => {
+    const coordinator = options?.execution ?? unavailable();
+    if (request && request.headers['execution-profile'] !== coordinator.profile)
+      throw new WalletProviderError('wallet_provider_input');
+    return coordinator;
+  };
+  app.post<{ Body: ExecutionAuthorityRequest }>(
+    '/v1/internal/execution-authority',
+    {
+      preParsing: canonicalServiceBody,
+      onSend: async (_request, _reply, payload) =>
+        typeof payload === 'string'
+          ? canonicalServiceJson(JSON.parse(payload))
+          : payload,
+      schema: {
+        operationId: 'checkExecutionAuthority',
+        security: [{ serviceProof: [] }],
+        description:
+          'Read-only callback for the configured designated executor. Requires a pinned signed service request, exact stored plan/attempt and an unexpired handoff lease. Rechecks current owner, grant, KYC, consent, immutable approval and active revision. Application OAuth tokens do not authenticate this endpoint.',
+        body: authoritySchema,
+        response: { 200: authorityReceiptSchema },
+      },
+    },
+    async (request, reply) => {
+      if (!options?.executionIdentity || !(await ready())) return unavailable();
+      if (request.url !== '/v1/internal/execution-authority')
+        throw new AuthenticationError(401);
+      const proof = await options.executionIdentity.verify(
+        request.headers.authorization,
+        'authority',
+        'POST',
+        '/v1/internal/execution-authority',
+        request.body,
+      );
+      const value = await execution().authorizeRemote(request.body);
+      const signed = await options.executionIdentity.sign(
+        proof.origin,
+        'authority',
+        'POST',
+        '/v1/internal/execution-authority',
+        value,
+        { requestId: proof.requestId, status: 200 },
+      );
+      reply.header('execution-service-proof', signed.proof);
+      return value;
+    },
+  );
   app.get(
     '/v1/execution-capabilities',
     {
@@ -287,31 +414,45 @@ export async function registerOnboardingRoutes(
         response: { 200: executionCapabilitiesSchema },
       },
     },
-    async () => ({
-      contract_version: '1',
-      profiles: [
-        {
-          id: 'erc3009-relayer-v1',
+    async () => {
+      const readyValue = await ready();
+      return {
+        contract_version: '1',
+        profiles: [
+          'erc3009-relayer-v1',
+          'erc3009-executor-v1',
+          'approved-evm-executor-v1',
+        ].map((profile) => ({
+          id: profile,
           revision: '1',
           implemented: true,
-          configured: !!options?.execution,
-          ready: !!options?.execution && (await ready()),
+          configured: options?.execution?.profile === profile,
+          ready: options?.execution?.profile === profile && readyValue,
           chain_id: 'eip155:84532',
-          account_type: 'eoa',
+          account_type:
+            profile === 'approved-evm-executor-v1'
+              ? 'eoa-or-safe-1.4.1'
+              : 'eoa',
           signing: 'eip-712',
-          token_authorization: 'erc-3009',
-          submission: 'openzeppelin-relayer-1.8.0',
+          token_authorization:
+            profile === 'approved-evm-executor-v1'
+              ? 'erc-3009-or-approved-contract-calls'
+              : 'erc-3009',
+          submission:
+            profile === 'erc3009-relayer-v1'
+              ? 'openzeppelin-relayer-1.8.0'
+              : 'designated-execution-service-v1',
           verification: 'rpc-quorum',
           finality: 'finalized',
           minimum_rpc_sources: 2,
           execute_scopes: ['wallet:execute', 'wallet:sign'],
           read_scopes: ['wallet:execute:read'],
-        },
-      ],
-    }),
+        })),
+      };
+    },
   );
   const executionDescription =
-    'Optional fixed ERC-3009 transfer execution with exact version selection, current owner/grant/identity/consent/approval checks, durable signing and submission authority, application gas sponsorship and independent RPC receipt/finality verification. Unknown submission outcomes never permit redispatch. No arbitrary transaction payload is accepted.';
+    'Optional immutable approved-action execution with exact version selection, current owner/grant/identity/consent/approval checks, durable signing and submission authority, application gas sponsorship and independent RPC receipt/finality verification. Unknown provider submission outcomes never permit redispatch. Contract calls require the approved-evm-executor-v1 profile and a stored policy-approved action; execute never accepts replacement calldata.';
   const executeSchema = schema(
     'executeTransfer',
     { type: 'object', additionalProperties: false },
@@ -335,7 +476,7 @@ export async function registerOnboardingRoutes(
       },
     },
     async (request) =>
-      execution().execute(
+      execution(request).execute(
         await context(request, 'wallet:execute'),
         request.params.actionId,
       ),
@@ -359,7 +500,7 @@ export async function registerOnboardingRoutes(
       },
     },
     async (request) =>
-      execution().read(
+      execution(request).read(
         (await context(request, 'wallet:execute:read')).principal,
         request.params.actionId,
       ),
@@ -384,7 +525,7 @@ export async function registerOnboardingRoutes(
       },
     },
     async (request) =>
-      execution().events(
+      execution(request).events(
         (await context(request, 'wallet:execute:read')).principal,
         request.params.actionId,
         request.query.after,
@@ -495,6 +636,10 @@ export async function registerOnboardingRoutes(
                     type: 'string',
                     pattern: '^[a-f0-9]{64}$',
                   },
+                  action_policy_revision: {
+                    type: 'string',
+                    pattern: '^[a-f0-9]{64}$',
+                  },
                   transfer_policy_revision: {
                     type: 'string',
                     pattern: '^[a-f0-9]{64}$',
@@ -564,8 +709,10 @@ export async function registerOnboardingRoutes(
               provider_login_required: { type: 'boolean' },
               flow: { type: 'string', enum: ['application', 'hosted'] },
               policy_revision: { type: 'string' },
+              action_policy_revision: { type: 'string' },
               transfer_policy_revision: { type: 'string' },
               transfer_terms: providerConfigurationSchema.properties.financial,
+              contract_call_terms: callTermsSchema,
               max_identity_age_days: { type: 'integer' },
               max_access_days: { type: 'integer' },
               verification_level: { type: 'string' },
@@ -579,7 +726,14 @@ export async function registerOnboardingRoutes(
         (await context(request, 'wallet:access:read')).principal,
       ),
       ...(options?.actions
-        ? { transfer_terms: options.actions.consentTerms() }
+        ? {
+            ...(options.actions.consentTerms()
+              ? { transfer_terms: options.actions.consentTerms() }
+              : {}),
+            ...(options.actions.callConsentTerms()
+              ? { contract_call_terms: options.actions.callConsentTerms() }
+              : {}),
+          }
         : {}),
     }),
   );
@@ -1179,9 +1333,14 @@ ${
           `<p>${escape(view.application)} wants to ${view.mode === 'create' ? 'set up a wallet with' : 'connect your existing wallet at'} ${escape(view.provider)}.</p>
 <ul>${view.permissions.map((p) => `<li>${escape(permissionLabels[p])}</li>`).join('')}</ul>
 ${
+  view.permissions.includes('contracts:request')
+    ? `<p>Contract-call delegation on Base Sepolia: you permit calls to the configured contracts and functions, swaps on the configured routes and deposits into the configured vaults. Limits and account bindings: <code>${escape(JSON.stringify(actions().callConsentTerms()))}</code>. Contract-call signatures remain private to coordinated execution. Safe signatures have no native expiry; revocation stops new service dispatch but cannot recall an already submitted authorization.</p>`
+    : ''
+}
+${
   view.permissions.includes('transfers:request')
     ? (() => {
-        const terms = actions().consentTerms();
+        const terms = actions().consentTerms() ?? deny();
         return `<p>Transfer delegation: ${escape(terms.token.symbol)} on Base Sepolia. Token contract: <code>${escape(terms.token.address)}</code>. Domain: ${escape(terms.token.name)} / ${escape(terms.token.version)}. Maximum per transfer: ${escape(formatUnits(terms.maximumAmount, terms.token.decimals))} ${escape(terms.token.symbol)}. Lifetime limit per account/token across applications: ${escape(formatUnits(terms.lifetimeAmount, terms.token.decimals))} ${escape(terms.token.symbol)}. Allowed recipients: ${terms.recipients.map((a) => `<code>${escape(a)}</code>`).join(', ')}. Each signature is valid for up to ${escape(terms.maxValiditySeconds)} seconds. The provider checks each request against these terms without another approval prompt. Revoking access stops new signing; signatures already issued may remain usable until expiry.</p>`;
       })()
     : ''

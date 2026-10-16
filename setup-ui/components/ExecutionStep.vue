@@ -7,7 +7,10 @@ const applications = computed(() =>
   model.value.policy.applications
     .filter(
       (app) =>
-        app.enabled !== false && app.permissions?.includes('transfers:request'),
+        app.enabled !== false &&
+        app.permissions?.some((permission) =>
+          ['transfers:request', 'contracts:request'].includes(permission),
+        ),
     )
     .map((app) => ({ label: app.name, value: app.clientId })),
 );
@@ -15,7 +18,13 @@ function sponsor() {
   return {
     clientId: applications.value[0]?.value ?? '',
     accountId: crypto.randomUUID(),
-    binding: { relayerId: '', signerId: '', address: '', bindingRevision: '1' },
+    binding: {
+      ...(model.value.execution?.profile === 'erc3009-relayer-v1'
+        ? { relayerId: '', signerId: '' }
+        : {}),
+      address: '',
+      bindingRevision: '1',
+    },
     fundingAgreement: '',
     gasLimit: '150000',
     maxFeePerGas: '',
@@ -44,35 +53,181 @@ function toggle(value: unknown) {
     pollIntervalSeconds: 15,
     maxLogRange: 10000,
   };
+  mode('erc3009-executor-v1');
+}
+function mode(value: unknown) {
+  const execution = model.value.execution;
+  if (!execution) return;
+  if (value === 'erc3009-executor-v1' || value === 'approved-evm-executor-v1') {
+    execution.profile = value;
+    if (value === 'approved-evm-executor-v1' && !model.value.financial)
+      delete execution.rpc.tokenCodeHash;
+    delete execution.relayer;
+    execution.service = {
+      url: '',
+      providerId: '',
+      providerRevision: '1',
+      signing: {
+        id: 'wallet-2026',
+        privateKey: { env: 'EXECUTION_WALLET_PRIVATE_KEY' },
+      },
+      keys: [
+        {
+          id: 'executor-2026',
+          publicKey: { env: 'EXECUTION_SERVICE_PUBLIC_KEY' },
+        },
+      ],
+    };
+    for (const entry of execution.sponsors) {
+      delete entry.binding.relayerId;
+      delete entry.binding.signerId;
+    }
+  } else {
+    execution.profile = 'erc3009-relayer-v1';
+    delete execution.service;
+    execution.relayer = {
+      url: '',
+      apiKey: { env: 'EXECUTION_RELAYER_API_KEY' },
+    };
+    for (const entry of execution.sponsors) {
+      entry.binding.relayerId = '';
+      entry.binding.signerId = '';
+    }
+  }
 }
 </script>
 <template>
   <section class="feature-panel">
-    <h3>Optional transfer execution and verified status</h3>
+    <h3>Optional approved-action execution and verified status</h3>
     <p>
-      Coordinate approved transfers with a dedicated application gas sponsor.
-      The service checks the same current wallet authority, simulates the exact
-      token call, records one durable dispatch and checks receipts through
+      Coordinate approved actions with a dedicated application gas sponsor. The
+      service checks the same current wallet authority, simulates the exact call
+      batch, records one durable dispatch and checks receipts through
       independent RPC sources. Lost responses never permit another submission.
     </p>
     <SetupField
       guide="executionEnabled"
       type="checkbox"
       label="Configure transfer execution and RPC verification"
-      :disabled="!model.financial"
       :modelValue="!!model.execution"
       @update:modelValue="toggle"
     />
-    <p v-if="!model.financial" class="help-text">
-      Configure delegated transfer signing in Policies first.
+    <p v-if="!model.financial && !model.approvedCalls" class="help-text">
+      Configure delegated transfer signing in Policies or an approved
+      contract-call policy below.
     </p>
     <template v-if="model.execution">
+      <SetupField
+        guide="executionEnabled"
+        type="select"
+        label="Execution submission service"
+        :modelValue="model.execution.profile"
+        :options="[
+          {
+            label: 'Approved EVM actions through designated service',
+            value: 'approved-evm-executor-v1',
+          },
+          {
+            label: 'Designated execution service',
+            value: 'erc3009-executor-v1',
+          },
+          { label: 'Direct OpenZeppelin Relayer', value: 'erc3009-relayer-v1' },
+        ]"
+        @update:modelValue="mode"
+      />
+      <section v-if="model.execution.service" class="feature-panel">
+        <h4>Designated execution service connection</h4>
+        <p>
+          Deploy the execution service separately with its own storage, provider
+          registry and sponsor credentials. These settings connect the wallet
+          service to that deployment; applications cannot choose the executor or
+          provider.
+        </p>
+        <div class="field-grid">
+          <SetupField
+            guide="executionService"
+            v-model="model.execution.service.url"
+            type="text"
+            label="Designated execution service HTTPS origin"
+            validation="required"
+          />
+          <SetupField
+            guide="executionService"
+            v-model="model.execution.service.providerId"
+            type="text"
+            label="Execution provider ID"
+            validation="required"
+          />
+          <SetupField
+            guide="executionService"
+            v-model="model.execution.service.providerRevision"
+            type="text"
+            label="Execution provider revision"
+            validation="required"
+          />
+          <SetupField
+            guide="executionService"
+            v-model="model.execution.service.signing.id"
+            type="text"
+            label="Wallet service signing key ID"
+            validation="required"
+          />
+          <SetupField
+            guide="executionService"
+            v-model="model.execution.service.signing.privateKey.env"
+            type="text"
+            label="Wallet service private signing key variable name"
+            validation="required"
+          />
+        </div>
+        <div
+          v-for="(key, index) in model.execution.service.keys"
+          :key="index"
+          class="field-grid"
+        >
+          <SetupField
+            guide="executionService"
+            v-model="key.id"
+            type="text"
+            :label="`Execution service public key ID ${index + 1}`"
+            validation="required"
+          />
+          <SetupField
+            guide="executionService"
+            v-model="key.publicKey.env"
+            type="text"
+            :label="`Execution service public key variable name ${index + 1}`"
+            validation="required"
+          />
+          <button
+            v-if="model.execution.service.keys.length > 1"
+            type="button"
+            class="secondary"
+            @click="model.execution.service.keys.splice(index, 1)"
+          >
+            Remove verification key {{ index + 1 }}
+          </button>
+        </div>
+        <button
+          v-if="model.execution.service.keys.length < 8"
+          type="button"
+          class="secondary"
+          @click="
+            model.execution.service.keys.push({
+              id: '',
+              publicKey: { env: '' },
+            })
+          "
+        >
+          Add execution service verification key
+        </button>
+      </section>
       <p class="callout">
         Base Sepolia EOA token transfers only. Configure pre-existing sponsor
-        signers separately from owner-wallet signers. This does not install a
+        accounts separately from owner-wallet signers. This does not install a
         Relayer, fund a sponsor or verify deployment readiness.
       </p>
-      <div class="field-grid">
+      <div v-if="model.execution.relayer" class="field-grid">
         <SetupField
           guide="executionSponsor"
           v-model="model.execution.relayer.url"
@@ -106,6 +261,7 @@ function toggle(value: unknown) {
           validation="required"
         />
         <SetupField
+          v-if="model.financial"
           guide="executionToken"
           v-model="model.execution.rpc.tokenCodeHash"
           type="text"
@@ -136,6 +292,7 @@ function toggle(value: unknown) {
         <div class="field-grid">
           <SetupField
             guide="executionSponsor"
+            v-if="model.execution.relayer"
             v-model="entry.binding.relayerId"
             type="text"
             :label="`Sponsor Relayer ID ${index + 1}`"
@@ -143,6 +300,7 @@ function toggle(value: unknown) {
           />
           <SetupField
             guide="executionSponsor"
+            v-if="model.execution.relayer"
             v-model="entry.binding.signerId"
             type="text"
             :label="`Sponsor signer ID ${index + 1}`"

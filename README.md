@@ -105,7 +105,7 @@ vendor services or certify readiness. Initial activation remains disabled._
 4. **[Connect your product](docs/application-access.md):** read access policy,
    submit current identity and consent evidence, receive a grant, create the wallet
    and revoke access when the user withdraws. Select the optional
-   [execution coordinator](docs/execution.md) or an accepted application submission
+   [execution coordinator](docs/execution.md) and [approved contract calls, swaps and vault deposits](docs/approved-contract-calls.md) or an accepted application submission
    rail. Applications arrange sponsor funding; verified chain status is separate
    from business settlement.
 
@@ -120,7 +120,7 @@ in that GUI using server-held secrets and an explicit operator allowlist.
 The local preview sends no API calls; deployed requests have real effects and permission checks.
 
 The [getting-started guide](docs/README.md) links every stage. Supported profiles
-remain single-host and Base Sepolia EOA only; production custody acceptance is pending.
+remain single-host and Base Sepolia only (EOA transfers and explicitly bound Safe 1.4.1 contract calls); production custody acceptance is pending.
 
 ## Who takes part
 
@@ -140,6 +140,8 @@ maps these names to configuration, API fields and the user's consent screen.
 
 For your next step, follow the [operator getting-started guide](docs/README.md).
 For unsupported integrations, use the [advanced adapter guide](docs/custom-adapters.md).
+
+The [approved contract-call guide](docs/approved-contract-calls.md) explains the general execution profile, pre-existing smart-account bindings, separate consent, operation limits and verified outcome scopes.
 
 ## A foundation for adopting teams
 
@@ -283,9 +285,7 @@ library-only execution profile.
 
 **Experimental · 0.1.0 · unpublished.** The default service stays unconfigured.
 The bundled onboarding-only profile manages access and provisioning. The
-configured service optionally supplies an exact provider-authorized ERC-3009 transfer
-profile and financial journal on Base Sepolia; custom financial actions require
-advanced host integration. The [built-in SQLite database](docs/storage.md)
+configured service supplies policy-authorized ERC-3009 transfers and optional Safe contract calls, swaps and vault deposits on Base Sepolia, backed by durable financial journals. Other execution mechanisms require advanced host integration. The [built-in SQLite database](docs/storage.md)
 stores onboarding, approvals, budgets and financial attempts on one persistent
 POSIX host, with required current host-policy checks. The original file store
 remains available for onboarding.
@@ -294,12 +294,13 @@ USDC and ZARP describe the wider project's asset use cases; they are not a claim
 that this experimental profile supports every token or mainnet operation. Its
 configured token contract and signing domain need independent verification.
 
-Production custody acceptance remains pending. Mainnet, contract accounts,
-WalletConnect and ERC-1271/4337/7702 are unsupported. The separate
+Production custody acceptance remains pending. Mainnet, automatic smart-account provisioning, WalletConnect and ERC-1271/4337/7702 are unsupported. General calls require explicitly bound, pre-existing Safe 1.4.1 accounts. The separate
 [orchestration draft](spec/orchestration-draft.json) is a reference for Moovha's
 business API; those business orchestration routes aren't implemented here. The
-optional [execution coordinator](docs/execution.md) supplies dedicated sponsor
-submission and verified token-transfer status. See the
+optional [execution coordinator](docs/execution.md) and [approved contract calls, swaps and vault deposits](docs/approved-contract-calls.md) supplies dedicated sponsor
+submission and verified token-transfer status. Its [designated execution service](docs/execution-service.md)
+runs separately with configurable providers, authenticated dispatch, fresh wallet
+authority callbacks and an independent durable journal. See the
 [enterprise v1 standards and release gates](docs/v1-standards.md) for extension
 boundaries and pending acceptance. The sponsorship commitment belongs to the connected application's
 execution rail; installing the kit or approving access does not activate it.

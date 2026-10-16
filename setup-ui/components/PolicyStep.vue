@@ -206,6 +206,11 @@ function financial(enabled: unknown) {
                 label: 'Request wallet operations (advanced hosts)',
               },
               {
+                value: 'contracts:request',
+                label:
+                  'Request approved contract calls, swaps and vault deposits',
+              },
+              {
                 value: 'transfers:request',
                 label: 'Request transfers on behalf of users',
               },

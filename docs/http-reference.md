@@ -43,7 +43,10 @@ Success response schema:
       "type": "array",
       "items": {
         "type": "string",
-        "enum": ["provider-authorized-erc3009-v1"]
+        "enum": [
+          "provider-authorized-erc3009-v1",
+          "provider-approved-contracts-v1"
+        ]
       }
     }
   }
@@ -431,142 +434,628 @@ Success response schema:
 
 ```json
 {
-  "type": "object",
-  "additionalProperties": false,
-  "required": [
-    "action_id",
-    "account_id",
-    "status",
-    "expires_at",
-    "payload_hash",
-    "payload"
-  ],
-  "properties": {
-    "action_id": {
-      "type": "string",
-      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
-    },
-    "account_id": {
-      "type": "string",
-      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
-    },
-    "status": {
-      "type": "string",
-      "enum": ["authorizing", "authorized", "denied"]
-    },
-    "expires_at": {
-      "type": "string",
-      "format": "date-time"
-    },
-    "payload_hash": {
-      "type": "string",
-      "pattern": "^0x[0-9a-f]{64}$"
-    },
-    "payload": {
+  "oneOf": [
+    {
       "type": "object",
       "additionalProperties": false,
-      "required": ["domain", "types", "primaryType", "message"],
+      "required": [
+        "action_id",
+        "account_id",
+        "status",
+        "expires_at",
+        "payload_hash",
+        "payload"
+      ],
       "properties": {
-        "primaryType": {
+        "action_id": {
           "type": "string",
-          "enum": ["TransferWithAuthorization"]
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
         },
-        "domain": {
+        "account_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["authorizing", "authorized", "denied"]
+        },
+        "expires_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "payload_hash": {
+          "type": "string",
+          "pattern": "^0x[0-9a-f]{64}$"
+        },
+        "payload": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["name", "version", "chainId", "verifyingContract"],
+          "required": ["domain", "types", "primaryType", "message"],
           "properties": {
-            "name": {
-              "type": "string"
-            },
-            "version": {
-              "type": "string"
-            },
-            "chainId": {
+            "primaryType": {
               "type": "string",
-              "enum": ["84532"]
+              "enum": ["TransferWithAuthorization"]
             },
-            "verifyingContract": {
-              "type": "string",
-              "pattern": "^0x[0-9a-fA-F]{40}$"
+            "domain": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["name", "version", "chainId", "verifyingContract"],
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "version": {
+                  "type": "string"
+                },
+                "chainId": {
+                  "type": "string",
+                  "enum": ["84532"]
+                },
+                "verifyingContract": {
+                  "type": "string",
+                  "pattern": "^0x[0-9a-fA-F]{40}$"
+                }
+              }
+            },
+            "types": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["TransferWithAuthorization"],
+              "properties": {
+                "TransferWithAuthorization": {
+                  "type": "array",
+                  "minItems": 6,
+                  "maxItems": 6,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["name", "type"],
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "enum": [
+                          "from",
+                          "to",
+                          "value",
+                          "validAfter",
+                          "validBefore",
+                          "nonce"
+                        ]
+                      },
+                      "type": {
+                        "type": "string",
+                        "enum": ["address", "uint256", "bytes32"]
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "message": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "from",
+                "to",
+                "value",
+                "validAfter",
+                "validBefore",
+                "nonce"
+              ],
+              "properties": {
+                "from": {
+                  "type": "string",
+                  "pattern": "^0x[0-9a-fA-F]{40}$"
+                },
+                "to": {
+                  "type": "string",
+                  "pattern": "^0x[0-9a-fA-F]{40}$"
+                },
+                "value": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,77})$"
+                },
+                "validAfter": {
+                  "type": "string",
+                  "enum": ["0"]
+                },
+                "validBefore": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,77})$"
+                },
+                "nonce": {
+                  "type": "string",
+                  "pattern": "^0x[0-9a-f]{64}$"
+                }
+              }
             }
           }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action_id",
+        "account_id",
+        "status",
+        "expires_at",
+        "payload_hash",
+        "payload",
+        "intent"
+      ],
+      "properties": {
+        "action_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
         },
-        "types": {
+        "account_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["authorizing", "authorized", "denied"]
+        },
+        "expires_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "payload_hash": {
+          "type": "string",
+          "pattern": "^0x[0-9a-f]{64}$"
+        },
+        "payload": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["TransferWithAuthorization"],
+          "required": ["primaryType", "domain", "types", "message"],
           "properties": {
-            "TransferWithAuthorization": {
-              "type": "array",
-              "minItems": 6,
-              "maxItems": 6,
-              "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": ["name", "type"],
-                "properties": {
-                  "name": {
-                    "type": "string",
-                    "enum": [
-                      "from",
-                      "to",
-                      "value",
-                      "validAfter",
-                      "validBefore",
-                      "nonce"
-                    ]
-                  },
-                  "type": {
-                    "type": "string",
-                    "enum": ["address", "uint256", "bytes32"]
+            "primaryType": {
+              "type": "string",
+              "enum": ["SafeTx"]
+            },
+            "domain": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["chainId", "verifyingContract"],
+              "properties": {
+                "chainId": {
+                  "type": "string",
+                  "enum": ["84532"]
+                },
+                "verifyingContract": {
+                  "type": "string",
+                  "pattern": "^0x[0-9a-fA-F]{40}$"
+                }
+              }
+            },
+            "types": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["SafeTx"],
+              "properties": {
+                "SafeTx": {
+                  "type": "array",
+                  "minItems": 10,
+                  "maxItems": 10,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["name", "type"],
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "enum": [
+                          "to",
+                          "value",
+                          "data",
+                          "operation",
+                          "safeTxGas",
+                          "baseGas",
+                          "gasPrice",
+                          "gasToken",
+                          "refundReceiver",
+                          "nonce"
+                        ]
+                      },
+                      "type": {
+                        "type": "string",
+                        "enum": ["address", "uint256", "bytes", "uint8"]
+                      }
+                    }
                   }
+                }
+              }
+            },
+            "message": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "to",
+                "value",
+                "data",
+                "operation",
+                "safeTxGas",
+                "baseGas",
+                "gasPrice",
+                "gasToken",
+                "refundReceiver",
+                "nonce"
+              ],
+              "properties": {
+                "to": {
+                  "type": "string",
+                  "pattern": "^0x[0-9a-fA-F]{40}$"
+                },
+                "value": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,77})$"
+                },
+                "data": {
+                  "type": "string",
+                  "pattern": "^0x(?:[0-9a-f]{2})*$",
+                  "maxLength": 8192
+                },
+                "operation": {
+                  "type": "string",
+                  "enum": ["0", "1"]
+                },
+                "safeTxGas": {
+                  "type": "string",
+                  "enum": ["0"]
+                },
+                "baseGas": {
+                  "type": "string",
+                  "enum": ["0"]
+                },
+                "gasPrice": {
+                  "type": "string",
+                  "enum": ["0"]
+                },
+                "gasToken": {
+                  "type": "string",
+                  "enum": ["0x0000000000000000000000000000000000000000"]
+                },
+                "refundReceiver": {
+                  "type": "string",
+                  "enum": ["0x0000000000000000000000000000000000000000"]
+                },
+                "nonce": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,77})$"
                 }
               }
             }
           }
         },
-        "message": {
+        "intent": {
           "type": "object",
           "additionalProperties": false,
           "required": [
-            "from",
-            "to",
-            "value",
-            "validAfter",
-            "validBefore",
+            "version",
+            "mechanism",
+            "input",
+            "account",
+            "multiSend",
+            "calls",
+            "contracts",
+            "effects",
             "nonce"
           ],
           "properties": {
-            "from": {
+            "version": {
               "type": "string",
-              "pattern": "^0x[0-9a-fA-F]{40}$"
+              "enum": ["1"]
             },
-            "to": {
+            "mechanism": {
               "type": "string",
-              "pattern": "^0x[0-9a-fA-F]{40}$"
+              "enum": ["safe-1.4.1"]
             },
-            "value": {
-              "type": "string",
-              "pattern": "^(0|[1-9][0-9]{0,77})$"
+            "input": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["account_id", "kind", "calls"],
+                  "properties": {
+                    "account_id": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": ["contract-call"]
+                    },
+                    "calls": {
+                      "type": "array",
+                      "minItems": 1,
+                      "maxItems": 16,
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["to", "value", "data"],
+                        "properties": {
+                          "to": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "value": {
+                            "type": "string",
+                            "pattern": "^(0|[1-9][0-9]{0,77})$"
+                          },
+                          "data": {
+                            "type": "string",
+                            "pattern": "^0x(?:[0-9a-f]{2}){4,4096}$"
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "account_id",
+                    "kind",
+                    "route",
+                    "amount_in",
+                    "minimum_out",
+                    "deadline"
+                  ],
+                  "properties": {
+                    "account_id": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": ["swap"]
+                    },
+                    "route": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z0-9._-]{1,64}$"
+                    },
+                    "amount_in": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]{0,77})$"
+                    },
+                    "minimum_out": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]{0,77})$"
+                    },
+                    "deadline": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]{0,77})$"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "account_id",
+                    "kind",
+                    "route",
+                    "assets",
+                    "minimum_shares"
+                  ],
+                  "properties": {
+                    "account_id": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": ["vault-deposit"]
+                    },
+                    "route": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z0-9._-]{1,64}$"
+                    },
+                    "assets": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]{0,77})$"
+                    },
+                    "minimum_shares": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]{0,77})$"
+                    }
+                  }
+                }
+              ]
             },
-            "validAfter": {
-              "type": "string",
-              "enum": ["0"]
+            "account": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["address", "codeHash", "accountId", "singleton"],
+              "properties": {
+                "address": {
+                  "type": "string",
+                  "pattern": "^0x[0-9a-fA-F]{40}$"
+                },
+                "codeHash": {
+                  "type": "string",
+                  "pattern": "^0x[0-9a-f]{64}$"
+                },
+                "implementation": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["address", "codeHash"],
+                  "properties": {
+                    "address": {
+                      "type": "string",
+                      "pattern": "^0x[0-9a-fA-F]{40}$"
+                    },
+                    "codeHash": {
+                      "type": "string",
+                      "pattern": "^0x[0-9a-f]{64}$"
+                    }
+                  }
+                },
+                "accountId": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                },
+                "singleton": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["address", "codeHash"],
+                  "properties": {
+                    "address": {
+                      "type": "string",
+                      "pattern": "^0x[0-9a-fA-F]{40}$"
+                    },
+                    "codeHash": {
+                      "type": "string",
+                      "pattern": "^0x[0-9a-f]{64}$"
+                    },
+                    "implementation": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["address", "codeHash"],
+                      "properties": {
+                        "address": {
+                          "type": "string",
+                          "pattern": "^0x[0-9a-fA-F]{40}$"
+                        },
+                        "codeHash": {
+                          "type": "string",
+                          "pattern": "^0x[0-9a-f]{64}$"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
             },
-            "validBefore": {
-              "type": "string",
-              "pattern": "^(0|[1-9][0-9]{0,77})$"
+            "multiSend": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["address", "codeHash"],
+              "properties": {
+                "address": {
+                  "type": "string",
+                  "pattern": "^0x[0-9a-fA-F]{40}$"
+                },
+                "codeHash": {
+                  "type": "string",
+                  "pattern": "^0x[0-9a-f]{64}$"
+                },
+                "implementation": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["address", "codeHash"],
+                  "properties": {
+                    "address": {
+                      "type": "string",
+                      "pattern": "^0x[0-9a-fA-F]{40}$"
+                    },
+                    "codeHash": {
+                      "type": "string",
+                      "pattern": "^0x[0-9a-f]{64}$"
+                    }
+                  }
+                }
+              }
+            },
+            "calls": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 16,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["to", "value", "data"],
+                "properties": {
+                  "to": {
+                    "type": "string",
+                    "pattern": "^0x[0-9a-fA-F]{40}$"
+                  },
+                  "value": {
+                    "type": "string",
+                    "pattern": "^(0|[1-9][0-9]{0,77})$"
+                  },
+                  "data": {
+                    "type": "string",
+                    "pattern": "^0x(?:[0-9a-f]{2}){4,4096}$"
+                  }
+                }
+              }
+            },
+            "contracts": {
+              "type": "array",
+              "maxItems": 32,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["address", "codeHash"],
+                "properties": {
+                  "address": {
+                    "type": "string",
+                    "pattern": "^0x[0-9a-fA-F]{40}$"
+                  },
+                  "codeHash": {
+                    "type": "string",
+                    "pattern": "^0x[0-9a-f]{64}$"
+                  },
+                  "implementation": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["address", "codeHash"],
+                    "properties": {
+                      "address": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                      },
+                      "codeHash": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-f]{64}$"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "effects": {
+              "type": "array",
+              "maxItems": 16,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["token", "from", "to", "minimum"],
+                "properties": {
+                  "token": {
+                    "type": "string",
+                    "pattern": "^0x[0-9a-fA-F]{40}$"
+                  },
+                  "from": {
+                    "type": "string"
+                  },
+                  "to": {
+                    "type": "string"
+                  },
+                  "minimum": {
+                    "type": "string",
+                    "pattern": "^(0|[1-9][0-9]{0,77})$"
+                  },
+                  "maximum": {
+                    "type": "string",
+                    "pattern": "^(0|[1-9][0-9]{0,77})$"
+                  }
+                }
+              }
             },
             "nonce": {
               "type": "string",
-              "pattern": "^0x[0-9a-f]{64}$"
+              "pattern": "^(0|[1-9][0-9]{0,77})$"
             }
           }
         }
       }
     }
-  }
+  ]
 }
 ```
 
@@ -598,6 +1087,762 @@ Success response schema:
 
 ```json
 {
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action_id",
+        "account_id",
+        "status",
+        "expires_at",
+        "payload_hash",
+        "payload"
+      ],
+      "properties": {
+        "action_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "account_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["authorizing", "authorized", "denied"]
+        },
+        "expires_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "payload_hash": {
+          "type": "string",
+          "pattern": "^0x[0-9a-f]{64}$"
+        },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["domain", "types", "primaryType", "message"],
+          "properties": {
+            "primaryType": {
+              "type": "string",
+              "enum": ["TransferWithAuthorization"]
+            },
+            "domain": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["name", "version", "chainId", "verifyingContract"],
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "version": {
+                  "type": "string"
+                },
+                "chainId": {
+                  "type": "string",
+                  "enum": ["84532"]
+                },
+                "verifyingContract": {
+                  "type": "string",
+                  "pattern": "^0x[0-9a-fA-F]{40}$"
+                }
+              }
+            },
+            "types": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["TransferWithAuthorization"],
+              "properties": {
+                "TransferWithAuthorization": {
+                  "type": "array",
+                  "minItems": 6,
+                  "maxItems": 6,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["name", "type"],
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "enum": [
+                          "from",
+                          "to",
+                          "value",
+                          "validAfter",
+                          "validBefore",
+                          "nonce"
+                        ]
+                      },
+                      "type": {
+                        "type": "string",
+                        "enum": ["address", "uint256", "bytes32"]
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "message": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "from",
+                "to",
+                "value",
+                "validAfter",
+                "validBefore",
+                "nonce"
+              ],
+              "properties": {
+                "from": {
+                  "type": "string",
+                  "pattern": "^0x[0-9a-fA-F]{40}$"
+                },
+                "to": {
+                  "type": "string",
+                  "pattern": "^0x[0-9a-fA-F]{40}$"
+                },
+                "value": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,77})$"
+                },
+                "validAfter": {
+                  "type": "string",
+                  "enum": ["0"]
+                },
+                "validBefore": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,77})$"
+                },
+                "nonce": {
+                  "type": "string",
+                  "pattern": "^0x[0-9a-f]{64}$"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action_id",
+        "account_id",
+        "status",
+        "expires_at",
+        "payload_hash",
+        "payload",
+        "intent"
+      ],
+      "properties": {
+        "action_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "account_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["authorizing", "authorized", "denied"]
+        },
+        "expires_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "payload_hash": {
+          "type": "string",
+          "pattern": "^0x[0-9a-f]{64}$"
+        },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["primaryType", "domain", "types", "message"],
+          "properties": {
+            "primaryType": {
+              "type": "string",
+              "enum": ["SafeTx"]
+            },
+            "domain": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["chainId", "verifyingContract"],
+              "properties": {
+                "chainId": {
+                  "type": "string",
+                  "enum": ["84532"]
+                },
+                "verifyingContract": {
+                  "type": "string",
+                  "pattern": "^0x[0-9a-fA-F]{40}$"
+                }
+              }
+            },
+            "types": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["SafeTx"],
+              "properties": {
+                "SafeTx": {
+                  "type": "array",
+                  "minItems": 10,
+                  "maxItems": 10,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["name", "type"],
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "enum": [
+                          "to",
+                          "value",
+                          "data",
+                          "operation",
+                          "safeTxGas",
+                          "baseGas",
+                          "gasPrice",
+                          "gasToken",
+                          "refundReceiver",
+                          "nonce"
+                        ]
+                      },
+                      "type": {
+                        "type": "string",
+                        "enum": ["address", "uint256", "bytes", "uint8"]
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "message": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "to",
+                "value",
+                "data",
+                "operation",
+                "safeTxGas",
+                "baseGas",
+                "gasPrice",
+                "gasToken",
+                "refundReceiver",
+                "nonce"
+              ],
+              "properties": {
+                "to": {
+                  "type": "string",
+                  "pattern": "^0x[0-9a-fA-F]{40}$"
+                },
+                "value": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,77})$"
+                },
+                "data": {
+                  "type": "string",
+                  "pattern": "^0x(?:[0-9a-f]{2})*$",
+                  "maxLength": 8192
+                },
+                "operation": {
+                  "type": "string",
+                  "enum": ["0", "1"]
+                },
+                "safeTxGas": {
+                  "type": "string",
+                  "enum": ["0"]
+                },
+                "baseGas": {
+                  "type": "string",
+                  "enum": ["0"]
+                },
+                "gasPrice": {
+                  "type": "string",
+                  "enum": ["0"]
+                },
+                "gasToken": {
+                  "type": "string",
+                  "enum": ["0x0000000000000000000000000000000000000000"]
+                },
+                "refundReceiver": {
+                  "type": "string",
+                  "enum": ["0x0000000000000000000000000000000000000000"]
+                },
+                "nonce": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,77})$"
+                }
+              }
+            }
+          }
+        },
+        "intent": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "version",
+            "mechanism",
+            "input",
+            "account",
+            "multiSend",
+            "calls",
+            "contracts",
+            "effects",
+            "nonce"
+          ],
+          "properties": {
+            "version": {
+              "type": "string",
+              "enum": ["1"]
+            },
+            "mechanism": {
+              "type": "string",
+              "enum": ["safe-1.4.1"]
+            },
+            "input": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["account_id", "kind", "calls"],
+                  "properties": {
+                    "account_id": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": ["contract-call"]
+                    },
+                    "calls": {
+                      "type": "array",
+                      "minItems": 1,
+                      "maxItems": 16,
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["to", "value", "data"],
+                        "properties": {
+                          "to": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "value": {
+                            "type": "string",
+                            "pattern": "^(0|[1-9][0-9]{0,77})$"
+                          },
+                          "data": {
+                            "type": "string",
+                            "pattern": "^0x(?:[0-9a-f]{2}){4,4096}$"
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "account_id",
+                    "kind",
+                    "route",
+                    "amount_in",
+                    "minimum_out",
+                    "deadline"
+                  ],
+                  "properties": {
+                    "account_id": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": ["swap"]
+                    },
+                    "route": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z0-9._-]{1,64}$"
+                    },
+                    "amount_in": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]{0,77})$"
+                    },
+                    "minimum_out": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]{0,77})$"
+                    },
+                    "deadline": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]{0,77})$"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "account_id",
+                    "kind",
+                    "route",
+                    "assets",
+                    "minimum_shares"
+                  ],
+                  "properties": {
+                    "account_id": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": ["vault-deposit"]
+                    },
+                    "route": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z0-9._-]{1,64}$"
+                    },
+                    "assets": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]{0,77})$"
+                    },
+                    "minimum_shares": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]{0,77})$"
+                    }
+                  }
+                }
+              ]
+            },
+            "account": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["address", "codeHash", "accountId", "singleton"],
+              "properties": {
+                "address": {
+                  "type": "string",
+                  "pattern": "^0x[0-9a-fA-F]{40}$"
+                },
+                "codeHash": {
+                  "type": "string",
+                  "pattern": "^0x[0-9a-f]{64}$"
+                },
+                "implementation": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["address", "codeHash"],
+                  "properties": {
+                    "address": {
+                      "type": "string",
+                      "pattern": "^0x[0-9a-fA-F]{40}$"
+                    },
+                    "codeHash": {
+                      "type": "string",
+                      "pattern": "^0x[0-9a-f]{64}$"
+                    }
+                  }
+                },
+                "accountId": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                },
+                "singleton": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["address", "codeHash"],
+                  "properties": {
+                    "address": {
+                      "type": "string",
+                      "pattern": "^0x[0-9a-fA-F]{40}$"
+                    },
+                    "codeHash": {
+                      "type": "string",
+                      "pattern": "^0x[0-9a-f]{64}$"
+                    },
+                    "implementation": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["address", "codeHash"],
+                      "properties": {
+                        "address": {
+                          "type": "string",
+                          "pattern": "^0x[0-9a-fA-F]{40}$"
+                        },
+                        "codeHash": {
+                          "type": "string",
+                          "pattern": "^0x[0-9a-f]{64}$"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "multiSend": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["address", "codeHash"],
+              "properties": {
+                "address": {
+                  "type": "string",
+                  "pattern": "^0x[0-9a-fA-F]{40}$"
+                },
+                "codeHash": {
+                  "type": "string",
+                  "pattern": "^0x[0-9a-f]{64}$"
+                },
+                "implementation": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["address", "codeHash"],
+                  "properties": {
+                    "address": {
+                      "type": "string",
+                      "pattern": "^0x[0-9a-fA-F]{40}$"
+                    },
+                    "codeHash": {
+                      "type": "string",
+                      "pattern": "^0x[0-9a-f]{64}$"
+                    }
+                  }
+                }
+              }
+            },
+            "calls": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 16,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["to", "value", "data"],
+                "properties": {
+                  "to": {
+                    "type": "string",
+                    "pattern": "^0x[0-9a-fA-F]{40}$"
+                  },
+                  "value": {
+                    "type": "string",
+                    "pattern": "^(0|[1-9][0-9]{0,77})$"
+                  },
+                  "data": {
+                    "type": "string",
+                    "pattern": "^0x(?:[0-9a-f]{2}){4,4096}$"
+                  }
+                }
+              }
+            },
+            "contracts": {
+              "type": "array",
+              "maxItems": 32,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["address", "codeHash"],
+                "properties": {
+                  "address": {
+                    "type": "string",
+                    "pattern": "^0x[0-9a-fA-F]{40}$"
+                  },
+                  "codeHash": {
+                    "type": "string",
+                    "pattern": "^0x[0-9a-f]{64}$"
+                  },
+                  "implementation": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["address", "codeHash"],
+                    "properties": {
+                      "address": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                      },
+                      "codeHash": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-f]{64}$"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "effects": {
+              "type": "array",
+              "maxItems": 16,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["token", "from", "to", "minimum"],
+                "properties": {
+                  "token": {
+                    "type": "string",
+                    "pattern": "^0x[0-9a-fA-F]{40}$"
+                  },
+                  "from": {
+                    "type": "string"
+                  },
+                  "to": {
+                    "type": "string"
+                  },
+                  "minimum": {
+                    "type": "string",
+                    "pattern": "^(0|[1-9][0-9]{0,77})$"
+                  },
+                  "maximum": {
+                    "type": "string",
+                    "pattern": "^(0|[1-9][0-9]{0,77})$"
+                  }
+                }
+              }
+            },
+            "nonce": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]{0,77})$"
+            }
+          }
+        }
+      }
+    }
+  ]
+}
+```
+
+## POST /v1/actions/contract-calls
+
+Operation: `requestContractCall`.
+
+Request an immutable approved contract call, Uniswap V3 exact-input swap or bounded ERC-4626 router deposit. Requires separately consented contracts:request delegation, current owner/grant/KYC/consent and configured target policies. The service constructs the Safe transaction and reserves its nonce; callers never supply signatures or a signing payload.
+
+| Parameter         | Location | Required | Schema                                                                                                |
+| ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
+| `idempotency-key` | header   | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+
+Request body (application/json):
+
+```json
+{
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["account_id", "kind", "calls"],
+      "properties": {
+        "account_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "kind": {
+          "type": "string",
+          "enum": ["contract-call"]
+        },
+        "calls": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 16,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["to", "value", "data"],
+            "properties": {
+              "to": {
+                "type": "string",
+                "pattern": "^0x[0-9a-fA-F]{40}$"
+              },
+              "value": {
+                "type": "string",
+                "pattern": "^(0|[1-9][0-9]{0,77})$"
+              },
+              "data": {
+                "type": "string",
+                "pattern": "^0x(?:[0-9a-f]{2}){4,4096}$"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "account_id",
+        "kind",
+        "route",
+        "amount_in",
+        "minimum_out",
+        "deadline"
+      ],
+      "properties": {
+        "account_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "kind": {
+          "type": "string",
+          "enum": ["swap"]
+        },
+        "route": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._-]{1,64}$"
+        },
+        "amount_in": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,77})$"
+        },
+        "minimum_out": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,77})$"
+        },
+        "deadline": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,77})$"
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["account_id", "kind", "route", "assets", "minimum_shares"],
+      "properties": {
+        "account_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "kind": {
+          "type": "string",
+          "enum": ["vault-deposit"]
+        },
+        "route": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._-]{1,64}$"
+        },
+        "assets": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,77})$"
+        },
+        "minimum_shares": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,77})$"
+        }
+      }
+    }
+  ]
+}
+```
+
+| Status | Content type     | Description      |
+| ------ | ---------------- | ---------------- |
+| 200    | application/json | Default Response |
+
+Success response schema:
+
+```json
+{
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -606,7 +1851,8 @@ Success response schema:
     "status",
     "expires_at",
     "payload_hash",
-    "payload"
+    "payload",
+    "intent"
   ],
   "properties": {
     "action_id": {
@@ -618,37 +1864,29 @@ Success response schema:
       "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
     },
     "status": {
-      "type": "string",
-      "enum": ["authorizing", "authorized", "denied"]
+      "type": "string"
     },
     "expires_at": {
       "type": "string",
       "format": "date-time"
     },
     "payload_hash": {
-      "type": "string",
-      "pattern": "^0x[0-9a-f]{64}$"
+      "type": "string"
     },
     "payload": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["domain", "types", "primaryType", "message"],
+      "required": ["primaryType", "domain", "types", "message"],
       "properties": {
         "primaryType": {
           "type": "string",
-          "enum": ["TransferWithAuthorization"]
+          "enum": ["SafeTx"]
         },
         "domain": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["name", "version", "chainId", "verifyingContract"],
+          "required": ["chainId", "verifyingContract"],
           "properties": {
-            "name": {
-              "type": "string"
-            },
-            "version": {
-              "type": "string"
-            },
             "chainId": {
               "type": "string",
               "enum": ["84532"]
@@ -662,12 +1900,12 @@ Success response schema:
         "types": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["TransferWithAuthorization"],
+          "required": ["SafeTx"],
           "properties": {
-            "TransferWithAuthorization": {
+            "SafeTx": {
               "type": "array",
-              "minItems": 6,
-              "maxItems": 6,
+              "minItems": 10,
+              "maxItems": 10,
               "items": {
                 "type": "object",
                 "additionalProperties": false,
@@ -676,17 +1914,21 @@ Success response schema:
                   "name": {
                     "type": "string",
                     "enum": [
-                      "from",
                       "to",
                       "value",
-                      "validAfter",
-                      "validBefore",
+                      "data",
+                      "operation",
+                      "safeTxGas",
+                      "baseGas",
+                      "gasPrice",
+                      "gasToken",
+                      "refundReceiver",
                       "nonce"
                     ]
                   },
                   "type": {
                     "type": "string",
-                    "enum": ["address", "uint256", "bytes32"]
+                    "enum": ["address", "uint256", "bytes", "uint8"]
                   }
                 }
               }
@@ -697,18 +1939,18 @@ Success response schema:
           "type": "object",
           "additionalProperties": false,
           "required": [
-            "from",
             "to",
             "value",
-            "validAfter",
-            "validBefore",
+            "data",
+            "operation",
+            "safeTxGas",
+            "baseGas",
+            "gasPrice",
+            "gasToken",
+            "refundReceiver",
             "nonce"
           ],
           "properties": {
-            "from": {
-              "type": "string",
-              "pattern": "^0x[0-9a-fA-F]{40}$"
-            },
             "to": {
               "type": "string",
               "pattern": "^0x[0-9a-fA-F]{40}$"
@@ -717,21 +1959,467 @@ Success response schema:
               "type": "string",
               "pattern": "^(0|[1-9][0-9]{0,77})$"
             },
-            "validAfter": {
+            "data": {
+              "type": "string",
+              "pattern": "^0x(?:[0-9a-f]{2})*$",
+              "maxLength": 8192
+            },
+            "operation": {
+              "type": "string",
+              "enum": ["0", "1"]
+            },
+            "safeTxGas": {
               "type": "string",
               "enum": ["0"]
             },
-            "validBefore": {
+            "baseGas": {
               "type": "string",
-              "pattern": "^(0|[1-9][0-9]{0,77})$"
+              "enum": ["0"]
+            },
+            "gasPrice": {
+              "type": "string",
+              "enum": ["0"]
+            },
+            "gasToken": {
+              "type": "string",
+              "enum": ["0x0000000000000000000000000000000000000000"]
+            },
+            "refundReceiver": {
+              "type": "string",
+              "enum": ["0x0000000000000000000000000000000000000000"]
             },
             "nonce": {
               "type": "string",
-              "pattern": "^0x[0-9a-f]{64}$"
+              "pattern": "^(0|[1-9][0-9]{0,77})$"
             }
           }
         }
       }
+    },
+    "intent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "mechanism",
+        "input",
+        "account",
+        "multiSend",
+        "calls",
+        "contracts",
+        "effects",
+        "nonce"
+      ],
+      "properties": {
+        "version": {
+          "type": "string",
+          "enum": ["1"]
+        },
+        "mechanism": {
+          "type": "string",
+          "enum": ["safe-1.4.1"]
+        },
+        "input": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["account_id", "kind", "calls"],
+              "properties": {
+                "account_id": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": ["contract-call"]
+                },
+                "calls": {
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 16,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["to", "value", "data"],
+                    "properties": {
+                      "to": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                      },
+                      "value": {
+                        "type": "string",
+                        "pattern": "^(0|[1-9][0-9]{0,77})$"
+                      },
+                      "data": {
+                        "type": "string",
+                        "pattern": "^0x(?:[0-9a-f]{2}){4,4096}$"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "account_id",
+                "kind",
+                "route",
+                "amount_in",
+                "minimum_out",
+                "deadline"
+              ],
+              "properties": {
+                "account_id": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": ["swap"]
+                },
+                "route": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9._-]{1,64}$"
+                },
+                "amount_in": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,77})$"
+                },
+                "minimum_out": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,77})$"
+                },
+                "deadline": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,77})$"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "account_id",
+                "kind",
+                "route",
+                "assets",
+                "minimum_shares"
+              ],
+              "properties": {
+                "account_id": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": ["vault-deposit"]
+                },
+                "route": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9._-]{1,64}$"
+                },
+                "assets": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,77})$"
+                },
+                "minimum_shares": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,77})$"
+                }
+              }
+            }
+          ]
+        },
+        "account": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["address", "codeHash", "accountId", "singleton"],
+          "properties": {
+            "address": {
+              "type": "string",
+              "pattern": "^0x[0-9a-fA-F]{40}$"
+            },
+            "codeHash": {
+              "type": "string",
+              "pattern": "^0x[0-9a-f]{64}$"
+            },
+            "implementation": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["address", "codeHash"],
+              "properties": {
+                "address": {
+                  "type": "string",
+                  "pattern": "^0x[0-9a-fA-F]{40}$"
+                },
+                "codeHash": {
+                  "type": "string",
+                  "pattern": "^0x[0-9a-f]{64}$"
+                }
+              }
+            },
+            "accountId": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            },
+            "singleton": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["address", "codeHash"],
+              "properties": {
+                "address": {
+                  "type": "string",
+                  "pattern": "^0x[0-9a-fA-F]{40}$"
+                },
+                "codeHash": {
+                  "type": "string",
+                  "pattern": "^0x[0-9a-f]{64}$"
+                },
+                "implementation": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["address", "codeHash"],
+                  "properties": {
+                    "address": {
+                      "type": "string",
+                      "pattern": "^0x[0-9a-fA-F]{40}$"
+                    },
+                    "codeHash": {
+                      "type": "string",
+                      "pattern": "^0x[0-9a-f]{64}$"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "multiSend": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["address", "codeHash"],
+          "properties": {
+            "address": {
+              "type": "string",
+              "pattern": "^0x[0-9a-fA-F]{40}$"
+            },
+            "codeHash": {
+              "type": "string",
+              "pattern": "^0x[0-9a-f]{64}$"
+            },
+            "implementation": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["address", "codeHash"],
+              "properties": {
+                "address": {
+                  "type": "string",
+                  "pattern": "^0x[0-9a-fA-F]{40}$"
+                },
+                "codeHash": {
+                  "type": "string",
+                  "pattern": "^0x[0-9a-f]{64}$"
+                }
+              }
+            }
+          }
+        },
+        "calls": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 16,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["to", "value", "data"],
+            "properties": {
+              "to": {
+                "type": "string",
+                "pattern": "^0x[0-9a-fA-F]{40}$"
+              },
+              "value": {
+                "type": "string",
+                "pattern": "^(0|[1-9][0-9]{0,77})$"
+              },
+              "data": {
+                "type": "string",
+                "pattern": "^0x(?:[0-9a-f]{2}){4,4096}$"
+              }
+            }
+          }
+        },
+        "contracts": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["address", "codeHash"],
+            "properties": {
+              "address": {
+                "type": "string",
+                "pattern": "^0x[0-9a-fA-F]{40}$"
+              },
+              "codeHash": {
+                "type": "string",
+                "pattern": "^0x[0-9a-f]{64}$"
+              },
+              "implementation": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["address", "codeHash"],
+                "properties": {
+                  "address": {
+                    "type": "string",
+                    "pattern": "^0x[0-9a-fA-F]{40}$"
+                  },
+                  "codeHash": {
+                    "type": "string",
+                    "pattern": "^0x[0-9a-f]{64}$"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "effects": {
+          "type": "array",
+          "maxItems": 16,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["token", "from", "to", "minimum"],
+            "properties": {
+              "token": {
+                "type": "string",
+                "pattern": "^0x[0-9a-fA-F]{40}$"
+              },
+              "from": {
+                "type": "string"
+              },
+              "to": {
+                "type": "string"
+              },
+              "minimum": {
+                "type": "string",
+                "pattern": "^(0|[1-9][0-9]{0,77})$"
+              },
+              "maximum": {
+                "type": "string",
+                "pattern": "^(0|[1-9][0-9]{0,77})$"
+              }
+            }
+          }
+        },
+        "nonce": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,77})$"
+        }
+      }
+    }
+  }
+}
+```
+
+## POST /v1/internal/execution-authority
+
+Operation: `checkExecutionAuthority`.
+
+Read-only callback for the configured designated executor. Requires a pinned signed service request, exact stored plan/attempt and an unexpired handoff lease. Rechecks current owner, grant, KYC, consent, immutable approval and active revision. Application OAuth tokens do not authenticate this endpoint.
+
+Request body (application/json):
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "execution_id",
+    "action_id",
+    "plan_hash",
+    "request_hash",
+    "provider_id",
+    "provider_revision"
+  ],
+  "properties": {
+    "provider_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._-]{1,64}$"
+    },
+    "provider_revision": {
+      "type": "string",
+      "pattern": "^[1-9][0-9]{0,19}$"
+    },
+    "execution_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "action_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "plan_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "request_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}
+```
+
+| Status | Content type     | Description      |
+| ------ | ---------------- | ---------------- |
+| 200    | application/json | Default Response |
+
+Success response schema:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "allowed",
+    "provider_id",
+    "provider_revision",
+    "execution_id",
+    "action_id",
+    "plan_hash",
+    "request_hash"
+  ],
+  "properties": {
+    "action_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "allowed": {
+      "type": "boolean",
+      "enum": [true]
+    },
+    "provider_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._-]{1,64}$"
+    },
+    "provider_revision": {
+      "type": "string",
+      "pattern": "^[1-9][0-9]{0,19}$"
+    },
+    "execution_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "plan_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "request_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
     }
   }
 }
@@ -848,12 +2536,12 @@ Success response schema:
 
 Operation: `executeTransfer`.
 
-Optional fixed ERC-3009 transfer execution with exact version selection, current owner/grant/identity/consent/approval checks, durable signing and submission authority, application gas sponsorship and independent RPC receipt/finality verification. Unknown submission outcomes never permit redispatch. No arbitrary transaction payload is accepted.
+Optional immutable approved-action execution with exact version selection, current owner/grant/identity/consent/approval checks, durable signing and submission authority, application gas sponsorship and independent RPC receipt/finality verification. Unknown provider submission outcomes never permit redispatch. Contract calls require the approved-evm-executor-v1 profile and a stored policy-approved action; execute never accepts replacement calldata.
 
 | Parameter                    | Location | Required | Schema                                                                                                |
 | ---------------------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
 | `actionId`                   | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
-| `execution-profile`          | header   | yes      | `{"type":"string","enum":["erc3009-relayer-v1"]}`                                                     |
+| `execution-profile`          | header   | yes      | `{"type":"string","enum":["erc3009-relayer-v1","erc3009-executor-v1","approved-evm-executor-v1"]}`    |
 | `execution-profile-revision` | header   | yes      | `{"type":"string","enum":["1"]}`                                                                      |
 | `idempotency-key`            | header   | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
 
@@ -903,7 +2591,21 @@ Success response schema:
   "properties": {
     "profile": {
       "type": "string",
-      "enum": ["erc3009-relayer-v1"]
+      "enum": [
+        "erc3009-relayer-v1",
+        "erc3009-executor-v1",
+        "approved-evm-executor-v1"
+      ]
+    },
+    "outcome_scope": {
+      "type": "string",
+      "enum": [
+        "token-transfer",
+        "contract-execution",
+        "swap-effects",
+        "vault-deposit-effects"
+      ],
+      "description": "What verified success establishes: exact token transfer, successful approved calls, or the required swap/vault asset effects. Contract execution alone does not prove an arbitrary business outcome."
     },
     "profile_revision": {
       "type": "string",
@@ -920,7 +2622,7 @@ Success response schema:
     "dispatch_status": {
       "type": "string",
       "enum": ["not_started", "pending", "accepted", "unknown", "failed"],
-      "description": "Durable submission state. Accepted identifies a Relayer queue record; it is not chain inclusion or settlement."
+      "description": "Durable submission state. Accepted identifies a durable executor/provider acceptance; it is not chain inclusion or settlement."
     },
     "observation_revision": {
       "type": "integer",
@@ -1093,12 +2795,12 @@ Success response schema:
 
 Operation: `getTransferExecution`.
 
-Optional fixed ERC-3009 transfer execution with exact version selection, current owner/grant/identity/consent/approval checks, durable signing and submission authority, application gas sponsorship and independent RPC receipt/finality verification. Unknown submission outcomes never permit redispatch. No arbitrary transaction payload is accepted.
+Optional immutable approved-action execution with exact version selection, current owner/grant/identity/consent/approval checks, durable signing and submission authority, application gas sponsorship and independent RPC receipt/finality verification. Unknown provider submission outcomes never permit redispatch. Contract calls require the approved-evm-executor-v1 profile and a stored policy-approved action; execute never accepts replacement calldata.
 
 | Parameter                    | Location | Required | Schema                                                                                                |
 | ---------------------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
 | `actionId`                   | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
-| `execution-profile`          | header   | yes      | `{"type":"string","enum":["erc3009-relayer-v1"]}`                                                     |
+| `execution-profile`          | header   | yes      | `{"type":"string","enum":["erc3009-relayer-v1","erc3009-executor-v1","approved-evm-executor-v1"]}`    |
 | `execution-profile-revision` | header   | yes      | `{"type":"string","enum":["1"]}`                                                                      |
 
 | Status | Content type             | Description      |
@@ -1138,7 +2840,21 @@ Success response schema:
   "properties": {
     "profile": {
       "type": "string",
-      "enum": ["erc3009-relayer-v1"]
+      "enum": [
+        "erc3009-relayer-v1",
+        "erc3009-executor-v1",
+        "approved-evm-executor-v1"
+      ]
+    },
+    "outcome_scope": {
+      "type": "string",
+      "enum": [
+        "token-transfer",
+        "contract-execution",
+        "swap-effects",
+        "vault-deposit-effects"
+      ],
+      "description": "What verified success establishes: exact token transfer, successful approved calls, or the required swap/vault asset effects. Contract execution alone does not prove an arbitrary business outcome."
     },
     "profile_revision": {
       "type": "string",
@@ -1155,7 +2871,7 @@ Success response schema:
     "dispatch_status": {
       "type": "string",
       "enum": ["not_started", "pending", "accepted", "unknown", "failed"],
-      "description": "Durable submission state. Accepted identifies a Relayer queue record; it is not chain inclusion or settlement."
+      "description": "Durable submission state. Accepted identifies a durable executor/provider acceptance; it is not chain inclusion or settlement."
     },
     "observation_revision": {
       "type": "integer",
@@ -1334,7 +3050,7 @@ Authenticated CloudEvents 1.0 execution observations with a monotonic sequence i
 | ---------------------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
 | `after`                      | query    | no       | `{"type":"string","pattern":"^(0\|[1-9][0-9]{0,15})$"}`                                               |
 | `actionId`                   | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
-| `execution-profile`          | header   | yes      | `{"type":"string","enum":["erc3009-relayer-v1"]}`                                                     |
+| `execution-profile`          | header   | yes      | `{"type":"string","enum":["erc3009-relayer-v1","erc3009-executor-v1","approved-evm-executor-v1"]}`    |
 | `execution-profile-revision` | header   | yes      | `{"type":"string","enum":["1"]}`                                                                      |
 
 | Status | Content type             | Description      |
@@ -1369,7 +3085,11 @@ Success response schema:
   "properties": {
     "profile": {
       "type": "string",
-      "enum": ["erc3009-relayer-v1"]
+      "enum": [
+        "erc3009-relayer-v1",
+        "erc3009-executor-v1",
+        "approved-evm-executor-v1"
+      ]
     },
     "profile_revision": {
       "type": "string",
@@ -1461,7 +3181,21 @@ Success response schema:
             "properties": {
               "profile": {
                 "type": "string",
-                "enum": ["erc3009-relayer-v1"]
+                "enum": [
+                  "erc3009-relayer-v1",
+                  "erc3009-executor-v1",
+                  "approved-evm-executor-v1"
+                ]
+              },
+              "outcome_scope": {
+                "type": "string",
+                "enum": [
+                  "token-transfer",
+                  "contract-execution",
+                  "swap-effects",
+                  "vault-deposit-effects"
+                ],
+                "description": "What verified success establishes: exact token transfer, successful approved calls, or the required swap/vault asset effects. Contract execution alone does not prove an arbitrary business outcome."
               },
               "profile_revision": {
                 "type": "string",
@@ -1484,7 +3218,7 @@ Success response schema:
                   "unknown",
                   "failed"
                 ],
-                "description": "Durable submission state. Accepted identifies a Relayer queue record; it is not chain inclusion or settlement."
+                "description": "Durable submission state. Accepted identifies a durable executor/provider acceptance; it is not chain inclusion or settlement."
               },
               "observation_revision": {
                 "type": "integer",
@@ -1972,6 +3706,10 @@ Request body (application/json):
               "type": "string",
               "pattern": "^[a-f0-9]{64}$"
             },
+            "action_policy_revision": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
             "transfer_policy_revision": {
               "type": "string",
               "pattern": "^[a-f0-9]{64}$"
@@ -1996,14 +3734,15 @@ Request body (application/json):
           "actions": {
             "type": "array",
             "minItems": 1,
-            "maxItems": 3,
+            "maxItems": 4,
             "uniqueItems": true,
             "items": {
               "type": "string",
               "enum": [
                 "account:read",
                 "operations:request",
-                "transfers:request"
+                "transfers:request",
+                "contracts:request"
               ]
             }
           }
@@ -2074,7 +3813,12 @@ Success response schema:
       "type": "array",
       "items": {
         "type": "string",
-        "enum": ["account:read", "operations:request", "transfers:request"]
+        "enum": [
+          "account:read",
+          "operations:request",
+          "transfers:request",
+          "contracts:request"
+        ]
       }
     },
     "expires_at": {
@@ -2155,6 +3899,9 @@ Success response schema:
     "policy_revision": {
       "type": "string"
     },
+    "action_policy_revision": {
+      "type": "string"
+    },
     "transfer_policy_revision": {
       "type": "string"
     },
@@ -2220,6 +3967,355 @@ Success response schema:
         "lifetimeAmount": {
           "type": "string",
           "pattern": "^[1-9][0-9]{0,77}$"
+        },
+        "maxValiditySeconds": {
+          "type": "integer",
+          "minimum": 60,
+          "maximum": 3600
+        }
+      }
+    },
+    "contract_call_terms": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["policy", "maxValiditySeconds"],
+      "properties": {
+        "policy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "mechanism",
+            "multiSend",
+            "maximumNativeValueWei",
+            "lifetimeOperations",
+            "contracts",
+            "swaps",
+            "vaults"
+          ],
+          "properties": {
+            "mechanism": {
+              "enum": ["safe-1.4.1"]
+            },
+            "multiSend": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["address", "codeHash"],
+              "properties": {
+                "address": {
+                  "type": "string",
+                  "pattern": "^0x[0-9a-fA-F]{40}$"
+                },
+                "codeHash": {
+                  "type": "string",
+                  "pattern": "^0x[0-9a-f]{64}$"
+                },
+                "implementation": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["address", "codeHash"],
+                  "properties": {
+                    "address": {
+                      "type": "string",
+                      "pattern": "^0x[0-9a-fA-F]{40}$"
+                    },
+                    "codeHash": {
+                      "type": "string",
+                      "pattern": "^0x[0-9a-f]{64}$"
+                    }
+                  }
+                }
+              }
+            },
+            "maximumNativeValueWei": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]{0,77})$"
+            },
+            "lifetimeOperations": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]{0,77})$"
+            },
+            "contracts": {
+              "type": "array",
+              "maxItems": 128,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "address",
+                  "codeHash",
+                  "selectors",
+                  "maximumValueWei"
+                ],
+                "properties": {
+                  "address": {
+                    "type": "string",
+                    "pattern": "^0x[0-9a-fA-F]{40}$"
+                  },
+                  "codeHash": {
+                    "type": "string",
+                    "pattern": "^0x[0-9a-f]{64}$"
+                  },
+                  "selectors": {
+                    "type": "array",
+                    "maxItems": 128,
+                    "items": {
+                      "type": "string",
+                      "pattern": "^0x[0-9a-f]{8}$"
+                    }
+                  },
+                  "maximumValueWei": {
+                    "type": "string",
+                    "pattern": "^(0|[1-9][0-9]{0,77})$"
+                  },
+                  "implementation": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["address", "codeHash"],
+                    "properties": {
+                      "address": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                      },
+                      "codeHash": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-f]{64}$"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "swaps": {
+              "type": "array",
+              "maxItems": 128,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "router",
+                  "tokenIn",
+                  "tokenOut",
+                  "fee",
+                  "maximumInput"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9._-]{1,64}$"
+                  },
+                  "router": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["address", "codeHash"],
+                    "properties": {
+                      "address": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                      },
+                      "codeHash": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-f]{64}$"
+                      },
+                      "implementation": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "tokenIn": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["address", "codeHash"],
+                    "properties": {
+                      "address": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                      },
+                      "codeHash": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-f]{64}$"
+                      },
+                      "implementation": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "tokenOut": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["address", "codeHash"],
+                    "properties": {
+                      "address": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                      },
+                      "codeHash": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-f]{64}$"
+                      },
+                      "implementation": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "fee": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 999999
+                  },
+                  "maximumInput": {
+                    "type": "string",
+                    "pattern": "^(0|[1-9][0-9]{0,77})$"
+                  }
+                }
+              }
+            },
+            "vaults": {
+              "type": "array",
+              "maxItems": 128,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["id", "router", "vault", "asset", "maximumAssets"],
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9._-]{1,64}$"
+                  },
+                  "router": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["address", "codeHash"],
+                    "properties": {
+                      "address": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                      },
+                      "codeHash": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-f]{64}$"
+                      },
+                      "implementation": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "vault": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["address", "codeHash"],
+                    "properties": {
+                      "address": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                      },
+                      "codeHash": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-f]{64}$"
+                      },
+                      "implementation": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "asset": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["address", "codeHash"],
+                    "properties": {
+                      "address": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                      },
+                      "codeHash": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-f]{64}$"
+                      },
+                      "implementation": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "maximumAssets": {
+                    "type": "string",
+                    "pattern": "^(0|[1-9][0-9]{0,77})$"
+                  }
+                }
+              }
+            }
+          }
         },
         "maxValiditySeconds": {
           "type": "integer",
@@ -2424,7 +4520,8 @@ Success response schema:
                   "enum": [
                     "account:read",
                     "operations:request",
-                    "transfers:request"
+                    "transfers:request",
+                    "contracts:request"
                   ]
                 }
               },
@@ -2509,7 +4606,12 @@ Success response schema:
       "type": "array",
       "items": {
         "type": "string",
-        "enum": ["account:read", "operations:request", "transfers:request"]
+        "enum": [
+          "account:read",
+          "operations:request",
+          "transfers:request",
+          "contracts:request"
+        ]
       }
     },
     "expires_at": {
@@ -2610,7 +4712,12 @@ Success response schema:
       "type": "array",
       "items": {
         "type": "string",
-        "enum": ["account:read", "operations:request", "transfers:request"]
+        "enum": [
+          "account:read",
+          "operations:request",
+          "transfers:request",
+          "contracts:request"
+        ]
       }
     },
     "expires_at": {

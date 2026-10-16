@@ -5,10 +5,16 @@ function setting(summary: string, why: string, source: string, guide: string) {
 }
 
 export const settings = {
+  executionService: setting(
+    'The separately deployed dispatcher, selected provider revision and pinned service keys.',
+    'Signed requests bind the method, path, destination and exact body. The executor maintains its own durable journal and calls the wallet service for current authority before provider effects. An application OAuth token cannot authorize that callback.',
+    'Deploy the execution service with a separate local database and an accepted provider registry. Configure matching provider/sponsor policy on both services. Supply ES256 PKCS8 private and SPKI public PEM values only through the named environment variables; copy key IDs from the corresponding service configuration. Read the execution-service guide for authentication, recovery and key rotation.',
+    'execution-service.html',
+  ),
   executionEnabled: setting(
     'Add the fixed approved-transfer execution profile and RPC verification.',
     'The provider signs and dispatches only stored approved transfers under current authority. A separate application sponsor covers gas; observation does not confer spending authority.',
-    'Configure transfer signing first. Use the execution guide to prepare a dedicated Relayer sponsor and two independent RPC sources. Keep activation off until execution, chain checks and lost-response recovery have deployment-specific acceptance evidence.',
+    'Configure transfer signing first. Choose the separately deployed execution service or the direct Relayer compatibility profile, configure a dedicated sponsor and two independent RPC sources. Keep activation off until execution, chain checks and lost-response recovery have deployment-specific acceptance evidence.',
     'execution.html',
   ),
   executionRpc: setting(
@@ -24,9 +30,9 @@ export const settings = {
     'execution.html#configure-and-accept-execution',
   ),
   executionSponsor: setting(
-    'A preconfigured application-funded Relayer signer and explicit funding agreement.',
+    'A preconfigured application-funded sponsor account and explicit funding agreement.',
     'Sponsors are selected by the authenticated application, never by an API body. Sponsor queues and signers must be separate from owner-wallet signing bindings.',
-    'Create and fund the dedicated sponsor outside the toolkit using your approved process. Copy its Relayer ID, signer ID, address and binding revision. Record the application funding agreement; API scopes and owner wallet consent do not authorize sponsor funding. Use an HTTPS Relayer origin and an environment variable name for its API key.',
+    'Create and fund the dedicated sponsor outside the toolkit using your approved process. Match its address, account identity, gas policy and binding revision on both services. Vendor-specific IDs belong in the designated executor; direct Relayer mode also needs its Relayer and signer IDs. Record the application funding agreement; API scopes and owner wallet consent do not authorize sponsor funding. Use an HTTPS Relayer origin and an environment variable name for its API key.',
     'execution.html#configure-and-accept-execution',
   ),
   executionGas: setting(
@@ -467,6 +473,12 @@ export const settings = {
     'Transfer signing requires verified contract, domain, limits and recovery behavior in addition to backend acceptance.',
     'Enter the reference to the reviewed report from your token specialist’s tests. The wizard does not issue this reference or verify the report.',
     'operator-services.html#optional-token-signing-policy',
+  ),
+  approvedCalls: setting(
+    'Explicit smart-account bindings and permitted contract actions.',
+    'Contract-call delegation is separate from transfer delegation. Only reviewed targets, functions, swap routes and vault routes are admitted. Native value and operation limits do not bound every possible token effect of an arbitrary contract.',
+    'Use an existing single-owner Safe 1.4.1 account, verified runtime hashes and the approved EVM execution profile. Review every target and consent term before activation. The wizard does not deploy accounts or certify contracts.',
+    'approved-contract-calls.html',
   ),
 } as const;
 

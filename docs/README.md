@@ -6,7 +6,7 @@ adapter or signing code. Product developers consume the API; custom adapters and
 embedded composition are the advanced path.
 
 This guide starts from an empty operator workstation. The current service is
-experimental, single-host and Base Sepolia EOA only. Mainnet and production custody
+experimental, single-host and Base Sepolia only, with EOA transfers and explicitly bound Safe 1.4.1 contract calls. Mainnet and production custody
 acceptance remain pending. Signing returns an authorization without broadcasting. The optional
 [execution coordinator](execution.md) submits through a pre-funded application
 sponsor and verifies token-transfer finality. Read [roles and terms](concepts.md) if wallet provider,

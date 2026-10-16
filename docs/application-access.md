@@ -199,3 +199,7 @@ grants need a reviewed mapping and migration; no automatic migration is supplied
 Use a new empty deployment for an independent evaluation, and retain recovery
 records for any existing wallets. Do not downgrade an application-led store to a revision that predates this access mode. Use matching code and recovery records. The SQLite schema is unchanged: additive access
 records use its existing transactional JSON collections.
+
+## Contract-call delegation
+
+`contracts:request` is separate from transfer delegation. Read `contract_call_terms` and `action_policy_revision`, show the permitted contracts/functions, operation limits and swap/vault routes to the owner, and include `user.consent.action_policy_revision` in application-led requests. The legacy `transfer_policy_revision` alias remains accepted; conflicting aliases are denied. Account bindings stay private. See [approved contract calls](approved-contract-calls.md) for execution, nonce recovery and the limits of general function delegation.

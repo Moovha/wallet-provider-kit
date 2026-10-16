@@ -58,6 +58,10 @@ export function operationStatus(
   config: ProviderConfiguration,
   applicationIndex: number,
 ) {
+  if (guide.serviceAuthenticated)
+    return config.execution?.service
+      ? 'Signed execution-service request required; application tokens are not accepted'
+      : 'Not enabled: The designated execution service is not configured';
   if (!guide.scope) return 'No access token needed';
   const id =
     Object.entries(operationGuides).find(([, entry]) => entry === guide)?.[0] ??
@@ -68,6 +72,8 @@ export function operationStatus(
     wallet: true,
     financial: !!config.financial,
     execution: !!config.execution,
+    executionService: !!config.execution?.service,
+    contractCalls: !!config.approvedCalls?.policy,
     flow: config.policy.access?.mode ?? 'hosted',
     records: !!config.policy.identity?.records,
     vendor: !!config.identity.didit || !!config.identity.sumsub,
@@ -98,6 +104,15 @@ export function requestExample(
   config: ProviderConfiguration,
   applicationIndex: number,
 ): object | undefined {
+  if (id === 'checkExecutionAuthority')
+    return {
+      provider_id: 'application-sponsor',
+      provider_revision: '1',
+      execution_id: exampleId,
+      action_id: exampleId,
+      plan_hash: '0'.repeat(64),
+      request_hash: '0'.repeat(64),
+    };
   if (id === 'beginEnrollment')
     return { identity_subject: 'example-provider-subject' };
   if (id === 'submitEnrollmentIdentity')
@@ -171,6 +186,22 @@ export function requestExample(
       vendor: config.identity.didit ? 'didit' : 'sumsub',
       share_token: '<SHARED_IDENTITY_TOKEN>',
     };
+  if (id === 'requestContractCall')
+    return {
+      account_id: exampleId,
+      kind: 'contract-call',
+      calls: [
+        {
+          to:
+            config.approvedCalls?.policy?.contracts[0]?.address ??
+            '0x1111111111111111111111111111111111111111',
+          value: '0',
+          data:
+            config.approvedCalls?.policy?.contracts[0]?.selectors[0] ??
+            '0x12345678',
+        },
+      ],
+    };
   if (id === 'requestTransferAuthorization')
     return {
       account_id: exampleId,
@@ -202,6 +233,8 @@ export function referenceOperations(
               method,
               operation,
               guide,
+              executionProfile:
+                config.execution?.profile ?? 'erc3009-relayer-v1',
               status: operationStatus(guide, config, applicationIndex),
               body: requestExample(
                 operation.operationId,
@@ -255,32 +288,109 @@ export function responseExample(
           }
         : {}),
     };
+  if (id === 'requestContractCall') {
+    const target = '0x1111111111111111111111111111111111111111',
+      codeHash = '0x' + '1'.repeat(64);
+    const input = {
+      account_id: exampleId,
+      kind: 'contract-call',
+      calls: [{ to: target, value: '0', data: '0x12345678' }],
+    };
+    return {
+      action_id: exampleId,
+      account_id: exampleId,
+      status: 'authorized',
+      expires_at: '2030-01-01T00:05:00.000Z',
+      payload_hash: '0x' + '0'.repeat(64),
+      payload: {
+        primaryType: 'SafeTx',
+        domain: { chainId: '84532', verifyingContract: target },
+        types: {
+          SafeTx: [
+            ['to', 'address'],
+            ['value', 'uint256'],
+            ['data', 'bytes'],
+            ['operation', 'uint8'],
+            ['safeTxGas', 'uint256'],
+            ['baseGas', 'uint256'],
+            ['gasPrice', 'uint256'],
+            ['gasToken', 'address'],
+            ['refundReceiver', 'address'],
+            ['nonce', 'uint256'],
+          ].map(([name, type]) => ({ name, type })),
+        },
+        message: {
+          to: target,
+          value: '0',
+          data: '0x12345678',
+          operation: '0',
+          safeTxGas: '0',
+          baseGas: '0',
+          gasPrice: '0',
+          gasToken: '0x0000000000000000000000000000000000000000',
+          refundReceiver: '0x0000000000000000000000000000000000000000',
+          nonce: '0',
+        },
+      },
+      intent: {
+        version: '1',
+        mechanism: 'safe-1.4.1',
+        input,
+        account: {
+          address: target,
+          codeHash,
+          accountId: exampleId,
+          singleton: { address: target, codeHash },
+        },
+        multiSend: { address: target, codeHash },
+        calls: input.calls,
+        contracts: [{ address: target, codeHash }],
+        effects: [],
+        nonce: '0',
+      },
+    };
+  }
+  if (id === 'checkExecutionAuthority')
+    return {
+      allowed: true,
+      provider_id: 'application-sponsor',
+      provider_revision: '1',
+      execution_id: exampleId,
+      action_id: exampleId,
+      plan_hash: '0'.repeat(64),
+      request_hash: '0'.repeat(64),
+    };
   if (id === 'getExecutionCapabilities')
     return {
       contract_version: '1',
       profiles: [
-        {
-          id: 'erc3009-relayer-v1',
-          revision: '1',
-          implemented: true,
-          configured: !!config?.execution,
-          ready: false,
-          chain_id: 'eip155:84532',
-          account_type: 'eoa',
-          signing: 'eip-712',
-          token_authorization: 'erc-3009',
-          submission: 'openzeppelin-relayer-1.8.0',
-          verification: 'rpc-quorum',
-          finality: 'finalized',
-          minimum_rpc_sources: 2,
-          execute_scopes: ['wallet:execute', 'wallet:sign'],
-          read_scopes: ['wallet:execute:read'],
-        },
-      ],
+        'erc3009-relayer-v1',
+        'erc3009-executor-v1',
+        'approved-evm-executor-v1',
+      ].map((profile) => ({
+        id: profile,
+        revision: '1',
+        implemented: true,
+        configured: config?.execution?.profile === profile,
+        ready: false,
+        chain_id: 'eip155:84532',
+        account_type: 'eoa',
+        signing: 'eip-712',
+        token_authorization: 'erc-3009',
+        submission:
+          profile === 'erc3009-relayer-v1'
+            ? 'openzeppelin-relayer-1.8.0'
+            : 'designated-execution-service-v1',
+        verification: 'rpc-quorum',
+        finality: 'finalized',
+        minimum_rpc_sources: 2,
+        execute_scopes: ['wallet:execute', 'wallet:sign'],
+        read_scopes: ['wallet:execute:read'],
+      })),
     };
   if (id === 'getExecutionEvents')
     return {
-      profile: 'erc3009-relayer-v1',
+      profile: config?.execution?.profile ?? 'erc3009-relayer-v1',
       profile_revision: '1',
       action_id: exampleId,
       events: [],
@@ -290,7 +400,7 @@ export function responseExample(
     };
   if (id === 'executeTransfer' || id === 'getTransferExecution')
     return {
-      profile: 'erc3009-relayer-v1',
+      profile: config?.execution?.profile ?? 'erc3009-relayer-v1',
       profile_revision: '1',
       action_id: exampleId,
       execution_id: exampleId,
@@ -444,11 +554,11 @@ export function referenceSpec(
   spec.paths = {};
   for (const item of operations) {
     const op = structuredClone(item.operation);
-    op.summary = `[${item.status === 'No access token needed' ? 'Public' : item.status.startsWith('Settings are present') ? 'Configured in draft' : 'Not enabled'}] ${item.guide.title}`;
+    op.summary = `[${item.status === 'No access token needed' ? 'Public' : item.status.startsWith('Settings are present') || item.status.startsWith('Signed execution-service') ? 'Configured in draft' : 'Not enabled'}] ${item.guide.title}`;
     op.tags = [item.guide.group];
     op.description = [
       `**Configuration preview:** ${item.status}.`,
-      `**Required OAuth scope:** ${item.guide.scope ?? 'None (public)'}.`,
+      `**Required OAuth scope:** ${item.guide.scope ?? (item.guide.serviceAuthenticated ? 'Service proof required; application OAuth is not accepted' : 'None (public)')}.`,
       item.guide.prerequisite,
       item.guide.success,
       op.description ?? '',
@@ -493,8 +603,12 @@ export function curlExample(item: ReferenceOperation, origin: string) {
   ];
   if (item.guide.execution)
     lines.push(
-      "  --header 'Execution-Profile: erc3009-relayer-v1'",
+      `  --header 'Execution-Profile: ${item.executionProfile ?? 'erc3009-relayer-v1'}'`,
       "  --header 'Execution-Profile-Revision: 1'",
+    );
+  if (item.guide.serviceAuthenticated)
+    lines.push(
+      "  --header 'Authorization: Bearer <SIGNED_SERVICE_REQUEST_PROOF>'",
     );
   if (item.guide.scope)
     lines.push("  --header 'Authorization: Bearer <APPLICATION_ACCESS_TOKEN>'");

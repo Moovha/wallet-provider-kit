@@ -1,3 +1,4 @@
+import type { RelayerBinding } from '../providers/relayer-client.js';
 import { toQuantity } from 'ethers';
 import { fingerprint } from '../onboarding/policy.js';
 import { WalletProviderError } from '../domain/signing.js';
@@ -18,13 +19,19 @@ export function createTransferExecutionProvider(
   apiKey: string,
   request: typeof fetch = fetch,
 ): ExecutionProvider {
+  if (!configuration.relayer)
+    throw new WalletProviderError('wallet_provider_configuration');
   const sponsors = structuredClone(configuration.sponsors);
+  for (const sponsor of sponsors)
+    if (!sponsor.binding.relayerId || !sponsor.binding.signerId)
+      throw new WalletProviderError('wallet_provider_configuration');
   const client = createRelayerClient(
     {
       url: configuration.relayer.url,
       apiKey,
       resolveAccount: async (id) =>
-        sponsors.find((sponsor) => sponsor.accountId === id)?.binding ?? null,
+        (sponsors.find((sponsor) => sponsor.accountId === id)?.binding as
+          RelayerBinding | undefined) ?? null,
     },
     request,
   );
@@ -93,8 +100,12 @@ export function createTransferExecutionProvider(
       )
         throw new WalletProviderError('wallet_provider_configuration');
     },
-    async submit(plan) {
-      await client.current(plan.sponsor.accountId, plan.sponsor.binding);
+    async submit(plan, context) {
+      await client.current(
+        plan.sponsor.accountId,
+        plan.sponsor.binding as RelayerBinding,
+      );
+      await context?.authorizeEffect?.();
       if (Date.parse(plan.action.expires_at) <= Date.now())
         throw new WalletProviderError('wallet_authorization_denied');
       const sponsor = plan.sponsor;
@@ -116,7 +127,10 @@ export function createTransferExecutionProvider(
     async transactionHash(plan, transactionId) {
       if (!uuid.test(transactionId))
         throw new WalletProviderError('wallet_authorization_denied');
-      await client.current(plan.sponsor.accountId, plan.sponsor.binding);
+      await client.current(
+        plan.sponsor.accountId,
+        plan.sponsor.binding as RelayerBinding,
+      );
       const accepted = response(
         plan,
         await client.call(

@@ -180,3 +180,17 @@ exhaustive accounting ledger. Single-active-host failover requires external
 fencing and reconciliation of effects missing from a backup. Sender-constrained
 OAuth proofs are not implemented: access tokens containing `cnf` are rejected.
 See the [enterprise v1 release gates](v1-standards.md).
+
+The [designated executor](execution-service.md) is a separate authenticated sponsor
+boundary. It independently validates immutable transfer plans and calls the wallet
+service for current authority before effects. Signed service identity never grants
+spending authority by itself. Request/response proofs bind destination, method,
+path, exact body and purpose; the two journals prevent duplicate provider dispatch
+across lost handoffs. Private execution plans contain usable owner signatures and
+need encrypted storage and backups. Custom execution modules are trusted process
+code and require review; they must invoke the supplied current-authority callback
+immediately before upstream effects and keep status lookup read-only.
+
+## Approved contract execution
+
+The general profile constructs exact SafeTx authorizations from separately delegated contract policies. It verifies the bound single-owner Safe, pins calls and code, reserves one nonce per immutable action and retains signatures for coordinated execution. Generic call execution is not verified business settlement. Swap and vault adapters require their specified asset effects and cleared allowances. Safe signatures have no native expiry; service revocation cannot recall an authorization already sent upstream. Review target logic, proxy implementations and token approval behavior before activation; see [the contract-call boundary](approved-contract-calls.md).

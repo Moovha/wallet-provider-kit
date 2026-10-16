@@ -41,7 +41,7 @@ npm start -- setup
 
 Keep the terminal running and open its complete local session link. The wizard is
 bundled and needs no FormKit Pro subscription. The service remains experimental,
-single-host and Base Sepolia EOA only, with production custody acceptance pending.
+single-host and Base Sepolia only (EOA transfers and explicitly bound Safe contract calls), with production custody acceptance pending.
 
 ## Before you begin
 
@@ -289,3 +289,14 @@ it does not automatically link wallets across applications.
 The screenshots use fictional settings and offline fixtures. Follow the
 [contributor screenshot instructions](../CONTRIBUTING.md#maintain-wizard-screenshots)
 to recreate them after UI changes.
+
+For optional execution in **Deployment**, choose **Designated execution service**
+for a separate authenticated dispatcher, then enter its provider ID/revision and
+service-key environment references. Configure the dispatcher and its sponsors
+using the [execution-service guide](execution-service.md). **Direct OpenZeppelin
+Relayer** retains the compatibility path with vendor bindings in the wallet
+configuration. The GUI never accepts private PEM values or deploys the dispatcher.
+
+### Approved contract actions
+
+In Deployment choose **Approved EVM actions through designated service**, then enable **Approved contract-call policy**. Configure existing Safe account bindings, code pins, allowed contract functions and optional swap/vault routes. The policy is independent of transfer signing. Enable `contracts:request` for accepted applications in Policies; new owner consent is required for the configured action-policy revision. The wizard does not create or fund smart accounts. Follow [approved contract calls](approved-contract-calls.md) before activation.

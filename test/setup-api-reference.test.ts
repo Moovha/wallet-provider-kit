@@ -28,7 +28,7 @@ describe('operator API reference', () => {
   it('uses canonical request/response contracts, includes unavailable advanced profiles and does not mutate them', () => {
     const config = fixture();
     const operations = referenceOperations(contract, config, 0);
-    expect(operations).toHaveLength(21);
+    expect(operations).toHaveLength(23);
     expect(
       Object.values(contract.paths)
         .flatMap((methods) =>
@@ -57,7 +57,10 @@ describe('operator API reference', () => {
         item.operation.requestBody?.content['application/json'].schema,
       );
       expect(preview.description).toContain(
-        item.guide.scope ?? 'None (public)',
+        item.guide.scope ??
+          (item.guide.serviceAuthenticated
+            ? 'Service proof required'
+            : 'None (public)'),
       );
     }
     expect(

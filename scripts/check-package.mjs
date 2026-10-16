@@ -40,6 +40,10 @@ try {
   assert.ok(paths.includes('dist/service/documentation-token-ui.mjs'));
   assert.ok(paths.includes('examples/inspect-api.mjs'));
   assert.ok(paths.includes('spec/provider-config.schema.json'));
+  assert.ok(paths.includes('spec/execution-service.config.schema.json'));
+  assert.ok(paths.includes('spec/execution-api.json'));
+  assert.ok(paths.includes('docs/executor.config.example.json'));
+  assert.ok(paths.includes('dist/executor/service.js'));
   assert.ok(paths.includes('docs/provider.config.example.json'));
   assert.ok(paths.includes('dist/setup-ui/index.html'));
   assert.ok(paths.includes('dist/setup-ui/providers/coinbase.png'));
@@ -106,6 +110,8 @@ try {
     await assert.rejects(import('@moovha/wallet-provider-kit/dist/main.js'), { code: 'ERR_PACKAGE_PATH_NOT_EXPORTED' });
     const schema = JSON.parse(await readFile(new URL(import.meta.resolve('@moovha/wallet-provider-kit/spec/provider-api.json')), 'utf8'));
     assert.ok(schema.paths['/v1/actions/{actionId}/sign']);
+    const executorSchema = JSON.parse(await readFile(new URL(import.meta.resolve('@moovha/wallet-provider-kit/spec/execution-api.json')), 'utf8'));
+    assert.ok(executorSchema.paths['/v1/dispatches']);
     const draft = JSON.parse(await readFile(new URL(import.meta.resolve('@moovha/wallet-provider-kit/spec/orchestration-draft.json')), 'utf8'));
     assert.equal(draft.openapi, '3.1.1');
   `,
@@ -124,6 +130,30 @@ try {
     /live: 200, ready: 503, openapi: '3.0.3'/,
   );
   const executable = join(installed, 'dist/main.js');
+  assert.match(
+    run(process.execPath, [executable, 'executor', 'init']),
+    /Execution service configuration created/,
+  );
+  assert.match(
+    run(process.execPath, [
+      executable,
+      'executor',
+      'validate',
+      '--config',
+      'executor.config.json',
+    ]),
+    /Execution service configuration valid/,
+  );
+  assert.match(
+    run(process.execPath, [
+      executable,
+      'executor',
+      'init-storage',
+      '--config',
+      'executor.config.json',
+    ]),
+    /Execution service storage initialized/,
+  );
   assert.match(
     run(process.execPath, [executable, 'init']),
     /Configuration created/,

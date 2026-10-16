@@ -1,4 +1,12 @@
 import {
+  implementationSlot,
+  safeInterface,
+  tokenInterface,
+  vaultInterface,
+  type SafeAccountBinding,
+  type ApprovedCallIntent,
+} from './approved-calls.js';
+import {
   Interface,
   TypedDataEncoder,
   keccak256,
@@ -26,6 +34,7 @@ type RpcMethod =
   | 'eth_chainId'
   | 'eth_getBlockByNumber'
   | 'eth_getCode'
+  | 'eth_getStorageAt'
   | 'eth_call'
   | 'eth_getBalance'
   | 'eth_getLogs'
@@ -134,7 +143,7 @@ interface Heads {
 }
 
 /** Agreement of configured RPC providers is trusted node evidence, not a light-client proof. */
-export class QuorumTransferObserver implements ExecutionObserver {
+export class QuorumExecutionObserver implements ExecutionObserver {
   private readonly readers: RpcReader[];
   constructor(
     endpoints: string[],
@@ -194,6 +203,7 @@ export class QuorumTransferObserver implements ExecutionObserver {
     }
   }
   private async preflightRead(plan: TransferExecutionPlan): Promise<void> {
+    if (plan.intent) return this.preflightCalls(plan);
     const token = String(plan.action.payload.domain.verifyingContract);
     const owner = String(plan.action.payload.message.from);
     const nonce = String(plan.action.payload.message.nonce);
@@ -245,7 +255,7 @@ export class QuorumTransferObserver implements ExecutionObserver {
           typeof code !== 'string' ||
           !bytesPattern.test(code) ||
           code === '0x' ||
-          keccak256(code).toLowerCase() !== plan.tokenCodeHash.toLowerCase() ||
+          keccak256(code).toLowerCase() !== plan.tokenCodeHash!.toLowerCase() ||
           hash(domain) !== expectedDomain ||
           used !== '0x' + '0'.repeat(64) ||
           simulation !== '0x' ||
@@ -256,6 +266,441 @@ export class QuorumTransferObserver implements ExecutionObserver {
           unavailable();
       }),
     );
+  }
+  private async safeAccount(
+    reader: RpcReader,
+    binding: SafeAccountBinding,
+    owner: string,
+    tag = 'latest',
+  ) {
+    await this.identity(reader);
+    const call = (name: string, args: unknown[] = []) =>
+      reader.call('eth_call', [
+        {
+          to: binding.address,
+          data: safeInterface.encodeFunctionData(name, args),
+        },
+        tag,
+      ]);
+    const [
+      proxy,
+      singleton,
+      implementation,
+      owners,
+      threshold,
+      version,
+      nonce,
+      modules,
+    ] = await Promise.all([
+      reader.call('eth_getCode', [binding.address, tag]),
+      reader.call('eth_getCode', [binding.singleton.address, tag]),
+      call('masterCopy'),
+      call('getOwners'),
+      call('getThreshold'),
+      call('VERSION'),
+      call('nonce'),
+      call('getModulesPaginated', [
+        '0x0000000000000000000000000000000000000001',
+        1,
+      ]),
+    ]);
+    const modulePage = safeInterface.decodeFunctionResult(
+      'getModulesPaginated',
+      String(modules),
+    );
+    if (
+      modulePage[0].length !== 0 ||
+      String(modulePage[1]).toLowerCase() !==
+        '0x0000000000000000000000000000000000000001'
+    )
+      unavailable();
+    if (
+      typeof proxy !== 'string' ||
+      typeof singleton !== 'string' ||
+      keccak256(proxy) !== binding.codeHash ||
+      keccak256(singleton) !== binding.singleton.codeHash ||
+      String(
+        safeInterface.decodeFunctionResult(
+          'masterCopy',
+          String(implementation),
+        )[0],
+      ).toLowerCase() !== binding.singleton.address.toLowerCase() ||
+      serviceOwners(owners).length !== 1 ||
+      serviceOwners(owners)[0].toLowerCase() !== owner.toLowerCase() ||
+      safeInterface.decodeFunctionResult(
+        'getThreshold',
+        String(threshold),
+      )[0] !== 1n ||
+      safeInterface.decodeFunctionResult('VERSION', String(version))[0] !==
+        '1.4.1'
+    )
+      unavailable();
+    return safeInterface
+      .decodeFunctionResult('nonce', String(nonce))[0]
+      .toString() as string;
+  }
+  /** Read-only verified account binding and common nonce before constructing an approved action. */
+  async contractNonce(
+    binding: SafeAccountBinding,
+    owner: string,
+  ): Promise<string> {
+    try {
+      const values = await Promise.all(
+        this.readers.map((reader) => this.safeAccount(reader, binding, owner)),
+      );
+      if (values.some((value) => value !== values[0])) unavailable();
+      return values[0];
+    } catch {
+      return unavailable();
+    }
+  }
+  private async pinnedCalls(
+    reader: RpcReader,
+    intent: ApprovedCallIntent,
+    tag: string,
+  ) {
+    for (const contract of [...intent.contracts, intent.multiSend]) {
+      const code = await reader.call('eth_getCode', [contract.address, tag]);
+      if (
+        typeof code !== 'string' ||
+        code === '0x' ||
+        keccak256(code) !== contract.codeHash
+      )
+        unavailable();
+      if (contract.implementation) {
+        const [slot, implementation] = await Promise.all([
+          reader.call('eth_getStorageAt', [
+            contract.address,
+            implementationSlot,
+            tag,
+          ]),
+          reader.call('eth_getCode', [contract.implementation.address, tag]),
+        ]);
+        if (
+          hash(slot) !==
+            zeroPadValue(contract.implementation.address.toLowerCase(), 32) ||
+          typeof implementation !== 'string' ||
+          keccak256(implementation) !== contract.implementation.codeHash
+        )
+          unavailable();
+      }
+    }
+    if (intent.input.kind === 'vault-deposit') {
+      const vault = intent.effects[1].token,
+        asset = intent.effects[0].token;
+      const result = await reader.call('eth_call', [
+        { to: vault, data: vaultInterface.encodeFunctionData('asset') },
+        tag,
+      ]);
+      if (
+        String(
+          vaultInterface.decodeFunctionResult('asset', String(result))[0],
+        ).toLowerCase() !== asset.toLowerCase()
+      )
+        unavailable();
+    }
+  }
+  private async preflightCalls(plan: TransferExecutionPlan) {
+    const intent = plan.intent!;
+    await Promise.all(
+      this.readers.map(async (reader) => {
+        const owner = plan.action.chain_account_id.split(':')[2];
+        if (
+          (await this.safeAccount(reader, intent.account, owner)) !==
+          intent.nonce
+        )
+          unavailable();
+        await this.pinnedCalls(reader, intent, 'latest');
+        const [balance, accountBalance, simulation] = await Promise.all([
+          reader.call('eth_getBalance', [
+            plan.sponsor.binding.address,
+            'latest',
+          ]),
+          reader.call('eth_getBalance', [intent.account.address, 'latest']),
+          reader.call('eth_call', [
+            {
+              from: plan.sponsor.binding.address,
+              to: intent.account.address,
+              data: plan.data,
+              value: '0x0',
+              gas: toQuantity(BigInt(plan.sponsor.gasLimit)),
+              maxFeePerGas: toQuantity(BigInt(plan.sponsor.maxFeePerGas)),
+              maxPriorityFeePerGas: toQuantity(
+                BigInt(plan.sponsor.maxPriorityFeePerGas),
+              ),
+            },
+            'latest',
+          ]),
+        ]);
+        if (
+          quantity(balance) <
+            BigInt(plan.sponsor.gasLimit) * BigInt(plan.sponsor.maxFeePerGas) +
+              BigInt(plan.sponsor.l1FeeReserveWei) ||
+          quantity(accountBalance) <
+            intent.calls.reduce(
+              (total, call) => total + BigInt(call.value),
+              0n,
+            ) ||
+          safeInterface.decodeFunctionResult(
+            'execTransaction',
+            String(simulation),
+          )[0] !== true
+        )
+          unavailable();
+      }),
+    );
+  }
+  private async findCalls(
+    reader: RpcReader,
+    plan: TransferExecutionPlan,
+    latest: bigint,
+    from: bigint,
+  ): Promise<string[]> {
+    if (latest < from) return [];
+    const maximum = from + BigInt(this.maxLogRange) - 1n;
+    const logs = await reader.call('eth_getLogs', [
+      {
+        address: plan.intent!.account.address,
+        fromBlock: toQuantity(from),
+        toBlock: toQuantity(latest < maximum ? latest : maximum),
+        topics: [
+          [
+            safeInterface.getEvent('ExecutionSuccess')!.topicHash,
+            safeInterface.getEvent('ExecutionFailure')!.topicHash,
+          ],
+        ],
+      },
+    ]);
+    if (!Array.isArray(logs) || logs.length > 256) unavailable();
+    return logs.flatMap((entry) => {
+      const log = checked(entry);
+      if (log.removed === true) return [];
+      const parsed = safeInterface.parseLog({
+        topics: log.topics as string[],
+        data: String(log.data),
+      });
+      return parsed?.args.txHash.toLowerCase() === plan.action.payload_hash
+        ? [hash(log.transactionHash)]
+        : [];
+    });
+  }
+  private async verifyCalls(
+    reader: RpcReader,
+    plan: TransferExecutionPlan,
+    candidate: string,
+    ownHash: string | undefined,
+    heads: Heads,
+  ): Promise<ChainObservation | null | 'reorged'> {
+    const [rawReceipt, rawTransaction] = await Promise.all([
+      reader.call('eth_getTransactionReceipt', [candidate]),
+      reader.call('eth_getTransactionByHash', [candidate]),
+    ]);
+    if (!rawReceipt || !rawTransaction) return null;
+    const receipt = checked(rawReceipt),
+      transaction = checked(rawTransaction),
+      intent = plan.intent!;
+    const blockHash = hash(receipt.blockHash),
+      blockNumber = quantity(receipt.blockNumber),
+      tag = toQuantity(blockNumber);
+    if (
+      hash(receipt.transactionHash) !== candidate ||
+      hash(transaction.hash) !== candidate ||
+      hash(transaction.blockHash) !== blockHash ||
+      quantity(transaction.blockNumber) !== blockNumber ||
+      heads.latest < blockNumber
+    )
+      unavailable();
+    const block = await reader.call('eth_getBlockByNumber', [tag, false]);
+    if (!block || hash(checked(block).hash) !== blockHash) return 'reorged';
+    if (quantity(checked(block).number) !== blockNumber) unavailable();
+    if (
+      address(transaction.to) !== intent.account.address.toLowerCase() ||
+      address(receipt.to) !== intent.account.address.toLowerCase() ||
+      quantity(transaction.value) !== 0n ||
+      quantity(transaction.chainId) !== 84532n ||
+      String(transaction.input).toLowerCase() !== plan.data
+    )
+      return null;
+    const sender = address(transaction.from);
+    if (address(receipt.from) !== sender) unavailable();
+    const code = await reader.call('eth_getCode', [
+      intent.account.address,
+      tag,
+    ]);
+    const singleton = await reader.call('eth_getCode', [
+      intent.account.singleton.address,
+      tag,
+    ]);
+    if (
+      typeof code !== 'string' ||
+      typeof singleton !== 'string' ||
+      keccak256(code) !== intent.account.codeHash ||
+      keccak256(singleton) !== intent.account.singleton.codeHash
+    )
+      unavailable();
+    const verifiedNonce = await this.safeAccount(
+      reader,
+      intent.account,
+      plan.action.chain_account_id.split(':')[2],
+      tag,
+    );
+    await this.pinnedCalls(reader, intent, tag);
+    const status = quantity(receipt.status);
+    if (status === 1n && BigInt(verifiedNonce) <= BigInt(intent.nonce))
+      unavailable();
+    if (status !== 0n && status !== 1n) unavailable();
+    if (
+      status === 0n &&
+      (candidate !== ownHash?.toLowerCase() ||
+        sender !== plan.sponsor.binding.address.toLowerCase())
+    )
+      return null;
+    if (!Array.isArray(receipt.logs) || receipt.logs.length > 512)
+      unavailable();
+    if (status === 1n) {
+      const successes = receipt.logs.filter((entry) => {
+        const log = checked(entry);
+        if (address(log.address) !== intent.account.address.toLowerCase())
+          return false;
+        try {
+          const parsed = safeInterface.parseLog({
+            topics: log.topics as string[],
+            data: String(log.data),
+          });
+          return (
+            parsed?.name === 'ExecutionSuccess' &&
+            parsed.args.txHash.toLowerCase() === plan.action.payload_hash &&
+            parsed.args.payment === 0n
+          );
+        } catch {
+          return false;
+        }
+      });
+      if (successes.length !== 1) return null;
+      if (intent.input.kind !== 'contract-call') {
+        const token = intent.effects[0].token,
+          spender = intent.calls[2].to;
+        const result = await reader.call('eth_call', [
+          {
+            to: token,
+            data: tokenInterface.encodeFunctionData('allowance', [
+              intent.account.address,
+              spender,
+            ]),
+          },
+          tag,
+        ]);
+        if (
+          tokenInterface.decodeFunctionResult(
+            'allowance',
+            String(result),
+          )[0] !== 0n
+        )
+          return null;
+        if (intent.input.kind === 'vault-deposit') {
+          const approval = await reader.call('eth_call', [
+            {
+              to: token,
+              data: tokenInterface.encodeFunctionData('allowance', [
+                spender,
+                intent.effects[1].token,
+              ]),
+            },
+            tag,
+          ]);
+          if (
+            tokenInterface.decodeFunctionResult(
+              'allowance',
+              String(approval),
+            )[0] !== 0n
+          )
+            return null;
+        }
+      }
+      for (const effect of intent.effects) {
+        let net = 0n;
+        for (const entry of receipt.logs) {
+          const log = checked(entry);
+          if (address(log.address) !== effect.token.toLowerCase()) continue;
+          try {
+            const event = tokenInterface.parseLog({
+              topics: log.topics as string[],
+              data: String(log.data),
+            });
+            if (event?.name !== 'Transfer') continue;
+            const from = String(event.args.from).toLowerCase(),
+              to = String(event.args.to).toLowerCase(),
+              value = BigInt(event.args.value);
+            if (effect.from === '*') {
+              if (to === effect.to.toLowerCase()) net += value;
+              if (from === effect.to.toLowerCase()) net -= value;
+            } else if (effect.to === '*') {
+              if (from === effect.from.toLowerCase()) net += value;
+              if (to === effect.from.toLowerCase()) net -= value;
+            } else if (
+              from === effect.from.toLowerCase() &&
+              to === effect.to.toLowerCase()
+            )
+              net += value;
+          } catch {
+            /* Non-Transfer events are not asset evidence. */
+          }
+        }
+        if (
+          net < BigInt(effect.minimum) ||
+          (effect.maximum && net > BigInt(effect.maximum))
+        )
+          return null;
+      }
+      if (intent.input.kind === 'vault-deposit') {
+        const deposits = receipt.logs.filter((entry) => {
+          const log = checked(entry);
+          if (address(log.address) !== intent.effects[1].token.toLowerCase())
+            return false;
+          try {
+            const event = vaultInterface.parseLog({
+              topics: log.topics as string[],
+              data: String(log.data),
+            });
+            return (
+              event?.name === 'Deposit' &&
+              String(event.args.owner).toLowerCase() ===
+                intent.account.address.toLowerCase() &&
+              event.args.assets.toString() ===
+                (intent.input as { assets: string }).assets &&
+              event.args.shares >=
+                BigInt(
+                  (intent.input as { minimum_shares: string }).minimum_shares,
+                )
+            );
+          } catch {
+            return false;
+          }
+        });
+        if (deposits.length !== 1) return null;
+      }
+    }
+    const chainStatus =
+        heads.finalized >= blockNumber
+          ? 'finalized'
+          : heads.safe >= blockNumber
+            ? 'safe'
+            : 'included',
+      outcome = status === 1n ? 'succeeded' : 'reverted';
+    return {
+      chain_status: chainStatus,
+      verification: 'rpc-quorum',
+      outcome,
+      settlement: chainStatus === 'finalized' ? outcome : 'pending',
+      observed_at: new Date(Date.now()).toISOString(),
+      transaction_hash: candidate,
+      block_hash: blockHash,
+      block_number: blockNumber.toString(),
+      execution_origin:
+        sender === plan.sponsor.binding.address.toLowerCase()
+          ? 'sponsor'
+          : 'external',
+    };
   }
   private async heads(reader: RpcReader): Promise<Heads> {
     await this.identity(reader);
@@ -278,6 +723,7 @@ export class QuorumTransferObserver implements ExecutionObserver {
     latest: bigint,
     from: bigint,
   ): Promise<string[]> {
+    if (plan.intent) return this.findCalls(reader, plan, latest, from);
     if (latest < from) return [];
     const maximum = from + BigInt(this.maxLogRange) - 1n;
     const logs = await reader.call('eth_getLogs', [
@@ -308,6 +754,8 @@ export class QuorumTransferObserver implements ExecutionObserver {
     ownHash: string | undefined,
     heads: Heads,
   ): Promise<ChainObservation | null | 'reorged'> {
+    if (plan.intent)
+      return this.verifyCalls(reader, plan, candidate, ownHash, heads);
     const [rawReceipt, rawTransaction] = await Promise.all([
       reader.call('eth_getTransactionReceipt', [candidate]),
       reader.call('eth_getTransactionByHash', [candidate]),
@@ -342,7 +790,7 @@ export class QuorumTransferObserver implements ExecutionObserver {
       quantity(checked(rawBlock).number) !== blockNumber ||
       typeof code !== 'string' ||
       !bytesPattern.test(code) ||
-      keccak256(code).toLowerCase() !== plan.tokenCodeHash.toLowerCase()
+      keccak256(code).toLowerCase() !== plan.tokenCodeHash!.toLowerCase()
     )
       unavailable();
     if (
@@ -550,3 +998,12 @@ export class QuorumTransferObserver implements ExecutionObserver {
     };
   }
 }
+
+function serviceOwners(value: unknown): string[] {
+  return [
+    ...safeInterface.decodeFunctionResult('getOwners', String(value))[0],
+  ] as string[];
+}
+
+/** Compatibility name for existing transfer integrations. */
+export { QuorumExecutionObserver as QuorumTransferObserver };

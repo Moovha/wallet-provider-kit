@@ -252,7 +252,8 @@ Do not put returned signatures into application logs.
 | `GET /v1/actions/{actionId}/execution-events`    | Reads retained CloudEvents observation transitions with a resumable sequence cursor.                                        |
 | `POST /v1/actions/{actionId}/transaction-events` | Stores an application's **unverified** report; no settlement decision.                                                      |
 
-Execution routes require `Execution-Profile: erc3009-relayer-v1` and
+Execution routes require the explicitly selected `Execution-Profile` (`erc3009-relayer-v1`
+or `erc3009-executor-v1`) and
 `Execution-Profile-Revision: 1`. The execute route requires both `wallet:execute`
 and `wallet:sign`, a UUIDv4 `Idempotency-Key` and an empty `{}` body. Reads require
 `wallet:execute:read`; event reads accept `?after=0` and return explicit cursor-gap
@@ -386,3 +387,17 @@ automatic mutation retry. Error middleware preserves no raw upstream error text.
 Health/docs routes are hidden from the generated application OpenAPI. Disabling
 Swagger UI doesn't disable `/openapi.json`. Application API responses use `cache-control: no-store`. The service doesn't trust arbitrary forwarded IP headers; place
 it behind a reviewed TLS and ingress boundary for a real deployment.
+
+## Designated execution service authority
+
+`POST /v1/internal/execution-authority` is a read-only callback for the configured
+executor. It requires a pinned, request-bound service proof and an exact original
+execution, provider revision, plan/attempt hash and unexpired handoff lease.
+Application OAuth tokens are rejected. It rechecks current financial authority
+and cannot create an action, renew a lease, sign or dispatch. The browser explorer
+shows the endpoint and its configuration status but blocks application-token
+execution of it. Read the [service authentication and recovery contract](execution-service.md).
+
+## Approved contract operations
+
+`POST /v1/actions/contract-calls` proposes policy-controlled calls or supported swap/deposit inputs. It returns a stored action rather than a signature or submission. Execute that ID using `approved-evm-executor-v1`; `/sign` does not export these signatures. Current contract delegation and every existing financial authority check remain required. Read [approved contract calls](approved-contract-calls.md) for account bindings, bodies and verified outcome scopes.

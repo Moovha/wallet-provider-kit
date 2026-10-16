@@ -8,8 +8,7 @@ implementation support or security certification.
 
 The deployment baseline is one active host with local SQLite and a tested passive
 recovery target. Applications use provider-authorized immutable actions, one
-durable execution identity and separately verified chain evidence. The
-[execution guide](execution.md) defines the supported transfer flow.
+durable execution identity and separately verified chain evidence. The [execution guide](execution.md) defines transfers; [approved contract calls](approved-contract-calls.md) defines the general action envelope and Safe mechanism.
 
 ## Support decisions
 
@@ -23,8 +22,10 @@ durable execution identity and separately verified chain evidence. The
 | Ethereum [execution JSON-RPC](https://github.com/ethereum/execution-apis), EIP-1559 transactions and Base [finality stages](https://docs.base.org/specifications/transactions/transaction-finality) | Read-only verification checks exact transaction, receipt, token effects, canonical block and safe/finalized progress across independently operated RPC sources. Trusted-node agreement is not light-client proof. Relayer acceptance is separate from settlement.                                                 |
 | [EIP-5792](https://eips.ethereum.org/EIPS/eip-5792) — Final                                                                                                                                         | Preferred future wallet-facing batching, capability and status interface. Not implemented. A dedicated adapter must map batch semantics, ordering, atomicity and errors without weakening provider approval. The REST execution API does not claim EIP-5792 conformance.                                          |
 | [ERC-4337](https://eips.ethereum.org/EIPS/eip-4337) — Final; [EIP-7702](https://eips.ethereum.org/EIPS/eip-7702) — Final                                                                            | Future smart-account and sponsorship profiles, not a transparent upgrade of EOA transfers. Require explicit EntryPoint/delegate versions, account implementation, bundler/paymaster trust and cost limits, account-bound signatures, simulation, per-user-operation receipts and recovery tests. Not implemented. |
+| Safe 1.4.1 SafeTx / MultiSendCallOnly                                                                                                                                                               | Implemented as an explicit single-owner, threshold-one mechanism for approved contract calls, original Uniswap V3 exact-input swaps and bounded ERC-4626 router deposits. Proxy/singleton, owner, nonce and code are checked. SafeTx has no native expiry. Offline evidence is not Safe certification.            |
+| [ERC-1967](https://eips.ethereum.org/EIPS/eip-1967)                                                                                                                                                 | Optional implementation-slot/address/code pins for supported logic proxies, checked before dispatch and at the receipt block. Beacon and other proxy mechanisms require separate support.                                                                                                                         |
 | [ERC-1271](https://eips.ethereum.org/EIPS/eip-1271) — Final                                                                                                                                         | Future contract-signature validation when the consuming token/protocol supports it. Current EOA recovery is not ERC-1271 support; a smart account cannot be substituted silently.                                                                                                                                 |
-| [ERC-4626](https://eips.ethereum.org/EIPS/eip-4626) — Final                                                                                                                                         | Future vault interface profile. Requires exact asset/vault binding, share/minimum-output bounds, deadlines, simulation and verified deposit/withdraw effects. Token-transfer finality alone cannot prove a vault operation. Not implemented.                                                                      |
+| [ERC-4626](https://eips.ethereum.org/EIPS/eip-4626) — Final                                                                                                                                         | Bounded deposits through a reviewed Yearn4626-compatible router are implemented in the Safe profile, including exact asset/vault binding, on-chain minimum shares, simulation and matching asset/share/Deposit evidence. Bare deposits, withdrawals and native on-chain deadline enforcement are not implemented. |
 | [ERC-2612](https://eips.ethereum.org/EIPS/eip-2612) — Final                                                                                                                                         | Separate allowance/permit profile if a product needs it. A permit is approval to spend, not proof of transfer; do not replace the direct ERC-3009 flow with broad allowances by default. Not implemented.                                                                                                         |
 | [ERC-7710](https://eips.ethereum.org/EIPS/eip-7710), [ERC-7715](https://eips.ethereum.org/EIPS/eip-7715), [ERC-7579](https://eips.ethereum.org/EIPS/eip-7579) — Draft                               | Track for delegated permission and modular-account adapters. Do not freeze draft payloads into enterprise spending authority or advertise support before exact versions and revocation/replay behavior are accepted. Not implemented.                                                                             |
 
@@ -109,3 +110,21 @@ process. No selection of blockchain standards removes the need to rotate
 credentials, patch dependencies or respond to protocol and token changes.
 Application deployment, mainnet enablement and package publication require their
 own acceptance and authorization.
+
+## Designated service authentication and provider boundaries
+
+The [designated execution service](execution-service.md) supplies a separately
+deployable dispatcher with configurable provider IDs/revisions, a built-in
+OpenZeppelin adapter and a versioned custom adapter port. It uses explicitly typed
+ES256 JWT/JWS request and response proofs, following
+[RFC 8725 validation guidance](https://www.rfc-editor.org/rfc/rfc8725.html), and
+[RFC 8785 canonical JSON](https://www.rfc-editor.org/rfc/rfc8785.html) for exact body
+binding. This is a toolkit service-authentication profile; it does not claim
+RFC 9421, DPoP or OAuth sender-constrained-token conformance.
+
+A separate journal owns provider dispatch. The wallet's fresh authority callback
+and short handoff lease remain mandatory. Both services retain stable identities
+through retries and recovery; unknown provider effects never dispatch again.
+Service proofs do not replace the application's current grants, KYC, consent,
+immutable approval or durable attempt authority. Enterprise v1 authentication,
+independent security review and live/failover acceptance gates remain applicable.
