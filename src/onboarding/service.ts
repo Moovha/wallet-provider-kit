@@ -283,11 +283,11 @@ export class OnboardingService {
           const previousRequest = state.requests[grant.requestId];
           if (
             grant.owner === assertion.owner &&
-            grant.state !== 'active' &&
+            grant.withdrawnAt !== undefined &&
             previousRequest?.input.user &&
             (previousRequest.input.user.consent.reference ===
               input.user!.consent.reference ||
-              assertion.consentAt <= (previousRequest.consent?.at ?? 0))
+              assertion.consentAt <= grant.withdrawnAt)
           )
             deny();
         }
@@ -1190,7 +1190,21 @@ export class OnboardingService {
       if (state.idempotency[key] && state.idempotency[key].hash !== hash)
         conflict();
       state.idempotency[key] = { hash, id };
-      grant.state = 'revoked';
+      const withdrawnAt = grant.withdrawnAt ?? Date.now();
+      const reference =
+        state.requests[grant.requestId]?.input.user?.consent.reference;
+      for (const related of Object.values(state.grants)) {
+        if (
+          related.id === grant.id ||
+          (reference &&
+            related.owner === grant.owner &&
+            state.requests[related.requestId]?.input.user?.consent.reference ===
+              reference)
+        ) {
+          related.state = 'revoked';
+          related.withdrawnAt ??= withdrawnAt;
+        }
+      }
       audit(state, 'application_access_revoked', id, this.policy.revision);
       return { grant_id: id, status: 'revoked' as const };
     });
@@ -1263,6 +1277,7 @@ export class OnboardingService {
       if (!grant || (owner && grant.owner !== owner)) deny();
       if (grant.state === 'revoked' && stateValue !== 'revoked') deny();
       grant.state = stateValue;
+      if (stateValue === 'revoked') grant.withdrawnAt ??= Date.now();
       audit(state, 'access_' + stateValue, id, this.policy.revision);
       return { grant_id: id, status: grant.state };
     });

@@ -145,12 +145,12 @@ not submit a transaction, pay gas or establish settlement.
 
 Your application must provide the user's access-management controls. On withdrawal,
 call `POST /v1/access-grants/{grantId}/revoke` with `wallet:access`, the same caller,
-an empty body and an idempotency key. Repeating revocation is safe. Revocation
+an empty body and an idempotency key. Repeating revocation is safe. Grants superseded by another request are distinct from withdrawn consent. Revoking a grant also revokes any superseding grant based on that same consent record. Revocation
 blocks current access and future signing; signatures already issued can remain
 usable until their on-chain expiry. It does not erase the account or journal.
 
 Renew through a new access request with current identity evidence, a new consent
-reference and a later consent grant time. Old consent cannot restore revoked
+reference and a consent grant time after the recorded withdrawal. Old consent cannot restore revoked
 access. Replaying the original access request cannot create a fresh grant and may be denied once its evidence expires. Use the request-status endpoint to inspect the saved outcome.
 Disable an application in provider policy to deny all of its current access.
 Changing policy invalidates previous grants; users must consent to the new terms

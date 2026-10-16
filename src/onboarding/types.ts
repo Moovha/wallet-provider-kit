@@ -171,6 +171,8 @@ export interface AccessGrant {
   revision: string;
   expiresAt: number;
   state: 'active' | 'suspended' | 'revoked';
+  /** Explicit withdrawal, distinct from replacing a grant during renewal. */
+  withdrawnAt?: number;
 }
 export interface StoredAttempt {
   request: WalletAttemptRequest;

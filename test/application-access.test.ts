@@ -371,4 +371,16 @@ it('serializes concurrent access requests for a new application user into one ac
   expect(stored.accounts).toHaveLength(1);
   expect(stored.grants).toHaveLength(1);
   expect(stored.grants[0].accountId).toBe(receipts[0].account_id);
+  const rotated = context();
+  rotated.principal.subject = 'rotated-service-caller';
+  await f.service.request(rotated, input);
+  // A withdrawal using an older receipt also invalidates its superseding consent grant.
+  await f.service.revokeApplicationGrant(context(), receipts[0].grant_id!);
+  await expect(
+    f.service.account(context().principal, receipts[0].account_id!),
+  ).rejects.toThrow();
+  await expect(f.service.request(context(), input)).rejects.toThrow();
+  await expect(
+    f.service.account(rotated.principal, receipts[0].account_id!),
+  ).rejects.toThrow();
 });
