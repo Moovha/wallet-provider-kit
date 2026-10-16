@@ -162,6 +162,33 @@ describe('provider HTTP boundary', () => {
       ).statusCode,
     ).toBe(503);
   });
+  it('serves a configured live explorer without changing the canonical contract and can disable it', async () => {
+    const app = await createServer({
+      configurationProfile: 'provider-service-v1',
+      documentation: true,
+    });
+    servers.push(app);
+    const live = (await app.inject('/docs/json')).json();
+    expect(Object.keys(live.paths)).toHaveLength(6);
+    expect(live.paths).not.toHaveProperty('/v1/enrollments');
+    expect(live.paths).not.toHaveProperty('/v1/actions/{actionId}/sign');
+    expect(live.servers).toEqual([{ url: '/' }]);
+    expect(live.info.description).toContain('Execute sends a real request');
+    expect(
+      live.paths['/v1/accounts/{accountId}/provision'].post.description,
+    ).toContain('wallet:provision');
+    const canonical = (await app.inject('/openapi.json')).json();
+    expect(canonical.paths).toHaveProperty('/v1/actions/{actionId}/sign');
+    expect(canonical.info.title).toBe('Moovha Wallet Provider Service');
+    const initializer = (
+      await app.inject('/docs/static/swagger-initializer.js')
+    ).body;
+    expect(initializer).toContain('liveRequestInterceptor');
+    expect(initializer).toContain('persistAuthorization');
+    const disabled = await createServer({ documentation: false });
+    servers.push(disabled);
+    expect((await disabled.inject('/docs/')).statusCode).toBe(404);
+  });
   it('passes verified identity and idempotency context, never body authority', async () => {
     const { app, headers, provision, provider } = await fixture();
     const response = await app.inject({

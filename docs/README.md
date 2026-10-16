@@ -92,6 +92,9 @@ Use **API reference** in the GUI to explore requests/responses with Swagger UI,
 preview each application's configured permissions and copy illustrative cURL requests.
 The [viewer instructions](setup-wizard.md#explore-the-provider-api) explain filtering,
 OpenAPI download and the difference between a local preview and actual API access.
+After deployment, use its **Try it out** handoff to open your own service's Swagger
+explorer. The [live testing guide](http-api.md#try-deployed-apis) walks through enabling
+it, getting an application token, making a first request and interpreting real responses.
 
 A successful export means configuration validation passed. It does not mean
 vendor connectivity, login, identity agreements or wallet recovery were tested.

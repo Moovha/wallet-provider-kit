@@ -15,6 +15,109 @@ works whether or not deployment documentation is enabled. Its exported reference
 is filtered to the displayed supported setup APIs; this guide covers advanced
 profiles as well.
 
+## Try deployed APIs
+
+Use **API reference → Try it out · real service responses** in the local wizard.
+The **Open deployed Try it out** link opens `<your-service-HTTPS-origin>/docs/`
+in a new tab. It uses your configured provider origin, not your workstation's
+listen port. The wizard keeps your draft and sends no tokens or test requests.
+
+### Enable and deploy the explorer
+
+1. Import your saved configuration into the wizard. Choose **Enable deployed API
+   explorer in draft**, or check **Enable deployed API explorer and Try it out**
+   in Deployment. This sets `http.documentation: true`; it does not enable activation.
+2. Validate and download configuration again. Follow the
+   [deployment instructions](operator-deployment.md), replacing the service's
+   configuration and restarting it with its existing private storage and binding.
+   There is no hot reload. Use a build/package containing this change.
+3. Open the link on your real HTTPS domain. A 404 normally means documentation is
+   disabled in the running configuration or ingress is not forwarding `/docs/`
+   and its assets. Check the running config and restart; exporting alone changes
+   nothing on the server. A TLS or connection error requires fixing ingress/DNS/service
+   availability first. Do not paste a token into an untrusted or incorrect domain.
+
+The deployed explorer is public when enabled; its API calls still enforce normal
+authentication, scopes, owner grants and readiness. Restrict `/docs` at ingress
+if your operator access policy requires it. You can disable the checkbox, export
+and restart after testing. `/openapi.json` remains the full implemented contract;
+configured `/docs/json` presents the supported setup profile and omits transfer
+operations when the signing profile is absent. This filtering does not grant
+permission or alter routes. The local application's permission preview does not
+carry over as proof of live access.
+
+### First test: no credential or code needed
+
+1. Expand **Discovery → GET /v1/capabilities**.
+2. Choose **Try it out**, then **Execute**. Merely opening the page sends no
+   operation request. The explorer sends the call directly to its own origin.
+3. Read **Server response** for the actual HTTP status, response body, headers
+   and request duration. The schemas and examples below it are documentation,
+   not a response from your deployment.
+
+A 200 response with `configured: false` is expected before activation/readiness;
+it proves that discovery responds, not that authentication, vendors, recovery or
+signing work. A configured service also lists its action profiles. Follow your
+[acceptance and activation process](operator-deployment.md#acceptance-and-explicit-activation)
+before testing protected flows in an isolated staging deployment.
+
+### Authenticate a calling application
+
+An **application access token** is the short-lived JWT issued to a registered
+calling application for this API. It is not the login client's secret, an owner
+ID token, a vendor API key or the wizard's local session token.
+
+Use the [Auth0 application registration recipe](auth0-setup.md#_4-register-each-calling-application)
+or your compatible issuer. With Auth0, open your registered API's **Test** tab,
+select the authorized Machine to Machine application, and use its access-token test facility
+([Auth0 dashboard token instructions](https://auth0.com/docs/quickstart/backend/golang/interactive)); the same tab provides the client-credentials
+request for your application's developer. Token issuance uses that application's
+client ID, its private client secret, the API Identifier as audience and granted
+scopes. Keep client secrets in the caller's private environment; Swagger needs
+only the resulting `access_token`. Confirm the issuer's RFC 9068 profile and
+600-second maximum lifetime as described in the recipe. Never upload tokens to a
+public JWT decoder. If your issuer has no dashboard token facility, your identity
+administrator or application developer supplies the short-lived token.
+
+In the deployed explorer, choose **Authorize**, paste only the token (without
+`Bearer `), authorize and close the dialog. Each operation states its required
+scope. The client must also match an enabled Policies registration and hold the
+necessary current owner-bound grant. Scopes alone cannot authorize spending.
+The token stays in page memory; **Logout** removes authorization and a page reload
+also clears token and response state. The explorer omits browser cookies and
+refuses cross-origin requests and redirects. It does not obtain or refresh tokens.
+
+### Test protected flows and understand failures
+
+Use the real IDs returned by this deployment. Follow the
+[access, identity, review, provisioning and approval sequence](operator-deployment.md#hand-the-api-to-the-product-developer).
+Owner consent and transfer approval still happen in the returned top-level browser
+URLs; Swagger does not impersonate owners or reviewers. Supply the operation's
+inputs, choose Try it out and Execute, then inspect Server response.
+
+Every distinct POST needs a fresh UUIDv4 `Idempotency-Key` (generate one with
+`node -p "require('node:crypto').randomUUID()"`). Record that key with the intended
+request and reuse it for retries of that same request. Provisioning and signing
+use `{}` bodies. Test with vendor-approved identities and test-network accounts;
+POSTs can create durable records, charge identity budgets or issue signatures
+that authorize later effects. There is no automatic rollback or sandbox simulation.
+Do not replace a timed-out request's key to force another attempt; reconcile its
+stored outcome first.
+
+| Actual result   | What to check                                                                                                |
+| --------------- | ------------------------------------------------------------------------------------------------------------ |
+| 401             | Missing, expired or invalid token; issuer, audience, RFC 9068 profile and signing algorithm                  |
+| 403             | Required scope, enabled client registration, permissions and current owner/grant/identity/approval authority |
+| 400 / 422       | Required inputs, UUIDs, integer base-unit amounts and configured recipient/token limits                      |
+| 409             | Existing durable attempt or conflicting request; preserve the original key and reconcile                     |
+| 429             | Rate limit; wait before retrying                                                                             |
+| 503             | Activation/readiness or unavailable dependency; inspect the problem code and `outcome` before retrying       |
+| Fetch/TLS error | Browser connectivity or ingress; there may be no HTTP response. A mutation may still have reached the server |
+
+Keep test evidence private. Responses and generated cURL can contain account
+identifiers, identity details, bearer tokens or executable signatures. A 200 from
+one endpoint does not certify end-to-end provider behavior or settlement.
+
 For a complete runnable request sequence without credentials, use the
 [integration example](integration-example.md). The snippets below show a real
 integration's request shape; their tokens and IDs are placeholders.

@@ -84,7 +84,10 @@ vendor services or certify readiness. Initial activation remains disabled._
 The GUI's **API reference** uses bundled Swagger UI to show each supported endpoint,
 required scope, configuration prerequisites, request/response schemas and illustrative
 examples. Select an application, copy a cURL request or download the displayed OpenAPI.
-It previews your settings; actual calls and permission checks happen on the deployed service.
+Its **Try it out** handoff enables the deployed Swagger explorer and opens it on
+your provider's HTTPS domain. [Test live API responses](docs/http-api.md#try-deployed-apis)
+with public discovery or a short-lived application token after deployment.
+The local preview sends no API calls; deployed requests have real effects and permission checks.
 
 The [getting-started guide](docs/README.md) links every stage. Supported profiles
 remain single-host and Base Sepolia EOA only; production custody acceptance is pending.

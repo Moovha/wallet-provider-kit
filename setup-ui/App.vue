@@ -224,6 +224,10 @@ function stepChanged(node: {
     });
   });
 }
+function enableDocumentation() {
+  if (config.value)
+    config.value.http = { ...config.value.http, documentation: true };
+}
 </script>
 <template>
   <div class="wizard-shell">
@@ -502,6 +506,7 @@ function stepChanged(node: {
           v-show="view === 'api'"
           :config="config"
           :contract="contract"
+          @enable-documentation="enableDocumentation"
         />
         <footer>
           <span

@@ -58,7 +58,8 @@ function updateHttp(key: 'host' | 'port' | 'documentation', value: unknown) {
   </div>
   <FormKit
     type="checkbox"
-    label="Expose API documentation on the deployed service"
+    label="Enable deployed API explorer and Try it out"
+    help="Serves Swagger at your HTTPS origin /docs/. Requests use real service authentication and can have real effects. Restart with the exported configuration to apply. Disabled by default."
     :modelValue="http.documentation ?? false"
     @update:modelValue="updateHttp('documentation', $event)"
   />

@@ -564,3 +564,52 @@ test('API renderer can retry a failed bundled asset without losing setup', async
     sample.policy.provider.name,
   );
 });
+
+test('operator enables live testing in the draft, exports the setting and retains setup state', async ({
+  page,
+}) => {
+  await imported(page, {
+    ...sample,
+    http: { documentation: false, host: '127.0.0.1', port: 8080 },
+  });
+  await page
+    .getByRole('button', { name: 'API reference', exact: true })
+    .click();
+  const link = page.getByRole('link', { name: 'Open deployed Try it out' });
+  await expect(link).toHaveAttribute(
+    'href',
+    `${sample.policy.provider.origin}/docs/`,
+  );
+  await expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+  await page
+    .getByRole('button', { name: 'Enable deployed API explorer in draft' })
+    .click();
+  await expect(
+    page.getByText('Explorer enabled in this draft.', { exact: false }),
+  ).toBeVisible();
+  await page
+    .getByRole('button', { name: 'Setup configuration', exact: true })
+    .click();
+  expect((await exported(page)).http.documentation).toBe(true);
+  await step(page, 'Provider');
+  await page
+    .getByLabel('Service HTTPS origin', { exact: true })
+    .fill('https://second.example.test');
+  await page
+    .getByRole('button', { name: 'API reference', exact: true })
+    .click();
+  await expect(link).toHaveAttribute(
+    'href',
+    'https://second.example.test/docs/',
+  );
+  await page
+    .getByRole('button', { name: 'Setup configuration', exact: true })
+    .click();
+  await page
+    .getByLabel('Service HTTPS origin', { exact: true })
+    .fill('http://invalid.test');
+  await page
+    .getByRole('button', { name: 'API reference', exact: true })
+    .click();
+  await expect(link).toHaveCount(0);
+});
