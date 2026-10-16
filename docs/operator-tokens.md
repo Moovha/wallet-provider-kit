@@ -115,7 +115,8 @@ renews a token with 30 seconds or less remaining before sending a protected requ
 It does not renew indefinitely in the background and never automatically replays
 an API request after a 401, timeout or unknown outcome.
 
-Each issuance rechecks the operator session and limits. Provider login requires
+Each issuance rechecks the operator session and limits before contacting the
+issuer, and checks the operator/configuration again before returning the token. Provider login requires
 fresh authentication and its operator session lasts at most five minutes. If it
 expires, sign in again; a failed renewal prevents that API request from being sent.
 Tokens are valid for at most ten minutes and can continue to work until expiry
@@ -135,8 +136,10 @@ API requests continue to omit browser cookies. Do not share screenshots or copie
 cURL that contain bearer tokens, personal data or signatures.
 
 To disable the feature, uncheck operator token controls, export and restart.
-Manual **Authorize** remains available for an existing application access token,
-including public-client integrations outside this supplied M2M broker.
+Manual **Authorize** remains available for an existing application access token.
+Choose **Clear token** first when switching from managed tokens to manual
+authorization; a managed token takes precedence while active. This also supports
+public-client integrations outside this supplied M2M broker.
 
 ## If it fails
 

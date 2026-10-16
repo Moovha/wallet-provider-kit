@@ -162,7 +162,12 @@ export async function registerDocumentationTokens(
           request.body.scopes.some((scope) => !entry.scopes.includes(scope))
         )
           throw new AuthenticationError(403);
-        return options.issue(entry.clientId, request.body.scopes);
+        const token = await options.issue(entry.clientId, request.body.scopes);
+        // Issuance can involve network I/O. Do not deliver credentials after authority expires or changes.
+        await operator(request);
+        if (!(await options.currentConfiguration()))
+          throw new AuthenticationError(403);
+        return token;
       },
     );
     routes.post<{ Body: { csrf: string } }>(

@@ -183,6 +183,30 @@ describe('operator-only application token broker', () => {
     ).toBe(403);
     expect(f.issue).toHaveBeenCalledTimes(2);
   });
+  it.each(['configuration', 'operator'] as const)(
+    'withholds issued tokens if %s authority changes during exchange',
+    async (change) => {
+      const f = await fixture();
+      f.issue.mockImplementationOnce(async () => {
+        if (change === 'configuration') f.fence();
+        else f.identity.authenticatedAt = Date.now() - 301000;
+        return {
+          access_token: 'withheld-fixture-token',
+          expires_at: Date.now() + 600000,
+          scope: 'wallet:account:read',
+        };
+      });
+      const response = await f.app.inject({
+        method: 'POST',
+        url: '/docs/operator/token',
+        headers: f.headers,
+        payload: f.body,
+      });
+      expect(response.statusCode).toBe(403);
+      expect(response.body).not.toContain('withheld-fixture-token');
+      expect(f.issue).toHaveBeenCalledTimes(1);
+    },
+  );
   it('limits repeated issuance without adding further issuer calls', async () => {
     const f = await fixture();
     for (let count = 0; count < 6; count++) {
