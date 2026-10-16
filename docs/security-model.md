@@ -7,8 +7,25 @@ wallet service API. Keep its one-hour private session link private and its liste
 on loopback. Exact Host/Origin checks, a fragment-delivered bearer token and a
 restrictive browser policy protect its API; do not expose or proxy it publicly.
 
-Configuration validation has no deployment effects. Explicitly starting a reviewed
-plan authorizes local Docker builds, private file creation, initialization of a new
+Configuration validation and runtime detection have no deployment effects.
+**Install local runtime and continue** separately authorizes package installation,
+Docker plugin configuration and local engine startup. Setup reuses a healthy
+Unix-socket Docker engine, starts installed Docker Desktop when applicable, or
+installs missing Homebrew packages and starts a dedicated Colima VM. It does not
+change the selected Docker context, enable a system Docker service or add users
+to the Docker group. Existing Colima profile resources and mounts are retained.
+Concurrent installers are blocked by a private host lock.
+
+If Homebrew is missing, setup verifies a revision-pinned installer against its
+recorded SHA-256 digest before running it. Browser setup opens that installer in
+a local terminal for OS permissions; the CLI uses its terminal. Never enter an
+administrator password in the browser. Package downloads are verified by Homebrew;
+installer output is not returned through the setup API. Installation requires
+trust in Homebrew, Colima and their distribution infrastructure. Runtime tools and
+VM images are installed separately from the toolkit and are not bundled in its
+package. They may remain installed after failed setup.
+
+Explicitly starting a reviewed plan authorizes local Docker builds, private file creation, initialization of a new
 store and container startup. The executor pins a local Unix-socket daemon, refuses
 custom modules and active configurations, accepts only referenced secrets and runs
 fixed commands without a shell. A wizard session can initialize only one new

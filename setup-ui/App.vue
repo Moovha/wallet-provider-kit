@@ -135,6 +135,12 @@ onMounted(async () => {
       setupLocked.value = true;
       await nextTick();
       goToStep('review');
+    } else if (result.runtimeConfiguration) {
+      config.value = result.runtimeConfiguration;
+      setupLocked.value = result.runtime?.state === 'installing';
+      await nextTick();
+      await check();
+      goToStep('review');
     } else config.value = emptyConfiguration(result.config);
   } catch (error) {
     showError(error);

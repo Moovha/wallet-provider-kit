@@ -18,7 +18,8 @@ container deployment, or download all three files for manual deployment:
 
 The [local executor](local-setup.md) saves private files, builds the Docker image,
 initializes new storage once, diagnoses and starts the service with progress and
-health results. Requires a local Docker engine with Compose. Manual downloads are
+health results. It detects missing runtime components and offers installation with
+progress before continuing to the deployment plan. Manual downloads are
 ready for the [deployment steps](operator-deployment.md). Validation alone does not
 check credentials, test external integrations or deploy a service. Wallet operations start only
 after you deploy, complete acceptance tests and explicitly enable them. Editing
@@ -174,8 +175,11 @@ Review the access flow, identity requirements, application permissions, backend
 and activation state. **Validate configuration** checks the draft you have been
 building across the earlier steps. Resolve any errors beside the named step and
 field. Check the per-application permission summary and deployment reminders,
-then choose **Check local setup prerequisites** to review the deployment plan,
-supply missing secrets and **Start local setup**. Follow progress through private
+then choose **Check local setup prerequisites**. If tools are missing or stopped,
+review the proposed machine changes and choose **Install local runtime and continue**.
+Follow runtime progress; complete any Homebrew or Docker Desktop prompts outside
+the browser. Setup then opens the deployment plan automatically. Review it,
+supply missing secrets and choose **Start local setup**. Follow progress through private
 file creation, image build, configuration validation, new storage initialization,
 diagnostics, startup and health checks. **Local service running · wallet operations
 disabled** is the expected first result. Follow [local setup](local-setup.md) for

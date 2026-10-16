@@ -1,5 +1,5 @@
 import { randomBytes, timingSafeEqual } from 'node:crypto';
-import { readFile, readdir } from 'node:fs/promises';
+import { access, readFile, readdir } from 'node:fs/promises';
 import { extname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
@@ -15,6 +15,11 @@ import {
   validateProviderConfiguration,
 } from './config.js';
 
+import {
+  createLocalRuntime,
+  type LocalRuntimeOptions,
+} from './local-runtime.js';
+
 const contentTypes: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
@@ -29,11 +34,35 @@ export async function createSetupServer(options: {
   token: string;
   assetDirectory?: string;
   executor?: SetupExecutorOptions;
+  runtime?: LocalRuntimeOptions;
 }) {
   const app = Fastify({ logger: false, bodyLimit: 65536 });
   const expiresAt = Date.now() + 60 * 60 * 1000;
   const token = Buffer.from(options.token);
-  const executor = createSetupExecutor(options.executor);
+  const runtime = createLocalRuntime({
+    root: options.executor?.root,
+    source: options.executor?.source,
+    ...options.runtime,
+  });
+  const executor = createSetupExecutor({
+    ...options.executor,
+    command: options.executor?.command ?? runtime.docker,
+    dockerExecutable: options.executor?.dockerExecutable ?? runtime.executable,
+  });
+  let runtimeConfiguration: unknown;
+  let checkedConfiguration: unknown;
+  let preparing = false;
+  const runtimeIdle = () => {
+    if (
+      preparing ||
+      runtime.status().state === 'checking' ||
+      runtime.status().state === 'installing' ||
+      executor.status().state !== 'idle'
+    )
+      throw new ConfigurationError([
+        'Runtime installation is unavailable while a deployment is running or has completed in this session.',
+      ]);
+  };
   const directory =
     options.assetDirectory ??
     fileURLToPath(new URL('../setup-ui/', import.meta.url));
@@ -108,6 +137,8 @@ export async function createSetupServer(options: {
   app.get('/api/template', async () => ({
     config: example,
     execution: executor.status(),
+    runtime: runtime.status(),
+    runtimeConfiguration,
   }));
   app.post('/api/validate', async (request, reply) => {
     try {
@@ -148,16 +179,68 @@ export async function createSetupServer(options: {
               'Local setup could not complete this request. Check its progress and saved deployment instructions.',
             ],
     });
-  app.post('/api/setup/plan', async (request, reply) => {
+  app.get('/api/runtime/status', async () => runtime.status());
+  app.post('/api/runtime/check', async (request, reply) => {
+    let owned = false;
     try {
+      runtimeIdle();
+      executor.resetPlan();
+      const config = validateProviderConfiguration(request.body);
+      if (
+        config.activation.enabled ||
+        !['cdp', 'openzeppelin-relayer'].includes(config.backend.kind)
+      )
+        throw new ConfigurationError([
+          'Local setup requires CDP or Relayer with wallet operations disabled.',
+        ]);
+      preparing = true;
+      owned = true;
+      const source =
+        options.executor?.source ??
+        fileURLToPath(new URL('../../', import.meta.url));
+      try {
+        await access(join(source, 'Dockerfile'));
+        await access(join(source, '.dockerignore'));
+      } catch {
+        throw new ConfigurationError([
+          'Run local container setup from a built source checkout containing Dockerfile and .dockerignore. Configuration downloads remain available.',
+        ]);
+      }
+      checkedConfiguration = config;
+      return await runtime.check();
+    } catch (error) {
+      return executionError(error, reply);
+    } finally {
+      if (owned) preparing = false;
+    }
+  });
+  app.post('/api/runtime/install', async (_request, reply) => {
+    try {
+      runtimeIdle();
+      const result = runtime.start();
+      runtimeConfiguration = checkedConfiguration;
+      return result;
+    } catch (error) {
+      return executionError(error, reply);
+    }
+  });
+  app.post('/api/setup/plan', async (request, reply) => {
+    let owned = false;
+    try {
+      runtimeIdle();
+      preparing = true;
+      owned = true;
       return await executor.prepare(request.body);
     } catch (error) {
       return executionError(error, reply);
+    } finally {
+      if (owned) preparing = false;
     }
   });
   app.post('/api/setup/start', async (request, reply) => {
     try {
       const body = request.body as { plan?: unknown; secrets?: unknown } | null;
+      runtimeIdle();
       return executor.start(body?.plan, body?.secrets);
     } catch (error) {
       return executionError(error, reply);

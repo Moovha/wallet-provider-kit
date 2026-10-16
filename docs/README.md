@@ -30,7 +30,8 @@ vendor accounts or replace infrastructure and product integration work.
 The wizard builds a local configuration draft. Its fields define the backend,
 application trust, policy and server settings your deployment will use. You
 can finish with an automated local Docker Compose deployment for CDP or Relayer,
-or download three files for manual deployment. Local setup saves private files,
+or download three files for manual deployment. Local setup checks the container
+runtime and offers to install missing tools before continuing. It saves private files,
 builds the image, initializes new storage, diagnoses and starts the disabled service
 with visible progress. Validation alone checks completeness and consistency;
 external acceptance follows afterward. Existing services use reviewed configuration

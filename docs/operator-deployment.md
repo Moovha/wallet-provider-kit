@@ -1,6 +1,7 @@
 # Deploy the wizard export
 
-For a new local CDP or Relayer evaluation, the wizard can perform file preparation,
+For a new local CDP or Relayer evaluation, the wizard or CLI can detect and install
+missing runtime tools, then perform file preparation,
 image build, storage initialization, diagnosis, startup and health checks with
 visible progress. Follow [automated local setup](local-setup.md). This guide covers
 manual deployment, final-host infrastructure and existing-service maintenance.
