@@ -909,6 +909,7 @@ export declare class OnboardingService {
     id: string,
     identity: OwnerIdentity,
   ): Promise<{
+    verificationUrl?: string | undefined;
     application: string;
     provider: string;
     privacyUrl: string;

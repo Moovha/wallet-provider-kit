@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — identity verification handoff
+
+- Open a prepared identity verification session through an explicit navigation
+  link, so strict browser form-action policies do not block the vendor handoff.
+- Preserve same-origin form submission restrictions, withheld external referrers
+  and reuse of an existing verification session when the owner resumes.
+
 ## Unreleased — public documentation language
 
 - Rewrite operator walkthroughs, integration guides and project policies for their

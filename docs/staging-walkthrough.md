@@ -115,8 +115,10 @@ In Swagger, execute `POST /v1/access-requests` with a new UUIDv4 idempotency key
 ```
 
 Open the returned consent URL as a top-level browser navigation. Sign in as the
-approved test owner and select **Allow requested access**. Complete the configured
-vendor test verification, or import authorized test evidence through
+approved test owner and select **Allow requested access**. For a new vendor check,
+choose **Continue verification**, then **Continue to identity verification** on
+the handoff page. Resuming the request uses its existing vendor session. Complete
+the configured vendor test verification, or import authorized test evidence through
 `POST /v1/access-requests/{requestId}/identity`. In a separate reviewer browser
 session, open `/onboarding/review`, inspect the actual evidence, establish its
 owner binding and original verification date, and accept only if it meets policy.

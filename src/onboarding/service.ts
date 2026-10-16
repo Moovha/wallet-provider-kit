@@ -263,6 +263,7 @@ export class OnboardingService {
         state.accounts[request.accountId]?.owner !== owner
       )
         deny();
+      const status = this.stateOf(state, request);
       return {
         application: application(this.policy, { ...request.caller, scopes: [] })
           .name,
@@ -271,7 +272,12 @@ export class OnboardingService {
         permissions: request.input.authorization_details[0].actions,
         mode: request.input.mode,
         durationDays: this.policy.access.maxAgeDays,
-        status: this.stateOf(state, request),
+        status,
+        ...(status === 'provider_review_required' &&
+        request.verification &&
+        !request.evidence
+          ? { verificationUrl: request.verification.url }
+          : {}),
       };
     });
   }
