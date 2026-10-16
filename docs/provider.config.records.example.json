@@ -23,7 +23,8 @@
       }
     },
     "access": {
-      "maxAgeDays": 7
+      "maxAgeDays": 7,
+      "mode": "hosted"
     }
   },
   "oauth": {

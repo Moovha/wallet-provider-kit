@@ -1,10 +1,10 @@
 # Prepare services, registrations and secrets
 
-Use this checklist before completing the [setup wizard](setup-wizard.md). You can
-start with [application-record evaluation](application-records.md) to try the
-service without a KYC vendor account. It uses admitted-client records, owner
-consent and provider review for unfunded wallets. Vendor credentials and pricing
-below apply only when you select external verification.
+Use this checklist before completing the [setup wizard](setup-wizard.md).
+The standard [application-led flow](application-access.md) accepts identity and
+consent attestations from explicitly trusted applications. Provider user login,
+manual review and provider-initiated vendor verification are not prerequisites.
+The hosted compatibility sections below describe those optional features.
 
 You can explore the wizard without these accounts, but placeholder values cannot run a
 working provider. Examples use reserved `.example` domains and invented IDs.
@@ -16,18 +16,38 @@ registrations require configuration; an incompatible token service may require a
 advanced integration. The kit does not supply an identity provider or token issuer. For a fresh setup,
 use the [Auth0 dashboard recipe](auth0-setup.md); it covers both registrations.
 
+Standard application-led access needs an API token issuer, admitted applications,
+reviewed identity/consent trust agreements and a wallet backend. Users authenticate
+and complete checks within the application. No separate provider user login,
+reviewer account or identity-vendor credential is required. See
+[the application-led contract](application-access.md).
+
+## Application identity and consent trust
+
+Agree each application's authority to attest its users, verification level,
+required fields, evidence freshness, consent terms and withdrawal process.
+Record `policy.applications[].assertionTrust.agreement` in Policies. Choose stable
+user IDs scoped to that application; names and email addresses cannot link wallets
+across applications. Configure `policy.identity.application` in Services. An API
+scope or a set of populated fields cannot replace this trust agreement.
+
+The application records consent for the provider's current policy revision, obtained
+from `GET /v1/access-policy`. Financial delegation also binds the exact transfer
+policy revision. Applications must communicate withdrawals through the grant
+revocation endpoint. The provider checks its current local grant before effects.
+
 ## What must exist
 
-| Service or decision                | Why it is needed                                                 | Who supplies it                                                 |
-| ---------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- |
-| Public domain and privacy notice   | Stable provider identity, login callbacks and owner-facing pages | Your domain/hosting administrator and privacy owner             |
-| One wallet backend                 | Creates accounts and signs admitted actions                      | CDP project, local OWS engine/vault, or your Relayer deployment |
-| Owner login service                | Authenticates wallet owners and provider reviewers               | Your OIDC identity provider administrator                       |
-| Application token service          | Authenticates each connected application to the API              | Your OAuth authorization-server administrator                   |
-| Didit, Sumsub or both              | Collects or imports identity evidence                            | Your identity-verification vendor account administrator         |
-| Identity funding agreements        | Authorizes and bounds verification/import costs                  | Your team, vendor and connected application                     |
-| Review staff                       | Independently accepts identity evidence                          | Named staff accounts in the owner login service                 |
-| Persistent host and secret storage | Runs the service and retains its authoritative records           | Your infrastructure operator                                    |
+| Service or decision                 | Why it is needed                                       | Who supplies it                                                 |
+| ----------------------------------- | ------------------------------------------------------ | --------------------------------------------------------------- |
+| Public domain and privacy notice    | Stable provider identity and application API endpoint  | Your domain/hosting administrator and privacy owner             |
+| One wallet backend                  | Creates accounts and signs admitted actions            | CDP project, local OWS engine/vault, or your Relayer deployment |
+| Optional staff/hosted login service | Staff token controls or hosted compatibility only      | Your OIDC identity provider administrator                       |
+| Application token service           | Authenticates each connected application to the API    | Your OAuth authorization-server administrator                   |
+| Didit, Sumsub or both               | Collects or imports identity evidence                  | Your identity-verification vendor account administrator         |
+| Hosted identity funding agreements  | Authorizes and bounds verification/import costs        | Your team, vendor and connected application                     |
+| Hosted review staff                 | Independently accepts identity evidence                | Named staff accounts in the owner login service                 |
+| Persistent host and secret storage  | Runs the service and retains its authoritative records | Your infrastructure operator                                    |
 
 **OIDC** (OpenID Connect) is the login protocol. **OAuth** supplies access tokens
 for API requests. An **issuer** is the exact HTTPS identity of the service issuing
@@ -158,6 +178,8 @@ Never change it to work around a failed or uncertain wallet operation.
 
 ## Register owner login
 
+**Optional staff login or hosted compatibility only.** Standard wallet users do not sign in to the provider. Configure this registration only for staff token controls or the explicit hosted flow.
+
 Ask your identity administrator to register a **confidential web application** for
 the wallet service. This client logs in owners and staff; it is separate from the
 application API clients below. An existing issuer can serve both purposes if it
@@ -187,6 +209,8 @@ provider before accepting the integration. A vendor's “OIDC supported” label
 alone does not confirm these settings.
 
 ### Identify reviewers
+
+**Hosted compatibility only.** Application-led access is decided by configured policy and does not require reviewer accounts.
 
 Create staff accounts at that same issuer and obtain each account's exact OIDC
 `sub` from the identity administrator's user record or a verified test login.
@@ -256,6 +280,8 @@ See [HTTP authentication](http-api.md#authentication-and-profiles).
 
 ## Prepare identity verification
 
+**Hosted compatibility only.** In standard application-led access, the application performs identity checks and submits accepted attestations; this provider does not start a vendor session.
+
 Choose Didit, Sumsub or both. These are vendor accounts/contracts, not login
 providers. Configure the recipient workflow/level that represents **your**
 acceptance requirements. Confirm vendor availability, sharing permissions and
@@ -304,6 +330,8 @@ for hosted verification/applicant status and the selected reuse operation. If
 those capabilities are unavailable, do not select this integration as ready.
 
 ### Prices, terms and application funding
+
+These settings cover provider-initiated vendor work in hosted mode. They are not required for application-led assertions.
 
 Obtain confirmed maximum charges from the vendor/your contract for **new
 verification** and **shared identity import** separately, for each selected

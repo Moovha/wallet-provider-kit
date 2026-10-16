@@ -146,7 +146,7 @@ The [API guide](api.md#core-wallet-service) describes the authority port, and
 
 Use [provider-guide.md](provider-guide.md) to connect the selected backend to your
 existing authority and HTTP application. Use [onboarding](onboarding.md) if you
-need hosted owner login, identity review, consent and application access. Keep
+need application-led access and journaled provisioning. Select hosted compatibility explicitly if provider login and review are required. Keep
 public configuration in one typed startup module and credentials in your secret
 store or ignored local environment files.
 

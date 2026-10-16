@@ -33,7 +33,7 @@ npx --no-install wallet-provider-kit init provider.config.json
 npx --no-install wallet-provider-kit validate --config provider.config.json
 ```
 
-`init` writes the [application-record template](provider.config.records.example.json) without overwriting
+`init` writes the [application-led template](provider.config.example.json) without overwriting
 an existing file. Editors can use the packaged
 [JSON Schema](../spec/provider-config.schema.json). Version 1 rejects unknown fields,
 unsupported profiles, plaintext credentials, invalid policies and incomplete
@@ -57,12 +57,25 @@ against the configuration file's directory.
 
 ## Register external integrations
 
+The standard configuration explicitly selects `policy.access.mode: "application"`.
+Set `policy.identity.application.verificationLevel` and `requiredFields`, and
+`policy.applications[].assertionTrust.agreement` for each trusted application.
+The application authenticates its users, performs identity checks and records
+consent before requesting access. No provider user login or manual review is
+required. The [application-led contract](application-access.md) defines the request,
+current policy revisions, user binding, expiry and withdrawal.
+
+Existing configurations without `access.mode` retain hosted compatibility behavior.
+`ownerLogin`, reviewers, vendor credentials and vendor funding below are required
+only for that hosted flow (or optional staff login where noted). An occupied store
+cannot switch access mode without a reviewed ownership migration.
+
 | Setting               | External setup                                                                                                                                                                                                           |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `ownerLogin`          | Register a confidential OIDC client with exact callback `<provider-origin>/onboarding/callback`; enable code flow, PKCE S256, RS256/ES256 ID tokens and `auth_time`. Your IdP owns registration, MFA and recovery.       |
 | `oauth`               | Configure the application API issuer, dedicated audience and HTTPS JWKS; issue RFC 9068 `at+jwt` access tokens with `client_id`, at most ten minutes old.                                                                |
-| `policy.applications` | Register connected application clients separately from the owner's login client. Match each checked issuer/client pair.                                                                                                  |
-| `reviewers`           | Configure provider staff's login subject IDs. Provider review establishes identity acceptance; a vendor approval alone cannot accept a user.                                                                             |
+| `policy.applications` | Register connected application API clients and their explicit assertion trust agreements. Optional staff/hosted login uses a separate client. Match each checked issuer/client pair.                                     |
+| `reviewers`           | Hosted compatibility only: configure provider staff's login subject IDs. Provider review establishes identity acceptance; a vendor approval alone cannot accept a user.                                                  |
 | `identity`            | Leave empty for application-record evaluation, with required fields in `policy.identity.records`. For external verification, supply Didit or Sumsub settings, confirmed price limits and application funding agreements. |
 | `backend`             | Select a bundled CDP, OWS or OpenZeppelin Relayer backend using the configurations below. Prove its Base Sepolia EOA lifecycle and recovery independently.                                                               |
 
@@ -203,6 +216,14 @@ No Docker or live-provider acceptance is implied by offline package tests.
 
 ## Consume the API
 
+For the standard flow, read `GET /v1/access-policy`, then send the application's
+stable user ID, current identity evidence and recorded consent to
+`POST /v1/access-requests`. Policy acceptance returns `granted` and account/grant
+IDs without a consent URL. Provision separately, read account details, and call
+`POST /v1/access-grants/{grantId}/revoke` when the user withdraws. Follow
+[application-led access](application-access.md) for the full payload and limits.
+The hosted sequence below applies only to compatibility deployments.
+
 An application written in any language uses the
 [implemented OpenAPI](../spec/provider-api.json) with its scoped access token. `GET /v1/capabilities` reports readiness and the
 configured action profiles.
@@ -264,9 +285,7 @@ validity window must be 60–3600 seconds and begins when requested. Signing and
 submission must finish before expiry.
 
 Explicitly allow `transfers:request` in the application's configured `permissions`
-and request it in the onboarding `authorization_details[0].actions`. The owner
-consents once to the delegation: the consent screen shows token/domain, network,
-recipients, per-transfer/lifetime limits and signature validity. Accepted KYC and
+and request it in `authorization_details[0].actions`. Read the exact `transfer_terms` and `transfer_policy_revision` from the access policy. Present the token/domain, network, recipients, limits and validity in the application, record the user’s consent and include that revision in the assertion. Hosted compatibility instead presents its own consent screen. Accepted KYC and
 provider acceptance are also required. `operations:request`, an access token or
 an account-read grant alone cannot authorise this transfer profile.
 

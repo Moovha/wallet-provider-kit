@@ -1,5 +1,10 @@
 # Get and renew application tokens in the GUI
 
+These optional controls authenticate **staff who obtain application API tokens**.
+They do not require wallet users to sign in to the provider. Standard user access
+remains [application-led](application-access.md). Enabling these controls requires
+optional staff login in Services; a reviewer account is unnecessary.
+
 The optional **Application tokens** panel in deployed Swagger lets an authorized
 operator obtain a short-lived calling-application token, renew it and use it for
 Try it out without copying tokens between tools. The provider server exchanges
@@ -25,7 +30,7 @@ wallet operations or give operators owner/spending consent.
    grant only the wallet scopes you intend to test. Its **Client ID** identifies
    the caller; its **Client Secret** is the private password used by the server
    to authenticate that caller to the issuer. Find both in the application's
-   Settings. The secret is distinct from the owner-login client's secret and
+   Settings. The secret is distinct from the staff-login client's secret and
    from wallet/identity vendor credentials. Enable client-credentials grants
    and client_secret_post authentication; do not use a public SPA/mobile client
    or a client that requires private_key_jwt/mTLS with this supplied panel.
@@ -33,7 +38,7 @@ wallet operations or give operators owner/spending consent.
    registration. Keep it enabled. Prefer an isolated staging application with
    approved test identities and its own owner access grants. The application's
    owner must authorize sharing its secret with the provider's token broker.
-4. Create or select the operator's account at the **owner-login issuer**. Copy its
+4. Create or select the operator's account at the **configured staff-login issuer**. Copy its
    exact user `sub` (Auth0 User Management → Users → User ID). This is a user
    identifier, not an email, client ID or secret. That person will sign in through
    the existing provider login registration and callback. Do not register a new
@@ -50,7 +55,7 @@ In the local wizard, import your saved configuration and open **Deployment**:
 
 1. Check **Enable application token controls for staff**. It also enables the deployed explorer.
 2. In **Token operator account IDs (sub)**, enter one exact subject per line from the
-   owner-login issuer. At least one is required.
+   configured staff-login issuer. At least one is required.
 3. For each intended application, check **Allow staff to get tokens for …**. Enter its
    **Application client secret variable name**. The suggested name is
    `WALLET_EXPLORER_APP_1_SECRET`, numbered by the wizard's application list.
@@ -145,7 +150,7 @@ public-client integrations outside this supplied M2M broker.
 
 - **No Application tokens panel:** confirm your toolkit build supports `apiExplorer`,
   enable it in validated configuration with documentation enabled, then restart.
-- **Sign-in loop / access denied:** check the exact operator subject and owner-login
+- **Sign-in loop / access denied:** check the exact operator subject and staff-login
   issuer, HTTPS/cookies, the callback and your existing short ID-token lifetime and
   fresh authentication settings. A reviewer account is not automatically a token operator.
 - **Could not obtain a token:** check the selected application's secret variable,

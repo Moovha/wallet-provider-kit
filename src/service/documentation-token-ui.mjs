@@ -12,7 +12,7 @@
   let generation = 0;
   let clearManual = () => {};
   const scopeLabels = {
-    'wallet:access': 'Request wallet access and share identity evidence',
+    'wallet:access': 'Request or revoke wallet access',
     'wallet:access:read': 'Read access request status',
     'wallet:account:read': 'Read wallet account details',
     'wallet:provision': 'Create an accepted account’s wallet',

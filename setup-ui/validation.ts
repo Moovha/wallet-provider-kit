@@ -53,6 +53,12 @@ export function explainIssue(issue: string) {
     maxItems: 'Remove entries beyond the limit shown for this setting.',
     enum: 'Choose one of the supported options.',
     const: 'Use the supported configuration version or integration profile.',
+    'login configuration is required for hosted access or staff token controls':
+      'Configure login in Services for enabled staff token controls or hosted compatibility. Standard wallet users stay in the application.',
+    'hosted access requires reviewers':
+      'In Policies, add the staff account IDs allowed to review hosted requests.',
+    'application-led access uses trusted application attestations, not hosted verification':
+      'Keep application-led access selected in Services and remove hosted identity-vendor settings. Configure application identity requirements and trust agreements instead.',
     'issuers must match /oauth/issuer':
       'Use the same token issuer for each application as in Services.',
     'documentation and enabled registered clients are required; duplicate clients are not allowed':
@@ -70,7 +76,7 @@ export function explainIssue(issue: string) {
     'custom adapters use the advanced setup guide':
       'Custom wallet backends cannot be configured in this wizard. Follow the advanced setup guide for custom adapters.',
     'invalid policy, integration or activation settings':
-      'Review the service addresses, application registrations, identity policy and activation settings using their field instructions.',
+      'Review the service addresses, application trust agreements, identity/access policy and activation settings using their field instructions.',
   };
   return `${area} — ${fieldLabel(path)}: ${hints[reason] ?? 'Review this setting using its field instructions.'}`;
 }
@@ -86,6 +92,9 @@ function fieldLabel(path: string): string {
     '/policy/provider/privacyUrl': 'Privacy notice URL',
     '/policy/version': 'Policy version',
     '/policy/identity/maxAgeDays': 'Maximum age of identity checks (days)',
+    '/policy/access/mode': 'Access flow',
+    '/policy/identity/application/verificationLevel': 'Required identity level',
+    '/policy/identity/application/requiredFields': 'Required identity fields',
     '/policy/access/maxAgeDays': 'Maximum access duration (days)',
     '/policy/applications': 'Connected applications',
     '/reviewers': 'Reviewer account IDs',
@@ -101,6 +110,8 @@ function fieldLabel(path: string): string {
     '/backend/url': 'Relayer service address',
     '/backend/apiKey': 'Relayer API key variable name',
     '/backend/signers': 'Relayer signer entries',
+    '/ownerLogin': 'Staff or hosted login',
+    '/policy/identity/application': 'Application identity requirements',
     '/ownerLogin/issuer': 'Login service issuer URL',
     '/ownerLogin/clientId': 'Wallet login client ID',
     '/ownerLogin/clientSecret': 'Wallet login client secret variable name',
@@ -141,6 +152,7 @@ function fieldLabel(path: string): string {
   );
   if (application) {
     const fields: Record<string, string> = {
+      'assertionTrust/agreement': 'identity and consent trust agreement',
       name: 'name',
       clientId: 'client ID',
       issuer: 'token issuer',

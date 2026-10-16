@@ -173,10 +173,7 @@ export async function setupCommand(args: string[]): Promise<boolean> {
   }
   if (args[0] === 'init' && args.length <= 2) {
     const example = await readFile(
-      new URL(
-        '../../docs/provider.config.records.example.json',
-        import.meta.url,
-      ),
+      new URL('../../docs/provider.config.example.json', import.meta.url),
     );
     await writeFile(resolve(args[1] ?? 'provider.config.json'), example, {
       flag: 'wx',

@@ -7,7 +7,7 @@ let url: string;
 const token = 'browser-test-session';
 const sample = JSON.parse(
   await readFile(
-    new URL('../../docs/provider.config.example.json', import.meta.url),
+    new URL('../../docs/provider.config.hosted.example.json', import.meta.url),
     'utf8',
   ),
 );
@@ -85,7 +85,9 @@ test('a first-time host can understand the address and open contextual instructi
   await expect(help).toContainText(
     'Choose a hostname under a domain you control',
   );
-  await expect(help).toContainText('Login returns people to this address');
+  await expect(help).toContainText(
+    'Connected applications send wallet requests here',
+  );
   await expect(help.getByRole('link')).toHaveAttribute(
     'href',
     'https://moovha.github.io/wallet-provider-kit/docs/operator-deployment.html#publish-through-https',
@@ -134,8 +136,11 @@ test('field guidance follows backend choices and explains service registrations,
   await relayerHelp.locator('summary').click();
   await expect(relayerHelp).toContainText('does not install a Relayer');
   await step(page, 'Services');
+  await page.getByLabel('Access flow', { exact: true }).selectOption('hosted');
   await expect(
-    page.getByText('People log in; applications use access tokens'),
+    page.getByRole('heading', {
+      name: 'Access tokens for connected applications',
+    }),
   ).toBeVisible();
   const audienceHelp = page.locator('[data-setting="audience"]');
   await audienceHelp.locator('summary').click();
@@ -143,6 +148,7 @@ test('field guidance follows backend choices and explains service registrations,
   await expect(page.locator('.callout code')).toHaveText(
     `${sample.policy.provider.origin}/onboarding/callback`,
   );
+  await page.getByText('Use Didit', { exact: true }).click();
   await page
     .getByText('Didit verification: set an agreed price limit', {
       exact: true,
@@ -220,6 +226,7 @@ test('an operator configures CDP without JSON, exports valid files, and editing 
     .getByLabel('Wallet environment name', { exact: true })
     .fill('acme-sepolia');
   await step(page, 'Services');
+  await page.getByLabel('Access flow', { exact: true }).selectOption('hosted');
   await page
     .getByLabel('Login service issuer URL', { exact: true })
     .fill('https://login.acme.example');
@@ -235,6 +242,11 @@ test('an operator configures CDP without JSON, exports valid files, and editing 
   await page
     .getByLabel('Token verification keys URL (JWKS)', { exact: true })
     .fill('https://applications.acme.example/jwks');
+  await page
+    .getByText('Use application-supplied records for an unfunded evaluation', {
+      exact: true,
+    })
+    .click();
   await expect(
     page.getByLabel('Required record fields', { exact: true }),
   ).toHaveValue('display_name\ncountry');
@@ -861,28 +873,15 @@ test('operator configures GUI token issuance with explicit subjects, clients, sc
   );
 });
 
-test('new drafts use required application records without vendor credentials or signing', async ({
+test('hosted compatibility supports unfunded record evaluation without vendor credentials or signing', async ({
   page,
 }) => {
+  await imported(page);
   await step(page, 'Services');
   const records = page.getByLabel(
     'Use application-supplied records for an unfunded evaluation',
     { exact: true },
   );
-  await expect(records).toBeChecked();
-  await expect(page.getByLabel('Use Didit', { exact: true })).not.toBeChecked();
-  await expect(
-    page.getByLabel('Use Sumsub', { exact: true }),
-  ).not.toBeChecked();
-  await expect(
-    page.getByLabel('Required record fields', { exact: true }),
-  ).toHaveValue('display_name\ncountry');
-  await page.screenshot({
-    path: 'artifacts/application-record-services.png',
-    fullPage: true,
-  });
-  await imported(page);
-  await step(page, 'Services');
   await expect(records).not.toBeChecked();
   await expect(page.getByLabel('Use Didit', { exact: true })).toBeChecked();
   await page

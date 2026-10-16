@@ -36,7 +36,7 @@ including [client IDs and owner-login registrations](concepts.md#what-does-clien
 ## Choose a profile
 
 For supported setups, use [declarative service configuration](setup.md) and the
-HTTP API. The kit supplies current authority, provider authorization of each exact transfer and durable
+[application-led HTTP access flow](application-access.md). Users stay in the application; the provider evaluates trusted identity and consent attestations. The kit supplies current authority, provider authorization of each exact transfer and durable
 journals without custom callbacks. The composition profiles below are
 advanced integrations for custom behavior and existing hosts.
 
@@ -46,13 +46,14 @@ journals for one host. Its financial authority still requires your current
 owner/grant/KYC/consent/dependency checks. Existing hosts can keep their own
 accepted persistence implementations.
 
-| Your application already has…                                                | Compose                                                                            | You still supply                                                                                                     |
-| ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| Approved stored actions and trusted transactional authority ports            | `createStoredWalletBackend` from `/backend`                                        | Current owner/grant/KYC/consent policy and accepted persistent authority adapters                                    |
-| Current owner/consent/KYC records and approved financial actions             | `EmbeddedWalletService`, a journaled signing backend and optionally `createServer` | Durable authority, attempts, current dispatch/replay authorization and recovery                                      |
-| A wallet backend but needs provider-hosted onboarding and application access | `createOnboardingProvider`                                                         | Existing OIDC login, approved clients, identity vendors/reviewers, private persistent storage and backend acceptance |
-| Existing login and a custom identity-acceptance workflow                     | `EnrollmentService` plus the wallet service                                        | Durable enrollment/identity authority and current financial authority                                                |
-| A configured OpenZeppelin Relayer and approved stored calls                  | The separate `RelayerExecutionService` profile                                     | Execution authority, durable attempt/status journal and accepted signer/network/budget bindings                      |
+| Your application already has…                                                         | Compose                                                                            | You still supply                                                                                                     |
+| ------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Approved stored actions and trusted transactional authority ports                     | `createStoredWalletBackend` from `/backend`                                        | Current owner/grant/KYC/consent policy and accepted persistent authority adapters                                    |
+| Current owner/consent/KYC records and approved financial actions                      | `EmbeddedWalletService`, a journaled signing backend and optionally `createServer` | Durable authority, attempts, current dispatch/replay authorization and recovery                                      |
+| A wallet backend and trusted application identity/consent assertions                  | `createOnboardingProvider` with application-led policy                             | Reviewed application trust agreements, accepted evidence, private storage and backend acceptance                     |
+| A wallet backend but needs optional provider-hosted onboarding and application access | `createOnboardingProvider`                                                         | Existing OIDC login, approved clients, identity vendors/reviewers, private persistent storage and backend acceptance |
+| Existing login and a custom identity-acceptance workflow                              | `EnrollmentService` plus the wallet service                                        | Durable enrollment/identity authority and current financial authority                                                |
+| A configured OpenZeppelin Relayer and approved stored calls                           | The separate `RelayerExecutionService` profile                                     | Execution authority, durable attempt/status journal and accepted signer/network/budget bindings                      |
 
 Choose onboarding **or** lower-level enrollment per server. The toolkit rejects
 combining them. Onboarding manages access and account provisioning; its bundled
@@ -178,7 +179,7 @@ credentials, liveness or fixture tests.
 
 | Entry point                             | Starting API                                                                                 | Detailed guide                                                                                              |
 | --------------------------------------- | -------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `/onboarding`                           | `createOnboardingProvider(config)` resolves to Fastify, using one typed configuration        | [Onboarding](onboarding.md), [configuration example](provider.config.example.ts)                            |
+| `/onboarding`                           | `createOnboardingProvider(config)` resolves to Fastify, using one typed configuration        | [Application-led access](application-access.md), [configuration example](provider.config.example.ts)        |
 | `/identity`                             | `EnrollmentService(identityVerifier, authority)` and `createIdentityVerifier(config)`        | [Enrollment and acceptance](enrollment.md)                                                                  |
 | `/telemetry`                            | `startTelemetry(endpoint?, allowInsecureDevelopment?)` returns a lifecycle with `shutdown()` | [Operations](operations.md)                                                                                 |
 | `/cdp`, `/ows`, `/openzeppelin-relayer` | Explicit backend factories with different key-control/recovery contracts                     | [CDP](provider-guide.md#current-adapter-profile), [OWS](ows-adapter.md), [Relayer](openzeppelin-relayer.md) |

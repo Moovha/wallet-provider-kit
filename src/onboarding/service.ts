@@ -1,3 +1,4 @@
+import { checkApplicationAssertion } from './application-access.js';
 import { randomUUID } from 'node:crypto';
 import type {
   AuthorityContext,
@@ -70,8 +71,9 @@ export class OnboardingService {
   ) {
     const resolved = defineOnboardingPolicy(input);
     if (
-      resolved.identity.records &&
-      (adapters.length || transferPolicyRevision)
+      (resolved.identity.records &&
+        (adapters.length || transferPolicyRevision)) ||
+      (resolved.access.mode === 'application' && adapters.length > 0)
     )
       throw new WalletProviderError('wallet_provider_configuration');
     this.policy = Object.freeze({
@@ -195,7 +197,11 @@ export class OnboardingService {
     return {
       request_id: request.id,
       status,
-      consent_url: `${this.policy.provider.origin}/onboarding/${request.id}`,
+      ...(this.policy.access.mode === 'hosted'
+        ? {
+            consent_url: `${this.policy.provider.origin}/onboarding/${request.id}`,
+          }
+        : {}),
       ...(request.grantId ? { grant_id: request.grantId } : {}),
       ...(status === 'granted'
         ? {
@@ -214,10 +220,20 @@ export class OnboardingService {
       structuredClone(value),
       application(this.policy, context.principal),
       this.policy.identity.records,
+      this.policy.access.mode === 'application',
     );
     const delegatesTransfers =
       input.authorization_details[0].actions.includes('transfers:request');
     if (delegatesTransfers && !this.transferPolicyRevision) deny();
+    const assertion =
+      this.policy.access.mode === 'application'
+        ? checkApplicationAssertion(
+            this.policy,
+            context.principal,
+            input.user,
+            delegatesTransfers ? this.transferPolicyRevision : undefined,
+          )
+        : undefined;
     const key = fingerprint([
       context.principal.issuer,
       context.principal.subject,
@@ -250,6 +266,82 @@ export class OnboardingService {
         expiresAt: Date.now() + day,
         accountId: input.account_id ?? randomUUID(),
       };
+      if (assertion) {
+        const evidenceKey = fingerprint([
+          'application-evidence',
+          context.principal.issuer,
+          context.principal.clientId,
+          input.user!.identity.reference,
+        ]);
+        if (
+          state.evidenceOwners[evidenceKey] &&
+          state.evidenceOwners[evidenceKey] !== assertion.owner
+        )
+          deny();
+        state.evidenceOwners[evidenceKey] = assertion.owner;
+        for (const grant of Object.values(state.grants)) {
+          const previousRequest = state.requests[grant.requestId];
+          if (
+            grant.owner === assertion.owner &&
+            grant.state !== 'active' &&
+            previousRequest?.input.user &&
+            (previousRequest.input.user.consent.reference ===
+              input.user!.consent.reference ||
+              assertion.consentAt <= (previousRequest.consent?.at ?? 0))
+          )
+            deny();
+        }
+        const existing = Object.values(state.accounts).find(
+          (account) => account.owner === assertion.owner,
+        );
+        if (
+          input.mode === 'connect' &&
+          state.accounts[request.accountId]?.owner !== assertion.owner
+        )
+          deny();
+        if (existing) {
+          if (
+            existing.status !== 'active' ||
+            (input.mode === 'connect' && existing.id !== request.accountId)
+          )
+            deny();
+          request.accountId = existing.id;
+        }
+        request.owner = assertion.owner;
+        request.consent = {
+          at: assertion.consentAt,
+          revision: this.policy.revision,
+          privacyUrl: this.policy.provider.privacyUrl,
+        };
+        request.acceptance = {
+          reviewer: 'application-policy',
+          evidenceHash: assertion.evidenceHash,
+          at: Date.now(),
+          expiresAt: assertion.acceptedUntil,
+          source: 'application_attestation',
+        };
+        state.accounts[request.accountId] = {
+          ...existing,
+          id: request.accountId,
+          owner: assertion.owner,
+          status: 'active',
+          acceptedUntil: assertion.acceptedUntil,
+          acceptanceRevision: this.policy.revision,
+          evidenceHash: assertion.evidenceHash,
+          identitySource: 'application_attestation',
+        };
+        this.grant(state, request);
+        state.grants[request.grantId!].expiresAt = Math.min(
+          state.grants[request.grantId!].expiresAt,
+          assertion.expiresAt,
+        );
+        audit(
+          state,
+          'application_access_accepted',
+          request.id,
+          this.policy.revision,
+        );
+      }
       state.requests[request.id] = request;
       state.idempotency[key] = { hash, id: request.id };
       audit(state, 'access_requested', request.id, this.policy.revision);
@@ -267,16 +359,35 @@ export class OnboardingService {
   accessPolicy(principal: VerifiedPrincipal) {
     application(this.policy, principal);
     return {
-      source: this.policy.identity.records
-        ? 'application_record'
-        : 'vendor_verification',
+      flow: this.policy.access.mode,
+      policy_revision: this.policy.revision,
+      ...(this.transferPolicyRevision
+        ? { transfer_policy_revision: this.transferPolicyRevision }
+        : {}),
+      max_identity_age_days: this.policy.identity.maxAgeDays,
+      max_access_days: this.policy.access.maxAgeDays,
+      ...(this.policy.identity.application
+        ? {
+            verification_level:
+              this.policy.identity.application.verificationLevel,
+          }
+        : {}),
+      source:
+        this.policy.access.mode === 'application'
+          ? 'application_attestation'
+          : this.policy.identity.records
+            ? 'application_record'
+            : 'vendor_verification',
       evaluation_only: Boolean(this.policy.identity.records),
       required_fields: [
-        ...(this.policy.identity.records?.requiredFields ?? []),
+        ...(this.policy.identity.application?.requiredFields ??
+          this.policy.identity.records?.requiredFields ??
+          []),
       ],
       maximum_field_characters: 512,
       owner_consent_required: true,
-      provider_review_required: true,
+      provider_login_required: this.policy.access.mode === 'hosted',
+      provider_review_required: this.policy.access.mode === 'hosted',
     };
   }
   async submitRecords(
@@ -1052,11 +1163,36 @@ export class OnboardingService {
       return {
         account_id: account.id,
         ...(account.identitySource
-          ? { identity_source: account.identitySource, evaluation_only: true }
+          ? {
+              identity_source: account.identitySource,
+              evaluation_only: account.identitySource === 'application_record',
+            }
           : {}),
         ...(account.address ? { address: account.address } : {}),
         status: account.address ? 'provisioned' : 'accepted',
       };
+    });
+  }
+  async revokeApplicationGrant(context: AuthorityContext, id: string) {
+    const current = this.context(context);
+    if (this.policy.access.mode !== 'application') deny();
+    return this.store.transaction((state) => {
+      const grant = state.grants[id];
+      if (!grant || !sameCaller(grant.caller, current.principal)) deny();
+      const key = fingerprint([
+        current.principal.issuer,
+        current.principal.subject,
+        current.principal.clientId,
+        'revoke',
+        current.idempotencyKey,
+      ]);
+      const hash = fingerprint(id);
+      if (state.idempotency[key] && state.idempotency[key].hash !== hash)
+        conflict();
+      state.idempotency[key] = { hash, id };
+      grant.state = 'revoked';
+      audit(state, 'application_access_revoked', id, this.policy.revision);
+      return { grant_id: id, status: 'revoked' as const };
     });
   }
   async ownerRequests(identity: OwnerIdentity) {

@@ -28,10 +28,28 @@ export interface ApplicationIdentityRecord {
 export interface ApplicationRecordPolicy {
   requiredFields: string[];
 }
+/** Attested by a registered application under an explicit provider trust agreement. */
+export interface ApplicationUserAssertion {
+  id: string;
+  identity: {
+    reference: string;
+    level: string;
+    verified_at: string;
+    fields: Record<string, string>;
+  };
+  consent: {
+    reference: string;
+    granted_at: string;
+    expires_at: string;
+    policy_revision: string;
+    transfer_policy_revision?: string;
+  };
+}
 export interface AccessInput {
   mode: 'create' | 'connect';
   account_id?: string;
   identity_record?: ApplicationIdentityRecord;
+  user?: ApplicationUserAssertion;
   authorization_details: [{ type: typeof accessType; actions: Permission[] }];
 }
 export interface ApplicationPolicy {
@@ -39,6 +57,8 @@ export interface ApplicationPolicy {
   clientId: string;
   name: string;
   enabled?: boolean;
+  /** Explicit permission to attest user identity and consent; an OAuth scope alone is insufficient. */
+  assertionTrust?: { agreement: string };
   permissions?: Permission[];
   /** Contractually agreed reimbursement, not a payment instruction or vendor price quote. */
   funding?: { agreement: string; monthlyLimitMinor: number };
@@ -49,14 +69,19 @@ export interface OnboardingPolicy {
   applications: ApplicationPolicy[];
   identity?: {
     maxAgeDays?: number;
+    application?: { requiredFields: string[]; verificationLevel: string };
     /** Explicit provider-reviewed record submission for unfunded, read-only evaluation. */
     records?: ApplicationRecordPolicy;
   };
-  access?: { maxAgeDays?: number };
+  access?: { maxAgeDays?: number; mode?: 'application' | 'hosted' };
 }
 export interface ResolvedPolicy extends OnboardingPolicy {
-  identity: { maxAgeDays: number; records?: ApplicationRecordPolicy };
-  access: { maxAgeDays: number };
+  identity: {
+    maxAgeDays: number;
+    records?: ApplicationRecordPolicy;
+    application?: { requiredFields: string[]; verificationLevel: string };
+  };
+  access: { maxAgeDays: number; mode: 'application' | 'hosted' };
   revision: string;
 }
 export interface VendorPrice {
@@ -121,7 +146,7 @@ export interface AccessRequest {
     evidenceHash: string;
     at: number;
     expiresAt: number;
-    source?: 'application_record';
+    source?: 'application_record' | 'application_attestation';
   };
   grantId?: string;
 }
@@ -133,7 +158,7 @@ export interface AccountRecord {
   evidenceHash: string;
   status: 'active' | 'suspended';
   address?: string;
-  identitySource?: 'application_record';
+  identitySource?: 'application_record' | 'application_attestation';
 }
 export interface AccessGrant {
   transferPolicyRevision?: string;
@@ -167,6 +192,7 @@ export interface ProviderState {
       provider: string;
       binding: string;
       activeRevision?: string;
+      accessMode?: 'application' | 'hosted';
     }
   >;
   requests: Record<string, AccessRequest>;

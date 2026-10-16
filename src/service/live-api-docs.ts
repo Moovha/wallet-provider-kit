@@ -5,6 +5,7 @@ export function liveApiSpecification<T extends object>(
   document: T,
   configuredProfile: boolean,
   financial: boolean,
+  flow?: 'application' | 'hosted',
 ): T {
   const result = structuredClone(document);
   const api = result as {
@@ -30,7 +31,7 @@ Start with GET /v1/capabilities without authorization. configured=false means th
 
 For protected calls, use the Application tokens panel when enabled: sign in as an allowed operator, choose a calling application and the API permissions (scopes) you need, then Get token or Renew token. Otherwise choose Authorize and paste a short-lived application access token without the Bearer prefix. Never enter client secrets, vendor keys, owner ID tokens or the local wizard session token. Tokens are kept in page memory; reload or Logout to clear authorization. Do not share screenshots containing tokens, cURL commands, personal data or signatures.
 
-Use real IDs returned by this deployment. POST requests can create records, incur vendor charges or issue usable signatures. Use a new UUIDv4 Idempotency-Key for each distinct mutation and retain the original key for retries. Reconcile unknown outcomes before retrying. Owner login, identity verification and provider review remain separate browser steps. Delegated transfers require the owner’s current access and transfer consent, identity acceptance and provider policy checks.
+Use real IDs returned by this deployment. POST requests can create records, incur vendor charges or issue usable signatures. Use a new UUIDv4 Idempotency-Key for each distinct mutation and retain the original key for retries. Reconcile unknown outcomes before retrying. In standard application-led access, first read GET /v1/access-policy. Submit identity and consent attestations from a trusted application; users remain in that application. Provider login and manual review apply only to hosted compatibility deployments. Optional staff sign-in is for token controls, not wallet users. Delegated transfers require the owner’s current access and transfer consent, identity acceptance and provider policy checks.
 
 For a 401, obtain a current application token. For a 403, check the required scope and current owner access. For a 409, inspect the original attempt. For a 503 or a connection error, check service readiness and the outcome before retrying. A failed connection does not prove the request had no effect; preserve its idempotency key.
 
@@ -40,7 +41,13 @@ See [operator testing instructions](https://moovha.github.io/wallet-provider-kit
   for (const [path, methods] of Object.entries(api.paths)) {
     for (const [method, operation] of Object.entries(methods)) {
       const guide = operationGuides[operation.operationId ?? ''];
-      if (configuredProfile && (!guide || (guide.financial && !financial))) {
+      if (
+        configuredProfile &&
+        (!guide ||
+          (guide.financial && !financial) ||
+          (flow === 'application' && (guide.records || guide.vendor)) ||
+          (flow === 'hosted' && guide.applicationLed))
+      ) {
         delete methods[method];
         continue;
       }

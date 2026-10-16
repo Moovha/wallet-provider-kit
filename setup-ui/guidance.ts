@@ -8,7 +8,7 @@ export const settings = {
   applicationRecords: setting(
     'Let an admitted application submit records for your unfunded evaluation without an identity vendor.',
     'You can test owner consent, account access and recovery without creating a KYC vendor account. Your staff must match each submitted record to the authenticated owner and explicitly accept it. Required fields do not prove externally verified identity.',
-    'Keep this starter option for fictional evaluation records. It permits account reads and unfunded provisioning only. Select a vendor instead when your policy needs external verification or transfer signing.',
+    'Use this hosted compatibility option for fictional evaluation records. It permits account reads and unfunded provisioning only. Select a vendor instead when your policy needs external verification or transfer signing.',
     'application-records.html',
   ),
   recordFields: setting(
@@ -18,14 +18,14 @@ export const settings = {
     'application-records.html#submit-records',
   ),
   providerName: setting(
-    'The name people see when they sign in and approve wallet access.',
+    'The wallet service name shown in operator tools and shared with connected applications.',
     'People need to recognise who operates their wallet service before sharing information or granting access.',
     'Choose your business or product name, for example Acme Wallets.',
     'operator-services.html#provider-domain-and-privacy-notice',
   ),
   origin: setting(
     'The public web address where you will host this wallet service, for example https://wallet.acme.com. The technical name is HTTPS origin.',
-    'Login returns people to this address, and connected applications send wallet requests here. HTTPS encrypts those connections. It must be your wallet service address, not your company homepage or this local wizard.',
+    'Connected applications send wallet requests here. Optional staff/hosted login also returns people to this address. HTTPS encrypts those connections. It must be your wallet service address, not your company homepage or this local wizard.',
     'Choose a hostname under a domain you control. Your domain registrar manages the domain; your hosting setup connects that hostname to your server and provides an HTTPS certificate. If you do not have these yet, follow the hosting guide before choosing the final address. Enter https:// and the hostname only, with no trailing slash or page path. Keep this address stable once storage is initialized.',
     'operator-deployment.html#publish-through-https',
   ),
@@ -102,7 +102,7 @@ export const settings = {
     'operator-services.html#openzeppelin-relayer',
   ),
   loginIssuer: setting(
-    'The address of the login service that signs in wallet owners and your staff. “Issuer” identifies the service that proves who signed in.',
+    'The address of the optional staff login service, or the wallet-owner login service in hosted compatibility mode. “Issuer” identifies the service that proves who signed in.',
     'The kit verifies login results against this trusted service. Your login provider also handles passwords, extra login checks and account recovery.',
     'Copy the exact HTTPS issuer from your login provider’s OpenID Connect settings or ask its administrator. Do not use a login-page URL or append /.well-known/openid-configuration. The Auth0 recipe gives one setup path.',
     'auth0-setup.html',
@@ -213,7 +213,7 @@ export const settings = {
     'How many days an accepted identity check may remain valid, from 1 to 365.',
     'Older evidence must not continue authorizing access indefinitely. Acceptance also depends on current status.',
     'Choose the period required by your identity policy with the person responsible for compliance. The supplied value is a configurable limit, not regulatory advice.',
-    'operator-services.html#identify-reviewers',
+    'application-access.html#configure-the-trust-policy',
   ),
   accessAge: setting(
     'How many days application access may last before renewal, from 1 to 365.',
@@ -222,8 +222,8 @@ export const settings = {
     'concepts.html',
   ),
   applicationName: setting(
-    'The product name owners see when that application asks to use their wallet.',
-    'People need to recognise the application requesting consent.',
+    'The application name shown in operator tools and, in hosted mode, on its consent page.',
+    'Operators need to recognise which application is trusted to request wallet access.',
     'Use the application’s real display name, agreed with its operator. A connected application is software calling this wallet API, even if you operate both.',
     'operator-services.html#register-the-application-api-and-clients',
   ),
@@ -271,7 +271,7 @@ export const settings = {
   ),
   reviewer: setting(
     'The exact login account ID of a staff member allowed to accept identity evidence. The login system calls it sub, or subject.',
-    'The kit requires provider review after vendor checks. This ID gives review authority to the intended staff account.',
+    'Hosted compatibility requires provider review after vendor checks. This ID gives review authority to the intended staff account.',
     'Create the staff account at the owner-login provider and copy its subject from the user record or ask that provider’s administrator. Do not enter an email, display name or application client ID. Keep at least one working reviewer.',
     'operator-services.html#identify-reviewers',
   ),

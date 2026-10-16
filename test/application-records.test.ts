@@ -414,7 +414,7 @@ describe('application record evaluation', () => {
       maxValiditySeconds: 300,
     };
     const vendorTemplate = JSON.parse(
-      await readFile('docs/provider.config.example.json', 'utf8'),
+      await readFile('docs/provider.config.hosted.example.json', 'utf8'),
     ) as ProviderConfiguration;
     expect(
       validateProviderConfiguration({ ...vendorTemplate, financial }).financial,

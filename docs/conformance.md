@@ -32,7 +32,12 @@ profile; include success, denial and uncertain-outcome cases.
 
 Before you enable an integration, keep evidence for these cases:
 
-- [Onboarding/access](onboarding.md): real provider login, browser-bound PKCE and
+- [Application-led access](application-access.md): explicit application trust,
+  accepted verification level/fields, current identity and consent dates, policy
+  revisions, application-scoped ownership, evidence reuse denial, grant withdrawal,
+  stale-consent replay denial and unchanged wallet identity across retries. Prove
+  real application attestation and recovery processes separately from fixtures.
+- Optional [hosted compatibility](onboarding.md): real provider login, browser-bound PKCE and
   consent, reviewer isolation, evidence-to-owner binding, approved client/permission
   checks, current grants, superseding renewal, expiry/revocation and provider suspension.
   Prove actual vendor sharing/hosted flows, confirmed cost bounds, concurrent budget

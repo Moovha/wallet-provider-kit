@@ -8,12 +8,13 @@ After [installing the package](package.md) and running the
 [provider walkthrough](integration-example.md), [choose and connect your backend](backend-guide.md).
 This guide connects it to your application's permission checks, persistent records and HTTP API.
 
-For new integrations, start with [onboarding and application access](onboarding.md)
-and its [single configuration example](provider.config.example.ts). It supplies
-default policy evaluation, owner consent, provider review, application-record
-evaluation or optional Didit/Sumsub adapters,
-durable reference storage and journaled account creation. The interfaces below
-are for existing hosts and financial-action integration.
+For new integrations, start with [application-led access](application-access.md)
+and its [typed configuration example](provider.config.example.ts). The application
+attests user identity and consent under a reviewed trust agreement; the service
+supplies current policy checks, durable grants and journaled account creation.
+[Hosted compatibility](onboarding.md) separately supplies login, consent pages,
+review and vendor adapters. The interfaces below support existing hosts and
+custom financial-action integration.
 
 For an existing application, the [supplied stored-action backend](stored-backend.md)
 provides account recovery and durable signing dispatch through one configuration.
@@ -41,6 +42,14 @@ the names shown to owners. See [roles and terms](concepts.md#what-does-client-me
 Use a dedicated OAuth audience, application registrations and network boundary.
 Keep these separate from any orchestrator's public API or custody service;
 a provider grant must not authorize access to Moovha-held custody keys.
+
+The standard configured service uses [application-led access](application-access.md):
+a trusted application authenticates users, performs identity checks and records
+consent in its own platform. The provider verifies its evidence against configured
+policy and stores revocable grants. Provider user login, vendor sessions and manual
+review are features of the explicit [hosted compatibility profile](onboarding.md).
+The low-level authority and OIDC enrollment contracts below remain advanced
+integration options; they are not additional sign-in steps for the standard flow.
 
 ## Agree asset support and gas sponsorship
 
@@ -127,12 +136,12 @@ existing journal's `authorizeAttempt`**, alongside exact approved action, limits
 current owner, KYC and consent. An HTTP admission check alone cannot protect
 against revocation between admission and dispatch or during result replay.
 The bundled onboarding journal is provisioning-only; it denies signing.
-Its canonical owner key is `ownerKey({ issuer, subject })` from the verified
+In hosted compatibility, its canonical owner key is `ownerKey({ issuer, subject })` from the verified
 provider login. Existing hosts must resolve that trusted login tuple to their
 customer record and use the same owner binding in their authority integration.
 Do not derive it from an application's service-account subject or supplied name.
 
-For new users, follow [enrollment and identity acceptance](enrollment.md). The kit
+For custom OIDC enrollment integrations, follow [enrollment and identity acceptance](enrollment.md). Standard users follow [application-led access](application-access.md). The kit
 verifies provider-bound OIDC Identity Assurance evidence; your host decides
 acceptance and keeps current local KYC and wallet authorization separate. The
 existing empty-body provisioning endpoint assumes a pre-enrolled owner unless

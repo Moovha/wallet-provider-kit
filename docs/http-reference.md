@@ -782,6 +782,82 @@ Request body (application/json):
         }
       }
     },
+    "user": {
+      "description": "Required in application-led mode. The explicitly trusted application attests its stable user identity and recorded consent; OAuth scopes alone do not establish these facts.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "identity", "consent"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "identity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["reference", "level", "verified_at", "fields"],
+          "properties": {
+            "reference": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "level": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "verified_at": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "fields": {
+              "type": "object",
+              "maxProperties": 16,
+              "additionalProperties": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              }
+            }
+          }
+        },
+        "consent": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "reference",
+            "granted_at",
+            "expires_at",
+            "policy_revision"
+          ],
+          "properties": {
+            "reference": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "granted_at": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "expires_at": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "policy_revision": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "transfer_policy_revision": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          }
+        }
+      }
+    },
     "authorization_details": {
       "type": "array",
       "minItems": 1,
@@ -836,7 +912,7 @@ Success response schema:
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["request_id", "status", "consent_url"],
+  "required": ["request_id", "status"],
   "properties": {
     "request_id": {
       "type": "string",
@@ -861,7 +937,8 @@ Success response schema:
     },
     "consent_url": {
       "type": "string",
-      "format": "uri"
+      "format": "uri",
+      "description": "Hosted compatibility only. Application-led grants have no provider user redirect."
     },
     "grant_id": {
       "type": "string",
@@ -921,7 +998,11 @@ Success response schema:
   "properties": {
     "source": {
       "type": "string",
-      "enum": ["application_record", "vendor_verification"]
+      "enum": [
+        "application_record",
+        "vendor_verification",
+        "application_attestation"
+      ]
     },
     "evaluation_only": {
       "type": "boolean"
@@ -940,8 +1021,147 @@ Success response schema:
       "enum": [true]
     },
     "provider_review_required": {
-      "type": "boolean",
-      "enum": [true]
+      "type": "boolean"
+    },
+    "provider_login_required": {
+      "type": "boolean"
+    },
+    "flow": {
+      "type": "string",
+      "enum": ["application", "hosted"]
+    },
+    "policy_revision": {
+      "type": "string"
+    },
+    "transfer_policy_revision": {
+      "type": "string"
+    },
+    "transfer_terms": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "token",
+        "recipients",
+        "maximumAmount",
+        "lifetimeAmount",
+        "maxValiditySeconds"
+      ],
+      "properties": {
+        "profile": {
+          "enum": ["provider-authorized-erc3009-v1"]
+        },
+        "token": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["address", "name", "version", "symbol", "decimals"],
+          "properties": {
+            "address": {
+              "type": "string",
+              "pattern": "^0x[0-9a-fA-F]{40}$"
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "version": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "symbol": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9]{1,12}$"
+            },
+            "decimals": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 36
+            }
+          }
+        },
+        "recipients": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 100,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^0x[0-9a-fA-F]{40}$"
+          }
+        },
+        "maximumAmount": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]{0,77}$"
+        },
+        "lifetimeAmount": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]{0,77}$"
+        },
+        "maxValiditySeconds": {
+          "type": "integer",
+          "minimum": 60,
+          "maximum": 3600
+        }
+      }
+    },
+    "max_identity_age_days": {
+      "type": "integer"
+    },
+    "max_access_days": {
+      "type": "integer"
+    },
+    "verification_level": {
+      "type": "string"
+    }
+  }
+}
+```
+
+## POST /v1/access-grants/{grantId}/revoke
+
+Operation: `revokeAccountAccess`.
+
+| Parameter         | Location | Required | Schema                                                                                                |
+| ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
+| `grantId`         | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+| `idempotency-key` | header   | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+
+Request body (application/json):
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false
+}
+```
+
+| Status | Content type     | Description      |
+| ------ | ---------------- | ---------------- |
+| 200    | application/json | Default Response |
+| 400    | application/json | Default Response |
+| 401    | application/json | Default Response |
+| 403    | application/json | Default Response |
+| 409    | application/json | Default Response |
+| 422    | application/json | Default Response |
+| 429    | application/json | Default Response |
+| 503    | application/json | Default Response |
+
+Success response schema:
+
+```json
+{
+  "type": "object",
+  "required": ["grant_id", "status"],
+  "properties": {
+    "grant_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["revoked"]
     }
   }
 }
@@ -1039,7 +1259,7 @@ Success response schema:
           "receipt": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["request_id", "status", "consent_url"],
+            "required": ["request_id", "status"],
             "properties": {
               "request_id": {
                 "type": "string",
@@ -1064,7 +1284,8 @@ Success response schema:
               },
               "consent_url": {
                 "type": "string",
-                "format": "uri"
+                "format": "uri",
+                "description": "Hosted compatibility only. Application-led grants have no provider user redirect."
               },
               "grant_id": {
                 "type": "string",
@@ -1126,7 +1347,7 @@ Success response schema:
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["request_id", "status", "consent_url"],
+  "required": ["request_id", "status"],
   "properties": {
     "request_id": {
       "type": "string",
@@ -1151,7 +1372,8 @@ Success response schema:
     },
     "consent_url": {
       "type": "string",
-      "format": "uri"
+      "format": "uri",
+      "description": "Hosted compatibility only. Application-led grants have no provider user redirect."
     },
     "grant_id": {
       "type": "string",
@@ -1226,7 +1448,7 @@ Success response schema:
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["request_id", "status", "consent_url"],
+  "required": ["request_id", "status"],
   "properties": {
     "request_id": {
       "type": "string",
@@ -1251,7 +1473,8 @@ Success response schema:
     },
     "consent_url": {
       "type": "string",
-      "format": "uri"
+      "format": "uri",
+      "description": "Hosted compatibility only. Application-led grants have no provider user redirect."
     },
     "grant_id": {
       "type": "string",
@@ -1309,11 +1532,10 @@ Success response schema:
     },
     "identity_source": {
       "type": "string",
-      "enum": ["application_record"]
+      "enum": ["application_record", "application_attestation"]
     },
     "evaluation_only": {
-      "type": "boolean",
-      "enum": [true]
+      "type": "boolean"
     },
     "status": {
       "type": "string",

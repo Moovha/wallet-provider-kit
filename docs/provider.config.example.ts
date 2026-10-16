@@ -25,42 +25,29 @@ const app = await createOnboardingProvider({
         issuer: 'https://applications.example.com',
         // Connected application's OAuth registration; match its checked token's client_id.
         clientId: 'your-registered-application-client',
-        // Human-readable name shown to the account owner on the consent screen.
+        // Human-readable application name for operator tools.
         name: 'Your Connected Application',
         permissions: ['account:read', 'operations:request'],
-        // Add funding only after agreeing who pays, the cap and reimbursement terms.
-        // funding: { agreement: 'signed-partner-agreement', monthlyLimitMinor: yourUsdCentsCap },
+        assertionTrust: {
+          agreement: 'your-reviewed-application-trust-agreement',
+        },
       },
     ],
-    // Defaults: provider review, identity no older than 365 days, access up to 30 days.
-    // identity: { maxAgeDays: 90 },
-    // access: { maxAgeDays: 7 },
+    identity: {
+      maxAgeDays: 90,
+      application: {
+        verificationLevel: 'verified',
+        requiredFields: ['country'],
+      },
+    },
+    access: { mode: 'application', maxAgeDays: 7 },
   },
   oauth: {
     issuer: 'https://applications.example.com',
     audience: 'your-wallet-provider',
     jwksUrl: 'https://applications.example.com/jwks',
   },
-  ownerLogin: {
-    // Separate OIDC registration: this wallet service uses it to sign owners in.
-    issuer: 'https://your-existing-login.example.com',
-    clientId: 'your-provider-login-client',
-    clientSecret: secret('PROVIDER_LOGIN_SECRET'),
-  },
-  reviewers: ['your-provider-reviewer-oidc-subject'],
-  identity: {
-    didit: {
-      apiKey: secret('DIDIT_API_KEY'),
-      workflowId: '00000000-0000-4000-8000-000000000001',
-      // Add confirmed importPrice/verificationPrice to enable budgeted vendor calls.
-      // importPrice: { maximumMinor: yourConfirmedUsdCentsBound, termsReference: 'vendor-terms' },
-    },
-    // Or use Sumsub (both can be configured):
-    // sumsub: {
-    //   appToken: secret('SUMSUB_APP_TOKEN'), secretKey: secret('SUMSUB_SECRET_KEY'),
-    //   levelName: 'your-recipient-level', reusableKycShareEnabled: true,
-    // },
-  },
+  identity: {},
   storage: database.onboardingStore,
   walletBackend: createCdpWalletProvider({
     WALLET_SERVICE_MODE: 'provider',
