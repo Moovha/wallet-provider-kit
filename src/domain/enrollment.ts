@@ -38,7 +38,7 @@ export interface EnrollmentRecord extends EnrollmentChallenge {
   decision?: EnrollmentDecision;
 }
 
-/** Trusted host integration. No runtime database or automatic KYC-acceptance implementation is supplied. */
+/** Trusted enrollment policy/persistence port; SQLite storage still requires host authorization and acceptance callbacks. */
 export interface EnrollmentAuthority {
   /** Authorize current caller; atomically reserve IDs/unique nonce and bind the idempotency key. Return original record on exact retry. */
   begin(

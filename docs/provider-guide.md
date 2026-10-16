@@ -24,7 +24,7 @@ one host. Its financial authority requires your current owner/grant/KYC/consent
 policy callback; database setup alone never enables signing.
 
 You choose the signing backend and supply the application that decides who may use it.
-We call that application the **host**. It checks owner consent, current grants,
+That application is the **host**. It checks owner consent, current grants,
 Know Your Customer (KYC) status and revocation, and keeps persistent attempt
 records.
 External orchestrators, including Moovha, request permitted actions without
@@ -105,10 +105,9 @@ const app = await createServer({
 await app.listen({ host: '127.0.0.1', port: 8080 });
 ```
 
-This example shows where your implementations fit. You'll still need to build
-and review them before production use. While the package is unpublished, use a
-local build or tarball in your integration project. You don't need any sibling
-Moovha repository to install or run this kit.
+This example shows where your implementations fit. Build and review them before
+production use. Install a [built tarball](package.md) in your integration project.
+This repository contains the source and dependency definitions needed to build it independently.
 
 ## Authentication and policy
 
@@ -132,7 +131,7 @@ provider login. Existing hosts must resolve that trusted login tuple to their
 customer record and use the same owner binding in their authority integration.
 Do not derive it from an application's service-account subject or supplied name.
 
-For new users, follow [enrollment and identity handoff](enrollment.md). The kit
+For new users, follow [enrollment and identity acceptance](enrollment.md). The kit
 verifies provider-bound OIDC Identity Assurance evidence; your host decides
 acceptance and keeps current local KYC and wallet authorization separate. The
 existing empty-body provisioning endpoint assumes a pre-enrolled owner unless
@@ -145,7 +144,9 @@ JSON Web Tokens (JWTs) with type `at+jwt`, using RS256/ES256, trusted keys and
 mandatory issuer, subject, audience, expiry, issue time, token ID and client ID.
 Tokens may live at most ten minutes. It rejects ID tokens, expired tokens and
 tokens with the wrong scope.
-No endpoint issues tokens or accepts shared Moovha admin API keys.
+Your OAuth issuer issues application tokens. Optional
+[operator token controls](operator-tokens.md) request them through that issuer;
+the kit is not a token issuer and does not accept shared Moovha admin API keys.
 
 `wallet:provision` and `wallet:sign` let a request reach your policy checks;
 they don't grant permission to spend. Your authority adapter must validate
@@ -236,7 +237,7 @@ It snapshots the input before awaits and rechecks expiry after the account read.
 These are tested restrictions, not a claim of universal account compatibility.
 
 The backend uses app-controlled CDP API-key wallets. Describe operator and vendor
-key control, recovery/export rights and failure modes to adopters. A login
+key control, recovery/export rights and failure modes to your users. A login
 integration does not establish end-user self-custody. Measure live usage and costs
 before activation. WalletConnect supplies connectivity and is not a signing
 backend included in this kit.

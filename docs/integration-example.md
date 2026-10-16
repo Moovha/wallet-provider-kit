@@ -157,8 +157,8 @@ const response = await app.inject({
 ```
 
 For a deployed provider these same method/path/header/body shapes travel over
-HTTPS; see the [HTTP guide](http-api.md). `app.inject()` is used here so the
-walkthrough doesn't create a service a user might accidentally deploy.
+HTTPS; see the [HTTP guide](http-api.md). Here, `app.inject()` exercises the HTTP
+middleware in process without opening a network listener.
 
 The separate `backend.mjs` adapter uses an ephemeral ethers wallet to sign a harmless EIP-712
 challenge with Base Sepolia chain ID. It has no asset-transfer fields and no
@@ -191,8 +191,8 @@ response with `WalletProviderError('wallet_provider_unavailable', 'unknown')`.
 The HTTP response is 503 with `outcome: unknown`. The journal retains that state;
 a retry with the same key stays unknown and doesn't sign again.
 
-The example deliberately doesn't resolve that uncertainty by inventing a result
-or generating a fresh attempt. In production, reconcile the original attempt
+The journal preserves the original attempt and its unknown outcome. In deployment,
+reconcile that attempt
 using accepted backend-specific read-only evidence. `findAccount` can reconcile
 account creation; the generic signing interface has no signature lookup, so
 signing recovery needs your host/provider's reviewed recovery path. Unknown
@@ -214,8 +214,9 @@ Keep the composition and public interfaces. Replace the fixture pieces with:
 5. A dependency/recovery readiness check, controlled service startup/shutdown,
    TLS/ingress and quotas appropriate to the host.
 
-A database adapter requires verified current schema evidence before you implement
-it. This example adds no schema, migration or production authority adapter.
+For persistent storage, use the [built-in SQLite adapter](storage.md) or implement
+an adapter against your deployment's inspected schema and transaction guarantees.
+The example's in-memory authority and journal are not deployment storage.
 Use [conformance](conformance.md) to plan the independent security and live-provider
 acceptance work. Passing this tutorial doesn't certify a provider or establish
 exclusive end-user custody. Continue with [backend integration](backend-guide.md),

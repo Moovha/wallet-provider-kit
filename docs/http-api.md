@@ -1,8 +1,8 @@
 # Use the provider HTTP API
 
 This is the toolkit's **provider-hosted** API. Use a base URL chosen by the
-adopting wallet provider. It is distinct from Moovha's planned business-operation
-API; see [the application/provider boundary](architecture.md#applications-and-wallet-control). The
+wallet provider operating the service. It is distinct from Moovha's planned
+business-operation API; see [the application/provider boundary](architecture.md#applications-and-wallet-control). The
 [generated schema reference](http-reference.md) records all implemented request
 and response schemas. Swagger UI is available at `/docs/` in the inspection
 service; configured deployments disable it by default. See [service setup](setup.md)
@@ -101,9 +101,11 @@ refuses cross-origin requests and redirects. The manual Authorize control does n
 
 Use the real IDs returned by this deployment. Follow the
 [access, identity, review, provisioning and approval sequence](operator-deployment.md#hand-the-api-to-the-product-developer).
-Owner consent and transfer approval still happen in the returned top-level browser
-URLs; Swagger does not impersonate owners or reviewers. Supply the operation's
-inputs, choose Try it out and Execute, then inspect Server response.
+Owners complete login and access consent in the returned top-level browser URL;
+reviewers separately accept identity evidence. Configured transfers use the
+delegation granted at onboarding and have no per-transfer owner approval page.
+Supply the operation's inputs in Swagger, choose Try it out and Execute, then
+inspect Server response. Swagger does not impersonate owners or reviewers.
 
 Every distinct POST needs a fresh UUIDv4 `Idempotency-Key` (generate one with
 `node -p "require('node:crypto').randomUUID()"`). Record that key with the intended

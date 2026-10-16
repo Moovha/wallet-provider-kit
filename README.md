@@ -84,7 +84,7 @@ vendor services or certify readiness. Initial activation remains disabled._
 The GUI's **API reference** uses bundled Swagger UI to show each supported endpoint,
 required scope, configuration prerequisites, request/response schemas and illustrative
 examples. Select an application, copy a cURL request or download the displayed OpenAPI.
-Its **Try it out** handoff enables the deployed Swagger explorer and opens it on
+Its **Try it out** controls enable the deployed Swagger explorer and open it on
 your provider's HTTPS domain. [Test live API responses](docs/http-api.md#try-deployed-apis)
 with public discovery or a short-lived application token after deployment.
 Optional [operator token controls](docs/operator-tokens.md) obtain and renew tokens
@@ -256,10 +256,9 @@ assets such as USDC and ZARP. These wallets hold blockchain assets and authorise
 transactions involving token and vault contracts. A simple product experience
 still needs to make the asset, network, approval and fees clear.
 
-Within Moovha's architecture, this project supplies a portable wallet/provider
-implementation for the signing foundation and independent-provider integration
-work. It is intended to support access to independently controlled wallets while
-keeping their keys with the wallet provider.
+Wallet Provider Kit lets independent wallet providers connect their services to
+applications such as Moovha. The provider checks access and signs approved actions
+while keeping wallet keys within its chosen backend.
 
 Learn about [Moovha](https://moovha.com/) and explore the
 [Moovha GitHub organization](https://github.com/Moovha).
@@ -275,8 +274,7 @@ the user's authority. It does not require sharing keys with the application.
 
 Non-custodial application access describes Moovha's relationship to the wallet's
 keys. Exclusive end-user self-custody depends on who can actually control and
-recover the chosen backend. Adopters must describe that model accurately to
-their users.
+recover the chosen backend. Explain that control and recovery model to your users.
 
 ## What is available today
 

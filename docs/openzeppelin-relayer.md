@@ -30,8 +30,9 @@ hosts and the separate transaction-execution integration.
 
 The execution profile differs from the orchestration draft's nonce-bound
 `SubmitTransactionAction`. Never silently drop that draft action's nonce to use
-Relayer. The existing HTTP routes and default CLI remain unchanged; no generic
-transaction endpoint is added and no draft execution conformance is claimed.
+Relayer. Execution is available through the library interfaces below, not a
+generic transaction HTTP endpoint. This profile does not establish conformance
+with the draft execution contract.
 
 ## Connect your host
 
@@ -160,5 +161,6 @@ Sources: [API](https://github.com/OpenZeppelin/openzeppelin-relayer/blob/b8cf360
 [controllers](https://github.com/OpenZeppelin/openzeppelin-relayer/blob/b8cf360a49c5739e43491ca5d2f6bbc934b7438e/src/api/controllers/relayer.rs),
 [typed signer](https://github.com/OpenZeppelin/openzeppelin-relayer/blob/b8cf360a49c5739e43491ca5d2f6bbc934b7438e/src/services/signer/evm/local_signer.rs),
 [fee recovery](https://github.com/OpenZeppelin/openzeppelin-relayer/blob/b8cf360a49c5739e43491ca5d2f6bbc934b7438e/src/domain/transaction/evm/price_calculator.rs).
-The tag's OpenAPI `info.version` is stale (`1.5.0`); source signatures were checked
-too. Pin a tested service artifact and repeat acceptance on upgrades.
+The v1.8.0 tag's OpenAPI reports `info.version: 1.5.0`; use the pinned source
+revision above to identify this compatibility target. Pin a tested service
+artifact and repeat acceptance on upgrades.

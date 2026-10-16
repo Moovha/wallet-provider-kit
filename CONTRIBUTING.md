@@ -12,8 +12,8 @@ If your change affects authorization, custody, public schemas, capabilities or
 dependencies, start a design discussion so we can review compatibility, security
 and cost together.
 
-Use GitHub issues for proposals and pull requests for changes. The owner's ongoing
-work uses the [toolkit branch workflow](docs/branch-workflow.md). Other
+Use GitHub issues for proposals and pull requests for changes. The maintainer uses
+the [toolkit branch workflow](docs/branch-workflow.md). Other
 contributions use separate branches and receive review before merging.
 See [SECURITY.md](SECURITY.md) for private vulnerability reports.
 
@@ -48,7 +48,7 @@ migration. Other dependency majors remain eligible for review.
 
 For tooling updates, check the upstream migration guide, run the full toolkit
 suite and inspect generated/formatting changes. Passing dependency PR CI against
-an older main alone is not enough to validate pending adapter work.
+an older main alone does not establish compatibility with the current adapters.
 
 Use ephemeral offline fixtures. Test supported behavior, denied effects and
 uncertain outcomes without live providers, credentials, customer data or funds.
@@ -116,21 +116,19 @@ remove it when a stable VitePress release supplies a patched dependency directly
 
 The published documentation is at
 [moovha.github.io/wallet-provider-kit](https://moovha.github.io/wallet-provider-kit/).
-GitHub Pages is configured to use GitHub Actions. Toolkit documentation delivery
-includes publication to this existing site under the owner's standing
-authorization. After checks pass and changes reach `main` through the repository's
-merge process, run **Actions → Publish documentation → Run workflow** on `main`.
+GitHub Pages is configured to use GitHub Actions. Documentation changes must also
+be published to this site. After checks pass and changes reach `main` through the
+repository's merge process, run **Actions → Publish documentation → Run workflow** on `main`.
 Verify the workflow succeeds and the live pages contain the update before
-reporting documentation delivery complete. The workflow publishes only the
-documentation. It still requires dispatch after a push or PR merge; npm
+completing documentation delivery. The workflow publishes only the
+documentation and requires manual dispatch after integration into `main`; npm
 publication remains disabled. See
 [GitHub's Pages workflow guide](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages).
 
 ### Documentation branding and links
 
-The bundled Moovha symbols in `docs/public/brand/` are the existing navy artwork
-used by the app and the white artwork used by the website. Keep those originals
-intact. `moovha-logo.svg` places the white symbol on its navy background for the
+The bundled Moovha symbols in `docs/public/brand/` include navy and white artwork.
+Keep those originals intact. `moovha-logo.svg` places the white symbol on its navy background for the
 README and favicon. The documentation theme uses the same navy (`#0f2338`) and
 app cyan (`#12bfde`); its styles live in `docs/.vitepress/theme/brand.css`.
 Assets are local to this repository and included with the packaged Markdown.
@@ -149,6 +147,19 @@ Use the Moovha website for company information and this repository's GitHub link
 for code, issues and contributions. Documentation links should take readers to
 the relevant guide or heading. Check their anchors after renaming a section;
 check logos, navigation and contrast in both themes and at phone width.
+
+### Maintain wizard screenshots
+
+The six wizard-step images and local API reference use invented Acme settings
+without secrets. The deployed explorer image uses an offline HTTP fixture with
+no backend and readiness disabled. To update these images, run `npm run build`
+and `node scripts/capture-setup-docs.mjs` after installing the repository's
+Playwright Chromium. The script uses loopback fixtures, performs no vendor calls
+and writes PNGs under ignored `artifacts/setup-docs/`.
+
+Review the images against the interface, then update the WebP copies in
+`docs/public/screenshots/`. Screenshots document the interface; they do not
+establish vendor connectivity or deployment acceptance.
 
 ## Submit and review
 

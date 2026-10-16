@@ -2,8 +2,8 @@
 
 The experimental `./ows` adapter reuses **Open Wallet Standard core 1.4.3** for
 encrypted wallet storage, key generation, derivation and EIP-712 signing. The kit
-adds the host authorization and attempt boundary. We don't maintain a second
-wallet engine or claim general OWS conformance.
+adds host authorization and attempt coordination around that engine. The adapter
+supports only the profile below, rather than the full OWS interface.
 
 ## What fits today
 
@@ -99,8 +99,9 @@ original journal and reviewed backups before permitting later signing.
 Test restore, credential loss/rotation, filesystem permissions, two-process
 concurrency, corrupted metadata, capacity and result-commit failures on your
 deployment. Reserve usage and retain pending/unknown attempts until reconciled.
-No database adapter, backup service, live wallet, funds or production deployment
-is included here. The default CLI stays unconfigured.
+Use the [built-in SQLite journal](storage.md) or an accepted persistent host
+journal. Prepare vault backups and restoration separately; the default CLI
+stays unconfigured.
 
 Engine references: [Node API](https://github.com/open-wallet-standard/core/blob/main/docs/sdk-node.md),
 [policy model](https://github.com/open-wallet-standard/core/blob/main/docs/03-policy-engine.md),

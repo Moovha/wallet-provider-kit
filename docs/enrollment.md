@@ -100,12 +100,14 @@ const app = await createServer({
 });
 ```
 
-Both authorities and the wallet journal are reviewed host implementations. No
-runtime memory store or database adapter is supplied. When calling the library
-directly for newly enrolled users, use
+Configure both authorities and the wallet journal with persistent storage and
+current host policy. The [SQLite adapter](storage.md#relayer-execution-and-alternative-enrollment)
+supplies enrollment persistence with your authorization and acceptance callbacks;
+you can also implement those ports over your own accepted storage.
+When calling the library directly for newly enrolled users, use
 `enrollment.provision(wallets, context, accountId)` so acceptance is checked.
-Direct `wallets.provision` remains the existing trusted/pre-enrolled integration
-path. Servers without `enrollment` keep that behavior and return 503 for enrollment
+Direct `wallets.provision` is the trusted/pre-enrolled integration path.
+Servers without `enrollment` use that path and return 503 for enrollment
 requests. The default CLI supplies neither authority and stays disabled.
 
 Enrollment never copies an upstream claim into `currentUserStatus`. Your wallet
@@ -140,7 +142,7 @@ a durable permission to dispatch.
   missing/extra attributes fail. Birth dates must be complete, valid past calendar
   dates. Unverified top-level ID-token attributes are not passed to acceptance.
 - Multi-set, aggregated/distributed claims, raw documents, attachments, addresses,
-  partial birth dates and other verification fields are unsupported in this first
+  partial birth dates and other verification fields are unsupported in this
   profile. Negotiate a compatible claim set or add a reviewed profile; don't strip
   material or reinterpret a different assertion as this one.
 
@@ -172,7 +174,7 @@ arrangements and remain able to request additional verification.
   null on denial. The kit also compares the local owner with wallet authority.
 
 Use narrowly privileged, transactional storage. Schema design requires inspection
-of your actual database; this kit proposes no migration. Keep nonce/proof hashes,
+of your actual database before implementing a custom adapter. Keep nonce/proof hashes,
 identity references, consent, policy revisions and audit records private. Retain
 only the identity data your provider needs, with access/retention controls; don't
 log tokens, names, birth dates, evidence or raw request bodies.

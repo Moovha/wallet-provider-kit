@@ -23,7 +23,7 @@ export interface SigningAuthority extends OwnerAuthority {
 }
 
 /**
- * Server-owned port, deliberately without a production implementation yet.
+ * Server-owned authority port for current policy and durable attempt admission.
  * Each call must verify the principal's current grant/session/proof and owner permission,
  * read current stored KYC, and durably admit the exact attempt and usage budget.
  * Signing additionally requires current consent, immutable committed plan/action,
@@ -54,7 +54,7 @@ function requireOwner(
   }
 }
 
-/** Internal service only: HTTP-independent; the host supplies authoritative persistence and policy. */
+/** HTTP-independent wallet service; the host supplies authoritative persistence and policy. */
 export class EmbeddedWalletService {
   constructor(
     private readonly authority: EmbeddedWalletAuthority,

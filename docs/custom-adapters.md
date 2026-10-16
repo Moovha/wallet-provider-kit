@@ -62,8 +62,9 @@ exact digest/signer checks, concurrent dispatch, restart/replay, current-grant
 revocation and unknown outcomes. The configured service always rechecks its own
 current authority; an adapter cannot confer spending permission from OAuth scopes.
 Declare and test who controls keys and recovery before activation. Runtime interface
-validation is not semantic certification; `doctor` reports custom conformance as
-pending rather than importing code to claim it passed.
+validation checks the returned interface, not the adapter's full behavior.
+`doctor` leaves custom conformance pending without executing the module; complete
+the integration checks separately.
 
 CDP, OWS and OpenZeppelin Relayer are selectable through [built-in configuration](setup.md#select-a-built-in-backend).
 Their journals are wired by the service. Do not return the already-wrapped OWS or

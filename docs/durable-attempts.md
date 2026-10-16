@@ -73,9 +73,9 @@ expired lease after dispatch doesn't authorise another backend call.
 
 The SQLite implementation follows the contract below. For another database,
 implement `WalletAttemptJournal` through your selected durable store. Before a
-database-backed implementation, inspect that deployment's actual schema, roles
-and isolation; this repository has no production database or verified schema.
-Do not assume it shares Moovha's Supabase project.
+database-backed implementation, inspect your deployment's actual schema, roles
+and transaction isolation. The toolkit does not connect to or define the schema
+of an external application database.
 
 The storage adapter must enforce these rules with transactions and constraints:
 
@@ -158,7 +158,8 @@ restoration, live provider idempotency or deployment authorization.
 
 Run the same scenarios against your real adapter, including two processes,
 network/storage outages and restore/reconciliation, before returning readiness.
-For embedded integrations, hosts can supply their own reviewed provider decorator or use the optional
+For embedded integrations, hosts can supply their own reviewed provider decorator
+or use the optional
 journal-backed wrapper. Its 409 conflict responses are recorded in the generated
 provider OpenAPI contract. Configure authority and durable storage before using
 the wrapper; the default CLI remains unconfigured.

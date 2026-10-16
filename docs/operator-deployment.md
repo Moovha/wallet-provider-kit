@@ -2,7 +2,7 @@
 
 This walkthrough follows a completed [wizard](setup-wizard.md) export. It uses a
 reviewed source checkout and a single persistent macOS or glibc Linux host. The
-commands are operational commands; you do not write a host application or adapter.
+commands configure and run the supplied service; no host application or adapter code is required.
 For a packaged installation use the [tarball guide](package.md) and its installed
 executable instead. Windows, network/shared disks, ephemeral storage and independent
 replicas sharing a database are unsupported.
@@ -11,18 +11,19 @@ The workstation runs the local wizard. The **deployment host** runs the wallet
 service and owns its persistent records. They can be the same machine for an
 isolated evaluation. A hosted deployment needs HTTPS, service supervision and
 backups in addition to the exported files. The profile remains experimental and
-Base Sepolia only; this guide does not approve production custody.
+Base Sepolia only and is not approved for production custody.
 
 For a repeatable acceptance run, use the [standard staging walkthrough](staging-walkthrough.md).
 It specifies which work happens in the configuration GUI, deployment CLI and
-deployed browser pages, and how to record real dependency/recovery gaps.
+deployed browser pages, with expected results and a checklist for missing
+services or untested recovery cases.
 
 ## Prepare the host and files
 
 Install Node **24.22.0**, npm **11.11.1** and Git. Follow the
 [Node downloads](https://nodejs.org/en/download) and [Git installation guide](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git)
-for your operating system; use the required versions rather than whichever Node
-version happens to be preinstalled. Confirm `node --version` and `npm --version`.
+for your operating system. Confirm `node --version` and `npm --version` match
+these versions before proceeding.
 Use a dedicated unprivileged operating-system account for the service. This account
 must own the data and optional vault; do not run the wallet service as root.
 
@@ -242,7 +243,7 @@ still does not continuously prove vendor availability or settlement.
 
 ## Test the deployed API in Swagger
 
-Use the wizard's **API reference → Try it out** handoff to enable the deployed
+Use the wizard's **API reference → Try it out** controls to enable the deployed
 explorer, export and restart, then open your HTTPS origin at `/docs/`. Begin with
 public discovery; add a short-lived application token for protected calls.
 The [step-by-step live testing guide](http-api.md#try-deployed-apis) covers token

@@ -103,8 +103,8 @@ signatures that may authorize later transactions. This panel is not a simulator.
 ![Application tokens panel with Get token, Renew token, Clear token and expiry countdown](public/screenshots/operator-tokens.webp)
 
 These interface screenshots use an offline fixture, invented identities and no
-real application secret or valid API token. They show the controls, not accepted
-IdP/vendor integration.
+real application secret or valid API token. They illustrate the controls without
+establishing compatibility with your identity provider or wallet backend.
 
 ## Renew, expire and sign out
 
@@ -143,8 +143,8 @@ public-client integrations outside this supplied M2M broker.
 
 ## If it fails
 
-- **No Application tokens panel:** deploy a build containing the feature and a
-  validated `apiExplorer` configuration with documentation enabled, then restart.
+- **No Application tokens panel:** confirm your toolkit build supports `apiExplorer`,
+  enable it in validated configuration with documentation enabled, then restart.
 - **Sign-in loop / access denied:** check the exact operator subject and owner-login
   issuer, HTTPS/cookies, the callback and your existing short ID-token lifetime and
   fresh authentication settings. A reviewer account is not automatically a token operator.

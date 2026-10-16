@@ -1,8 +1,10 @@
 # Run and monitor the service
 
-Start after [backend integration](backend-guide.md), [host composition](provider-guide.md)
-and [acceptance checks](conformance.md). The default executable and container
-inspect the API; your configured application owns financial readiness and recovery.
+For the configured service, start with [deployment and supervision](operator-deployment.md).
+For an embedded host, complete [backend integration](backend-guide.md),
+[host composition](provider-guide.md) and [acceptance checks](conformance.md).
+This guide covers monitoring and the optional local development stack. Your
+deployment controls financial readiness and recovery.
 
 You can send traces and metrics to your existing OpenTelemetry collector using
 OTLP/HTTP. For local development, the optional Grafana `otel-lgtm` image bundles

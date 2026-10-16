@@ -14,8 +14,7 @@ and start with [the single configuration example](provider.config.example.ts).
 `createOnboardingProvider` supplies hosted consent, provider review, persistent
 grants and journaled wallet creation. You configure your provider, approved
 applications, existing identity service and selected wallet backend. There is
-no policy scripting language, administrative CLI sequence or separate policy
-server to operate.
+no policy scripting language or separate policy server to operate.
 
 This is an experimental single-host reference integration. It has offline
 conformance evidence; real vendor accounts, identity-service setup and backend
@@ -59,7 +58,7 @@ Registering an application client doesn't register or approve a user. See
    file store's private persistent directory, and configure your wallet backend.
    Keep `ready()` false until its unfunded lifecycle and recovery checks pass.
 
-The example uses the existing CDP Base Sepolia adapter to show a concrete backend.
+The example uses the CDP Base Sepolia adapter to show a concrete backend.
 You can select another supported adapter without changing the onboarding policy.
 The normal `npm start` preview remains unconfigured; it does not discover or load
 configuration modules from HTTP input.

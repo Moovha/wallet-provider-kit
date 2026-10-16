@@ -4,8 +4,9 @@ Use this recipe if you do not already have compatible login/token services.
 Auth0 is the reference choice because its managed dashboard exposes confidential
 web-client authentication and the RFC 9068 API token profile required by the kit.
 No Auth0 Action or custom token-mapping code is required by this recipe.
-This is a configuration guide checked against official documentation, **not a
-claim of completed live tenant acceptance**. Verify your tenant before activation.
+Verify the configured tenant against the
+[staging checks below](#_6-confirm-the-tenant-works-before-admitting-traffic)
+before activation. Dashboard configuration alone does not establish compatibility.
 
 An Auth0 **tenant** is your isolated login configuration and user directory. Create
 a dedicated development tenant through the [Auth0 Dashboard](https://manage.auth0.com/),

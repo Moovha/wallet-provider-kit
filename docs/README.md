@@ -84,7 +84,9 @@ with your own prepared configuration; the screenshot is not a deployable setup._
    HTTPS. Complete acceptance, explicitly activate and retain recovery evidence.
 4. **[Hand the API to your product developer](operator-deployment.md#hand-the-api-to-the-product-developer).**
    Supply the origin, OpenAPI, client/token details and supported policies.
-   Owners use provider-hosted login, consent and transfer approval pages.
+   Owners use provider-hosted login, access-consent and access-management pages.
+   Configured transfers require delegation at onboarding; the provider authorises
+   each transfer request under that delegation without another owner prompt.
 5. **[Operate and recover](operator-deployment.md#keep-it-operating).** Supervise the
    process, monitor readiness, preserve storage/bindings and test encrypted backups.
 
@@ -92,7 +94,7 @@ Use **API reference** in the GUI to explore requests/responses with Swagger UI,
 preview each application's configured permissions and copy illustrative cURL requests.
 The [viewer instructions](setup-wizard.md#explore-the-provider-api) explain filtering,
 OpenAPI download and the difference between a local preview and actual API access.
-After deployment, use its **Try it out** handoff to open your own service's Swagger
+After deployment, use **Open deployed Try it out** to open your service's Swagger
 explorer. The [live testing guide](http-api.md#try-deployed-apis) walks through enabling
 it, getting an application token, making a first request and interpreting real responses.
 [Integrated token controls](operator-tokens.md) let allowed operators obtain and
@@ -101,8 +103,8 @@ renew application tokens in the deployed GUI without fetching/pasting them.
 Before a full deployment test, follow the [staging walkthrough](staging-walkthrough.md):
 configure/export in the GUI, deploy with the supplied CLI, then use deployed
 Swagger and owner/reviewer pages to prove unfunded provisioning, application
-access, policy denials and recovery. Record unavailable real dependencies as
-blocked; a custom harness or synthetic identity adapter does not complete this path.
+access, policy denials and recovery. Mark a step blocked when its required service
+is unavailable. Offline fixtures do not validate that service's live integration.
 
 A successful export means configuration validation passed. It does not mean
 vendor connectivity, login, identity agreements or wallet recovery were tested.

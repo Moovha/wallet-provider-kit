@@ -33,7 +33,7 @@ export type WalletAttemptClaim = {
 );
 
 /**
- * Host-owned transactional persistence. No default or in-memory implementation.
+ * Transactional persistence supplied through the SQLite journal or a host adapter.
  *
  * claim must atomically bind namespace/provider/attempt and resource identities,
  * reserve the bounded usage, and commit dispatch with a fresh fencing token.

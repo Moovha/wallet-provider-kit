@@ -1,6 +1,8 @@
 # HTTP schema reference
 
-Generated from [provider-api.json](../spec/provider-api.json); do not edit manually.
+Use these request and response schemas with the
+[implemented provider contract](../spec/provider-api.json). For contributing or
+regeneration, see the [development guide](../CONTRIBUTING.md#development).
 Read the [HTTP usage guide](http-api.md) for authentication, scopes, error handling
 and integration profiles. Optional-profile routes are present in the contract even
 when the corresponding service is not configured. Read [roles and terms](concepts.md)

@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased — public documentation language
+
+- Rewrite operator walkthroughs, integration guides and project policies for their
+  public readers, replacing development-session narration with tasks, current
+  behavior and explicit requirements.
+- Clarify configured-service and embedded-host responsibilities, SQLite storage
+  options, token exchange and onboarding transfer delegation in existing guidance.
+- Move screenshot upkeep to the contributor guide, summarize live CDP evidence
+  with its limits and regenerate public references from corrected source comments.
+
 ## Unreleased — guided operator settings
 
 - Explain every wizard setting with a plain-language purpose, its source or
