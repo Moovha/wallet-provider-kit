@@ -12,7 +12,9 @@ publication requires separate maintainer authorization.
    and `npm pack --dry-run`. Review the package contents and confirm the standalone
    install requires no sibling modules or local secrets.
 2. Review generated contract/reference diffs, API compatibility, dependencies and
-   licensing. [NOTICE](../NOTICE), [extraction.json](extraction.json) and
+   licensing. Apply the [public writing review](public-writing.md#review-before-publication)
+   to release notes and other candidate text before publication.
+   [NOTICE](../NOTICE), [extraction.json](extraction.json) and
    [LICENSE.source](LICENSE.source) preserve source attribution; third-party
    dependencies retain their own licenses.
 3. Run Docker runtime checks on a suitable host. Record container build evidence

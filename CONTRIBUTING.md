@@ -56,6 +56,14 @@ Adapters must include [conformance evidence](docs/conformance.md) and untested c
 
 ## Documentation and examples
 
+Before every commit and push, review public language against the
+[public writing guide](docs/public-writing.md). This includes walkthroughs,
+examples, UI text, code comments, generated descriptions, changelog entries,
+commit messages and PR titles/bodies. Identify the reader and purpose first;
+check that the text works without the development conversation. Record that
+review in the PR checklist. Formatting and automated checks cannot establish
+whether language fits its audience.
+
 Write for someone installing and integrating the wallet service. Put prerequisites,
 commands, expected results and the next integration step close together. Explain
 who controls the wallet and which host responsibilities an example replaces.
@@ -146,8 +154,9 @@ check logos, navigation and contrast in both themes and at phone width.
 
 Use `feat:`, `fix:`, `docs:` or `chore:` commit summaries. Include checks,
 limitations and a [changelog](CHANGELOG.md) entry. Review covers correctness,
-compatibility, security, licensing and cost; CI must pass. Financial/security
-boundary changes require independent competent review before production release.
+compatibility, security, licensing, cost and audience-appropriate public language;
+CI must pass. Financial/security boundary changes require independent competent
+review before production release.
 
 Contributions use Apache-2.0 and the
 [Developer Certificate of Origin 1.1](https://developercertificate.org/).

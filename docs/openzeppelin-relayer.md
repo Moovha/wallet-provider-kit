@@ -151,8 +151,9 @@ scope, durable Redis/queue configuration, two-process journal concurrency, lost
 results and restore. Configure Relayer's own logs/metrics for your privacy policy.
 Test replacement/cancellation costs and on-chain effects.
 The kit does not start Relayer, provision infrastructure, migrate a database or
-move funds. OWS, direct CDP and Relayer are alternative compositions; this change
-adds no OWS signer plugin to Relayer and migrates no Moovha service.
+move funds. OWS, direct CDP and Relayer are alternative backend compositions.
+The Relayer integration requires its own configured signer; the kit does not
+supply an OWS signer plugin for Relayer.
 
 Sources: [API](https://github.com/OpenZeppelin/openzeppelin-relayer/blob/b8cf360a49c5739e43491ca5d2f6bbc934b7438e/openapi.json),
 [request types](https://github.com/OpenZeppelin/openzeppelin-relayer/blob/b8cf360a49c5739e43491ca5d2f6bbc934b7438e/src/models/transaction/request/evm.rs),
