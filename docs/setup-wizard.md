@@ -160,7 +160,7 @@ exact login subject from the owner-login issuer. The
 [funding](operator-services.md#prices-terms-and-application-funding) and
 [reviewer instructions](operator-services.md#identify-reviewers) explain their sources.
 
-Leave **Configure provider-authorized transfer signing** off for onboarding/provisioning
+Leave **Configure delegated transfer signing** off for onboarding/provisioning
 only. If required, use the [token policy preparation](operator-services.md#optional-token-signing-policy)
 to supply the verified Base Sepolia contract/domain, symbol, decimals, recipient
 allowlist, integer base-unit limits and 60–3600-second validity. Users explicitly
@@ -183,7 +183,7 @@ port `8080`, data directory `.provider-data`. The
 The **Enable deployed API explorer and Try it out** checkbox exposes Swagger on the deployed
 service; it is separate from this setup wizard and the public documentation site.
 
-Keep **Enable service activation in this export** off initially. Activation requires
+Keep **Enable wallet operations in this configuration** off initially. Activation requires
 real backend and recovery acceptance evidence; signing also requires token evidence.
 These are references to reviewed reports/tickets, not automatically issued codes
 or tests performed by the wizard. Follow [acceptance and activation](operator-deployment.md#acceptance-and-explicit-activation)
@@ -267,7 +267,7 @@ response rendering, not vendor connectivity or an accepted deployment.
 
 ### Optional application token controls
 
-Deployment also offers **Enable operator token controls**. Enter allowed token
+Deployment also offers **Enable application token controls for staff**. Enter allowed token
 operator login subjects, select the registered applications, set secret variable
 names and limit scopes. The [operator token guide](operator-tokens.md) explains
 what each identifier/secret means, where to obtain it, deployment and the signed-in

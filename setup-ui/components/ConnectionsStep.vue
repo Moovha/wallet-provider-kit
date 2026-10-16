@@ -56,32 +56,32 @@ function sumsub(enabled: unknown) {
       >Follow the Auth0 login and API setup recipe ↗</a
     >
   </div>
-  <h3>Account owner login</h3>
+  <h3>Login for wallet owners and staff</h3>
   <div class="field-grid">
     <SetupField
       guide="loginIssuer"
       v-model="model.ownerLogin.issuer"
       type="url"
-      label="Owner login issuer"
+      label="Login service issuer URL"
       placeholder="https://login.acme.com"
       validation="required|https_url"
     /><SetupField
       guide="loginClient"
       v-model="model.ownerLogin.clientId"
       type="text"
-      label="Owner login client ID"
+      label="Wallet login client ID"
       validation="required|length:1,256"
     />
   </div>
   <SecretField
     guide="loginSecret"
     v-model="model.ownerLogin.clientSecret"
-    label="Owner login client secret"
+    label="Wallet login client secret"
   />
   <SetupField
     guide="loginAlgorithm"
     type="select"
-    label="ID token algorithm"
+    label="Login token signing algorithm"
     :modelValue="model.ownerLogin.idTokenAlgorithm ?? 'RS256'"
     :options="['RS256', 'ES256']"
     @update:modelValue="
@@ -111,7 +111,7 @@ function sumsub(enabled: unknown) {
       </p>
     </details>
   </div>
-  <h3>Connected application API authentication</h3>
+  <h3>Access tokens for connected applications</h3>
   <SetupField
     guide="tokenIssuer"
     v-model="model.oauth.issuer"
@@ -125,13 +125,13 @@ function sumsub(enabled: unknown) {
       guide="audience"
       v-model="model.oauth.audience"
       type="text"
-      label="Dedicated API audience"
+      label="Wallet API audience"
       validation="required|length:1,256"
     /><SetupField
       guide="jwks"
       v-model="model.oauth.jwksUrl"
       type="url"
-      label="Application JWKS URL"
+      label="Token verification keys URL (JWKS)"
       validation="required|https_url"
     />
   </div>
@@ -156,10 +156,11 @@ function sumsub(enabled: unknown) {
   <h3>Identity verification</h3>
   <p class="help-text">
     Choose at least one vendor. Login proves which account signed in; identity
-    verification checks who that person is. Your staff still review acceptance.
-    “Verification” starts new checks; “import” reuses evidence shared from
-    another service. Each route you offer needs a confirmed price and an
-    application funding agreement in Policies, even when it is free.
+    verification checks who that person is. Your staff review the evidence and
+    decide whether to accept it. “Verification” starts new checks; “import”
+    reuses evidence shared from another service. Each route you offer needs a
+    confirmed price and an application funding agreement in Policies, even when
+    it is free.
   </p>
   <fieldset class="vendor-panel">
     <legend>
@@ -232,7 +233,8 @@ function sumsub(enabled: unknown) {
         v-model="model.identity.sumsub.secretKey"
         label="Sumsub secret key" />
       <p class="help-text">
-        This adapter requires reusable KYC Share to be enabled at Sumsub.
+        Ask Sumsub to enable Reusable KYC Share for your account and confirm the
+        sharing arrangement. Selecting Sumsub here does not enable that product.
       </p>
       <PriceFields
         v-model="model.identity.sumsub.importPrice"

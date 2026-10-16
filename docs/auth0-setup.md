@@ -117,17 +117,17 @@ screenshots, logs, issues or online JWT decoders.
 
 For a tenant domain `your-tenant.us.auth0.com`, the mapping is:
 
-| Wizard field                            | Value                                                                  |
-| --------------------------------------- | ---------------------------------------------------------------------- |
-| Owner login issuer                      | Exact discovery `issuer`, normally `https://your-tenant.us.auth0.com/` |
-| Owner login client ID                   | Regular Web Application Client ID from step 1                          |
-| Owner login client secret variable name | `PROVIDER_LOGIN_SECRET`                                                |
-| ID token algorithm                      | `RS256`                                                                |
-| Application token issuer                | Same exact discovery issuer, including its trailing slash              |
-| Dedicated API audience                  | API **Identifier** from step 3, not Auth0's internal API ID            |
-| Application JWKS URL                    | `https://your-tenant.us.auth0.com/.well-known/jwks.json`               |
-| Application client ID in Policies       | Calling application's ID from step 4                                   |
-| Reviewer login subject                  | Staff user `sub`/user_id from step 2                                   |
+| Wizard field                             | Value                                                                  |
+| ---------------------------------------- | ---------------------------------------------------------------------- |
+| Login service issuer URL                 | Exact discovery `issuer`, normally `https://your-tenant.us.auth0.com/` |
+| Wallet login client ID                   | Regular Web Application Client ID from step 1                          |
+| Wallet login client secret variable name | `PROVIDER_LOGIN_SECRET`                                                |
+| Login token signing algorithm            | `RS256`                                                                |
+| Application token issuer                 | Same exact discovery issuer, including its trailing slash              |
+| Wallet API audience                      | API **Identifier** from step 3, not Auth0's internal API ID            |
+| Token verification keys URL (JWKS)       | `https://your-tenant.us.auth0.com/.well-known/jwks.json`               |
+| Application client ID in Policies        | Calling application's ID from step 4                                   |
+| Reviewer account ID (sub)                | Staff user `sub`/user_id from step 2                                   |
 
 Open `https://your-tenant.us.auth0.com/.well-known/openid-configuration` to confirm
 `issuer` and `jwks_uri`; these public metadata contain no client secrets. Auth0's

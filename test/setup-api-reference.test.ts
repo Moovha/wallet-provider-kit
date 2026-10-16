@@ -68,16 +68,16 @@ describe('operator API reference', () => {
       operations.find(
         (item) => item.operation.operationId === 'getCapabilities',
       )?.status,
-    ).toBe('Public discovery');
+    ).toBe('No access token needed');
     expect(
       operations.find(
         (item) => item.operation.operationId === 'requestAccountAccess',
       )?.status,
-    ).toBe('Activation disabled');
+    ).toBe('Wallet operations are disabled in Deployment');
     expect(
       operations.find((item) => item.operation.operationId === 'signAction')
         ?.status,
-    ).toBe('Transfer profile not configured');
+    ).toBe('Transfer signing is off in Policies');
     config.financial = {
       profile: 'provider-authorized-erc3009-v1',
       token: {
@@ -98,12 +98,12 @@ describe('operator API reference', () => {
     expect(
       operations.find((item) => item.operation.operationId === 'signAction')
         ?.status,
-    ).toBe('Application permission not allowed');
+    ).toBe('Select the required permission for this application in Policies');
     expect(
       operations.find(
         (item) => item.operation.operationId === 'provisionAccount',
       )?.status,
-    ).toBe('Configured; runtime checks apply');
+    ).toBe('Settings are present; deployed access has not been checked');
     config.policy.applications.push({
       ...config.policy.applications[0],
       clientId: 'disabled-app',
@@ -112,13 +112,13 @@ describe('operator API reference', () => {
     expect(
       referenceOperations(contract, config, 1).find((item) => item.guide.scope)
         ?.status,
-    ).toBe('Application disabled');
+    ).toBe('This application is disabled in Policies');
     delete config.policy.applications[0].permissions;
     expect(
       referenceOperations(contract, config, 0).find(
         (item) => item.operation.operationId === 'signAction',
       )?.status,
-    ).toBe('Application permission not allowed');
+    ).toBe('Select the required permission for this application in Policies');
   });
   it('provides schema-valid request examples and placeholder-only scoped cURL with an explicit retry key', () => {
     const config = fixture();

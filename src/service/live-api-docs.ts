@@ -26,13 +26,15 @@ export function liveApiSpecification<T extends object>(
   api.info.title = 'Provider API · Live testing';
   api.info.description = `**Live service: Execute sends a real request to this domain.**
 
-Start with GET /v1/capabilities without authorization. configured=false means readiness gates are closed; 200 discovery alone does not prove vendor acceptance.
+Start with GET /v1/capabilities without authorization. configured=false means the service is not ready for wallet operations. A 200 discovery response does not confirm that wallet creation, identity checks or recovery work.
 
-For protected calls, use the Application tokens panel when enabled: sign in as an allowed operator, choose a client/scopes, then Get token or Renew token. Otherwise choose Authorize and paste a short-lived application access token without the Bearer prefix. Never enter client secrets, vendor keys, owner ID tokens or the local wizard session token. Tokens are kept in page memory; reload or Logout to clear authorization. Do not share screenshots containing tokens, cURL commands, personal data or signatures.
+For protected calls, use the Application tokens panel when enabled: sign in as an allowed operator, choose a calling application and the API permissions (scopes) you need, then Get token or Renew token. Otherwise choose Authorize and paste a short-lived application access token without the Bearer prefix. Never enter client secrets, vendor keys, owner ID tokens or the local wizard session token. Tokens are kept in page memory; reload or Logout to clear authorization. Do not share screenshots containing tokens, cURL commands, personal data or signatures.
 
-Use real IDs returned by this deployment. POST requests can create records, incur vendor charges or issue usable signatures. Use a new UUIDv4 Idempotency-Key for each distinct mutation and retain the original key for retries. Reconcile unknown outcomes before retrying. Owner login, identity verification and provider review remain separate browser steps. Transfer authority comes from the current grant and configured provider policy.
+Use real IDs returned by this deployment. POST requests can create records, incur vendor charges or issue usable signatures. Use a new UUIDv4 Idempotency-Key for each distinct mutation and retain the original key for retries. Reconcile unknown outcomes before retrying. Owner login, identity verification and provider review remain separate browser steps. Delegated transfers require the owner’s current access and transfer consent, identity acceptance and provider policy checks.
 
-See [operator testing instructions](https://moovha.github.io/wallet-provider-kit/docs/http-api.html#try-deployed-apis) for tokens, the first test and troubleshooting. Examples and documented responses below are schemas; the Server response section appears only after Execute.`;
+For a 401, obtain a current application token. For a 403, check the required scope and current owner access. For a 409, inspect the original attempt. For a 503 or a connection error, check service readiness and the outcome before retrying. A failed connection does not prove the request had no effect; preserve its idempotency key.
+
+See [operator testing instructions](https://moovha.github.io/wallet-provider-kit/docs/http-api.html#try-deployed-apis) for tokens, the first test and troubleshooting. The request examples and response schemas below explain the format. After Execute, read Server response for the actual result from this deployment.`;
   // Relative origin survives TLS ingress without trusting forwarded host headers.
   api.servers = [{ url: '/' }];
   for (const [path, methods] of Object.entries(api.paths)) {
@@ -66,7 +68,10 @@ See [operator testing instructions](https://moovha.github.io/wallet-provider-kit
 
 /** Serialized by Swagger UI: keep this function self-contained for browser execution. */
 export function liveRequestInterceptor(request: Record<string, unknown>) {
-  if (typeof request.url !== 'string') throw new Error('Missing request URL.');
+  if (typeof request.url !== 'string')
+    throw new Error(
+      'The request has no destination address. Reload the explorer and try again.',
+    );
   const location = (
     globalThis as unknown as {
       location: {
@@ -86,7 +91,7 @@ export function liveRequestInterceptor(request: Record<string, unknown>) {
     (location.protocol !== 'https:' && !loopback)
   ) {
     throw new Error(
-      'Live testing requires this provider HTTPS origin (or local loopback).',
+      'Send requests only to the provider address shown in this explorer, using HTTPS. Local testing is supported on localhost. Requests to other sites are blocked.',
     );
   }
   request.credentials = 'omit';

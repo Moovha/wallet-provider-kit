@@ -144,7 +144,7 @@ test('field guidance follows backend choices and explains service registrations,
     `${sample.policy.provider.origin}/onboarding/callback`,
   );
   await page
-    .getByText('Didit verification: configure an agreed price bound', {
+    .getByText('Didit verification: set an agreed price limit', {
       exact: true,
     })
     .click();
@@ -157,7 +157,7 @@ test('field guidance follows backend choices and explains service registrations,
   await reviewerHelp.locator('summary').click();
   await expect(reviewerHelp).toContainText('Do not enter an email');
   await page
-    .getByText('Configure provider-authorized transfer signing', {
+    .getByText('Configure delegated transfer signing', {
       exact: true,
     })
     .click();
@@ -166,21 +166,23 @@ test('field guidance follows backend choices and explains service registrations,
   );
   await step(page, 'Deployment');
   await expect(
-    page.getByLabel('Enable service activation in this export', {
+    page.getByLabel('Enable wallet operations in this configuration', {
       exact: true,
     }),
   ).not.toBeChecked();
   const activationHelp = page.locator('[data-setting="activation"]');
   await activationHelp.locator('summary').click();
   await expect(activationHelp).toContainText(
-    'the service fails closed without it',
+    'The deployed service refuses wallet operations',
   );
   await page
-    .getByText('Enable service activation in this export', { exact: true })
+    .getByText('Enable wallet operations in this configuration', {
+      exact: true,
+    })
     .click();
   const evidenceHelp = page.locator('[data-setting="backendEvidence"]');
   await evidenceHelp.locator('summary').click();
-  await expect(evidenceHelp).toContainText('Do not invent a value');
+  await expect(evidenceHelp).toContainText('Complete the staging tests first');
   await step(page, 'Export');
   await expect(
     page.getByRole('heading', { name: 'Review your configuration' }),
@@ -219,19 +221,19 @@ test('an operator configures CDP without JSON, exports valid files, and editing 
     .fill('acme-sepolia');
   await step(page, 'Services');
   await page
-    .getByLabel('Owner login issuer', { exact: true })
+    .getByLabel('Login service issuer URL', { exact: true })
     .fill('https://login.acme.example');
   await page
-    .getByLabel('Owner login client ID', { exact: true })
+    .getByLabel('Wallet login client ID', { exact: true })
     .fill('owner-login');
   await page
     .getByLabel('Application token issuer', { exact: true })
     .fill('https://applications.acme.example');
   await page
-    .getByLabel('Dedicated API audience', { exact: true })
+    .getByLabel('Wallet API audience', { exact: true })
     .fill('acme-wallets');
   await page
-    .getByLabel('Application JWKS URL', { exact: true })
+    .getByLabel('Token verification keys URL (JWKS)', { exact: true })
     .fill('https://applications.acme.example/jwks');
   await page
     .getByLabel('Didit workflow ID', { exact: true })
@@ -245,7 +247,7 @@ test('an operator configures CDP without JSON, exports valid files, and editing 
     page.getByLabel('Application issuer', { exact: true }),
   ).toHaveValue('https://applications.acme.example');
   await page
-    .getByLabel('Reviewer 1 login subject', { exact: true })
+    .getByLabel('Reviewer 1 account ID (sub)', { exact: true })
     .fill('reviewer-one');
   const config = await exported(page);
   expect(config.policy.provider.name).toBe('Acme Wallets');
@@ -318,15 +320,15 @@ test('OWS and Sumsub can be selected with their references and exported without 
     .getByLabel('Sumsub recipient level name', { exact: true })
     .fill('recipient-level');
   await page
-    .getByText('Sumsub import: configure an agreed price bound', {
+    .getByText('Sumsub import: set an agreed price limit', {
       exact: true,
     })
     .click();
   await page
-    .getByLabel('Sumsub import maximum (USD cents)', { exact: true })
+    .getByLabel('Sumsub import price limit (USD cents)', { exact: true })
     .fill('25');
   await page
-    .getByLabel('Sumsub import terms reference', { exact: true })
+    .getByLabel('Sumsub import price agreement reference', { exact: true })
     .fill('contract-2026');
   const config = await exported(page);
   expect(config.backend).toEqual({
@@ -354,7 +356,7 @@ test('Relayer signer pool, applications, financial policies and activation are c
     .getByLabel('Wallet environment name', { exact: true })
     .fill('acme-relayer');
   await page
-    .getByLabel('Relayer HTTPS origin', { exact: true })
+    .getByLabel('Relayer service address', { exact: true })
     .fill('https://relayer.acme.example');
   await page.getByLabel('Relayer ID', { exact: true }).fill('relayer-one');
   await page.getByLabel('Signer ID', { exact: true }).fill('signer-one');
@@ -382,10 +384,9 @@ test('Relayer signer pool, applications, financial policies and activation are c
   );
   await step(page, 'Policies');
   await page
-    .getByText(
-      'Configure an application funding agreement for identity costs',
-      { exact: true },
-    )
+    .getByText('Record an identity funding agreement for this application', {
+      exact: true,
+    })
     .click();
   await page
     .getByLabel('Funding agreement reference', { exact: true })
@@ -411,7 +412,7 @@ test('Relayer signer pool, applications, financial policies and activation are c
     .getByText('Request transfers on behalf of users', { exact: true })
     .click();
   await page
-    .getByText('Configure provider-authorized transfer signing', {
+    .getByText('Configure delegated transfer signing', {
       exact: true,
     })
     .click();
@@ -426,10 +427,10 @@ test('Relayer signer pool, applications, financial policies and activation are c
     .fill('1');
   await page.getByLabel('Token symbol', { exact: true }).fill('TEST');
   await page
-    .getByLabel('Maximum per action (base units)', { exact: true })
+    .getByLabel('Maximum per transfer (base units)', { exact: true })
     .fill('1000000');
   await page
-    .getByLabel('Lifetime limit per account/token (base units)', {
+    .getByLabel('Total limit per account and token (base units)', {
       exact: true,
     })
     .fill('10000000');
@@ -438,16 +439,18 @@ test('Relayer signer pool, applications, financial policies and activation are c
     .fill('0x4444444444444444444444444444444444444444');
   await step(page, 'Deployment');
   await page
-    .getByText('Enable service activation in this export', { exact: true })
+    .getByText('Enable wallet operations in this configuration', {
+      exact: true,
+    })
     .click();
   await page
-    .getByLabel('Backend acceptance evidence reference', { exact: true })
+    .getByLabel('Wallet backend test report reference', { exact: true })
     .fill('review/backend');
   await page
-    .getByLabel('Recovery acceptance evidence reference', { exact: true })
+    .getByLabel('Recovery test report reference', { exact: true })
     .fill('review/recovery');
   await page
-    .getByLabel('Token acceptance evidence reference', { exact: true })
+    .getByLabel('Token signing test report reference', { exact: true })
     .fill('review/token');
   const config = await exported(page);
   expect(config.backend.signers).toEqual([
@@ -472,7 +475,7 @@ test('invalid policies block exports, imports round-trip, and custom adapters st
   await step(page, 'Policies');
   await page.getByRole('button', { name: 'Add reviewer', exact: true }).click();
   await page
-    .getByLabel('Reviewer 2 login subject', { exact: true })
+    .getByLabel('Reviewer 2 account ID (sub)', { exact: true })
     .fill(sample.reviewers[0]);
   await step(page, 'Export');
   await page
@@ -532,6 +535,19 @@ test('step validation accepts variable names, shows HTTPS errors, and supports k
   await expect(
     page.getByRole('tab', { name: 'Services', exact: true }),
   ).toHaveAttribute('aria-selected', 'true');
+  await step(page, 'Backend');
+  const secretName = page.getByLabel('CDP API key secret variable name', {
+    exact: true,
+  });
+  await secretName.fill('not-a-variable');
+  await secretName.blur();
+  await expect(
+    page.getByText('Enter a variable name using uppercase letters', {
+      exact: false,
+    }),
+  ).toBeVisible();
+  await secretName.fill('WALLET_CDP_API_KEY_SECRET');
+  await step(page, 'Services');
   await page.getByLabel('Use Didit', { exact: true }).press('Space');
   await expect(
     page.getByLabel('Didit workflow ID', { exact: true }),
@@ -569,7 +585,11 @@ test('API reference follows the configuration, preserves edits, shows Swagger sc
   ).toBeVisible();
   await expect(page.locator('.swagger-ui .opblock')).toHaveCount(6);
   await expect(
-    page.getByText('Activation disabled', { exact: true }).first(),
+    page
+      .getByText('Wallet operations are disabled in Deployment', {
+        exact: true,
+      })
+      .first(),
   ).toBeVisible();
   await expect(
     page.getByRole('button', { name: 'Try it out', exact: true }),
@@ -604,17 +624,18 @@ test('API reference follows the configuration, preserves edits, shows Swagger sc
   ).toContainText('wallet.example.com/v1/accounts/');
   await page.getByLabel('Find an endpoint', { exact: true }).fill('');
   await page
-    .getByLabel(
-      'Show transfer APIs when the signing profile is not configured',
-      { exact: true },
-    )
+    .getByLabel('Show transfer APIs even when transfer signing is off', {
+      exact: true,
+    })
     .check();
   await expect(page.locator('.swagger-ui .opblock')).toHaveCount(9);
   await page
     .getByLabel('Example endpoint', { exact: true })
     .selectOption('signAction');
   await expect(
-    page.getByText('Transfer profile not configured', { exact: true }).first(),
+    page
+      .getByText('Transfer signing is off in Policies', { exact: true })
+      .first(),
   ).toBeVisible();
   await page
     .getByRole('button', { name: 'Setup configuration', exact: true })
@@ -631,7 +652,9 @@ test('API reference follows the configuration, preserves edits, shows Swagger sc
     .getByLabel('Example endpoint', { exact: true })
     .selectOption('requestAccountAccess');
   await expect(
-    page.getByText('Application disabled', { exact: true }).first(),
+    page
+      .getByText('This application is disabled in Policies', { exact: true })
+      .first(),
   ).toBeVisible();
   const financial = structuredClone(sample);
   financial.financial = {
@@ -668,14 +691,21 @@ test('API reference follows the configuration, preserves edits, shows Swagger sc
     .selectOption('signAction');
   await expect(
     page
-      .getByText('Application permission not allowed', { exact: true })
+      .getByText(
+        'Select the required permission for this application in Policies',
+        { exact: true },
+      )
       .first(),
   ).toBeVisible();
   await page
-    .getByLabel('Preview application', { exact: true })
+    .getByLabel('Application to preview', { exact: true })
     .selectOption('1');
   await expect(
-    page.getByText('Configured; runtime checks apply', { exact: true }).first(),
+    page
+      .getByText('Settings are present; deployed access has not been checked', {
+        exact: true,
+      })
+      .first(),
   ).toBeVisible();
   await page
     .getByRole('button', { name: 'Copy cURL example', exact: true })
@@ -724,11 +754,11 @@ test('API renderer can retry a failed bundled asset without losing setup', async
     .getByRole('button', { name: 'API reference', exact: true })
     .click();
   await expect(page.getByRole('alert')).toContainText(
-    'API renderer unavailable',
+    'The API reference could not be loaded',
   );
   await page.unroute('**/reference/swagger-ui-bundle.js');
   await page
-    .getByRole('button', { name: 'Retry API renderer', exact: true })
+    .getByRole('button', { name: 'Reload API reference', exact: true })
     .click();
   await expect(page.locator('.swagger-ui .opblock')).toHaveCount(6);
   await page
@@ -794,18 +824,21 @@ test('operator configures GUI token issuance with explicit subjects, clients, sc
   await imported(page);
   await step(page, 'Deployment');
   await page
-    .getByText('Enable operator token controls', { exact: true })
+    .getByText('Enable application token controls for staff', { exact: true })
     .click();
   await page
-    .getByLabel('Token operator login subjects', { exact: true })
+    .getByLabel('Token operator account IDs (sub)', { exact: true })
     .fill('auth0|offline-operator');
   await page
-    .getByText(`Allow GUI tokens for ${sample.policy.applications[0].name}`, {
-      exact: true,
-    })
+    .getByText(
+      `Allow staff to get tokens for ${sample.policy.applications[0].name}`,
+      {
+        exact: true,
+      },
+    )
     .click();
   await expect(
-    page.getByLabel('Application client secret variable', { exact: true }),
+    page.getByLabel('Application client secret variable name', { exact: true }),
   ).toHaveValue('WALLET_EXPLORER_APP_1_SECRET');
   const config = await exported(page);
   expect(config.http.documentation).toBe(true);

@@ -11,6 +11,15 @@
   let expiryTimer;
   let generation = 0;
   let clearManual = () => {};
+  const scopeLabels = {
+    'wallet:access': 'Request wallet access and share identity evidence',
+    'wallet:access:read': 'Read access request status',
+    'wallet:account:read': 'Read wallet account details',
+    'wallet:provision': 'Create an accepted account’s wallet',
+    'wallet:actions': 'Request transfer authorization',
+    'wallet:actions:read': 'Read transfer authorization status',
+    'wallet:sign': 'Sign an authorized transfer',
+  };
   const message = (text) => {
     panel.querySelector('[role="status"]').textContent = text;
   };
@@ -21,7 +30,7 @@
     clearManual();
     clearInterval(expiryTimer);
     message(
-      'Application token cleared. Existing issued tokens expire normally.',
+      'Authorization cleared for future requests. Tokens already issued can still work until they expire. Reload this page to clear previous request and response details.',
     );
   }
   async function call(path, body) {
@@ -32,22 +41,30 @@
       redirect: 'error',
       headers: body ? { 'Content-Type': 'application/json' } : {},
       ...(body ? { body: JSON.stringify(body) } : {}),
+    }).catch(() => {
+      throw new Error(
+        'Cannot reach token controls. Check your connection and try Check sign-in. If the problem continues, ask the provider administrator to check the service.',
+      );
     });
     if (!response.ok) {
       if ([401, 403].includes(response.status)) {
         session = undefined;
         clear();
         throw new Error(
-          'Sign in with an allowed token-operator account again. No API request was retried.',
+          'Sign in again with an account allowed to use token controls. If access is still denied, ask the provider administrator to check your account and the selected permissions. No wallet API request was retried.',
         );
       }
       throw new Error(
         response.status === 429
-          ? 'Token issuance is rate limited. Wait before renewing.'
-          : 'Could not obtain a token. Check the configured client, scopes, secret and issuer. No API request was retried.',
+          ? 'Too many token requests. Wait one minute before getting or renewing a token.'
+          : 'Could not get an application token. Ask the provider administrator to check this application’s registration, allowed scopes, secret and token issuer. No wallet API request was retried.',
       );
     }
-    return response.json();
+    return response.json().catch(() => {
+      throw new Error(
+        'Token controls returned an unreadable response. Reload this page. If the problem continues, ask the provider administrator to check the service.',
+      );
+    });
   }
   function selection() {
     clear();
@@ -69,7 +86,12 @@
           (item) => item.value,
         );
       });
-      label.append(input, document.createTextNode(scope));
+      label.append(
+        input,
+        document.createTextNode(
+          `${scopeLabels[scope] ?? 'API permission'} (${scope})`,
+        ),
+      );
       list.append(label);
     }
   }
@@ -86,7 +108,7 @@
     panel.querySelector('[data-controls]').hidden = false;
     selection();
     message(
-      'Operator signed in. Select only the scopes needed, then Get token.',
+      'Signed in to token controls. Select only the API permissions you need, then choose Get token.',
     );
   }
   function status() {
@@ -97,7 +119,7 @@
     );
     message(
       seconds
-        ? `Application token ready for ${clientId}; expires in ${seconds}s. Requests use the selected application and scopes.`
+        ? `Application token ready for ${session.applications.find((item) => item.clientId === clientId)?.name ?? 'the selected application'}; expires in ${seconds}s. Requests use its selected API permissions.`
         : 'Token expired. Renew token, or the next Execute will renew it before sending.',
     );
   }
@@ -109,7 +131,9 @@
     const requestedScopes = [...scopes];
     requestInFlight = (async () => {
       if (!clientId || !scopes.length)
-        throw new Error('Choose an application and at least one scope.');
+        throw new Error(
+          'Choose a calling application and at least one API permission (scope), then choose Get token.',
+        );
       // Recheck the short operator session for every issuance; no unlimited background renewal.
       const current = await call('/docs/operator/session');
       const value = await call('/docs/operator/token', {
@@ -122,10 +146,12 @@
         !Number.isFinite(value.expires_at) ||
         value.expires_at <= Date.now()
       )
-        throw new Error('Issuer returned an unusable token.');
+        throw new Error(
+          'The token issuer returned a token this API cannot use. Ask the provider administrator to check the token format and expiry settings.',
+        );
       if (version !== generation)
         throw new Error(
-          'Token selection changed. Request a token for the current selection.',
+          'Token selection changed. Choose Get token for the application and permissions currently selected.',
         );
       clearManual();
       token = value;
@@ -179,12 +205,12 @@
       panel.className = 'wpk-token-panel';
       panel.setAttribute('aria-label', 'Application token controls');
       panel.innerHTML = `<h2>Application tokens</h2>
-<p>Sign in as an allowed token operator, choose an application and scopes, then obtain its token here. Client secrets stay on the server. Owner consent and API authority still apply.</p>
-<p><a href="/docs/operator/login">Sign in as token operator</a> <button type="button" data-session>Check operator login</button></p>
-<div data-controls hidden><label>Calling application <select aria-label="Token application"></select></label><fieldset aria-label="Token scopes"></fieldset>
-<button type="button" data-get>Get token</button><button type="button" data-renew>Renew token</button><button type="button" data-clear>Clear token</button><button type="button" data-logout>Sign out operator</button></div>
-<p role="status" aria-live="polite">Checking operator login…</p>
-<p>Renew uses a new client-credentials grant. After Get token, Execute renews a token nearing expiry before sending; it never retries an API call automatically. Reload clears the token. Issuance may count toward your identity provider's usage.</p>`;
+<p>Sign in with a staff account allowed to use these controls. Choose a calling application and the API permissions it needs, then get its access token. Application secrets stay on the server. Tokens do not replace wallet owner consent or account permissions.</p>
+<p><a href="/docs/operator/login">Sign in to token controls</a> <button type="button" data-session>Check sign-in</button></p>
+<div data-controls hidden><label>Calling application <select aria-label="Token application"></select></label><p>API permissions (scopes): select only what you need for this test.</p><fieldset aria-label="Token scopes"></fieldset>
+<button type="button" data-get>Get token</button><button type="button" data-renew>Renew token</button><button type="button" data-clear>Clear token</button><button type="button" data-logout>Sign out of token controls</button></div>
+<p role="status" aria-live="polite">Checking sign-in…</p>
+<p>Renew token requests a new access token from your token service. After Get token, Execute renews a token nearing expiry before sending your request. It never retries a wallet API call automatically. Reload clears the token and earlier responses. Token requests may count toward your login provider’s usage limits.</p>`;
       document.querySelector('#swagger-ui').before(panel);
       panel.querySelector('select').addEventListener('change', selection);
       const action = (selector, callback) =>
@@ -205,13 +231,13 @@
           clear();
           panel.querySelector('[data-controls]').hidden = true;
           message(
-            'Operator signed out of this browser. Sign in again to obtain tokens.',
+            'Signed out of token controls in this browser. Sign in again to get tokens. Tokens already issued remain valid until expiry.',
           );
         }
       });
       loadSession().catch(() =>
         message(
-          'Sign in as an allowed token operator to obtain application tokens. Manual Authorize remains available.',
+          'Sign in with a staff account allowed to use token controls. If you already have an application access token, use Authorize instead.',
         ),
       );
     },

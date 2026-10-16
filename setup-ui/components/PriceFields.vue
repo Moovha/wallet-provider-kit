@@ -8,7 +8,7 @@ defineProps<{ label: string }>();
   <SetupField
     guide="priceEnabled"
     type="checkbox"
-    :label="label + ': configure an agreed price bound'"
+    :label="label + ': set an agreed price limit'"
     :modelValue="!!model"
     @update:modelValue="
       model = $event ? { maximumMinor: 0, termsReference: '' } : undefined
@@ -20,7 +20,7 @@ defineProps<{ label: string }>();
       v-model="model.maximumMinor"
       type="number"
       :number="true"
-      :label="label + ' maximum (USD cents)'"
+      :label="label + ' price limit (USD cents)'"
       min="0"
       max="9007199254740991"
       validation="required|min:0|max:9007199254740991"
@@ -29,7 +29,7 @@ defineProps<{ label: string }>();
       guide="priceTerms"
       v-model="model.termsReference"
       type="text"
-      :label="label + ' terms reference'"
+      :label="label + ' price agreement reference'"
       validation="required|length:1,256"
     />
   </div>

@@ -5,23 +5,23 @@ export function setupWarnings(config: ProviderConfiguration): string[] {
   const warnings: string[] = [];
   if (!config.activation.enabled)
     warnings.push(
-      'Activation is disabled. The deployed service will deny wallet operations until acceptance is recorded and activation is enabled.',
+      'Wallet operations are disabled. Complete the wallet backend and recovery tests, then enable operations in Deployment, export and restart the service.',
     );
   for (const [vendor, settings] of Object.entries(config.identity)) {
     if (!settings.verificationPrice)
       warnings.push(
-        `${vendor}: new hosted identity verification is blocked until an agreed verification price bound is configured, even for a free workflow.`,
+        `${vendor === 'didit' ? 'Didit' : 'Sumsub'}: new identity checks are unavailable. In Services, set the agreed verification price limit, including 0 for an agreed free workflow.`,
       );
     if (!settings.importPrice)
       warnings.push(
-        `${vendor}: shared identity import is blocked until an agreed import price bound is configured.`,
+        `${vendor === 'didit' ? 'Didit' : 'Sumsub'}: shared identity import is unavailable. In Services, set the agreed import price limit.`,
       );
   }
   for (const [index, application] of config.policy.applications.entries()) {
     if (application.enabled === false) continue;
     if (!application.funding)
       warnings.push(
-        `Application ${index + 1}: new verification and identity import are blocked until an application funding agreement and monthly USD-cent budget are configured.`,
+        `Application ${index + 1}: identity checks and imports are unavailable. In Policies, record its funding agreement and monthly identity budget in USD cents.`,
       );
     else if (
       Object.values(config.identity).some((vendor) =>
@@ -33,7 +33,7 @@ export function setupWarnings(config: ProviderConfiguration): string[] {
       )
     )
       warnings.push(
-        `Application ${index + 1}: its monthly identity budget is smaller than at least one configured vendor price bound.`,
+        `Application ${index + 1}: its monthly identity budget is smaller than a vendor's per-request price limit. Review the agreed budget in Policies and prices in Services.`,
       );
   }
   if (
@@ -44,7 +44,7 @@ export function setupWarnings(config: ProviderConfiguration): string[] {
     )
   )
     warnings.push(
-      'Transfer signing is configured but no enabled application is permitted to request transfers on behalf of its users.',
+      'Transfer signing is configured, but no enabled application can request transfers. In Policies, select Request transfers on behalf of users for the intended application, or turn off transfer signing.',
     );
   if (config.backend.kind === 'ows')
     warnings.push(

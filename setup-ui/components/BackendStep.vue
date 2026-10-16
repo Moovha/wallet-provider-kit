@@ -154,7 +154,7 @@ function removeSigner(index: number) {
       guide="relayerOrigin"
       v-model="relayer.url"
       type="url"
-      label="Relayer HTTPS origin"
+      label="Relayer service address"
       placeholder="https://relayer.acme.com"
       validation="required|https_origin"
     />

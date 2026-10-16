@@ -18,10 +18,11 @@ createApp(App)
         en: {
           validation: {
             https_url:
-              'Use an HTTPS URL without credentials, query or fragment.',
+              'Enter a complete https:// address. Remove any username, password, query (?…) or fragment (#…).',
             https_origin:
               'Enter https:// and your service hostname only, such as https://wallet.acme.com. Remove any trailing slash or page path.',
           },
+          ui: { incomplete: 'Check the highlighted fields before continuing.' },
         },
       },
       icons: genesisIcons,
