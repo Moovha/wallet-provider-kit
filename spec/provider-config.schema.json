@@ -652,6 +652,70 @@
           "type": "boolean"
         }
       }
+    },
+    "apiExplorer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operators", "clients"],
+      "properties": {
+        "operators": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 100,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        },
+        "clients": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 20,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["clientId", "clientSecret", "scopes"],
+            "properties": {
+              "clientId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "clientSecret": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["env"],
+                "properties": {
+                  "env": {
+                    "type": "string",
+                    "pattern": "^[A-Z][A-Z0-9_]{0,127}$"
+                  }
+                }
+              },
+              "scopes": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 7,
+                "uniqueItems": true,
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "wallet:access",
+                    "wallet:access:read",
+                    "wallet:account:read",
+                    "wallet:provision",
+                    "wallet:actions",
+                    "wallet:actions:read",
+                    "wallet:sign"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
     }
   }
 }

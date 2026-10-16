@@ -37,6 +37,7 @@ try {
   );
   const paths = candidate.files.map(({ path }) => path);
   assert.ok(paths.includes('dist/providers/ows-worker.js'));
+  assert.ok(paths.includes('dist/service/documentation-token-ui.mjs'));
   assert.ok(paths.includes('examples/inspect-api.mjs'));
   assert.ok(paths.includes('spec/provider-config.schema.json'));
   assert.ok(paths.includes('docs/provider.config.example.json'));

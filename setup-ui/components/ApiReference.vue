@@ -192,8 +192,10 @@ async function copy() {
       </p>
       <p>
         Start with GET /v1/capabilities without a token. For protected APIs, use
-        Authorize with a short-lived application access token. POST requests can
-        create records, incur vendor charges or produce usable signatures.
+        the Application tokens panel when operator token controls are
+        configured, or Authorize with a short-lived application access token.
+        POST requests can create records, incur vendor charges or produce usable
+        signatures.
       </p>
       <a
         :href="docs + 'http-api.html#try-deployed-apis'"

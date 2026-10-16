@@ -246,6 +246,11 @@ issuance, actual responses, idempotency keys, required owner steps and troublesh
 This is real API execution, including any admitted records, charges and signatures.
 Use your isolated acceptance deployment before wider admission.
 
+If you configure [operator token controls](operator-tokens.md), supply the selected
+M2M client secrets in their exported environment variables before restarting.
+Operators can then sign in and obtain/renew tokens directly in Swagger. No client
+secret belongs in the browser or plaintext configuration.
+
 ## Hand the API to the product developer
 
 Provide the final HTTPS origin, [implemented OpenAPI](../spec/provider-api.json),

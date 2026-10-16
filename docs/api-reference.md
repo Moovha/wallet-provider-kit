@@ -595,6 +595,8 @@ export interface ServerOptions {
   /** Must check durable authority/recovery dependencies; never infer readiness from env keys. */
   ready?: () => Promise<boolean>;
   documentation?: boolean;
+  /** Optional operator-authenticated client-credentials broker for the deployed explorer. */
+  documentationTokens?: DocumentationTokenOptions;
   configurationProfile?: 'provider-service-v1';
   actionProfiles?: readonly 'provider-authorized-erc3009-v1'[];
   /** Release host-owned resources when the service closes. Registered before ready. */
@@ -2235,6 +2237,7 @@ export interface ProviderConfiguration {
   profile: 'provider-service-v1';
   policy: OnboardingPolicy;
   oauth: OAuthConfiguration;
+  apiExplorer?: ExplorerTokensConfiguration;
   ownerLogin: {
     issuer: string;
     clientId: string;

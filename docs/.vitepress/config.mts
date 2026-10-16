@@ -59,6 +59,7 @@ export default defineConfig({
           { text: 'Auth0 dashboard setup', link: '/docs/auth0-setup' },
           { text: 'Operator setup wizard', link: '/docs/setup-wizard' },
           { text: 'Deploy the export', link: '/docs/operator-deployment' },
+          { text: 'GUI application tokens', link: '/docs/operator-tokens' },
           { text: 'Understand the roles', link: '/docs/concepts' },
           {
             text: 'Install the package',
@@ -126,6 +127,7 @@ export default defineConfig({
           { text: 'Auth0 dashboard setup', link: '/docs/auth0-setup' },
           { text: '3. FormKit wizard', link: '/docs/setup-wizard' },
           { text: '4. Deploy and activate', link: '/docs/operator-deployment' },
+          { text: 'Get and renew API tokens', link: '/docs/operator-tokens' },
           { text: 'Configuration reference', link: '/docs/setup' },
           { text: 'Built-in SQLite storage', link: '/docs/storage' },
           { text: 'Acceptance checklist', link: '/docs/conformance' },

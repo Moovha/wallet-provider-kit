@@ -1,3 +1,4 @@
+import { createExplorerTokenIssuer } from './explorer-tokens.js';
 import { createConfiguredBackend } from './backends.js';
 import { resolve } from 'node:path';
 import { EmbeddedWalletService } from '../domain/embedded-wallet.js';
@@ -30,6 +31,10 @@ export async function createConfiguredProvider(
   )
     throw new ConfigurationError(['/: unsafe environment']);
   const config = validateProviderConfiguration(input);
+  const authenticate = createAuthenticator(config.oauth);
+  const issueExplorerToken = config.apiExplorer
+    ? createExplorerTokenIssuer(config, authenticate)
+    : undefined;
   const database = openProviderDatabase({
     directory: resolve(directory, config.storage.directory),
   });
@@ -137,6 +142,7 @@ export async function createConfiguredProvider(
       config.ownerLogin.issuer,
       config.ownerLogin.clientId,
       config.activation.enabled,
+      ...(config.apiExplorer ? [config.apiExplorer, config.oauth] : []),
     ]);
     await database.onboardingStore.transaction((state) => {
       const binding = state.deploymentBindings!['service-v1'];
@@ -192,14 +198,38 @@ export async function createConfiguredProvider(
       },
       backend,
     );
+    const currentConfiguration = () =>
+      database.onboardingStore.transaction(
+        (state) =>
+          state.deploymentBindings?.['service-v1']?.activeRevision ===
+          activeRevision,
+      );
     const app = await createServer({
-      authenticate: createAuthenticator(config.oauth),
+      documentationTokens: config.apiExplorer
+        ? {
+            origin: config.policy.provider.origin,
+            issuer: config.ownerLogin.issuer,
+            login,
+            operators: config.apiExplorer.operators,
+            applications: config.apiExplorer.clients.map((entry) => ({
+              clientId: entry.clientId,
+              name: config.policy.applications.find(
+                (app) => app.clientId === entry.clientId,
+              )!.name,
+              scopes: entry.scopes,
+            })),
+            currentConfiguration,
+            issue: issueExplorerToken!,
+          }
+        : undefined,
+      authenticate,
       configurationProfile: config.profile,
       actionProfiles: config.financial ? [config.financial.profile] : [],
       service,
       onboarding: {
         service: onboarding,
         login,
+        apiExplorerLogin: !!config.apiExplorer,
         reviewers: config.reviewers,
         currentConfiguration: () =>
           database.onboardingStore.transaction(

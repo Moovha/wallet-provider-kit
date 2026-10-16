@@ -28,7 +28,7 @@ afterEach(async () => {
     folders.splice(0).map((f) => rm(f, { recursive: true, force: true })),
   );
 });
-async function setup() {
+async function setup(apiExplorerLogin = false) {
   const folder = await mkdtemp(join(tmpdir(), 'wpk-http-'));
   folders.push(folder);
   const store = createFileOnboardingStore(folder);
@@ -144,7 +144,12 @@ async function setup() {
     authenticate,
     service: new EmbeddedWalletService(onboarding.walletAuthority(), backend),
     ready: async () => true,
-    onboarding: { service: onboarding, login, reviewers: ['reviewer'] },
+    onboarding: {
+      service: onboarding,
+      login,
+      apiExplorerLogin,
+      reviewers: ['reviewer'],
+    },
   });
   servers.push(app);
   const headers = {
@@ -420,4 +425,19 @@ it('opens provider login with a secure browser cookie and rejects an unavailable
   expect((await app.inject({ url: '/onboarding/access' })).statusCode).toBe(
     503,
   );
+});
+
+it('allows only the configured fixed explorer login return target', async () => {
+  for (const enabled of [false, true]) {
+    const fixture = await setup(enabled);
+    fixture.login.finish.mockResolvedValue({
+      sessionToken: 'a'.repeat(43),
+      requestId: 'api-explorer',
+    });
+    const response = await fixture.app.inject(
+      '/onboarding/callback?state=offline',
+    );
+    expect(response.statusCode).toBe(enabled ? 302 : 403);
+    if (enabled) expect(response.headers.location).toBe('/docs/');
+  }
 });

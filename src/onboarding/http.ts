@@ -21,6 +21,8 @@ export interface OnboardingHttpOptions {
   login: OwnerLogin;
   /** Provider IdP subjects allowed to review; applications cannot grant themselves staff access. */
   reviewers: readonly string[];
+  /** Allow the fixed operator-login return target only when integrated API tokens are configured. */
+  apiExplorerLogin?: boolean;
   /** Configuration-first provider-authorized transfers; absent in the onboarding-only profile. */
   actions?: SupportedActions;
   /** Fence superseded configured-service instances, including browser authority writers. */
@@ -481,6 +483,10 @@ export async function registerOnboardingRoutes(
           url,
           cookie(request, '__Host-wpk-browser'),
         );
+        if (result.requestId === 'api-explorer' && options.apiExplorerLogin) {
+          setCookie(reply, '__Host-wpk-session', result.sessionToken);
+          return reply.redirect('/docs/');
+        }
         if (
           !uuid.test(result.requestId) &&
           !['access', 'review'].includes(result.requestId)

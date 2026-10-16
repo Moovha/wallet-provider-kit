@@ -28,9 +28,9 @@ export function liveApiSpecification<T extends object>(
 
 Start with GET /v1/capabilities without authorization. configured=false means readiness gates are closed; 200 discovery alone does not prove vendor acceptance.
 
-For protected calls, choose Authorize and paste a short-lived application access token without the Bearer prefix. Never enter client secrets, vendor keys, owner ID tokens or the local wizard session token. Tokens are kept in page memory; reload or Logout to clear authorization. Do not share screenshots containing tokens, cURL commands, personal data or signatures.
+For protected calls, use the Application tokens panel when enabled: sign in as an allowed operator, choose a client/scopes, then Get token or Renew token. Otherwise choose Authorize and paste a short-lived application access token without the Bearer prefix. Never enter client secrets, vendor keys, owner ID tokens or the local wizard session token. Tokens are kept in page memory; reload or Logout to clear authorization. Do not share screenshots containing tokens, cURL commands, personal data or signatures.
 
-Use real IDs returned by this deployment. POST requests can create records, incur vendor charges or issue usable signatures. Use a new UUIDv4 Idempotency-Key for each distinct mutation and retain the original key for retries. Reconcile unknown outcomes before retrying. Owner login, identity verification, provider review and exact transfer approval remain separate browser steps.
+Use real IDs returned by this deployment. POST requests can create records, incur vendor charges or issue usable signatures. Use a new UUIDv4 Idempotency-Key for each distinct mutation and retain the original key for retries. Reconcile unknown outcomes before retrying. Owner login, identity verification and provider review remain separate browser steps. Transfer authority comes from the current grant and configured provider policy.
 
 See [operator testing instructions](https://moovha.github.io/wallet-provider-kit/docs/http-api.html#try-deployed-apis) for tokens, the first test and troubleshooting. Examples and documented responses below are schemas; the Server response section appears only after Execute.`;
   // Relative origin survives TLS ingress without trusting forwarded host headers.
@@ -91,5 +91,31 @@ export function liveRequestInterceptor(request: Record<string, unknown>) {
   }
   request.credentials = 'omit';
   request.redirect = 'error';
-  return request;
+  const controller = (
+    globalThis as unknown as {
+      wpkExplorerTokens?: {
+        prepare: (
+          value: Record<string, unknown>,
+        ) => Promise<Record<string, unknown>>;
+      };
+    }
+  ).wpkExplorerTokens;
+  return controller ? controller.prepare(request) : request;
+}
+
+/** Called after Swagger renders; the optional local theme supplies the controller. */
+export function mountDocumentationTokens() {
+  (
+    globalThis as unknown as { wpkExplorerTokens?: { mount: () => void } }
+  ).wpkExplorerTokens?.mount();
+}
+
+/** Capture only the ability to clear manual bearer authorization when using managed tokens. */
+export function documentationTokenPlugin(system: unknown) {
+  (
+    globalThis as unknown as {
+      wpkExplorerTokens?: { attach: (value: unknown) => void };
+    }
+  ).wpkExplorerTokens?.attach(system);
+  return {};
 }
