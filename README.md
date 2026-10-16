@@ -81,6 +81,11 @@ vendor services or certify readiness. Initial activation remains disabled._
    its developer consumes the HTTP API and integrates owner access/approval. The
    application separately arranges submission, gas and settlement.
 
+The GUI's **API reference** uses bundled Swagger UI to show each supported endpoint,
+required scope, configuration prerequisites, request/response schemas and illustrative
+examples. Select an application, copy a cURL request or download the displayed OpenAPI.
+It previews your settings; actual calls and permission checks happen on the deployed service.
+
 The [getting-started guide](docs/README.md) links every stage. Supported profiles
 remain single-host and Base Sepolia EOA only; production custody acceptance is pending.
 

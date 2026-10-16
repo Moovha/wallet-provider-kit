@@ -88,6 +88,11 @@ with your own prepared configuration; the screenshot is not a deployable setup._
 5. **[Operate and recover](operator-deployment.md#keep-it-operating).** Supervise the
    process, monitor readiness, preserve storage/bindings and test encrypted backups.
 
+Use **API reference** in the GUI to explore requests/responses with Swagger UI,
+preview each application's configured permissions and copy illustrative cURL requests.
+The [viewer instructions](setup-wizard.md#explore-the-provider-api) explain filtering,
+OpenAPI download and the difference between a local preview and actual API access.
+
 A successful export means configuration validation passed. It does not mean
 vendor connectivity, login, identity agreements or wallet recovery were tested.
 Do not enable activation merely because every wizard tab has been visited.

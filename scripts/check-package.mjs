@@ -43,6 +43,16 @@ try {
   assert.ok(paths.includes('dist/setup-ui/index.html'));
   assert.ok(paths.includes('dist/setup-ui/providers/coinbase.png'));
   assert.ok(paths.includes('dist/setup-ui/THIRD_PARTY_NOTICES.txt'));
+  for (const asset of [
+    'swagger-ui-bundle.js',
+    'swagger-ui.css',
+    'swagger-ui-bundle.js.LICENSE.txt',
+    'LICENSE',
+    'NOTICE',
+    'VERSION.txt',
+  ]) {
+    assert.ok(paths.includes('dist/setup-ui/reference/' + asset));
+  }
   for (const path of paths) {
     assert.match(path, /^(dist\/|spec\/|docs\/|examples\/|[^/]+$)/);
     assert.doesNotMatch(
@@ -252,6 +262,21 @@ try {
     const asset = /src="([^\"]+\.js)"/.exec(html)[1];
     assert.equal((await fetch(origin + asset)).status, 200);
     assert.equal((await fetch(origin + '/api/template')).status, 403);
+    assert.equal((await fetch(origin + '/api/openapi')).status, 403);
+    const reference = await fetch(origin + '/api/openapi', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    assert.equal(reference.status, 200);
+    assert.equal((await reference.json()).openapi, '3.0.3');
+    for (const file of [
+      'swagger-ui-bundle.js',
+      'swagger-ui.css',
+      'swagger-ui-bundle.js.LICENSE.txt',
+      'VERSION.txt',
+    ]) {
+      assert.equal((await fetch(origin + '/reference/' + file)).status, 200);
+    }
+
     const template = await (
       await fetch(origin + '/api/template', {
         headers: { Authorization: `Bearer ${token}` },

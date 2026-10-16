@@ -489,7 +489,7 @@ details {
 summary {
   cursor: pointer;
 }
-pre {
+.export-panel pre {
   background: #fff;
   overflow: auto;
   max-height: 340px;
@@ -674,4 +674,133 @@ footer img {
 .readiness-panel li {
   margin: 0.6rem 0;
   line-height: 1.5;
+}
+
+/* The maintained Swagger renderer is scoped to its own .swagger-ui tree. */
+.topbar-actions,
+.view-switch {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.view-switch {
+  padding: 4px;
+  border: 1px solid #d5dde3;
+  border-radius: 10px;
+  background: #f5f6f8;
+}
+.view-switch button {
+  border: 0;
+  padding: 0.6rem 0.8rem;
+  border-radius: 7px;
+  background: transparent;
+  color: #234454;
+  font-size: 0.8rem;
+}
+.view-switch button[aria-pressed='true'] {
+  background: #153e52;
+  color: white;
+}
+.api-sidebar-note {
+  background: #234454;
+  padding: 1rem;
+  border-radius: 9px;
+}
+.api-sidebar-note small {
+  display: block;
+  color: #b7c7d0;
+  margin-top: 0.5rem;
+  line-height: 1.5;
+}
+.api-reference {
+  background: white;
+  padding: clamp(1rem, 3vw, 2rem);
+  border: 1px solid #dfe5e8;
+  border-radius: 16px;
+  min-width: 0;
+}
+.api-controls {
+  margin: 1.5rem 0;
+}
+.api-reference label {
+  display: grid;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+.api-reference input[type='search'],
+.api-reference select {
+  border: 1px solid #d5dde3;
+  border-radius: 8px;
+  background: white;
+  padding: 0.8rem;
+  width: 100%;
+  min-width: 0;
+}
+.api-reference .api-toggle {
+  display: flex;
+  align-items: center;
+  font-weight: 400;
+}
+.api-reference .api-toggle input {
+  flex: none;
+}
+.api-flow,
+.api-example {
+  border-top: 1px solid #dfe5e8;
+  padding-bottom: 1rem;
+}
+.api-example pre {
+  max-width: 100%;
+  overflow-x: auto;
+  padding: 1rem;
+  border-radius: 9px;
+  background: #102a39;
+  color: #e0ecf2;
+  font-size: 0.8rem;
+  line-height: 1.6;
+}
+.api-swagger {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.api-swagger .swagger-ui .wrapper {
+  padding: 0;
+}
+.api-swagger .swagger-ui .info {
+  margin: 1.5rem 0;
+}
+.api-swagger .swagger-ui .info .title {
+  font-size: 1.5rem;
+}
+.api-swagger .swagger-ui .opblock .opblock-summary {
+  flex-wrap: wrap;
+}
+.api-swagger .swagger-ui .opblock .opblock-summary-path {
+  word-break: break-word;
+  min-width: 0;
+}
+.api-swagger .swagger-ui .opblock-summary-control {
+  min-width: 0;
+}
+.api-swagger .swagger-ui .opblock-body {
+  overflow-x: auto;
+}
+@media (max-width: 700px) {
+  .topbar {
+    flex-wrap: wrap;
+    gap: 0.7rem;
+  }
+  .topbar-actions {
+    width: 100%;
+  }
+  .api-swagger .swagger-ui .opblock .opblock-summary-description {
+    flex-basis: 100%;
+    margin-top: 0.5rem;
+  }
+  .api-reference .section-heading {
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
 }

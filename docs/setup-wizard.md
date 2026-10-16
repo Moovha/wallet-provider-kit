@@ -180,6 +180,42 @@ storage and incompatible external services can also prevent the intended flow.
 The review screen and checklist call out configuration prerequisites; they do not
 claim to test services remotely.
 
+## Explore the provider API
+
+Choose **API reference** in the top bar at any point. **Setup configuration** returns
+to the same form without losing edits or its current step. The viewer uses bundled
+[Swagger UI](https://swagger.io/tools/swagger-ui/) and the kit's implemented OpenAPI,
+with explanatory notes and fictional, schema-checked examples. It does not use the
+separate orchestration draft or expose vendor APIs as provider endpoints.
+
+![Local provider API reference with application selection, cURL example and Swagger endpoint groups](public/screenshots/api-reference.webp)
+
+[Open full-size API reference screenshot](public/screenshots/api-reference.webp)
+
+Select an application to preview its configured permissions, then search by endpoint,
+action or OAuth scope. Onboarding-only setups initially show six endpoints; enabling
+the transfer profile adds its three endpoints. Use the checkbox to inspect those
+three while they are not configured. Each operation explains its required scope,
+activation/permission prerequisites, owner/grant/identity checks and successful
+response. Expand a Swagger row to see parameters, required headers, example JSON,
+response status codes and schemas.
+
+The viewer shows the API origin, application token issuer and audience. **Copy cURL
+example** copies an illustrative request; replace its token, IDs, any share token
+and the mutation's UUIDv4 idempotency key before using it in your application tooling.
+Preserve the original key when retrying that same mutation. **Download displayed
+OpenAPI** exports the currently displayed endpoints and their reference notes;
+search and the transfer visibility checkbox affect that export. It is a reference
+snapshot, not a runtime capability or acceptance report.
+
+This is a **local preview of possibly unsaved and unvalidated configuration**.
+It does not inspect live tokens, stored grants, deployed readiness or vendor status.
+No provider request is executed: Try it out and token-entry controls are disabled.
+The setup-session token is never an application credential. Example responses,
+approval URLs, hashes and signatures are fictional and confer no authority.
+Production calls belong to the application's integration after deployment and
+acceptance; follow [the HTTP guide](http-api.md) and [API handoff](operator-deployment.md#hand-the-api-to-the-product-developer).
+
 ## Use the exported files
 
 - `provider.config.json`: the existing version-1 provider service configuration.
@@ -235,7 +271,7 @@ and deployment process independently before enabling it.
 
 ## Screenshot maintenance
 
-The six images use the example configuration with invented Acme settings and no
+The six step images and API reference use the example configuration with invented Acme settings and no
 secret values. Maintainers can rebuild and capture them with
 `npm run build` and `node scripts/capture-setup-docs.mjs` after installing the
 repository's Playwright Chromium. The script uses only a loopback setup server,
