@@ -59,7 +59,7 @@ connection. Auth0's [user creation guide](https://auth0.com/docs/manage-users/us
 explains the dashboard flow. Copy the exact **user_id** from the user's profile
 (for example, `auth0|…`) as the reviewer login subject. Confirm it equals the `sub`
 from a verified login using this same tenant. Enter it under **Policies → Reviewer
-1 login subject**. An Auth0 Dashboard administrator is not automatically a wallet
+1 account ID (sub)**. An Auth0 Dashboard administrator is not automatically a wallet
 reviewer; this explicit subject allowlist grants that role.
 
 ## 3. Register the wallet HTTP API

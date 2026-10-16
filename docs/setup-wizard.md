@@ -126,9 +126,9 @@ registrations. Follow the [Auth0 field mapping](auth0-setup.md#_5-copy-the-value
 or [issuer requirements](operator-services.md#register-owner-login); URLs alone are insufficient.
 
 Select Didit, Sumsub or both. Enter your recipient workflow ID/level and credential
-variable names. For each intended route, enable its **agreed price bound**, supply
+variable names. For each intended route, enable its **agreed price limit**, supply
 the maximum in USD cents and reference the actual terms. Import and new verification
-have separate bounds. Even free work needs an explicit agreed zero. Obtain these
+have separate price limits. Even free work needs an explicit agreed zero. Obtain these
 from the [identity/vendor setup guide](operator-services.md#prepare-identity-verification).
 Sumsub requires Reusable KYC Share to be enabled externally; selecting it does not
 turn on that product. Provider staff still decide identity acceptance.
