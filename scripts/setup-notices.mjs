@@ -85,3 +85,8 @@ await writeFile(
       'utf8',
     )),
 );
+
+await copyFile(
+  new URL('../src/service/documentation-token-ui.mjs', import.meta.url),
+  new URL('../dist/service/documentation-token-ui.mjs', import.meta.url),
+);

@@ -1,3 +1,4 @@
+import type { ExplorerTokensConfiguration } from './explorer-tokens.js';
 import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { Ajv } from 'ajv';
@@ -22,6 +23,7 @@ export interface ProviderConfiguration {
   profile: 'provider-service-v1';
   policy: OnboardingPolicy;
   oauth: OAuthConfiguration;
+  apiExplorer?: ExplorerTokensConfiguration;
   ownerLogin: {
     issuer: string;
     clientId: string;
@@ -119,6 +121,25 @@ export function validateProviderConfiguration(
       throw new ConfigurationError([
         '/policy/applications: issuers must match /oauth/issuer',
       ]);
+    if (config.apiExplorer) {
+      if (
+        !config.http?.documentation ||
+        new Set(config.apiExplorer.clients.map((entry) => entry.clientId))
+          .size !== config.apiExplorer.clients.length ||
+        config.apiExplorer.clients.some(
+          (entry) =>
+            !config.policy.applications.some(
+              (app) =>
+                app.enabled !== false &&
+                app.clientId === entry.clientId &&
+                app.issuer === config.oauth.issuer,
+            ),
+        )
+      )
+        throw new ConfigurationError([
+          '/apiExplorer: documentation and enabled registered clients are required; duplicate clients are not allowed',
+        ]);
+    }
     if (
       config.backend.kind === 'custom' &&
       !(
@@ -197,6 +218,7 @@ export function secretReferences(
 ): SecretReference[] {
   return [
     config.ownerLogin.clientSecret,
+    ...(config.apiExplorer?.clients.map((entry) => entry.clientSecret) ?? []),
     ...(config.identity.didit ? [config.identity.didit.apiKey] : []),
     ...(config.identity.sumsub
       ? [config.identity.sumsub.appToken, config.identity.sumsub.secretKey]

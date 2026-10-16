@@ -231,6 +231,15 @@ status. The [live testing guide](http-api.md#try-deployed-apis) explains enablin
 This screenshot uses a local offline fixture with readiness closed. It demonstrates
 response rendering, not vendor connectivity or an accepted deployment.
 
+### Optional application token controls
+
+Deployment also offers **Enable operator token controls**. Enter allowed token
+operator login subjects, select the registered applications, set secret variable
+names and limit scopes. The [operator token guide](operator-tokens.md) explains
+what each identifier/secret means, where to obtain it, deployment and the signed-in
+Get token/Renew token flow. Reviewers are not implicitly token operators. The local
+wizard does not fetch or store application tokens.
+
 ## Use the exported files
 
 - `provider.config.json`: the existing version-1 provider service configuration.

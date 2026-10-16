@@ -63,6 +63,16 @@ before testing protected flows in an isolated staging deployment.
 
 ### Authenticate a calling application
 
+If you enable [integrated application tokens](operator-tokens.md), use the deployed
+**Application tokens** panel: sign in as a configured token operator, choose an
+application/scopes and **Get token**. **Renew token** and renewal before Execute
+remove the manual copy/paste step. Secrets remain in deployment variables;
+operator login, scope limits and ordinary API authority are enforced. The panel
+uses server-side client credentials; it does not turn operator login into an
+application or owner token.
+
+The manual alternative below remains available when integrated tokens are disabled.
+
 An **application access token** is the short-lived JWT issued to a registered
 calling application for this API. It is not the login client's secret, an owner
 ID token, a vendor API key or the wizard's local session token.
@@ -85,7 +95,7 @@ scope. The client must also match an enabled Policies registration and hold the
 necessary current owner-bound grant. Scopes alone cannot authorize spending.
 The token stays in page memory; **Logout** removes authorization and a page reload
 also clears token and response state. The explorer omits browser cookies and
-refuses cross-origin requests and redirects. It does not obtain or refresh tokens.
+refuses cross-origin requests and redirects. The manual Authorize control does not obtain or refresh tokens.
 
 ### Test protected flows and understand failures
 

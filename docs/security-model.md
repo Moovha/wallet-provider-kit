@@ -72,3 +72,23 @@ and stored signatures, and prevents automatic replay of pending/unknown outcomes
 through the host journal contract. The host must implement transactional uniqueness,
 fencing, audit/result persistence, storage encryption and real recovery. Offline
 fixtures are not a production storage adapter, and readiness remains host-owned.
+
+## Optional operator application tokens
+
+The deployed explorer can use an explicitly configured server-side
+client-credentials broker. It is disabled by default. Fresh owner-login sessions
+must match a separate exact-issuer/subject operator allowlist, and each client
+must be an enabled provider registration with explicit scope limits. Client
+secrets are environment references; only the server exchanges them with the
+configured issuer. Issued JWTs pass the normal RFC 9068 authenticator and exact
+client/scope checks before being returned to the browser.
+
+Token endpoints require exact Host, Origin and CSRF checks, have a low issuance
+rate limit, and fence superseded configured instances. The browser keeps tokens
+only in page memory, clears authorization on caller/scope changes and page state
+on reload, renews before
+Execute when needed, and never retries provider API effects automatically. An
+expired operator session blocks renewal. These controls grant application token
+issuance, not wallet owner consent, identity acceptance or spending authority.
+[Operator instructions](operator-tokens.md) cover setup, scope limits and the
+lifetime of already-issued tokens after sign-out.

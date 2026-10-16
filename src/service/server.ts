@@ -1,3 +1,8 @@
+import { readFile } from 'node:fs/promises';
+import {
+  registerDocumentationTokens,
+  type DocumentationTokenOptions,
+} from './documentation-tokens.js';
 import { randomUUID } from 'node:crypto';
 import { STATUS_CODES } from 'node:http';
 import Fastify, { type FastifyRequest } from 'fastify';
@@ -13,6 +18,8 @@ import { AuthenticationError, type Authenticate } from './auth.js';
 import {
   liveApiSpecification,
   liveRequestInterceptor,
+  mountDocumentationTokens,
+  documentationTokenPlugin,
 } from './live-api-docs.js';
 import { observeRequest } from './telemetry.js';
 import {
@@ -40,6 +47,8 @@ export interface ServerOptions {
   /** Must check durable authority/recovery dependencies; never infer readiness from env keys. */
   ready?: () => Promise<boolean>;
   documentation?: boolean;
+  /** Optional operator-authenticated client-credentials broker for the deployed explorer. */
+  documentationTokens?: DocumentationTokenOptions;
   configurationProfile?: 'provider-service-v1';
   actionProfiles?: readonly 'provider-authorized-erc3009-v1'[];
   /** Release host-owned resources when the service closes. Registered before ready. */
@@ -93,6 +102,28 @@ export async function createServer(options: ServerOptions = {}) {
     await app.register(swaggerUi, {
       routePrefix: '/docs',
       staticCSP: true,
+      ...(options.documentationTokens
+        ? {
+            theme: {
+              js: [
+                {
+                  filename: 'operator-tokens.js',
+                  content: await readFile(
+                    new URL('./documentation-token-ui.mjs', import.meta.url),
+                    'utf8',
+                  ),
+                },
+              ],
+              css: [
+                {
+                  filename: 'operator-tokens.css',
+                  content:
+                    '.wpk-token-panel{max-width:1460px;margin:24px auto;padding:24px;box-sizing:border-box;border:1px solid #c7dfd3;border-radius:12px;background:#f3faf6;color:#163e31;font:16px/1.5 system-ui}.wpk-token-panel h2{margin-top:0}.wpk-token-panel button,.wpk-token-panel select{font:inherit;padding:8px 12px;margin:6px 8px 6px 0;max-width:100%}.wpk-token-panel button{cursor:pointer;border:1px solid #adcabc;border-radius:8px;background:white;color:#163e31}.wpk-token-panel [data-get],.wpk-token-panel [data-renew]{background:#166346;color:white;border-color:#166346}.wpk-token-panel button:focus-visible,.wpk-token-panel select:focus-visible,.wpk-token-panel a:focus-visible{outline:3px solid #68b893;outline-offset:2px}.wpk-token-panel select{border:1px solid #adcabc;border-radius:8px;background:white}.wpk-token-panel input{accent-color:#166346}.wpk-token-panel label{display:block}.wpk-token-panel input{margin-right:8px}.wpk-token-panel [role=status]{overflow-wrap:anywhere}.wpk-token-panel fieldset{border:0;padding:8px 0}.wpk-token-panel a{color:#176448}',
+                },
+              ],
+            },
+          }
+        : {}),
       transformSpecification: (document) =>
         liveApiSpecification(
           document,
@@ -101,6 +132,12 @@ export async function createServer(options: ServerOptions = {}) {
         ),
       uiConfig: {
         layout: 'BaseLayout',
+        ...(options.documentationTokens
+          ? {
+              onComplete: mountDocumentationTokens,
+              plugins: [documentationTokenPlugin],
+            }
+          : {}),
         persistAuthorization: false,
         validatorUrl: null,
         supportedSubmitMethods: ['get', 'post'],
@@ -474,6 +511,8 @@ export async function createServer(options: ServerOptions = {}) {
     options.authenticate,
     isReady,
   );
+  if (options.documentation !== false && options.documentationTokens)
+    await registerDocumentationTokens(app, options.documentationTokens);
   await app.ready();
   return app;
 }

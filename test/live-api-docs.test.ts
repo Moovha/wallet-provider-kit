@@ -56,9 +56,11 @@ describe('live API explorer boundaries', () => {
     ])
       expect(deployedExplorerUrl(origin)).toBeUndefined();
   });
-  it('restricts requests to this HTTPS provider, omits browser cookies and refuses redirects', () => {
+  it('restricts requests to this HTTPS provider, omits browser cookies and refuses redirects', async () => {
     vi.stubGlobal('location', new URL('https://wallet.example.test/docs/'));
-    expect(liveRequestInterceptor({ url: '/v1/capabilities' })).toMatchObject({
+    expect(
+      await liveRequestInterceptor({ url: '/v1/capabilities' }),
+    ).toMatchObject({
       credentials: 'omit',
       redirect: 'error',
     });
@@ -70,8 +72,8 @@ describe('live API explorer boundaries', () => {
     vi.stubGlobal('location', new URL('http://public.example.test/docs/'));
     expect(() => liveRequestInterceptor({ url: '/v1/capabilities' })).toThrow();
     vi.stubGlobal('location', new URL('http://127.0.0.1:8080/docs/'));
-    expect(liveRequestInterceptor({ url: '/v1/capabilities' }).url).toBe(
-      '/v1/capabilities',
-    );
+    expect(
+      (await liveRequestInterceptor({ url: '/v1/capabilities' })).url,
+    ).toBe('/v1/capabilities');
   });
 });

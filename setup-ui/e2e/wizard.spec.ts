@@ -619,3 +619,43 @@ test('operator enables live testing in the draft, exports the setting and retain
     .click();
   await expect(link).toHaveCount(0);
 });
+
+test('operator configures GUI token issuance with explicit subjects, clients, scope limits and secret variable exports', async ({
+  page,
+}) => {
+  await imported(page);
+  await step(page, 'Deployment');
+  await page
+    .getByText('Enable operator token controls', { exact: true })
+    .click();
+  await page
+    .getByLabel('Token operator login subjects', { exact: true })
+    .fill('auth0|offline-operator');
+  await page
+    .getByText(`Allow GUI tokens for ${sample.policy.applications[0].name}`, {
+      exact: true,
+    })
+    .click();
+  await expect(
+    page.getByLabel('Application client secret variable', { exact: true }),
+  ).toHaveValue('WALLET_EXPLORER_APP_1_SECRET');
+  const config = await exported(page);
+  expect(config.http.documentation).toBe(true);
+  expect(config.apiExplorer).toEqual({
+    operators: ['auth0|offline-operator'],
+    clients: [
+      {
+        clientId: sample.policy.applications[0].clientId,
+        clientSecret: { env: 'WALLET_EXPLORER_APP_1_SECRET' },
+        scopes: ['wallet:access:read', 'wallet:account:read'],
+      },
+    ],
+  });
+  const download = page.waitForEvent('download');
+  await page
+    .getByRole('button', { name: 'Download variable template' })
+    .click();
+  expect(await readFile((await (await download).path())!, 'utf8')).toContain(
+    'WALLET_EXPLORER_APP_1_SECRET=',
+  );
+});

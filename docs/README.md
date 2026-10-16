@@ -95,6 +95,8 @@ OpenAPI download and the difference between a local preview and actual API acces
 After deployment, use its **Try it out** handoff to open your own service's Swagger
 explorer. The [live testing guide](http-api.md#try-deployed-apis) walks through enabling
 it, getting an application token, making a first request and interpreting real responses.
+[Integrated token controls](operator-tokens.md) let allowed operators obtain and
+renew application tokens in the deployed GUI without fetching/pasting them.
 
 A successful export means configuration validation passed. It does not mean
 vendor connectivity, login, identity agreements or wallet recovery were tested.

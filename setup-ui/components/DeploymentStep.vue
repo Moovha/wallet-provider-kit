@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ExplorerTokensStep from './ExplorerTokensStep.vue';
 import { computed } from 'vue';
 import type { ProviderConfiguration } from '../model';
 const model = defineModel<ProviderConfiguration>({ required: true });
@@ -63,6 +64,7 @@ function updateHttp(key: 'host' | 'port' | 'documentation', value: unknown) {
     :modelValue="http.documentation ?? false"
     @update:modelValue="updateHttp('documentation', $event)"
   />
+  <ExplorerTokensStep v-model="model" />
   <div class="callout">
     <strong>Deployment still needs operational setup</strong>
     <p>

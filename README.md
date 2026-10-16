@@ -87,6 +87,8 @@ examples. Select an application, copy a cURL request or download the displayed O
 Its **Try it out** handoff enables the deployed Swagger explorer and opens it on
 your provider's HTTPS domain. [Test live API responses](docs/http-api.md#try-deployed-apis)
 with public discovery or a short-lived application token after deployment.
+Optional [operator token controls](docs/operator-tokens.md) obtain and renew tokens
+in that GUI using server-held secrets and an explicit operator allowlist.
 The local preview sends no API calls; deployed requests have real effects and permission checks.
 
 The [getting-started guide](docs/README.md) links every stage. Supported profiles

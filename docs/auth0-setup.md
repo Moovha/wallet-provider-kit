@@ -90,7 +90,10 @@ For a product with a trusted backend, create a separate **Machine to Machine
 Application** for each connected application, authorize it for this wallet API and
 select only its needed scopes. Copy its Client ID into the wizard's application
 policy. Give its Client ID and secret securely to that product's backend operator;
-do not put its secret in the wallet provider configuration. Repeat for each app.
+do not put its secret value in provider JSON or browser code. Repeat for each app.
+For optional [GUI token controls](operator-tokens.md), an authorized operator can
+configure an environment reference to an approved M2M application secret held by
+the provider server. That feature has separate operator and scope allowlists.
 Follow [machine-to-machine registration](https://auth0.com/docs/get-started/auth0-overview/create-applications/machine-to-machine-apps).
 
 This reference uses server-to-server client credentials. The API caller's subject
