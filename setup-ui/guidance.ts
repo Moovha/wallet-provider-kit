@@ -5,6 +5,24 @@ function setting(summary: string, why: string, source: string, guide: string) {
 }
 
 export const settings = {
+  identityLevel: setting(
+    'The exact label applications must use for accepted identity checks. The starting label is verified.',
+    'The provider matches this label exactly; it does not rank verification levels or perform the application’s checks.',
+    'Agree the checks and label with each application operator. Keep verified only if that is your agreed label. Record the actual verification duties in the trust agreement below; this is not an identity-vendor account setting.',
+    'application-access.html#configure-the-trust-policy',
+  ),
+  identityFields: setting(
+    'Additional user facts required with identity evidence, one field name per line. The starting requirement is country.',
+    'The provider requires a nonempty value for each name. Presence does not prove KYC or restrict which countries are accepted.',
+    'Agree the minimum fields with application operators. Use up to 16 distinct names of 1–64 lowercase letters, digits or underscores, beginning with a letter, such as country or customer_type. Do not use constructor or prototype. Leave empty when no additional fields are needed.',
+    'application-access.html#configure-the-trust-policy',
+  ),
+  assertionTrust: setting(
+    'Your reference to the reviewed identity and consent agreement with this application.',
+    'The agreement authorizes this application to attest completed identity checks and user consent. A token scope or populated field cannot replace it.',
+    'Agree verification duties, retained evidence, consent terms and withdrawal handling with the application operator. Enter the reference to your reviewed contract or approval record, such as app-trust-2026-01. You maintain this reference; no vendor issues a special toolkit code. Enter a reference, not private agreement contents.',
+    'application-access.html#configure-the-trust-policy',
+  ),
   applicationRecords: setting(
     'Let an admitted application submit records for your unfunded evaluation without an identity vendor.',
     'You can test owner consent, account access and recovery without creating a KYC vendor account. Your staff must match each submitted record to the authenticated owner and explicitly accept it. Required fields do not prove externally verified identity.',
@@ -276,7 +294,7 @@ export const settings = {
     'operator-services.html#identify-reviewers',
   ),
   financialEnabled: setting(
-    'Optional. Leave off if you only need wallet onboarding and account access.',
+    'Optional. Leave off if you only need wallet creation and account access.',
     'Enabling this allows signing of specific token transfer authorizations under owner delegation and provider limits. It does not send transactions, pay network fees or settle transfers.',
     'Enable only with a verified ERC-3009 token on Base Sepolia and reviewed recipients and limits. Have a token integration specialist verify the contract and signing details below.',
     'operator-services.html#optional-token-signing-policy',

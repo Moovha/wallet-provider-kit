@@ -65,6 +65,12 @@ try {
       fullPage: true,
       animations: 'disabled',
     });
+    if (name === 'Export') {
+      await page.locator('.export-panel').screenshot({
+        path: new URL('export-handoff.png', output).pathname,
+        animations: 'disabled',
+      });
+    }
     if (name === 'Provider') {
       const help = page.locator('[data-setting="origin"] summary');
       await help.click();

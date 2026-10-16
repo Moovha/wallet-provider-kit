@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased — first-time setup guidance
+
+- Add identity and trust-agreement field explanations, immediate required-field
+  name validation, and direct routes to dependent connection settings and back.
+- Explain validation-only downloads and expected disabled activation, show
+  application permissions in review, and give an ordered deployment handoff.
+- Make the downloaded checklist use explicit source paths and private environment
+  loading, with host/file preparation, acceptance and restart instructions.
+
 ## Unreleased — consolidated policy setup
 
 - Keep access flow, identity requirements, application trust and permissions,

@@ -6,6 +6,7 @@ import { computed } from 'vue';
 import { docs } from '../model';
 import type { ProviderConfiguration } from '../model';
 const model = defineModel<ProviderConfiguration>({ required: true });
+const emit = defineEmits<{ 'configure-services': [] }>();
 const identityDays = computed({
   get: () => model.value.policy.identity?.maxAgeDays ?? 365,
   set: (value: number) => {
@@ -75,7 +76,10 @@ function financial(enabled: unknown) {
       setup; review the access periods against your own requirements.
     </p>
   </div>
-  <AccessPolicyFields v-model="model" />
+  <AccessPolicyFields
+    v-model="model"
+    @configure-services="emit('configure-services')"
+  />
   <SetupField
     guide="policyVersion"
     v-model="model.policy.version"
@@ -246,13 +250,13 @@ function financial(enabled: unknown) {
         validation="required|min:0|max:9007199254740991"
       />
     </div>
-    <FormKit
+    <SetupField
+      guide="assertionTrust"
       v-if="model.policy.access?.mode === 'application'"
       type="text"
       v-model="application.assertionTrust!.agreement"
       label="Application identity and consent trust agreement"
       validation="required|length:1,256"
-      help="Reference your reviewed agreement with this application. It authorizes identity and consent attestations; a token scope alone does not."
     />
     <SetupField
       guide="applicationEnabled"

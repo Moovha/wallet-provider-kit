@@ -1,5 +1,9 @@
 import { test, expect } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+import { dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { createSetupServer } from '../../dist/deployment/setup-server.js';
 
 test('a new operator configures application-led access without user login, vendors or reviewers and previews its contract', async ({
@@ -19,11 +23,11 @@ test('a new operator configures application-led access without user login, vendo
     await page
       .getByLabel('Privacy notice URL', { exact: true })
       .fill('https://wallet.example.test/privacy');
-    await page.getByRole('tab', { name: 'Backend', exact: true }).click();
+    await page.getByRole('button', { name: 'Next', exact: true }).click();
     await page
       .getByLabel('Wallet environment name', { exact: true })
       .fill('offline-example');
-    await page.getByRole('tab', { name: 'Services', exact: true }).click();
+    await page.getByRole('button', { name: 'Next', exact: true }).click();
     const services = page.getByRole('tabpanel', {
       name: 'Services',
       exact: true,
@@ -52,13 +56,24 @@ test('a new operator configures application-led access without user login, vendo
     await page
       .getByLabel('Token verification keys URL (JWKS)', { exact: true })
       .fill('https://apps.example.test/jwks');
-    await page.getByRole('tab', { name: 'Policies', exact: true }).click();
+    await page.getByRole('button', { name: 'Next', exact: true }).click();
     await expect(page.getByLabel('Access flow', { exact: true })).toHaveValue(
       'application',
     );
     await page
       .getByLabel('Required identity level', { exact: true })
       .fill('enhanced');
+    await page
+      .getByLabel('Required identity fields (one per line)', { exact: true })
+      .fill('Country\ncountry');
+    await page
+      .getByLabel('Required identity fields (one per line)', { exact: true })
+      .blur();
+    await expect(
+      page.getByText('Use up to 16 different field names, one per line:', {
+        exact: false,
+      }),
+    ).toBeVisible();
     await page
       .getByLabel('Required identity fields (one per line)', { exact: true })
       .fill('country\ncustomer_type');
@@ -87,7 +102,25 @@ test('a new operator configures application-led access without user login, vendo
     await expect(
       page.getByRole('button', { name: 'Add reviewer', exact: true }),
     ).toHaveCount(0);
-    await page.getByRole('tab', { name: 'Export', exact: true }).click();
+    await page.getByRole('button', { name: 'Next', exact: true }).click();
+    await expect(
+      page.getByLabel('Enable wallet operations in this configuration', {
+        exact: true,
+      }),
+    ).not.toBeChecked();
+    await page.getByRole('button', { name: 'Next', exact: true }).click();
+    await expect(
+      page.getByRole('heading', {
+        name: 'Application permissions to review',
+        exact: true,
+      }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('heading', {
+        name: 'What to do after downloading',
+        exact: true,
+      }),
+    ).toHaveCount(0);
     await page
       .getByRole('button', { name: 'Validate configuration', exact: true })
       .click();
@@ -96,9 +129,8 @@ test('a new operator configures application-led access without user login, vendo
     await page
       .getByRole('button', { name: 'Download configuration', exact: true })
       .click();
-    const config = JSON.parse(
-      await readFile((await (await download).path())!, 'utf8'),
-    );
+    const configPath = (await (await download).path())!;
+    const config = JSON.parse(await readFile(configPath, 'utf8'));
     expect(config.policy.access.mode).toBe('application');
     expect(config.policy.access.maxAgeDays).toBe(3);
     expect(config.policy.identity.maxAgeDays).toBe(30);
@@ -109,6 +141,54 @@ test('a new operator configures application-led access without user login, vendo
     expect(config.ownerLogin).toBeUndefined();
     expect(config.reviewers).toBeUndefined();
     expect(config.identity).toEqual({});
+    await expect(
+      page.getByRole('heading', {
+        name: 'What to do after downloading',
+        exact: true,
+      }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('link', {
+        name: 'Open the deployment guide ↗',
+        exact: true,
+      }),
+    ).toHaveAttribute('href', /operator-deployment.html$/);
+    const checklistDownload = page.waitForEvent('download');
+    await page
+      .getByRole('button', { name: 'Download checklist', exact: true })
+      .click();
+    const checklist = await readFile(
+      (await (await checklistDownload).path())!,
+      'utf8',
+    );
+    expect(checklist).toContain(
+      'node "$PROVIDER_SOURCE/dist/main.js" validate',
+    );
+    expect(checklist).toContain('--env-file="$PROVIDER_STATE/provider.env"');
+    expect(checklist).toContain('readiness HTTP 503 while disabled');
+    expect(checklist).not.toContain('npx --no-install');
+    const validation = await promisify(execFile)(
+      process.execPath,
+      [
+        fileURLToPath(new URL('../../dist/main.js', import.meta.url)),
+        'validate',
+        '--config',
+        configPath,
+      ],
+      { cwd: dirname(configPath) },
+    );
+    expect(validation.stdout).toContain(
+      'Configuration valid; no integrations activated',
+    );
+    const variablesDownload = page.waitForEvent('download');
+    await page
+      .getByRole('button', { name: 'Download variable template', exact: true })
+      .click();
+    const variables = await readFile(
+      (await (await variablesDownload).path())!,
+      'utf8',
+    );
+    expect(variables).toContain('WALLET_CDP_API_KEY_SECRET=\n');
     const external: string[] = [];
     page.on('request', (request) => {
       if (!request.url().startsWith(url)) external.push(request.url());

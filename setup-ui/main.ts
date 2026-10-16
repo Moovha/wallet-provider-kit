@@ -6,17 +6,23 @@ import '@formkit/themes/genesis';
 import '@formkit/addons/css/multistep';
 import './style.css';
 import App from './App.vue';
-import { httpsUrl, httpsOrigin } from './validation';
+import { httpsUrl, httpsOrigin, identityFields } from './validation';
 
 createApp(App)
   .use(
     plugin,
     defaultConfig({
       plugins: [createMultiStepPlugin()],
-      rules: { https_url: httpsUrl, https_origin: httpsOrigin },
+      rules: {
+        https_url: httpsUrl,
+        https_origin: httpsOrigin,
+        identity_fields: identityFields,
+      },
       messages: {
         en: {
           validation: {
+            identity_fields:
+              'Use up to 16 different field names, one per line: 1–64 lowercase letters, digits or underscores, starting with a letter. Do not use constructor or prototype.',
             https_url:
               'Enter a complete https:// address. Remove any username, password, query (?…) or fragment (#…).',
             https_origin:

@@ -51,8 +51,10 @@ account or identity-vendor credential is needed for application-led access.
 
 Fields explain the expected value and its source. Expand **Why do I need this?
 Where do I get it?** for more detail. Secret fields take deployment variable names,
-not secret values. Download your configuration to save progress; page refresh
-loses unsaved edits.
+not secret values. Keep the session open until the configuration is complete:
+downloads become available only after validation in Export. Incomplete drafts
+cannot be saved; refreshing or closing the page loses unsaved edits. Import a
+previously exported file to resume.
 
 ![Provider setting instructions](public/screenshots/provider-guidance.webp)
 
@@ -105,12 +107,17 @@ Keep **Access flow → Application-led access (standard)**. Set **Required ident
 level** and **Required identity fields (one per line)**. Use the exact level agreed
 with applications and lowercase field names such as `country`. Field presence is
 not proof of KYC; the trust agreement defines the application's verification duties.
+Expand the identity and trust-agreement field guidance for examples and where to
+get each value. Invalid field names and duplicate requirements are flagged beside
+the input before you continue.
 
 For a legacy deployment, explicitly select **Provider-hosted access (compatibility)**.
 Configure hosted login and identity-vendor connections in Services. Keep record
 evaluation, required fields, vendor route price limits and reviewer settings in
 Policies. It is a separate flow; see [hosted access](onboarding.md). Changing flow
-clears incompatible identity settings. Review your export before deployment.
+clears incompatible identity settings. Use **Configure hosted connections in
+Services** to fill login/vendor settings, then **Continue in Policies** to return.
+Review your export before deployment.
 
 Register the exact issuer/client ID and name of each application. Set its permitted
 actions and **Application identity and consent trust agreement** reference. Review
@@ -151,7 +158,9 @@ verify those tests.
 
 **Enable deployed API explorer and Try it out** is optional. Optional staff token
 controls use a separately configured staff login and explicit operator allowlist.
-They do not create a wallet-user onboarding step.
+They do not create a wallet-user onboarding step. When enabled, choose
+**Configure staff login in Services**, complete the login settings and choose
+**Continue in Deployment** to finish the operator allowlist and token controls.
 
 ![Deployment settings](public/screenshots/deployment.webp)
 
@@ -160,7 +169,8 @@ They do not create a wallet-user onboarding step.
 Review the access flow, identity requirements, application permissions, backend
 and activation state. **Validate configuration** checks the draft you have been
 building across the earlier steps. Resolve any errors beside the named step and
-field, then download all three files listed at the start of this guide. Editing
+field. Check the per-application permission summary and deployment reminders,
+then download all three files listed at the start of this guide. Editing
 a setting afterward requires validation again before downloading.
 
 ![Validated configuration and exports](public/screenshots/export.webp)
@@ -203,11 +213,23 @@ trust and current wallet authority. See [operator tokens](operator-tokens.md).
 
 ## Use the exported files
 
-Supply secret values privately on your deployment host. Initialize new storage
-once, diagnose local prerequisites, publish through HTTPS and perform acceptance
-tests before activation. Follow [deployment](operator-deployment.md) and the
-[staging walkthrough](staging-walkthrough.md). No application deployment or package
-publication occurs when you export configuration.
+Choose **Open the deployment guide** from Export. Build the same toolkit revision
+on the deployment host and copy all three files to a private directory outside
+the source checkout. Rename `provider.env.example` to `provider.env`, then fill
+its secret values privately or inject them through your secret manager. The
+service does not load an environment file automatically: the downloaded checklist
+uses explicit `--env-file` arguments for native commands.
+
+A disabled first deployment is expected. Liveness returns HTTP 200 and readiness
+HTTP 503 until activation. Some end-to-end acceptance checks require explicit
+activation in an isolated test deployment with reviewed evidence; follow the
+staging walkthrough before wider admission. The wizard itself performs none of
+those checks.
+
+Follow [deployment](operator-deployment.md) for private storage, local checks,
+HTTPS and backups, and the [staging walkthrough](staging-walkthrough.md) for
+isolated acceptance testing. Exporting configuration does not deploy an
+application or publish a package.
 
 To change policies later, import your saved `provider.config.json`, edit the
 rules and review the effect on existing users. Validate and download the updated
