@@ -12,6 +12,7 @@ export const permissions = [
   'account:read',
   'operations:request',
   'transfers:request',
+  'contracts:request',
 ] as const;
 /** Transfer delegation must be explicitly enabled; it is never a default permission. */
 export const defaultPermissions: readonly Permission[] = [
@@ -43,6 +44,7 @@ export interface ApplicationUserAssertion {
     expires_at: string;
     policy_revision: string;
     transfer_policy_revision?: string;
+    action_policy_revision?: string;
   };
 }
 export interface AccessInput {
@@ -194,6 +196,7 @@ export interface ProviderState {
       provider: string;
       binding: string;
       activeRevision?: string;
+      transportRevision?: string;
       accessMode?: 'application' | 'hosted';
     }
   >;

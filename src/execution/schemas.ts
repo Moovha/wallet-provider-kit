@@ -6,7 +6,11 @@ export const executionHeaders = {
   properties: {
     'execution-profile': {
       type: 'string',
-      enum: ['erc3009-relayer-v1'],
+      enum: [
+        'erc3009-relayer-v1',
+        'erc3009-executor-v1',
+        'approved-evm-executor-v1',
+      ],
       description:
         'Select the exact execution contract from GET /v1/execution-capabilities.',
     },
@@ -44,7 +48,25 @@ export const executionReceiptSchema = {
     'observed_at',
   ],
   properties: {
-    profile: { type: 'string', enum: ['erc3009-relayer-v1'] },
+    profile: {
+      type: 'string',
+      enum: [
+        'erc3009-relayer-v1',
+        'erc3009-executor-v1',
+        'approved-evm-executor-v1',
+      ],
+    },
+    outcome_scope: {
+      type: 'string',
+      enum: [
+        'token-transfer',
+        'contract-execution',
+        'swap-effects',
+        'vault-deposit-effects',
+      ],
+      description:
+        'What verified success establishes: exact token transfer, successful approved calls, or the required swap/vault asset effects. Contract execution alone does not prove an arbitrary business outcome.',
+    },
     profile_revision: { type: 'string', enum: ['1'] },
     action_id: uuidSchema,
     execution_id: uuidSchema,
@@ -52,7 +74,7 @@ export const executionReceiptSchema = {
       type: 'string',
       enum: ['not_started', 'pending', 'accepted', 'unknown', 'failed'],
       description:
-        'Durable submission state. Accepted identifies a Relayer queue record; it is not chain inclusion or settlement.',
+        'Durable submission state. Accepted identifies a durable executor/provider acceptance; it is not chain inclusion or settlement.',
     },
     observation_revision: { type: 'integer', minimum: 0 },
     next_poll_after_ms: { type: 'integer', minimum: 5000, maximum: 300000 },
@@ -205,7 +227,14 @@ export const executionEventsSchema = {
     'history_truncated',
   ],
   properties: {
-    profile: { type: 'string', enum: ['erc3009-relayer-v1'] },
+    profile: {
+      type: 'string',
+      enum: [
+        'erc3009-relayer-v1',
+        'erc3009-executor-v1',
+        'approved-evm-executor-v1',
+      ],
+    },
     profile_revision: { type: 'string', enum: ['1'] },
     action_id: uuidSchema,
     oldest_sequence: { type: 'integer', minimum: 0 },

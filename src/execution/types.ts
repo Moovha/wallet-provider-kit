@@ -1,13 +1,25 @@
 import type { SecretReference } from '../deployment/config.js';
 import type { RelayerBinding } from '../providers/relayer-client.js';
+import type { WalletAttemptRequest } from '../domain/attempt-journal.js';
+import type { VerifiedPrincipal } from '../domain/principal.js';
+import type {
+  ServiceSigningKey,
+  ServiceVerificationKey,
+} from '../executor/auth.js';
 import type { TypedDataAction } from '../domain/signing.js';
 
 export const executionProfile = 'erc3009-relayer-v1' as const;
+export const designatedExecutionProfile = 'erc3009-executor-v1' as const;
+export type ExecutionProfile =
+  | typeof executionProfile
+  | typeof designatedExecutionProfile
+  | 'approved-evm-executor-v1';
 
 export interface ExecutionSponsor {
   clientId: string;
   accountId: string;
-  binding: RelayerBinding;
+  binding: Pick<RelayerBinding, 'address' | 'bindingRevision'> &
+    Partial<Pick<RelayerBinding, 'relayerId' | 'signerId'>>;
   fundingAgreement: string;
   gasLimit: string;
   maxFeePerGas: string;
@@ -16,31 +28,39 @@ export interface ExecutionSponsor {
   lifetimeBudgetWei: string;
 }
 
-/** Optional fixed-profile execution. Secrets and RPC addresses remain server configuration. */
+/** Optional versioned approved-action execution. Secrets and RPC addresses remain server configuration. */
 export interface ExecutionConfiguration {
-  profile: typeof executionProfile;
-  relayer: { url: string; apiKey: SecretReference };
+  profile: ExecutionProfile;
+  relayer?: { url: string; apiKey: SecretReference };
+  service?: {
+    url: string;
+    providerId: string;
+    providerRevision: string;
+    signing: ServiceSigningKey;
+    keys: ServiceVerificationKey[];
+  };
   rpc: {
     endpoints: SecretReference[];
     genesisHash: string;
-    tokenCodeHash: string;
+    tokenCodeHash?: string;
   };
   sponsors: ExecutionSponsor[];
   pollIntervalSeconds: number;
   maxLogRange: number;
 }
 
-/** Immutable private plan. HTTP callers never supply calldata, signatures or a sponsor. */
-export interface TransferExecutionPlan {
-  profile: typeof executionProfile;
+/** Immutable private plan. Requests may propose policy-controlled calls; execute uses only this stored envelope and server-selected sponsor. */
+export interface ApprovedExecutionPlan {
+  profile: ExecutionProfile;
   revision: '1';
   action: TypedDataAction;
   sponsor: ExecutionSponsor;
   configurationHash: string;
   genesisHash: string;
-  tokenCodeHash: string;
+  tokenCodeHash?: string;
   data: string;
   scanFromBlock: string;
+  intent?: import('./approved-calls.js').ApprovedCallIntent;
 }
 
 export interface ChainObservation {
@@ -57,10 +77,12 @@ export interface ChainObservation {
 }
 
 export interface TransferExecutionRecord {
-  profile: typeof executionProfile;
+  profile: ExecutionProfile;
   revision: '1';
   executionId: string;
   signingKey: string;
+  dispatchPrincipal?: VerifiedPrincipal;
+  dispatchLeaseUntil?: number;
   configurationHash: string;
   sponsorClientId: string;
   plan?: TransferExecutionPlan;
@@ -77,19 +99,41 @@ export interface TransferExecutionRecord {
 }
 
 export interface ExecutionReceipt extends ChainObservation {
-  profile: typeof executionProfile;
+  profile: ExecutionProfile;
   profile_revision: '1';
   action_id: string;
   execution_id: string;
   dispatch_status:
     'not_started' | 'pending' | 'accepted' | 'unknown' | 'failed';
   observation_revision: number;
+  outcome_scope?:
+    | 'token-transfer'
+    | 'contract-execution'
+    | 'swap-effects'
+    | 'vault-deposit-effects';
   next_poll_after_ms: number;
 }
 
+export interface ExecutionDispatchContext {
+  executionId: string;
+  request: WalletAttemptRequest;
+  authorizeEffect?: () => Promise<void>;
+}
+export interface ExecutionRecovery {
+  accepted: boolean;
+  transactionId?: string;
+  transactionHash?: string;
+}
 export interface ExecutionProvider {
   prepare(plan: TransferExecutionPlan): Promise<void>;
-  submit(plan: TransferExecutionPlan): Promise<string>;
+  submit(
+    plan: TransferExecutionPlan,
+    context?: ExecutionDispatchContext,
+  ): Promise<string>;
+  recover?(
+    plan: TransferExecutionPlan,
+    context: ExecutionDispatchContext,
+  ): Promise<ExecutionRecovery>;
   transactionHash(
     plan: TransferExecutionPlan,
     transactionId: string,
@@ -119,3 +163,6 @@ export interface ExecutionCloudEvent {
   sequence: number;
   data: ExecutionReceipt;
 }
+
+/** Common immutable execution envelope; transfer plans remain source compatible. */
+export type TransferExecutionPlan = ApprovedExecutionPlan;

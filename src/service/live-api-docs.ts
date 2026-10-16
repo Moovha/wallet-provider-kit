@@ -53,19 +53,21 @@ See [operator testing instructions](https://moovha.github.io/wallet-provider-kit
         operation.operationId!,
         features,
       );
-      operation.summary = `[${reason ? 'Not enabled' : guide.scope ? 'Configured' : 'Public'}] ${guide.title}`;
+      operation.summary = `[${reason ? 'Not enabled' : guide.scope || guide.serviceAuthenticated ? 'Configured' : 'Public'}] ${guide.title}`;
       operation.tags = [guide.group];
       operation.description = [
         reason
           ? `**Not enabled:** ${reason}. Visibility does not enable this operation.`
-          : guide.scope
+          : guide.scope || guide.serviceAuthenticated
             ? '**Configured:** Current authentication, authority and service readiness are still required.'
             : '**Public:** No token is required. Discovery reports readiness without enabling wallet operations.',
         guide.scope
           ? `Required application scope: **${guide.scope}**. Scopes alone do not grant account or spending authority.`
-          : 'Public discovery; no access token required.',
+          : guide.serviceAuthenticated
+            ? 'Requires a pinned signed service request. Application OAuth tokens are not accepted.'
+            : 'Public discovery; no access token required.',
         guide.prerequisite,
-        method === 'post'
+        method === 'post' && !guide.serviceAuthenticated
           ? '**Live mutation.** Execute may create records, incur vendor charges or issue a usable signature. Supply your own real inputs and retain the idempotency key.'
           : '',
         operation.description ?? '',
@@ -107,6 +109,10 @@ export function liveRequestInterceptor(request: Record<string, unknown>) {
       'Send requests only to the provider address shown in this explorer, using HTTPS. Local testing is supported on localhost. Requests to other sites are blocked.',
     );
   }
+  if (target.pathname === '/v1/internal/execution-authority')
+    throw new Error(
+      'This endpoint requires a request-bound execution-service proof and cannot be called with an application token from the explorer.',
+    );
   request.credentials = 'omit';
   request.redirect = 'error';
   const controller = (

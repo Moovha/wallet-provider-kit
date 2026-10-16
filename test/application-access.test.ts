@@ -384,3 +384,43 @@ it('serializes concurrent access requests for a new application user into one ac
     f.service.account(rotated.principal, receipts[0].account_id!),
   ).rejects.toThrow();
 });
+
+it('binds contract delegation to the action-policy consent revision and rejects conflicting compatibility aliases', async () => {
+  const f = await fixture(),
+    configured = structuredClone(policy),
+    revision = 'a'.repeat(64);
+  configured.applications[0].permissions!.push('contracts:request');
+  const service = new OnboardingService(
+    configured,
+    f.store,
+    [],
+    undefined,
+    revision,
+  );
+  const input = f.input();
+  input.authorization_details[0].actions = [
+    'account:read',
+    'contracts:request',
+  ];
+  input.user!.consent.policy_revision = service.policy.revision;
+  input.user!.consent.action_policy_revision = revision;
+  const granted = await service.request(context(), input);
+  expect(
+    (
+      await service.authorize(
+        context().principal,
+        granted.account_id!,
+        'contracts:request',
+      )
+    ).owner,
+  ).toBeTruthy();
+  await expect(
+    service.authorize(
+      context().principal,
+      granted.account_id!,
+      'transfers:request',
+    ),
+  ).rejects.toThrow();
+  input.user!.consent.transfer_policy_revision = 'b'.repeat(64);
+  await expect(service.request(context(), input)).rejects.toThrow();
+});

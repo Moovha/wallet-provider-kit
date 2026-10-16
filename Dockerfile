@@ -7,7 +7,7 @@ COPY tsconfig.json ./
 COPY src ./src
 COPY setup-ui ./setup-ui
 COPY scripts/setup-notices.mjs ./scripts/setup-notices.mjs
-COPY spec/provider-config.schema.json ./spec/provider-config.schema.json
+COPY spec/provider-config.schema.json spec/execution-service.config.schema.json ./spec/
 RUN npm run build
 RUN npm prune --omit=dev --ignore-scripts
 
@@ -17,8 +17,8 @@ WORKDIR /app
 COPY --from=build --chown=node:node /app/node_modules ./node_modules
 COPY --from=build --chown=node:node /app/dist ./dist
 COPY --chown=node:node package.json LICENSE NOTICE ./
-COPY --chown=node:node spec/provider-config.schema.json ./spec/provider-config.schema.json
-COPY --chown=node:node docs/provider.config.example.json ./docs/provider.config.example.json
+COPY --chown=node:node spec/provider-config.schema.json spec/execution-service.config.schema.json ./spec/
+COPY --chown=node:node docs/provider.config.example.json docs/executor.config.example.json ./docs/
 COPY --chown=node:node docs/provider.config.records.example.json ./docs/provider.config.records.example.json
 USER node
 EXPOSE 8080

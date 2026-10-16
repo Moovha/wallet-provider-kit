@@ -30,7 +30,9 @@ export function executionFixture(
   version = '1',
 ) {
   const sponsor = Wallet.createRandom();
-  const configuration: ExecutionConfiguration = {
+  const configuration: ExecutionConfiguration & {
+    relayer: NonNullable<ExecutionConfiguration['relayer']>;
+  } = {
     profile: 'erc3009-relayer-v1',
     relayer: {
       url: 'https://execution.example.test',

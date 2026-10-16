@@ -271,3 +271,14 @@ Online backup/restore fixtures preserve execution identity, gas reservation and
 event IDs after dispatch without another submission. Single-active-host failover
 requires external fencing and reconciliation of the backup-loss window; see the
 [recovery runbook](execution.md#single-active-host-recovery-and-failover).
+
+The designated executor uses a separate private toolkit database with its own
+`executorBindings` and `executorDispatches` records in the existing catalog and
+reuses the financial admissions, attempts, budget and audit tables. It never
+reinitializes or migrates an occupied wallet database. Schema version 1 and the
+verified catalog remain unchanged. Provider/economic policy identity is separate
+from service-key registration, so key rotation preserves approved dispatch plans.
+Back up both service stores and reconcile each loss window before recovery; an
+executor record cannot reconstruct missing wallet authority.
+
+Approved Safe execution reserves each address/nonce atomically in the executor’s `executorNonces` collection alongside dispatch admission and sponsor budgets. These records use the existing verified `onboarding_records` catalog; no database DDL or migration is introduced. Wallet-side unsigned reservations can expire only when no financial signing admission exists. Signed or uncertain authorizations retain their nonce reservations.

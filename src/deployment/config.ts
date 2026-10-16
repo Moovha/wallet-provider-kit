@@ -1,3 +1,4 @@
+import { validateApprovedCallPolicy } from '../execution/approved-calls.js';
 import type { ExecutionConfiguration } from '../execution/types.js';
 import type { ExplorerTokensConfiguration } from './explorer-tokens.js';
 import { readFile } from 'node:fs/promises';
@@ -84,6 +85,7 @@ export interface ProviderConfiguration {
     executionAcceptance?: string;
   };
   financial?: TransferPolicy;
+  approvedCalls?: import('../execution/approved-calls.js').ApprovedCallsConfiguration;
   execution?: ExecutionConfiguration;
   http?: {
     host?: '127.0.0.1' | '0.0.0.0' | '::1' | '::';
@@ -133,7 +135,12 @@ export function validateProviderConfiguration(
           '/identity: application-led access uses trusted application attestations, not hosted verification',
         ]);
     } else if (config.policy.identity?.records) {
-      if (config.identity.didit || config.identity.sumsub || config.financial)
+      if (
+        config.identity.didit ||
+        config.identity.sumsub ||
+        config.financial ||
+        config.approvedCalls
+      )
         throw new ConfigurationError([
           '/policy/identity/records: application records are an unfunded evaluation source; vendor verification and financial signing require a separate profile',
         ]);
@@ -209,20 +216,25 @@ export function validateProviderConfiguration(
     if (config.execution) {
       const execution = config.execution;
       if (
-        !config.financial ||
+        (!config.financial && !config.approvedCalls) ||
         config.policy.identity?.records ||
         (config.activation.enabled && !config.activation.executionAcceptance)
       )
         throw new ConfigurationError([
-          '/execution: transfer signing and separate execution acceptance are required',
+          '/execution: an approved-action policy and separate execution acceptance are required',
         ]);
-      if (trustedHttpsUrl(execution.relayer.url).pathname !== '/')
+      if (
+        execution.relayer &&
+        trustedHttpsUrl(execution.relayer.url).pathname !== '/'
+      )
         throw new Error();
       if (
         new Set(execution.rpc.endpoints.map((entry) => entry.env)).size !==
           execution.rpc.endpoints.length ||
         /^0x0{64}$/.test(execution.rpc.genesisHash) ||
-        /^0x0{64}$/.test(execution.rpc.tokenCodeHash)
+        (config.financial &&
+          (!execution.rpc.tokenCodeHash ||
+            /^0x0{64}$/.test(execution.rpc.tokenCodeHash)))
       )
         throw new Error();
       for (const field of ['clientId', 'accountId'] as const)
@@ -231,11 +243,23 @@ export function validateProviderConfiguration(
           execution.sponsors.length
         )
           throw new Error();
-      for (const field of ['relayerId', 'signerId', 'address'] as const)
+      if (execution.service) {
+        if (
+          trustedHttpsUrl(execution.service.url).origin !==
+            execution.service.url ||
+          execution.service.url === config.policy.provider.origin ||
+          execution.service.keys.length !==
+            new Set(execution.service.keys.map((key) => key.id)).size
+        )
+          throw new Error();
+      }
+      for (const field of execution.relayer
+        ? (['relayerId', 'signerId', 'address'] as const)
+        : (['address'] as const))
         if (
           new Set(
             execution.sponsors.map((entry) =>
-              entry.binding[field].toLowerCase(),
+              (entry.binding[field] ?? '').toLowerCase(),
             ),
           ).size !== execution.sponsors.length
         )
@@ -245,7 +269,9 @@ export function validateProviderConfiguration(
           (candidate) =>
             candidate.clientId === sponsor.clientId &&
             candidate.enabled !== false &&
-            candidate.permissions?.includes('transfers:request'),
+            candidate.permissions?.some((permission) =>
+              ['transfers:request', 'contracts:request'].includes(permission),
+            ),
         );
         if (
           !app ||
@@ -264,12 +290,17 @@ export function validateProviderConfiguration(
         )
           throw new Error();
         const binding = sponsor.binding;
-        sponsor.binding = {
-          relayerId: binding.relayerId,
-          signerId: binding.signerId,
-          address: getAddress(binding.address),
-          bindingRevision: binding.bindingRevision,
-        };
+        sponsor.binding = execution.relayer
+          ? {
+              relayerId: binding.relayerId,
+              signerId: binding.signerId,
+              address: getAddress(binding.address),
+              bindingRevision: binding.bindingRevision,
+            }
+          : {
+              address: getAddress(binding.address),
+              bindingRevision: binding.bindingRevision,
+            };
         if (
           /^0x0{40}$/i.test(sponsor.binding.address) ||
           (config.backend.kind === 'openzeppelin-relayer' &&
@@ -284,8 +315,17 @@ export function validateProviderConfiguration(
           throw new Error();
       }
     }
+    if (config.approvedCalls) {
+      validateApprovedCallPolicy(config.approvedCalls.policy);
+      if (
+        config.execution?.profile !== 'approved-evm-executor-v1' ||
+        !config.execution.service
+      )
+        throw new Error();
+    }
     if (config.financial) {
       const p = config.financial;
+
       if (amount(p.maximumAmount) > amount(p.lifetimeAmount))
         throw new ConfigurationError([
           '/financial/maximumAmount: must not exceed lifetimeAmount',
@@ -326,7 +366,18 @@ export function secretReferences(
 ): SecretReference[] {
   return [
     ...(config.execution
-      ? [config.execution.relayer.apiKey, ...config.execution.rpc.endpoints]
+      ? [
+          ...(config.execution.relayer
+            ? [config.execution.relayer.apiKey]
+            : []),
+          ...(config.execution.service
+            ? [
+                config.execution.service.signing.privateKey,
+                ...config.execution.service.keys.map((key) => key.publicKey),
+              ]
+            : []),
+          ...config.execution.rpc.endpoints,
+        ]
       : []),
     ...(config.ownerLogin ? [config.ownerLogin.clientSecret] : []),
     ...(config.apiExplorer?.clients.map((entry) => entry.clientSecret) ?? []),

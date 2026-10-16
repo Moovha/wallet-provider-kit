@@ -134,6 +134,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/actions/contract-calls": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Request an immutable approved contract call, Uniswap V3 exact-input swap or bounded ERC-4626 router deposit. Requires separately consented contracts:request delegation, current owner/grant/KYC/consent and configured target policies. The service constructs the Safe transaction and reserves its nonce; callers never supply signatures or a signing payload. */
+        post: operations["requestContractCall"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/internal/execution-authority": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Read-only callback for the configured designated executor. Requires a pinned signed service request, exact stored plan/attempt and an unexpired handoff lease. Rechecks current owner, grant, KYC, consent, immutable approval and active revision. Application OAuth tokens do not authenticate this endpoint. */
+        post: operations["checkExecutionAuthority"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/execution-capabilities": {
         parameters: {
             query?: never;
@@ -160,7 +194,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Optional fixed ERC-3009 transfer execution with exact version selection, current owner/grant/identity/consent/approval checks, durable signing and submission authority, application gas sponsorship and independent RPC receipt/finality verification. Unknown submission outcomes never permit redispatch. No arbitrary transaction payload is accepted. */
+        /** @description Optional immutable approved-action execution with exact version selection, current owner/grant/identity/consent/approval checks, durable signing and submission authority, application gas sponsorship and independent RPC receipt/finality verification. Unknown provider submission outcomes never permit redispatch. Contract calls require the approved-evm-executor-v1 profile and a stored policy-approved action; execute never accepts replacement calldata. */
         post: operations["executeTransfer"];
         delete?: never;
         options?: never;
@@ -175,7 +209,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Optional fixed ERC-3009 transfer execution with exact version selection, current owner/grant/identity/consent/approval checks, durable signing and submission authority, application gas sponsorship and independent RPC receipt/finality verification. Unknown submission outcomes never permit redispatch. No arbitrary transaction payload is accepted. */
+        /** @description Optional immutable approved-action execution with exact version selection, current owner/grant/identity/consent/approval checks, durable signing and submission authority, application gas sponsorship and independent RPC receipt/finality verification. Unknown provider submission outcomes never permit redispatch. Contract calls require the approved-evm-executor-v1 profile and a stored policy-approved action; execute never accepts replacement calldata. */
         get: operations["getTransferExecution"];
         put?: never;
         post?: never;
@@ -367,7 +401,7 @@ export interface operations {
                         configured: boolean;
                         /** @enum {string} */
                         configuration_profile?: "provider-service-v1";
-                        action_profiles?: "provider-authorized-erc3009-v1"[];
+                        action_profiles?: ("provider-authorized-erc3009-v1" | "provider-approved-contracts-v1")[];
                     };
                 };
             };
@@ -1446,6 +1480,126 @@ export interface operations {
                                 nonce: string;
                             };
                         };
+                    } | {
+                        action_id: string;
+                        account_id: string;
+                        /** @enum {string} */
+                        status: "authorizing" | "authorized" | "denied";
+                        /** Format: date-time */
+                        expires_at: string;
+                        payload_hash: string;
+                        payload: {
+                            /** @enum {string} */
+                            primaryType: "SafeTx";
+                            domain: {
+                                /** @enum {string} */
+                                chainId: "84532";
+                                verifyingContract: string;
+                            };
+                            types: {
+                                SafeTx: {
+                                    /** @enum {string} */
+                                    name: "to" | "value" | "data" | "operation" | "safeTxGas" | "baseGas" | "gasPrice" | "gasToken" | "refundReceiver" | "nonce";
+                                    /** @enum {string} */
+                                    type: "address" | "uint256" | "bytes" | "uint8";
+                                }[];
+                            };
+                            message: {
+                                to: string;
+                                value: string;
+                                data: string;
+                                /** @enum {string} */
+                                operation: "0" | "1";
+                                /** @enum {string} */
+                                safeTxGas: "0";
+                                /** @enum {string} */
+                                baseGas: "0";
+                                /** @enum {string} */
+                                gasPrice: "0";
+                                /** @enum {string} */
+                                gasToken: "0x0000000000000000000000000000000000000000";
+                                /** @enum {string} */
+                                refundReceiver: "0x0000000000000000000000000000000000000000";
+                                nonce: string;
+                            };
+                        };
+                        intent: {
+                            /** @enum {string} */
+                            version: "1";
+                            /** @enum {string} */
+                            mechanism: "safe-1.4.1";
+                            input: {
+                                account_id: string;
+                                /** @enum {string} */
+                                kind: "contract-call";
+                                calls: {
+                                    to: string;
+                                    value: string;
+                                    data: string;
+                                }[];
+                            } | {
+                                account_id: string;
+                                /** @enum {string} */
+                                kind: "swap";
+                                route: string;
+                                amount_in: string;
+                                minimum_out: string;
+                                deadline: string;
+                            } | {
+                                account_id: string;
+                                /** @enum {string} */
+                                kind: "vault-deposit";
+                                route: string;
+                                assets: string;
+                                minimum_shares: string;
+                            };
+                            account: {
+                                address: string;
+                                codeHash: string;
+                                implementation?: {
+                                    address: string;
+                                    codeHash: string;
+                                };
+                                accountId: string;
+                                singleton: {
+                                    address: string;
+                                    codeHash: string;
+                                    implementation?: {
+                                        address: string;
+                                        codeHash: string;
+                                    };
+                                };
+                            };
+                            multiSend: {
+                                address: string;
+                                codeHash: string;
+                                implementation?: {
+                                    address: string;
+                                    codeHash: string;
+                                };
+                            };
+                            calls: {
+                                to: string;
+                                value: string;
+                                data: string;
+                            }[];
+                            contracts: {
+                                address: string;
+                                codeHash: string;
+                                implementation?: {
+                                    address: string;
+                                    codeHash: string;
+                                };
+                            }[];
+                            effects: {
+                                token: string;
+                                from: string;
+                                to: string;
+                                minimum: string;
+                                maximum?: string;
+                            }[];
+                            nonce: string;
+                        };
                     };
                 };
             };
@@ -1674,6 +1828,126 @@ export interface operations {
                                 nonce: string;
                             };
                         };
+                    } | {
+                        action_id: string;
+                        account_id: string;
+                        /** @enum {string} */
+                        status: "authorizing" | "authorized" | "denied";
+                        /** Format: date-time */
+                        expires_at: string;
+                        payload_hash: string;
+                        payload: {
+                            /** @enum {string} */
+                            primaryType: "SafeTx";
+                            domain: {
+                                /** @enum {string} */
+                                chainId: "84532";
+                                verifyingContract: string;
+                            };
+                            types: {
+                                SafeTx: {
+                                    /** @enum {string} */
+                                    name: "to" | "value" | "data" | "operation" | "safeTxGas" | "baseGas" | "gasPrice" | "gasToken" | "refundReceiver" | "nonce";
+                                    /** @enum {string} */
+                                    type: "address" | "uint256" | "bytes" | "uint8";
+                                }[];
+                            };
+                            message: {
+                                to: string;
+                                value: string;
+                                data: string;
+                                /** @enum {string} */
+                                operation: "0" | "1";
+                                /** @enum {string} */
+                                safeTxGas: "0";
+                                /** @enum {string} */
+                                baseGas: "0";
+                                /** @enum {string} */
+                                gasPrice: "0";
+                                /** @enum {string} */
+                                gasToken: "0x0000000000000000000000000000000000000000";
+                                /** @enum {string} */
+                                refundReceiver: "0x0000000000000000000000000000000000000000";
+                                nonce: string;
+                            };
+                        };
+                        intent: {
+                            /** @enum {string} */
+                            version: "1";
+                            /** @enum {string} */
+                            mechanism: "safe-1.4.1";
+                            input: {
+                                account_id: string;
+                                /** @enum {string} */
+                                kind: "contract-call";
+                                calls: {
+                                    to: string;
+                                    value: string;
+                                    data: string;
+                                }[];
+                            } | {
+                                account_id: string;
+                                /** @enum {string} */
+                                kind: "swap";
+                                route: string;
+                                amount_in: string;
+                                minimum_out: string;
+                                deadline: string;
+                            } | {
+                                account_id: string;
+                                /** @enum {string} */
+                                kind: "vault-deposit";
+                                route: string;
+                                assets: string;
+                                minimum_shares: string;
+                            };
+                            account: {
+                                address: string;
+                                codeHash: string;
+                                implementation?: {
+                                    address: string;
+                                    codeHash: string;
+                                };
+                                accountId: string;
+                                singleton: {
+                                    address: string;
+                                    codeHash: string;
+                                    implementation?: {
+                                        address: string;
+                                        codeHash: string;
+                                    };
+                                };
+                            };
+                            multiSend: {
+                                address: string;
+                                codeHash: string;
+                                implementation?: {
+                                    address: string;
+                                    codeHash: string;
+                                };
+                            };
+                            calls: {
+                                to: string;
+                                value: string;
+                                data: string;
+                            }[];
+                            contracts: {
+                                address: string;
+                                codeHash: string;
+                                implementation?: {
+                                    address: string;
+                                    codeHash: string;
+                                };
+                            }[];
+                            effects: {
+                                token: string;
+                                from: string;
+                                to: string;
+                                minimum: string;
+                                maximum?: string;
+                            }[];
+                            nonce: string;
+                        };
                     };
                 };
             };
@@ -1849,6 +2123,215 @@ export interface operations {
             };
         };
     };
+    requestContractCall: {
+        parameters: {
+            query?: never;
+            header: {
+                "idempotency-key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    account_id: string;
+                    /** @enum {string} */
+                    kind: "contract-call";
+                    calls: {
+                        to: string;
+                        value: string;
+                        data: string;
+                    }[];
+                } | {
+                    account_id: string;
+                    /** @enum {string} */
+                    kind: "swap";
+                    route: string;
+                    amount_in: string;
+                    minimum_out: string;
+                    deadline: string;
+                } | {
+                    account_id: string;
+                    /** @enum {string} */
+                    kind: "vault-deposit";
+                    route: string;
+                    assets: string;
+                    minimum_shares: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        action_id: string;
+                        account_id: string;
+                        status: string;
+                        /** Format: date-time */
+                        expires_at: string;
+                        payload_hash: string;
+                        payload: {
+                            /** @enum {string} */
+                            primaryType: "SafeTx";
+                            domain: {
+                                /** @enum {string} */
+                                chainId: "84532";
+                                verifyingContract: string;
+                            };
+                            types: {
+                                SafeTx: {
+                                    /** @enum {string} */
+                                    name: "to" | "value" | "data" | "operation" | "safeTxGas" | "baseGas" | "gasPrice" | "gasToken" | "refundReceiver" | "nonce";
+                                    /** @enum {string} */
+                                    type: "address" | "uint256" | "bytes" | "uint8";
+                                }[];
+                            };
+                            message: {
+                                to: string;
+                                value: string;
+                                data: string;
+                                /** @enum {string} */
+                                operation: "0" | "1";
+                                /** @enum {string} */
+                                safeTxGas: "0";
+                                /** @enum {string} */
+                                baseGas: "0";
+                                /** @enum {string} */
+                                gasPrice: "0";
+                                /** @enum {string} */
+                                gasToken: "0x0000000000000000000000000000000000000000";
+                                /** @enum {string} */
+                                refundReceiver: "0x0000000000000000000000000000000000000000";
+                                nonce: string;
+                            };
+                        };
+                        intent: {
+                            /** @enum {string} */
+                            version: "1";
+                            /** @enum {string} */
+                            mechanism: "safe-1.4.1";
+                            input: {
+                                account_id: string;
+                                /** @enum {string} */
+                                kind: "contract-call";
+                                calls: {
+                                    to: string;
+                                    value: string;
+                                    data: string;
+                                }[];
+                            } | {
+                                account_id: string;
+                                /** @enum {string} */
+                                kind: "swap";
+                                route: string;
+                                amount_in: string;
+                                minimum_out: string;
+                                deadline: string;
+                            } | {
+                                account_id: string;
+                                /** @enum {string} */
+                                kind: "vault-deposit";
+                                route: string;
+                                assets: string;
+                                minimum_shares: string;
+                            };
+                            account: {
+                                address: string;
+                                codeHash: string;
+                                implementation?: {
+                                    address: string;
+                                    codeHash: string;
+                                };
+                                accountId: string;
+                                singleton: {
+                                    address: string;
+                                    codeHash: string;
+                                    implementation?: {
+                                        address: string;
+                                        codeHash: string;
+                                    };
+                                };
+                            };
+                            multiSend: {
+                                address: string;
+                                codeHash: string;
+                                implementation?: {
+                                    address: string;
+                                    codeHash: string;
+                                };
+                            };
+                            calls: {
+                                to: string;
+                                value: string;
+                                data: string;
+                            }[];
+                            contracts: {
+                                address: string;
+                                codeHash: string;
+                                implementation?: {
+                                    address: string;
+                                    codeHash: string;
+                                };
+                            }[];
+                            effects: {
+                                token: string;
+                                from: string;
+                                to: string;
+                                minimum: string;
+                                maximum?: string;
+                            }[];
+                            nonce: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    checkExecutionAuthority: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    provider_id: string;
+                    provider_revision: string;
+                    execution_id: string;
+                    action_id: string;
+                    plan_hash: string;
+                    request_hash: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        action_id: string;
+                        /** @enum {boolean} */
+                        allowed: true;
+                        provider_id: string;
+                        provider_revision: string;
+                        execution_id: string;
+                        plan_hash: string;
+                        request_hash: string;
+                    };
+                };
+            };
+        };
+    };
     getExecutionCapabilities: {
         parameters: {
             query?: never;
@@ -1894,7 +2377,7 @@ export interface operations {
             query?: never;
             header: {
                 /** @description Select the exact execution contract from GET /v1/execution-capabilities. */
-                "execution-profile": "erc3009-relayer-v1";
+                "execution-profile": "erc3009-relayer-v1" | "erc3009-executor-v1" | "approved-evm-executor-v1";
                 /** @description Unknown revisions are rejected; the server never substitutes a different execution contract. */
                 "execution-profile-revision": "1";
                 "idempotency-key": string;
@@ -1918,13 +2401,18 @@ export interface operations {
                 content: {
                     "application/json": {
                         /** @enum {string} */
-                        profile: "erc3009-relayer-v1";
+                        profile: "erc3009-relayer-v1" | "erc3009-executor-v1" | "approved-evm-executor-v1";
+                        /**
+                         * @description What verified success establishes: exact token transfer, successful approved calls, or the required swap/vault asset effects. Contract execution alone does not prove an arbitrary business outcome.
+                         * @enum {string}
+                         */
+                        outcome_scope?: "token-transfer" | "contract-execution" | "swap-effects" | "vault-deposit-effects";
                         /** @enum {string} */
                         profile_revision: "1";
                         action_id: string;
                         execution_id: string;
                         /**
-                         * @description Durable submission state. Accepted identifies a Relayer queue record; it is not chain inclusion or settlement.
+                         * @description Durable submission state. Accepted identifies a durable executor/provider acceptance; it is not chain inclusion or settlement.
                          * @enum {string}
                          */
                         dispatch_status: "not_started" | "pending" | "accepted" | "unknown" | "failed";
@@ -2170,7 +2658,7 @@ export interface operations {
             query?: never;
             header: {
                 /** @description Select the exact execution contract from GET /v1/execution-capabilities. */
-                "execution-profile": "erc3009-relayer-v1";
+                "execution-profile": "erc3009-relayer-v1" | "erc3009-executor-v1" | "approved-evm-executor-v1";
                 /** @description Unknown revisions are rejected; the server never substitutes a different execution contract. */
                 "execution-profile-revision": "1";
             };
@@ -2189,13 +2677,18 @@ export interface operations {
                 content: {
                     "application/json": {
                         /** @enum {string} */
-                        profile: "erc3009-relayer-v1";
+                        profile: "erc3009-relayer-v1" | "erc3009-executor-v1" | "approved-evm-executor-v1";
+                        /**
+                         * @description What verified success establishes: exact token transfer, successful approved calls, or the required swap/vault asset effects. Contract execution alone does not prove an arbitrary business outcome.
+                         * @enum {string}
+                         */
+                        outcome_scope?: "token-transfer" | "contract-execution" | "swap-effects" | "vault-deposit-effects";
                         /** @enum {string} */
                         profile_revision: "1";
                         action_id: string;
                         execution_id: string;
                         /**
-                         * @description Durable submission state. Accepted identifies a Relayer queue record; it is not chain inclusion or settlement.
+                         * @description Durable submission state. Accepted identifies a durable executor/provider acceptance; it is not chain inclusion or settlement.
                          * @enum {string}
                          */
                         dispatch_status: "not_started" | "pending" | "accepted" | "unknown" | "failed";
@@ -2443,7 +2936,7 @@ export interface operations {
             };
             header: {
                 /** @description Select the exact execution contract from GET /v1/execution-capabilities. */
-                "execution-profile": "erc3009-relayer-v1";
+                "execution-profile": "erc3009-relayer-v1" | "erc3009-executor-v1" | "approved-evm-executor-v1";
                 /** @description Unknown revisions are rejected; the server never substitutes a different execution contract. */
                 "execution-profile-revision": "1";
             };
@@ -2462,7 +2955,7 @@ export interface operations {
                 content: {
                     "application/json": {
                         /** @enum {string} */
-                        profile: "erc3009-relayer-v1";
+                        profile: "erc3009-relayer-v1" | "erc3009-executor-v1" | "approved-evm-executor-v1";
                         /** @enum {string} */
                         profile_revision: "1";
                         action_id: string;
@@ -2486,13 +2979,18 @@ export interface operations {
                             sequence: number;
                             data: {
                                 /** @enum {string} */
-                                profile: "erc3009-relayer-v1";
+                                profile: "erc3009-relayer-v1" | "erc3009-executor-v1" | "approved-evm-executor-v1";
+                                /**
+                                 * @description What verified success establishes: exact token transfer, successful approved calls, or the required swap/vault asset effects. Contract execution alone does not prove an arbitrary business outcome.
+                                 * @enum {string}
+                                 */
+                                outcome_scope?: "token-transfer" | "contract-execution" | "swap-effects" | "vault-deposit-effects";
                                 /** @enum {string} */
                                 profile_revision: "1";
                                 action_id: string;
                                 execution_id: string;
                                 /**
-                                 * @description Durable submission state. Accepted identifies a Relayer queue record; it is not chain inclusion or settlement.
+                                 * @description Durable submission state. Accepted identifies a durable executor/provider acceptance; it is not chain inclusion or settlement.
                                  * @enum {string}
                                  */
                                 dispatch_status: "not_started" | "pending" | "accepted" | "unknown" | "failed";
@@ -3218,13 +3716,14 @@ export interface operations {
                             /** Format: date-time */
                             expires_at: string;
                             policy_revision: string;
+                            action_policy_revision?: string;
                             transfer_policy_revision?: string;
                         };
                     };
                     authorization_details: {
                         /** @enum {string} */
                         type: "https://moovha.com/wallet/account-access";
-                        actions: ("account:read" | "operations:request" | "transfers:request")[];
+                        actions: ("account:read" | "operations:request" | "transfers:request" | "contracts:request")[];
                     }[];
                 };
             };
@@ -3247,7 +3746,7 @@ export interface operations {
                         consent_url?: string;
                         grant_id?: string;
                         account_id?: string;
-                        permissions?: ("account:read" | "operations:request" | "transfers:request")[];
+                        permissions?: ("account:read" | "operations:request" | "transfers:request" | "contracts:request")[];
                         /** Format: date-time */
                         expires_at?: string;
                     };
@@ -3453,6 +3952,7 @@ export interface operations {
                         /** @enum {string} */
                         flow?: "application" | "hosted";
                         policy_revision?: string;
+                        action_policy_revision?: string;
                         transfer_policy_revision?: string;
                         transfer_terms?: {
                             /** @enum {unknown} */
@@ -3467,6 +3967,90 @@ export interface operations {
                             recipients: string[];
                             maximumAmount: string;
                             lifetimeAmount: string;
+                            maxValiditySeconds: number;
+                        };
+                        contract_call_terms?: {
+                            policy: {
+                                /** @enum {unknown} */
+                                mechanism: "safe-1.4.1";
+                                multiSend: {
+                                    address: string;
+                                    codeHash: string;
+                                    implementation?: {
+                                        address: string;
+                                        codeHash: string;
+                                    };
+                                };
+                                maximumNativeValueWei: string;
+                                lifetimeOperations: string;
+                                contracts: {
+                                    address: string;
+                                    codeHash: string;
+                                    selectors: string[];
+                                    maximumValueWei: string;
+                                    implementation?: {
+                                        address: string;
+                                        codeHash: string;
+                                    };
+                                }[];
+                                swaps: {
+                                    id: string;
+                                    router: {
+                                        address: string;
+                                        codeHash: string;
+                                        implementation?: {
+                                            address: string;
+                                            codeHash: string;
+                                        };
+                                    };
+                                    tokenIn: {
+                                        address: string;
+                                        codeHash: string;
+                                        implementation?: {
+                                            address: string;
+                                            codeHash: string;
+                                        };
+                                    };
+                                    tokenOut: {
+                                        address: string;
+                                        codeHash: string;
+                                        implementation?: {
+                                            address: string;
+                                            codeHash: string;
+                                        };
+                                    };
+                                    fee: number;
+                                    maximumInput: string;
+                                }[];
+                                vaults: {
+                                    id: string;
+                                    router: {
+                                        address: string;
+                                        codeHash: string;
+                                        implementation?: {
+                                            address: string;
+                                            codeHash: string;
+                                        };
+                                    };
+                                    vault: {
+                                        address: string;
+                                        codeHash: string;
+                                        implementation?: {
+                                            address: string;
+                                            codeHash: string;
+                                        };
+                                    };
+                                    asset: {
+                                        address: string;
+                                        codeHash: string;
+                                        implementation?: {
+                                            address: string;
+                                            codeHash: string;
+                                        };
+                                    };
+                                    maximumAssets: string;
+                                }[];
+                            };
                             maxValiditySeconds: number;
                         };
                         max_identity_age_days?: number;
@@ -3843,7 +4427,7 @@ export interface operations {
                                 consent_url?: string;
                                 grant_id?: string;
                                 account_id?: string;
-                                permissions?: ("account:read" | "operations:request" | "transfers:request")[];
+                                permissions?: ("account:read" | "operations:request" | "transfers:request" | "contracts:request")[];
                                 /** Format: date-time */
                                 expires_at?: string;
                             };
@@ -4051,7 +4635,7 @@ export interface operations {
                         consent_url?: string;
                         grant_id?: string;
                         account_id?: string;
-                        permissions?: ("account:read" | "operations:request" | "transfers:request")[];
+                        permissions?: ("account:read" | "operations:request" | "transfers:request" | "contracts:request")[];
                         /** Format: date-time */
                         expires_at?: string;
                     };
@@ -4267,7 +4851,7 @@ export interface operations {
                         consent_url?: string;
                         grant_id?: string;
                         account_id?: string;
-                        permissions?: ("account:read" | "operations:request" | "transfers:request")[];
+                        permissions?: ("account:read" | "operations:request" | "transfers:request" | "contracts:request")[];
                         /** Format: date-time */
                         expires_at?: string;
                     };

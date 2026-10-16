@@ -95,6 +95,18 @@ export default defineConfig({
           },
           { text: 'HTTP schemas', link: '/docs/http-reference' },
           { text: 'Transfer execution', link: '/docs/execution' },
+          {
+            text: 'Designated execution service',
+            link: '/docs/execution-service',
+          },
+          {
+            text: 'Approved contract calls',
+            link: '/docs/approved-contract-calls',
+          },
+          {
+            text: 'Executor HTTP schemas',
+            link: '/docs/executor-http-reference',
+          },
           { text: 'Enterprise v1 standards', link: '/docs/v1-standards' },
         ],
       },
@@ -168,6 +180,18 @@ export default defineConfig({
           { text: 'HTTP guide', link: '/docs/http-api' },
           { text: 'HTTP schemas', link: '/docs/http-reference' },
           { text: 'Transfer execution', link: '/docs/execution' },
+          {
+            text: 'Designated execution service',
+            link: '/docs/execution-service',
+          },
+          {
+            text: 'Approved contract calls',
+            link: '/docs/approved-contract-calls',
+          },
+          {
+            text: 'Executor HTTP schemas',
+            link: '/docs/executor-http-reference',
+          },
           { text: 'Enterprise v1 standards', link: '/docs/v1-standards' },
         ],
       },

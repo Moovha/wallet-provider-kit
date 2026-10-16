@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { createServer } from '../dist/index.js';
+import { createServer, createExecutionService } from '../dist/index.js';
 
 const app = await createServer();
 try {
@@ -33,4 +33,18 @@ try {
   );
 } finally {
   await app.close();
+}
+
+const executor = await createExecutionService();
+try {
+  const origin = await executor.listen({ host: '127.0.0.1', port: 0 });
+  assert.equal((await fetch(origin + '/health/ready')).status, 503);
+  assert.equal((await fetch(origin + '/docs/')).status, 200);
+  assert.equal((await fetch(origin + '/v1/executor-capabilities')).status, 503);
+  assert.ok(executor.swagger().paths['/v1/dispatches']);
+  console.log(
+    'Built executor HTTP, Swagger, generated contract and default denial verified',
+  );
+} finally {
+  await executor.close();
 }

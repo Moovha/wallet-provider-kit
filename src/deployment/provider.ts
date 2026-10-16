@@ -1,3 +1,6 @@
+import { executionConfigurationIdentity } from '../executor/protocol.js';
+import { createServiceIdentity } from '../executor/auth.js';
+import { createRemoteExecutionProvider } from '../execution/remote.js';
 import { createExplorerTokenIssuer } from './explorer-tokens.js';
 import { createConfiguredBackend } from './backends.js';
 import { resolve } from 'node:path';
@@ -61,7 +64,9 @@ export async function createConfiguredProvider(
           (await database.onboardingStore.transaction(
             (state) =>
               state.deploymentBindings?.['service-v1']?.activeRevision ===
-              activeRevision,
+                activeRevision &&
+              state.deploymentBindings?.['service-v1']?.transportRevision ===
+                transportRevision,
           )) &&
           (await onboarding.canDispatchProvision(
             request.attemptId,
@@ -124,12 +129,17 @@ export async function createConfiguredProvider(
           ]
         : []),
     ];
+    const actionPolicyRevision = config.approvedCalls
+      ? fingerprint([config.financial ?? null, config.approvedCalls])
+      : config.financial
+        ? fingerprint(config.financial)
+        : undefined;
     onboarding = new OnboardingService(
       config.policy,
       database.onboardingStore,
       identity,
       backend,
-      config.financial ? fingerprint(config.financial) : undefined,
+      actionPolicyRevision,
     );
     const login = config.ownerLogin
       ? await createOwnerLogin(
@@ -141,15 +151,24 @@ export async function createConfiguredProvider(
           database.onboardingStore,
         )
       : undefined;
+    const transportRevision = config.execution?.service
+      ? fingerprint([
+          config.execution.service.signing,
+          config.execution.service.keys,
+        ])
+      : undefined;
     activeRevision = fingerprint([
       onboarding!.policy.revision,
       config.financial ?? null,
+      ...(config.approvedCalls ? [config.approvedCalls] : []),
       config.backend,
       config.reviewers,
       config.ownerLogin?.issuer,
       config.ownerLogin?.clientId,
       config.activation.enabled,
-      ...(config.execution ? [config.execution] : []),
+      ...(config.execution
+        ? [executionConfigurationIdentity(config.execution)]
+        : []),
       ...(config.apiExplorer ? [config.apiExplorer, config.oauth] : []),
     ]);
     await database.onboardingStore.transaction((state) => {
@@ -161,9 +180,10 @@ export async function createConfiguredProvider(
         for (const grant of Object.values(state.grants)) {
           if (
             grant.revision !== onboarding!.policy.revision ||
-            (grant.permissions.includes('transfers:request') &&
-              grant.transferPolicyRevision !==
-                (config.financial ? fingerprint(config.financial) : undefined))
+            (grant.permissions.some((permission) =>
+              ['transfers:request', 'contracts:request'].includes(permission),
+            ) &&
+              grant.transferPolicyRevision !== actionPolicyRevision)
           )
             grant.state = 'revoked';
         }
@@ -175,15 +195,18 @@ export async function createConfiguredProvider(
         });
       }
       binding.activeRevision = activeRevision;
+      binding.transportRevision = transportRevision;
     });
-    const actions = config.financial
-      ? new SupportedActions(
-          onboarding,
-          database,
-          config.financial,
-          activeRevision,
-        )
-      : undefined;
+    const actions =
+      config.financial || config.approvedCalls
+        ? new SupportedActions(
+            onboarding,
+            database,
+            config.financial,
+            activeRevision,
+            config.approvedCalls,
+          )
+        : undefined;
     financial = actions
       ? database.financialAuthority({
           namespace: 'configured-transfers-v1',
@@ -206,6 +229,25 @@ export async function createConfiguredProvider(
       },
       backend,
     );
+    const executionIdentity = config.execution?.service
+      ? await createServiceIdentity(
+          config.policy.provider.origin,
+          config.execution.service.signing,
+          [
+            {
+              origin: config.execution.service.url,
+              keys: config.execution.service.keys,
+            },
+          ],
+        )
+      : undefined;
+    const observer = config.execution
+      ? new QuorumTransferObserver(
+          config.execution.rpc.endpoints.map((entry) => resolveSecret(entry)),
+          config.execution.rpc.genesisHash,
+          config.execution.maxLogRange,
+        )
+      : undefined;
     const execution =
       config.execution && actions
         ? new TransferExecutionCoordinator(
@@ -213,24 +255,25 @@ export async function createConfiguredProvider(
             database,
             service,
             config.execution,
-            createTransferExecutionProvider(
-              config.execution,
-              resolveSecret(config.execution.relayer.apiKey),
-            ),
-            new QuorumTransferObserver(
-              config.execution.rpc.endpoints.map((entry) =>
-                resolveSecret(entry),
-              ),
-              config.execution.rpc.genesisHash,
-              config.execution.maxLogRange,
-            ),
+            config.execution.service
+              ? createRemoteExecutionProvider(
+                  config.execution,
+                  executionIdentity!,
+                )
+              : createTransferExecutionProvider(
+                  config.execution,
+                  resolveSecret(config.execution.relayer!.apiKey),
+                ),
+            observer!,
           )
         : undefined;
     const currentConfiguration = () =>
       database.onboardingStore.transaction(
         (state) =>
           state.deploymentBindings?.['service-v1']?.activeRevision ===
-          activeRevision,
+            activeRevision &&
+          state.deploymentBindings?.['service-v1']?.transportRevision ===
+            transportRevision,
       );
     const app = await createServer({
       documentationTokens: config.apiExplorer
@@ -252,7 +295,12 @@ export async function createConfiguredProvider(
         : undefined,
       authenticate,
       configurationProfile: config.profile,
-      actionProfiles: config.financial ? [config.financial.profile] : [],
+      actionProfiles: [
+        ...(config.financial ? [config.financial.profile] : []),
+        ...(config.approvedCalls
+          ? ['provider-approved-contracts-v1' as const]
+          : []),
+      ],
       service,
       onboarding: {
         service: onboarding,
@@ -263,10 +311,17 @@ export async function createConfiguredProvider(
           database.onboardingStore.transaction(
             (state) =>
               state.deploymentBindings?.['service-v1']?.activeRevision ===
-              activeRevision,
+                activeRevision &&
+              state.deploymentBindings?.['service-v1']?.transportRevision ===
+                transportRevision,
           ),
         actions,
         execution,
+        executionIdentity,
+        contractNonce:
+          config.approvedCalls && observer
+            ? (binding, owner) => observer.contractNonce(binding, owner)
+            : undefined,
       },
       onClose: async () => {
         await execution?.close();
@@ -278,7 +333,9 @@ export async function createConfiguredProvider(
         (await database.onboardingStore.transaction(
           (state) =>
             state.deploymentBindings?.['service-v1']?.activeRevision ===
-            activeRevision,
+              activeRevision &&
+            state.deploymentBindings?.['service-v1']?.transportRevision ===
+              transportRevision,
         )),
       documentation: config.http?.documentation ?? false,
     });

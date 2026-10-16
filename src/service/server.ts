@@ -50,7 +50,9 @@ export interface ServerOptions {
   /** Optional operator-authenticated client-credentials broker for the deployed explorer. */
   documentationTokens?: DocumentationTokenOptions;
   configurationProfile?: 'provider-service-v1';
-  actionProfiles?: readonly 'provider-authorized-erc3009-v1'[];
+  actionProfiles?: readonly (
+    'provider-authorized-erc3009-v1' | 'provider-approved-contracts-v1'
+  )[];
   /** Release host-owned resources when the service closes. Registered before ready. */
   onClose?: () => Promise<void>;
 }
@@ -85,10 +87,17 @@ export async function createServer(options: ServerOptions = {}) {
         title: 'Moovha Wallet Provider Service',
         version: '0.1.0',
         description:
-          'Experimental wallet-provider API with application-led access and optional hosted compatibility. Signing returns an approved EIP-712 signature; it does not submit a transaction or pay gas. Optional approved-transfer execution coordinates signing, simulation and sponsored submission through a durable attempt; independent RPC checks verify transfer effects and finality. Application transaction-event reports remain unverified and do not establish settlement. No arbitrary transaction-submission endpoint is exposed. Not the Moovha operation orchestration API.',
+          'Experimental wallet-provider API with application-led access and optional hosted compatibility. Signing returns an approved EIP-712 signature; it does not submit a transaction or pay gas. Optional approved-transfer execution coordinates signing, simulation and sponsored submission through a durable attempt; independent RPC checks verify transfer effects and finality. Application transaction-event reports remain unverified and do not establish settlement. General contract calls require a stored policy-approved action and the explicit Safe execution profile; no blind signing or direct arbitrary-submission endpoint is exposed. Not the Moovha operation orchestration API.',
       },
       components: {
         securitySchemes: {
+          serviceProof: {
+            type: 'http',
+            scheme: 'bearer',
+            bearerFormat: 'wpk-service-request+jwt',
+            description:
+              'Request-bound proof produced by the designated executor. Application tokens and private keys are not accepted here; this callback cannot be executed by the application-token explorer.',
+          },
           accessToken: {
             type: 'http',
             scheme: 'bearer',
@@ -128,10 +137,12 @@ export async function createServer(options: ServerOptions = {}) {
         liveApiSpecification(document, {
           onboarding: !!options.onboarding,
           enrollment: !!options.enrollment,
-          financial: !!options.onboarding?.actions,
+          financial: !!options.onboarding?.actions?.consentTerms(),
           execution: !!options.onboarding?.execution,
+          executionService: !!options.onboarding?.executionIdentity,
+          contractCalls: !!options.onboarding?.contractNonce,
           signing:
-            !!options.onboarding?.actions ||
+            !!options.onboarding?.actions?.consentTerms() ||
             (!!options.service && !options.configurationProfile),
           wallet:
             !!options.service && !!options.authenticate && !!options.ready,
@@ -272,7 +283,10 @@ export async function createServer(options: ServerOptions = {}) {
                 type: 'array',
                 items: {
                   type: 'string',
-                  enum: ['provider-authorized-erc3009-v1'],
+                  enum: [
+                    'provider-authorized-erc3009-v1',
+                    'provider-approved-contracts-v1',
+                  ],
                 },
               },
             },
@@ -494,6 +508,9 @@ export async function createServer(options: ServerOptions = {}) {
         principal: principals.get(request)!,
         idempotencyKey: request.headers['idempotency-key'] as string,
       };
+      await options.onboarding?.actions?.assertSignatureExport(
+        request.params.actionId,
+      );
       const signature = await options.service!.sign(
         context,
         request.params.actionId,

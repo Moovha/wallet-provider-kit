@@ -52,6 +52,7 @@ export function checkApplicationAssertion(
       'expires_at',
       'policy_revision',
       'transfer_policy_revision',
+      'action_policy_revision',
     ])
   )
     invalid();
@@ -83,7 +84,12 @@ export function checkApplicationAssertion(
     consentExpiry <= now ||
     consentExpiry > consentAt + policy.access.maxAgeDays * day ||
     user.consent.policy_revision !== policy.revision ||
-    user.consent.transfer_policy_revision !== transferRevision
+    (user.consent.action_policy_revision ??
+      user.consent.transfer_policy_revision) !== transferRevision ||
+    (user.consent.action_policy_revision !== undefined &&
+      user.consent.transfer_policy_revision !== undefined &&
+      user.consent.action_policy_revision !==
+        user.consent.transfer_policy_revision)
   )
     deny();
   return {

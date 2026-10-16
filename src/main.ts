@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { executionServiceCommand } from './executor/cli.js';
 import { setupCommand } from './deployment/cli.js';
 import { createConfiguredProvider } from './deployment/provider.js';
 import {
@@ -16,6 +17,8 @@ async function main() {
   ) {
     throw new Error('Unsafe environment');
   }
+  if (process.argv[2] === 'executor')
+    return executionServiceCommand(process.argv.slice(3));
   if (await setupCommand(process.argv.slice(2))) return;
   const loaded =
     process.argv[2] === 'run'

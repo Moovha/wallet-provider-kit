@@ -175,9 +175,28 @@ for (const [path, methods] of Object.entries(schema.paths)) {
     http += '\n';
   }
 }
+const executorSchema = JSON.parse(
+  await readFile(resolve(root, 'spec/execution-api.json'), 'utf8'),
+);
+let executorHttp =
+  '# Execution service HTTP reference\n\nUse the [designated execution service guide](execution-service.md) for deployment, signed service requests, current wallet authority and recovery. This is a separate process and API from the wallet service. The [generated OpenAPI contract](../spec/execution-api.json) includes all implemented service operations.\n\n';
+for (const [path, methods] of Object.entries(executorSchema.paths)) {
+  for (const [method, operation] of Object.entries(methods)) {
+    if (!['get', 'post'].includes(method)) continue;
+    executorHttp += `## ${method.toUpperCase()} ${path}\n\nOperation: \`${operation.operationId}\`.\n\n${operation.description ?? ''}\n\n`;
+    const body = operation.requestBody?.content?.['application/json']?.schema;
+    if (body)
+      executorHttp += `Request body:\n\n\`\`\`json\n${JSON.stringify(body, null, 2)}\n\`\`\`\n\n`;
+    const response =
+      operation.responses['200']?.content?.['application/json']?.schema;
+    if (response)
+      executorHttp += `Success response:\n\n\`\`\`json\n${JSON.stringify(response, null, 2)}\n\`\`\`\n\n`;
+  }
+}
 for (const [path, text] of [
   ['docs/api-reference.md', markdown],
   ['docs/http-reference.md', http],
+  ['docs/executor-http-reference.md', executorHttp],
 ]) {
   const content = await format(text, {
     ...(await resolveConfig(resolve(root, path))),

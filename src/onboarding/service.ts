@@ -125,8 +125,8 @@ export class OnboardingService {
       !request ||
       request.revision !== this.policy.revision ||
       (!allowExpired && request.expiresAt <= Date.now()) ||
-      (request.input.authorization_details[0].actions.includes(
-        'transfers:request',
+      (request.input.authorization_details[0].actions.some((permission) =>
+        ['transfers:request', 'contracts:request'].includes(permission),
       ) &&
         (!this.transferPolicyRevision ||
           request.transferPolicyRevision !== this.transferPolicyRevision))
@@ -155,8 +155,8 @@ export class OnboardingService {
     if (request.denied) return 'denied';
     if (
       request.revision !== this.policy.revision ||
-      (request.input.authorization_details[0].actions.includes(
-        'transfers:request',
+      (request.input.authorization_details[0].actions.some((permission) =>
+        ['transfers:request', 'contracts:request'].includes(permission),
       ) &&
         request.transferPolicyRevision !== this.transferPolicyRevision)
     )
@@ -222,8 +222,10 @@ export class OnboardingService {
       this.policy.identity.records,
       this.policy.access.mode === 'application',
     );
-    const delegatesTransfers =
-      input.authorization_details[0].actions.includes('transfers:request');
+    const delegatesTransfers = input.authorization_details[0].actions.some(
+      (permission) =>
+        ['transfers:request', 'contracts:request'].includes(permission),
+    );
     if (delegatesTransfers && !this.transferPolicyRevision) deny();
     const assertion =
       this.policy.access.mode === 'application'
@@ -362,7 +364,10 @@ export class OnboardingService {
       flow: this.policy.access.mode,
       policy_revision: this.policy.revision,
       ...(this.transferPolicyRevision
-        ? { transfer_policy_revision: this.transferPolicyRevision }
+        ? {
+            transfer_policy_revision: this.transferPolicyRevision,
+            action_policy_revision: this.transferPolicyRevision,
+          }
         : {}),
       max_identity_age_days: this.policy.identity.maxAgeDays,
       max_access_days: this.policy.access.maxAgeDays,
@@ -1118,7 +1123,10 @@ export class OnboardingService {
         (!permission || g.permissions.includes(permission)),
     );
     if (!grant) deny();
-    if (permission === 'transfers:request') {
+    if (
+      permission === 'transfers:request' ||
+      permission === 'contracts:request'
+    ) {
       const request = state.requests[grant.requestId];
       const consent = request?.consent;
       if (
@@ -1135,13 +1143,11 @@ export class OnboardingService {
         request.accountId !== accountId ||
         request.owner !== grant.owner ||
         !sameCaller(request.caller, principal) ||
-        !request.input.authorization_details[0].actions.includes(
-          'transfers:request',
-        ) ||
+        !request.input.authorization_details[0].actions.includes(permission) ||
         !application(this.policy, {
           ...principal,
           scopes: [],
-        }).permissions?.includes('transfers:request')
+        }).permissions?.includes(permission)
       )
         deny();
     }

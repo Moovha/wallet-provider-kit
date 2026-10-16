@@ -103,6 +103,13 @@ export function openProviderDatabase(options: ProviderDatabaseOptions) {
       const current = loadApproval(connection, id, !allowExpired);
       return current !== null && fingerprint(current) === fingerprint(approval);
     },
+    /** Synchronous inside the shared storage transaction; any admission retains possible signing exposure. */
+    hasActionAttempts(id: string): boolean {
+      return !!connection.get(
+        'SELECT 1 FROM admissions WHERE approval_id=? LIMIT 1',
+        id,
+      );
+    },
     async revokeAction(id: string) {
       connection.transaction(() => {
         connection.run('UPDATE approvals SET revoked=1 WHERE id=?', id);

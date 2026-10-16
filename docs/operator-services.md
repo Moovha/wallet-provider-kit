@@ -380,3 +380,13 @@ You should now have real public registration values, secret-store entries, revie
 subjects, vendor terms and application funding decisions. Continue with the
 [six-screen walkthrough](setup-wizard.md#complete-the-six-steps), then
 [deployment and acceptance](operator-deployment.md).
+
+## Optional designated execution service
+
+Prepare the [separate dispatcher](execution-service.md) when the wallet service
+should delegate submission to an operator-selected execution provider. It needs
+its own HTTPS origin, private local database, service signing key and registered
+wallet public keys, provider registry and application sponsor credentials. The
+wallet needs the executor's public keys and callback connectivity in return.
+Application OAuth clients do not authenticate this service boundary. Owner
+signing keys remain with the wallet backend; gas funding remains explicit.

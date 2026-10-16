@@ -56,6 +56,8 @@ const connectionsReturnStep = ref<'policies' | 'deployment'>();
 const permissionNames: Record<string, string> = {
   'account:read': 'Read wallet accounts',
   'operations:request': 'Request wallet operations (advanced hosts)',
+  'contracts:request':
+    'Request approved contract calls, swaps and vault deposits',
   'transfers:request': 'Request transfers on behalf of users',
 };
 const selectedBackend = computed(() =>

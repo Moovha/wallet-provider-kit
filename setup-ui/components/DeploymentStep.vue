@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import SetupField from './SetupField.vue';
 import ExecutionStep from './ExecutionStep.vue';
+import ContractCallsStep from './ContractCallsStep.vue';
 import ExplorerTokensStep from './ExplorerTokensStep.vue';
 import { computed } from 'vue';
 import type { ProviderConfiguration } from '../model';
@@ -99,6 +100,7 @@ function updateHttp(key: 'host' | 'port' | 'documentation', value: unknown) {
     </p>
   </div>
   <ExecutionStep v-model="model" />
+  <ContractCallsStep v-model="model" />
   <h3>Enable wallet operations</h3>
   <p class="help-text">
     Leave this off for your first deployment. Complete wallet backend and

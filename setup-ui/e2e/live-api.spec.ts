@@ -53,7 +53,7 @@ test('deployed Swagger executes same-origin HTTP and displays real success/auth/
   await expect(
     page.getByRole('heading', { name: /Provider API · Live testing/ }),
   ).toBeVisible();
-  await expect(page.locator('.opblock')).toHaveCount(21);
+  await expect(page.locator('.opblock')).toHaveCount(23);
   const discovery = page.locator('#operations-Discovery-getCapabilities');
   await discovery.locator('.opblock-summary-control').click();
   await discovery
@@ -97,12 +97,15 @@ test('deployed Swagger executes same-origin HTTP and displays real success/auth/
     .getByRole('button', { name: 'Authorize', exact: true })
     .first()
     .click();
-  await page.locator('.auth-container input').fill('offline-application-token');
-  await page
+  const applicationAuth = page
+    .locator('.auth-container')
+    .filter({ hasText: 'accessToken (http, Bearer)' });
+  await applicationAuth.locator('input').fill('offline-application-token');
+  await applicationAuth
     .locator('.auth-btn-wrapper')
     .getByRole('button', { name: 'Apply credentials', exact: true })
     .click();
-  await page
+  await applicationAuth
     .locator('.auth-btn-wrapper')
     .getByRole('button', { name: 'Close', exact: true })
     .click();
@@ -129,9 +132,9 @@ test('deployed Swagger executes same-origin HTTP and displays real success/auth/
     .getByRole('button', { name: 'Authorize', exact: true })
     .first()
     .click();
-  await expect(page.locator('.auth-container input')).toHaveValue('');
+  await expect(applicationAuth.locator('input')).toHaveValue('');
 
-  await page
+  await applicationAuth
     .locator('.auth-btn-wrapper')
     .getByRole('button', { name: 'Close', exact: true })
     .click();

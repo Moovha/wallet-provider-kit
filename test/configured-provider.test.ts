@@ -1,3 +1,4 @@
+import { approvedCallsFixture } from './helpers/approved-calls.js';
 import { randomUUID } from 'node:crypto';
 import { DatabaseSync, backup } from 'node:sqlite';
 import { createRequire } from 'node:module';
@@ -14,7 +15,14 @@ import {
   keccak256,
   concat,
 } from 'ethers';
-import { generateKeyPair, SignJWT } from 'jose';
+import { generateKeyPair, SignJWT, exportPKCS8, exportSPKI } from 'jose';
+import {
+  canonicalServiceJson,
+  createServiceIdentity,
+} from '../src/executor/auth.js';
+import { createWalletAttemptRequest } from '../src/providers/attempt-lifecycle.js';
+import { createExecutionService } from '../src/executor/service.js';
+import type { ExecutionServiceConfiguration } from '../src/executor/config.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { executionFixture } from './helpers/execution.js';
 import { fingerprint } from '../src/onboarding/policy.js';
@@ -127,6 +135,10 @@ async function fixture(
   accessPermissions: Permission[] = ['account:read', 'transfers:request'],
   enableExecution = false,
   executionBudget?: string,
+  configureExecution?: (
+    config: ProviderConfiguration,
+    execution: ReturnType<typeof executionFixture>,
+  ) => Promise<void>,
 ) {
   const config = await template();
   config.policy.applications[0].permissions = [
@@ -180,6 +192,8 @@ async function fixture(
     vi.stubEnv('EXECUTION_RPC_SECONDARY_URL', 'https://secondary.example.test');
     vi.stubGlobal('fetch', execution.request);
   }
+  if (execution && configureExecution)
+    await configureExecution(config, execution);
   const database = openProviderDatabase({
     directory: config.storage.directory,
     initialize: true,
@@ -258,7 +272,8 @@ async function fixture(
         'idempotency-key': key,
         ...(url.endsWith('/execute')
           ? {
-              'execution-profile': 'erc3009-relayer-v1',
+              'execution-profile':
+                config.execution?.profile ?? 'erc3009-relayer-v1',
               'execution-profile-revision': '1',
             }
           : {}),
@@ -364,6 +379,163 @@ async function fixture(
         { account_id: grant.account_id, recipient, amount },
         key,
       );
+    },
+  };
+}
+
+async function designatedFixture() {
+  for (const name of ['WALLET', 'EXECUTOR']) {
+    const pair = await generateKeyPair('ES256', { extractable: true });
+    vi.stubEnv(name + '_SERVICE_PRIVATE', await exportPKCS8(pair.privateKey));
+    vi.stubEnv(name + '_SERVICE_PUBLIC', await exportSPKI(pair.publicKey));
+  }
+  let walletApp: Awaited<ReturnType<typeof createConfiguredProvider>>;
+  let executor: Awaited<ReturnType<typeof createExecutionService>>;
+  let executorConfig: ExecutionServiceConfiguration;
+  let bridge: typeof fetch;
+  const state = {
+    loseBeforeHandoff: false,
+    loseAfterHandoff: false,
+    authorityCalls: 0,
+    beforeAuthority: undefined as (() => Promise<void>) | undefined,
+  };
+  const f = await fixture(
+    undefined,
+    undefined,
+    true,
+    undefined,
+    async (config, execution) => {
+      const legacy = structuredClone(config.execution!);
+      const serviceOrigin = 'https://executor.example.test';
+      const walletOrigin = config.policy.provider.origin;
+      config.execution = {
+        ...legacy,
+        profile: 'erc3009-executor-v1',
+        service: {
+          url: serviceOrigin,
+          providerId: 'sponsor',
+          providerRevision: '1',
+          signing: {
+            id: 'wallet-key',
+            privateKey: { env: 'WALLET_SERVICE_PRIVATE' },
+          },
+          keys: [
+            {
+              id: 'executor-key',
+              publicKey: { env: 'EXECUTOR_SERVICE_PUBLIC' },
+            },
+          ],
+        },
+        sponsors: legacy.sponsors.map((sponsor) => ({
+          ...sponsor,
+          binding: {
+            address: sponsor.binding.address,
+            bindingRevision: sponsor.binding.bindingRevision,
+          },
+        })),
+      };
+      delete config.execution.relayer;
+      const directory = await folder();
+      const db = openProviderDatabase({ directory, initialize: true });
+      db.close();
+      executorConfig = {
+        configVersion: 1,
+        profile: 'execution-service-v1',
+        origin: serviceOrigin,
+        binding: 'offline-executor',
+        storage: { kind: 'sqlite', directory },
+        signing: {
+          id: 'executor-key',
+          privateKey: { env: 'EXECUTOR_SERVICE_PRIVATE' },
+        },
+        callers: [
+          {
+            origin: walletOrigin,
+            keys: [
+              { id: 'wallet-key', publicKey: { env: 'WALLET_SERVICE_PUBLIC' } },
+            ],
+            providers: ['sponsor'],
+          },
+        ],
+        providers: [
+          {
+            id: 'sponsor',
+            revision: '1',
+            kind: 'openzeppelin-relayer',
+            relayer: legacy.relayer,
+            rpc: legacy.rpc,
+            token: config.financial!.token,
+            sponsors: legacy.sponsors,
+          },
+        ],
+        activation: {
+          enabled: true,
+          providerAcceptance: 'offline-provider',
+          recoveryAcceptance: 'offline-recovery',
+          authenticationAcceptance: 'offline-auth',
+        },
+      };
+      bridge = (async (input, options) => {
+        const url = new URL(String(input));
+        if ([walletOrigin, serviceOrigin].includes(url.origin)) {
+          const handoff =
+            url.origin === serviceOrigin && options?.method === 'POST';
+          if (handoff && state.loseBeforeHandoff)
+            throw new Error(
+              'Offline transport loss before executor acceptance',
+            );
+          if (url.origin === walletOrigin) {
+            state.authorityCalls++;
+            await state.beforeAuthority?.();
+          }
+          const server = url.origin === walletOrigin ? walletApp : executor;
+          const response = await server.inject({
+            method: options?.method as 'GET' | 'POST',
+            url: url.pathname,
+            headers: Object.fromEntries(new Headers(options?.headers)),
+            ...(options?.body ? { payload: String(options.body) } : {}),
+          });
+          if (handoff && state.loseAfterHandoff)
+            throw new Error('Offline handoff response loss');
+          return new Response(response.body, {
+            status: response.statusCode,
+            headers: Object.fromEntries(
+              Object.entries(response.headers).map(([key, value]) => [
+                key,
+                String(value),
+              ]),
+            ),
+          });
+        }
+        return execution.request(input, options);
+      }) as typeof fetch;
+      vi.stubGlobal('fetch', bridge);
+      executor = await createExecutionService({
+        configuration: executorConfig,
+        request: bridge,
+      });
+      servers.push(executor);
+    },
+  );
+  walletApp = f.app;
+  return {
+    f,
+    state,
+    get executor() {
+      return executor;
+    },
+    get executorConfig() {
+      return executorConfig;
+    },
+    async restart() {
+      await f.restart();
+      walletApp = f.app;
+      await executor.close();
+      executor = await createExecutionService({
+        configuration: executorConfig,
+        request: bridge,
+      });
+      servers.push(executor);
     },
   };
 }
@@ -502,6 +674,198 @@ describe('configured API and provider transfer authorization', () => {
     ).toBe(receipt.payload_hash);
     await f.restart();
     expect((await f.api(signPath, {})).json()).toEqual(signed.json());
+    expect(injected.backend!.signTypedData).toHaveBeenCalledTimes(1);
+  });
+  it('dispatches through the designated service with fresh callbacks, independent verification and stable recovery across both stores', async () => {
+    const t = await designatedFixture();
+    const f = t.f;
+    const action = (await f.request('1')).json();
+    const path = '/v1/actions/' + action.action_id;
+    t.state.loseAfterHandoff = true;
+    const first = await f.api(path + '/execute', {});
+    expect(first.statusCode).toBe(503);
+    expect(f.execution!.state.posts).toBe(1);
+    expect(t.state.authorityCalls).toBeGreaterThanOrEqual(4);
+    t.state.loseAfterHandoff = false;
+    await t.restart();
+    const headers = {
+      authorization: await f.token('wallet:execute:read'),
+      'execution-profile': 'erc3009-executor-v1',
+      'execution-profile-revision': '1',
+    };
+    f.execution!.state.included = true;
+    f.execution!.state.finality = 'finalized';
+    const recovered = await f.app.inject({ url: path + '/execution', headers });
+    expect(recovered.statusCode).toBe(200);
+    expect(recovered.json()).toMatchObject({
+      profile: 'erc3009-executor-v1',
+      dispatch_status: 'accepted',
+      verification: 'rpc-quorum',
+      settlement: 'succeeded',
+    });
+    expect((await f.api(path + '/execute', {})).json().execution_id).toBe(
+      recovered.json().execution_id,
+    );
+    expect(f.execution!.state.posts).toBe(1);
+    expect(injected.backend!.signTypedData).toHaveBeenCalledTimes(1);
+    expect(
+      (
+        await f.app.inject({
+          url: path + '/execution',
+          headers: { ...headers, 'execution-profile': 'erc3009-relayer-v1' },
+        })
+      ).statusCode,
+    ).toBe(422);
+    expect(
+      (
+        await f.app.inject({
+          method: 'POST',
+          url: '/v1/internal/execution-authority',
+          headers: {
+            authorization: await f.token('wallet:execute wallet:sign'),
+          },
+          payload: {
+            provider_id: 'sponsor',
+            provider_revision: '1',
+            execution_id: recovered.json().execution_id,
+            action_id: action.action_id,
+            plan_hash: '0'.repeat(64),
+            request_hash: '0'.repeat(64),
+          },
+        })
+      ).statusCode,
+    ).toBe(401);
+  });
+  it('recovers a handoff lost before executor acceptance using the original identity and current authority', async () => {
+    const t = await designatedFixture();
+    const f = t.f;
+    const action = (await f.request('1')).json();
+    const path = '/v1/actions/' + action.action_id;
+    t.state.loseBeforeHandoff = true;
+    expect((await f.api(path + '/execute', {})).statusCode).toBe(503);
+    expect(f.execution!.state.posts).toBe(0);
+    t.state.loseBeforeHandoff = false;
+    await t.restart();
+    const resumed = await f.api(path + '/execute', {});
+    expect(resumed.statusCode).toBe(200);
+    expect(resumed.json().dispatch_status).toBe('accepted');
+    await f.api(path + '/execute', {});
+    expect(f.execution!.state.posts).toBe(1);
+    expect(injected.backend!.signTypedData).toHaveBeenCalledTimes(1);
+  });
+  it('denies executor dispatch when wallet authority is revoked during the remote callback', async () => {
+    const t = await designatedFixture();
+    const f = t.f;
+    const action = (await f.request('1')).json();
+    const db = openProviderDatabase({ directory: f.config.storage.directory });
+    t.state.beforeAuthority = async () => {
+      await db.onboardingStore.transaction((state) => {
+        state.grants[f.grant.grant_id].state = 'revoked';
+      });
+    };
+    expect(
+      (await f.api('/v1/actions/' + action.action_id + '/execute', {}))
+        .statusCode,
+    ).toBe(503);
+    expect(f.execution!.state.posts).toBe(0);
+    db.close();
+  });
+  it('expires a handoff lease without dispatch and renews it only through a fresh authorized execute request', async () => {
+    const t = await designatedFixture();
+    const f = t.f;
+    const action = (await f.request('1')).json();
+    const path = '/v1/actions/' + action.action_id;
+    t.state.loseBeforeHandoff = true;
+    await f.api(path + '/execute', {});
+    const db = openProviderDatabase({ directory: f.config.storage.directory });
+    const record = await db.onboardingStore.transaction(
+      (state) => state.supportedActions![action.action_id],
+    );
+    const execution = record.execution!;
+    const request = createWalletAttemptRequest(
+      'configured-execution-v1',
+      'erc3009-executor-v1',
+      'relay_transaction',
+      record.approval.account.accountId,
+      execution.executionId,
+      action.action_id,
+      execution.plan!,
+    );
+    vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 31000);
+    const identity = await createServiceIdentity(
+      t.executorConfig.origin,
+      t.executorConfig.signing,
+      t.executorConfig.callers,
+    );
+    const body = {
+      provider_id: 'sponsor',
+      provider_revision: '1',
+      execution_id: execution.executionId,
+      action_id: action.action_id,
+      plan_hash: execution.planHash!,
+      request_hash: request.requestHash,
+    };
+    const signed = await identity.sign(
+      f.config.policy.provider.origin,
+      'authority',
+      'POST',
+      '/v1/internal/execution-authority',
+      body,
+    );
+    const denied = await f.app.inject({
+      method: 'POST',
+      url: '/v1/internal/execution-authority',
+      headers: {
+        authorization: 'Bearer ' + signed.proof,
+        'content-type': 'application/json',
+      },
+      payload: canonicalServiceJson(body),
+    });
+    expect(denied.statusCode).toBe(403);
+    expect(f.execution!.state.posts).toBe(0);
+    t.state.loseBeforeHandoff = false;
+    expect((await f.api(path + '/execute', {})).statusCode).toBe(200);
+    expect(f.execution!.state.posts).toBe(1);
+    db.close();
+  });
+  it('rotates both service key identities without rebuilding approved plans or dispatching again', async () => {
+    const t = await designatedFixture();
+    const f = t.f;
+    const action = (await f.request('1')).json();
+    const path = '/v1/actions/' + action.action_id;
+    const original = (await f.api(path + '/execute', {})).json();
+    for (const name of ['WALLET_NEXT', 'EXECUTOR_NEXT']) {
+      const pair = await generateKeyPair('ES256', { extractable: true });
+      vi.stubEnv(name + '_PRIVATE', await exportPKCS8(pair.privateKey));
+      vi.stubEnv(name + '_PUBLIC', await exportSPKI(pair.publicKey));
+    }
+    f.config.execution!.service!.signing = {
+      id: 'wallet-next',
+      privateKey: { env: 'WALLET_NEXT_PRIVATE' },
+    };
+    f.config.execution!.service!.keys.push({
+      id: 'executor-next',
+      publicKey: { env: 'EXECUTOR_NEXT_PUBLIC' },
+    });
+    t.executorConfig.signing = {
+      id: 'executor-next',
+      privateKey: { env: 'EXECUTOR_NEXT_PRIVATE' },
+    };
+    t.executorConfig.callers[0].keys.push({
+      id: 'wallet-next',
+      publicKey: { env: 'WALLET_NEXT_PUBLIC' },
+    });
+    await t.restart();
+    const headers = {
+      authorization: await f.token('wallet:execute:read'),
+      'execution-profile': 'erc3009-executor-v1',
+      'execution-profile-revision': '1',
+    };
+    const status = await f.app.inject({ url: path + '/execution', headers });
+    expect(status.statusCode).toBe(200);
+    expect(status.json().execution_id).toBe(original.execution_id);
+    expect((await f.api(path + '/execute', {})).statusCode).toBe(200);
+    expect(f.execution!.state.posts).toBe(1);
     expect(injected.backend!.signTypedData).toHaveBeenCalledTimes(1);
   });
   it('coordinates one sponsored transfer, persists replay and verifies its exact finalized effect', async () => {
@@ -1807,4 +2171,318 @@ it('runs application-led policy, provisioning and delegated signing without user
   await expect(createConfiguredProvider(changed)).rejects.toThrow(
     'Invalid provider configuration',
   );
+});
+
+async function generalFixture(contractOnly = false) {
+  const t = await designatedFixture(),
+    f = t.f;
+  const calls = approvedCallsFixture(
+    f.grant.account_id,
+    f.wallet.address,
+    f.execution!,
+  );
+  f.execution!.request = calls.request;
+  f.config.approvedCalls = { policy: calls.policy, maxValiditySeconds: 300 };
+  f.config.execution!.profile = 'approved-evm-executor-v1';
+  f.config.policy.applications[0].permissions!.push('contracts:request');
+  t.executorConfig.providers[0].contractCalls = calls.policy;
+  t.executorConfig.providers[0].revision = '2';
+  f.config.execution!.service!.providerRevision = '2';
+  if (contractOnly) {
+    delete f.config.financial;
+    delete t.executorConfig.providers[0].token;
+    delete f.config.execution!.rpc.tokenCodeHash;
+    delete t.executorConfig.providers[0].rpc.tokenCodeHash;
+  }
+  await t.restart();
+  const access = await f.api('/v1/access-requests', {
+    mode: 'connect',
+    account_id: f.grant.account_id,
+    authorization_details: [
+      {
+        type: 'https://moovha.com/wallet/account-access',
+        actions: ['account:read', 'contracts:request'],
+      },
+    ],
+  });
+  expect(access.statusCode, access.body).toBe(200);
+  const requestId = access.json().request_id;
+  expect(
+    (await f.form('/onboarding/' + requestId, { decision: 'approve' }))
+      .statusCode,
+  ).toBe(302);
+  expect(
+    (
+      await f.api('/v1/access-requests/' + requestId + '/identity', {
+        vendor: 'didit',
+        share_token: 'ephemeral-share',
+      })
+    ).statusCode,
+  ).toBe(200);
+  expect(
+    (
+      await f.form(
+        '/onboarding/review/' + requestId,
+        {
+          vendor: 'didit',
+          decision: 'accept',
+          identity_matches_owner: 'yes',
+          verified_at: new Date(Date.now() - 1000).toISOString(),
+        },
+        'b',
+      )
+    ).statusCode,
+  ).toBe(302);
+  const grant = (
+    await f.app.inject({
+      url: '/v1/access-requests/' + requestId,
+      headers: { authorization: await f.token() },
+    })
+  ).json();
+  expect(grant.status).toBe('granted');
+  expect(
+    (await f.api('/v1/accounts/' + f.grant.account_id + '/provision', {}))
+      .statusCode,
+  ).toBe(200);
+  const request = async (
+    kind: 'contract-call' | 'swap' | 'vault-deposit' = 'contract-call',
+    key?: string,
+  ) => {
+    const input =
+      kind === 'contract-call'
+        ? {
+            account_id: f.grant.account_id,
+            kind,
+            calls: [
+              {
+                to: calls.policy.contracts[0].address,
+                value: '0',
+                data: '0x12345678',
+              },
+            ],
+          }
+        : kind === 'swap'
+          ? {
+              account_id: f.grant.account_id,
+              kind,
+              route: 'swap',
+              amount_in: '50',
+              minimum_out: '40',
+              deadline: String(Math.floor(Date.now() / 1000) + 120),
+            }
+          : {
+              account_id: f.grant.account_id,
+              kind,
+              route: 'vault',
+              assets: '50',
+              minimum_shares: '40',
+            };
+    const response = await f.api('/v1/actions/contract-calls', input, key);
+    if (response.statusCode === 200) {
+      calls.state.intent = response.json().intent;
+      calls.state.digest = response.json().payload_hash;
+    }
+    return response;
+  };
+  return { ...t, calls, grant, request };
+}
+
+describe('approved EVM execution foundation', () => {
+  it('retains an expired nonce after signing admission and keeps other account bindings private', async () => {
+    const t = await generalFixture(),
+      action = await t.request();
+    expect(action.statusCode, action.body).toBe(200);
+    const policy = await t.f.app.inject({
+      url: '/v1/access-policy',
+      headers: { authorization: await t.f.token() },
+    });
+    expect(policy.statusCode, policy.body).toBe(200);
+    expect(policy.json().contract_call_terms.policy).not.toHaveProperty(
+      'accounts',
+    );
+    expect(policy.json().action_policy_revision).toBe(
+      policy.json().transfer_policy_revision,
+    );
+    expect(
+      (await t.f.api('/v1/actions/' + action.json().action_id + '/execute', {}))
+        .statusCode,
+    ).toBe(200);
+    const now = Date.now(),
+      clock = vi.spyOn(Date, 'now').mockReturnValue(now + 301000);
+    const another = await t.request();
+    expect(another.statusCode).toBe(409);
+    expect(t.calls.state.posts).toBe(1);
+    clock.mockRestore();
+  });
+
+  it('releases an expired unsigned nonce only with durable evidence that no signing admission exists', async () => {
+    const t = await generalFixture(),
+      action = await t.request();
+    expect(action.statusCode, action.body).toBe(200);
+    const now = Date.now(),
+      clock = vi.spyOn(Date, 'now').mockReturnValue(now + 301000);
+    // HTTP token lifetime is independent; obtain a fresh token for the advanced clock.
+    const token = await t.f.token();
+    const next = await t.f.app.inject({
+      method: 'POST',
+      url: '/v1/actions/contract-calls',
+      headers: { authorization: token, 'idempotency-key': randomUUID() },
+      payload: {
+        account_id: t.f.grant.account_id,
+        kind: 'contract-call',
+        calls: [
+          {
+            to: t.calls.policy.contracts[0].address,
+            value: '0',
+            data: '0x12345678',
+          },
+        ],
+      },
+    });
+    expect(next.statusCode, next.body).toBe(200);
+    expect(next.json().action_id).not.toBe(action.json().action_id);
+    const db = openProviderDatabase({
+      directory: t.f.config.storage.directory,
+    });
+    const previous = await db.onboardingStore.transaction(
+      (state) => state.supportedActions![action.json().action_id],
+    );
+    db.close();
+    expect(previous.nonceReleased).toBe(true);
+    expect(previous.status).toBe('denied');
+    clock.mockRestore();
+  });
+
+  it('supports a contract-only deployment without a token-transfer policy or token-code configuration', async () => {
+    const t = await generalFixture(true),
+      action = await t.request('vault-deposit');
+    expect(action.statusCode, action.body).toBe(200);
+    const executed = await t.f.api(
+      '/v1/actions/' + action.json().action_id + '/execute',
+      {},
+    );
+    expect(executed.statusCode, executed.body).toBe(200);
+    expect(t.calls.state.posts).toBe(1);
+  });
+  it.each(['contract-call', 'swap', 'vault-deposit'] as const)(
+    'coordinates approved %s calls through signed dispatch and verifies its exact finalized effects',
+    async (kind) => {
+      const t = await generalFixture();
+      const action = await t.request(kind);
+      expect(action.statusCode, action.body).toBe(200);
+      expect(action.json().payload.primaryType).toBe('SafeTx');
+      expect(
+        (await t.f.api('/v1/actions/' + action.json().action_id + '/sign', {}))
+          .statusCode,
+      ).toBe(403);
+      const executed = await t.f.api(
+        '/v1/actions/' + action.json().action_id + '/execute',
+        {},
+      );
+      expect(executed.statusCode, executed.body).toBe(200);
+      expect(executed.json().dispatch_status).toBe('accepted');
+      expect(t.calls.state.posts).toBe(1);
+      t.calls.state.included = true;
+      const response = await t.f.app.inject({
+        url: '/v1/actions/' + action.json().action_id + '/execution',
+        headers: {
+          authorization: await t.f.token(),
+          'execution-profile': 'approved-evm-executor-v1',
+          'execution-profile-revision': '1',
+        },
+      });
+      expect(response.statusCode, response.body).toBe(200);
+      expect(response.json()).toMatchObject({
+        verification: 'rpc-quorum',
+        chain_status: 'finalized',
+        outcome: 'succeeded',
+        settlement: 'succeeded',
+      });
+      expect(t.calls.state.posts).toBe(1);
+    },
+  );
+  it('retains the nonce and action on idempotent replay and rejects another action at that nonce', async () => {
+    const t = await generalFixture(),
+      key = randomUUID();
+    const first = await t.request('contract-call', key),
+      replay = await t.request('contract-call', key);
+    expect(first.statusCode, first.body).toBe(200);
+    expect(replay.json().action_id).toBe(first.json().action_id);
+    const another = await t.request('contract-call');
+    expect(another.statusCode).toBe(409);
+    expect(t.calls.state.posts).toBe(0);
+  });
+  it('recovers lost designated-service acceptance after both services restart without another provider submission', async () => {
+    const t = await generalFixture(),
+      action = await t.request('swap');
+    expect(action.statusCode, action.body).toBe(200);
+    t.state.loseAfterHandoff = true;
+    expect(
+      (await t.f.api('/v1/actions/' + action.json().action_id + '/execute', {}))
+        .statusCode,
+    ).toBe(503);
+    expect(t.calls.state.posts).toBe(1);
+    t.state.loseAfterHandoff = false;
+    await t.restart();
+    t.calls.state.included = true;
+    const read = await t.f.app.inject({
+      url: '/v1/actions/' + action.json().action_id + '/execution',
+      headers: {
+        authorization: await t.f.token(),
+        'execution-profile': 'approved-evm-executor-v1',
+        'execution-profile-revision': '1',
+      },
+    });
+    expect(read.statusCode, read.body).toBe(200);
+    expect(read.json().settlement).toBe('succeeded');
+    expect(t.calls.state.posts).toBe(1);
+  });
+  it('does not promote successful Safe execution into a verified swap without matching output effects', async () => {
+    const t = await generalFixture(),
+      action = await t.request('swap');
+    expect(action.statusCode, action.body).toBe(200);
+    expect(
+      (await t.f.api('/v1/actions/' + action.json().action_id + '/execute', {}))
+        .statusCode,
+    ).toBe(200);
+    t.calls.state.included = true;
+    t.calls.state.minimumEffects = false;
+    const read = await t.f.app.inject({
+      url: '/v1/actions/' + action.json().action_id + '/execution',
+      headers: {
+        authorization: await t.f.token(),
+        'execution-profile': 'approved-evm-executor-v1',
+        'execution-profile-revision': '1',
+      },
+    });
+    expect(read.statusCode, read.body).toBe(200);
+    expect(read.json().settlement).toBe('pending');
+    expect(read.json().verification).toBe('unverified');
+  });
+  it('rechecks current contract delegation during executor authority callbacks', async () => {
+    const t = await generalFixture(),
+      action = await t.request();
+    expect(action.statusCode, action.body).toBe(200);
+    t.state.beforeAuthority = async () => {
+      const db = openProviderDatabase({
+        directory: t.f.config.storage.directory,
+      });
+      await db.onboardingStore.transaction((state) => {
+        state.grants[t.grant.grant_id].state = 'revoked';
+      });
+      db.close();
+    };
+    expect(
+      (await t.f.api('/v1/actions/' + action.json().action_id + '/execute', {}))
+        .statusCode,
+    ).toBe(503);
+    expect(t.calls.state.posts).toBe(0);
+  });
+  it('denies Safe owner disagreement before creating an approved signing action', async () => {
+    const t = await generalFixture();
+    t.calls.state.owner = Wallet.createRandom().address;
+    const action = await t.request();
+    expect(action.statusCode).toBe(503);
+    expect(t.calls.state.posts).toBe(0);
+  });
 });

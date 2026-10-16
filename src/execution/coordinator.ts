@@ -1,3 +1,9 @@
+import { approvedCallData } from './approved-calls.js';
+import {
+  executionPlanHash,
+  executionConfigurationIdentity,
+  type ExecutionAuthorityRequest,
+} from '../executor/protocol.js';
 import { randomUUID } from 'node:crypto';
 import { Signature, recoverAddress } from 'ethers';
 import type {
@@ -22,22 +28,21 @@ import {
 } from '../providers/attempt-lifecycle.js';
 import { transferInterface } from './chain.js';
 import {
-  executionProfile,
   type ExecutionConfiguration,
   type ExecutionObserver,
   type ExecutionProvider,
   type ExecutionReceipt,
   type TransferExecutionPlan,
-  type TransferExecutionRecord,
 } from './types.js';
 
 function unknown(): never {
   throw new WalletProviderError('wallet_attempt_unavailable', 'unknown');
 }
 
-/** One immutable execution per approved transfer; uncertain attempts are never dispatched again. */
-export class TransferExecutionCoordinator {
+/** One immutable execution per approved action; uncertain attempts are never dispatched again. */
+export class ApprovedExecutionCoordinator {
   readonly configurationHash: string;
+  readonly profile: ExecutionConfiguration['profile'];
   private readonly config: ExecutionConfiguration;
   private timer?: ReturnType<typeof setTimeout>;
   private running?: Promise<void>;
@@ -52,25 +57,31 @@ export class TransferExecutionCoordinator {
     private readonly observer: ExecutionObserver,
   ) {
     this.config = structuredClone(configuration);
-    this.configurationHash = fingerprint(configuration);
+    this.profile = configuration.profile;
+    this.configurationHash = fingerprint(
+      executionConfigurationIdentity(configuration),
+    );
   }
   private request(record: TransferRecord): WalletAttemptRequest {
     const execution = record.execution;
     if (
       !execution?.plan ||
       !execution.planHash ||
-      execution.planHash !== fingerprint(execution.plan) ||
-      execution.profile !== executionProfile ||
+      execution.planHash !== executionPlanHash(execution.plan) ||
+      execution.profile !== this.profile ||
       execution.revision !== '1' ||
-      execution.plan.profile !== executionProfile ||
+      execution.plan.profile !== this.profile ||
       execution.plan.revision !== '1' ||
       execution.plan.action.action_id !== record.approval.action.action_id ||
-      fingerprint(execution.plan.action) !== fingerprint(record.approval.action)
+      fingerprint(execution.plan.action) !==
+        fingerprint(record.approval.action) ||
+      fingerprint(execution.plan.intent ?? null) !==
+        fingerprint(record.intent ?? null)
     )
       unknown();
     return createWalletAttemptRequest(
       'configured-execution-v1',
-      executionProfile,
+      this.profile,
       'relay_transaction',
       record.approval.account.accountId,
       execution.executionId,
@@ -126,12 +137,19 @@ export class TransferExecutionCoordinator {
             ? 'failed'
             : 'unknown';
     return {
-      profile: executionProfile,
+      profile: this.profile,
       profile_revision: '1',
       action_id: record.approval.action.action_id,
       execution_id: execution.executionId,
       dispatch_status: dispatch,
       observation_revision: execution.observationRevision,
+      outcome_scope: record.intent
+        ? record.intent.input.kind === 'swap'
+          ? 'swap-effects'
+          : record.intent.input.kind === 'vault-deposit'
+            ? 'vault-deposit-effects'
+            : 'contract-execution'
+        : 'token-transfer',
       next_poll_after_ms: this.config.pollIntervalSeconds * 1000,
       ...(execution.observation ?? {
         chain_status: 'unobserved',
@@ -193,10 +211,13 @@ export class TransferExecutionCoordinator {
           deny();
         if (!latest.execution)
           latest.execution = {
-            profile: executionProfile,
+            profile: this.profile,
             revision: '1',
             executionId: randomUUID(),
             signingKey: randomUUID(),
+            ...(this.config.service
+              ? { dispatchPrincipal: context.principal }
+              : {}),
             configurationHash: this.configurationHash,
             sponsorClientId: sponsor.clientId,
             observationRevision: 0,
@@ -209,9 +230,26 @@ export class TransferExecutionCoordinator {
       },
       true,
     );
+    if (record.intent && this.profile !== 'approved-evm-executor-v1') deny();
     const existing = await this.claim(record);
-    if (existing || record.execution?.effectObserved)
+    if (existing || record.execution?.effectObserved) {
+      if (
+        this.provider.recover &&
+        existing?.state === 'unknown' &&
+        !record.execution?.effectObserved
+      ) {
+        await this.openHandoff(context.principal, id, this.request(record));
+        await this.provider.submit(record.execution!.plan!, {
+          executionId: record.execution!.executionId,
+          request: this.request(record),
+          authorizeEffect: async () => {
+            await this.authorize(context.principal, id, this.request(record));
+          },
+        });
+        await this.recover(record);
+      }
       return this.receipt(await this.current(context.principal, id, true));
+    }
     record = await this.current(context.principal, id);
     if (!record.execution) unknown();
     if (!record.execution.plan) {
@@ -231,27 +269,32 @@ export class TransferExecutionCoordinator {
         unknown();
       const message = record.approval.action.payload.message;
       const plan: TransferExecutionPlan = {
-        profile: executionProfile,
+        profile: this.profile,
         revision: '1',
         action: record.approval.action,
         sponsor: structuredClone(sponsor),
         configurationHash: this.configurationHash,
         genesisHash: this.config.rpc.genesisHash,
-        tokenCodeHash: this.config.rpc.tokenCodeHash,
+        ...(!record.intent
+          ? { tokenCodeHash: this.config.rpc.tokenCodeHash! }
+          : {}),
         scanFromBlock,
-        data: transferInterface
-          .encodeFunctionData('transferWithAuthorization', [
-            message.from,
-            message.to,
-            message.value,
-            message.validAfter,
-            message.validBefore,
-            message.nonce,
-            signature.v,
-            signature.r,
-            signature.s,
-          ])
-          .toLowerCase(),
+        ...(record.intent ? { intent: structuredClone(record.intent) } : {}),
+        data: record.intent
+          ? approvedCallData(record.approval.action, signature.serialized)
+          : transferInterface
+              .encodeFunctionData('transferWithAuthorization', [
+                message.from,
+                message.to,
+                message.value,
+                message.validAfter,
+                message.validBefore,
+                message.nonce,
+                signature.v,
+                signature.r,
+                signature.s,
+              ])
+              .toLowerCase(),
       };
       record = await this.actions.withAuthorizedTransfer(
         context.principal,
@@ -269,7 +312,7 @@ export class TransferExecutionCoordinator {
             return latest;
           }
           execution.plan = plan;
-          execution.planHash = fingerprint(plan);
+          execution.planHash = executionPlanHash(plan);
           return latest;
         },
       );
@@ -296,7 +339,7 @@ export class TransferExecutionCoordinator {
       BigInt(sponsor.l1FeeReserveWei)
     ).toString();
     await this.database.admitAttempt({ request, budgetId, units });
-    const lifecycle = createAttemptLifecycle(executionProfile, {
+    const lifecycle = createAttemptLifecycle(this.profile, {
       namespace: 'configured-execution-v1',
       journal: this.database.journal,
       authorizeAttempt: (attempt) =>
@@ -306,9 +349,17 @@ export class TransferExecutionCoordinator {
       request,
       async () => {
         await this.authorize(context.principal, id, request);
+        if (this.config.service)
+          await this.openHandoff(context.principal, id, request);
         return {
           kind: 'relay_transaction',
-          transactionId: await this.provider.submit(plan),
+          transactionId: await this.provider.submit(plan, {
+            executionId: execution.executionId,
+            request,
+            authorizeEffect: async () => {
+              await this.authorize(context.principal, id, request);
+            },
+          }),
         };
       },
       (result) => {
@@ -321,6 +372,77 @@ export class TransferExecutionCoordinator {
       },
     );
     return this.receipt(await this.current(context.principal, id, true));
+  }
+  private async openHandoff(
+    principal: VerifiedPrincipal,
+    id: string,
+    request: WalletAttemptRequest,
+  ) {
+    await this.authorize(principal, id, request);
+    await this.actions.withAuthorizedTransfer(
+      principal,
+      id,
+      (_state, record) => {
+        if (
+          !record.execution ||
+          record.execution.configurationHash !== this.configurationHash ||
+          fingerprint(this.request(record)) !== fingerprint(request)
+        )
+          deny();
+        record.execution.dispatchPrincipal = structuredClone(principal);
+        record.execution.dispatchLeaseUntil = Date.now() + 30000;
+      },
+    );
+  }
+  /** Authenticated executor callback: a service identity never replaces current wallet authority. */
+  async authorizeRemote(input: ExecutionAuthorityRequest) {
+    if (
+      !this.config.service ||
+      this.config.service.providerId !== input.provider_id ||
+      this.config.service.providerRevision !== input.provider_revision
+    )
+      deny();
+    const record = await this.actions.onboarding.store.transaction(
+      (state) => state.supportedActions?.[input.action_id],
+    );
+    const execution = record?.execution;
+    if (
+      !execution?.dispatchPrincipal ||
+      !execution.plan ||
+      execution.executionId !== input.execution_id ||
+      execution.planHash !== input.plan_hash ||
+      execution.dispatchLeaseUntil === undefined ||
+      execution.dispatchLeaseUntil <= Date.now()
+    )
+      deny();
+    const request = this.request(record!);
+    if (request.requestHash !== input.request_hash) deny();
+    await this.authorize(execution.dispatchPrincipal, input.action_id, request);
+    const claim = await this.database.journal.read(request);
+    if (!claim || !['pending', 'unknown'].includes(claim.state)) deny();
+    await this.authorize(execution.dispatchPrincipal, input.action_id, request);
+    if (execution.dispatchLeaseUntil <= Date.now()) deny();
+    return { allowed: true as const, ...input };
+  }
+  private async recover(record: TransferRecord): Promise<string | undefined> {
+    if (!this.provider.recover || !record.execution?.plan) return undefined;
+    const request = this.request(record);
+    const recovered = await this.provider.recover(record.execution.plan, {
+      executionId: record.execution.executionId,
+      request,
+    });
+    const claim = await this.database.journal.read(request);
+    if (recovered.accepted && claim?.state === 'unknown')
+      await this.database.reconcileAttempt(
+        request,
+        {
+          kind: 'relay_transaction',
+          transactionId: record.execution.executionId,
+        },
+        'designated-executor:' + record.execution.planHash,
+        async () => recovered.accepted,
+      );
+    return recovered.transactionHash;
   }
   async read(
     principal: VerifiedPrincipal,
@@ -352,7 +474,7 @@ export class TransferExecutionCoordinator {
         const events = execution.events ?? [];
         const oldest = events[0]?.sequence ?? 0;
         return {
-          profile: executionProfile,
+          profile: this.profile,
           profile_revision: '1',
           action_id: id,
           events: events.filter((event) => event.sequence > Number(after)),
@@ -379,6 +501,13 @@ export class TransferExecutionCoordinator {
     const plan = structuredClone(execution.plan!);
     const claim = await this.database.journal.read(this.request(record));
     let ownHash: string | undefined;
+    if (this.provider.recover) {
+      try {
+        ownHash = await this.recover(record);
+      } catch {
+        /* Preserve transport uncertainty; independent observation can still recover exact effects. */
+      }
+    }
     if (
       claim?.state === 'succeeded' &&
       claim.result.kind === 'relay_transaction' &&
@@ -555,3 +684,6 @@ export class TransferExecutionCoordinator {
     await this.running;
   }
 }
+
+/** Compatibility name for existing transfer integrations. */
+export { ApprovedExecutionCoordinator as TransferExecutionCoordinator };
