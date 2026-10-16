@@ -18,7 +18,7 @@ const accessDays = computed({
 function financial(enabled: unknown) {
   if (enabled)
     model.value.financial = {
-      profile: 'owner-approved-erc3009-v1',
+      profile: 'provider-authorized-erc3009-v1',
       token: { address: '', name: '', version: '', symbol: '', decimals: 6 },
       recipients: [''],
       maximumAmount: '',
@@ -118,7 +118,11 @@ function financial(enabled: unknown) {
         { value: 'account:read', label: 'Read wallet accounts' },
         {
           value: 'operations:request',
-          label: 'Request owner-approved actions',
+          label: 'Request wallet operations (advanced hosts)',
+        },
+        {
+          value: 'transfers:request',
+          label: 'Request transfers on behalf of users',
         },
       ]"
       validation="required"
@@ -189,12 +193,13 @@ function financial(enabled: unknown) {
   <div class="feature-panel">
     <h3>Optional transfer authorization</h3>
     <p>
-      Enable the implemented owner-approved ERC-3009 signing profile. The
-      service prepares an exact action and requires fresh owner approval.
+      Enable provider-authorized ERC-3009 signing. Users delegate transfer
+      requests during onboarding; the provider checks each exact request against
+      its policies without another user approval prompt.
     </p>
     <FormKit
       type="checkbox"
-      label="Configure owner-approved transfer signing"
+      label="Configure provider-authorized transfer signing"
       :modelValue="!!model.financial"
       @update:modelValue="financial($event)"
     />

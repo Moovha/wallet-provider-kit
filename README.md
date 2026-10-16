@@ -126,8 +126,8 @@ and a deployment checklist. No application code is needed for this setup path.
 
 The standard path is **configure, deploy and consume the API**. Use one validated
 JSON configuration for supported login, identity, wallet backends and SQLite storage.
-The kit supplies consent, grants, account recovery, exact owner-approved transfer
-authorizations and durable signing coordination. Start with [service setup](docs/setup.md).
+The kit supplies consent, grants, account recovery, provider-authorized transfers
+and durable signing coordination. Start with [service setup](docs/setup.md).
 Custom backend adapters and embedded host composition are the advanced path.
 
 The kit is for a team that wants to provide wallets as part of its own product,
@@ -150,7 +150,7 @@ Its OpenAPI contract also lets applications written in other languages use the i
 flowchart TB
     accTitle: Account owner, connected application and provider control
     accDescr: The owner approves access through the host. Applications request actions from the toolkit, which checks host authority and calls the chosen backend. Only permitted results return to the application.
-    walletOwner["Account owner"] -->|"Login, consent and approval"|authority
+    walletOwner["Account owner"] -->|"Login and application-access consent"|authority
     connectedApp["Connected application"] -->|"Authenticated action request"|kit
     subgraph walletService["Your wallet service"]
         kit["Wallet Provider Kit"] -->|"Check current permission"|authority["Your host authority"]
@@ -187,15 +187,17 @@ When an application requests an action, the host resolves the caller to the
 account owner and checks current access, consent and identity-verification
 status against stored records. These are provider checks, not fresh consent prompts.
 For signing, it also loads the exact **approved action**: an instruction
-stored by the host with the content and limits that were approved. It records an
+stored by the host after authorising its exact content and limits. It records an
 **attempt**, the identity of this execution that retries must preserve, before
 the backend is called. The application references a stored action;
 it doesn't submit arbitrary bytes for the service to sign.
 
-The bundled transfer profile currently requires a separate owner approval for
-each exact transfer before signing. This transaction approval is distinct from
-the application-access consent recorded during onboarding; an access grant alone
-does not authorise spending. See the [configured transfer flow](docs/setup.md).
+In the bundled transfer profile, the user grants `transfers:request` delegation
+during onboarding. The consent screen shows the token, recipients and limits.
+The application requests transfers on the user's behalf; the provider authorises
+and stores each exact action under that delegation and its current policies,
+without another user approval prompt. Ordinary access or `operations:request`
+grants do not confer this delegation. See the [configured transfer flow](docs/setup.md).
 
 The **journal** is the private, persistent record of attempts, their state and
 their results. The toolkit's journal wrapper coordinates the backend call,
@@ -206,7 +208,7 @@ host can establish what happened; this is called **reconciliation**. Current
 permission is checked again before returning a stored success. Ordinary application
 logs don't replace the journal. See [attempts and recovery](docs/concepts.md#actions-attempts-and-the-journal).
 
-This separates the user's approval, the host's authority and the backend's signing
+This separates the user's access consent, the host's authority and the backend's signing
 responsibility. **OAuth scopes** are named permissions on an application's access
 token. They allow a request to reach the host's policy checks. Spending authority
 also requires the current account owner, the application's **grant** (its stored,
@@ -288,7 +290,7 @@ library-only execution profile.
 
 **Experimental · 0.1.0 · unpublished.** The default service stays unconfigured.
 The bundled onboarding-only profile manages access and provisioning. The
-configured service optionally supplies an exact owner-approved ERC-3009 transfer
+configured service optionally supplies an exact provider-authorized ERC-3009 transfer
 profile and financial journal on Base Sepolia; custom financial actions require
 advanced host integration. The [built-in SQLite database](docs/storage.md)
 stores onboarding, approvals, budgets and financial attempts on one persistent

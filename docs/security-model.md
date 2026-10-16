@@ -32,6 +32,19 @@ and a monitoring backend. Each has a different trust role. A compromised token i
 compromised signing provider create separate risks; OAuth scopes never replace
 current owner, grant and consent checks.
 
+The configured `provider-authorized-erc3009-v1` transfer profile requires a separate
+`transfers:request` delegation recorded at onboarding. The provider trusts the
+registered application to request transfers within that delegation; the API does
+not independently attest that the user clicked a transaction button. A compromised
+application credential can request transfers within the active delegation and
+provider limits, so admit applications accordingly. Ordinary OAuth scopes and
+`operations:request` grants do not establish delegated spending authority.
+The provider verifies the source consent record, current owner/grant/KYC, financial
+terms, exact immutable action and lifetime budget, then uses durable admission,
+exclusive dispatch and current-policy checks before signing or replay. Financial
+policy changes revoke affected delegation grants without changing accepted KYC.
+No per-transfer owner approval endpoint is exposed.
+
 Anyone with backend signing credentials may control the wallet. Explain that
 control and recovery model to your users. The kit doesn't establish end-user
 self-custody or hardware security module (HSM) attestation.

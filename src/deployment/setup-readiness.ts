@@ -40,12 +40,11 @@ export function setupWarnings(config: ProviderConfiguration): string[] {
     config.financial &&
     !config.policy.applications.some(
       (app) =>
-        app.enabled !== false &&
-        app.permissions?.includes('operations:request'),
+        app.enabled !== false && app.permissions?.includes('transfers:request'),
     )
   )
     warnings.push(
-      'Transfer signing is configured but no enabled application is permitted to request owner-approved actions.',
+      'Transfer signing is configured but no enabled application is permitted to request transfers on behalf of its users.',
     );
   if (config.backend.kind === 'ows')
     warnings.push(

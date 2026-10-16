@@ -8,7 +8,6 @@ export const transferReceiptSchema = {
     'action_id',
     'account_id',
     'status',
-    'approval_url',
     'expires_at',
     'payload_hash',
     'payload',
@@ -18,9 +17,8 @@ export const transferReceiptSchema = {
     account_id: uuidSchema,
     status: {
       type: 'string',
-      enum: ['approval_required', 'approved', 'denied'],
+      enum: ['authorizing', 'authorized', 'denied'],
     },
-    approval_url: { type: 'string', format: 'uri' },
     expires_at: { type: 'string', format: 'date-time' },
     payload_hash: { type: 'string', pattern: '^0x[0-9a-f]{64}$' },
     payload: {

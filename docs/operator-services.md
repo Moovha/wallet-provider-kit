@@ -235,14 +235,16 @@ client secret in a browser or mobile app.
 | Poll an access request                           | `wallet:access:read`  |
 | Read a granted account                           | `wallet:account:read` |
 | Provision an accepted account                    | `wallet:provision`    |
-| Request exact transfer approval                  | `wallet:actions`      |
-| Read transfer approval status                    | `wallet:actions:read` |
-| Sign an approved transfer                        | `wallet:sign`         |
+| Request provider transfer authorization          | `wallet:actions`      |
+| Read transfer authorization status               | `wallet:actions:read` |
+| Sign an authorized transfer                      | `wallet:sign`         |
 
 Authorize only needed scopes. Do not give connected apps staff review authority.
-The wizard's **Read wallet accounts** (`account:read`) and **Request owner-approved
-actions** (`operations:request`) are separate stored-consent permissions, not OAuth
-scope names. A permitted API scope still requires a current owner grant and policy.
+The wizard's **Read wallet accounts** (`account:read`) and **Request transfers on
+behalf of users** (`transfers:request`) are separate stored-consent permissions,
+not OAuth scope names. Transfer delegation is explicitly consented to during
+onboarding; the provider checks each exact request without asking again.
+`operations:request` remains a request-only permission for advanced hosts. A permitted API scope still requires a current owner grant and policy.
 See [HTTP authentication](http-api.md#authentication-and-profiles).
 
 ## Prepare identity verification

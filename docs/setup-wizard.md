@@ -113,7 +113,9 @@ policy changes can invalidate grants and approvals.
 
 For each connected application, enter its display name and registered API client
 ID. Its issuer inherits Services. Choose **Read wallet accounts** and, where needed,
-**Request owner-approved actions**. These consent permissions differ from the
+**Request transfers on behalf of users** (`transfers:request`) for the configured
+transfer profile. **Request wallet operations (advanced hosts)** remains available
+for custom financial hosts. These consent permissions differ from the
 [token scopes](operator-services.md#register-the-application-api-and-clients).
 Keep access enabled only for admitted applications. A client ID is not an owner ID.
 
@@ -124,11 +126,14 @@ exact login subject from the owner-login issuer. The
 [funding](operator-services.md#prices-terms-and-application-funding) and
 [reviewer instructions](operator-services.md#identify-reviewers) explain their sources.
 
-Leave **Configure owner-approved transfer signing** off for onboarding/provisioning
+Leave **Configure provider-authorized transfer signing** off for onboarding/provisioning
 only. If required, use the [token policy preparation](operator-services.md#optional-token-signing-policy)
 to supply the verified Base Sepolia contract/domain, symbol, decimals, recipient
-allowlist, integer base-unit limits and 60–3600-second validity. An application-access
-grant does not approve spending: each exact transfer requires separate owner approval.
+allowlist, integer base-unit limits and 60–3600-second validity. Users explicitly
+consent to transfer delegation during onboarding. The provider then authorises
+each exact application request against those terms without a second user prompt.
+Ordinary account access and `operations:request` do not grant this delegation.
+Changed transfer terms require renewed delegation consent.
 
 ### 5. Deployment
 
@@ -212,7 +217,7 @@ This is a **local preview of possibly unsaved and unvalidated configuration**.
 It does not inspect live tokens, stored grants, deployed readiness or vendor status.
 No provider request is executed: Try it out and token-entry controls are disabled.
 The setup-session token is never an application credential. Example responses,
-approval URLs, hashes and signatures are fictional and confer no authority.
+consent URLs, hashes and signatures are fictional and confer no authority.
 For real responses after deployment, use the **Try it out · real service responses**
 card. Enable the deployed explorer in your draft, validate/export it and restart
 the service, then choose **Open deployed Try it out**. This opens Swagger on your

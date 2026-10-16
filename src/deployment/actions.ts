@@ -6,15 +6,8 @@ import type {
 } from '../domain/principal.js';
 import type { TypedDataAction } from '../domain/signing.js';
 import { WalletProviderError } from '../domain/signing.js';
-import {
-  application,
-  deny,
-  fingerprint,
-  invalid,
-  uuid,
-} from '../onboarding/policy.js';
-import { ownerKey, type OnboardingService } from '../onboarding/service.js';
-import type { OwnerIdentity } from '../onboarding/types.js';
+import { deny, fingerprint, invalid, uuid } from '../onboarding/policy.js';
+import type { OnboardingService } from '../onboarding/service.js';
 import type {
   FinancialApproval,
   FinancialAuthorization,
@@ -22,7 +15,7 @@ import type {
 } from '../storage/index.js';
 
 export interface TransferPolicy {
-  profile: 'owner-approved-erc3009-v1';
+  profile: 'provider-authorized-erc3009-v1';
   token: {
     address: string;
     name: string;
@@ -44,7 +37,7 @@ export interface TransferInput {
 export interface TransferRecord {
   approval: FinancialApproval & { action: TypedDataAction };
   revision: string;
-  status: 'approval_required' | 'approved' | 'denied';
+  status: 'authorizing' | 'authorized' | 'denied';
 }
 const transferTypes = {
   TransferWithAuthorization: [
@@ -75,7 +68,7 @@ function sameCaller(
     a.clientId === b.clientId
   );
 }
-/** Fixed transfer construction and explicit owner approval. HTTP never supplies typed data or authority records. */
+/** Fixed transfer construction and provider policy authorization under an explicit owner delegation. HTTP never supplies typed data or authority records. */
 export class SupportedActions {
   readonly revision: string;
   private readonly policy: TransferPolicy;
@@ -88,6 +81,10 @@ export class SupportedActions {
     this.policy = structuredClone(policy);
     this.revision =
       revision ?? fingerprint([onboarding.policy.revision, policy]);
+  }
+  /** Public terms shown when the owner delegates transfers during onboarding. */
+  consentTerms() {
+    return structuredClone(this.policy);
   }
   private current(record: TransferRecord, includeDenied = false) {
     try {
@@ -132,7 +129,7 @@ export class SupportedActions {
     const grant = await this.onboarding.authorize(
       principal,
       accountId,
-      'operations:request',
+      'transfers:request',
     );
     const account = await this.onboarding.store.transaction((state) => {
       if (
@@ -170,6 +167,8 @@ export class SupportedActions {
     if (
       grant.id !== approval.grantId ||
       grant.owner !== approval.ownerSubject ||
+      grant.requestId !== approval.consentReference ||
+      approval.policyRevision !== this.revision ||
       account.address?.toLowerCase() !== approval.account.address.toLowerCase()
     )
       deny();
@@ -269,7 +268,7 @@ export class SupportedActions {
       };
       const record: TransferRecord = {
         revision: this.revision,
-        status: 'approval_required',
+        status: 'authorizing',
         approval: {
           ownerSubject: grant.owner,
           caller: {
@@ -278,7 +277,7 @@ export class SupportedActions {
             clientId: context.principal.clientId,
           },
           grantId: grant.id,
-          consentReference: id,
+          consentReference: grant.requestId,
           policyRevision: this.revision,
           account: { accountId: input.account_id, address: account.address! },
           action,
@@ -302,7 +301,37 @@ export class SupportedActions {
       return record;
     });
     await this.permitted(context.principal, record);
-    return this.receipt(record);
+    if (record.status === 'authorizing') {
+      // Both writes are idempotent. A crash leaves an unsigned action that the same
+      // request can resume, preserving its nonce, digest and action identity.
+      await this.database.setBudget(
+        record.approval.budgetId,
+        this.policy.lifetimeAmount,
+        this.revision,
+      );
+      await this.database.approveAction(record.approval);
+      await this.permitted(context.principal, record);
+      await this.onboarding.store.transaction((state) => {
+        const latest =
+          state.supportedActions?.[record.approval.action.action_id];
+        if (
+          !latest ||
+          fingerprint(latest.approval) !== fingerprint(record.approval)
+        )
+          deny();
+        this.current(latest);
+        if (latest.status === 'authorizing') {
+          latest.status = 'authorized';
+          state.audit.push({
+            at: Date.now(),
+            event: 'action_provider_authorized',
+            resource: latest.approval.action.action_id,
+            revision: this.revision,
+          });
+        }
+      });
+    }
+    return this.read(context.principal, record.approval.action.action_id);
   }
   private receipt(record: TransferRecord) {
     const action = record.approval.action;
@@ -310,7 +339,6 @@ export class SupportedActions {
       action_id: action.action_id,
       account_id: record.approval.account.accountId,
       status: record.status,
-      approval_url: `${this.onboarding.policy.provider.origin}/onboarding/actions/${action.action_id}`,
       expires_at: action.expires_at,
       payload_hash: action.payload_hash,
       payload: action.payload,
@@ -329,61 +357,6 @@ export class SupportedActions {
       return record;
     });
   }
-  async ownerView(identity: OwnerIdentity, id: string) {
-    if (
-      !Number.isFinite(identity.authenticatedAt) ||
-      identity.authenticatedAt > Date.now() + 5000 ||
-      identity.authenticatedAt <= Date.now() - 300000
-    )
-      deny();
-    const record = await this.load(id);
-    if (record.approval.ownerSubject !== ownerKey(identity)) deny();
-    await this.permitted(
-      { ...record.approval.caller, scopes: [] },
-      record,
-      true,
-    );
-    return {
-      ...this.receipt(record),
-      application: application(this.onboarding.policy, {
-        ...record.approval.caller,
-        scopes: [],
-      }).name,
-      token: structuredClone(this.policy.token),
-    };
-  }
-  async decide(identity: OwnerIdentity, id: string, approved: boolean) {
-    await this.ownerView(identity, id);
-    const record = await this.load(id);
-    if (approved) {
-      await this.database.setBudget(
-        record.approval.budgetId,
-        this.policy.lifetimeAmount,
-      );
-      await this.database.approveAction(record.approval);
-    }
-    await this.onboarding.store.transaction((state) => {
-      const latest = state.supportedActions?.[id];
-      if (
-        !latest ||
-        fingerprint(latest.approval) !== fingerprint(record.approval)
-      )
-        deny();
-      this.current(latest);
-      if (
-        latest.status !== 'approval_required' &&
-        latest.status !== (approved ? 'approved' : 'denied')
-      )
-        deny();
-      latest.status = approved ? 'approved' : 'denied';
-      state.audit.push({
-        at: Date.now(),
-        event: approved ? 'action_owner_approved' : 'action_owner_denied',
-        resource: id,
-        revision: this.revision,
-      });
-    });
-  }
   async authorize(
     context: AuthorityContext,
     approval: FinancialApproval,
@@ -392,7 +365,7 @@ export class SupportedActions {
       if (approval.action.kind !== 'sign_typed_data') return null;
       const record = await this.load(approval.action.action_id);
       if (
-        record.status !== 'approved' ||
+        record.status !== 'authorized' ||
         fingerprint(record.approval) !== fingerprint(approval)
       )
         return null;

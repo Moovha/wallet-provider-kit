@@ -119,6 +119,7 @@ export async function createConfiguredProvider(
       database.onboardingStore,
       identity,
       backend,
+      config.financial ? fingerprint(config.financial) : undefined,
     );
     const login = await createOwnerLogin(
       {
@@ -144,7 +145,12 @@ export async function createConfiguredProvider(
           if (record.revision !== activeRevision) record.status = 'denied';
         }
         for (const grant of Object.values(state.grants)) {
-          if (grant.revision !== onboarding!.policy.revision)
+          if (
+            grant.revision !== onboarding!.policy.revision ||
+            (grant.permissions.includes('transfers:request') &&
+              grant.transferPolicyRevision !==
+                (config.financial ? fingerprint(config.financial) : undefined))
+          )
             grant.state = 'revoked';
         }
         state.audit.push({

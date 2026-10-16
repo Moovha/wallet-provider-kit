@@ -167,9 +167,7 @@ export function responseExample(id: string): object {
   return {
     action_id: exampleId,
     account_id: exampleId,
-    status:
-      id === 'requestTransferAuthorization' ? 'approval_required' : 'approved',
-    approval_url: `https://wallet.example.com/onboarding/actions/${exampleId}`,
+    status: 'authorized',
     expires_at: '2030-01-01T00:00:00.000Z',
     payload_hash: '0x' + '0'.repeat(64),
     payload: {

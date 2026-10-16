@@ -90,7 +90,11 @@
                 "minItems": 1,
                 "uniqueItems": true,
                 "items": {
-                  "enum": ["account:read", "operations:request"]
+                  "enum": [
+                    "account:read",
+                    "operations:request",
+                    "transfers:request"
+                  ]
                 }
               },
               "funding": {
@@ -573,7 +577,7 @@
       ],
       "properties": {
         "profile": {
-          "const": "owner-approved-erc3009-v1"
+          "const": "provider-authorized-erc3009-v1"
         },
         "token": {
           "type": "object",

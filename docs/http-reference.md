@@ -41,7 +41,7 @@ Success response schema:
       "type": "array",
       "items": {
         "type": "string",
-        "enum": ["owner-approved-erc3009-v1"]
+        "enum": ["provider-authorized-erc3009-v1"]
       }
     }
   }
@@ -381,7 +381,7 @@ Success response schema:
 
 Operation: `requestTransferAuthorization`.
 
-Fixed Base Sepolia ERC-3009 transfer authorization. Current application access and separate exact owner approval are required. No broadcast or settlement.
+Fixed Base Sepolia ERC-3009 transfer authorization. Explicit transfer delegation, current owner-bound access, identity and provider policy authorization are required. No per-transfer owner prompt. No broadcast or settlement.
 
 | Parameter         | Location | Required | Schema                                                                                                |
 | ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
@@ -435,7 +435,6 @@ Success response schema:
     "action_id",
     "account_id",
     "status",
-    "approval_url",
     "expires_at",
     "payload_hash",
     "payload"
@@ -451,11 +450,7 @@ Success response schema:
     },
     "status": {
       "type": "string",
-      "enum": ["approval_required", "approved", "denied"]
-    },
-    "approval_url": {
-      "type": "string",
-      "format": "uri"
+      "enum": ["authorizing", "authorized", "denied"]
     },
     "expires_at": {
       "type": "string",
@@ -577,7 +572,7 @@ Success response schema:
 
 Operation: `getTransferAuthorization`.
 
-Fixed Base Sepolia ERC-3009 transfer authorization. Current application access and separate exact owner approval are required. No broadcast or settlement.
+Fixed Base Sepolia ERC-3009 transfer authorization. Explicit transfer delegation, current owner-bound access, identity and provider policy authorization are required. No per-transfer owner prompt. No broadcast or settlement.
 
 | Parameter  | Location | Required | Schema                                                                                                |
 | ---------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
@@ -607,7 +602,6 @@ Success response schema:
     "action_id",
     "account_id",
     "status",
-    "approval_url",
     "expires_at",
     "payload_hash",
     "payload"
@@ -623,11 +617,7 @@ Success response schema:
     },
     "status": {
       "type": "string",
-      "enum": ["approval_required", "approved", "denied"]
-    },
-    "approval_url": {
-      "type": "string",
-      "format": "uri"
+      "enum": ["authorizing", "authorized", "denied"]
     },
     "expires_at": {
       "type": "string",
@@ -785,11 +775,15 @@ Request body (application/json):
           "actions": {
             "type": "array",
             "minItems": 1,
-            "maxItems": 2,
+            "maxItems": 3,
             "uniqueItems": true,
             "items": {
               "type": "string",
-              "enum": ["account:read", "operations:request"]
+              "enum": [
+                "account:read",
+                "operations:request",
+                "transfers:request"
+              ]
             }
           }
         }
@@ -858,7 +852,7 @@ Success response schema:
       "type": "array",
       "items": {
         "type": "string",
-        "enum": ["account:read", "operations:request"]
+        "enum": ["account:read", "operations:request", "transfers:request"]
       }
     },
     "expires_at": {
@@ -936,7 +930,7 @@ Success response schema:
       "type": "array",
       "items": {
         "type": "string",
-        "enum": ["account:read", "operations:request"]
+        "enum": ["account:read", "operations:request", "transfers:request"]
       }
     },
     "expires_at": {
@@ -1036,7 +1030,7 @@ Success response schema:
       "type": "array",
       "items": {
         "type": "string",
-        "enum": ["account:read", "operations:request"]
+        "enum": ["account:read", "operations:request", "transfers:request"]
       }
     },
     "expires_at": {

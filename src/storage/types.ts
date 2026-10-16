@@ -5,7 +5,7 @@ import type {
 import type { EmbeddedAccount, TypedDataAction } from '../domain/signing.js';
 import type { RelayerExecutionAction } from '../domain/relayer-execution.js';
 
-/** Insert only from the host's trusted exact-action approval flow, never an HTTP body. */
+/** Insert only from the host's trusted exact-action authorization flow, never an HTTP body. */
 export interface FinancialApproval {
   ownerSubject: string;
   caller: Pick<VerifiedPrincipal, 'issuer' | 'subject' | 'clientId'>;

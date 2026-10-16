@@ -21,7 +21,7 @@ export interface OnboardingHttpOptions {
   login: OwnerLogin;
   /** Provider IdP subjects allowed to review; applications cannot grant themselves staff access. */
   reviewers: readonly string[];
-  /** Configuration-first exact transfer approvals; absent in the onboarding-only profile. */
+  /** Configuration-first provider-authorized transfers; absent in the onboarding-only profile. */
   actions?: SupportedActions;
   /** Fence superseded configured-service instances, including browser authority writers. */
   currentConfiguration?: () => Promise<boolean>;
@@ -72,6 +72,8 @@ const permissionLabels = {
   'account:read': 'Read your wallet address and account status',
   'operations:request':
     'Request wallet operations, subject to your provider’s approvals',
+  'transfers:request':
+    'Request transfers on your behalf under the provider’s limits, without asking you to approve each transfer again',
 };
 const statusLabels: Record<string, string> = {
   consent_required: 'Your permission is needed.',
@@ -204,7 +206,7 @@ export async function registerOnboardingRoutes(
     return {
       ...base,
       description:
-        'Fixed Base Sepolia ERC-3009 transfer authorization. Current application access and separate exact owner approval are required. No broadcast or settlement.',
+        'Fixed Base Sepolia ERC-3009 transfer authorization. Explicit transfer delegation, current owner-bound access, identity and provider policy authorization are required. No per-transfer owner prompt. No broadcast or settlement.',
       response: { ...base.response, 200: transferReceiptSchema },
     };
   };
@@ -258,7 +260,7 @@ export async function registerOnboardingRoutes(
                 actions: {
                   type: 'array',
                   minItems: 1,
-                  maxItems: 2,
+                  maxItems: permissions.length,
                   uniqueItems: true,
                   items: { type: 'string', enum: permissions },
                 },
@@ -481,77 +483,11 @@ export async function registerOnboardingRoutes(
         );
         if (
           !uuid.test(result.requestId) &&
-          !['access', 'review'].includes(result.requestId) &&
-          !(
-            result.requestId.startsWith('actions/') &&
-            uuid.test(result.requestId.slice(8))
-          )
+          !['access', 'review'].includes(result.requestId)
         )
           deny();
         setCookie(reply, '__Host-wpk-session', result.sessionToken);
         return reply.redirect('/onboarding/' + result.requestId);
-      },
-    );
-    ui.get<{ Params: { actionId: string } }>(
-      '/onboarding/actions/:actionId',
-      { schema: { hide: true, params: actionParams } },
-      async (request, reply) => {
-        if (!(await ready())) return unavailable();
-        const current = await session(
-          request,
-          reply,
-          'actions/' + request.params.actionId,
-        );
-        if (!current) return;
-        const action = await actions().ownerView(
-          current.identity,
-          request.params.actionId,
-        );
-        const message = action.payload.message;
-        return html(
-          reply,
-          'Approve a transfer authorization',
-          `<p>${escape(action.application)} requests your approval.</p>
-<p>Send <strong>${escape(formatUnits(String(message.value), action.token.decimals))} ${escape(action.token.symbol)}</strong> on Base Sepolia (test network).</p>
-<p>From: <code>${escape(message.from)}</code><br>Recipient: <code>${escape(message.to)}</code><br>Token contract: <code>${escape(action.token.address)}</code><br>Token domain: ${escape(action.token.name)} / ${escape(action.token.version)}</p>
-<p>Valid until ${escape(action.expires_at)}. This authorizes one transfer for this exact amount and recipient. Once signed, revoking application access does not cancel the signature. The application may submit it before expiry.</p>
-<p>Status: ${escape(action.status)}</p>${action.status === 'approval_required' ? `<form method="post" action="/onboarding/actions/${action.action_id}"><input type="hidden" name="csrf" value="${escape(current.csrf)}"><button name="decision" value="approve">Approve this transfer</button><button name="decision" value="deny">Decline</button></form>` : '<p>You can return to your application.</p>'}`,
-        );
-      },
-    );
-    ui.post<{
-      Params: { actionId: string };
-      Body: { csrf: string; decision: string };
-    }>(
-      '/onboarding/actions/:actionId',
-      {
-        schema: {
-          hide: true,
-          params: actionParams,
-          body: {
-            type: 'object',
-            additionalProperties: false,
-            required: ['csrf', 'decision'],
-            properties: {
-              csrf: csrfSchema,
-              decision: { type: 'string', enum: ['approve', 'deny'] },
-            },
-          },
-        },
-      },
-      async (request, reply) => {
-        if (!(await ready())) return unavailable();
-        const current = await formSession(request, request.body.csrf);
-        await actions().decide(
-          current.identity,
-          request.params.actionId,
-          request.body.decision === 'approve',
-        );
-        return html(
-          reply,
-          'Transfer decision recorded',
-          '<p>Your decision has been recorded. Return to your application to continue.</p>',
-        );
       },
     );
     ui.get(
@@ -809,6 +745,14 @@ export async function registerOnboardingRoutes(
           `Connect ${view.application}`,
           `<p>${escape(view.application)} wants to ${view.mode === 'create' ? 'set up a wallet with' : 'connect your existing wallet at'} ${escape(view.provider)}.</p>
 <ul>${view.permissions.map((p) => `<li>${escape(permissionLabels[p])}</li>`).join('')}</ul>
+${
+  view.permissions.includes('transfers:request')
+    ? (() => {
+        const terms = actions().consentTerms();
+        return `<p>Transfer delegation: ${escape(terms.token.symbol)} on Base Sepolia. Token contract: <code>${escape(terms.token.address)}</code>. Domain: ${escape(terms.token.name)} / ${escape(terms.token.version)}. Maximum per transfer: ${escape(formatUnits(terms.maximumAmount, terms.token.decimals))} ${escape(terms.token.symbol)}. Lifetime limit per account/token across applications: ${escape(formatUnits(terms.lifetimeAmount, terms.token.decimals))} ${escape(terms.token.symbol)}. Allowed recipients: ${terms.recipients.map((a) => `<code>${escape(a)}</code>`).join(', ')}. Each signature is valid for up to ${escape(terms.maxValiditySeconds)} seconds. The provider checks each request against these terms without another approval prompt. Revoking access stops new signing; signatures already issued may remain usable until expiry.</p>`;
+      })()
+    : ''
+}
 <p>Access lasts up to ${view.durationDays} days. You can pause or revoke it at any time. Each financial action still needs the provider’s authorization.</p>
 <p>Your provider may receive identity evidence to review your account. The requesting application funds agreed verification costs. <a href="${escape(view.privacyUrl)}">Read the provider’s privacy notice</a>.</p>
 <p><strong>${escape(statusLabels[view.status] ?? 'Your provider will help with the next step.')}</strong>

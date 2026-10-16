@@ -79,7 +79,7 @@ describe('operator API reference', () => {
         ?.status,
     ).toBe('Transfer profile not configured');
     config.financial = {
-      profile: 'owner-approved-erc3009-v1',
+      profile: 'provider-authorized-erc3009-v1',
       token: {
         address: '0x1111111111111111111111111111111111111111',
         name: 'Example',
@@ -118,7 +118,7 @@ describe('operator API reference', () => {
       referenceOperations(contract, config, 0).find(
         (item) => item.operation.operationId === 'signAction',
       )?.status,
-    ).toBe('Configured; runtime checks apply');
+    ).toBe('Application permission not allowed');
   });
   it('provides schema-valid request examples and placeholder-only scoped cURL with an explicit retry key', () => {
     const config = fixture();

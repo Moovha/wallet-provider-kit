@@ -4,6 +4,7 @@ import { WalletProviderError } from '../domain/signing.js';
 import {
   accessType,
   permissions,
+  defaultPermissions,
   type AccessInput,
   type ApplicationPolicy,
   type OnboardingPolicy,
@@ -153,7 +154,7 @@ export function normalizeInput(
   if (
     !Array.isArray(actions) ||
     actions.length === 0 ||
-    actions.some((p) => !(app.permissions ?? permissions).includes(p)) ||
+    actions.some((p) => !(app.permissions ?? defaultPermissions).includes(p)) ||
     new Set(actions).size !== actions.length
   )
     invalid();
