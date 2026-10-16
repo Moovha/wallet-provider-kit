@@ -101,7 +101,7 @@ async function fixture(transferRevision?: string) {
   }
   return { service, store, input };
 }
-it('grants trusted application access without login or review and preserves one wallet across retries and concurrent requests', async () => {
+it('grants trusted application access without login or review and preserves one wallet across retries and renewal', async () => {
   const f = await fixture();
   const ctx = context();
   const input = f.input();
@@ -353,4 +353,22 @@ it('preserves legacy hosted policy revisions when access mode was omitted', () =
     revision: expected,
     access: { mode: 'hosted', maxAgeDays: 30 },
   });
+});
+
+it('serializes concurrent access requests for a new application user into one account and one active grant', async () => {
+  const f = await fixture();
+  const input = f.input('concurrent-user');
+  const receipts = await Promise.all(
+    Array.from({ length: 4 }, () => f.service.request(context(), input)),
+  );
+  expect(new Set(receipts.map((receipt) => receipt.account_id)).size).toBe(1);
+  const stored = await f.store.transaction((state) => ({
+    accounts: Object.keys(state.accounts),
+    grants: Object.values(state.grants).filter(
+      (grant) => grant.state === 'active',
+    ),
+  }));
+  expect(stored.accounts).toHaveLength(1);
+  expect(stored.grants).toHaveLength(1);
+  expect(stored.grants[0].accountId).toBe(receipts[0].account_id);
 });
