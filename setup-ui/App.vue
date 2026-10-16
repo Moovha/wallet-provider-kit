@@ -376,8 +376,9 @@ function enableDocumentation() {
                 <span class="eyebrow">Review & export</span>
                 <h2>Review your configuration</h2>
                 <p>
-                  Validate the complete configuration, then download the files
-                  for your operator workflow.
+                  Check your settings, then download three files to take to your
+                  server. Validation checks the configuration’s structure; it
+                  does not test your external services or deploy anything.
                 </p>
               </div>
               <dl class="summary">
@@ -386,7 +387,7 @@ function enableDocumentation() {
                   <dd>{{ config.policy.provider.name || 'Not set' }}</dd>
                 </div>
                 <div>
-                  <dt>Public origin</dt>
+                  <dt>Public service address</dt>
                   <dd>{{ config.policy.provider.origin || 'Not set' }}</dd>
                 </div>
                 <div>
@@ -418,7 +419,7 @@ function enableDocumentation() {
                   <dd>
                     {{
                       config.financial
-                        ? 'Owner-approved ERC-3009 signing'
+                        ? 'Delegated token transfer signing'
                         : 'Onboarding and access only'
                     }}
                   </dd>
@@ -467,10 +468,22 @@ function enableDocumentation() {
                   </p>
                 </div>
                 <h3>Your deployment files</h3>
-                <p>
-                  Download all three files. The environment template contains
-                  names only.
-                </p>
+                <ul class="export-file-guide">
+                  <li>
+                    <strong>Configuration:</strong> the settings your server
+                    will load as provider.config.json.
+                  </li>
+                  <li>
+                    <strong>Checklist:</strong> the preparation tasks and
+                    commands to validate, initialize and run your service.
+                  </li>
+                  <li>
+                    <strong>Variable template:</strong> empty entries for your
+                    secret values. Fill these privately on the deployment host
+                    or through your secret manager, following the deployment
+                    guide. The wizard exports names only.
+                  </li>
+                </ul>
                 <p>
                   <a
                     :href="docs + 'staging-walkthrough.html'"

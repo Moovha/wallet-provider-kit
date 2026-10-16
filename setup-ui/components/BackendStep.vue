@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SetupField from './SetupField.vue';
 import { computed } from 'vue';
 import {
   backends,
@@ -42,8 +43,23 @@ function removeSigner(index: number) {
     <span class="eyebrow">Wallet infrastructure</span>
     <h2>Choose your wallet backend</h2>
     <p>
-      The kit handles permissions and signing coordination for all three
-      supported choices.
+      A wallet backend is the engine that creates wallet accounts and signs
+      actions your service approves. Choose where that engine runs.
+    </p>
+  </div>
+  <div class="callout step-orientation">
+    <strong>Choose one option to set up</strong>
+    <p>
+      CDP connects to a managed Coinbase project. OWS keeps a private wallet
+      vault on your own server. Relayer connects to a separate signing service
+      you already operate. All three profiles are experimental and support Base
+      Sepolia test-network accounts only.
+    </p>
+    <p>
+      Credential fields below contain variable names: labels that tell the
+      server where to find each secret. Keep the supplied names for a first
+      setup. You will put the actual values in your private deployment
+      environment after exporting.
     </p>
   </div>
   <div class="provider-cards" role="group" aria-label="Wallet backend">
@@ -75,13 +91,13 @@ function removeSigner(index: number) {
       >Kit adapter guide ↗</a
     >
   </div>
-  <FormKit
+  <SetupField
+    guide="binding"
     v-model="model.backend.binding"
     type="text"
-    label="Stable backend binding"
+    label="Wallet environment name"
     placeholder="acme-sepolia-wallets"
     validation="required|length:1,256"
-    help="A permanent name for this wallet environment. Retain it across credential rotations and restarts."
   />
   <template v-if="model.backend.kind === 'cdp'">
     <div class="callout">
@@ -91,12 +107,18 @@ function removeSigner(index: number) {
         the names of their deployment variables below.
       </p>
     </div>
-    <SecretField v-model="model.backend.apiKeyId" label="CDP API key ID" />
     <SecretField
+      guide="cdpKeyId"
+      v-model="model.backend.apiKeyId"
+      label="CDP API key ID"
+    />
+    <SecretField
+      guide="cdpKeySecret"
       v-model="model.backend.apiKeySecret"
       label="CDP API key secret"
     />
     <SecretField
+      guide="cdpWalletSecret"
       v-model="model.backend.walletSecret"
       label="CDP wallet secret"
     />
@@ -110,14 +132,15 @@ function removeSigner(index: number) {
         reference Docker image does not include the engine.
       </p>
     </div>
-    <FormKit
+    <SetupField
+      guide="vault"
       v-model="model.backend.vaultDirectory"
       type="text"
       label="OWS vault directory"
       validation="required|length:1,256"
-      help="Relative paths resolve beside the exported configuration on your deployment host."
     />
     <SecretField
+      guide="passphrase"
       v-model="model.backend.passphrase"
       label="OWS owner passphrase"
     />
@@ -127,14 +150,19 @@ function removeSigner(index: number) {
     </p>
   </template>
   <template v-if="model.backend.kind === 'openzeppelin-relayer'">
-    <FormKit
+    <SetupField
+      guide="relayerOrigin"
       v-model="relayer.url"
       type="url"
       label="Relayer HTTPS origin"
       placeholder="https://relayer.acme.com"
       validation="required|https_origin"
     />
-    <SecretField v-model="relayer.apiKey" label="Relayer API key" />
+    <SecretField
+      guide="relayerKey"
+      v-model="relayer.apiKey"
+      label="Relayer API key"
+    />
     <div class="section-heading">
       <h3>Existing signer pool</h3>
       <button
@@ -153,24 +181,26 @@ function removeSigner(index: number) {
     >
       <legend>Signer {{ index + 1 }}</legend>
       <div class="field-grid">
-        <FormKit
+        <SetupField
+          guide="relayerId"
           v-model="signer.relayerId"
           type="text"
           label="Relayer ID"
           :validation="[['required'], ['matches', /^[a-zA-Z0-9_-]{1,64}$/]]"
-        /><FormKit
+        /><SetupField
+          guide="signerId"
           v-model="signer.signerId"
           type="text"
           label="Signer ID"
           :validation="[['required'], ['matches', /^[a-zA-Z0-9_-]{1,64}$/]]"
         />
       </div>
-      <FormKit
+      <SetupField
+        guide="signerAddress"
         v-model="signer.address"
         type="text"
         label="Signer wallet address"
         :validation="[['required'], ['matches', /^0x[0-9a-fA-F]{40}$/]]"
-        help="Base Sepolia EOA address already assigned to this signer. Binding revision is fixed at 1."
       />
       <button
         type="button"

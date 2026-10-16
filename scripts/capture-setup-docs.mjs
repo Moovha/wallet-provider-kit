@@ -76,6 +76,16 @@ try {
       fullPage: true,
       animations: 'disabled',
     });
+    if (name === 'Provider') {
+      const help = page.locator('[data-setting="origin"] summary');
+      await help.click();
+      await page.screenshot({
+        path: new URL('provider-guidance.png', output).pathname,
+        fullPage: true,
+        animations: 'disabled',
+      });
+      await help.click();
+    }
   }
   await page
     .getByRole('button', { name: 'API reference', exact: true })

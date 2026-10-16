@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SetupField from './SetupField.vue';
 import { computed } from 'vue';
 import { docs } from '../model';
 import type { ProviderConfiguration } from '../model';
@@ -37,15 +38,30 @@ function financial(enabled: unknown) {
       which actions are supported.
     </p>
   </div>
-  <FormKit
+  <div class="callout step-orientation">
+    <strong>Decide who can use the service and who pays</strong>
+    <p>
+      A connected application is a product that calls your wallet API. Add its
+      registration below, agree who covers identity checks, and name the staff
+      who review identity evidence. These are your business decisions, not extra
+      credentials to buy.
+    </p>
+    <p>
+      Transfer signing is optional. Leave it off if you only need wallet
+      onboarding and account access. Keep the starting policy version for a
+      first setup; review the access periods against your own requirements.
+    </p>
+  </div>
+  <SetupField
+    guide="policyVersion"
     v-model="model.policy.version"
     type="text"
     label="Policy version"
     validation="required|length:1,256"
-    help="Change this deliberately when publishing a new policy. Updates can invalidate existing grants and approvals."
   />
   <div class="field-grid">
-    <FormKit
+    <SetupField
+      guide="identityAge"
       v-model="identityDays"
       type="number"
       :number="true"
@@ -53,7 +69,8 @@ function financial(enabled: unknown) {
       min="1"
       max="365"
       validation="required|between:1,365"
-    /><FormKit
+    /><SetupField
+      guide="accessAge"
       v-model="accessDays"
       type="number"
       :number="true"
@@ -88,29 +105,31 @@ function financial(enabled: unknown) {
   >
     <legend>Application {{ index + 1 }}</legend>
     <div class="field-grid">
-      <FormKit
+      <SetupField
+        guide="applicationName"
         v-model="application.name"
         type="text"
         label="Application name"
         validation="required|length:1,100"
-        help="Shown to the account owner on consent screens."
-      /><FormKit
+      /><SetupField
+        guide="applicationClient"
         v-model="application.clientId"
         type="text"
         label="Application client ID"
         validation="required|length:1,256"
       />
     </div>
-    <FormKit
+    <SetupField
+      guide="applicationIssuer"
       v-model="application.issuer"
       type="url"
       label="Application issuer"
       validation="required|https_url"
       :placeholder="model.oauth.issuer"
-      help="Inherited from the application token issuer in Connected services."
       readonly
     />
-    <FormKit
+    <SetupField
+      guide="permissions"
       v-model="application.permissions"
       type="checkbox"
       label="Allowed permissions"
@@ -127,7 +146,8 @@ function financial(enabled: unknown) {
       ]"
       validation="required"
     />
-    <FormKit
+    <SetupField
+      guide="fundingEnabled"
       type="checkbox"
       label="Configure an application funding agreement for identity costs"
       :modelValue="!!application.funding"
@@ -138,12 +158,14 @@ function financial(enabled: unknown) {
       "
     />
     <div v-if="application.funding" class="field-grid">
-      <FormKit
+      <SetupField
+        guide="fundingReference"
         v-model="application.funding.agreement"
         type="text"
         label="Funding agreement reference"
         validation="required|length:1,256"
-      /><FormKit
+      /><SetupField
+        guide="monthlyBudget"
         v-model="application.funding.monthlyLimitMinor"
         type="number"
         :number="true"
@@ -153,7 +175,8 @@ function financial(enabled: unknown) {
         validation="required|min:0|max:9007199254740991"
       />
     </div>
-    <FormKit
+    <SetupField
+      guide="applicationEnabled"
       type="checkbox"
       label="Application access enabled"
       :modelValue="application.enabled !== false"
@@ -175,12 +198,12 @@ function financial(enabled: unknown) {
     </button>
   </div>
   <div v-for="(_, index) in model.reviewers" :key="index" class="inline-row">
-    <FormKit
+    <SetupField
+      guide="reviewer"
       v-model="model.reviewers[index]"
       type="text"
       :label="'Reviewer ' + (index + 1) + ' login subject'"
       validation="required|length:1,256"
-      help="The staff member’s subject ID from the owner login issuer."
     /><button
       type="button"
       class="text-button"
@@ -197,7 +220,8 @@ function financial(enabled: unknown) {
       requests during onboarding; the provider checks each exact request against
       its policies without another user approval prompt.
     </p>
-    <FormKit
+    <SetupField
+      guide="financialEnabled"
       type="checkbox"
       label="Configure provider-authorized transfer signing"
       :modelValue="!!model.financial"
@@ -218,29 +242,34 @@ function financial(enabled: unknown) {
       token. This service does not broadcast transactions, sponsor gas or settle
       transfers.
     </p>
-    <FormKit
+    <SetupField
+      guide="tokenAddress"
       v-model="model.financial.token.address"
       type="text"
       label="Token contract address"
       :validation="[['required'], ['matches', /^0x[0-9a-fA-F]{40}$/]]"
     />
     <div class="field-grid">
-      <FormKit
+      <SetupField
+        guide="tokenName"
         v-model="model.financial.token.name"
         type="text"
         label="Token signing-domain name"
         validation="required|length:1,256"
-      /><FormKit
+      /><SetupField
+        guide="tokenVersion"
         v-model="model.financial.token.version"
         type="text"
         label="Token signing-domain version"
         validation="required|length:1,256"
-      /><FormKit
+      /><SetupField
+        guide="tokenSymbol"
         v-model="model.financial.token.symbol"
         type="text"
         label="Token symbol"
         :validation="[['required'], ['matches', /^[A-Za-z0-9]{1,12}$/]]"
-      /><FormKit
+      /><SetupField
+        guide="tokenDecimals"
         v-model="model.financial.token.decimals"
         type="number"
         :number="true"
@@ -251,21 +280,22 @@ function financial(enabled: unknown) {
       />
     </div>
     <div class="field-grid">
-      <FormKit
+      <SetupField
+        guide="maximumAmount"
         v-model="model.financial.maximumAmount"
         type="text"
         label="Maximum per action (base units)"
         :validation="[['required'], ['matches', /^[1-9][0-9]{0,77}$/]]"
-        help="Integer string, not a decimal token amount. With 6 decimals, 1000000 is one token."
-      /><FormKit
+      /><SetupField
+        guide="lifetimeAmount"
         v-model="model.financial.lifetimeAmount"
         type="text"
         label="Lifetime limit per account/token (base units)"
         :validation="[['required'], ['matches', /^[1-9][0-9]{0,77}$/]]"
-        help="Must be at least the per-action maximum. Reservations remain held for uncertain attempts."
       />
     </div>
-    <FormKit
+    <SetupField
+      guide="validity"
       v-model="model.financial.maxValiditySeconds"
       type="number"
       :number="true"
@@ -290,7 +320,8 @@ function financial(enabled: unknown) {
       :key="index"
       class="inline-row"
     >
-      <FormKit
+      <SetupField
+        guide="recipient"
         v-model="model.financial.recipients[index]"
         type="text"
         :label="'Recipient ' + (index + 1) + ' address'"

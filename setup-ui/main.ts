@@ -20,7 +20,7 @@ createApp(App)
             https_url:
               'Use an HTTPS URL without credentials, query or fragment.',
             https_origin:
-              'Use only the HTTPS origin, without a trailing slash or path.',
+              'Enter https:// and your service hostname only, such as https://wallet.acme.com. Remove any trailing slash or page path.',
           },
         },
       },
