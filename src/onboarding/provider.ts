@@ -45,7 +45,9 @@ export async function createOnboardingProvider(
     !config.reviewers.length ||
     config.reviewers.some((s) => !s || s.length > 256) ||
     !config.identity ||
-    (!config.identity.didit && !config.identity.sumsub) ||
+    (!config.identity.didit &&
+      !config.identity.sumsub &&
+      !config.policy.identity?.records) ||
     typeof config.ready !== 'function' ||
     (config.storage === undefined) ===
       (config.storageDirectory === undefined) ||

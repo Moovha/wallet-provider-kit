@@ -10,6 +10,7 @@ import {
   permissions,
   type AccessInput,
   type Vendor,
+  type ApplicationIdentityRecord,
 } from './types.js';
 import { deny, uuid } from './policy.js';
 import { WalletProviderError } from '../domain/signing.js';
@@ -59,6 +60,23 @@ export const accessReceiptSchema = {
       items: { type: 'string', enum: permissions },
     },
     expires_at: { type: 'string', format: 'date-time' },
+  },
+};
+const applicationRecordSchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['reference', 'fields'],
+  properties: {
+    reference: {
+      type: 'string',
+      pattern: '^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$',
+    },
+    fields: {
+      type: 'object',
+      minProperties: 1,
+      maxProperties: 64,
+      additionalProperties: { type: 'string', minLength: 1, maxLength: 512 },
+    },
   },
 };
 function escape(value: unknown): string {
@@ -242,6 +260,7 @@ export async function registerOnboardingRoutes(
   app.post<{ Body: AccessInput }>(
     '/v1/access-requests',
     {
+      bodyLimit: 32768,
       schema: schema('requestAccountAccess', {
         type: 'object',
         additionalProperties: false,
@@ -249,6 +268,7 @@ export async function registerOnboardingRoutes(
         properties: {
           mode: { type: 'string', enum: ['create', 'connect'] },
           account_id: uuidSchema,
+          identity_record: applicationRecordSchema,
           authorization_details: {
             type: 'array',
             minItems: 1,
@@ -274,6 +294,97 @@ export async function registerOnboardingRoutes(
     },
     async (request) =>
       service().request(await context(request, 'wallet:access'), request.body),
+  );
+  app.get(
+    '/v1/access-policy',
+    {
+      schema: {
+        ...schema('getAccountAccessPolicy'),
+        response: {
+          ...schema('getAccountAccessPolicy').response,
+          200: {
+            type: 'object',
+            additionalProperties: false,
+            required: [
+              'source',
+              'evaluation_only',
+              'required_fields',
+              'maximum_field_characters',
+              'owner_consent_required',
+              'provider_review_required',
+            ],
+            properties: {
+              source: {
+                type: 'string',
+                enum: ['application_record', 'vendor_verification'],
+              },
+              evaluation_only: { type: 'boolean' },
+              required_fields: { type: 'array', items: { type: 'string' } },
+              maximum_field_characters: { type: 'integer' },
+              owner_consent_required: { type: 'boolean', enum: [true] },
+              provider_review_required: { type: 'boolean', enum: [true] },
+            },
+          },
+        },
+      },
+    },
+    async (request) =>
+      service().accessPolicy(
+        (await context(request, 'wallet:access:read')).principal,
+      ),
+  );
+  app.post<{ Body: { records: ApplicationIdentityRecord[] } }>(
+    '/v1/access-records',
+    {
+      bodyLimit: 524288,
+      schema: {
+        ...schema('submitAccountAccessRecords', {
+          type: 'object',
+          additionalProperties: false,
+          required: ['records'],
+          properties: {
+            records: {
+              type: 'array',
+              minItems: 1,
+              maxItems: 50,
+              items: applicationRecordSchema,
+            },
+          },
+        }),
+        response: {
+          ...schema('submitAccountAccessRecords').response,
+          200: {
+            type: 'object',
+            additionalProperties: false,
+            required: ['results'],
+            properties: {
+              results: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  additionalProperties: false,
+                  required: ['index', 'status'],
+                  properties: {
+                    index: { type: 'integer', minimum: 0 },
+                    status: { type: 'string', enum: ['submitted', 'invalid'] },
+                    required_fields: {
+                      type: 'array',
+                      items: { type: 'string' },
+                    },
+                    receipt: accessReceiptSchema,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    async (request) =>
+      service().submitRecords(
+        await context(request, 'wallet:access'),
+        request.body.records,
+      ),
   );
   app.get<{ Params: { requestId: string } }>(
     '/v1/access-requests/:requestId',
@@ -332,6 +443,8 @@ export async function registerOnboardingRoutes(
             required: ['account_id', 'status'],
             properties: {
               account_id: uuidSchema,
+              identity_source: { type: 'string', enum: ['application_record'] },
+              evaluation_only: { type: 'boolean', enum: [true] },
               status: { type: 'string', enum: ['accepted', 'provisioned'] },
               address: { type: 'string', pattern: '^0x[0-9a-fA-F]{40}$' },
             },
@@ -599,17 +712,28 @@ export async function registerOnboardingRoutes(
         return html(
           reply,
           'Review wallet requests',
-          `<p>Check identity evidence in your vendor workspace and match it to the provider user below. A share token or application login alone does not establish that match.</p>${
+          `<p>${service().policy.identity.records ? 'Review the application-supplied record, match it to the authenticated provider user and accept it only for your unfunded evaluation. Required fields do not establish externally verified KYC.' : 'Check identity evidence in your vendor workspace and match it to the provider user below. A share token or application login alone does not establish that match.'}</p>${
             pending.length
               ? pending
                   .map(
                     (r) => `<article>
 <p>Provider user: <code>${escape(r.owner?.subject)}</code>
-<br>Issuer: ${escape(r.owner?.issuer)}<br>Evidence: ${escape(r.vendor ?? 'not supplied')} <code>${escape(r.reference ?? '')}</code>
+<br>Issuer: ${escape(r.owner?.issuer)}${r.applicationRecord ? '' : `<br>Evidence: ${escape(r.vendor ?? 'not supplied')} <code>${escape(r.reference ?? '')}</code>`}
 <br>Status: ${escape(r.status)}</p>
 <form method="post" action="/onboarding/review/${r.requestId}">
 <input type="hidden" name="csrf" value="${escape(current.csrf)}">
-<label>Vendor <select name="vendor">
+${
+  r.applicationRecord
+    ? `<p>Submitted by ${escape(r.application)} · application record <code>${escape(r.applicationRecord.reference)}</code></p>
+<dl>${Object.entries(r.applicationRecord.fields)
+        .map(
+          ([field, value]) =>
+            `<dt>${escape(field)}</dt><dd>${escape(value)}</dd>`,
+        )
+        .join('')}</dl>
+<label><input type="checkbox" name="identity_matches_owner" value="yes"> I matched this submitted record to this provider user and accept it for an unfunded evaluation.</label>
+<button name="decision" value="accept">Accept submitted record</button>`
+    : `<label>Vendor <select name="vendor">
 <option value="didit"${r.vendor === 'didit' ? ' selected' : ''}>Didit</option>
 <option value="sumsub"${r.vendor === 'sumsub' ? ' selected' : ''}>Sumsub</option>
 </select>
@@ -620,7 +744,8 @@ export async function registerOnboardingRoutes(
 </label>
 <label>
 <input type="checkbox" name="identity_matches_owner" value="yes"> I checked that this verified identity belongs to this provider user and meets our policy.</label>
-<button name="decision" value="accept">Accept verified user</button>
+<button name="decision" value="accept">Accept verified user</button>`
+}
 <button name="decision" value="reject">Decline request</button>
 </form>
 </article>`,
@@ -690,7 +815,7 @@ export async function registerOnboardingRoutes(
       Params: { requestId: string };
       Body: {
         csrf: string;
-        vendor: Vendor;
+        vendor?: Vendor;
         reference?: string;
         verified_at?: string;
         identity_matches_owner?: string;
@@ -705,7 +830,7 @@ export async function registerOnboardingRoutes(
           body: {
             type: 'object',
             additionalProperties: false,
-            required: ['csrf', 'vendor', 'decision'],
+            required: ['csrf', 'decision'],
             properties: {
               csrf: csrfSchema,
               vendor: { type: 'string', enum: ['didit', 'sumsub'] },
@@ -732,7 +857,7 @@ export async function registerOnboardingRoutes(
             ...(request.body.verified_at
               ? { verified_at: request.body.verified_at }
               : {}),
-            vendor: request.body.vendor,
+            ...(request.body.vendor ? { vendor: request.body.vendor } : {}),
           },
         );
         return reply.redirect('/onboarding/review');
@@ -762,8 +887,8 @@ ${
     : ''
 }
 <p>Access lasts up to ${view.durationDays} days. You can pause or revoke it at any time. Each financial action still needs the provider’s authorization.</p>
-<p>Your provider may receive identity evidence to review your account. The requesting application funds agreed verification costs. <a href="${escape(view.privacyUrl)}">Read the provider’s privacy notice</a>.</p>
-<p><strong>${escape(view.verificationUrl ? 'Your identity verification session is ready.' : (statusLabels[view.status] ?? 'Your provider will help with the next step.'))}</strong>
+<p>${view.identitySource === 'application_record' ? 'Your application submitted a record for provider review. This is an unfunded evaluation; the record is not externally verified KYC.' : 'Your provider may receive identity evidence to review your account. The requesting application funds agreed verification costs.'} <a href="${escape(view.privacyUrl)}">Read the provider’s privacy notice</a>.</p>
+<p><strong>${escape(view.verificationUrl ? 'Your identity verification session is ready.' : view.identitySource === 'application_record' && view.status === 'provider_review_required' ? 'Your provider is reviewing your submitted record.' : (statusLabels[view.status] ?? 'Your provider will help with the next step.'))}</strong>
 </p>${
             view.status === 'consent_required'
               ? `<form method="post">

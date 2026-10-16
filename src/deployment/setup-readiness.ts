@@ -3,6 +3,10 @@ import type { ProviderConfiguration } from './config.js';
 /** Configuration warnings only. Never infer remote readiness from these inputs. */
 export function setupWarnings(config: ProviderConfiguration): string[] {
   const warnings: string[] = [];
+  if (config.policy.identity?.records)
+    warnings.push(
+      'Application-record evaluation uses provider-reviewed application assertions, not externally verified KYC. Keep wallets unfunded; financial signing is unavailable.',
+    );
   if (!config.activation.enabled)
     warnings.push(
       'Wallet operations are disabled. Complete the wallet backend and recovery tests, then enable operations in Deployment, export and restart the service.',
@@ -18,6 +22,7 @@ export function setupWarnings(config: ProviderConfiguration): string[] {
       );
   }
   for (const [index, application] of config.policy.applications.entries()) {
+    if (config.policy.identity?.records) continue;
     if (application.enabled === false) continue;
     if (!application.funding)
       warnings.push(

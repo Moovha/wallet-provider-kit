@@ -217,12 +217,12 @@ file does not set one. HTTPS ingress remains necessary. Use
 
 Before admitting real traffic, retain reviewable evidence for your exact environment:
 
-| Evidence                     | What your team must establish                                                                                                                   |
-| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| Backend acceptance           | Supported network/account type, exact account binding, restart/replay, concurrent denial and uncertain-result handling for the selected backend |
-| Recovery acceptance          | Restorable private records and backend/vault access, retained assignments/attempts, recovery of unknown outcomes without replacement effects    |
-| Token acceptance, if signing | Exact Base Sepolia ERC-3009 contract/domain, recipients, limits, delegation consent and independently verified signature behavior               |
-| Service acceptance           | Compatible owner login/API tokens, vendor test workflow/sharing, funded identity costs, staff review, consent, revocation and HTTPS operation   |
+| Evidence                     | What your team must establish                                                                                                                                                        |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Backend acceptance           | Supported network/account type, exact account binding, restart/replay, concurrent denial and uncertain-result handling for the selected backend                                      |
+| Recovery acceptance          | Restorable private records and backend/vault access, retained assignments/attempts, recovery of unknown outcomes without replacement effects                                         |
+| Token acceptance, if signing | Exact Base Sepolia ERC-3009 contract/domain, recipients, limits, delegation consent and independently verified signature behavior                                                    |
+| Service acceptance           | Compatible owner login/API tokens, selected identity source, staff review, consent, revocation and HTTPS operation; vendor routes also require workflow/sharing and identity funding |
 
 Use the [conformance checklist](conformance.md), your selected backend guide and
 [Auth0 verification steps](auth0-setup.md#_6-confirm-the-tenant-works-before-admitting-traffic).
@@ -268,8 +268,8 @@ The developer integrates these stages using [the HTTP guide](http-api.md),
 
 1. Create an access request and open the returned provider consent URL in the
    owner's top-level browser. Use its returned URL, not a guessed route.
-2. Complete owner login, consent, funded identity verification/import and staff
-   acceptance. Poll for the accepted account/grant; do not assume instant approval.
+2. Complete owner login, consent and staff acceptance of the submitted record.
+   Vendor configurations also require funded identity verification/import. Poll for the accepted account/grant; do not assume instant approval.
 3. Provision the accepted account with an empty JSON body and retain its ID.
 4. If signing is configured, obtain `transfers:request` delegation during onboarding,
    request an exact transfer authorization, then sign the provider-authorized

@@ -29,6 +29,7 @@ import type {
   Permission,
   ProviderState,
   Vendor,
+  ApplicationIdentityRecord,
 } from './types.js';
 
 export function ownerKey(
@@ -68,6 +69,11 @@ export class OnboardingService {
     private readonly transferPolicyRevision?: string,
   ) {
     const resolved = defineOnboardingPolicy(input);
+    if (
+      resolved.identity.records &&
+      (adapters.length || transferPolicyRevision)
+    )
+      throw new WalletProviderError('wallet_provider_configuration');
     this.policy = Object.freeze({
       ...resolved,
       revision: fingerprint([
@@ -176,7 +182,11 @@ export class OnboardingService {
         ? 'reconciliation_required'
         : 'identity_pending';
     if (request.evidence?.status === 'rejected') return 'denied';
-    if (request.evidence || request.verification)
+    if (
+      request.evidence ||
+      request.verification ||
+      request.input.identity_record
+    )
       return 'provider_review_required';
     return 'verification_required';
   }
@@ -203,6 +213,7 @@ export class OnboardingService {
     const input = normalizeInput(
       structuredClone(value),
       application(this.policy, context.principal),
+      this.policy.identity.records,
     );
     const delegatesTransfers =
       input.authorization_details[0].actions.includes('transfers:request');
@@ -253,6 +264,113 @@ export class OnboardingService {
       return this.receipt(state, request);
     });
   }
+  accessPolicy(principal: VerifiedPrincipal) {
+    application(this.policy, principal);
+    return {
+      source: this.policy.identity.records
+        ? 'application_record'
+        : 'vendor_verification',
+      evaluation_only: Boolean(this.policy.identity.records),
+      required_fields: [
+        ...(this.policy.identity.records?.requiredFields ?? []),
+      ],
+      maximum_field_characters: 512,
+      owner_consent_required: true,
+      provider_review_required: true,
+    };
+  }
+  async submitRecords(
+    inputContext: AuthorityContext,
+    records: ApplicationIdentityRecord[],
+  ) {
+    const context = this.context(inputContext);
+    if (!this.policy.identity.records) deny();
+    if (!Array.isArray(records) || !records.length || records.length > 50)
+      invalid();
+    const policy = this.policy.identity.records;
+    const app = application(this.policy, context.principal);
+    const seen = new Set<string>();
+    const inputs = structuredClone(records).map((record) => {
+      try {
+        const input = normalizeInput(
+          {
+            mode: 'create',
+            identity_record: record,
+            authorization_details: [
+              {
+                type: 'https://moovha.com/wallet/account-access',
+                actions: ['account:read'],
+              },
+            ],
+          },
+          app,
+          policy,
+        );
+        if (seen.has(input.identity_record!.reference)) return undefined;
+        seen.add(input.identity_record!.reference);
+        return input;
+      } catch (error) {
+        if (
+          error instanceof WalletProviderError &&
+          error.code === 'wallet_provider_input'
+        )
+          return undefined;
+        throw error;
+      }
+    });
+    const key = fingerprint([
+      context.principal.issuer,
+      context.principal.subject,
+      context.principal.clientId,
+      'record-batch',
+      context.idempotencyKey,
+    ]);
+    const hash = fingerprint(
+      records.map((record, index) => inputs[index] ?? record),
+    );
+    await this.store.transaction((state) => {
+      const previous = state.idempotency[key];
+      if (previous && previous.hash !== hash) conflict();
+      state.idempotency[key] = { hash, id: context.idempotencyKey };
+    });
+    const results: (
+      | { index: number; status: 'invalid'; required_fields: string[] }
+      | {
+          index: number;
+          status: 'submitted';
+          receipt: Awaited<ReturnType<OnboardingService['request']>>;
+        }
+    )[] = [];
+    for (const [index, input] of inputs.entries()) {
+      if (!input) {
+        results.push({
+          index,
+          status: 'invalid',
+          required_fields: [...policy.requiredFields],
+        });
+        continue;
+      }
+      const bytes = fingerprint(['record-item', context.idempotencyKey, index])
+        .slice(0, 32)
+        .split('');
+      bytes[12] = '4';
+      bytes[16] = '8';
+      const id = bytes.join('');
+      const itemKey = [
+        id.slice(0, 8),
+        id.slice(8, 12),
+        id.slice(12, 16),
+        id.slice(16, 20),
+        id.slice(20),
+      ].join('-');
+      const receipt = await this.request(
+        { ...context, idempotencyKey: itemKey },
+        input,
+      );
+      results.push({ index, status: 'submitted', receipt });
+    }
+    return { results };
+  }
   async consentView(id: string, identity: OwnerIdentity) {
     const owner = this.freshOwner(identity);
     return this.store.transaction((state) => {
@@ -273,6 +391,9 @@ export class OnboardingService {
         mode: request.input.mode,
         durationDays: this.policy.access.maxAgeDays,
         status,
+        ...(this.policy.identity.records
+          ? { identitySource: 'application_record' as const }
+          : {}),
         ...(status === 'provider_review_required' &&
         request.verification &&
         !request.evidence
@@ -361,7 +482,8 @@ export class OnboardingService {
           account &&
           account.status === 'active' &&
           account.acceptedUntil > Date.now() &&
-          account.acceptanceRevision === this.policy.revision
+          account.acceptanceRevision === this.policy.revision &&
+          !this.policy.identity.records
         )
           this.grant(state, request);
       }
@@ -593,6 +715,15 @@ export class OnboardingService {
           reference: r.evidence?.reference ?? r.verification?.reference,
           verifiedAt: r.evidence?.verifiedAt,
           status: this.stateOf(state, r),
+          ...(this.policy.identity.records && r.input.identity_record
+            ? {
+                applicationRecord: structuredClone(r.input.identity_record),
+                application: application(this.policy, {
+                  ...r.caller,
+                  scopes: [],
+                }).name,
+              }
+            : {}),
         })),
     );
   }
@@ -707,6 +838,22 @@ export class OnboardingService {
         audit(state, 'provider_rejected', id, this.policy.revision);
         return this.receipt(state, request);
       });
+    if (this.policy.identity.records) {
+      const record = before.input.identity_record;
+      if (!record || !input.identity_matches_owner) deny();
+      if (input.vendor || input.reference || input.verified_at) invalid();
+      return this.acceptReviewed(reviewer, id, before, {
+        evidenceKey: fingerprint([
+          'application-record',
+          before.caller.issuer,
+          before.caller.clientId,
+          record.reference,
+        ]),
+        evidenceHash: fingerprint([before.caller, record, before.revision]),
+        expiresAt: Date.now() + this.policy.identity.maxAgeDays * day,
+        source: 'application_record',
+      });
+    }
     const vendor =
       before.evidence?.vendor ??
       before.verification?.vendor ??
@@ -760,6 +907,27 @@ export class OnboardingService {
       verifiedAt.slice(0, 19)
     )
       deny();
+    return this.acceptReviewed(reviewer, id, before, {
+      evidenceKey: fingerprint([vendor, reference]),
+      expiresAt: verifiedTime + this.policy.identity.maxAgeDays * day,
+      evidence: {
+        ...evidence,
+        verifiedAt: new Date(verifiedTime).toISOString(),
+      },
+    });
+  }
+  private async acceptReviewed(
+    reviewer: string,
+    id: string,
+    before: AccessRequest,
+    proof: {
+      evidenceKey: string;
+      evidenceHash?: string;
+      expiresAt: number;
+      evidence?: IdentityEvidence;
+      source?: 'application_record';
+    },
+  ) {
     return this.store.transaction((state) => {
       const request = this.current(state, id, true);
       if (
@@ -767,10 +935,12 @@ export class OnboardingService {
         request.denied ||
         !request.consent ||
         request.grantId ||
-        fingerprint(request.evidence) !== fingerprint(before.evidence)
+        fingerprint(request.evidence) !== fingerprint(before.evidence) ||
+        fingerprint(request.input) !== fingerprint(before.input)
       )
         conflict();
-      const evidenceKey = fingerprint([vendor, reference]);
+      const { evidenceKey, expiresAt } = proof;
+      const evidenceHash = proof.evidenceHash ?? evidenceKey;
       if (
         state.evidenceOwners[evidenceKey] &&
         state.evidenceOwners[evidenceKey] !== request.owner
@@ -783,16 +953,13 @@ export class OnboardingService {
         request.accountId = existing.id;
       const account = state.accounts[request.accountId];
       if (account && account.owner !== request.owner) deny();
-      const expiresAt = verifiedTime + this.policy.identity.maxAgeDays * day;
-      request.evidence = {
-        ...evidence,
-        verifiedAt: new Date(verifiedTime).toISOString(),
-      };
+      if (proof.evidence) request.evidence = proof.evidence;
       request.acceptance = {
         reviewer,
-        evidenceHash: evidenceKey,
+        evidenceHash,
         at: Date.now(),
         expiresAt,
+        ...(proof.source ? { source: proof.source } : {}),
       };
       if (request.importAttempt) request.importAttempt.state = 'complete';
       state.evidenceOwners[evidenceKey] = request.owner!;
@@ -803,8 +970,11 @@ export class OnboardingService {
         status: 'active',
         acceptedUntil: expiresAt,
         acceptanceRevision: this.policy.revision,
-        evidenceHash: evidenceKey,
+        evidenceHash,
+        ...(proof.source ? { identitySource: proof.source } : {}),
       };
+      if (!proof.source)
+        delete state.accounts[request.accountId].identitySource;
       // A completed identity review can be reused, but expired application consent cannot create access.
       if (request.expiresAt > Date.now()) this.grant(state, request);
       audit(state, 'provider_accepted', id, this.policy.revision);
@@ -881,6 +1051,9 @@ export class OnboardingService {
       const account = state.accounts[accountId];
       return {
         account_id: account.id,
+        ...(account.identitySource
+          ? { identity_source: account.identitySource, evaluation_only: true }
+          : {}),
         ...(account.address ? { address: account.address } : {}),
         status: account.address ? 'provisioned' : 'accepted',
       };

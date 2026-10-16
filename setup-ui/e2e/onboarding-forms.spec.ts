@@ -261,3 +261,186 @@ test('browser consent, verification handoff, review and revocation preserve Orig
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+test('application records require browser owner consent and a separate provider decision', async ({
+  page,
+}) => {
+  const origin = 'https://wallet.example.test';
+  const issuer = 'https://issuer.example.test';
+  const directory = await mkdtemp(join(tmpdir(), 'wpk-browser-records-'));
+  const ownerSession = randomBytes(32).toString('base64url');
+  const reviewerSession = randomBytes(32).toString('base64url');
+  const csrf = randomBytes(32).toString('base64url');
+  const principal = {
+    issuer,
+    subject: 'offline-worker',
+    clientId: 'offline-client',
+    scopes: ['wallet:access', 'wallet:access:read', 'wallet:account:read'],
+  };
+  const onboarding = new OnboardingService(
+    {
+      version: '1',
+      provider: {
+        name: 'Offline provider',
+        origin,
+        privacyUrl: origin + '/privacy',
+      },
+      applications: [
+        {
+          issuer,
+          clientId: principal.clientId,
+          name: 'Offline application',
+          permissions: ['account:read'],
+        },
+      ],
+      identity: {
+        maxAgeDays: 7,
+        records: { requiredFields: ['display_name', 'country'] },
+      },
+    },
+    createFileOnboardingStore(directory),
+  );
+  const app = await createServer({
+    service: new EmbeddedWalletService(onboarding.walletAuthority(), {
+      provider: 'offline-no-effects',
+      createAccount: async () => {
+        throw new Error('Unexpected provisioning');
+      },
+      findAccount: async () => null,
+      signTypedData: async () => {
+        throw new Error('Unexpected signing');
+      },
+    }),
+    authenticate: async () => principal,
+    ready: async () => true,
+    onboarding: {
+      service: onboarding,
+      reviewers: ['reviewer'],
+      login: {
+        start: async () => {
+          throw new Error('Unexpected login');
+        },
+        finish: async () => {
+          throw new Error('Unexpected callback');
+        },
+        session: async (token) => {
+          if (![ownerSession, reviewerSession].includes(token))
+            throw new AuthenticationError(401);
+          return {
+            csrf,
+            identity: {
+              issuer,
+              subject: token === ownerSession ? 'owner' : 'reviewer',
+              authenticatedAt: Date.now(),
+            },
+          };
+        },
+      },
+    },
+  });
+  const session = async (value: string) =>
+    page
+      .context()
+      .addCookies([
+        { name: '__Host-wpk-session', value, url: origin, secure: true },
+      ]);
+  try {
+    await page.route('**/*', async (route) => {
+      const request = route.request();
+      expect(new URL(request.url()).origin).toBe(origin);
+      const headers = await request.allHeaders();
+      const response = await app.inject({
+        method: request.method() as 'GET' | 'POST',
+        url: new URL(request.url()).pathname,
+        headers,
+        ...(request.postData() ? { payload: request.postData()! } : {}),
+      });
+      if (request.method() === 'POST') {
+        expect(headers.origin).toBe(origin);
+        expect(response.statusCode).toBe(302);
+      }
+      await route.fulfill({
+        status: response.statusCode,
+        headers: response.headers as Record<string, string>,
+        body: response.body,
+      });
+    });
+    const batch = await app.inject({
+      method: 'POST',
+      url: '/v1/access-records',
+      headers: { 'idempotency-key': randomUUID() },
+      payload: {
+        records: [
+          {
+            reference: 'fictional-a',
+            fields: {
+              display_name: '<script>unexpected()</script>',
+              country: 'ZA',
+              kyc_status: 'approved',
+            },
+          },
+        ],
+      },
+    });
+    expect(batch.statusCode).toBe(200);
+    const receipt = batch.json().results[0].receipt;
+    await session(ownerSession);
+    await page.goto(origin + '/onboarding/' + receipt.request_id);
+    await expect(
+      page.getByText(/record is not externally verified KYC/),
+    ).toBeVisible();
+    await page.getByRole('button', { name: 'Allow requested access' }).click();
+    await expect(
+      page.getByText('Your provider is reviewing your submitted record.', {
+        exact: true,
+      }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Continue verification' }),
+    ).toHaveCount(0);
+    await session(reviewerSession);
+    await page.goto(origin + '/onboarding/review');
+    const review = page.locator(
+      `form[action="/onboarding/review/${receipt.request_id}"]`,
+    );
+    await expect(
+      review.getByText('<script>unexpected()</script>', { exact: true }),
+    ).toBeVisible();
+    await expect(review.getByText('kyc_status', { exact: true })).toHaveCount(
+      0,
+    );
+    await expect(
+      review.locator('[name=vendor], [name=verified_at]'),
+    ).toHaveCount(0);
+    await page.screenshot({
+      path: 'artifacts/application-record-review.png',
+      fullPage: true,
+    });
+    await review.locator('[name=identity_matches_owner]').check();
+    await review
+      .getByRole('button', { name: 'Accept submitted record' })
+      .click();
+    await expect(
+      page.getByText('No requests need review.', { exact: true }),
+    ).toBeVisible();
+    const granted = await onboarding.read(
+      { principal, idempotencyKey: randomUUID() },
+      receipt.request_id,
+    );
+    expect(
+      await onboarding.account(principal, granted.account_id!),
+    ).toMatchObject({
+      evaluation_only: true,
+      identity_source: 'application_record',
+    });
+    await session(ownerSession);
+    await page.goto(origin + '/onboarding/access');
+    await page.getByRole('button', { name: 'Revoke access' }).click();
+    await expect(
+      onboarding.account(principal, granted.account_id!),
+    ).rejects.toThrow();
+  } finally {
+    await app.close();
+    await rm(directory, { recursive: true, force: true });
+  }
+});

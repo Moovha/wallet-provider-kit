@@ -59,6 +59,10 @@ export function operationStatus(
   if (!guide.scope) return 'No access token needed';
   if (guide.financial && !config.financial)
     return 'Transfer signing is off in Policies';
+  if (guide.records && !config.policy.identity?.records)
+    return 'Select application records in Services to use batch submission';
+  if (guide.vendor && config.policy.identity?.records)
+    return 'Select an identity vendor in Services to import verification';
   const app = config.policy.applications[applicationIndex];
   if (!app?.clientId || !app.issuer || app.issuer !== config.oauth.issuer)
     return "Complete this application's registration in Policies and Services";
@@ -79,9 +83,27 @@ export function requestExample(
   config: ProviderConfiguration,
   applicationIndex: number,
 ): object | undefined {
+  const identityRecord = {
+    reference: 'evaluation-owner-001',
+    fields: Object.fromEntries(
+      (
+        config.policy.identity?.records?.requiredFields ?? [
+          'display_name',
+          'country',
+        ]
+      ).map((field) => [
+        field,
+        field === 'country' ? 'ZA' : 'Fictional evaluation value',
+      ]),
+    ),
+  };
+  if (id === 'submitAccountAccessRecords') return { records: [identityRecord] };
   if (id === 'requestAccountAccess')
     return {
       mode: 'create',
+      ...(config.policy.identity?.records
+        ? { identity_record: identityRecord }
+        : {}),
       authorization_details: [
         {
           type: 'https://moovha.com/wallet/account-access',
@@ -142,6 +164,29 @@ export function responseExample(id: string): object {
       profile: 'provider-signing-preview',
       status: 'experimental',
       configured: false,
+    };
+  if (id === 'getAccountAccessPolicy')
+    return {
+      source: 'application_record',
+      evaluation_only: true,
+      required_fields: ['country', 'display_name'],
+      maximum_field_characters: 512,
+      owner_consent_required: true,
+      provider_review_required: true,
+    };
+  if (id === 'submitAccountAccessRecords')
+    return {
+      results: [
+        {
+          index: 0,
+          status: 'submitted',
+          receipt: {
+            request_id: exampleId,
+            status: 'consent_required',
+            consent_url,
+          },
+        },
+      ],
     };
   if (id === 'provisionAccount') return { account_id: exampleId, address };
   if (id === 'readGrantedAccount')

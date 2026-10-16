@@ -20,9 +20,18 @@ export const defaultPermissions: readonly Permission[] = [
 ];
 export type Permission = (typeof permissions)[number];
 export type Vendor = 'didit' | 'sumsub';
+/** Application assertions for an unfunded evaluation; not externally verified identity evidence. */
+export interface ApplicationIdentityRecord {
+  reference: string;
+  fields: Record<string, string>;
+}
+export interface ApplicationRecordPolicy {
+  requiredFields: string[];
+}
 export interface AccessInput {
   mode: 'create' | 'connect';
   account_id?: string;
+  identity_record?: ApplicationIdentityRecord;
   authorization_details: [{ type: typeof accessType; actions: Permission[] }];
 }
 export interface ApplicationPolicy {
@@ -38,11 +47,15 @@ export interface OnboardingPolicy {
   version: string;
   provider: { name: string; origin: string; privacyUrl: string };
   applications: ApplicationPolicy[];
-  identity?: { maxAgeDays?: number };
+  identity?: {
+    maxAgeDays?: number;
+    /** Explicit provider-reviewed record submission for unfunded, read-only evaluation. */
+    records?: ApplicationRecordPolicy;
+  };
   access?: { maxAgeDays?: number };
 }
 export interface ResolvedPolicy extends OnboardingPolicy {
-  identity: { maxAgeDays: number };
+  identity: { maxAgeDays: number; records?: ApplicationRecordPolicy };
   access: { maxAgeDays: number };
   revision: string;
 }
@@ -108,6 +121,7 @@ export interface AccessRequest {
     evidenceHash: string;
     at: number;
     expiresAt: number;
+    source?: 'application_record';
   };
   grantId?: string;
 }
@@ -119,6 +133,7 @@ export interface AccountRecord {
   evidenceHash: string;
   status: 'active' | 'suspended';
   address?: string;
+  identitySource?: 'application_record';
 }
 export interface AccessGrant {
   transferPolicyRevision?: string;

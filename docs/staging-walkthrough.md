@@ -3,8 +3,10 @@
 Use **the FormKit GUI to configure**, **the supplied CLI to deploy**, and **the
 deployed Swagger and owner/reviewer pages to test the service**. This walkthrough
 checks onboarding, unfunded wallet creation, application access and recovery on
-your staging deployment. Use registered login and application clients, a vendor
-test identity workflow and the supported configured service.
+your staging deployment. Use registered login and application clients, your
+selected identity source and the supported configured service. The default
+[application-record evaluation](application-records.md) requires no KYC vendor;
+external verification needs that vendor's approved test workflow.
 
 Use a reviewed toolkit revision and the matching walkthrough for your staging
 deployment. Record the source revision, exported configuration revision and
@@ -17,14 +19,14 @@ Use a separate staging origin, application registrations, approved test identiti
 and private persistent storage. Keep all accounts unfunded and leave the financial
 profile absent for this walkthrough. Do not request signatures or submit transactions.
 
-| Prerequisite    | Evidence required before the corresponding step                                                                                                                     |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Host and HTTPS  | A persistent supported POSIX host, adequate free disk, supervision, private storage and a stable HTTPS origin trusted by the browser and service.                   |
-| Wallet backend  | A verified CDP project/key set, supported OWS vault, or existing Relayer signer pool; independently reviewed backend/recovery prerequisites.                        |
-| Owner login     | A real OIDC registration, exact provider callback, code flow, S256 PKCE, compatible ID tokens and test owner/reviewer accounts.                                     |
-| Application API | Two distinct registered application clients, issuer/audience/JWKS and RFC 9068 tokens with the required scopes and at most ten-minute lifetime.                     |
-| Identity        | An actual Didit test workflow or Sumsub test level/sharing setup, approved test evidence and confirmed cost limits/funding agreements. A key alone is insufficient. |
-| Recovery        | A protected backup destination, retained backend credentials or OWS vault, and a reviewed restore/lost-response procedure.                                          |
+| Prerequisite    | Evidence required before the corresponding step                                                                                                                                                                                                               |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Host and HTTPS  | A persistent supported POSIX host, adequate free disk, supervision, private storage and a stable HTTPS origin trusted by the browser and service.                                                                                                             |
+| Wallet backend  | A verified CDP project/key set, supported OWS vault, or existing Relayer signer pool; independently reviewed backend/recovery prerequisites.                                                                                                                  |
+| Owner login     | A real OIDC registration, exact provider callback, code flow, S256 PKCE, compatible ID tokens and test owner/reviewer accounts.                                                                                                                               |
+| Application API | Two distinct registered application clients, issuer/audience/JWKS and RFC 9068 tokens with the required scopes and at most ten-minute lifetime.                                                                                                               |
+| Identity        | For application-record evaluation: provider-required fields, fictional records and separate reviewer accounts. For vendor verification: an actual approved test workflow/level, test evidence and confirmed cost/funding limits; a key alone is insufficient. |
+| Recovery        | A protected backup destination, retained backend credentials or OWS vault, and a reviewed restore/lost-response procedure.                                                                                                                                    |
 
 If a required service is unavailable, mark its step **blocked** and record what
 is missing. You can continue preparation for other steps. A fixture-based result
@@ -49,11 +51,13 @@ Complete the [six wizard screens](setup-wizard.md#complete-the-six-steps):
 1. Set the real staging origin and privacy notice under **Provider**.
 2. Select the actual backend under **Backend**, using secret variable names only
    and a stable staging binding. CDP does not require a local vault.
-3. Configure the real owner login, application token issuer and identity test
-   workflow under **Services**. Supply reviewer subjects from that login issuer.
+3. Configure the real owner login and application token issuer under **Services**.
+   Keep application-record evaluation for the starter path and choose its required
+   fields, or configure your selected vendor test workflow. Supply reviewer subjects
+   from that login issuer.
 4. Register applications **A** and **B** under **Policies**, both allowed
-   `account:read`. Start with a one-day access limit. Configure confirmed identity
-   price bounds and the corresponding application funding agreement.
+   `account:read`. Start with a one-day access limit. Vendor verification also
+   needs confirmed price bounds and the corresponding application funding agreement.
 5. Under **Deployment**, keep activation disabled and enable the deployed API
    explorer. Optionally enable [operator token controls](operator-tokens.md) for
    the two applications, with explicit operator subjects and minimum scopes.
@@ -100,7 +104,33 @@ select application A and get scopes `wallet:access`, `wallet:access:read`,
 use the documented [manual token path](http-api.md#try-deployed-apis) with the
 same registered client. Do not change the token profile to bypass authentication.
 
-In Swagger, execute `POST /v1/access-requests` with a new UUIDv4 idempotency key:
+In Swagger, first execute `GET /v1/access-policy` as A. For the default
+`application_record` source, execute `POST /v1/access-records` with a new
+UUIDv4 idempotency key and fictional records containing the returned required
+fields. With the starter `display_name` and `country` policy:
+
+```json
+{
+  "records": [
+    {
+      "reference": "staging-owner-a",
+      "fields": { "display_name": "Fictional Staging Owner A", "country": "ZA" }
+    },
+    {
+      "reference": "incomplete-staging-example",
+      "fields": { "display_name": "Fictional Incomplete Record" }
+    }
+  ]
+}
+```
+
+Confirm the first item is `submitted` with a consent receipt, the second is
+`invalid`, and no wallet has been created. Retain the complete batch and key.
+Use the first item's receipt for the owner flow below. See the
+[batch contract](application-records.md#submit-records) for limits and replay.
+
+For `vendor_verification`, execute `POST /v1/access-requests` with a new
+UUIDv4 idempotency key:
 
 ```json
 {
@@ -115,7 +145,12 @@ In Swagger, execute `POST /v1/access-requests` with a new UUIDv4 idempotency key
 ```
 
 Open the returned consent URL as a top-level browser navigation. Sign in as the
-approved test owner and select **Allow requested access**. For a new vendor check,
+approved test owner and select **Allow requested access**. For application records,
+have the separate reviewer inspect the submitted fields, match the authenticated
+owner and choose **Accept submitted record**. Required fields alone must not grant
+access.
+
+For a new vendor check,
 choose **Continue verification**, then **Continue to identity verification** on
 the handoff page. Resuming the request uses its existing vendor session. Complete
 the configured vendor test verification, or import authorized test evidence through
@@ -137,18 +172,18 @@ product using its own server-held credentials.
 
 ## 5. Exercise policy denials in the deployed GUI
 
-| Action                                                                                | Expected result                                                                        |
-| ------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| Clear authorization and read the account                                              | Authentication denial; no provider effect.                                             |
-| Obtain A's token without `wallet:account:read` and read                               | Scope denial.                                                                          |
-| Select application B and read/provision A's account without B consent                 | Current-grant/object denial, despite a valid token and scopes.                         |
-| Sign in as another owner and attempt to manage the first owner's grant                | Owner isolation; no grant changes.                                                     |
-| Sign in as an owner at `/onboarding/review`                                           | Review denied unless that subject is independently a configured reviewer.              |
-| Pause access at `/onboarding/access`, then read or replay provisioning as A           | Both denied, including replay of a prior success.                                      |
-| Reconnect as A with `mode: connect` and the original account ID                       | Fresh owner consent required; the existing wallet is retained.                         |
-| Revoke that new grant, then read as A                                                 | Denied. Reconnection requires another request/consent.                                 |
-| Change the policy in the wizard, export, stop/replace/restart, then use the old grant | Stale-policy denial; follow current consent/identity requirements before new access.   |
-| Let the grant expire naturally, then read/replay                                      | Denied; reading must not extend its expiry. Mark pending until the real expiry occurs. |
+| Action                                                                                | Expected result                                                                                                                                     |
+| ------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Clear authorization and read the account                                              | Authentication denial; no provider effect.                                                                                                          |
+| Obtain A's token without `wallet:account:read` and read                               | Scope denial.                                                                                                                                       |
+| Select application B and read/provision A's account without B consent                 | Current-grant/object denial, despite a valid token and scopes.                                                                                      |
+| Sign in as another owner and attempt to manage the first owner's grant                | Owner isolation; no grant changes.                                                                                                                  |
+| Sign in as an owner at `/onboarding/review`                                           | Review denied unless that subject is independently a configured reviewer.                                                                           |
+| Pause access at `/onboarding/access`, then read or replay provisioning as A           | Both denied, including replay of a prior success.                                                                                                   |
+| Reconnect as A with `mode: connect` and the original account ID                       | Fresh owner consent required; the existing wallet is retained. Application-record mode also requires the complete record and fresh provider review. |
+| Revoke that new grant, then read as A                                                 | Denied. Reconnection requires another request/consent.                                                                                              |
+| Change the policy in the wizard, export, stop/replace/restart, then use the old grant | Stale-policy denial; follow current consent/identity requirements before new access.                                                                |
+| Let the grant expire naturally, then read/replay                                      | Denied; reading must not extend its expiry. Mark pending until the real expiry occurs.                                                              |
 
 Retain status codes and sanitized outcome summaries. Keep request bodies, tokens,
 signatures, full consent URLs, account/identity identifiers and vendor evidence
@@ -187,7 +222,9 @@ tests and evidence.
 
 Record each step as **passed**, **failed**, **blocked** or **pending**, with the
 actual GUI/CLI path and dependency used. A full configured-service rehearsal
-passes only after its required real dependencies and recovery cases pass. Keep
+passes only after its configured dependencies and recovery cases pass. Record
+the selected identity source; application-record evaluation does not establish
+external identity verification. Keep
 the staging deployment and its records private, supervised and recoverable;
 record whether it remains running or has been stopped. Do not delete a wallet,
 rotate credentials or remove authority records as routine cleanup.

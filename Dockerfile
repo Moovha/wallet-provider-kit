@@ -19,6 +19,7 @@ COPY --from=build --chown=node:node /app/dist ./dist
 COPY --chown=node:node package.json LICENSE NOTICE ./
 COPY --chown=node:node spec/provider-config.schema.json ./spec/provider-config.schema.json
 COPY --chown=node:node docs/provider.config.example.json ./docs/provider.config.example.json
+COPY --chown=node:node docs/provider.config.records.example.json ./docs/provider.config.records.example.json
 USER node
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=3s CMD node -e "fetch('http://127.0.0.1:8080/health/live').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"

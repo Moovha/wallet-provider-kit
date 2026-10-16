@@ -47,7 +47,10 @@ export async function createSetupServer(options: {
   if (!files.has('/index.html')) throw new Error('Setup assets unavailable');
   const example = JSON.parse(
     await readFile(
-      new URL('../../docs/provider.config.example.json', import.meta.url),
+      new URL(
+        '../../docs/provider.config.records.example.json',
+        import.meta.url,
+      ),
       'utf8',
     ),
   );

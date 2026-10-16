@@ -761,6 +761,27 @@ Request body (application/json):
       "type": "string",
       "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
     },
+    "identity_record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reference", "fields"],
+      "properties": {
+        "reference": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        },
+        "fields": {
+          "type": "object",
+          "minProperties": 1,
+          "maxProperties": 64,
+          "additionalProperties": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          }
+        }
+      }
+    },
     "authorization_details": {
       "type": "array",
       "minItems": 1,
@@ -860,6 +881,218 @@ Success response schema:
     "expires_at": {
       "type": "string",
       "format": "date-time"
+    }
+  }
+}
+```
+
+## GET /v1/access-policy
+
+Operation: `getAccountAccessPolicy`.
+
+| Status | Content type             | Description      |
+| ------ | ------------------------ | ---------------- |
+| 200    | application/json         | Default Response |
+| 400    | application/problem+json | Default Response |
+| 401    | application/problem+json | Default Response |
+| 403    | application/problem+json | Default Response |
+| 409    | application/problem+json | Default Response |
+| 413    | application/problem+json | Default Response |
+| 415    | application/problem+json | Default Response |
+| 422    | application/problem+json | Default Response |
+| 429    | application/problem+json | Default Response |
+| 500    | application/problem+json | Default Response |
+| 503    | application/problem+json | Default Response |
+
+Success response schema:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "source",
+    "evaluation_only",
+    "required_fields",
+    "maximum_field_characters",
+    "owner_consent_required",
+    "provider_review_required"
+  ],
+  "properties": {
+    "source": {
+      "type": "string",
+      "enum": ["application_record", "vendor_verification"]
+    },
+    "evaluation_only": {
+      "type": "boolean"
+    },
+    "required_fields": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "maximum_field_characters": {
+      "type": "integer"
+    },
+    "owner_consent_required": {
+      "type": "boolean",
+      "enum": [true]
+    },
+    "provider_review_required": {
+      "type": "boolean",
+      "enum": [true]
+    }
+  }
+}
+```
+
+## POST /v1/access-records
+
+Operation: `submitAccountAccessRecords`.
+
+| Parameter         | Location | Required | Schema                                                                                                |
+| ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
+| `idempotency-key` | header   | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+
+Request body (application/json):
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["records"],
+  "properties": {
+    "records": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 50,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["reference", "fields"],
+        "properties": {
+          "reference": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+          },
+          "fields": {
+            "type": "object",
+            "minProperties": 1,
+            "maxProperties": 64,
+            "additionalProperties": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512
+            }
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+| Status | Content type             | Description      |
+| ------ | ------------------------ | ---------------- |
+| 200    | application/json         | Default Response |
+| 400    | application/problem+json | Default Response |
+| 401    | application/problem+json | Default Response |
+| 403    | application/problem+json | Default Response |
+| 409    | application/problem+json | Default Response |
+| 413    | application/problem+json | Default Response |
+| 415    | application/problem+json | Default Response |
+| 422    | application/problem+json | Default Response |
+| 429    | application/problem+json | Default Response |
+| 500    | application/problem+json | Default Response |
+| 503    | application/problem+json | Default Response |
+
+Success response schema:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["results"],
+  "properties": {
+    "results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["index", "status"],
+        "properties": {
+          "index": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "status": {
+            "type": "string",
+            "enum": ["submitted", "invalid"]
+          },
+          "required_fields": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "receipt": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["request_id", "status", "consent_url"],
+            "properties": {
+              "request_id": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "consent_required",
+                  "verification_required",
+                  "funding_approval_required",
+                  "identity_pending",
+                  "reconciliation_required",
+                  "provider_review_required",
+                  "granted",
+                  "denied",
+                  "expired",
+                  "suspended",
+                  "revoked",
+                  "policy_changed"
+                ]
+              },
+              "consent_url": {
+                "type": "string",
+                "format": "uri"
+              },
+              "grant_id": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+              },
+              "account_id": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+              },
+              "permissions": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "account:read",
+                    "operations:request",
+                    "transfers:request"
+                  ]
+                }
+              },
+              "expires_at": {
+                "type": "string",
+                "format": "date-time"
+              }
+            }
+          }
+        }
+      }
     }
   }
 }
@@ -1073,6 +1306,14 @@ Success response schema:
     "account_id": {
       "type": "string",
       "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "identity_source": {
+      "type": "string",
+      "enum": ["application_record"]
+    },
+    "evaluation_only": {
+      "type": "boolean",
+      "enum": [true]
     },
     "status": {
       "type": "string",

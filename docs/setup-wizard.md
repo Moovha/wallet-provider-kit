@@ -125,7 +125,14 @@ JWKS URL separately. These can use the same compatible issuer but have different
 registrations. Follow the [Auth0 field mapping](auth0-setup.md#_5-copy-the-values-into-formkit)
 or [issuer requirements](operator-services.md#register-owner-login); URLs alone are insufficient.
 
-Select Didit, Sumsub or both. Enter your recipient workflow ID/level and credential
+New drafts select [application-record evaluation](application-records.md).
+Keep that option to submit fictional records containing your required fields,
+without a vendor key or verification budget. Owners still consent and staff review
+each record before unfunded account access. Choose required field names one per
+line; only those fields are retained.
+
+When your policy requires external verification, select Didit, Sumsub or both.
+That selection replaces the record source. Enter your recipient workflow ID/level and credential
 variable names. For each intended route, enable its **agreed price limit**, supply
 the maximum in USD cents and reference the actual terms. Import and new verification
 have separate price limits. Even free work needs an explicit agreed zero. Obtain these

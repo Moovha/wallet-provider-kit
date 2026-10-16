@@ -5,6 +5,18 @@ function setting(summary: string, why: string, source: string, guide: string) {
 }
 
 export const settings = {
+  applicationRecords: setting(
+    'Let an admitted application submit records for your unfunded evaluation without an identity vendor.',
+    'You can test owner consent, account access and recovery without creating a KYC vendor account. Your staff must match each submitted record to the authenticated owner and explicitly accept it. Required fields do not prove externally verified identity.',
+    'Keep this starter option for fictional evaluation records. It permits account reads and unfunded provisioning only. Select a vendor instead when your policy needs external verification or transfer signing.',
+    'application-records.html',
+  ),
+  recordFields: setting(
+    'The exact field names every application record must contain, one per line.',
+    'Admitted applications can discover these names through GET /v1/access-policy. Complete records in a submitted batch receive consent requests; incomplete records are marked invalid. No vendor is called.',
+    'Choose 1–16 lower-case names using letters, digits and underscores, beginning with a letter. Use only fields needed for your evaluation, for example display_name and country. Each required value is a non-empty string of at most 512 characters. The service retains only these fields and discards other submitted attributes.',
+    'application-records.html#submit-records',
+  ),
   providerName: setting(
     'The name people see when they sign in and approve wallet access.',
     'People need to recognise who operates their wallet service before sharing information or granting access.',

@@ -3,6 +3,8 @@ export interface OperationGuide {
   group: string;
   scope?: string;
   financial?: boolean;
+  records?: boolean;
+  vendor?: boolean;
   permission?: 'account:read' | 'operations:request' | 'transfers:request';
   prerequisite: string;
   success: string;
@@ -22,9 +24,28 @@ export const operationGuides: Record<string, OperationGuide> = {
     group: 'Application access',
     scope: 'wallet:access',
     prerequisite:
-      'Register and enable the calling application in your provider settings. Open consent_url as a full browser page so the owner can sign in and consent. Identity checks need an agreed vendor price and an application funding agreement, even for free checks.',
+      'Register and enable the calling application. Read GET /v1/access-policy for its required record fields. In application-record evaluation mode, include identity_record; no vendor credentials or verification budget are needed. Vendor checks require agreed pricing and application funding. Open consent_url so the owner can sign in and consent.',
     success:
       '200: a request ID, consent link and status. Wait for owner consent and provider review before using the account; this response does not create a wallet.',
+  },
+  getAccountAccessPolicy: {
+    title: 'Read required record fields',
+    group: 'Application access',
+    scope: 'wallet:access:read',
+    prerequisite:
+      'Use an enabled application registration and its API token. The response identifies the provider’s identity source and required submission fields without returning customer records.',
+    success:
+      '200: the selected source, required field names and consent/review requirements. Application records support unfunded evaluation and do not establish externally verified KYC.',
+  },
+  submitAccountAccessRecords: {
+    records: true,
+    title: 'Submit application records',
+    group: 'Application access',
+    scope: 'wallet:access',
+    prerequisite:
+      'Select application-record evaluation in provider policy. Read GET /v1/access-policy, then submit up to 50 records in a body no larger than 512 KiB. Each reference must be unique within the batch and fields must contain every required policy field. Only required fields are retained. Keep the batch idempotency key; a changed batch requires a new key.',
+    success:
+      '200: an indexed result for each record. Complete records receive their own access request and consent URL; incomplete or duplicate records are marked invalid. Replaying the original batch resumes its requests without duplicate creation. Submission makes no wallet or vendor call. Owner consent and explicit provider review are still required.',
   },
   getAccountAccessRequest: {
     title: 'Read access request status',
@@ -36,6 +57,7 @@ export const operationGuides: Record<string, OperationGuide> = {
       '200: the current request status. granted includes account and access-grant details. For funding_approval_required, arrange identity funding; for provider_review_required, wait for staff review; for reconciliation_required, ask the operator to investigate the original attempt.',
   },
   importAccessIdentity: {
+    vendor: true,
     title: 'Reuse shared identity evidence',
     group: 'Application access',
     scope: 'wallet:access',

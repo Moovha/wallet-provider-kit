@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased — application-record evaluation
+
+- Default new wizard drafts and CLI templates to application-supplied records
+  with provider-defined required fields, owner consent and explicit provider review.
+- Add admitted-client policy discovery and bounded batch submission with indexed
+  validation results, retained-field projection and durable item replay.
+- Keep this source limited to unfunded account provisioning and reads. It requires
+  no KYC vendor credentials or verification budget and does not establish
+  externally verified KYC or permit financial signing.
+
 ## Unreleased — operator interface language
 
 - Clarify setup labels, field guidance, validation messages and export steps for

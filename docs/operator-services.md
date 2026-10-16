@@ -1,7 +1,12 @@
 # Prepare services, registrations and secrets
 
 Use this checklist before completing the [setup wizard](setup-wizard.md). You can
-explore the wizard without these accounts, but placeholder values cannot run a
+start with [application-record evaluation](application-records.md) to try the
+service without a KYC vendor account. It uses admitted-client records, owner
+consent and provider review for unfunded wallets. Vendor credentials and pricing
+below apply only when you select external verification.
+
+You can explore the wizard without these accounts, but placeholder values cannot run a
 working provider. Examples use reserved `.example` domains and invented IDs.
 
 The **operator** prepares accounts, registrations, policy and deployment. The
