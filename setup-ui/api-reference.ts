@@ -1,3 +1,8 @@
+import {
+  operationGuides,
+  type OperationGuide,
+} from '../src/service/api-guides.js';
+export { operationGuides } from '../src/service/api-guides.js';
 import type { ProviderConfiguration } from './model.js';
 
 export interface ApiOperation {
@@ -25,106 +30,17 @@ export interface ApiContract {
   servers?: Array<{ url: string }>;
   [key: string]: unknown;
 }
-interface OperationGuide {
-  title: string;
-  group: string;
-  scope?: string;
-  financial?: boolean;
-  permission?: 'account:read' | 'operations:request';
-  prerequisite: string;
-  success: string;
-}
-// Educational annotations only. The deployed service always decides actual authority.
-export const operationGuides: Record<string, OperationGuide> = {
-  getCapabilities: {
-    title: 'Discover this provider',
-    group: 'Discovery',
-    prerequisite:
-      'Public discovery. configured reflects deployed readiness, not this local preview.',
-    success:
-      '200: profile and configured status. An unconfigured or disabled service can still return 200.',
-  },
-  requestAccountAccess: {
-    title: 'Request owner access',
-    group: 'Application access',
-    scope: 'wallet:access',
-    prerequisite:
-      'Allowed application registration. Open the returned consent_url in a top-level owner browser. Identity work needs agreed vendor prices and application funding, including free routes.',
-    success:
-      '200: an access receipt, initially requiring consent. This is not yet an access grant or a provisioned wallet.',
-  },
-  getAccountAccessRequest: {
-    title: 'Read access request status',
-    group: 'Application access',
-    scope: 'wallet:access:read',
-    prerequisite:
-      'Use the request_id from the access receipt and the same authorized caller. Wait for owner consent, identity verification and provider review.',
-    success:
-      '200: current receipt. Only granted includes usable account/grant details; funding_approval_required, provider_review_required or reconciliation_required need follow-up.',
-  },
-  importAccessIdentity: {
-    title: 'Import shared identity',
-    group: 'Application access',
-    scope: 'wallet:access',
-    prerequisite:
-      'Owner consent, an enabled recipient vendor/workflow, a fresh vendor share token and an agreed import price/application funding. Vendor evidence still needs provider acceptance.',
-    success:
-      '200: updated access receipt. Vendor acceptance alone is not provider acceptance; unknown imports must be reconciled.',
-  },
-  readGrantedAccount: {
-    title: 'Read a granted account',
-    group: 'Wallet accounts',
-    scope: 'wallet:account:read',
-    permission: 'account:read',
-    prerequisite:
-      'A current owner-bound account:read grant, accepted identity and matching application/caller.',
-    success:
-      '200: accepted or provisioned account status. An address is present after provisioning.',
-  },
-  provisionAccount: {
-    title: 'Provision an accepted account',
-    group: 'Wallet accounts',
-    scope: 'wallet:provision',
-    prerequisite:
-      'Use the accepted account_id and a current owner-bound grant. Empty JSON body. Retain the original idempotency key on retries; never replace an unknown attempt.',
-    success:
-      '200: account_id and address, including authorized replay. This does not approve spending.',
-  },
-  requestTransferAuthorization: {
-    title: 'Request exact transfer approval',
-    group: 'Owner-approved transfers',
-    scope: 'wallet:actions',
-    financial: true,
-    permission: 'operations:request',
-    prerequisite:
-      'Configured ERC-3009 profile, provisioned account and current operations:request grant. Recipient and integer base-unit amount must fit policy. Open the returned approval_url for separate owner approval.',
-    success:
-      '200: approval_required with the exact payload and expiry. Neither approval nor this response submits a transaction.',
-  },
-  getTransferAuthorization: {
-    title: 'Read transfer approval status',
-    group: 'Owner-approved transfers',
-    scope: 'wallet:actions:read',
-    financial: true,
-    permission: 'operations:request',
-    prerequisite:
-      'Use the returned action_id with the authorized application/caller. Current owner/grant/identity and policy checks still apply.',
-    success:
-      '200: approval_required, approved or denied. An approved action is not a signing or settlement receipt.',
-  },
-  signAction: {
-    title: 'Sign the approved stored action',
-    group: 'Owner-approved transfers',
-    scope: 'wallet:sign',
-    financial: true,
-    permission: 'operations:request',
-    prerequisite:
-      'Exact stored owner approval, current grant/identity/consent, unchanged policy and durable attempt authority. Empty JSON body. Preserve the original idempotency key, including after timeouts.',
-    success:
-      '200: verified signature, including authorized replay. Submission, gas and settlement are separate; a signature may remain executable until its on-chain expiry.',
-  },
-};
 export const exampleId = '10000000-0000-4000-8000-000000000001';
+
+export function deployedExplorerUrl(value: string): string | undefined {
+  try {
+    const url = new URL(value);
+    if (url.protocol === 'https:' && url.origin === value)
+      return `${value}/docs/`;
+  } catch {
+    /* An incomplete origin must not produce a live destination. */
+  }
+}
 
 export function referenceOrigin(value: string) {
   try {

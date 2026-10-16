@@ -4,6 +4,7 @@ import type { ProviderConfiguration } from '../model';
 import { docs } from '../model';
 import {
   curlExample,
+  deployedExplorerUrl,
   referenceOperations,
   referenceOrigin,
   referenceSpec,
@@ -14,6 +15,10 @@ const props = defineProps<{
   config: ProviderConfiguration;
   contract: ApiContract;
 }>();
+const emit = defineEmits<{ enableDocumentation: [] }>();
+const liveUrl = computed(() =>
+  deployedExplorerUrl(props.config.policy.provider.origin),
+);
 const applicationIndex = ref(0);
 const search = ref('');
 const showUnconfigured = ref(false);
@@ -152,6 +157,52 @@ async function copy() {
         setup-session token or vendor secrets.
       </p>
     </div>
+    <section class="callout api-live" aria-label="Try deployed APIs">
+      <span class="eyebrow">After deployment</span>
+      <h3>Try it out · real service responses</h3>
+      <p>
+        Open Swagger on your provider's HTTPS domain to send requests and see
+        the actual status, headers, response body and timing. Nothing runs
+        automatically. Your local preview and edits stay here.
+      </p>
+      <p v-if="!config.http?.documentation">
+        Enable the deployed explorer in this draft, then validate, export and
+        deploy the new configuration. Restart the service for it to take effect.
+      </p>
+      <button
+        v-if="!config.http?.documentation"
+        type="button"
+        class="secondary"
+        @click="emit('enableDocumentation')"
+      >
+        Enable deployed API explorer in draft
+      </button>
+      <p v-else>
+        Explorer enabled in this draft. Export and deploy it before opening the
+        link; this setting does not verify or activate the deployed service.
+      </p>
+      <p v-if="liveUrl">
+        <a :href="liveUrl" target="_blank" rel="noopener noreferrer">
+          Open deployed Try it out ↗</a
+        ><br /><code>{{ liveUrl }}</code>
+      </p>
+      <p v-else>
+        Set a valid Service HTTPS origin in Provider to create the deployment
+        link.
+      </p>
+      <p>
+        Start with GET /v1/capabilities without a token. For protected APIs, use
+        Authorize with a short-lived application access token. POST requests can
+        create records, incur vendor charges or produce usable signatures.
+      </p>
+      <a
+        :href="docs + 'http-api.html#try-deployed-apis'"
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        Deployment, token and testing instructions ↗</a
+      >
+    </section>
     <dl class="summary api-auth-summary">
       <div>
         <dt>API base URL</dt>

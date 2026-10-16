@@ -236,6 +236,16 @@ run validation/diagnostics, and restart with the same storage and binding.
 No file is hot-reloaded. Readiness can become 200 once local gates pass; that
 still does not continuously prove vendor availability or settlement.
 
+## Test the deployed API in Swagger
+
+Use the wizard's **API reference → Try it out** handoff to enable the deployed
+explorer, export and restart, then open your HTTPS origin at `/docs/`. Begin with
+public discovery; add a short-lived application token for protected calls.
+The [step-by-step live testing guide](http-api.md#try-deployed-apis) covers token
+issuance, actual responses, idempotency keys, required owner steps and troubleshooting.
+This is real API execution, including any admitted records, charges and signatures.
+Use your isolated acceptance deployment before wider admission.
+
 ## Hand the API to the product developer
 
 Provide the final HTTPS origin, [implemented OpenAPI](../spec/provider-api.json),
@@ -327,7 +337,7 @@ services:
     restart: unless-stopped
 ```
 
-With the [Compose path/UID variables](#optional-cdprelayer-container-path) restored
+With the [Compose path/UID variables](#optional-cdp-relayer-container-path) restored
 in your deployment environment, start using both files:
 
 ```sh

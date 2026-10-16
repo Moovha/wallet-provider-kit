@@ -141,7 +141,7 @@ configuration on the deployment host. For native deployment behind a local proxy
 use `127.0.0.1`, port `8080`. For the reference Compose deployment, use `0.0.0.0`,
 port `8080`, data directory `.provider-data`. The
 [deployment guide](operator-deployment.md) supplies private directory and volume setup.
-The optional documentation checkbox exposes API documentation on the deployed
+The **Enable deployed API explorer and Try it out** checkbox exposes Swagger on the deployed
 service; it is separate from this setup wizard and the public documentation site.
 
 Keep **Enable service activation in this export** off initially. Activation requires
@@ -213,8 +213,18 @@ It does not inspect live tokens, stored grants, deployed readiness or vendor sta
 No provider request is executed: Try it out and token-entry controls are disabled.
 The setup-session token is never an application credential. Example responses,
 approval URLs, hashes and signatures are fictional and confer no authority.
-Production calls belong to the application's integration after deployment and
-acceptance; follow [the HTTP guide](http-api.md) and [API handoff](operator-deployment.md#hand-the-api-to-the-product-developer).
+For real responses after deployment, use the **Try it out · real service responses**
+card. Enable the deployed explorer in your draft, validate/export it and restart
+the service, then choose **Open deployed Try it out**. This opens Swagger on your
+configured HTTPS domain in a separate tab. No local configuration, credential or
+application permission preview is sent with the link. It does not check deployment
+status. The [live testing guide](http-api.md#try-deployed-apis) explains enabling
+`/docs/`, obtaining a token, the first request, real effects and troubleshooting.
+
+![Deployed Swagger shows an actual discovery response from an offline local fixture](public/screenshots/api-live.webp)
+
+This screenshot uses a local offline fixture with readiness closed. It demonstrates
+response rendering, not vendor connectivity or an accepted deployment.
 
 ## Use the exported files
 
@@ -271,10 +281,11 @@ and deployment process independently before enabling it.
 
 ## Screenshot maintenance
 
-The six step images and API reference use the example configuration with invented Acme settings and no
-secret values. Maintainers can rebuild and capture them with
+The six step images and local API reference use the example configuration with
+invented Acme settings and no secret values. The live explorer image uses an
+offline HTTP fixture with no backend adapter and readiness closed. Maintainers can rebuild and capture them with
 `npm run build` and `node scripts/capture-setup-docs.mjs` after installing the
-repository's Playwright Chromium. The script uses only a loopback setup server,
+repository's Playwright Chromium. The script uses only loopback setup/service fixtures,
 performs no vendor calls and writes PNGs under ignored `artifacts/setup-docs/`.
 The published WebP copies live in `docs/public/screenshots/`; inspect them when the
 UI changes. They are interface documentation, not acceptance evidence.

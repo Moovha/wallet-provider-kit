@@ -10,6 +10,10 @@ import type { EnrollmentService } from '../domain/enrollment.js';
 import type { VerifiedPrincipal } from '../domain/principal.js';
 import { WalletProviderError } from '../domain/signing.js';
 import { AuthenticationError, type Authenticate } from './auth.js';
+import {
+  liveApiSpecification,
+  liveRequestInterceptor,
+} from './live-api-docs.js';
 import { observeRequest } from './telemetry.js';
 import {
   registerOnboardingRoutes,
@@ -89,7 +93,22 @@ export async function createServer(options: ServerOptions = {}) {
     await app.register(swaggerUi, {
       routePrefix: '/docs',
       staticCSP: true,
-      uiConfig: { persistAuthorization: false, validatorUrl: null },
+      transformSpecification: (document) =>
+        liveApiSpecification(
+          document,
+          !!options.configurationProfile,
+          !!options.onboarding?.actions,
+        ),
+      uiConfig: {
+        layout: 'BaseLayout',
+        persistAuthorization: false,
+        validatorUrl: null,
+        supportedSubmitMethods: ['get', 'post'],
+        tryItOutEnabled: false,
+        displayRequestDuration: true,
+        defaultModelsExpandDepth: -1,
+        requestInterceptor: liveRequestInterceptor,
+      },
     });
   }
   const isReady = async () => {

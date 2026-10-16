@@ -1,6 +1,7 @@
 /** Recreate documentation screenshots using only the offline example configuration. */
 import { chromium } from '@playwright/test';
 import { mkdir, readFile } from 'node:fs/promises';
+import { createServer } from '../dist/service/server.js';
 import { createSetupServer } from '../dist/deployment/setup-server.js';
 
 const sample = JSON.parse(
@@ -31,6 +32,7 @@ await mkdir(output, { recursive: true });
 const token = 'offline-documentation-session';
 const app = await createSetupServer({ token });
 let browser;
+let liveApp;
 try {
   const url = await app.listen({ host: '127.0.0.1', port: 0 });
   browser = await chromium.launch({ channel: 'chromium' });
@@ -86,10 +88,36 @@ try {
     path: new URL('api-endpoints.png', output).pathname,
     animations: 'disabled',
   });
+  liveApp = await createServer({
+    documentation: true,
+    configurationProfile: 'provider-service-v1',
+  });
+  const liveUrl = await liveApp.listen({ host: '127.0.0.1', port: 0 });
+  await page.goto(`${liveUrl}/docs/`);
+  const discovery = page.locator('#operations-Discovery-getCapabilities');
+  await discovery.locator('.opblock-summary-control').click();
+  await discovery
+    .getByRole('button', { name: 'Try it out', exact: true })
+    .click();
+  await discovery.getByRole('button', { name: 'Execute', exact: true }).click();
+  await page
+    .getByText('"configured": false', { exact: false })
+    .first()
+    .waitFor();
+  await page.screenshot({
+    path: new URL('api-live.png', output).pathname,
+    fullPage: true,
+    animations: 'disabled',
+  });
+  await discovery.screenshot({
+    path: new URL('api-live-response.png', output).pathname,
+    animations: 'disabled',
+  });
   console.log(
-    'Captured six wizard steps and the API reference in artifacts/setup-docs.',
+    'Captured six wizard steps, the API reference and offline live responses in artifacts/setup-docs.',
   );
 } finally {
   await browser?.close();
   await app.close();
+  await liveApp?.close();
 }
