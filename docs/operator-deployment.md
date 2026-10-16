@@ -1,5 +1,10 @@
 # Deploy the wizard export
 
+For a new local CDP or Relayer evaluation, the wizard can perform file preparation,
+image build, storage initialization, diagnosis, startup and health checks with
+visible progress. Follow [automated local setup](local-setup.md). This guide covers
+manual deployment, final-host infrastructure and existing-service maintenance.
+
 This walkthrough follows a completed [wizard](setup-wizard.md) export. It uses a
 reviewed source checkout and a single persistent macOS or glibc Linux host. The
 commands configure and run the supplied service; no host application or adapter code is required.
@@ -64,7 +69,8 @@ Open `provider.env` with a local text editor or have your secret manager render 
 for the service account. Replace each empty value with the matching issued secret
 from the [credential guide](operator-services.md#put-references-in-the-wizard-values-in-the-deployment).
 For example, `WALLET_CDP_API_KEY_SECRET=` receives the CDP key secret. Login/vendor variables appear only when optional staff login or hosted compatibility features are configured. Keep the names exactly
-as exported. Do not put values in the wizard or JSON configuration.
+as exported. Do not put values in configuration fields or JSON. The separate local
+executor collects missing values privately when you explicitly start local setup.
 
 This file uses Node environment-file syntax: `NAME=value`, one entry per variable.
 Quote values containing spaces or `#`; preserve vendor key material exactly,

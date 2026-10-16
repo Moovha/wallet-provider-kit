@@ -6,6 +6,10 @@ import { spawn } from 'node:child_process';
 import Fastify from 'fastify';
 import { setupWarnings } from './setup-readiness.js';
 import {
+  createSetupExecutor,
+  type SetupExecutorOptions,
+} from './setup-executor.js';
+import {
   ConfigurationError,
   secretReferences,
   validateProviderConfiguration,
@@ -20,14 +24,16 @@ const contentTypes: Record<string, string> = {
   '.txt': 'text/plain; charset=utf-8',
 };
 
-/** This separate local tool validates deployment inputs; it never opens a provider or database. */
+/** Local configuration tool with an explicit, authenticated container-setup action. */
 export async function createSetupServer(options: {
   token: string;
   assetDirectory?: string;
+  executor?: SetupExecutorOptions;
 }) {
   const app = Fastify({ logger: false, bodyLimit: 65536 });
   const expiresAt = Date.now() + 60 * 60 * 1000;
   const token = Buffer.from(options.token);
+  const executor = createSetupExecutor(options.executor);
   const directory =
     options.assetDirectory ??
     fileURLToPath(new URL('../setup-ui/', import.meta.url));
@@ -99,7 +105,10 @@ export async function createSetupServer(options: {
     ),
   );
   app.get('/api/openapi', async () => contract);
-  app.get('/api/template', async () => ({ config: example }));
+  app.get('/api/template', async () => ({
+    config: example,
+    execution: executor.status(),
+  }));
   app.post('/api/validate', async (request, reply) => {
     try {
       const config = validateProviderConfiguration(request.body);
@@ -127,8 +136,44 @@ export async function createSetupServer(options: {
       });
     }
   });
+  const executionError = (
+    error: unknown,
+    reply: import('fastify').FastifyReply,
+  ) =>
+    reply.code(422).send({
+      issues:
+        error instanceof ConfigurationError
+          ? error.issues
+          : [
+              'Local setup could not complete this request. Check its progress and saved deployment instructions.',
+            ],
+    });
+  app.post('/api/setup/plan', async (request, reply) => {
+    try {
+      return await executor.prepare(request.body);
+    } catch (error) {
+      return executionError(error, reply);
+    }
+  });
+  app.post('/api/setup/start', async (request, reply) => {
+    try {
+      const body = request.body as { plan?: unknown; secrets?: unknown } | null;
+      return executor.start(body?.plan, body?.secrets);
+    } catch (error) {
+      return executionError(error, reply);
+    }
+  });
+  app.get('/api/setup/status', async () => executor.liveStatus());
+  app.post('/api/setup/stop', async (_request, reply) => {
+    try {
+      return await executor.stop();
+    } catch (error) {
+      return executionError(error, reply);
+    }
+  });
   app.get('/*', async (request, reply) => {
-    const path = request.url === '/' ? '/index.html' : request.url;
+    const pathname = request.url.split('?')[0];
+    const path = pathname === '/' ? '/index.html' : pathname;
     const file = files.get(path);
     if (!file) return reply.code(404).send({ error: 'not_found' });
     return reply.type(file.type).send(file.bytes);

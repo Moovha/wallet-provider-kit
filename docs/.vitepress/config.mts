@@ -59,6 +59,7 @@ export default defineConfig({
           { text: 'Application-led access', link: '/docs/application-access' },
           { text: 'Auth0 dashboard setup', link: '/docs/auth0-setup' },
           { text: 'Operator setup wizard', link: '/docs/setup-wizard' },
+          { text: 'Automated local setup', link: '/docs/local-setup' },
           { text: 'Deploy the export', link: '/docs/operator-deployment' },
           { text: 'GUI application tokens', link: '/docs/operator-tokens' },
           { text: 'Understand the roles', link: '/docs/concepts' },
@@ -120,6 +121,7 @@ export default defineConfig({
       {
         text: 'Operator setup',
         items: [
+          { text: 'Run locally with progress', link: '/docs/local-setup' },
           { text: '1. Get started', link: '/docs/' },
           {
             text: '2. Services and credentials',

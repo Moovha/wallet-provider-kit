@@ -29,11 +29,12 @@ vendor accounts or replace infrastructure and product integration work.
 
 The wizard builds a local configuration draft. Its fields define the backend,
 application trust, policy and server settings your deployment will use. You
-finish with three files: `provider.config.json` for the server,
-`provider.env.example` for private secret setup and `provider-setup.md` for the
-deployment checklist. Validation checks completeness and consistency; deployment
-and integration testing follow afterward. Changes take effect only when you
-deploy the reviewed configuration and restart the service.
+can finish with an automated local Docker Compose deployment for CDP or Relayer,
+or download three files for manual deployment. Local setup saves private files,
+builds the image, initializes new storage, diagnoses and starts the disabled service
+with visible progress. Validation alone checks completeness and consistency;
+external acceptance follows afterward. Existing services use reviewed configuration
+replacement and restart rather than the new-deployment executor.
 
 Install [Node.js](https://nodejs.org/en/download) **24.22.0**, npm **11.11.1** and
 [Git](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git) for your OS.
@@ -88,10 +89,12 @@ with your own prepared configuration; the screenshot is not a deployable setup._
    For a fresh login/token setup use the [Auth0 dashboard recipe](auth0-setup.md).
 2. **[Complete the six wizard screens](setup-wizard.md#complete-the-six-steps).**
    Configure Provider, Backend, Services, Policies and Deployment. Validate under
-   Export and download all three files. Enter secret variable names only.
-3. **[Deploy the export](operator-deployment.md).** Supply actual secrets, prepare
-   private persistent storage, initialize once, diagnose, start disabled and add
-   HTTPS. Complete acceptance, explicitly activate and retain recovery evidence.
+   Export. Enter secret variable names in the settings; supply missing values
+   privately only when starting local setup.
+3. **[Run local setup](local-setup.md)** with Docker Compose, or
+   **[deploy the export](operator-deployment.md)** manually. Setup can prepare
+   private files and storage and start the disabled container for you. Add HTTPS,
+   complete acceptance, explicitly activate and retain recovery evidence.
 4. **[Hand the API to your product developer](operator-deployment.md#hand-the-api-to-the-product-developer).**
    Supply the origin, OpenAPI, client/token details and supported policies.
    Users stay in the application. It submits accepted identity and consent evidence,
@@ -112,7 +115,7 @@ it, getting an application token, making a first request and interpreting real r
 renew application tokens in the deployed GUI without fetching/pasting them.
 
 Before a full deployment test, follow the [staging walkthrough](staging-walkthrough.md):
-configure/export in the GUI, deploy with the supplied CLI, then use deployed
+configure in the GUI, run local setup or deploy with the supplied CLI, then use deployed
 Swagger and the application’s user experience to prove unfunded provisioning, application
 access, policy denials and recovery. Mark a step blocked when its required service
 is unavailable. Offline fixtures do not validate that service's live integration.

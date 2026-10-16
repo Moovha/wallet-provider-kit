@@ -44,7 +44,7 @@ rail, the application's obligations and the current implementation boundary.
 [Get started](docs/README.md) ·
 [Operator wizard](docs/setup-wizard.md) ·
 [Services and credentials](docs/operator-services.md) ·
-[Deploy the export](docs/operator-deployment.md)
+[Run locally](docs/local-setup.md) · [Deploy the export](docs/operator-deployment.md)
 
 ## Start with the graphical setup
 
@@ -68,12 +68,17 @@ Keep the terminal open. The wizard is bundled; it needs no FormKit Pro subscript
 The package is experimental and not published to npm; a registry install by name
 is not available. See [getting started](docs/README.md) for installation help.
 
-You are preparing a local configuration draft throughout the wizard. Each field
-defines a setting the server will use after deployment. Finish by checking the
-draft and downloading `provider.config.json` (settings and policy),
+The wizard turns your settings into a deployment. After validation, choose
+**Set up and run locally** for CDP or Relayer: review the plan, supply missing
+secrets privately and watch setup save files, build the Docker image, initialize
+new storage, diagnose and start the service. It uses the single-host container
+security pattern and starts with wallet operations disabled. Requires a running
+local Docker engine with Compose; see [local setup](docs/local-setup.md).
+
+You can instead download `provider.config.json` (settings and policy),
 `provider.env.example` (secret variable names) and `provider-setup.md` (deployment
-checklist). Then take those files to your server, supply secrets and follow the
-deployment guide. The wizard does not install or update a running wallet service.
+checklist) for [manual deployment](docs/operator-deployment.md), including native OWS.
+Existing deployments are updated through the reviewed maintenance process.
 The [policy controls table](docs/application-access.md#configure-the-trust-policy)
 explains which access rules you can customize in the GUI and how they are enforced.
 
@@ -90,9 +95,10 @@ vendor services or certify readiness. Initial activation remains disabled._
 2. **[Configure the six screens](docs/setup-wizard.md):** Provider, Backend, Services,
    Policies, Deployment and Export. Application-led access is selected by default.
    Record application trust agreements and enter secret variable names, not values.
-3. **[Deploy and accept](docs/operator-deployment.md):** supply secrets privately,
-   initialize new persistent storage once, add HTTPS, test authority, backend and
-   recovery behavior, then explicitly activate. The wizard does not deploy.
+3. **[Run locally and accept](docs/local-setup.md):** let setup save private files,
+   initialize new storage once and start a disabled container. Add HTTPS, test
+   authority, backend and recovery behavior, then explicitly activate. Manual
+   deployments follow the [deployment guide](docs/operator-deployment.md).
 4. **[Connect your product](docs/application-access.md):** read access policy,
    submit current identity and consent evidence, receive a grant, create the wallet
    and revoke access when the user withdraws. Submission, gas and settlement remain
@@ -133,8 +139,9 @@ For unsupported integrations, use the [advanced adapter guide](docs/custom-adapt
 ## A foundation for adopting teams
 
 Operators can run `wallet-provider-kit setup` to configure supported deployments
-through the [FormKit setup wizard](docs/setup-wizard.md), then export configuration
-and a deployment checklist. No application code is needed for this setup path.
+through the [FormKit setup wizard](docs/setup-wizard.md), then run automated local
+container setup or export configuration and a deployment checklist. No application
+code is needed for this setup path.
 
 The standard path is **configure, deploy and consume the API**. Use one validated
 JSON configuration for application trust, identity requirements, wallet backends and SQLite storage.

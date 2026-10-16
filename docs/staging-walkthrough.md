@@ -24,12 +24,15 @@ Configure token issuer/audience/JWKS in Services. In Policies, choose
 application registrations, trust-agreement references, allowed permissions,
 identity age and access duration. Choose a backend
 and private storage. Keep wallet operations disabled initially. Enable the deployed
-API explorer if needed, then validate and download all three files.
+API explorer if needed, then validate. Choose automated local setup for a local
+container evaluation or download all three files for manual deployment.
 
-## 3. Deploy that export with the supplied CLI
+## 3. Start the isolated deployment
 
-Follow [deployment](operator-deployment.md) to supply secrets, initialize a new
-store once, diagnose, start and add HTTPS. Keep the origin and backend binding stable.
+For CDP or Relayer on a local machine, follow [local setup](local-setup.md) to supply
+missing secrets and watch the executor prepare files, build, initialize once,
+diagnose and start disabled. For manual or OWS setup, follow [deployment](operator-deployment.md).
+Add HTTPS in either case. Keep the origin and backend binding stable.
 Check `GET /v1/capabilities`: disabled activation should report `configured: false`.
 Complete the backend's isolated lifecycle/recovery acceptance and the authority
 checks below before admitting users. Record real reports and explicitly enable

@@ -1,7 +1,7 @@
 /** Recreate documentation screenshots using only the offline example configuration. */
 import { randomBytes } from 'node:crypto';
 import { chromium } from '@playwright/test';
-import { mkdir, readFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { createServer } from '../dist/service/server.js';
 import { createSetupServer } from '../dist/deployment/setup-server.js';
 
@@ -24,6 +24,8 @@ const app = await createSetupServer({ token });
 let browser;
 let liveApp;
 let tokenApp;
+let localApp;
+let localDirectory;
 try {
   const url = await app.listen({ host: '127.0.0.1', port: 0 });
   browser = await chromium.launch({ channel: 'chromium' });
@@ -234,6 +236,67 @@ try {
     fullPage: true,
     animations: 'disabled',
   });
+  // The executor fixture performs no Docker commands, database DDL or provider calls.
+  localDirectory = await mkdtemp('/tmp/wpk-local-docs-');
+  localApp = await createSetupServer({
+    token,
+    executor: {
+      root: `${localDirectory}/deployments`,
+      environment: {},
+      command: async (args) => {
+        if (args[0] === 'context') return 'unix:///offline/docker.sock';
+        if (args.includes('version')) return '2.40.0';
+        if (args.includes('info')) return 'linux';
+        if (args.includes('ps')) return 'api';
+        return '';
+      },
+    },
+  });
+  const localUrl = await localApp.listen({ host: '127.0.0.1', port: 0 });
+  await page.goto(`${localUrl}/#${token}`);
+  await page
+    .getByLabel('Import provider configuration', { exact: true })
+    .setInputFiles({
+      name: 'provider.config.json',
+      mimeType: 'application/json',
+      buffer: Buffer.from(JSON.stringify(sample)),
+    });
+  await page
+    .getByRole('status')
+    .filter({ hasText: 'Configuration imported' })
+    .waitFor();
+  await page.getByRole('tab', { name: 'Export', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Validate configuration', exact: true })
+    .click();
+  await page
+    .getByRole('status')
+    .filter({ hasText: 'Configuration valid' })
+    .waitFor();
+  await page
+    .getByRole('button', {
+      name: 'Check local setup prerequisites',
+      exact: true,
+    })
+    .click();
+  await page
+    .getByRole('heading', { name: 'Supply deployment secrets', exact: true })
+    .waitFor();
+  for (const field of await page.locator('.secret-value').all())
+    await field.fill('offline-documentation-value');
+  await page
+    .getByRole('button', { name: 'Start local setup', exact: true })
+    .click();
+  await page
+    .getByRole('heading', {
+      name: 'Local service running · wallet operations disabled',
+      exact: true,
+    })
+    .waitFor();
+  await page.locator('.local-setup').screenshot({
+    path: new URL('local-setup.png', output).pathname,
+    animations: 'disabled',
+  });
   console.log(
     'Captured six wizard steps, the API reference and offline live responses in artifacts/setup-docs.',
   );
@@ -242,4 +305,7 @@ try {
   await app.close();
   await liveApp?.close();
   await tokenApp?.close();
+  await localApp?.close();
+  if (localDirectory)
+    await rm(localDirectory, { recursive: true, force: true });
 }

@@ -7,7 +7,8 @@ the service stores its records. You are configuring a local draft throughout
 the six steps.
 
 At the end, **Validate configuration** checks that draft for completeness and
-consistency. Then download all three deployment files:
+consistency. Then choose **Set up and run locally** for an automated CDP/Relayer
+container deployment, or download all three files for manual deployment:
 
 | File                   | What you use it for                                                                                                           |
 | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
@@ -15,9 +16,11 @@ consistency. Then download all three deployment files:
 | `provider.env.example` | A template listing secret variable names. Supply their values privately on the deployment host or through its secret manager. |
 | `provider-setup.md`    | A deployment checklist with preparation tasks and CLI commands for your selected settings.                                    |
 
-Finishing the wizard leaves you with these files, ready for the
-[deployment steps](operator-deployment.md). Validation does not check credentials,
-test external integrations or deploy a service. Wallet operations start only
+The [local executor](local-setup.md) saves private files, builds the Docker image,
+initializes new storage once, diagnoses and starts the service with progress and
+health results. Requires a local Docker engine with Compose. Manual downloads are
+ready for the [deployment steps](operator-deployment.md). Validation alone does not
+check credentials, test external integrations or deploy a service. Wallet operations start only
 after you deploy, complete acceptance tests and explicitly enable them. Editing
 or downloading a draft does not change an existing deployment.
 
@@ -51,7 +54,8 @@ account or identity-vendor credential is needed for application-led access.
 
 Fields explain the expected value and its source. Expand **Why do I need this?
 Where do I get it?** for more detail. Secret fields take deployment variable names,
-not secret values. Keep the session open until the configuration is complete:
+not secret values. The separate local setup plan collects missing values privately
+when you start a deployment. Keep the session open until configuration is complete:
 downloads become available only after validation in Export. Incomplete drafts
 cannot be saved; refreshing or closing the page loses unsaved edits. Import a
 previously exported file to resume.
@@ -67,7 +71,7 @@ previously exported file to resume.
 | Services   | How the provider connects to token, login and identity-vendor services.                                  |
 | Policies   | Which access flow and identity requirements apply, which applications are trusted and what limits apply. |
 | Deployment | Where the server listens and stores private records, and which features it enables.                      |
-| Export     | Whether the draft is consistent and which files to take to your server.                                  |
+| Export     | Validate, review and start a local container deployment, or download files for manual setup.             |
 
 ### 1. Provider
 
@@ -170,8 +174,16 @@ Review the access flow, identity requirements, application permissions, backend
 and activation state. **Validate configuration** checks the draft you have been
 building across the earlier steps. Resolve any errors beside the named step and
 field. Check the per-application permission summary and deployment reminders,
-then download all three files listed at the start of this guide. Editing
-a setting afterward requires validation again before downloading.
+then choose **Check local setup prerequisites** to review the deployment plan,
+supply missing secrets and **Start local setup**. Follow progress through private
+file creation, image build, configuration validation, new storage initialization,
+diagnostics, startup and health checks. **Local service running · wallet operations
+disabled** is the expected first result. Follow [local setup](local-setup.md) for
+operation, recovery and the final-host handoff.
+
+Alternatively, download all three files listed at the start of this guide. Editing
+a setting afterward requires validation again. Starting local setup locks this
+session's configuration; existing-service changes use reviewed maintenance.
 
 ![Validated configuration and exports](public/screenshots/export.webp)
 
@@ -211,7 +223,12 @@ names and scopes. The deployed **Application tokens** panel can get or renew tok
 without exposing client secrets. These controls still enforce ordinary application
 trust and current wallet authority. See [operator tokens](operator-tokens.md).
 
-## Use the exported files
+## Use manual exports or finish local acceptance
+
+Automated local setup performs the file preparation, build, initialization,
+diagnosis and startup tasks below. Use its saved `provider-setup.md` for status,
+stop and restart commands. It retains private records after stopping. Add HTTPS
+and complete acceptance before enabling wallet operations; see [local setup](local-setup.md).
 
 Choose **Open the deployment guide** from Export. Build the same toolkit revision
 on the deployment host and copy all three files to a private directory outside
@@ -223,8 +240,8 @@ uses explicit `--env-file` arguments for native commands.
 A disabled first deployment is expected. Liveness returns HTTP 200 and readiness
 HTTP 503 until activation. Some end-to-end acceptance checks require explicit
 activation in an isolated test deployment with reviewed evidence; follow the
-staging walkthrough before wider admission. The wizard itself performs none of
-those checks.
+staging walkthrough before wider admission. The local executor checks startup
+health; it does not perform those external acceptance checks.
 
 Follow [deployment](operator-deployment.md) for private storage, local checks,
 HTTPS and backups, and the [staging walkthrough](staging-walkthrough.md) for

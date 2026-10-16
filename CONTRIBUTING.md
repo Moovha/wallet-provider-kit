@@ -156,6 +156,9 @@ no backend and readiness disabled. To update these images, run `npm run build`
 and `node scripts/capture-setup-docs.mjs` after installing the repository's
 Playwright Chromium. The script uses loopback fixtures, performs no vendor calls
 and writes PNGs under ignored `artifacts/setup-docs/`.
+The local setup progress image uses injected offline command responses and
+ephemeral private files. It executes no Docker commands, database DDL or provider
+calls. Label it as an offline fixture rather than evidence of a running service.
 
 Review the images against the interface, then update the WebP copies in
 `docs/public/screenshots/`. Screenshots document the interface; they do not

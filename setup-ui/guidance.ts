@@ -356,19 +356,19 @@ export const settings = {
   storage: setting(
     'The private folder on your server for wallet records, permissions and operation history.',
     'The SQLite database must survive restarts so retries and recovery use the same records. The supported service runs on one persistent host.',
-    'Keep .provider-data for a native deployment or choose a private persistent location. Relative paths start beside the configuration file. Arrange backups; do not use temporary or shared network storage.',
+    'Keep .provider-data or choose a private persistent location for manual deployment. Automated local setup uses .provider-data on a private host bind mount. Relative paths start beside the configuration file. Arrange backups; do not use temporary or shared network storage.',
     'operator-deployment.html',
   ),
   listenHost: setting(
     'Which network connections the service accepts on its server, before your HTTPS gateway forwards requests.',
     'The public web address and this internal listening address have different jobs. Your gateway supplies HTTPS; the service listens behind it.',
-    'For a native service with a gateway on the same host, keep 127.0.0.1. For the supplied container deployment, use 0.0.0.0 and restrict the published port. Use IPv6 only if your hosting setup requires it.',
+    'For a native service with a gateway on the same host, keep 127.0.0.1. Automated local setup uses 0.0.0.0 inside its container and publishes only on host loopback. For manual containers, restrict the published port. Use IPv6 only if your hosting setup requires it.',
     'operator-deployment.html#publish-through-https',
   ),
   port: setting(
     'The internal connection number the service listens on. You can usually keep 8080.',
     'Your HTTPS gateway must forward requests to this same port. Visitors still use your normal https:// address.',
-    'Keep the default unless another program uses it or your hosting setup requires a different port. Match your gateway or container settings to this value.',
+    'Keep the default unless another program uses it. Automated local setup publishes this host port and uses 8080 inside the container. For manual deployment, match your gateway or container settings to the selected port.',
     'operator-deployment.html#publish-through-https',
   ),
   explorer: setting(

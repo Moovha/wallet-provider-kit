@@ -863,3 +863,36 @@ footer img {
     gap: 1rem;
   }
 }
+.local-setup {
+  margin: 1.5rem 0;
+}
+.configuration-fields {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.local-path {
+  overflow-wrap: anywhere;
+}
+.execution-progress {
+  display: grid;
+  gap: 0.6rem;
+  padding-left: 1.4rem;
+}
+.setup-secret {
+  margin: 1rem 0;
+}
+.setup-secret label {
+  display: grid;
+  gap: 0.4rem;
+  overflow-wrap: anywhere;
+}
+.secret-value {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 0.7rem;
+  font: inherit;
+  -webkit-text-security: disc;
+}
