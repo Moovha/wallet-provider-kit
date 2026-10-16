@@ -63,9 +63,10 @@ const model = defineModel<ProviderConfiguration>({ required: true });
     <strong>What you’ll connect next</strong>
     <p>
       A wallet backend creates accounts and signs approved actions. A login
-      service signs people in. An identity verification service checks their
-      identity, and your staff review the evidence. Each step explains which
-      details to copy and which values you choose yourself.
+      service signs people in. Start with application-supplied records for an
+      unfunded evaluation, or connect a vendor for external identity checks.
+      Your staff review the submitted records or evidence. Each step explains
+      which details to copy and which values you choose yourself.
     </p>
     <a
       :href="docs + 'operator-services.html'"
