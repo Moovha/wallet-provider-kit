@@ -7,7 +7,10 @@ const model = defineModel<ProviderConfiguration>({ required: true });
 const identityDays = computed({
   get: () => model.value.policy.identity?.maxAgeDays ?? 365,
   set: (value: number) => {
-    model.value.policy.identity = { maxAgeDays: value };
+    model.value.policy.identity = {
+      ...model.value.policy.identity,
+      maxAgeDays: value,
+    };
   },
 });
 const accessDays = computed({
@@ -42,9 +45,10 @@ function financial(enabled: unknown) {
     <strong>Decide who can use the service and who pays</strong>
     <p>
       A connected application is a product that calls your wallet API. Add its
-      registration below, agree who covers identity checks, and name the staff
-      who review identity evidence. Agree these rules and costs with the people
-      operating the connected applications.
+      registration below and name the staff who review submitted records or
+      identity evidence. Vendor verification also needs an agreement about who
+      covers its costs. Agree these rules with the people operating the
+      connected applications.
     </p>
     <p>
       Transfer signing is optional. Leave it off if you only need wallet
@@ -65,7 +69,11 @@ function financial(enabled: unknown) {
       v-model="identityDays"
       type="number"
       :number="true"
-      label="Maximum age of identity checks (days)"
+      :label="
+        model.policy.identity?.records
+          ? 'Maximum age of accepted records (days)'
+          : 'Maximum age of identity checks (days)'
+      "
       min="1"
       max="365"
       validation="required|between:1,365"
@@ -133,20 +141,25 @@ function financial(enabled: unknown) {
       v-model="application.permissions"
       type="checkbox"
       label="Allowed permissions"
-      :options="[
-        { value: 'account:read', label: 'Read wallet accounts' },
-        {
-          value: 'operations:request',
-          label: 'Request wallet operations (advanced hosts)',
-        },
-        {
-          value: 'transfers:request',
-          label: 'Request transfers on behalf of users',
-        },
-      ]"
+      :options="
+        model.policy.identity?.records
+          ? [{ value: 'account:read', label: 'Read wallet accounts' }]
+          : [
+              { value: 'account:read', label: 'Read wallet accounts' },
+              {
+                value: 'operations:request',
+                label: 'Request wallet operations (advanced hosts)',
+              },
+              {
+                value: 'transfers:request',
+                label: 'Request transfers on behalf of users',
+              },
+            ]
+      "
       validation="required"
     />
     <SetupField
+      v-if="!model.policy.identity?.records"
       guide="fundingEnabled"
       type="checkbox"
       label="Record an identity funding agreement for this application"
@@ -157,7 +170,10 @@ function financial(enabled: unknown) {
           : undefined
       "
     />
-    <div v-if="application.funding" class="field-grid">
+    <div
+      v-if="!model.policy.identity?.records && application.funding"
+      class="field-grid"
+    >
       <SetupField
         guide="fundingReference"
         v-model="application.funding.agreement"
@@ -215,6 +231,11 @@ function financial(enabled: unknown) {
   </div>
   <div class="feature-panel">
     <h3>Optional delegated transfer signing</h3>
+    <p v-if="model.policy.identity?.records" class="help-text">
+      Application-record evaluation keeps wallets unfunded and permits reads
+      only. Select external identity verification in Services before configuring
+      transfers.
+    </p>
     <p>
       Allow applications to request token transfers within limits that owners
       accept during onboarding. Your service checks each transfer and signs its
@@ -225,6 +246,7 @@ function financial(enabled: unknown) {
       guide="financialEnabled"
       type="checkbox"
       label="Configure delegated transfer signing"
+      :disabled="!!model.policy.identity?.records"
       :modelValue="!!model.financial"
       @update:modelValue="financial($event)"
     />

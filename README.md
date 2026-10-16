@@ -68,12 +68,17 @@ _Example configuration only. Validation checks the configuration; it does not te
 vendor services or certify readiness. Initial activation remains disabled._
 
 1. **[Prepare services](docs/operator-services.md):** domain, wallet backend, login,
-   application token issuer, identity vendor, reviewers and funding agreements.
+   application token issuer and reviewers. Use application records for an
+   unfunded evaluation, or prepare vendor verification and its funding agreements.
    Each ID/secret is explained with its source. The [Auth0 recipe](docs/auth0-setup.md)
    gives a dashboard-based reference for login and compatible API tokens.
 2. **[Configure the six screens](docs/setup-wizard.md):** Provider, Backend, Services,
    Policies, Deployment and Export. Enter secret **variable names**, not values.
    Download configuration, the empty variable template and deployment checklist.
+   The starter [application-record workflow](docs/application-records.md) lets an
+   admitted application submit policy-required fields for provider review without
+   a KYC vendor account. Use fictional records and unfunded wallets; choose an
+   external vendor when your identity policy requires verified evidence.
 3. **[Deploy and accept](docs/operator-deployment.md):** fill secrets privately,
    prepare persistent storage, initialize once, diagnose, add HTTPS, prove backend
    and recovery behavior, then explicitly activate. The wizard does not deploy.

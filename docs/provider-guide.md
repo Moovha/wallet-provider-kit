@@ -10,7 +10,8 @@ This guide connects it to your application's permission checks, persistent recor
 
 For new integrations, start with [onboarding and application access](onboarding.md)
 and its [single configuration example](provider.config.example.ts). It supplies
-default policy evaluation, owner consent, provider review, Didit/Sumsub adapters,
+default policy evaluation, owner consent, provider review, application-record
+evaluation or optional Didit/Sumsub adapters,
 durable reference storage and journaled account creation. The interfaces below
 are for existing hosts and financial-action integration.
 

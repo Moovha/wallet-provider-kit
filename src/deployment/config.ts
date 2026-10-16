@@ -111,6 +111,15 @@ export function validateProviderConfiguration(
   const config = structuredClone(input) as unknown as ProviderConfiguration;
   try {
     defineOnboardingPolicy(config.policy);
+    if (config.policy.identity?.records) {
+      if (config.identity.didit || config.identity.sumsub || config.financial)
+        throw new ConfigurationError([
+          '/policy/identity/records: application records are an unfunded evaluation source; vendor verification and financial signing require a separate profile',
+        ]);
+    } else if (!config.identity.didit && !config.identity.sumsub)
+      throw new ConfigurationError([
+        '/identity: select application records or an identity vendor',
+      ]);
     createAuthenticator(config.oauth);
     trustedHttpsUrl(config.ownerLogin.issuer);
     if (

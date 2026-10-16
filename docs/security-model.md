@@ -94,3 +94,13 @@ expired operator session blocks renewal. These controls grant application token
 issuance, not wallet owner consent, identity acceptance or spending authority.
 [Operator instructions](operator-tokens.md) cover setup, scope limits and the
 lifetime of already-issued tokens after sign-out.
+
+## Application-record evaluation
+
+The starter profile accepts assertions from admitted applications solely for
+unfunded account evaluation. It retains provider-required fields and requires
+separate owner consent and provider review. Application claims of KYC approval,
+roles or spending permission confer no authority. The profile rejects external
+vendor adapters, operational/transfer permissions and financial signing. Existing
+vendor profiles retain their evidence checks; record acceptance cannot satisfy
+a later external-verification policy. See [application records](application-records.md).

@@ -9,6 +9,8 @@ import {
   type ApplicationPolicy,
   type OnboardingPolicy,
   type ResolvedPolicy,
+  type ApplicationRecordPolicy,
+  type ApplicationIdentityRecord,
 } from './types.js';
 import type { VerifiedPrincipal } from '../domain/principal.js';
 
@@ -50,7 +52,26 @@ export function defineOnboardingPolicy(
   try {
     keys(policy, ['version', 'provider', 'applications', 'identity', 'access']);
     keys(policy.provider, ['name', 'origin', 'privacyUrl']);
-    if (policy.identity) keys(policy.identity, ['maxAgeDays']);
+    if (policy.identity) keys(policy.identity, ['maxAgeDays', 'records']);
+    const records = policy.identity?.records;
+    if (records) {
+      keys(records, ['requiredFields']);
+      if (
+        !Array.isArray(records.requiredFields) ||
+        records.requiredFields.length < 1 ||
+        records.requiredFields.length > 16 ||
+        new Set(records.requiredFields).size !==
+          records.requiredFields.length ||
+        records.requiredFields.some(
+          (field) =>
+            typeof field !== 'string' ||
+            !/^[a-z][a-z0-9_]{0,63}$/.test(field) ||
+            ['constructor', 'prototype'].includes(field),
+        )
+      )
+        throw new Error();
+      records.requiredFields.sort();
+    }
     if (policy.access) keys(policy.access, ['maxAgeDays']);
     if (!text(policy.version) || !text(policy.provider.name, 100))
       throw new Error();
@@ -93,6 +114,13 @@ export function defineOnboardingPolicy(
       )
         throw new Error();
       if (
+        records &&
+        (app.permissions ?? defaultPermissions).some(
+          (p) => p !== 'account:read',
+        )
+      )
+        throw new Error();
+      if (
         app.funding &&
         (!text(app.funding.agreement) ||
           !Number.isSafeInteger(app.funding.monthlyLimitMinor) ||
@@ -100,7 +128,10 @@ export function defineOnboardingPolicy(
       )
         throw new Error();
     }
-    const identity = { maxAgeDays: policy.identity?.maxAgeDays ?? 365 };
+    const identity = {
+      maxAgeDays: policy.identity?.maxAgeDays ?? 365,
+      ...(records ? { records } : {}),
+    };
     const access = { maxAgeDays: policy.access?.maxAgeDays ?? 30 };
     for (const days of [identity.maxAgeDays, access.maxAgeDays])
       if (!Number.isInteger(days) || days < 1 || days > 365) throw new Error();
@@ -126,12 +157,19 @@ export function application(
 export function normalizeInput(
   value: AccessInput,
   app: ApplicationPolicy,
+  records?: ApplicationRecordPolicy,
 ): AccessInput {
   if (
     !value ||
     !['create', 'connect'].includes(value.mode) ||
     Object.keys(value).some(
-      (k) => !['mode', 'account_id', 'authorization_details'].includes(k),
+      (k) =>
+        ![
+          'mode',
+          'account_id',
+          'authorization_details',
+          'identity_record',
+        ].includes(k),
     )
   )
     invalid();
@@ -158,9 +196,41 @@ export function normalizeInput(
     new Set(actions).size !== actions.length
   )
     invalid();
+  let identityRecord: ApplicationIdentityRecord | undefined;
+  if (records) {
+    const record = value.identity_record;
+    if (
+      !record ||
+      typeof record !== 'object' ||
+      Array.isArray(record) ||
+      Object.keys(record).some(
+        (key) => !['reference', 'fields'].includes(key),
+      ) ||
+      typeof record.reference !== 'string' ||
+      !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(record.reference) ||
+      !record.fields ||
+      typeof record.fields !== 'object' ||
+      Array.isArray(record.fields) ||
+      Object.keys(record.fields).length > 64 ||
+      records.requiredFields.some(
+        (field) =>
+          !Object.hasOwn(record.fields, field) ||
+          !text(record.fields[field], 512) ||
+          !record.fields[field].trim(),
+      )
+    )
+      invalid();
+    identityRecord = {
+      reference: record.reference,
+      fields: Object.fromEntries(
+        records.requiredFields.map((field) => [field, record.fields[field]]),
+      ),
+    };
+  } else if (value.identity_record !== undefined) invalid();
   return {
     mode: value.mode,
     ...(value.account_id ? { account_id: value.account_id } : {}),
+    ...(identityRecord ? { identity_record: identityRecord } : {}),
     authorization_details: [{ type: accessType, actions: [...actions].sort() }],
   };
 }

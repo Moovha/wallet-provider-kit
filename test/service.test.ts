@@ -169,7 +169,7 @@ describe('provider HTTP boundary', () => {
     });
     servers.push(app);
     const live = (await app.inject('/docs/json')).json();
-    expect(Object.keys(live.paths)).toHaveLength(6);
+    expect(Object.keys(live.paths)).toHaveLength(8);
     expect(live.paths).not.toHaveProperty('/v1/enrollments');
     expect(live.paths).not.toHaveProperty('/v1/actions/{actionId}/sign');
     expect(live.servers).toEqual([{ url: '/' }]);

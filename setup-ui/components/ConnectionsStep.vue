@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import SetupField from './SetupField.vue';
 import { docs } from '../model';
-import { watch } from 'vue';
+import { computed, watch } from 'vue';
 import type { ProviderConfiguration } from '../model';
 import SecretField from './SecretField.vue';
 import PriceFields from './PriceFields.vue';
@@ -14,6 +14,8 @@ watch(
   },
 );
 function didit(enabled: unknown) {
+  if (enabled && model.value.policy.identity)
+    delete model.value.policy.identity.records;
   if (enabled)
     model.value.identity.didit = {
       apiKey: { env: 'DIDIT_API_KEY' },
@@ -22,6 +24,8 @@ function didit(enabled: unknown) {
   else delete model.value.identity.didit;
 }
 function sumsub(enabled: unknown) {
+  if (enabled && model.value.policy.identity)
+    delete model.value.policy.identity.records;
   if (enabled)
     model.value.identity.sumsub = {
       appToken: { env: 'SUMSUB_APP_TOKEN' },
@@ -30,6 +34,29 @@ function sumsub(enabled: unknown) {
       reusableKycShareEnabled: true,
     };
   else delete model.value.identity.sumsub;
+}
+const recordFields = computed({
+  get: () =>
+    model.value.policy.identity?.records?.requiredFields.join('\n') ?? '',
+  set: (value: string) => {
+    if (model.value.policy.identity?.records)
+      model.value.policy.identity.records.requiredFields = value
+        .split(/\r?\n/)
+        .map((field) => field.trim())
+        .filter(Boolean);
+  },
+});
+function records(enabled: unknown) {
+  const identity = (model.value.policy.identity ??= {});
+  if (enabled) {
+    identity.records = { requiredFields: ['display_name', 'country'] };
+    model.value.identity = {};
+    delete model.value.financial;
+    for (const app of model.value.policy.applications) {
+      app.permissions = ['account:read'];
+      delete app.funding;
+    }
+  } else delete identity.records;
 }
 </script>
 <template>
@@ -153,14 +180,36 @@ function sumsub(enabled: unknown) {
       >Exact required token fields ↗</a
     >
   </details>
-  <h3>Identity verification</h3>
+  <h3>Records and identity policy</h3>
+  <fieldset class="vendor-panel">
+    <legend>Application records · starter evaluation</legend>
+    <SetupField
+      guide="applicationRecords"
+      type="checkbox"
+      label="Use application-supplied records for an unfunded evaluation"
+      :modelValue="!!model.policy.identity?.records"
+      @update:modelValue="records($event)"
+    />
+    <SetupField
+      v-if="model.policy.identity?.records"
+      guide="recordFields"
+      type="textarea"
+      label="Required record fields"
+      v-model="recordFields"
+      validation="required"
+    />
+  </fieldset>
   <p class="help-text">
-    Choose at least one vendor. Login proves which account signed in; identity
-    verification checks who that person is. Your staff review the evidence and
-    decide whether to accept it. “Verification” starts new checks; “import”
-    reuses evidence shared from another service. Each route you offer needs a
-    confirmed price and an application funding agreement in Policies, even when
-    it is free.
+    Start with application records to try onboarding without vendor credentials
+    or verification charges. Each submitted record must contain your required
+    fields. Owners consent and your staff review each record before account
+    access. These records are not externally verified KYC and cannot enable
+    transfers. Choose a vendor below when your policy requires external
+    verification. Login proves which account signed in; identity verification
+    checks who that person is. Your staff still review acceptance.
+    “Verification” starts new checks; “import” reuses evidence shared from
+    another service. Each route you offer needs a confirmed price and an
+    application funding agreement in Policies, even when it is free.
   </p>
   <fieldset class="vendor-panel">
     <legend>
@@ -244,10 +293,14 @@ function sumsub(enabled: unknown) {
     /></template>
   </fieldset>
   <p
-    v-if="!model.identity.didit && !model.identity.sumsub"
+    v-if="
+      !model.policy.identity?.records &&
+      !model.identity.didit &&
+      !model.identity.sumsub
+    "
     role="alert"
     class="error-text"
   >
-    Choose at least one identity vendor before exporting.
+    Choose application records or an identity vendor before exporting.
   </p>
 </template>

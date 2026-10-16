@@ -15,6 +15,8 @@ export { accessType } from './types.js';
 export type {
   OnboardingPolicy,
   ApplicationPolicy,
+  ApplicationIdentityRecord,
+  ApplicationRecordPolicy,
   OnboardingStore,
   ProviderState,
   IdentityAdapter,

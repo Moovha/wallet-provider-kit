@@ -20,6 +20,12 @@ This is an experimental single-host reference integration. It has offline
 conformance evidence; real vendor accounts, identity-service setup and backend
 recovery still need acceptance testing before you enable it.
 
+The starter wizard and CLI default to [application-record evaluation](application-records.md):
+admitted applications submit required fields, owners consent and staff review
+each record before unfunded wallet access. That source does not establish
+externally verified KYC or permit financial signing. The vendor examples below
+remain available when your policy requires external verification.
+
 ## Applications, clients and owner login
 
 A **connected application** is software asking to access a user's wallet account.

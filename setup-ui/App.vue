@@ -411,6 +411,9 @@ function enableDocumentation() {
                     {{
                       [
                         config.identity.didit ? 'Didit' : '',
+                        config.policy.identity?.records
+                          ? 'Application records · evaluation'
+                          : '',
                         config.identity.sumsub ? 'Sumsub' : '',
                       ]
                         .filter(Boolean)

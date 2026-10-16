@@ -77,7 +77,12 @@ export function emptyConfiguration(
   config.ownerLogin.issuer = '';
   config.ownerLogin.clientId = '';
   config.reviewers = [''];
-  config.identity.didit!.workflowId = '';
+  config.identity = {};
+  config.policy.identity = {
+    maxAgeDays: 90,
+    records: { requiredFields: ['display_name', 'country'] },
+  };
+  delete config.financial;
   config.backend = newBackend('cdp');
   return config;
 }
@@ -104,8 +109,14 @@ export function deploymentChecklist(
     `- Register owner login callback: ${config.policy.provider.origin}/onboarding/callback`,
     '- Enable OIDC code flow, PKCE S256, client_secret_post, RS256/ES256 ID tokens valid for at most ten minutes, and fresh auth_time at the login provider.',
     '- Register connected application clients separately. Issue dedicated-audience RFC 9068 at+jwt API tokens with the required wallet scopes and a lifetime no longer than ten minutes.',
-    '- Configure the selected identity vendor workflows/levels and sharing agreements.',
-    '- Confirm the agreed price limit for each identity route and the application’s funding agreement, including for free routes.',
+    ...(config.policy.identity?.records
+      ? [
+          '- Application-record evaluation: submit only the configured required fields, obtain owner consent and complete provider review. No vendor key or verification budget is required. Do not fund these wallets or enable financial signing.',
+        ]
+      : [
+          '- Configure the selected identity vendor workflows/levels and sharing agreements.',
+          '- Confirm the agreed price limit for each identity route and the application’s funding agreement, including for free routes.',
+        ]),
     '- Supply these environment variables through the deployment secret store: ' +
       environment.join(', '),
     '- Use one persistent POSIX host. Secure and back up its SQLite data directory; run as its owning unprivileged user.',

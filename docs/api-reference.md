@@ -609,7 +609,9 @@ export interface ServerOptions {
 Import from `@moovha/wallet-provider-kit/onboarding`. [Integration guide](onboarding.md).
 
 - [accessType](#accesstype)
+- [ApplicationIdentityRecord](#applicationidentityrecord)
 - [ApplicationPolicy](#applicationpolicy)
+- [ApplicationRecordPolicy](#applicationrecordpolicy)
 - [createDiditIdentityAdapter](#creatediditidentityadapter)
 - [createFileOnboardingStore](#createfileonboardingstore)
 - [createOnboardingJournal](#createonboardingjournal)
@@ -641,6 +643,18 @@ Import from `@moovha/wallet-provider-kit/onboarding`. [Integration guide](onboar
 export declare const accessType = 'https://moovha.com/wallet/account-access';
 ```
 
+### ApplicationIdentityRecord
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/onboarding/types.ts).
+
+```ts
+/** Application assertions for an unfunded evaluation; not externally verified identity evidence. */
+export interface ApplicationIdentityRecord {
+  reference: string;
+  fields: Record<string, string>;
+}
+```
+
 ### ApplicationPolicy
 
 [Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/onboarding/types.ts).
@@ -657,6 +671,16 @@ export interface ApplicationPolicy {
     agreement: string;
     monthlyLimitMinor: number;
   };
+}
+```
+
+### ApplicationRecordPolicy
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/onboarding/types.ts).
+
+```ts
+export interface ApplicationRecordPolicy {
+  requiredFields: string[];
 }
 ```
 
@@ -815,6 +839,8 @@ export interface OnboardingPolicy {
   applications: ApplicationPolicy[];
   identity?: {
     maxAgeDays?: number;
+    /** Explicit provider-reviewed record submission for unfunded, read-only evaluation. */
+    records?: ApplicationRecordPolicy;
   };
   access?: {
     maxAgeDays?: number;
@@ -858,6 +884,7 @@ export declare class OnboardingService {
     revision: string;
     identity: {
       maxAgeDays: number;
+      records?: import('./types.js').ApplicationRecordPolicy;
     };
     access: {
       maxAgeDays: number;
@@ -905,11 +932,37 @@ export declare class OnboardingService {
     status: string;
     consent_url: string;
   }>;
+  accessPolicy(principal: VerifiedPrincipal): {
+    source: string;
+    evaluation_only: boolean;
+    required_fields: string[];
+    maximum_field_characters: number;
+    owner_consent_required: boolean;
+    provider_review_required: boolean;
+  };
+  submitRecords(
+    inputContext: AuthorityContext,
+    records: ApplicationIdentityRecord[],
+  ): Promise<{
+    results: (
+      | {
+          index: number;
+          status: 'invalid';
+          required_fields: string[];
+        }
+      | {
+          index: number;
+          status: 'submitted';
+          receipt: Awaited<ReturnType<OnboardingService['request']>>;
+        }
+    )[];
+  }>;
   consentView(
     id: string,
     identity: OwnerIdentity,
   ): Promise<{
     verificationUrl?: string | undefined;
+    identitySource?: 'application_record' | undefined;
     application: string;
     provider: string;
     privacyUrl: string;
@@ -970,6 +1023,8 @@ export declare class OnboardingService {
   >;
   reviews(principal: VerifiedPrincipal): Promise<
     {
+      applicationRecord?: ApplicationIdentityRecord | undefined;
+      application?: string | undefined;
       requestId: string;
       owner: Pick<OwnerIdentity, 'issuer' | 'subject'> | undefined;
       vendor: Vendor | undefined;
@@ -1024,6 +1079,8 @@ export declare class OnboardingService {
   ): Promise<{
     status: string;
     address?: string | undefined;
+    identity_source?: 'application_record' | undefined;
+    evaluation_only?: boolean | undefined;
     account_id: string;
   }>;
   ownerRequests(identity: OwnerIdentity): Promise<

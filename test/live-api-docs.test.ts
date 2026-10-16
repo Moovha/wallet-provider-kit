@@ -18,7 +18,7 @@ describe('live API explorer boundaries', () => {
     const live = liveApiSpecification(contract, true, true);
     expect(
       Object.values(live.paths).flatMap((methods) => Object.values(methods)),
-    ).toHaveLength(9);
+    ).toHaveLength(11);
     for (const [path, methods] of Object.entries(live.paths)) {
       for (const [method, operation] of Object.entries(
         methods as Record<string, any>,

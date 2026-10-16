@@ -128,6 +128,10 @@ export default defineConfig({
           { text: '3. FormKit wizard', link: '/docs/setup-wizard' },
           { text: '4. Deploy and activate', link: '/docs/operator-deployment' },
           { text: '5. Staging walkthrough', link: '/docs/staging-walkthrough' },
+          {
+            text: 'Application-record evaluation',
+            link: '/docs/application-records',
+          },
           { text: 'Get and renew API tokens', link: '/docs/operator-tokens' },
           { text: 'Configuration reference', link: '/docs/setup' },
           { text: 'Built-in SQLite storage', link: '/docs/storage' },

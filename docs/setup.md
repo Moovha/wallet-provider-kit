@@ -33,7 +33,7 @@ npx --no-install wallet-provider-kit init provider.config.json
 npx --no-install wallet-provider-kit validate --config provider.config.json
 ```
 
-`init` writes the [JSON template](provider.config.example.json) without overwriting
+`init` writes the [application-record template](provider.config.records.example.json) without overwriting
 an existing file. Editors can use the packaged
 [JSON Schema](../spec/provider-config.schema.json). Version 1 rejects unknown fields,
 unsupported profiles, plaintext credentials, invalid policies and incomplete
@@ -42,7 +42,9 @@ modules, create storage or call identity/wallet services. Diagnostics contain pa
 and validation rules rather than input values.
 
 Set your provider's HTTPS origin/privacy notice, allowed application issuer/client
-IDs and permissions, provider reviewers, existing login and identity vendor. Keep
+IDs and permissions, provider reviewers and existing login. The default
+[application-record evaluation](application-records.md) needs no identity vendor.
+Select Didit or Sumsub when your policy requires externally verified evidence. Keep
 credentials in environment variables supplied by your secret store; configuration
 contains only references such as `{"env":"PROVIDER_LOGIN_SECRET"}`. The command does
 not automatically read `.env` files. Set `backend.binding` to a stable public identifier for this wallet-backend
@@ -55,14 +57,14 @@ against the configuration file's directory.
 
 ## Register external integrations
 
-| Setting               | External setup                                                                                                                                                                                                     |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `ownerLogin`          | Register a confidential OIDC client with exact callback `<provider-origin>/onboarding/callback`; enable code flow, PKCE S256, RS256/ES256 ID tokens and `auth_time`. Your IdP owns registration, MFA and recovery. |
-| `oauth`               | Configure the application API issuer, dedicated audience and HTTPS JWKS; issue RFC 9068 `at+jwt` access tokens with `client_id`, at most ten minutes old.                                                          |
-| `policy.applications` | Register connected application clients separately from the owner's login client. Match each checked issuer/client pair.                                                                                            |
-| `reviewers`           | Configure provider staff's login subject IDs. Provider review establishes identity acceptance; a vendor approval alone cannot accept a user.                                                                       |
-| `identity`            | Supply Didit recipient workflow or Sumsub recipient level/Share setup and credentials. Add confirmed price bounds and application funding agreements before paid/import work.                                      |
-| `backend`             | Select a bundled CDP, OWS or OpenZeppelin Relayer backend using the configurations below. Prove its Base Sepolia EOA lifecycle and recovery independently.                                                         |
+| Setting               | External setup                                                                                                                                                                                                           |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `ownerLogin`          | Register a confidential OIDC client with exact callback `<provider-origin>/onboarding/callback`; enable code flow, PKCE S256, RS256/ES256 ID tokens and `auth_time`. Your IdP owns registration, MFA and recovery.       |
+| `oauth`               | Configure the application API issuer, dedicated audience and HTTPS JWKS; issue RFC 9068 `at+jwt` access tokens with `client_id`, at most ten minutes old.                                                                |
+| `policy.applications` | Register connected application clients separately from the owner's login client. Match each checked issuer/client pair.                                                                                                  |
+| `reviewers`           | Configure provider staff's login subject IDs. Provider review establishes identity acceptance; a vendor approval alone cannot accept a user.                                                                             |
+| `identity`            | Leave empty for application-record evaluation, with required fields in `policy.identity.records`. For external verification, supply Didit or Sumsub settings, confirmed price limits and application funding agreements. |
+| `backend`             | Select a bundled CDP, OWS or OpenZeppelin Relayer backend using the configurations below. Prove its Base Sepolia EOA lifecycle and recovery independently.                                                               |
 
 The [onboarding guide](onboarding.md) explains acceptance, identity sharing, cost
 reservations and access management. Login clients, vendor accounts and commercial
@@ -207,7 +209,9 @@ configured action profiles.
 POST requests require a UUIDv4 `Idempotency-Key`; keep it when retrying the same
 request. Application credentials alone do not establish owner consent or transfer delegation.
 
-1. `POST /v1/access-requests` to create/connect; open its provider consent URL in
+1. Read `GET /v1/access-policy`. In record mode, submit required fields through
+   `POST /v1/access-records`, or include `identity_record` in
+   `POST /v1/access-requests` to create/connect; open its provider consent URL in
    the user's browser. The provider owns login, consent and identity-review pages.
 2. Poll `GET /v1/access-requests/{id}` for the approved account/grant and expiry.
 3. `POST /v1/accounts/{id}/provision` with `{}`; the kit creates the account once

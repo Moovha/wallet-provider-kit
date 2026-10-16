@@ -235,9 +235,9 @@ test('an operator configures CDP without JSON, exports valid files, and editing 
   await page
     .getByLabel('Token verification keys URL (JWKS)', { exact: true })
     .fill('https://applications.acme.example/jwks');
-  await page
-    .getByLabel('Didit workflow ID', { exact: true })
-    .fill('00000000-0000-4000-8000-000000000001');
+  await expect(
+    page.getByLabel('Required record fields', { exact: true }),
+  ).toHaveValue('display_name\ncountry');
   await step(page, 'Policies');
   await page.getByLabel('Application name', { exact: true }).fill('Acme App');
   await page
@@ -583,7 +583,7 @@ test('API reference follows the configuration, preserves edits, shows Swagger sc
   await expect(
     page.getByRole('heading', { name: 'Provider API reference', exact: true }),
   ).toBeVisible();
-  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(6);
+  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(8);
   await expect(
     page
       .getByText('Wallet operations are disabled in Deployment', {
@@ -628,7 +628,7 @@ test('API reference follows the configuration, preserves edits, shows Swagger sc
       exact: true,
     })
     .check();
-  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(9);
+  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(11);
   await page
     .getByLabel('Example endpoint', { exact: true })
     .selectOption('signAction');
@@ -685,7 +685,7 @@ test('API reference follows the configuration, preserves edits, shows Swagger sc
     permissions: ['account:read', 'transfers:request'],
   });
   await imported(page, financial);
-  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(9);
+  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(11);
   await page
     .getByLabel('Example endpoint', { exact: true })
     .selectOption('signAction');
@@ -760,7 +760,7 @@ test('API renderer can retry a failed bundled asset without losing setup', async
   await page
     .getByRole('button', { name: 'Reload API reference', exact: true })
     .click();
-  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(6);
+  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(8);
   await page
     .getByRole('button', { name: 'Setup configuration', exact: true })
     .click();
@@ -859,4 +859,58 @@ test('operator configures GUI token issuance with explicit subjects, clients, sc
   expect(await readFile((await (await download).path())!, 'utf8')).toContain(
     'WALLET_EXPLORER_APP_1_SECRET=',
   );
+});
+
+test('new drafts use required application records without vendor credentials or signing', async ({
+  page,
+}) => {
+  await step(page, 'Services');
+  const records = page.getByLabel(
+    'Use application-supplied records for an unfunded evaluation',
+    { exact: true },
+  );
+  await expect(records).toBeChecked();
+  await expect(page.getByLabel('Use Didit', { exact: true })).not.toBeChecked();
+  await expect(
+    page.getByLabel('Use Sumsub', { exact: true }),
+  ).not.toBeChecked();
+  await expect(
+    page.getByLabel('Required record fields', { exact: true }),
+  ).toHaveValue('display_name\ncountry');
+  await page.screenshot({
+    path: 'artifacts/application-record-services.png',
+    fullPage: true,
+  });
+  await imported(page);
+  await step(page, 'Services');
+  await expect(records).not.toBeChecked();
+  await expect(page.getByLabel('Use Didit', { exact: true })).toBeChecked();
+  await page
+    .getByText('Use application-supplied records for an unfunded evaluation', {
+      exact: true,
+    })
+    .click();
+  await page
+    .getByLabel('Required record fields', { exact: true })
+    .fill('display_name\ncountry\ncustomer_type');
+  await step(page, 'Policies');
+  await expect(
+    page.getByLabel('Configure delegated transfer signing', { exact: true }),
+  ).toBeDisabled();
+  const config = await exported(page);
+  expect(config.policy.identity.records.requiredFields).toEqual([
+    'display_name',
+    'country',
+    'customer_type',
+  ]);
+  expect(config.policy.applications[0].permissions).toEqual(['account:read']);
+  expect(config.identity).toEqual({});
+  expect(config.financial).toBeUndefined();
+  const variables = page.waitForEvent('download');
+  await page
+    .getByRole('button', { name: 'Download variable template' })
+    .click();
+  expect(
+    await readFile((await (await variables).path())!, 'utf8'),
+  ).not.toContain('DIDIT');
 });
