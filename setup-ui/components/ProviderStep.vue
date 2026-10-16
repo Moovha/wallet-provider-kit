@@ -9,9 +9,9 @@ const model = defineModel<ProviderConfiguration>({ required: true });
     <span class="eyebrow">Before you start</span>
     <h2>Prepare your wallet service configuration</h2>
     <p>
-      This wizard turns your service choices and access rules into files for
-      your deployment. You are preparing settings locally; your wallet service
-      starts serving applications after you deploy and test it on your server.
+      Choose your service settings and access rules, then start an isolated
+      local deployment with Docker Compose and follow its progress. You can also
+      download files for manual deployment on another host.
     </p>
   </div>
   <div class="callout step-orientation">
@@ -21,17 +21,19 @@ const model = defineModel<ProviderConfiguration>({ required: true });
         <strong>Choose your settings.</strong> Name the service, connect an
         existing wallet backend and token issuer, then define application trust,
         permissions and limits. Enter secret variable names here; supply their
-        values privately on your server.
+        values privately during local setup or on your deployment server.
       </li>
       <li>
-        <strong>Check and download.</strong> Export provides your configuration,
-        a secret-variable template and a deployment checklist. Validation checks
-        the settings for completeness and consistency.
+        <strong>Validate and start.</strong> In Export, check your settings and
+        review the local setup plan. Supply missing secrets, then let setup
+        build the image, prepare private files and storage, start the service
+        and check health.
       </li>
       <li>
-        <strong>Deploy, test and enable.</strong> Follow the checklist to
-        install the service, supply secrets, prepare storage and HTTPS, and test
-        your integrations before enabling wallet operations.
+        <strong>Test and enable.</strong> Your local service starts with wallet
+        operations disabled. Complete HTTPS, application, backend and recovery
+        acceptance before enabling them. Downloads remain available for manual
+        setup.
       </li>
     </ol>
     <p>
@@ -85,8 +87,8 @@ const model = defineModel<ProviderConfiguration>({ required: true });
       >
     </p>
     <p>
-      This local wizard only prepares configuration files. It does not buy a
-      domain or set up hosting. The supported service uses Base Sepolia, a
+      Local setup runs containers on this machine. It does not buy a domain or
+      configure public hosting. The supported service uses Base Sepolia, a
       blockchain test network. It is experimental and is not approved for
       production custody.
     </p>

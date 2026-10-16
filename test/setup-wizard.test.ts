@@ -66,7 +66,7 @@ describe('local operator setup boundary', () => {
   ])(
     'rejects foreign hosts, origins and unauthenticated local API access',
     async (requestHeaders) => {
-      for (const url of ['/api/template', '/api/openapi'])
+      for (const url of ['/api/template', '/api/openapi', '/api/setup/status'])
         expect(
           (await app.inject({ url, headers: requestHeaders })).statusCode,
         ).toBe(403);
@@ -97,6 +97,20 @@ describe('local operator setup boundary', () => {
     });
     expect(reply.statusCode).toBe(403);
     expect(reply.headers['access-control-allow-origin']).toBeUndefined();
+    for (const url of [
+      '/api/setup/plan',
+      '/api/setup/start',
+      '/api/setup/stop',
+    ]) {
+      const denied = await app.inject({
+        method: 'POST',
+        url,
+        headers: { host: headers.host, authorization: headers.authorization },
+        payload: {},
+      });
+      expect(denied.statusCode).toBe(403);
+      expect(denied.headers['access-control-allow-origin']).toBeUndefined();
+    }
   });
   it('expires local API access after one hour', async () => {
     vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 3_600_001);

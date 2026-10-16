@@ -85,6 +85,10 @@ service verifies its access tokens using public keys. If you enable
 selected application's secret to request tokens through the configured issuer.
 The [deployment walkthrough](operator-deployment.md#supply-the-secret-values)
 shows how to fill the downloaded variable template without writing application code.
+For [automated local setup](local-setup.md), the executor offers a separate private
+secret-entry screen after validation. It saves values in an owner-only file outside
+the checkout and mounts that file read-only. The service-setting fields and downloads
+still contain names only.
 
 ## Provider domain and privacy notice
 

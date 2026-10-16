@@ -24,6 +24,7 @@ import BackendStep from './components/BackendStep.vue';
 import ConnectionsStep from './components/ConnectionsStep.vue';
 import PolicyStep from './components/PolicyStep.vue';
 import DeploymentStep from './components/DeploymentStep.vue';
+import LocalSetup from './components/LocalSetup.vue';
 import { defaultPermissions } from '../src/onboarding/types';
 
 const ApiReference = defineAsyncComponent(
@@ -40,6 +41,7 @@ window.history.replaceState(null, '', window.location.pathname);
 const config = ref<ProviderConfiguration>();
 const generation = ref(0);
 const busy = ref(false);
+const setupLocked = ref(false);
 const issues = ref<string[]>([]);
 const notice = ref('');
 const validated = ref<{
@@ -128,7 +130,12 @@ function showError(error: unknown) {
 onMounted(async () => {
   try {
     const result = await request('/api/template');
-    config.value = emptyConfiguration(result.config);
+    if (result.execution?.state !== 'idle' && result.execution?.plan) {
+      config.value = result.execution.plan.config;
+      setupLocked.value = true;
+      await nextTick();
+      goToStep('review');
+    } else config.value = emptyConfiguration(result.config);
   } catch (error) {
     showError(error);
   }
@@ -144,7 +151,7 @@ async function check() {
     if (JSON.stringify(config.value) === snapshot) {
       validated.value = result;
       notice.value =
-        'Configuration valid for export. Download all three files, then deploy and test your service before enabling wallet operations.';
+        'Configuration valid. Set up a local container deployment below, or download the files for manual deployment. Wallet operations remain disabled until acceptance and explicit activation.';
     }
   } catch (error) {
     showError(error);
@@ -240,7 +247,7 @@ function stepChanged(node: FormKitNode) {
     });
   });
 }
-function goToStep(step: 'connections' | 'policies' | 'deployment') {
+function goToStep(step: 'connections' | 'policies' | 'deployment' | 'review') {
   if (setupSteps) setupSteps.props.activeStep = step;
 }
 function configureServices(returnStep: 'policies' | 'deployment') {
@@ -266,10 +273,11 @@ function enableDocumentation() {
       >
       <div class="sidebar-copy">
         <span class="eyebrow">Operator setup</span>
-        <h1>Configure here.<br />Deploy on your server.</h1>
+        <h1>Configure your service.<br />Run it locally.</h1>
         <p>
-          Prepare settings and access rules across six steps. Leave with
-          configuration files and a deployment checklist.
+          Choose settings and access rules, then let local setup prepare
+          storage, start the service and show its progress. You can also export
+          files.
         </p>
       </div>
       <ol
@@ -339,7 +347,7 @@ function enableDocumentation() {
           /><button
             type="button"
             class="secondary"
-            :disabled="busy || !config"
+            :disabled="busy || !config || setupLocked"
             @click="importInput?.click()"
           >
             Import configuration
@@ -385,42 +393,51 @@ function enableDocumentation() {
             @node="stepChanged"
           >
             <FormKit type="step" name="provider" label="Provider"
-              ><ProviderStep v-model="config"
-            /></FormKit>
+              ><fieldset class="configuration-fields" :disabled="setupLocked">
+                <ProviderStep v-model="config" /></fieldset
+            ></FormKit>
             <FormKit type="step" name="backend" label="Backend"
-              ><BackendStep v-model="config"
-            /></FormKit>
+              ><fieldset class="configuration-fields" :disabled="setupLocked">
+                <BackendStep v-model="config" /></fieldset
+            ></FormKit>
             <FormKit type="step" name="connections" label="Services"
-              ><ConnectionsStep
-                v-model="config"
-                :return-label="
-                  connectionsReturnStep
-                    ? stepNames[connectionsReturnStep]
-                    : undefined
-                "
-                @return-to-step="
-                  connectionsReturnStep && goToStep(connectionsReturnStep)
-                "
-            /></FormKit>
+              ><fieldset class="configuration-fields" :disabled="setupLocked">
+                <ConnectionsStep
+                  v-model="config"
+                  :return-label="
+                    connectionsReturnStep
+                      ? stepNames[connectionsReturnStep]
+                      : undefined
+                  "
+                  @return-to-step="
+                    connectionsReturnStep && goToStep(connectionsReturnStep)
+                  "
+                /></fieldset
+            ></FormKit>
             <FormKit type="step" name="policies" label="Policies"
-              ><PolicyStep
-                v-model="config"
-                @configure-services="configureServices('policies')"
-            /></FormKit>
+              ><fieldset class="configuration-fields" :disabled="setupLocked">
+                <PolicyStep
+                  v-model="config"
+                  @configure-services="configureServices('policies')"
+                /></fieldset
+            ></FormKit>
             <FormKit type="step" name="deployment" label="Deployment"
-              ><DeploymentStep
-                v-model="config"
-                @configure-services="configureServices('deployment')"
-            /></FormKit>
+              ><fieldset class="configuration-fields" :disabled="setupLocked">
+                <DeploymentStep
+                  v-model="config"
+                  @configure-services="configureServices('deployment')"
+                /></fieldset
+            ></FormKit>
             <FormKit type="step" name="review" label="Export">
               <div ref="review" tabindex="-1" class="step-heading">
                 <span class="eyebrow">Review & export</span>
                 <h2>Review your configuration</h2>
                 <p>
                   You’ve prepared a configuration draft. Check it for
-                  completeness and consistency, then download all three files
-                  for your server. Validation does not test credentials, connect
-                  external services or deploy your wallet service.
+                  completeness and consistency, then start a local container
+                  deployment below or download files for your server. Validation
+                  does not test credentials, connect external services or deploy
+                  your wallet service.
                 </p>
               </div>
               <dl class="summary">
@@ -538,21 +555,26 @@ function enableDocumentation() {
                   >Test your services before enabling wallet operations.</strong
                 >
                 <p>
-                  No wallet is created and no external service is called. Your
-                  server still needs secret values, private storage and HTTPS.
-                  Test wallet creation, signing where enabled, backup and
-                  recovery using the deployment guide before enabling
-                  operations.
+                  Validation creates no wallet and calls no external service.
+                  Local setup can prepare secrets, storage and service startup;
+                  your deployment also needs HTTPS. Test wallet creation,
+                  signing where enabled, backup and recovery using the
+                  deployment guide before enabling operations.
                 </p>
               </div>
               <button
                 type="button"
                 class="primary"
-                :disabled="busy"
+                :disabled="busy || setupLocked"
                 @click="check"
               >
                 {{ busy ? 'Checking…' : 'Validate configuration' }}
               </button>
+              <LocalSetup
+                :config="validated?.config"
+                :request="request"
+                @locked="setupLocked = $event"
+              />
               <div v-if="validated" class="export-panel">
                 <div v-if="validated.warnings.length" class="readiness-panel">
                   <h3>Deployment reminders</h3>
@@ -566,7 +588,7 @@ function enableDocumentation() {
                     on your deployment before allowing users to connect.
                   </p>
                 </div>
-                <h3>Finish configuration, then deploy</h3>
+                <h3>Or download for manual deployment</h3>
                 <ul class="export-file-guide">
                   <li>
                     <strong>provider.config.json:</strong> your service settings

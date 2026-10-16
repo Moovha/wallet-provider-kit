@@ -1,5 +1,29 @@
 # Security model
 
+## Local setup authority
+
+The [local setup executor](local-setup.md) is an operator tool, separate from the
+wallet service API. Keep its one-hour private session link private and its listener
+on loopback. Exact Host/Origin checks, a fragment-delivered bearer token and a
+restrictive browser policy protect its API; do not expose or proxy it publicly.
+
+Configuration validation has no deployment effects. Explicitly starting a reviewed
+plan authorizes local Docker builds, private file creation, initialization of a new
+store and container startup. The executor pins a local Unix-socket daemon, refuses
+custom modules and active configurations, accepts only referenced secrets and runs
+fixed commands without a shell. A wizard session can initialize only one new
+deployment and cannot replace existing records. Containers have a read-only root,
+no capabilities and read-only secret/config mounts; data persists on the host.
+
+The operator account and Docker daemon remain trusted. Secret values are plaintext
+in an owner-only host file, available to the container and Docker administrators.
+Progress and errors omit raw command output and secret values. Startup health is
+distinct from application, backend and recovery acceptance; wallet operations
+remain disabled. A failed setup retains records and attempts project-container
+cleanup without deleting data. Unconfirmed cleanup requires operator investigation.
+
+## Hosted compatibility authority
+
 The optional [hosted compatibility profile](onboarding.md) keeps application authentication, provider
 owner login, identity evidence, customer acceptance and account access as distinct
 records. Share tokens never authenticate an owner. Provider reviewers explicitly

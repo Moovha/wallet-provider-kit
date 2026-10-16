@@ -7,6 +7,17 @@
 - Use matching navy-and-cyan vector diagrams for application relationships and
   approved signing, including durable attempts, permission rechecks and recovery.
 
+## Unreleased — automated local container setup
+
+- Add an explicit wizard executor for new local CDP/Relayer deployments with
+  prerequisite checks, private secret entry, file preparation, image build,
+  one-time storage initialization, diagnosis, startup and visible health progress.
+- Use the repository Dockerfile, private persistent bind mounts, container security
+  settings, loopback publishing and an unless-stopped restart policy. Retain data
+  on failure or stop and provide saved operation/recovery commands.
+- Keep wallet operations disabled and distinguish local startup from HTTPS and
+  application/backend/recovery acceptance. Retain manual downloads and native OWS.
+
 ## Unreleased — first-time setup guidance
 
 - Add identity and trust-agreement field explanations, immediate required-field

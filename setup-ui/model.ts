@@ -102,7 +102,7 @@ export function deploymentChecklist(
   const lines = [
     '# Wallet provider deployment checklist',
     '',
-    'Your local configuration draft passed completeness and consistency checks. This checklist is the handoff from the wizard to your deployment host; no service has been deployed or updated by the wizard.',
+    'Your configuration draft passed completeness and consistency checks. This checklist covers manual deployment. Downloading it does not deploy or update a service; the wizard offers a separate explicit local container setup action.',
     'Keep provider.config.json (service settings and policy), provider.env.example (secret variable names) and this provider-setup.md checklist together privately. Supply secret values on the deployment host or through its secret manager. Validation has not tested your credentials or external integrations.',
     'Before enabling wallet operations, test your external services, wallet recovery and token signing where configured.',
     `Configure and export in the wizard, deploy with the CLI, then test application-led access through the deployed API explorer. Hosted compatibility deployments also test their owner/reviewer pages. Follow ${docs}staging-walkthrough.html`,

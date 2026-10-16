@@ -87,12 +87,14 @@ function updateHttp(key: 'host' | 'port' | 'documentation', value: unknown) {
     @configure-services="emit('configure-services')"
   />
   <div class="callout">
-    <strong>Next, prepare your server</strong>
+    <strong>Next, choose local setup or a manual deployment</strong>
     <p>
-      After export, put secret values in your private environment file, prepare
-      persistent storage, and connect your public address through an HTTPS
-      gateway. This gateway forwards encrypted web traffic to the service’s
-      internal port. The deployment guide walks through these tasks and backups.
+      Local setup can save private files, prepare persistent storage and start a
+      container for you. It uses 0.0.0.0:8080 inside the container and publishes
+      your selected port only on this machine. Connect your public address
+      through an HTTPS gateway. This gateway forwards encrypted web traffic to
+      the service’s internal port. The deployment guide walks through these
+      tasks and backups.
     </p>
   </div>
   <h3>Enable wallet operations</h3>
