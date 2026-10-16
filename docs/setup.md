@@ -1,4 +1,9 @@
-# Configure, deploy and integrate
+# Configuration and financial profile reference
+
+For the complete operator path, start with [getting started](README.md),
+[services and credentials](operator-services.md), [Auth0 setup](auth0-setup.md) and
+[deploying the export](operator-deployment.md). This page is the technical reference
+for the configuration produced by the GUI.
 
 For graphical setup, run `wallet-provider-kit setup` and follow the
 [FormKit operator wizard](setup-wizard.md). It exports this same validated

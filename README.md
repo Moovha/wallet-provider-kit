@@ -33,9 +33,56 @@ The [assets and gas guide](docs/assets-and-gas.md) explains this project-support
 rail, the application's obligations and the current implementation boundary.
 
 [Documentation](https://moovha.github.io/wallet-provider-kit/) ·
-[Install the package](https://moovha.github.io/wallet-provider-kit/docs/package.html#build-an-installable-tarball) ·
-[Run the tutorial](https://moovha.github.io/wallet-provider-kit/docs/integration-example.html#_1-install-and-run) ·
-[Choose an API profile](https://moovha.github.io/wallet-provider-kit/docs/api.html#choose-a-profile)
+[Get started](docs/README.md) ·
+[Operator wizard](docs/setup-wizard.md) ·
+[Services and credentials](docs/operator-services.md) ·
+[Deploy the export](docs/operator-deployment.md)
+
+## Start with the graphical setup
+
+Supported setups need **configuration, deployment and API consumption**. Operators
+configure the supplied service through FormKit; they do not write policies in
+code, authority callbacks, database adapters or signing journals. Custom adapters
+and embedding the TypeScript library are advanced developer paths.
+
+Use Node **24.22.0**, npm **11.11.1** and Git. From your operator workstation:
+
+```sh
+git clone https://github.com/Moovha/wallet-provider-kit.git
+cd wallet-provider-kit
+npm ci
+npm run build
+npm start -- setup
+```
+
+The command opens a temporary local wizard, or prints its private session URL.
+Keep the terminal open. The wizard is bundled; it needs no FormKit Pro subscription.
+The package is experimental and not published to npm; a registry install by name
+is not available. See [getting started](docs/README.md) for installation help.
+
+![FormKit review and export screen using offline example settings](docs/public/screenshots/export.webp)
+
+[Open full-size screenshot](docs/public/screenshots/export.webp)
+
+_Example configuration only. Validation checks the configuration; it does not test
+vendor services or certify readiness. Initial activation remains disabled._
+
+1. **[Prepare services](docs/operator-services.md):** domain, wallet backend, login,
+   application token issuer, identity vendor, reviewers and funding agreements.
+   Each ID/secret is explained with its source. The [Auth0 recipe](docs/auth0-setup.md)
+   gives a dashboard-based reference for login and compatible API tokens.
+2. **[Configure the six screens](docs/setup-wizard.md):** Provider, Backend, Services,
+   Policies, Deployment and Export. Enter secret **variable names**, not values.
+   Download configuration, the empty variable template and deployment checklist.
+3. **[Deploy and accept](docs/operator-deployment.md):** fill secrets privately,
+   prepare persistent storage, initialize once, diagnose, add HTTPS, prove backend
+   and recovery behavior, then explicitly activate. The wizard does not deploy.
+4. **[Connect your product](docs/operator-deployment.md#hand-the-api-to-the-product-developer):**
+   its developer consumes the HTTP API and integrates owner access/approval. The
+   application separately arranges submission, gas and settlement.
+
+The [getting-started guide](docs/README.md) links every stage. Supported profiles
+remain single-host and Base Sepolia EOA only; production custody acceptance is pending.
 
 ## Who takes part
 
@@ -60,9 +107,8 @@ Your product may contain both a wallet service and an application that calls it;
 the responsibilities still remain distinct. The [concepts guide](docs/concepts.md)
 maps these names to configuration, API fields and the user's consent screen.
 
-For your next step, [choose a backend](docs/backend-guide.md#choose-an-integration),
-[implement your own adapter](docs/backend-guide.md#your-own-backend), or
-[connect an application over HTTP](docs/http-api.md#authentication-and-profiles).
+For your next step, follow the [operator getting-started guide](docs/README.md).
+For unsupported integrations, use the [advanced adapter guide](docs/custom-adapters.md).
 
 ## A foundation for adopting teams
 
@@ -253,7 +299,7 @@ implemented here. The sponsorship commitment belongs to the connected applicatio
 execution rail; installing the kit or approving access does not activate it.
 Use the [acceptance requirements](docs/conformance.md) to assess your integration.
 
-## Try the complete provider flow
+## Developer learning: offline provider flow
 
 Use Node **24.22.0** and npm **11.11.1**:
 
@@ -272,8 +318,7 @@ step and the production integrations you must supply.
 
 To consume the toolkit in your own application, run `npm run pack:local` and
 follow the [package installation guide](docs/package.md). npm publication remains
-disabled. For a new provider, continue with [declarative setup](docs/setup.md) and
-[one JSON configuration](docs/provider.config.example.json); for an existing host,
+disabled. For a new provider, continue with the [operator wizard](docs/setup-wizard.md); for an existing embedded host,
 start with the [API guide](docs/api.md) and [durable attempts](docs/durable-attempts.md).
 
 ## Build with us

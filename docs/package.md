@@ -1,8 +1,9 @@
 # Install and use the package
 
 The toolkit is a **Node.js ESM package** for backend applications. Use Node
-24.22.0 and npm 11.11.1. Browser bundles, CommonJS builds and other runtimes aren't
-supported. TypeScript declarations accompany every JavaScript entry point.
+24.22.0 and npm 11.11.1. Importing the wallet library into a browser, CommonJS builds
+and other runtimes aren't supported. The package includes a separate bundled
+FormKit browser wizard served by its local Node.js setup command. TypeScript declarations accompany every JavaScript entry point.
 Version 0.1.0 is experimental and unpublished; `private: true` keeps npm
 publication disabled.
 
@@ -44,6 +45,19 @@ compiled files aren't committed and there is intentionally no install-time build
 The repository disables npm lifecycle scripts in `.npmrc`. `pack:local` builds
 explicitly, so it also works under that policy. A bare `npm pack` packages whatever
 is already in `dist`; run `pack:local` to create a fresh candidate.
+
+## Operators: launch the wizard
+
+After installing the tarball, run:
+
+```sh
+npx --no-install wallet-provider-kit setup
+```
+
+Follow [getting started](README.md), [service/credential preparation](operator-services.md),
+[the wizard screens](setup-wizard.md) and [deployment](operator-deployment.md).
+The examples and import guides below are developer learning material, not required
+operator implementation work.
 
 ## Run your first example
 
