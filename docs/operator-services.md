@@ -55,7 +55,9 @@ and underscores, beginning with a letter.
 
 Only your selected backend/vendor variables are required. The application API
 client's own secret belongs to the calling application's secret store; the wallet
-service verifies its access tokens using public keys. It does not need that secret.
+service verifies its access tokens using public keys. If you enable
+[operator token controls](operator-tokens.md), the provider also needs the
+selected application's secret to request tokens through the configured issuer.
 The [deployment walkthrough](operator-deployment.md#supply-the-secret-values)
 shows how to fill the downloaded variable template without writing application code.
 
@@ -218,9 +220,9 @@ with the following kit requirements:
 
 An ordinary JWT with `typ: JWT`, an ID token, an opaque access token, `azp` alone
 without `client_id`, or a vendor API key will fail. There is no wizard switch to
-relax this. **No particular third-party authorization server is certified by this
-guide.** If your administrator cannot configure this profile, stop the deployment
-handoff and resolve that compatibility gap rather than inventing field values.
+relax this. Confirm that your issuer produces the required profile before
+deployment; this guide does not certify a third-party authorization server.
+Resolve incompatible token formats with your identity administrator.
 
 Give application developers the issuer's own token endpoint, supported grant type,
 client credentials/PKCE instructions and audience/scope request syntax. Those are
@@ -307,7 +309,7 @@ terms. `250` means USD 2.50; it is not a token amount or gas budget.
 Then agree who pays with each connected application. In Policies, enable its
 funding agreement, enter your agreement reference and monthly limit in USD cents.
 For example, an agreed USD 100 cap is `10000`. These references point to your actual
-agreements; the vendor does not issue magic IDs for these fields. The kit reserves
+agreements; they are your own record references, not vendor-issued identifiers. The kit reserves
 budget before vendor work; it does not pay invoices or establish a contract.
 
 **Even free routes need an explicit zero price bound and an application funding

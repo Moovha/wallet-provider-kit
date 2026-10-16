@@ -78,7 +78,7 @@ generic public signing endpoint.
 `createDurableSigningService` exposes the same signing lifecycle separately for
 hosts that already have account provisioning. Do not compose it with a second
 attempt journal around the same dispatch; that would introduce two authorities.
-The older raw-provider journal decorator remains appropriate when an existing
+The raw-provider journal decorator is an alternative when an existing
 host implements the distinct `WalletAttemptJournal` contract.
 
 ## Acceptance and deployment
@@ -86,6 +86,6 @@ host implements the distinct `WalletAttemptJournal` contract.
 This is an experimental supplied implementation. Offline tests establish ordering,
 identity/result validation, current-authority replay, recovery and no redispatch
 after unknown effects. They do not establish real database concurrency, vendor
-recovery or production acceptance. No new infrastructure or billing dependency
-is introduced. Select a reviewed checksum-pinned package, prove host adapter
-compatibility, and keep its default host unconfigured until activation is reviewed.
+recovery or production acceptance. Select a reviewed checksum-pinned package,
+verify host adapter compatibility and complete the deployment's acceptance
+checks before activation. The default service remains unconfigured.

@@ -96,8 +96,8 @@ async function boundedJson(response: Response): Promise<unknown> {
 /**
  * No SDK singleton, telemetry, ambient credentials, redirects or automatic retries.
  * Auth uses the vendor's public SDK; HTTP lifecycle belongs to this adapter.
- * This factory is not imported by application startup. Business policy and durable
- * attempts must be composed through EmbeddedWalletService before activation.
+ * Import this factory explicitly when selecting CDP. Compose business policy and
+ * durable attempts through the configured service or an embedded host before activation.
  */
 export function createCdpWalletProvider(
   environment: NodeJS.ProcessEnv,

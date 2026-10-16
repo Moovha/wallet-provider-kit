@@ -7,7 +7,7 @@ For exact declarations, use the [generated TypeScript reference](api-reference.m
 for requests and responses, use the [HTTP guide](http-api.md) and
 [generated HTTP schemas](http-reference.md).
 
-The kit is a wallet/provider implementation that an adopter can host or embed.
+You can run the kit as a configured wallet service or embed it in your application.
 It supports controlled wallet access for applications including Moovha. Key
 control, recovery, business authorization and transaction execution are distinct
 choices. The [architecture guide](architecture.md#applications-and-wallet-control)
@@ -37,7 +37,7 @@ including [client IDs and owner-login registrations](concepts.md#what-does-clien
 
 For supported setups, use [declarative service configuration](setup.md) and the
 HTTP API. The kit supplies current authority, provider authorization of each exact transfer and durable
-journals; no adopter callbacks are required. The composition profiles below are
+journals without custom callbacks. The composition profiles below are
 advanced integrations for custom behavior and existing hosts.
 
 The [built-in SQLite database](storage.md) supplies onboarding persistence,
@@ -200,8 +200,9 @@ a generic 500. Avoid logging raw exceptions, identifiers, signatures or tokens.
 | `rejected`       | Provider explicitly rejected the effect              | Preserve rejection and attempt identity; don't automatically fund or retry                                    |
 | `unknown`        | The effect or its recording may have happened        | Stop mutation retries and reconcile the original attempt read-only                                            |
 
-A successful signature is an authorization artifact, not settlement or a revoked
-artifact when a grant is later revoked. The [HTTP guide](http-api.md) maps status
+A successful signature can authorize a later transaction; it does not establish
+settlement. Revoking a grant cannot invalidate a signature already issued.
+The [HTTP guide](http-api.md) maps status
 codes and explains how connected applications should respond.
 
 ## Compatibility and support
@@ -216,5 +217,5 @@ The package is experimental 0.1.x, unpublished and has no stable compatibility
 promise. Review changelog, schemas, profiles and migration notes when changing a
 pin; use a reviewed artifact/commit rather than a moving branch. Changes to public
 signatures, route semantics or supported account profiles require compatibility
-review, regenerated references/contracts and a changelog entry. A future stable
-release/support policy remains a release gate; see [releases](releases.md).
+review, regenerated references/contracts and a changelog entry. A stable support
+policy has not been established; see [releases](releases.md).

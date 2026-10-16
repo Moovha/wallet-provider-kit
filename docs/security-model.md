@@ -64,14 +64,16 @@ Live custody/account recovery, an external security audit, penetration testing,
 SOC2 certification and on-chain settlement remain unverified. Before enabling
 production operations, complete the relevant [acceptance checks](conformance.md).
 Any database schema change must use verified current schema evidence and receive
-explicit approval; this repository has no production schema or migration.
+explicit approval for the target deployment. The built-in SQLite schema is toolkit-owned;
+the kit supplies no migration for an external application database.
 
-The [journal-backed provider wrapper](durable-attempts.md) is an additive library
-integration. It rechecks current host policy, validates immutable request identity
+The [journal-backed provider wrapper](durable-attempts.md) coordinates backend
+effects. It rechecks current host policy, validates immutable request identity
 and stored signatures, and prevents automatic replay of pending/unknown outcomes
-through the host journal contract. The host must implement transactional uniqueness,
-fencing, audit/result persistence, storage encryption and real recovery. Offline
-fixtures are not a production storage adapter, and readiness remains host-owned.
+through the host journal contract. Use the [SQLite journal](storage.md) or a host
+adapter with transactional uniqueness, fencing and audit/result persistence.
+Your deployment must protect stored data and verify recovery. Offline fixtures
+are not deployment storage, and readiness remains the host's responsibility.
 
 ## Optional operator application tokens
 

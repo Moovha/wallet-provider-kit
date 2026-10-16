@@ -1,15 +1,15 @@
 # Rehearse a deployment through the supported operator path
 
 Use **the FormKit GUI to configure**, **the supplied CLI to deploy**, and **the
-deployed Swagger and owner/reviewer pages to exercise the service**. This is the
-standard staging acceptance path. It uses the same exported configuration and
-runtime as an adopter, without a custom host, injected login, synthetic identity
-acceptance or edited database records.
+deployed Swagger and owner/reviewer pages to test the service**. This walkthrough
+checks onboarding, unfunded wallet creation, application access and recovery on
+your staging deployment. Use registered login and application clients, a vendor
+test identity workflow and the supported configured service.
 
 Use a reviewed toolkit revision and the matching walkthrough for your staging
 deployment. Record the source revision, exported configuration revision and
-runbook version privately with the results. A wizard preview, mock
-test or advanced developer harness cannot stand in for this run.
+runbook version privately with the results. Local previews and offline tests do
+not validate the deployed service or its external integrations.
 
 ## 1. Check prerequisites and record gaps
 
@@ -26,10 +26,10 @@ profile absent for this walkthrough. Do not request signatures or submit transac
 | Identity        | An actual Didit test workflow or Sumsub test level/sharing setup, approved test evidence and confirmed cost limits/funding agreements. A key alone is insufficient. |
 | Recovery        | A protected backup destination, retained backend credentials or OWS vault, and a reviewed restore/lost-response procedure.                                          |
 
-Mark each unavailable dependency **blocked**, with the missing registration,
-configuration or implementation described. Continue independent preparation, but
-do not replace a missing dependency with a test adapter and mark the step passed.
-Distinguish an operational configuration gap from missing toolkit behavior.
+If a required service is unavailable, mark its step **blocked** and record what
+is missing. You can continue preparation for other steps. A fixture-based result
+does not establish that the unavailable service works. Record whether each gap
+requires configuration or functionality the toolkit does not support.
 The [credential guide](operator-services.md) and [Auth0 recipe](auth0-setup.md)
 explain the required registrations. Account creation at external services and paid
 identity checks need the applicable account authority and agreed budget.
@@ -88,8 +88,8 @@ disabled, and mutations must deny without backend effects. Resolve diagnosis,
 login discovery and TLS failures before proceeding. Record actual backend and
 recovery evidence before enabling isolated staging activation through the GUI;
 export again, stop the old process, replace configuration, diagnose and restart.
-Use the same origin, binding and storage. Never invent acceptance references to
-make readiness pass. Readiness 200 alone is not full service acceptance.
+Use the same origin, binding and storage. Enter acceptance references only after
+the corresponding checks pass. Readiness 200 alone is not full service acceptance.
 
 ## 4. Create an unfunded account and access it as application A
 
@@ -129,10 +129,9 @@ with `{}` and a new UUIDv4 idempotency key; retain this exact key. Then execute
 the original address. Confirm the account has no native test-network funds using
 a read-only explorer/RPC lookup. Do not fund it or request signing.
 
-This demonstrates application access through a real registered caller in Swagger.
-If a product application is part of acceptance, it must then consume these same
-HTTP routes using its own server-held credentials; a custom harness is not a
-substitute for that application's integration.
+These requests validate the registered application's API access through Swagger.
+To validate your product integration, also call the same HTTP routes from the
+product using its own server-held credentials.
 
 ## 5. Exercise policy denials in the deployed GUI
 
@@ -178,9 +177,9 @@ performs read-only lookup. A confirmed original wallet may restore its receipt.
 A lookup miss does not authorize a replacement account or fresh attempt.
 
 If the host has no reviewed fault mechanism, mark lost-provider-response testing
-blocked instead of modifying the adapter, inserting state or claiming client-side
-replay tested provider uncertainty. Power-loss and crash-during-commit recovery
-also require their own explicit host-level plan/evidence.
+blocked. Client-side replay and inserted fixture state do not test a lost provider
+response. Power-loss and crash-during-commit recovery require separate host-level
+tests and evidence.
 
 ## 7. Decide acceptance and retain the deployment
 
@@ -191,8 +190,6 @@ the staging deployment and its records private, supervised and recoverable;
 record whether it remains running or has been stopped. Do not delete a wallet,
 rotate credentials or remove authority records as routine cleanup.
 
-The [16 October engineering exercise](conformance.md#isolated-cdp-staging-exercise-16-october-2026)
-used a custom advanced host with synthetic login/identity services. It found real
-defects and established limited CDP provisioning/recovery evidence, but it did
-**not** complete this supported operator workflow. Its successful cases must not
-be promoted to full deployment acceptance.
+The published [CDP evidence summary](conformance.md#isolated-cdp-staging-exercise-16-october-2026)
+covers provisioning and recovery with a custom host and synthetic login/identity
+services. It does not validate this configured-service walkthrough or your deployment.

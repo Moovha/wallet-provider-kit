@@ -38,8 +38,8 @@ npm install /absolute/path/to/moovha-wallet-provider-kit-0.1.0.tgz
 Keep the reviewed tarball in your own artifact store and record its source commit
 and checksum for repeatable installs. GitHub CI also uploads a `release-candidate`
 artifact containing the package and SBOM; these are short-lived build candidates,
-not approved releases. A registry install by name won't work until publication
-is separately authorized. Installing directly from a Git branch isn't supported:
+not approved releases. The package is not available from the npm registry;
+install a built tarball. Installing directly from a Git branch isn't supported:
 compiled files aren't committed and there is intentionally no install-time build.
 
 The repository disables npm lifecycle scripts in `.npmrc`. `pack:local` builds
@@ -97,7 +97,7 @@ Open [Swagger UI](http://127.0.0.1:8080/docs/). Use Ctrl-C to stop. This executa
 has the same unconfigured behavior as `npm start` in the source checkout.
 For a configured deployment, follow [Configure, deploy and integrate](setup.md).
 The `init`, `validate`, `doctor`, `init-storage` and `run --config` commands supply
-the supported service without adopter startup code. Environment credentials alone
+the supported service without custom startup code. Environment credentials alone
 cannot activate signing.
 
 ## Continue with your wallet backend
@@ -112,8 +112,8 @@ when you need owner login, consent, identity review and application grants.
 
 ## Choose imports by responsibility
 
-The root import retains all existing convenience exports. Focused imports let a
-reader see the part being used and let core consumers avoid loading HTTP and
+The root import provides convenience exports. Focused imports make each module's
+responsibility explicit and let core consumers avoid loading HTTP and
 onboarding modules. They are entry points within one package, not independently
 installed packages; runtime dependencies are still installed together.
 
@@ -193,7 +193,7 @@ configures that monitoring stack. Neither overrides your application's policy.
 
 ## Check the distribution
 
-Maintainers run:
+To verify the packaged files and consumer examples from a source checkout, run:
 
 ```sh
 npm run check:package

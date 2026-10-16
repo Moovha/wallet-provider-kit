@@ -1,7 +1,7 @@
 # TypeScript API reference
 
-Generated from the public package exports and TypeScript declarations. Run
-`npm run generate:docs` after API changes; `npm run check:docs` rejects drift.
+Use this reference for the public package exports and TypeScript declarations.
+For contributing or regeneration, see the [development guide](../CONTRIBUTING.md#development).
 
 Start with the [API guide](api.md) for composition, ownership and errors, or the
 [runnable integration tutorial](integration-example.md). These declaration excerpts
@@ -125,7 +125,7 @@ export interface EmbeddedAccount {
 
 ```ts
 /**
- * Server-owned port, deliberately without a production implementation yet.
+ * Server-owned authority port for current policy and durable attempt admission.
  * Each call must verify the principal's current grant/session/proof and owner permission,
  * read current stored KYC, and durably admit the exact attempt and usage budget.
  * Signing additionally requires current consent, immutable committed plan/action,
@@ -149,7 +149,7 @@ export interface EmbeddedWalletAuthority {
 [Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/domain/embedded-wallet.ts).
 
 ```ts
-/** Internal service only: HTTP-independent; the host supplies authoritative persistence and policy. */
+/** HTTP-independent wallet service; the host supplies authoritative persistence and policy. */
 export declare class EmbeddedWalletService {
   constructor(
     authority: EmbeddedWalletAuthority,
@@ -383,7 +383,7 @@ export interface WalletAttemptFailure {
 
 ```ts
 /**
- * Host-owned transactional persistence. No default or in-memory implementation.
+ * Transactional persistence supplied through the SQLite journal or a host adapter.
  *
  * claim must atomically bind namespace/provider/attempt and resource identities,
  * reserve the bounded usage, and commit dispatch with a fresh fencing token.
@@ -1287,7 +1287,7 @@ export declare function createIdentityVerifier(
 [Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/domain/enrollment.ts).
 
 ```ts
-/** Trusted host integration. No runtime database or automatic KYC-acceptance implementation is supplied. */
+/** Trusted enrollment policy/persistence port; SQLite storage still requires host authorization and acceptance callbacks. */
 export interface EnrollmentAuthority {
   /** Authorize current caller; atomically reserve IDs/unique nonce and bind the idempotency key. Return original record on exact retry. */
   begin(
@@ -1520,8 +1520,8 @@ Import from `@moovha/wallet-provider-kit/cdp`. [Integration guide](provider-guid
 /**
  * No SDK singleton, telemetry, ambient credentials, redirects or automatic retries.
  * Auth uses the vendor's public SDK; HTTP lifecycle belongs to this adapter.
- * This factory is not imported by application startup. Business policy and durable
- * attempts must be composed through EmbeddedWalletService before activation.
+ * Import this factory explicitly when selecting CDP. Compose business policy and
+ * durable attempts through the configured service or an embedded host before activation.
  */
 export declare function createCdpWalletProvider(
   environment: NodeJS.ProcessEnv,
@@ -2198,7 +2198,7 @@ export declare class ConfigurationError extends Error {
 [Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/deployment/provider.ts).
 
 ```ts
-/** Compose the supported service. No adopter authority callbacks, module loading from HTTP or implicit activation. */
+/** Compose the supported configured service with built-in authority and journals; activation remains explicit. */
 export declare function createConfiguredProvider(
   input: unknown,
   directory?: string,

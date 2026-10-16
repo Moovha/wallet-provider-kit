@@ -276,7 +276,7 @@ wizard does not fetch or store application tokens.
 
 ## Use the exported files
 
-- `provider.config.json`: the existing version-1 provider service configuration.
+- `provider.config.json`: version-1 provider service configuration.
 - `provider.env.example`: required variable names with empty values. Supply actual
   values through your deployment's secret store; the CLI does not automatically
   load an environment file.
@@ -313,27 +313,17 @@ sources are recorded in the source checkout's `setup-ui/ASSETS.md`.
 
 ## Verification and limits
 
-Offline browser tests cover a new CDP configuration, OWS/Sumsub selection,
-Relayer pool editing, application funding, financial bounds and activation,
-import/export round-trips, rejected configurations and mobile layout. Local API
-tests exercise origin/session controls, sanitized diagnostics and custom-module
-denial. Installed-package checks verify that the wizard assets work without the
-frontend development dependencies.
+The wizard validates configuration structure and policy. Before activation,
+verify vendor registration, login compatibility, identity-sharing agreements,
+wallet recovery and token acceptance on your deployment using the
+[staging walkthrough](staging-walkthrough.md) and [integration checks](conformance.md).
+Offline UI and package tests do not establish those external properties.
 
-Those checks establish that the UI produces usable configuration inputs. They do
-not prove live vendor registration, login compatibility, identity-sharing
-agreements, wallet recovery or token acceptance. The current configured service
-remains experimental, single-host and Base Sepolia EOA only. Signing does not
-broadcast, sponsor gas or establish settlement. Complete the provider acceptance
-and deployment process independently before enabling it.
+The configured service is experimental, single-host and Base Sepolia EOA only.
+Signing does not broadcast, sponsor gas or establish settlement.
 
 ## Screenshot maintenance
 
-The six step images and local API reference use the example configuration with
-invented Acme settings and no secret values. The live explorer image uses an
-offline HTTP fixture with no backend adapter and readiness closed. Maintainers can rebuild and capture them with
-`npm run build` and `node scripts/capture-setup-docs.mjs` after installing the
-repository's Playwright Chromium. The script uses only loopback setup/service fixtures,
-performs no vendor calls and writes PNGs under ignored `artifacts/setup-docs/`.
-The published WebP copies live in `docs/public/screenshots/`; inspect them when the
-UI changes. They are interface documentation, not acceptance evidence.
+The screenshots use fictional settings and offline fixtures to illustrate the
+interface. To update them, follow the
+[contributor screenshot instructions](../CONTRIBUTING.md#maintain-wizard-screenshots).

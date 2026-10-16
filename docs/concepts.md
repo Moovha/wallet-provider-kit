@@ -21,9 +21,10 @@ the provider/application responsibilities and current supported scope.
 [View full-size diagram](public/diagrams/service-boundary.webp)
 
 The **wallet provider** is the team operating the wallet service. Its **host** is
-the server application where the toolkit runs. You supply that application's
-startup code, persistent records and permission checks. The toolkit runs as a
-library inside this host.
+the server application where the toolkit runs. For supported deployments, use
+the configured service's supplied startup, persistence and permission checks.
+For an embedded integration, your application supplies those parts through the
+toolkit's library interfaces.
 
 An **account owner**, also called a wallet owner, is the user recorded as owning
 an account in the provider's records. An **account** is the wallet record exposed

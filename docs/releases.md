@@ -45,6 +45,7 @@ a long-term audit record.
 
 Before rollback, check schema and authorization compatibility with the candidate.
 Preserve admitted attempts and reconcile uncertain effects. A rollback cannot
-revoke a signature or erase financial history. The kit ships no production database
-migration to reverse. Pin and review package/image/action updates rather than
+revoke a signature or erase financial history. The kit does not supply automatic
+schema upgrades or downgrades; do not reinitialize storage to roll back. Pin and
+review package/image/action updates rather than
 using floating `latest` references.

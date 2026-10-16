@@ -9,10 +9,11 @@ for how these responsibilities appear in configuration and API types.
 
 `HTTP → verified principal → host authority → EmbeddedWalletService → signing provider`
 
-Your host supplies persistent authorization and a signing backend. The domain
-service works through interfaces, so HTTP handling and
-vendor-specific code stay in their adapters. The kit doesn't connect directly to
-Moovha user records, databases or settlement services.
+For supported deployments, the configured service supplies authorization and
+persistence; you select the wallet backend and connect external services.
+Embedded integrations supply their own host composition. The domain service
+uses interfaces to keep HTTP handling and vendor-specific code in their adapters.
+Moovha user records, databases and settlement services are separate integrations.
 
 ## Responsibilities
 
@@ -25,8 +26,9 @@ Moovha user records, databases or settlement services.
 
 - **Onboarding/access profile:** approved applications, hosted provider login and
   owner consent, identity-vendor adapters, provider review, private persistent
-  records and expiring/revocable account grants. The small reference store and
-  provisioning journal are bundled; financial-action authorization stays separate.
+  records and expiring/revocable account grants. The profile supports SQLite or
+  the bundled file store and a provisioning-only journal. The configured transfer
+  profile adds financial-action authorization separately.
 - **HTTP service:** validate requests/tokens and dispatch account/action references.
 - **Host authority:** check owner, grant, consent and KYC; supply durable attempts,
   result storage, concurrency control and recovery.
@@ -69,7 +71,7 @@ There are two different API directions:
 This package implements the provider side. Its signing routes are not a business
 operation planner or a settlement API. The orchestration snapshot below supplies
 reference action schemas only. Keep service registrations, OAuth audiences,
-owner grants and legacy custody systems separate; a provider token must not grant
+owner grants and other custody systems separate; a provider token must not grant
 access to another host's custody keys.
 
 For implementation, follow [package installation](package.md), the

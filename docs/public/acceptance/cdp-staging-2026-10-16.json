@@ -152,9 +152,9 @@
     "fundingCalls": 0
   },
   "completedAt": "2026-10-16T09:54:48.925Z",
-  "sourceRevisionState": "base revision plus browser-form and CDP-name fixes in the accompanying pull request",
+  "sourceRevisionState": "Base revision plus browser-form and CDP-name fixes in pull request #28.",
   "fullDeploymentAcceptance": false,
   "workflow": "Custom advanced engineering harness; not the supported GUI-export/CLI deployment workflow",
   "runtimeStatus": "stopped; wallets, original authority and recovery records retained",
-  "requiredFollowup": "Publish reviewed standard staging walkthrough before any full deployment run; use real registered login/application/identity dependencies and mark missing ones blocked."
+  "requiredFollowup": "Validate the configured service using docs/staging-walkthrough.md with registered login/application clients and vendor identity services. Mark steps blocked where their required service is unavailable."
 }

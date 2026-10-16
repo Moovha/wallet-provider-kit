@@ -1,6 +1,6 @@
 # Use the built-in SQLite database
 
-The toolkit includes a persistent SQLite implementation for its implemented
+The toolkit includes persistent SQLite storage for its supported
 onboarding, signing and Relayer execution profiles. It runs inside your Node.js
 process and requires no database server or additional npm dependency. Use it on
 one host with a private directory on persistent local POSIX storage.
@@ -16,7 +16,7 @@ one host with a private directory on persistent local POSIX storage.
 | Financial audit events and reconciliation evidence fingerprints                              | Committed with the corresponding state transition          |
 | Alternative OIDC Identity Assurance enrollment                                               | `database.enrollmentAuthority`, with host policy callbacks |
 
-This stores the records needed by the toolkit's **implemented** profiles. It
+SQLite stores the records needed by these profiles. It
 does not implement the orchestration draft, on-chain settlement, a relayer's nonce
 database, vendor key storage or a user's recovery vault. Your chosen wallet
 backend continues to own keys. No private keys, seed phrases, API tokens, identity
@@ -25,8 +25,10 @@ signatures remain sensitive private data.
 
 ## Initialize and open
 
-After [installing the package](package.md), initialize a dedicated empty directory
-once, in your own operator-controlled setup code:
+For the configured service, initialize storage with the
+[deployment CLI](operator-deployment.md#validate-initialize-once-then-diagnose).
+For an embedded integration, [install the package](package.md) and initialize a
+dedicated empty directory once from trusted setup code:
 
 ```ts
 import { resolve } from 'node:path';

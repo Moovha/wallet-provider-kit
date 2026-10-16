@@ -20,7 +20,7 @@ import {
 } from './config.js';
 import { SupportedActions } from './actions.js';
 
-/** Compose the supported service. No adopter authority callbacks, module loading from HTTP or implicit activation. */
+/** Compose the supported configured service with built-in authority and journals; activation remains explicit. */
 export async function createConfiguredProvider(
   input: unknown,
   directory = process.cwd(),
