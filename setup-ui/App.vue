@@ -135,7 +135,7 @@ async function check() {
     if (JSON.stringify(config.value) === snapshot) {
       validated.value = result;
       notice.value =
-        'Configuration valid. Download your files, then complete the deployment checks before enabling wallet operations.';
+        'Configuration valid for export. Download all three files, then deploy and test your service before enabling wallet operations.';
     }
   } catch (error) {
     showError(error);
@@ -250,10 +250,10 @@ function enableDocumentation() {
       >
       <div class="sidebar-copy">
         <span class="eyebrow">Operator setup</span>
-        <h1>Your wallet service,<br />ready to configure.</h1>
+        <h1>Configure here.<br />Deploy on your server.</h1>
         <p>
-          Connect the services you use. Set your policies. Export a deployment
-          configuration.
+          Prepare settings and access rules across six steps. Leave with
+          configuration files and a deployment checklist.
         </p>
       </div>
       <ol
@@ -387,9 +387,10 @@ function enableDocumentation() {
                 <span class="eyebrow">Review & export</span>
                 <h2>Review your configuration</h2>
                 <p>
-                  Check your settings, then download three files to take to your
-                  server. Validation checks the configuration’s structure; it
-                  does not test your external services or deploy anything.
+                  You’ve prepared a configuration draft. Check it for
+                  completeness and consistency, then download all three files
+                  for your server. Validation does not test credentials, connect
+                  external services or deploy your wallet service.
                 </p>
               </div>
               <dl class="summary">
@@ -442,8 +443,29 @@ function enableDocumentation() {
                     {{
                       config.financial
                         ? 'Delegated token transfer signing'
-                        : 'Onboarding and access only'
+                        : 'Wallet creation and account access'
                     }}
+                  </dd>
+                </div>
+                <div v-if="config.policy.access?.mode === 'application'">
+                  <dt>Identity requirements</dt>
+                  <dd>
+                    {{ config.policy.identity?.application?.verificationLevel }}
+                    · required fields:
+                    {{
+                      config.policy.identity?.application?.requiredFields.join(
+                        ', ',
+                      ) || 'none'
+                    }}
+                    · maximum age
+                    {{ config.policy.identity?.maxAgeDays ?? 365 }} days
+                  </dd>
+                </div>
+                <div>
+                  <dt>Access limit</dt>
+                  <dd>
+                    {{ config.policy.access?.maxAgeDays ?? 30 }} days maximum;
+                    identity or consent expiry can end access sooner
                   </dd>
                 </div>
                 <div>
@@ -490,23 +512,30 @@ function enableDocumentation() {
                     on your deployment before allowing users to connect.
                   </p>
                 </div>
-                <h3>Your deployment files</h3>
+                <h3>Finish configuration, then deploy</h3>
                 <ul class="export-file-guide">
                   <li>
-                    <strong>Configuration:</strong> the settings your server
-                    will load as provider.config.json.
+                    <strong>provider.config.json:</strong> your service settings
+                    and policy. Your server loads this file; you can also import
+                    it here to make future changes.
                   </li>
                   <li>
-                    <strong>Checklist:</strong> the preparation tasks and
-                    commands to validate, initialize and run your service.
+                    <strong>provider-setup.md:</strong> your deployment
+                    checklist, with preparation tasks and commands to validate,
+                    initialize and run your service.
                   </li>
                   <li>
-                    <strong>Variable template:</strong> empty entries for your
-                    secret values. Fill these privately on the deployment host
-                    or through your secret manager, following the deployment
-                    guide. The wizard exports names only.
+                    <strong>provider.env.example:</strong> variable names with
+                    empty entries for secret values. Fill these privately on the
+                    deployment host or through your secret manager, following
+                    the deployment guide. The wizard exports names only.
                   </li>
                 </ul>
+                <p>
+                  Next, take these files to your deployment host and follow the
+                  checklist. Downloads save your work; they do not apply it to a
+                  running service.
+                </p>
                 <p>
                   <a
                     :href="docs + 'staging-walkthrough.html'"

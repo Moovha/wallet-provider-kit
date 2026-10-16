@@ -61,6 +61,15 @@ Keep the terminal open. The wizard is bundled; it needs no FormKit Pro subscript
 The package is experimental and not published to npm; a registry install by name
 is not available. See [getting started](docs/README.md) for installation help.
 
+You are preparing a local configuration draft throughout the wizard. Each field
+defines a setting the server will use after deployment. Finish by checking the
+draft and downloading `provider.config.json` (settings and policy),
+`provider.env.example` (secret variable names) and `provider-setup.md` (deployment
+checklist). Then take those files to your server, supply secrets and follow the
+deployment guide. The wizard does not install or update a running wallet service.
+The [policy controls table](docs/application-access.md#configure-the-trust-policy)
+explains which access rules you can customize in the GUI and how they are enforced.
+
 ![FormKit review and export screen using offline example settings](docs/public/screenshots/export.webp)
 
 [Open full-size screenshot](docs/public/screenshots/export.webp)

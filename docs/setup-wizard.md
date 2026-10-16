@@ -1,10 +1,29 @@
 # Configure your wallet service in the wizard
 
-The wizard prepares configuration for the supplied service. Application-led access
-is the standard flow: users sign in, complete identity checks and approve access
-inside the connected application. The provider accepts its attestations only under
-an explicit trust agreement and current policy. The wizard does not deploy the
-service or test external integrations.
+Use the wizard to prepare the settings your wallet service will load when you
+deploy it. Each field becomes part of that configuration: which backend creates
+wallets, how applications authenticate, what evidence permits access and where
+the service stores its records. You are configuring a local draft throughout
+the six steps.
+
+At the end, **Validate configuration** checks that draft for completeness and
+consistency. Then download all three deployment files:
+
+| File                   | What you use it for                                                                                                           |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `provider.config.json` | The service settings and policy your server loads. Import this file into the wizard to edit it later.                         |
+| `provider.env.example` | A template listing secret variable names. Supply their values privately on the deployment host or through its secret manager. |
+| `provider-setup.md`    | A deployment checklist with preparation tasks and CLI commands for your selected settings.                                    |
+
+Finishing the wizard leaves you with these files, ready for the
+[deployment steps](operator-deployment.md). Validation does not check credentials,
+test external integrations or deploy a service. Wallet operations start only
+after you deploy, complete acceptance tests and explicitly enable them. Editing
+or downloading a draft does not change an existing deployment.
+
+Application-led access is the standard flow: users sign in, complete identity
+checks and approve access inside the connected application. The provider accepts
+its attestations under the trust agreement and policy you configure.
 
 ## Open the wizard
 
@@ -38,6 +57,15 @@ loses unsaved edits.
 ![Provider setting instructions](public/screenshots/provider-guidance.webp)
 
 ## Complete the six steps
+
+| Step       | Decision you are making                                                                   |
+| ---------- | ----------------------------------------------------------------------------------------- |
+| Provider   | How applications identify and reach your service.                                         |
+| Backend    | Which existing service or engine creates wallets and signs approved actions.              |
+| Services   | How the provider authenticates applications and what identity evidence it requires.       |
+| Policies   | Which applications are trusted, which permissions they may request and what limits apply. |
+| Deployment | Where the server listens and stores private records, and which features it enables.       |
+| Export     | Whether the draft is consistent and which files to take to your server.                   |
 
 ### 1. Provider
 
@@ -91,6 +119,20 @@ Set maximum identity age and access duration. Grants are also bounded by submitt
 consent expiry. Different applications' user IDs cannot claim the same wallet;
 cross-application linking needs a separately verified integration.
 
+The GUI customizes the supplied rules directly; no policy code is needed for
+these controls. Identity requirements and age limits apply to all registered
+applications. Each application has its own trust agreement, permissions and
+enabled switch. The [policy controls table](application-access.md#configure-the-trust-policy)
+maps these settings to their effects and describes the customization limits.
+
+For example, keep `verified` and `country` in Services, set identity age to 30
+days and access duration to three days in Policies, then allow one trusted
+application to **Read wallet accounts**. It must attest a `verified` check less
+than 30 days old, a nonempty `country` value and current user consent. Access ends
+within three days, sooner if identity evidence or consent expires. A request
+for transfer permission is denied. The `country` requirement checks presence;
+it does not restrict which countries are accepted.
+
 **Configure delegated transfer signing** is optional. Supply the verified token,
 recipients, limits and validity. The application must present those exact terms to
 the user and attest consent to the returned transfer-policy revision. Signing does
@@ -113,10 +155,11 @@ They do not create a wallet-user onboarding step.
 
 ### 6. Export
 
-Validate the settings and resolve any errors shown beside the named step and field.
-Review the access flow, application trust policy, backend and activation state.
-Download `provider.config.json`, `provider.env.example` and `provider-setup.md`.
-Configuration validation makes no wallet or identity-vendor call.
+Review the access flow, identity requirements, application permissions, backend
+and activation state. **Validate configuration** checks the draft you have been
+building across the earlier steps. Resolve any errors beside the named step and
+field, then download all three files listed at the start of this guide. Editing
+a setting afterward requires validation again before downloading.
 
 ![Validated configuration and exports](public/screenshots/export.webp)
 
@@ -163,6 +206,13 @@ once, diagnose local prerequisites, publish through HTTPS and perform acceptance
 tests before activation. Follow [deployment](operator-deployment.md) and the
 [staging walkthrough](staging-walkthrough.md). No application deployment or package
 publication occurs when you export configuration.
+
+To change policies later, import your saved `provider.config.json`, edit the
+rules and review the effect on existing users. Validate and download the updated
+files, deploy them and restart the service. Policy changes invalidate previous
+grants; applications must read the new policy and obtain consent to its current
+terms before requesting fresh access. Optional transfer-term changes also require
+consent to the new transfer-policy revision.
 
 ## Resume and privacy
 

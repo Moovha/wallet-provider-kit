@@ -195,7 +195,7 @@ test('field guidance follows backend choices and explains service registrations,
   ).toBeVisible();
   await expect(
     page.getByText(
-      'it does not test your external services or deploy anything.',
+      'Validation does not test credentials, connect external services or deploy your wallet service.',
       { exact: false },
     ),
   ).toBeVisible();

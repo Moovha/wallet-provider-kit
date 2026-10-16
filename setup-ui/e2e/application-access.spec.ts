@@ -50,6 +50,11 @@ test('a new operator configures application-led access without user login, vendo
     await page
       .getByLabel('Maximum age of identity checks (days)', { exact: true })
       .fill('30');
+    const rules = page.locator('.callout').filter({
+      hasText: 'How the provider uses these rules',
+    });
+    await expect(rules).toContainText('checked within 30 days');
+    await expect(rules).toContainText('Access lasts at most 3 days');
     await page
       .getByLabel('Application name', { exact: true })
       .fill('Example App');
@@ -77,6 +82,8 @@ test('a new operator configures application-led access without user login, vendo
       await readFile((await (await download).path())!, 'utf8'),
     );
     expect(config.policy.access.mode).toBe('application');
+    expect(config.policy.access.maxAgeDays).toBe(3);
+    expect(config.policy.identity.maxAgeDays).toBe(30);
     expect(config.ownerLogin).toBeUndefined();
     expect(config.reviewers).toBeUndefined();
     expect(config.identity).toEqual({});
