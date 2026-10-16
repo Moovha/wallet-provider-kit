@@ -18,6 +18,13 @@
   screenshots with the standard flow. Configuration and HTTP changes are additive;
   the toolkit-owned SQLite schema and backend interfaces are unchanged.
 
+## Unreleased — configured staging evidence
+
+- Record a live hosted consent/review rehearsal with application records, Auth0,
+  unfunded CDP provisioning, policy denials and encrypted restore. Keep natural
+  expiry and lost-provider-response acceptance explicitly incomplete.
+- Explain Auth0 M2M issued-scope checks and purpose-specific client grants.
+
 ## Unreleased — application-record evaluation
 
 - Default new wizard drafts and CLI templates to application-supplied records
