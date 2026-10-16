@@ -1,6 +1,25 @@
 import { expect, it } from 'vitest';
 import { explainIssue } from '../setup-ui/validation.js';
 
+it('routes policy requirements and vendor price errors to Policies while connection errors stay in Services', () => {
+  for (const path of [
+    '/policy/access/mode',
+    '/policy/identity/application/verificationLevel',
+    '/policy/identity/records/requiredFields',
+    '/identity/didit/importPrice/maximumMinor',
+    '/identity/sumsub/verificationPrice/termsReference',
+  ]) {
+    expect(explainIssue(`${path}: required`)).toMatch(/^Policies — /);
+  }
+  for (const path of [
+    '/oauth/issuer',
+    '/identity/didit/apiKey/env',
+    '/identity/sumsub/levelName',
+  ]) {
+    expect(explainIssue(`${path}: required`)).toMatch(/^Services — /);
+  }
+});
+
 it('points operators to the visible step and repeated field instead of a JSON path', () => {
   const message = explainIssue(
     '/policy/applications/1/funding/monthlyLimitMinor: maximum',

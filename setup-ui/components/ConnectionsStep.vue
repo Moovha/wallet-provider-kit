@@ -4,7 +4,6 @@ import { docs } from '../model';
 import { computed, watch } from 'vue';
 import type { ProviderConfiguration } from '../model';
 import SecretField from './SecretField.vue';
-import PriceFields from './PriceFields.vue';
 const model = defineModel<ProviderConfiguration>({ required: true });
 watch(
   () => model.value.oauth.issuer,
@@ -14,8 +13,6 @@ watch(
   },
 );
 function didit(enabled: unknown) {
-  if (enabled && model.value.policy.identity)
-    delete model.value.policy.identity.records;
   if (enabled)
     model.value.identity.didit = {
       apiKey: { env: 'DIDIT_API_KEY' },
@@ -24,8 +21,6 @@ function didit(enabled: unknown) {
   else delete model.value.identity.didit;
 }
 function sumsub(enabled: unknown) {
-  if (enabled && model.value.policy.identity)
-    delete model.value.policy.identity.records;
   if (enabled)
     model.value.identity.sumsub = {
       appToken: { env: 'SUMSUB_APP_TOKEN' },
@@ -35,124 +30,31 @@ function sumsub(enabled: unknown) {
     };
   else delete model.value.identity.sumsub;
 }
-const recordFields = computed({
-  get: () =>
-    model.value.policy.identity?.records?.requiredFields.join('\n') ?? '',
-  set: (value: string) => {
-    if (model.value.policy.identity?.records)
-      model.value.policy.identity.records.requiredFields = value
-        .split(/\r?\n/)
-        .map((field) => field.trim())
-        .filter(Boolean);
-  },
-});
-function records(enabled: unknown) {
-  const identity = (model.value.policy.identity ??= {});
-  if (enabled) {
-    identity.records = { requiredFields: ['display_name', 'country'] };
-    model.value.identity = {};
-    delete model.value.financial;
-    for (const app of model.value.policy.applications) {
-      app.permissions = ['account:read'];
-      delete app.funding;
-    }
-  } else delete identity.records;
-}
 const flow = computed(() => model.value.policy.access?.mode ?? 'hosted');
-function setFlow(value: unknown) {
-  if (value !== 'application' && value !== 'hosted') return;
-  model.value.policy.access = { ...model.value.policy.access, mode: value };
-  delete model.value.policy.identity!.records;
-  model.value.identity = {};
-  if (value === 'application') {
-    model.value.policy.identity!.application = {
-      requiredFields: ['country'],
-      verificationLevel: 'verified',
-    };
-    if (!model.value.apiExplorer) delete model.value.ownerLogin;
-    delete model.value.reviewers;
-    for (const app of model.value.policy.applications)
-      app.assertionTrust ??= { agreement: '' };
-  } else {
-    delete model.value.policy.identity!.application;
-    model.value.ownerLogin ??= {
-      issuer: '',
-      clientId: '',
-      clientSecret: { env: 'PROVIDER_LOGIN_SECRET' },
-    };
-    model.value.reviewers = [''];
-    for (const app of model.value.policy.applications)
-      delete app.assertionTrust;
-  }
-}
-const requiredFields = computed({
-  get: () =>
-    model.value.policy.identity?.application?.requiredFields.join('\n') ?? '',
-  set: (value: string) => {
-    if (model.value.policy.identity?.application)
-      model.value.policy.identity.application.requiredFields = value
-        .split('\n')
-        .map((x) => x.trim())
-        .filter(Boolean);
-  },
-});
 </script>
 <template>
   <div class="step-heading">
     <span class="eyebrow">Connected services</span>
-    <h2>Connect applications and identity</h2>
+    <h2>Connect your services</h2>
     <p>
-      Your application signs users in and completes identity checks. Configure
-      how this provider authenticates the application and accepts its evidence.
+      Configure how the provider authenticates applications. Add login and
+      identity-vendor connections when your selected access flow needs them.
     </p>
   </div>
-  <FormKit
-    type="select"
-    label="Access flow"
-    :modelValue="flow"
-    :options="[
-      { label: 'Application-led access (standard)', value: 'application' },
-      { label: 'Provider-hosted access (compatibility)', value: 'hosted' },
-    ]"
-    @update:modelValue="setFlow($event)"
-    help="Use application-led access for new deployments. Existing hosted deployments retain their own identity and consent flow."
-  />
-  <div v-if="flow === 'application'" class="callout">
-    <strong>Users stay in the application</strong>
+  <div class="callout step-orientation">
+    <strong>Connect the services your provider will use</strong>
     <p>
-      The application attests identity and consent under the trust agreement you
-      record in Policies. The provider checks the evidence and issues access
-      automatically when policy passes. No provider user login or staff review
-      is required.
+      Configure application tokens here. Set the access flow, identity evidence,
+      application trust and limits together in Policies.
     </p>
-    <p>
-      User IDs are private to each application. A different application cannot
-      connect to an existing wallet by claiming the same user ID. Linking users
-      across applications requires a separately verified integration.
+    <p v-if="flow === 'application'">
+      Users stay in the application. It authenticates them, completes identity
+      checks and records consent; no provider user login or staff review is
+      required.
     </p>
-    <a
-      :href="docs + 'application-access.html'"
-      target="_blank"
-      rel="noopener noreferrer"
-      >Application-led access contract ↗</a
-    >
-    <FormKit
-      type="text"
-      v-model="model.policy.identity!.application!.verificationLevel"
-      label="Required identity level"
-      validation="required|length:1,100"
-      help="Use the exact verification level agreed with your trusted applications."
-    />
-    <FormKit
-      type="textarea"
-      v-model="requiredFields"
-      label="Required identity fields (one per line)"
-      help="Use lowercase names. Leave empty when the policy needs no additional identity fields."
-    />
-    <p>
-      Use lowercase field names such as country. Matching fields do not prove
-      KYC by themselves: only explicitly trusted applications may attest
-      completed checks.
+    <p v-else>
+      Hosted compatibility requires login and either an identity-vendor
+      connection or application-record evaluation selected in Policies.
     </p>
   </div>
   <template v-if="model.ownerLogin">
@@ -263,137 +165,118 @@ const requiredFields = computed({
     >
   </details>
   <template v-if="flow === 'hosted'">
-    <h3>Hosted verification and record evaluation</h3>
-    <fieldset class="vendor-panel">
-      <legend>Application records · starter evaluation</legend>
-      <SetupField
-        guide="applicationRecords"
-        type="checkbox"
-        label="Use application-supplied records for an unfunded evaluation"
-        :modelValue="!!model.policy.identity?.records"
-        @update:modelValue="records($event)"
-      />
-      <SetupField
-        v-if="model.policy.identity?.records"
-        guide="recordFields"
-        type="textarea"
-        label="Required record fields"
-        v-model="recordFields"
-        validation="required"
-      />
-    </fieldset>
-    <p class="help-text">
-      Start with application records to try onboarding without vendor
-      credentials or verification charges. Each submitted record must contain
-      your required fields. Owners consent and your staff review each record
-      before account access. These records are not externally verified KYC and
-      cannot enable transfers. Choose a vendor below when your policy requires
-      external verification. Login proves which account signed in; identity
-      verification checks who that person is. Your staff still review
-      acceptance. “Verification” starts new checks; “import” reuses evidence
-      shared from another service. Each route you offer needs a confirmed price
-      and an application funding agreement in Policies, even when it is free.
+    <h3>Hosted identity-vendor connections</h3>
+    <p v-if="model.policy.identity?.records" class="help-text">
+      Application-record evaluation is selected in Policies. It uses no
+      identity-vendor connection. To use a vendor, turn off record evaluation in
+      Policies, then configure its connection here.
     </p>
-    <fieldset class="vendor-panel">
-      <legend>
-        <img
-          src="/providers/didit.png"
-          alt="Didit logo"
-          width="28"
-          height="28"
+    <template v-else>
+      <p class="help-text">
+        Connect Didit or Sumsub for external verification. “Verification” starts
+        new checks; “import” reuses evidence shared from another service. Set
+        each route's agreed price limit and application funding in Policies,
+        including free routes.
+      </p>
+      <fieldset class="vendor-panel">
+        <legend>
+          <img
+            src="/providers/didit.png"
+            alt="Didit logo"
+            width="28"
+            height="28"
+          />
+          Didit
+        </legend>
+        <SetupField
+          guide="didit"
+          type="checkbox"
+          label="Use Didit"
+          :modelValue="!!model.identity.didit"
+          @update:modelValue="didit($event)"
         />
-        Didit
-      </legend>
-      <SetupField
-        guide="didit"
-        type="checkbox"
-        label="Use Didit"
-        :modelValue="!!model.identity.didit"
-        @update:modelValue="didit($event)"
-      />
-      <a href="https://docs.didit.me/" target="_blank" rel="noopener noreferrer"
-        >Didit setup documentation ↗</a
-      >
-      <template v-if="model.identity.didit"
-        ><SetupField
-          guide="diditWorkflow"
-          v-model="model.identity.didit.workflowId"
-          type="text"
-          label="Didit workflow ID"
-          :validation="[
-            ['required'],
-            [
-              'matches',
-              /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
-            ],
-          ]" /><SecretField
-          guide="diditKey"
-          v-model="model.identity.didit.apiKey"
-          label="Didit API key" /><PriceFields
-          v-model="model.identity.didit.importPrice"
-          label="Didit import" /><PriceFields
-          v-model="model.identity.didit.verificationPrice"
-          label="Didit verification"
-      /></template>
-    </fieldset>
-    <fieldset class="vendor-panel">
-      <legend>
-        <img
-          src="/providers/sumsub.png"
-          alt="Sumsub logo"
-          width="28"
-          height="28"
+        <a
+          href="https://docs.didit.me/"
+          target="_blank"
+          rel="noopener noreferrer"
+          >Didit setup documentation ↗</a
+        >
+        <template v-if="model.identity.didit"
+          ><SetupField
+            guide="diditWorkflow"
+            v-model="model.identity.didit.workflowId"
+            type="text"
+            label="Didit workflow ID"
+            :validation="[
+              ['required'],
+              [
+                'matches',
+                /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+              ],
+            ]" /><SecretField
+            guide="diditKey"
+            v-model="model.identity.didit.apiKey"
+            label="Didit API key"
+        /></template>
+      </fieldset>
+      <fieldset class="vendor-panel">
+        <legend>
+          <img
+            src="/providers/sumsub.png"
+            alt="Sumsub logo"
+            width="28"
+            height="28"
+          />
+          Sumsub
+        </legend>
+        <SetupField
+          guide="sumsub"
+          type="checkbox"
+          label="Use Sumsub"
+          :modelValue="!!model.identity.sumsub"
+          @update:modelValue="sumsub($event)"
         />
-        Sumsub
-      </legend>
-      <SetupField
-        guide="sumsub"
-        type="checkbox"
-        label="Use Sumsub"
-        :modelValue="!!model.identity.sumsub"
-        @update:modelValue="sumsub($event)"
-      />
-      <a
-        href="https://docs.sumsub.com/"
-        target="_blank"
-        rel="noopener noreferrer"
-        >Sumsub setup documentation ↗</a
+        <a
+          href="https://docs.sumsub.com/"
+          target="_blank"
+          rel="noopener noreferrer"
+          >Sumsub setup documentation ↗</a
+        >
+        <template v-if="model.identity.sumsub"
+          ><SetupField
+            guide="sumsubLevel"
+            v-model="model.identity.sumsub.levelName"
+            type="text"
+            label="Sumsub recipient level name"
+            validation="required|length:1,256"
+          /><SecretField
+            guide="sumsubToken"
+            v-model="model.identity.sumsub.appToken"
+            label="Sumsub app token"
+          /><SecretField
+            guide="sumsubSecret"
+            v-model="model.identity.sumsub.secretKey"
+            label="Sumsub secret key"
+          />
+          <p class="help-text">
+            Ask Sumsub to enable Reusable KYC Share for your account and confirm
+            the sharing arrangement. Selecting Sumsub here does not enable that
+            product.
+          </p>
+        </template>
+      </fieldset>
+      <p
+        v-if="
+          !model.policy.identity?.records &&
+          !model.identity.didit &&
+          !model.identity.sumsub
+        "
+        role="alert"
+        class="error-text"
       >
-      <template v-if="model.identity.sumsub"
-        ><SetupField
-          guide="sumsubLevel"
-          v-model="model.identity.sumsub.levelName"
-          type="text"
-          label="Sumsub recipient level name"
-          validation="required|length:1,256" /><SecretField
-          guide="sumsubToken"
-          v-model="model.identity.sumsub.appToken"
-          label="Sumsub app token" /><SecretField
-          guide="sumsubSecret"
-          v-model="model.identity.sumsub.secretKey"
-          label="Sumsub secret key" />
-        <p class="help-text">
-          Ask Sumsub to enable Reusable KYC Share for your account and confirm
-          the sharing arrangement. Selecting Sumsub here does not enable that
-          product.
-        </p>
-        <PriceFields
-          v-model="model.identity.sumsub.importPrice"
-          label="Sumsub import" /><PriceFields
-          v-model="model.identity.sumsub.verificationPrice"
-          label="Sumsub verification"
-      /></template>
-    </fieldset>
-    <p
-      v-if="
-        !model.policy.identity?.records &&
-        !model.identity.didit &&
-        !model.identity.sumsub
-      "
-      role="alert"
-      class="error-text"
-    >
-      Choose application records or an identity vendor before exporting.
-    </p>
+        Configure an identity vendor here or select application-record
+        evaluation in Policies before exporting.
+      </p>
+    </template>
   </template>
 </template>

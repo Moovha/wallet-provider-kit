@@ -135,8 +135,9 @@ test('field guidance follows backend choices and explains service registrations,
   const relayerHelp = page.locator('[data-setting="relayerOrigin"]');
   await relayerHelp.locator('summary').click();
   await expect(relayerHelp).toContainText('does not install a Relayer');
-  await step(page, 'Services');
+  await step(page, 'Policies');
   await page.getByLabel('Access flow', { exact: true }).selectOption('hosted');
+  await step(page, 'Services');
   await expect(
     page.getByRole('heading', {
       name: 'Access tokens for connected applications',
@@ -149,6 +150,7 @@ test('field guidance follows backend choices and explains service registrations,
     `${sample.policy.provider.origin}/onboarding/callback`,
   );
   await page.getByText('Use Didit', { exact: true }).click();
+  await step(page, 'Policies');
   await page
     .getByText('Didit verification: set an agreed price limit', {
       exact: true,
@@ -225,8 +227,9 @@ test('an operator configures CDP without JSON, exports valid files, and editing 
   await page
     .getByLabel('Wallet environment name', { exact: true })
     .fill('acme-sepolia');
-  await step(page, 'Services');
+  await step(page, 'Policies');
   await page.getByLabel('Access flow', { exact: true }).selectOption('hosted');
+  await step(page, 'Services');
   await page
     .getByLabel('Login service issuer URL', { exact: true })
     .fill('https://login.acme.example');
@@ -242,6 +245,7 @@ test('an operator configures CDP without JSON, exports valid files, and editing 
   await page
     .getByLabel('Token verification keys URL (JWKS)', { exact: true })
     .fill('https://applications.acme.example/jwks');
+  await step(page, 'Policies');
   await page
     .getByText('Use application-supplied records for an unfunded evaluation', {
       exact: true,
@@ -331,6 +335,7 @@ test('OWS and Sumsub can be selected with their references and exported without 
   await page
     .getByLabel('Sumsub recipient level name', { exact: true })
     .fill('recipient-level');
+  await step(page, 'Policies');
   await page
     .getByText('Sumsub import: set an agreed price limit', {
       exact: true,
@@ -878,12 +883,13 @@ test('hosted compatibility supports unfunded record evaluation without vendor cr
 }) => {
   await imported(page);
   await step(page, 'Services');
+  await expect(page.getByLabel('Use Didit', { exact: true })).toBeChecked();
+  await step(page, 'Policies');
   const records = page.getByLabel(
     'Use application-supplied records for an unfunded evaluation',
     { exact: true },
   );
   await expect(records).not.toBeChecked();
-  await expect(page.getByLabel('Use Didit', { exact: true })).toBeChecked();
   await page
     .getByText('Use application-supplied records for an unfunded evaluation', {
       exact: true,
@@ -912,4 +918,25 @@ test('hosted compatibility supports unfunded record evaluation without vendor cr
   expect(
     await readFile((await (await variables).path())!, 'utf8'),
   ).not.toContain('DIDIT');
+  await imported(page, config);
+  await step(page, 'Policies');
+  await expect(
+    page.getByLabel('Required record fields', { exact: true }),
+  ).toHaveValue('display_name\ncountry\ncustomer_type');
+  await page
+    .getByText('Use application-supplied records for an unfunded evaluation', {
+      exact: true,
+    })
+    .click();
+  await step(page, 'Services');
+  await page.getByText('Use Didit', { exact: true }).click();
+  await expect(
+    page.getByLabel('Didit workflow ID', { exact: true }),
+  ).toBeVisible();
+  await step(page, 'Policies');
+  await expect(
+    page.getByLabel('Didit verification: set an agreed price limit', {
+      exact: true,
+    }),
+  ).toBeVisible();
 });

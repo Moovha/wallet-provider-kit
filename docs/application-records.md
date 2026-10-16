@@ -17,8 +17,9 @@ retain their selected source.
 ## Configure the starter workflow
 
 Complete the normal [login, API and backend preparation](operator-services.md).
-In FormKit **Services**, first select **Provider-hosted access (compatibility)**, then enable **Use application-supplied records for an unfunded
-evaluation**. Under **Required record fields**, enter one name per line.
+In FormKit **Policies**, first select **Provider-hosted access (compatibility)**,
+then enable **Use application-supplied records for an unfunded evaluation**.
+Under **Required record fields**, enter one name per line.
 The initial fields are `display_name` and `country`; choose the minimum fields
 needed for your evaluation.
 
@@ -37,10 +38,10 @@ Initial activation remains disabled.
 Export all three files and use the [supplied deployment CLI](operator-deployment.md).
 The [record template](provider.config.records.example.json) contains example
 registrations and variable references, not credentials. The
-[vendor template](provider.config.example.json) remains available for external
+[vendor template](provider.config.hosted.example.json) remains available for external
 verification configurations.
 
-![Services screen with application records selected and required fields](public/screenshots/application-record-services.png)
+![Policies screen with application records selected and required fields](public/screenshots/application-record-policies.png)
 
 ## Submit records
 
@@ -121,7 +122,9 @@ restart with the reviewed export rather than editing stored records.
 
 ## Select external verification
 
-Choose **Use Didit** or **Use Sumsub** in Services to replace the record source.
+Turn off **Use application-supplied records for an unfunded evaluation** in
+Policies, then connect **Use Didit** or **Use Sumsub** in Services. Set the vendor
+route price limits and application funding agreements in Policies.
 Prepare that vendor's real workflow/level, credentials, agreed price and
 application funding as described in [identity preparation](operator-services.md#prepare-identity-verification).
 Obtain fresh consent and the required identity evidence under the new policy.
