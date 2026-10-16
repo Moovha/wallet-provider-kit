@@ -240,6 +240,16 @@ try {
   localDirectory = await mkdtemp('/tmp/wpk-local-docs-');
   localApp = await createSetupServer({
     token,
+    runtime: {
+      environment: {},
+      command: async (_file, args) => {
+        if (args[0] === '--version') return 'offline';
+        if (args[0] === 'context') return 'unix:///offline/docker.sock';
+        if (args[0] === 'compose') return '2.40.0';
+        if (args.includes('info')) return 'linux';
+        return '';
+      },
+    },
     executor: {
       root: `${localDirectory}/deployments`,
       environment: {},

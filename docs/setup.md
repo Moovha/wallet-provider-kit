@@ -198,6 +198,12 @@ services; enable `http.documentation` deliberately. `/health/live` checks proces
 liveness only. SIGTERM closes HTTP work and the database. Existing no-argument
 execution still exposes an unconfigured inspection service.
 
+For a new local CDP or Relayer deployment, the wizard or
+`wallet-provider-kit local-setup --config provider.config.json --install-runtime`
+can install missing runtime tools, initialize a fresh store and start the disabled
+service with progress. See [local setup](local-setup.md) for private secrets,
+installation prompts and recovery. The commands below are the manual container path.
+
 Docker deployment uses a reviewed source checkout rather than the installed npm
 tarball. [provider.compose.yaml](../ops/provider.compose.yaml) supplies the
 configured command, a read-only configuration mount and a persistent data mount.

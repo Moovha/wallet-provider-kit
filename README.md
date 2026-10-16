@@ -72,8 +72,11 @@ The wizard turns your settings into a deployment. After validation, choose
 **Set up and run locally** for CDP or Relayer: review the plan, supply missing
 secrets privately and watch setup save files, build the Docker image, initialize
 new storage, diagnose and start the service. It uses the single-host container
-security pattern and starts with wallet operations disabled. Requires a running
-local Docker engine with Compose; see [local setup](docs/local-setup.md).
+security pattern and starts with wallet operations disabled. The wizard checks
+Docker, Compose and the image builder, offers **Install local runtime and continue**
+for missing components, then resumes setup. A working local Docker installation is
+reused; otherwise setup uses Homebrew and a dedicated Colima VM on macOS or Linux.
+Administrator prompts, when needed for Homebrew, stay in a terminal. See [local setup](docs/local-setup.md).
 
 You can instead download `provider.config.json` (settings and policy),
 `provider.env.example` (secret variable names) and `provider-setup.md` (deployment

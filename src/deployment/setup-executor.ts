@@ -52,6 +52,7 @@ export interface SetupExecutorOptions {
   root?: string;
   source?: string;
   environment?: NodeJS.ProcessEnv;
+  dockerExecutable?: () => string;
   command?: (args: string[], timeout: number) => Promise<string>;
 }
 
@@ -386,7 +387,10 @@ export function createSetupExecutor(options: SetupExecutorOptions = {}) {
             JSON.stringify(localCompose(plan!, buildSource), null, 2) + '\n',
           );
           composeSaved = true;
-          await save('provider-setup.md', setupInstructions(plan!, endpoint!));
+          await save(
+            'provider-setup.md',
+            setupInstructions(plan!, endpoint!, options.dockerExecutable?.()),
+          );
         } else if (step.id === 'image')
           await compose(['build', 'api'], 15 * 60 * 1000);
         else if (['validate', 'storage', 'doctor'].includes(step.id)) {
@@ -437,7 +441,7 @@ export function createSetupExecutor(options: SetupExecutorOptions = {}) {
         files:
           'Check the deployment parent directory permissions. Files may be incomplete; no storage initialization was attempted.',
         image:
-          'Check Docker, network access and disk space for the image build.',
+          'Check Docker, network access, disk space and VM mounts for the checkout and deployment directory.',
         validate:
           'Check that the built toolkit image matches this configuration.',
         storage:
@@ -520,6 +524,12 @@ export function createSetupExecutor(options: SetupExecutorOptions = {}) {
   }
   return {
     prepare,
+    resetPlan: () => {
+      if (preparing || job.state !== 'idle')
+        failure('Wait for the current setup action to finish.');
+      plan = undefined;
+      inherited = {};
+    },
     start,
     status,
     liveStatus,
@@ -528,9 +538,13 @@ export function createSetupExecutor(options: SetupExecutorOptions = {}) {
   };
 }
 
-function setupInstructions(plan: SetupPlan, endpoint: string) {
+function setupInstructions(
+  plan: SetupPlan,
+  endpoint: string,
+  executable = 'docker',
+) {
   const shell = (value: string) => `'${value.replaceAll("'", "'\\''")}'`;
-  const command = `docker --host ${shell(endpoint)} compose --env-file /dev/null --file ${shell(join(plan.directory, 'compose.json'))} --project-name ${plan.project}`;
+  const command = `${shell(executable)} --host ${shell(endpoint)} compose --env-file /dev/null --file ${shell(join(plan.directory, 'compose.json'))} --project-name ${plan.project}`;
   return `# Local wallet service
 
 This deployment uses the toolkit Docker image, private host storage and a restart policy. Docker must remain running. Closing the wizard does not stop the container. Wallet operations are disabled.

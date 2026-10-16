@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased — local runtime installation
+
+- Detect Docker, Compose, the image builder and local engine availability before
+  deployment. Offer an explicit installation action with progress, then continue
+  to the deployment plan automatically; preserve existing runtimes and stores.
+- Install missing tools through Homebrew and start a dedicated Colima VM on macOS
+  or Linux, or start installed Docker Desktop. Keep OS permission prompts in a
+  terminal and preserve the selected Docker context and existing CLI settings.
+- Add CLI runtime checks, installation and `local-setup --install-runtime` using
+  the same executors. Keep wallet operations disabled after service startup.
+
 ## Unreleased — wallet service illustrations
 
 - Add an architecture illustration to the README and documentation landing page

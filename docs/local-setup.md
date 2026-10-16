@@ -1,4 +1,4 @@
-# Run a local deployment from the wizard
+# Install the local runtime and run your service
 
 Use **Export → Set up and run locally** to turn a validated configuration into a
 running, isolated Docker Compose deployment. Downloads and manual preparation
@@ -16,24 +16,61 @@ the single-host model. Local startup does not establish production acceptance.
 ## Prepare the machine
 
 Use a built source checkout, Node 24.22.0 and npm 11.11.1, as an unprivileged macOS
-or Linux account. Install and start [Docker with Compose](https://docs.docker.com/compose/install/).
-Select a local Linux engine context using a Unix socket. Remote Docker engines and
-`DOCKER_HOST` overrides are rejected. Docker administrators can access container
-secrets; use a trusted machine. Allow disk space and network access for the image
-build and pinned dependency downloads.
+or Linux account (ARM64 or x64). Setup checks the Docker CLI, Compose v2 or newer,
+Buildx image builder and a running Linux container engine. Detection does not
+install packages, write settings or create containers.
+
+If something is missing or stopped, review **Install local runtime and continue**:
+
+- A healthy local Docker installation is reused. Installed Docker Desktop can be
+  started instead of installing another engine; complete its first-run prompts
+  in Docker Desktop if requested.
+- Otherwise, setup installs missing Docker CLI, Compose, Buildx and Colima packages
+  through [Homebrew](https://brew.sh/). On Linux it also installs QEMU if missing.
+  Homebrew verifies its package downloads. Runtime packages use Homebrew's available
+  stable versions; the toolkit's image and application dependency pins are separate.
+- If Homebrew is missing, setup downloads a revision-pinned installer, checks its
+  SHA-256 digest, then opens a terminal for installation. Complete the installer's
+  permission prompts there; the wizard resumes automatically. The CLI uses its
+  current terminal when interactive. A Linux desktop needs `x-terminal-emulator`
+  for browser-launched installation; otherwise use the CLI in an interactive terminal.
+  Linux hosts must meet [Homebrew's prerequisites](https://docs.brew.sh/Homebrew-on-Linux#requirements),
+  including compiler tools and any required virtualization permissions.
+- Homebrew's Docker plugin directory is added to your Docker CLI settings. Existing
+  settings, including registry authentication, are preserved; symlinked, malformed
+  or unsafe settings are rejected. No credentials are shown in progress.
+- A dedicated **wallet-provider-kit** Colima VM provides the missing engine: 2 CPUs,
+  4 GiB memory, a 6 GiB data disk and a 4 GiB system disk. macOS uses Virtualization.framework
+  and virtiofs; Linux uses QEMU and 9p. The checkout is mounted read-only and the
+  private deployment directory writable. An existing profile is started with its
+  existing resources and mounts; setup does not rewrite them.
+
+Allow several GiB of free disk space, enough host memory for the VM, and network
+access for packages, the VM image and the service build. Progress shows each stage;
+these downloads can take several minutes. Setup leaves the selected Docker context
+unchanged and pins its local Unix-socket daemon for subsequent service commands.
+Remote engines and `DOCKER_HOST` overrides are rejected. It does not enable a system
+Docker service, change Docker group membership or configure startup at login.
+Docker administrators can access container secrets; use a trusted machine.
 
 Prepare isolated backend credentials and application trust settings through
-[services and credentials](operator-services.md). The wizard does not create
-vendor accounts, issue credentials or install Docker. OWS uses a separate native
-vault and engine omitted from the reference image; use the
-[native deployment path](operator-deployment.md) for OWS.
+[services and credentials](operator-services.md). Setup does not create vendor
+accounts or issue credentials. OWS uses a separate native vault and engine omitted
+from the reference image; use the [native deployment path](operator-deployment.md).
+
+![Runtime prerequisite review using offline responses](public/screenshots/local-runtime.webp)
+
+_Offline example with missing tools. The installation action applies the displayed
+machine changes; the screenshot does not establish live installation acceptance._
 
 ## Review and start
 
 1. Complete the six wizard steps. Leave **Enable wallet operations in this
    configuration** off and choose an unused service port in Deployment.
 2. In Export, choose **Validate configuration**, then **Check local setup prerequisites**.
-   This checks Docker without creating files or containers.
+   If runtime components are missing, review the machine changes and choose
+   **Install local runtime and continue**. Follow its progress and any terminal
+   prompts. The deployment plan opens automatically when the runtime is ready.
 3. Review the private directory, local API address and container settings. The saved
    config uses `0.0.0.0:8080` internally and `.provider-data` storage. Your selected
    port is published only on `127.0.0.1`; policies and the public HTTPS origin are
@@ -47,6 +84,10 @@ vault and engine omitted from the reference image; use the
    creation, new database initialization and container start. Follow the statuses;
    the first build can take several minutes.
 
+Runtime installation does not start a wallet deployment. The reviewed deployment
+plan and private secret entry are the next stage; **Start local setup** authorizes
+that stage. Wallet activation remains a separate acceptance decision.
+
 The executor saves files, builds the image, validates in a container, initializes
 new storage once, runs diagnostics, starts the container and checks health. Commands
 are fixed and run without a shell or user-supplied scripts. Only missing secret names
@@ -58,6 +99,34 @@ secret contents. Multiline values are preserved. Values containing carriage retu
 NULs or all three quote styles need the manual secret-manager path. The file is not
 encrypted; protect host storage and backups. Never paste secrets into commands or
 public reports.
+
+## Use the CLI instead
+
+From the same built checkout, inspect or install the runtime:
+
+```sh
+npm start -- runtime check
+npm start -- runtime install
+```
+
+`runtime check` exits unsuccessfully when prerequisites are missing and prints the
+proposed actions without applying them. `runtime install` explicitly authorizes
+those actions and shows progress. A ready runtime is reused without installation.
+
+For configuration and deployment together, first supply every referenced secret
+through your process environment or a private Node environment file. Keep that file
+outside the checkout with owner-only permissions. Then run:
+
+```sh
+node --env-file=/absolute/private/provider.env dist/main.js local-setup --config provider.config.json --install-runtime
+```
+
+This command checks configuration eligibility and secret presence, installs missing
+runtime components, then saves private files, builds, initializes a new store and
+starts the disabled service. It prints each stage and the saved operating instructions.
+Omit `--install-runtime` to require an already-working runtime. Never pass secret
+values as command arguments. The same command cannot resume an interrupted database
+initialization; use the saved recovery instructions instead of creating another store.
 
 ## Understand the result
 
@@ -83,7 +152,8 @@ The private directory under `~/.wallet-provider-kit-deployments/` contains:
 | `.provider-data/`            | Persistent private records; never erase to repair an uncertain operation. |
 
 Closing the browser or wizard does not stop the container. Docker must remain
-running; Docker Desktop startup after reboot depends on your host settings. Use
+running. Start Docker Desktop or `colima start wallet-provider-kit` after reboot,
+as applicable; automatic runtime startup depends on your host settings. Use
 **Stop local service** or the saved Compose command to stop deliberately. Stopping
 retains files and records. Setup never activates wallet operations automatically.
 
@@ -94,7 +164,17 @@ retains files and records. Setup never activates wallet operations automatically
 _Fictional settings and offline executor responses. This screenshot demonstrates
 progress and controls; it is not evidence of a deployed or accepted wallet service._
 
-Setup stops on the first failed step. It attempts to remove its project containers
+Runtime installation stops on its first failure and retains installed packages.
+Resolve network, disk, terminal permissions or host prerequisites, then choose
+**Check local setup prerequisites** again. Only still-missing components are installed
+on the next attempt. Runtime installation never initializes wallet storage.
+A private `~/.wallet-provider-kit-runtime.lock` prevents competing installers.
+A timeout or interrupted process retains that lock because installation may still
+be running. If a lock remains, confirm no other wizard or CLI
+installation is running before removing the empty lock directory. Existing Colima
+resources and Docker settings are not removed to recover a failure.
+
+Deployment setup stops on the first failed step. It attempts to remove its project containers
 without deleting host data and reports unconfirmed cleanup. It never automatically
 reruns initialization or overwrites an existing deployment.
 Read the private status file after interruption. A step recorded as running has an

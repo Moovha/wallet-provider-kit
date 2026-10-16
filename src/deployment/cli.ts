@@ -2,6 +2,7 @@ import { readFile, writeFile, lstat } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import {
+  ConfigurationError,
   loadProviderConfiguration,
   resolveSecret,
   secretReferences,
@@ -151,8 +152,35 @@ export async function setupCommand(args: string[]): Promise<boolean> {
   if (!args.length) return false;
   if (args.length === 1 && ['help', '--help', '-h'].includes(args[0])) {
     process.stdout.write(
-      'wallet-provider-kit setup [--port number] [--no-open]\nwallet-provider-kit init [file]\nwallet-provider-kit validate --config file\nwallet-provider-kit doctor --config file\nwallet-provider-kit init-storage --config file\nwallet-provider-kit run --config file\n',
+      'wallet-provider-kit setup [--port number] [--no-open]\nwallet-provider-kit runtime check\nwallet-provider-kit runtime install\nwallet-provider-kit local-setup --config file [--install-runtime]\nwallet-provider-kit init [file]\nwallet-provider-kit validate --config file\nwallet-provider-kit doctor --config file\nwallet-provider-kit init-storage --config file\nwallet-provider-kit run --config file\n',
     );
+    return true;
+  }
+  if (
+    args[0] === 'runtime' &&
+    args.length === 2 &&
+    ['check', 'install'].includes(args[1])
+  ) {
+    const { runLocalSetup } = await import('./local-setup-cli.js');
+    await runLocalSetup({ installRuntime: args[1] === 'install' });
+    return true;
+  }
+  if (args[0] === 'local-setup') {
+    if (
+      args[1] !== '--config' ||
+      !args[2] ||
+      (args.length !== 3 &&
+        !(args.length === 4 && args[3] === '--install-runtime'))
+    )
+      throw new ConfigurationError([
+        'Use wallet-provider-kit local-setup --config file [--install-runtime].',
+      ]);
+    const { config } = await loadProviderConfiguration(args[2]);
+    const { runLocalSetup } = await import('./local-setup-cli.js');
+    await runLocalSetup({
+      config,
+      installRuntime: args.includes('--install-runtime'),
+    });
     return true;
   }
   if (args[0] === 'setup') {

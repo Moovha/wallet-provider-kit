@@ -4,6 +4,7 @@ import type {
   SetupPlan,
   SetupProgress,
 } from '../../src/deployment/setup-executor';
+import type { RuntimeProgress } from '../../src/deployment/local-runtime';
 import type { ProviderConfiguration } from '../model';
 import { docs } from '../model';
 const props = defineProps<{
@@ -12,6 +13,9 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ locked: [value: boolean] }>();
 const plan = ref<SetupPlan>();
+const runtime = ref<RuntimeProgress>();
+let continueAfterInstall = false;
+let initialPoll = true;
 const progress = ref<SetupProgress>({ state: 'idle', steps: [] });
 const secrets = ref<Record<string, string>>({});
 const busy = ref(false);
@@ -28,6 +32,7 @@ watch(
   () => {
     if (progress.value.state === 'idle') {
       plan.value = undefined;
+      if (runtime.value?.state !== 'installing') runtime.value = undefined;
       secrets.value = {};
       errors.value = [];
     }
@@ -42,7 +47,7 @@ function errorMessage(error: unknown) {
     ];
   }
 }
-async function prepare() {
+async function preparePlan() {
   busy.value = true;
   errors.value = [];
   const snapshot = props.config;
@@ -55,19 +60,72 @@ async function prepare() {
     busy.value = false;
   }
 }
+async function prepare() {
+  busy.value = true;
+  plan.value = undefined;
+  errors.value = [];
+  try {
+    const snapshot = props.config;
+    const result = await props.request('/api/runtime/check', snapshot);
+    if (props.config !== snapshot) return;
+    runtime.value = result;
+    if (runtime.value?.state === 'ready') await preparePlan();
+  } catch (error) {
+    errorMessage(error);
+  } finally {
+    busy.value = false;
+  }
+}
+async function installRuntime() {
+  busy.value = true;
+  errors.value = [];
+  try {
+    runtime.value = await props.request('/api/runtime/install', {});
+    continueAfterInstall = true;
+    emit('locked', true);
+    void poll();
+  } catch (error) {
+    errorMessage(error);
+  } finally {
+    busy.value = false;
+  }
+}
 async function poll() {
   try {
+    runtime.value = await props.request('/api/runtime/status');
     progress.value = await props.request('/api/setup/status');
     if (progress.value.state !== 'idle' && progress.value.plan) {
       plan.value = progress.value.plan;
       emit('locked', true);
     }
-    errors.value = [];
+    if (initialPoll && runtime.value?.steps.length) continueAfterInstall = true;
+    initialPoll = false;
+    if (runtime.value?.state === 'installing') {
+      continueAfterInstall = true;
+      emit('locked', true);
+    } else if (continueAfterInstall && progress.value.state === 'idle') {
+      emit('locked', false);
+      if (runtime.value?.state !== 'ready' || props.config) {
+        continueAfterInstall = false;
+        if (runtime.value?.state === 'ready') await preparePlan();
+      }
+    }
   } catch (error) {
     errorMessage(error);
   }
-  if (!disposed && ['running', 'complete'].includes(progress.value.state))
-    timer = setTimeout(poll, progress.value.state === 'running' ? 1500 : 10000);
+  if (
+    !disposed &&
+    (continueAfterInstall ||
+      runtime.value?.state === 'installing' ||
+      ['running', 'complete'].includes(progress.value.state))
+  )
+    timer = setTimeout(
+      poll,
+      runtime.value?.state === 'installing' ||
+        progress.value.state === 'running'
+        ? 1500
+        : 10000,
+    );
 }
 async function start() {
   if (!plan.value || !canStart.value || busy.value) return;
@@ -117,9 +175,10 @@ onMounted(() => {
       checks its health. Downloads are optional for this path.
     </p>
     <p>
-      Requires a running local Docker engine with Compose on macOS or Linux. CDP
-      and Relayer are supported; use the native deployment guide for OWS. The
-      first image build needs network access and may take several minutes.
+      Setup checks Docker, Compose and the image builder on macOS or Linux. If
+      tools are missing, install them here and continue automatically. CDP and
+      Relayer are supported; use the native deployment guide for OWS. The first
+      image build needs network access and may take several minutes.
     </p>
     <p>
       Wallet operations must stay disabled. This creates a new isolated
@@ -133,11 +192,56 @@ onMounted(() => {
       v-if="progress.state === 'idle'"
       type="button"
       class="secondary"
-      :disabled="busy || !config"
+      :disabled="busy || !config || runtime?.state === 'installing'"
       @click="prepare"
     >
       {{ busy ? 'Checking Docker…' : 'Check local setup prerequisites' }}
     </button>
+    <div
+      v-if="
+        runtime && runtime.state !== 'unchecked' && progress.state === 'idle'
+      "
+      aria-live="polite"
+    >
+      <h4>Local container runtime</h4>
+      <p>{{ runtime.message }}</p>
+      <ul>
+        <li v-for="check in runtime.checks" :key="check.id">
+          {{ check.available ? '✓ Available' : 'Missing or stopped' }} ·
+          {{ check.label }}
+        </li>
+      </ul>
+      <ul v-if="runtime.canInstall">
+        <li v-for="action in runtime.actions" :key="action">{{ action }}</li>
+      </ul>
+      <button
+        v-if="runtime.canInstall"
+        type="button"
+        class="primary"
+        :disabled="busy || !config"
+        @click="installRuntime"
+      >
+        Install local runtime and continue
+      </button>
+      <ol v-if="runtime.steps.length" class="execution-progress">
+        <li v-for="step in runtime.steps" :key="step.id">
+          <strong>{{
+            step.state === 'complete'
+              ? '✓ Complete'
+              : step.state === 'running'
+                ? 'In progress'
+                : step.state === 'failed'
+                  ? 'Failed'
+                  : 'Waiting'
+          }}</strong>
+          · {{ step.label }}
+        </li>
+      </ol>
+      <p v-if="runtime.state === 'installing'">
+        Keep the setup terminal running. Runtime installation continues if you
+        close this page. Reopen the private session URL to see progress.
+      </p>
+    </div>
     <template v-if="plan">
       <dl class="export-summary">
         <div>
@@ -282,5 +386,10 @@ onMounted(() => {
         >
       </p>
     </template>
+    <p v-if="!plan">
+      <a :href="docs + 'local-setup.html'" target="_blank" rel="noreferrer"
+        >Runtime installation, prerequisites and recovery ↗</a
+      >
+    </p>
   </section>
 </template>

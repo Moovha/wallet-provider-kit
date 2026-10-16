@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { setupWarnings } from '../src/deployment/setup-readiness.js';
 import { validateProviderConfiguration } from '../src/deployment/config.js';
 import type { FastifyInstance } from 'fastify';
+import { runtimeFixture } from './fixtures/local-runtime.js';
 import { createSetupServer } from '../src/deployment/setup-server.js';
 
 let directory: string;
@@ -66,7 +67,12 @@ describe('local operator setup boundary', () => {
   ])(
     'rejects foreign hosts, origins and unauthenticated local API access',
     async (requestHeaders) => {
-      for (const url of ['/api/template', '/api/openapi', '/api/setup/status'])
+      for (const url of [
+        '/api/template',
+        '/api/openapi',
+        '/api/setup/status',
+        '/api/runtime/status',
+      ])
         expect(
           (await app.inject({ url, headers: requestHeaders })).statusCode,
         ).toBe(403);
@@ -98,6 +104,8 @@ describe('local operator setup boundary', () => {
     expect(reply.statusCode).toBe(403);
     expect(reply.headers['access-control-allow-origin']).toBeUndefined();
     for (const url of [
+      '/api/runtime/check',
+      '/api/runtime/install',
       '/api/setup/plan',
       '/api/setup/start',
       '/api/setup/stop',
@@ -239,4 +247,91 @@ it('distinguishes valid configuration from usable new-user identity and financia
   expect(setupWarnings(config)).toEqual([]);
   config.policy.applications[0].funding.monthlyLimitMinor = 5;
   expect(setupWarnings(config).join()).toContain('smaller than');
+});
+
+it('requires an eligible reviewed runtime plan, blocks overlapping changes and resumes with the checked configuration', async () => {
+  await app.close();
+  const fixture = runtimeFixture(directory);
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  fixture.beforeInstall(() => gate);
+  app = await createSetupServer({
+    token,
+    assetDirectory: directory,
+    runtime: fixture.options,
+  });
+  try {
+    expect(
+      (
+        await app.inject({
+          method: 'POST',
+          url: '/api/runtime/install',
+          headers,
+          payload: { command: 'ignored' },
+        })
+      ).statusCode,
+    ).toBe(422);
+    const active = structuredClone(example);
+    active.activation = {
+      enabled: true,
+      backendAcceptance: 'offline',
+      recoveryAcceptance: 'offline',
+    };
+    expect(
+      (
+        await app.inject({
+          method: 'POST',
+          url: '/api/runtime/check',
+          headers,
+          payload: active,
+        })
+      ).statusCode,
+    ).toBe(422);
+    expect(fixture.calls).toHaveLength(0);
+    const check = await app.inject({
+      method: 'POST',
+      url: '/api/runtime/check',
+      headers,
+      payload: example,
+    });
+    expect(check.json().state).toBe('missing');
+    expect(
+      (
+        await app.inject({
+          method: 'POST',
+          url: '/api/runtime/install',
+          headers,
+          payload: {},
+        })
+      ).json().state,
+    ).toBe('installing');
+    for (const url of [
+      '/api/runtime/install',
+      '/api/runtime/check',
+      '/api/setup/plan',
+      '/api/setup/start',
+    ])
+      expect(
+        (await app.inject({ method: 'POST', url, headers, payload: example }))
+          .statusCode,
+      ).toBe(422);
+    expect(
+      (await app.inject({ url: '/api/template', headers })).json()
+        .runtimeConfiguration,
+    ).toEqual(validateProviderConfiguration(example));
+    release();
+    await vi.waitFor(async () =>
+      expect(
+        (await app.inject({ url: '/api/runtime/status', headers })).json()
+          .state,
+      ).toBe('ready'),
+    );
+    expect(
+      fixture.calls.filter((call) => call.args[0] === 'install'),
+    ).toHaveLength(1);
+  } finally {
+    release();
+  }
 });
