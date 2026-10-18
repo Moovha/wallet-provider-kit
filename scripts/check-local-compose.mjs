@@ -5,6 +5,8 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import { randomBytes } from 'node:crypto';
+import { prepareLocalExecution } from '../dist/deployment/local-execution.js';
 import { caddyConfiguration } from '../dist/deployment/https-ingress.js';
 import {
   localCompose,
@@ -25,7 +27,7 @@ const args = [
 ];
 const docker = (extra) =>
   execute('docker', [...args, ...extra], {
-    timeout: 60000,
+    timeout: 180000,
     maxBuffer: 1024 * 1024,
   });
 try {
@@ -55,6 +57,23 @@ try {
     setupEnvironment({ OFFLINE_COMPOSE_VALUE: fixture }),
     { mode: 0o600 },
   );
+  const prepared = prepareLocalExecution(config, {
+    LOCAL_EXECUTION_API_KEY: randomBytes(48).toString('base64url'),
+    LOCAL_EXECUTION_KEYSTORE_PASSPHRASE: randomBytes(48).toString('base64url'),
+    LOCAL_EXECUTION_STORAGE_KEY: randomBytes(32).toString('base64'),
+  });
+  await mkdir(join(directory, '.local-execution'), { mode: 0o700 });
+  await mkdir(join(directory, '.execution-data'), { mode: 0o700 });
+  await writeFile(
+    join(directory, '.local-execution/config.json'),
+    JSON.stringify(prepared.relayer),
+    { mode: 0o600 },
+  );
+  await writeFile(
+    join(directory, 'execution.env'),
+    setupEnvironment(prepared.environment),
+    { mode: 0o600 },
+  );
   const compose = localCompose(
     { directory, project, port: 18080, config },
     fileURLToPath(new URL('../', import.meta.url)),
@@ -62,6 +81,8 @@ try {
   // CI builds this reviewed image immediately before this check.
   compose.services.api.image = 'wallet-provider-kit:verify';
   delete compose.services.api.build;
+  // Empty engine and isolated network prohibit provider effects in this check.
+  compose.networks.execution.internal = true;
   await writeFile(join(directory, 'compose.json'), JSON.stringify(compose), {
     mode: 0o600,
   });
@@ -108,8 +129,42 @@ try {
     '--config',
     '/etc/caddy/provider.json',
   ]);
+  await docker(['build', 'local-execution']);
+  await docker([
+    'up',
+    '--detach',
+    '--wait',
+    '--wait-timeout',
+    '120',
+    'local-execution',
+  ]);
+  await docker([
+    'exec',
+    '-T',
+    'local-execution',
+    'node',
+    '--input-type=module',
+    '-e',
+    `
+    import { readFileSync } from 'node:fs';
+    import { parseEnv } from 'node:util';
+    const {API_KEY} = parseEnv(readFileSync('/secrets/execution.env', 'utf8'));
+    const r = await fetch('http://127.0.0.1:8080/api/v1/relayers', {headers:{authorization:'Bearer '+API_KEY}});
+    const data = await r.json();
+    if(!r.ok || !data.success || !Array.isArray(data.data) || data.data.length) process.exit(1);
+  `,
+  ]);
+  await docker(['restart', 'execution-store']);
+  await docker([
+    'up',
+    '--detach',
+    '--wait',
+    '--wait-timeout',
+    '120',
+    'local-execution',
+  ]);
   console.log(
-    'Compose parsing, unprivileged config validation, literal multiline secret loading, bundled OWS native import and Caddy configuration validation passed; no storage initialization, wallets, provider requests or certificate issuance.',
+    'Compose parsing, unprivileged config validation, literal multiline secret loading, bundled OWS native import Caddy configuration validation and empty bundled Relayer/Valkey readiness across a store restart passed; no wallets, provider requests or certificate issuance.',
   );
 } finally {
   await docker(['down', '--remove-orphans']).catch(() => {});

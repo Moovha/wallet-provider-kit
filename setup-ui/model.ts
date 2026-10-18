@@ -1,3 +1,4 @@
+import { defaultLocalExecution } from '../src/deployment/local-execution-contract.js';
 import {
   bundledOAuth,
   initialApplicationScopes,
@@ -102,6 +103,7 @@ export function emptyConfiguration(
   delete config.execution;
   delete config.activation.executionAcceptance;
   config.backend = newBackend('ows');
+  config.localExecution = defaultLocalExecution();
   config.http = { ...config.http, ingress: 'caddy' };
   synchronizeBundledServices(config);
   return config;

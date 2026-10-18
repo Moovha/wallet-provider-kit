@@ -57,7 +57,7 @@ Docker administrators can access container secrets; use a trusted machine.
 
 Prepare isolated backend credentials and application trust settings through
 [services and credentials](operator-services.md). Setup generates missing bundled issuer/client credentials and the OWS passphrase
-privately. It creates no vendor accounts. The OWS engine is included in the image;
+privately. The bundled local execution engine and Valkey start automatically, with separate generated API, storage and keystore credentials. Approved-action policies add encrypted local sponsor keys; you configure RPC verification, gas limits and funding. It creates no vendor accounts. The OWS engine is included in the image;
 its vault is a private persistent bind mount. See [bundled setup](bundled-setup.md).
 
 ![Runtime prerequisite review using offline responses](public/screenshots/local-runtime.webp)

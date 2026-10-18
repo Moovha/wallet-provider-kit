@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import {
+  localExecutionOrigin,
+  localSponsorIds,
+} from '../../src/deployment/local-execution-contract';
 import { computed } from 'vue';
 import {
   defaultReplacementPolicy,
@@ -19,14 +23,16 @@ const applications = computed(() =>
     .map((app) => ({ label: app.name, value: app.clientId })),
 );
 function sponsor() {
+  const accountId = crypto.randomUUID();
   return {
     clientId: applications.value[0]?.value ?? '',
-    accountId: crypto.randomUUID(),
+    accountId,
     binding: {
       ...(model.value.execution?.profile === 'erc3009-relayer-v1'
         ? { relayerId: '', signerId: '' }
         : {}),
-      address: '',
+      ...(model.value.execution?.local ? localSponsorIds(accountId) : {}),
+      address: model.value.execution?.local ? 'managed' : '',
       bindingRevision: '1',
     },
     fundingAgreement: '',
@@ -56,11 +62,40 @@ function toggle(value: unknown) {
     recovery: { stuckAfterSeconds: 30, quarantineOnStuck: true },
     replacement: { ...defaultReplacementPolicy },
   };
-  mode('erc3009-executor-v1');
+  mode(model.value.localExecution ? 'local-transfer' : 'erc3009-executor-v1');
 }
 function mode(value: unknown) {
   const execution = model.value.execution;
   if (!execution) return;
+  if (value === 'local-transfer' || value === 'local-approved') {
+    if (!model.value.localExecution) return;
+    execution.local = true;
+    execution.profile =
+      value === 'local-approved'
+        ? 'approved-evm-executor-v1'
+        : 'erc3009-relayer-v1';
+    delete execution.service;
+    delete execution.replacement;
+    if (value !== 'local-approved') delete execution.safeQueue;
+    if (value === 'local-approved' && !model.value.financial)
+      delete execution.rpc.tokenCodeHash;
+    execution.relayer = {
+      url: localExecutionOrigin,
+      apiKey: { ...model.value.localExecution.apiKey },
+    };
+    for (const entry of execution.sponsors) {
+      entry.binding = {
+        ...localSponsorIds(entry.accountId),
+        address: 'managed',
+        bindingRevision: '1',
+      };
+    }
+    return;
+  }
+  if (execution.local) {
+    for (const entry of execution.sponsors) entry.binding.address = '';
+  }
+  delete execution.local;
   if (value === 'erc3009-executor-v1' || value === 'approved-evm-executor-v1') {
     execution.profile = value;
     if (value !== 'approved-evm-executor-v1') delete execution.safeQueue;
@@ -161,7 +196,7 @@ function toggleReplacement(value: unknown) {
 </script>
 <template>
   <section class="feature-panel">
-    <h3>Optional approved-action execution and verified status</h3>
+    <h3>Approved-action policies and verified execution</h3>
     <p>
       Coordinate approved actions with a dedicated application gas sponsor. The
       service checks the same current wallet authority, simulates the exact call
@@ -184,8 +219,26 @@ function toggleReplacement(value: unknown) {
         guide="executionEnabled"
         type="select"
         label="Execution submission service"
-        :modelValue="model.execution.profile"
+        :modelValue="
+          model.execution.local
+            ? model.execution.profile === 'approved-evm-executor-v1'
+              ? 'local-approved'
+              : 'local-transfer'
+            : model.execution.profile
+        "
         :options="[
+          ...(model.localExecution
+            ? [
+                {
+                  label: 'Bundled local engine · transfers (recommended)',
+                  value: 'local-transfer',
+                },
+                {
+                  label: 'Bundled local engine · approved EVM actions',
+                  value: 'local-approved',
+                },
+              ]
+            : []),
           {
             label: 'Approved EVM actions through designated service',
             value: 'approved-evm-executor-v1',
@@ -286,12 +339,16 @@ function toggleReplacement(value: unknown) {
         </button>
       </section>
       <p class="callout">
-        Base Sepolia EOA transfers and explicitly approved Safe calls. Configure
-        pre-existing sponsor accounts separately from owner-wallet signers. This
-        does not install a Relayer, fund a sponsor or verify deployment
-        readiness.
+        Base Sepolia EOA transfers and explicitly approved Safe calls. Bundled
+        setup creates encrypted gas-sponsor keys separately from OWS
+        owner-wallet signers. With existing services, supply their sponsor
+        bindings. Fund gas accounts and complete execution acceptance before
+        activation.
       </p>
-      <div v-if="model.execution.relayer" class="field-grid">
+      <div
+        v-if="model.execution.relayer && !model.execution.local"
+        class="field-grid"
+      >
         <SetupField
           guide="executionSponsor"
           v-model="model.execution.relayer.url"
@@ -552,7 +609,12 @@ function toggleReplacement(value: unknown) {
           :options="applications"
           validation="required"
         />
-        <div class="field-grid">
+        <p v-if="model.execution.local" class="help-text">
+          Setup creates this sponsor's encrypted keystore and public address.
+          Its Relayer and signer bindings are managed automatically. Retain the
+          deployment's private files for maintenance and recovery.
+        </p>
+        <div v-if="!model.execution.local" class="field-grid">
           <SetupField
             guide="executionSponsor"
             v-if="model.execution.relayer"

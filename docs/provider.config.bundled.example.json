@@ -76,5 +76,17 @@
         ]
       }
     ]
+  },
+  "localExecution": {
+    "kind": "openzeppelin-relayer",
+    "apiKey": {
+      "env": "LOCAL_EXECUTION_API_KEY"
+    },
+    "keystorePassphrase": {
+      "env": "LOCAL_EXECUTION_KEYSTORE_PASSPHRASE"
+    },
+    "storageKey": {
+      "env": "LOCAL_EXECUTION_STORAGE_KEY"
+    }
   }
 }

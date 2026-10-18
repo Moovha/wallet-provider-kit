@@ -19,7 +19,15 @@ export async function inspectSetup(
   directory: string,
 ) {
   const checks: { check: string; status: 'pass' | 'fail' | 'pending' }[] = [];
-  for (const ref of secretReferences(config)) {
+  const isolated = config.localExecution
+    ? [
+        config.localExecution.keystorePassphrase.env,
+        config.localExecution.storageKey.env,
+      ]
+    : [];
+  for (const ref of secretReferences(config).filter(
+    (entry) => !isolated.includes(entry.env),
+  )) {
     try {
       resolveSecret(ref);
       checks.push({ check: 'secret:' + ref.env, status: 'pass' });

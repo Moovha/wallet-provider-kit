@@ -203,8 +203,7 @@ Choose coordinated execution if the service should sign internally, dispatch
 through an application sponsor and verify chain results. The connected application
 arranges sponsor funding; [assets and gas](assets-and-gas.md) explains that role.
 
-For transfers, select the designated service or direct Relayer compatibility
-profile. The [transfer execution guide](execution.md) covers sponsors, independent
+Keep the bundled local engine selected in Services. For transfers, its local profile is selected automatically; setup creates encrypted sponsor keys and bindings. Configure independent RPC sources, gas budgets and funding before activation. Existing designated services and direct Relayer connections remain optional. The [transfer execution guide](execution.md) covers sponsors, independent
 RPC sources, fixed gas limits, budgets and outcome meanings. The
 [designated service guide](execution-service.md) explains its separate deployment,
 provider ID/revision and service-key environment references. The wizard configures
@@ -221,7 +220,7 @@ Optional execution settings support [Safe queues and sponsor pools](safe-queue-a
 [stuck-transaction detection and recovery](stuck-transactions-and-recovery.md),
 [bounded fee replacements](automatic-replacements.md) and
 [payer events and health](payer-events-and-health.md). Configure only the features
-your execution service supports. Replacement requires the
+your execution service supports. Automatic replacement is not selected for the bundled local engine. Replacement requires the
 [fee-only Relayer build](fee-only-relayer.md); ordinary Relayer is insufficient.
 [Standard wallet calls](wallet-calls.md) uses the runtime-authorized Safe queue.
 [Account-abstraction helpers](account-abstraction-sponsorship.md) do not enable

@@ -31,6 +31,7 @@ export interface ExecutionSponsor {
 /** Optional versioned approved-action execution. Secrets and RPC addresses remain server configuration. */
 export interface ExecutionConfiguration {
   profile: ExecutionProfile;
+  local?: true;
   relayer?: { url: string; apiKey: SecretReference };
   service?: {
     url: string;

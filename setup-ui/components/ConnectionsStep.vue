@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { defaultLocalExecution } from '../../src/deployment/local-execution-contract';
 import SetupField from './SetupField.vue';
 import { docs, synchronizeBundledServices } from '../model';
 import { applicationScopes } from '../../src/deployment/authorization-contract';
@@ -25,6 +26,16 @@ function setAuthorization(value: unknown) {
   } else {
     delete model.value.authorizationServer;
     model.value.oauth = { issuer: '', audience: '', jwksUrl: '' };
+  }
+}
+function setExecution(value: unknown) {
+  if (value === 'bundled') model.value.localExecution = defaultLocalExecution();
+  else {
+    if (model.value.execution?.local) {
+      delete model.value.execution;
+      delete model.value.operations;
+    }
+    delete model.value.localExecution;
   }
 }
 function didit(enabled: unknown) {
@@ -72,6 +83,27 @@ const flow = computed(() => model.value.policy.access?.mode ?? 'hosted');
       connection or application-record evaluation selected in Policies.
     </p>
   </div>
+  <SetupField
+    type="select"
+    guide="executionEnabled"
+    label="Local execution engine"
+    :modelValue="model.localExecution ? 'bundled' : 'external'"
+    :options="[
+      {
+        label: 'Bundled OpenZeppelin Relayer and Valkey (recommended)',
+        value: 'bundled',
+      },
+      { label: 'Existing services or custom adapter', value: 'external' },
+    ]"
+    @update:modelValue="setExecution"
+  />
+  <p v-if="model.localExecution" class="callout">
+    Local setup starts the execution engine and its persistent queue
+    automatically on private networks. Configure approved-action policies, then
+    set independent RPC sources and gas budgets in Deployment. Setup creates
+    encrypted sponsor keys locally; you fund their public addresses before
+    enabling execution. OWS remains the separate owner-wallet engine.
+  </p>
   <template v-if="model.ownerLogin">
     <h3>
       {{

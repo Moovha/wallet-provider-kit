@@ -217,6 +217,7 @@ it('requires exact issuer binding, unique credentials and an enabled application
 it('defaults to the bundled issuer and OWS, synchronizes registrations without replacing retained secret references', () => {
   const draft = emptyConfiguration(config);
   expect(draft.backend.kind).toBe('ows');
+  expect(draft.localExecution?.kind).toBe('openzeppelin-relayer');
   expect(draft.authorizationServer).toBeDefined();
   const secret = draft.authorizationServer!.clients[0].clientSecret;
   draft.policy.provider.origin = 'https://wallet.example.test';

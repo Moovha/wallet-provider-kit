@@ -32,7 +32,7 @@ export const settings = {
   executionEnabled: setting(
     'Coordinate stored approved actions and independently verify their execution.',
     'The provider signs and dispatches stored approved transfers or explicitly configured Safe calls under current authority. An application-funded sponsor covers gas; observation does not confer spending authority.',
-    'Configure transfer or contract-call policy first. Use the designated execution service for approved Safe operations or the direct Relayer compatibility profile for transfers. Configure application sponsors and two independent RPC sources. Keep activation off until execution, chain checks and lost-response recovery have deployment-specific acceptance evidence.',
+    'Keep the bundled local engine selected in Services for automatic private Relayer and Valkey startup. Configure transfer or contract-call policy, gas budgets and two independent RPC sources. Setup generates encrypted sponsor keys and bindings. Existing execution services remain optional. Keep activation off until execution, chain checks and lost-response recovery have deployment-specific acceptance evidence.',
     'execution.html',
   ),
   safeQueue: setting(

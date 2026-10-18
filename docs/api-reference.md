@@ -3057,6 +3057,7 @@ export interface ExecutionCloudEvent {
 /** Optional versioned approved-action execution. Secrets and RPC addresses remain server configuration. */
 export interface ExecutionConfiguration {
   profile: ExecutionProfile;
+  local?: true;
   relayer?: {
     url: string;
     apiKey: SecretReference;
@@ -3481,6 +3482,7 @@ export type PinnedReplacementPolicy = {
 ```ts
 export interface ProviderConfiguration {
   runtimeConfiguration?: RuntimeConfigurationOptions;
+  localExecution?: LocalExecutionConfiguration;
   configVersion: 1;
   profile: 'provider-service-v1';
   policy: OnboardingPolicy;

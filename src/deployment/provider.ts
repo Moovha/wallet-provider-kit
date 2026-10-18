@@ -1,3 +1,4 @@
+import { localExecutionFetch } from './local-execution.js';
 import { createBundledAuthorizationServer } from './authorization-server.js';
 import { WalletCallsService } from '../wallet-calls/service.js';
 import {
@@ -45,6 +46,15 @@ export async function createConfiguredProvider(
   )
     throw new ConfigurationError(['/: unsafe environment']);
   const config = validateProviderConfiguration(input);
+  if (
+    config.execution?.local &&
+    config.execution.sponsors.some(
+      (sponsor) => sponsor.binding.address === 'managed',
+    )
+  )
+    throw new ConfigurationError([
+      '/execution/sponsors: run local setup to create and retain managed sponsor credentials before starting',
+    ]);
   const authorizationServer = config.authorizationServer
     ? createBundledAuthorizationServer(config)
     : undefined;
@@ -319,6 +329,7 @@ export async function createConfiguredProvider(
               : createTransferExecutionProvider(
                   config.execution,
                   resolveSecret(config.execution.relayer!.apiKey),
+                  config.execution.local ? localExecutionFetch() : undefined,
                 ),
             observer!,
             operations,

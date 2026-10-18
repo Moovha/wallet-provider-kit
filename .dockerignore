@@ -16,3 +16,5 @@
 !setup-ui/**
 !scripts/
 !scripts/setup-notices.mjs
+!scripts/bundled-relayer-launcher.mjs
+!docs/provider.config.bundled.example.json

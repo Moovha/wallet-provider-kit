@@ -2,6 +2,8 @@
 
 ## Unreleased bundled setup
 
+- Start a private OpenZeppelin Relayer and persistent Valkey by default in bundled setup; generate encrypted local gas-sponsor keys and bindings for configured approved actions. Existing execution services remain optional.
+
 - Default new wizard and CLI configurations to a bundled oidc-provider application
   token service, pinned OWS engine, private vault and SQLite authority records.
 - Register configured server applications, generate missing deployment credentials

@@ -267,13 +267,14 @@ try {
         if (args[0] === 'context') return 'unix:///offline/docker.sock';
         if (args.includes('version')) return '2.40.0';
         if (args.includes('info')) return 'linux';
-        if (args.includes('ps')) return 'api';
+        if (args.includes('ps')) return 'api\nlocal-execution\nexecution-store';
         return '';
       },
     },
   });
   const localUrl = await localApp.listen({ host: '127.0.0.1', port: 0 });
   await page.goto(`${localUrl}/#${token}`);
+  await page.getByLabel('Provider name', { exact: true }).waitFor();
   await page
     .getByLabel('Import provider configuration', { exact: true })
     .setInputFiles({

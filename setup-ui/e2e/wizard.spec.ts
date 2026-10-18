@@ -1516,3 +1516,46 @@ test('a new provider exports the bundled issuer, OWS vault and Caddy profile wit
     config.authorizationServer,
   );
 });
+
+test('bundled execution starts selected and supplies managed sponsor bindings', async ({
+  page,
+}) => {
+  await step(page, 'Services');
+  await expect(
+    page.getByLabel('Local execution engine', { exact: true }),
+  ).toHaveValue('bundled');
+  await expect(
+    page.getByText('Local setup starts the execution engine'),
+  ).toBeVisible();
+  await step(page, 'Deployment');
+  await page
+    .getByText('Configure transfer execution and RPC verification', {
+      exact: true,
+    })
+    .click();
+  await expect(
+    page.getByLabel('Execution submission service', { exact: true }),
+  ).toHaveValue('local-transfer');
+  await expect(
+    page.getByLabel('Sponsor signer ID 1', { exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByText("Setup creates this sponsor's encrypted keystore"),
+  ).toBeVisible();
+  await page
+    .getByLabel('Execution submission service', { exact: true })
+    .selectOption('local-approved');
+  await expect(
+    page.getByLabel('Enable durable per-Safe request queues', { exact: true }),
+  ).toBeVisible();
+  await step(page, 'Services');
+  await page
+    .getByLabel('Local execution engine', { exact: true })
+    .selectOption('external');
+  await step(page, 'Deployment');
+  await expect(
+    page.getByLabel('Configure transfer execution and RPC verification', {
+      exact: true,
+    }),
+  ).not.toBeChecked();
+});

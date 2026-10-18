@@ -1,7 +1,7 @@
 # Prepare the values for each wizard step
 
 The wizard supplies a recommended [bundled setup](bundled-setup.md): application
-token issuance, the OWS wallet engine, SQLite and a saved Caddy HTTPS profile.
+token issuance, the OWS wallet engine, a running OpenZeppelin Relayer with durable Valkey queues, SQLite and a saved Caddy HTTPS profile.
 Use this reference for domain ownership, policy agreements or optional existing
 services and vendor credentials. Prepare each value as you
 reach its step; you can explore the forms without external accounts.
@@ -37,8 +37,7 @@ All three configured backends currently target **Base Sepolia**, chain ID `84532
 with externally owned accounts (EOAs: accounts controlled by signing keys). These
 are experimental profiles. Choosing a vendor does not establish production custody
 acceptance. No RPC URL or gas key is required by the kit's configured signing
-service. Broadcasting and gas sponsorship need the application's separate execution
-rail; see [assets and gas](assets-and-gas.md).
+service. The bundled local execution engine supplies broadcasting once approved-action policies, RPC verification and sponsor funding are configured; see [assets and gas](assets-and-gas.md).
 
 ### Coinbase CDP
 

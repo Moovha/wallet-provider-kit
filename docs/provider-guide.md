@@ -210,7 +210,7 @@ and signing behind the same approved-action boundary. Its profile requires the
 host journal wrapper and owner credential; read its control and recovery limits
 before choosing it. The [OpenZeppelin Relayer adapter](openzeppelin-relayer.md)
 binds preconfigured signers and adds a separate stored-action execution service.
-Relayer owns its nonce and broadcast workers; the host keeps spending authority
+The recommended bundled setup starts a private Relayer and persistent Valkey automatically alongside OWS. Setup generates encrypted sponsor keys and bindings when approved-action execution is configured; RPC verification, budgets and gas funding remain explicit policy settings. Relayer owns its nonce and broadcast workers; the host keeps spending authority
 and durable attempt identity. The default CLI does not activate any adapter.
 
 ### Current adapter profile

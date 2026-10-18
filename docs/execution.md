@@ -5,7 +5,7 @@ your service should sign an approved transfer internally, submit it through an
 application-funded sponsor and verify its chain result. The application still
 needs the transfer delegation configured in Policies. This guide follows that
 request from the stored authorization to its verified status, then explains the
-settings and acceptance tests. Use `erc3009-executor-v1` for the
+settings and acceptance tests. New setups use the [bundled local Relayer and Valkey](bundled-setup.md#local-execution-persistence-and-recovery), enabled in Services. Configure policies, RPC verification and sponsor funding; setup supplies keys and bindings. The local transfer path uses `erc3009-relayer-v1` with `execution.local: true`. Use `erc3009-executor-v1` for an optional existing
 [designated service](execution-service.md), or `erc3009-relayer-v1` for direct
 Relayer compatibility. Both are experimental Base Sepolia EOA profiles;
 configuration and offline tests do not establish live execution or custody acceptance.

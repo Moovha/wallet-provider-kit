@@ -1,4 +1,9 @@
 import {
+  localExecutionOrigin,
+  localSponsorIds,
+  type LocalExecutionConfiguration,
+} from './local-execution-contract.js';
+import {
   bundledOAuth,
   type BundledAuthorizationConfiguration,
 } from './authorization-contract.js';
@@ -32,6 +37,7 @@ export interface SecretReference {
 }
 export interface ProviderConfiguration {
   runtimeConfiguration?: RuntimeConfigurationOptions;
+  localExecution?: LocalExecutionConfiguration;
   configVersion: 1;
   profile: 'provider-service-v1';
   policy: OnboardingPolicy;
@@ -129,6 +135,28 @@ export function validateProviderConfiguration(
     );
   const config = structuredClone(input) as unknown as ProviderConfiguration;
   try {
+    if (config.localExecution) {
+      const names = [
+        config.localExecution.apiKey.env,
+        config.localExecution.keystorePassphrase.env,
+        config.localExecution.storageKey.env,
+      ];
+      if (
+        new Set(names).size !== 3 ||
+        names.some((name) =>
+          secretReferences({
+            ...config,
+            localExecution: undefined,
+            execution: config.execution?.local
+              ? { ...config.execution, relayer: undefined }
+              : config.execution,
+          }).some((ref) => ref.env === name),
+        )
+      )
+        throw new ConfigurationError([
+          '/localExecution: use separate private secret variables',
+        ]);
+    }
     if (config.operations) validateOperations(config.operations);
     if (config.operations && !config.execution) throw new Error();
     const resolvedPolicy = defineOnboardingPolicy(config.policy);
@@ -317,6 +345,19 @@ export function validateProviderConfiguration(
     }
     if (config.execution) {
       const execution = config.execution;
+      if (
+        execution.local &&
+        (!config.localExecution ||
+          execution.service ||
+          execution.relayer?.url !== localExecutionOrigin ||
+          execution.relayer.apiKey.env !== config.localExecution.apiKey.env ||
+          execution.replacement)
+      )
+        throw new ConfigurationError([
+          '/execution/local: use the bundled engine connection without a designated service or replacement policy',
+        ]);
+      if (!execution.local && execution.relayer?.url === localExecutionOrigin)
+        throw new Error();
       if (execution.replacement) {
         if (!execution.service || !execution.recovery) throw new Error();
         validateReplacementSponsors(execution.replacement, execution.sponsors);
@@ -373,12 +414,36 @@ export function validateProviderConfiguration(
         if (
           new Set(
             execution.sponsors.map((entry) =>
-              (entry.binding[field] ?? '').toLowerCase(),
+              execution.local &&
+              field === 'address' &&
+              entry.binding.address === 'managed'
+                ? entry.accountId
+                : (entry.binding[field] ?? '').toLowerCase(),
             ),
           ).size !== execution.sponsors.length
         )
           throw new Error();
       for (const sponsor of execution.sponsors) {
+        if (
+          execution.local &&
+          (sponsor.binding.relayerId !==
+            localSponsorIds(sponsor.accountId).relayerId ||
+            sponsor.binding.signerId !==
+              localSponsorIds(sponsor.accountId).signerId ||
+            sponsor.binding.bindingRevision !== '1')
+        )
+          throw new ConfigurationError([
+            '/execution/sponsors: retain the managed local sponsor IDs',
+          ]);
+        const managed =
+          execution.local && sponsor.binding.address === 'managed';
+        if (
+          sponsor.binding.address === 'managed' &&
+          (!managed || config.activation.enabled)
+        )
+          throw new ConfigurationError([
+            '/execution/sponsors: complete local setup before activation',
+          ]);
         const app = config.policy.applications.find(
           (candidate) =>
             candidate.clientId === sponsor.clientId &&
@@ -408,11 +473,11 @@ export function validateProviderConfiguration(
           ? {
               relayerId: binding.relayerId,
               signerId: binding.signerId,
-              address: getAddress(binding.address),
+              address: managed ? binding.address : getAddress(binding.address),
               bindingRevision: binding.bindingRevision,
             }
           : {
-              address: getAddress(binding.address),
+              address: managed ? binding.address : getAddress(binding.address),
               bindingRevision: binding.bindingRevision,
             };
         if (
@@ -433,7 +498,7 @@ export function validateProviderConfiguration(
       validateApprovedCallPolicy(config.approvedCalls.policy);
       if (
         config.execution?.profile !== 'approved-evm-executor-v1' ||
-        !config.execution.service
+        (!config.execution.service && !config.execution.local)
       )
         throw new Error();
     }
@@ -479,6 +544,13 @@ export function secretReferences(
   config: ProviderConfiguration,
 ): SecretReference[] {
   return [
+    ...(config.localExecution
+      ? [
+          config.localExecution.apiKey,
+          config.localExecution.keystorePassphrase,
+          config.localExecution.storageKey,
+        ]
+      : []),
     ...(config.authorizationServer
       ? [
           config.authorizationServer.signingKey,
