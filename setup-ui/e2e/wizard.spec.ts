@@ -1005,6 +1005,18 @@ test('optional execution sponsor settings survive wizard import, edits and expor
       exact: true,
     })
     .click();
+  await expect(
+    page.getByLabel(
+      'Automatically replace stuck transactions within approved fees',
+      { exact: true },
+    ),
+  ).toBeChecked();
+  await expect(
+    page.getByLabel('Initial fee percentage in basis points', { exact: true }),
+  ).toHaveValue('5000');
+  await expect(
+    page.getByLabel('Maximum replacement attempts', { exact: true }),
+  ).toHaveValue('3');
   await page
     .getByLabel('Execution submission service', { exact: true })
     .selectOption('erc3009-relayer-v1');
@@ -1043,7 +1055,8 @@ test('optional execution sponsor settings survive wizard import, edits and expor
     .fill('10000000000000000');
   const first = await exported(page);
   expect(first.execution.profile).toBe('erc3009-relayer-v1');
-  expect(first.execution.sponsors[0].gasLimit).toBe('150000');
+  expect(first.execution.sponsors[0].gasLimit).toBe('500000');
+  expect(first.execution.replacement).toBeUndefined();
   expect(first.execution.sponsors[0].maxFeePerGas).toBe('3000000000');
   expect(first.execution.rpc.endpoints).toEqual([
     { env: 'EXECUTION_RPC_PRIMARY_URL' },
@@ -1365,4 +1378,51 @@ test('operators can export per-Safe queue limits and multiple sponsors for one a
   await expect(page.getByLabel('cURL request example')).toContainText(
     'Idempotency-Key',
   );
+});
+
+test('replacement defaults are editable for future designated execution plans and survive configuration export', async ({
+  page,
+}) => {
+  const config = JSON.parse(
+    await readFile(
+      new URL(
+        '../../docs/provider.config.contracts.example.json',
+        import.meta.url,
+      ),
+      'utf8',
+    ),
+  );
+  await imported(page, config);
+  await step(page, 'Deployment');
+  await expect(
+    page.getByLabel(
+      'Automatically replace stuck transactions within approved fees',
+      { exact: true },
+    ),
+  ).not.toBeChecked();
+  await page
+    .getByText(
+      'Automatically replace stuck transactions within approved fees',
+      { exact: true },
+    )
+    .click();
+  await expect(
+    page.getByLabel('Initial fee percentage in basis points', { exact: true }),
+  ).toHaveValue('5000');
+  await page
+    .getByLabel('Initial fee percentage in basis points', { exact: true })
+    .fill('6000');
+  await page
+    .getByLabel('Maximum replacement attempts', { exact: true })
+    .fill('2');
+  const saved = await exported(page);
+  expect(saved.execution.replacement).toEqual({
+    initialFeeBasisPoints: 6000,
+    bumpBasisPoints: 1250,
+    maxAttempts: 2,
+    intervalSeconds: 30,
+  });
+  expect(saved.execution.sponsors).toEqual(config.execution.sponsors);
+  await imported(page, saved);
+  expect((await exported(page)).execution).toEqual(saved.execution);
 });

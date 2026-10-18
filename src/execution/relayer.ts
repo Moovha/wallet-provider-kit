@@ -1,3 +1,4 @@
+import { initialFees, replacementProviderContract } from './replacement.js';
 import type { RelayerBinding } from '../providers/relayer-client.js';
 import { toQuantity } from 'ethers';
 import { fingerprint } from '../onboarding/policy.js';
@@ -70,6 +71,10 @@ export function createTransferExecutionProvider(
         (value.hash != null &&
           (typeof value.hash !== 'string' ||
             !/^0x[0-9a-fA-F]{64}$/.test(value.hash))) ||
+        (value.max_priority_fee_per_gas != null &&
+          (!/^[0-9]+$/.test(String(value.max_priority_fee_per_gas)) ||
+            BigInt(String(value.max_priority_fee_per_gas)) >
+              BigInt(sponsor.maxPriorityFeePerGas))) ||
         (value.max_fee_per_gas != null &&
           (!/^[0-9]+$/.test(String(value.max_fee_per_gas)) ||
             BigInt(String(value.max_fee_per_gas)) >
@@ -85,11 +90,34 @@ export function createTransferExecutionProvider(
     }
   }
   return {
+    async supportsReplacement() {
+      for (const sponsor of sponsors) {
+        const binding = await client.binding(sponsor.accountId);
+        if (
+          binding?.metadata.wpk_replacement_contract !==
+            replacementProviderContract ||
+          !record(binding.metadata.policies) ||
+          binding.metadata.policies.gas_limit_estimation !== false ||
+          binding.metadata.policies.eip1559_pricing !== true ||
+          binding.metadata.policies.gas_price_cap !==
+            Number(sponsor.maxFeePerGas)
+        )
+          return false;
+      }
+      return true;
+    },
     async prepare(plan) {
       const selected = await client.binding(plan.sponsor.accountId);
       const policies = selected?.metadata.policies;
       if (
         !selected ||
+        (plan.replacement &&
+          (selected.metadata.wpk_replacement_contract !==
+            replacementProviderContract ||
+            !record(selected.metadata.policies) ||
+            selected.metadata.policies.eip1559_pricing !== true ||
+            selected.metadata.policies.gas_price_cap !==
+              Number(plan.sponsor.maxFeePerGas))) ||
         fingerprint(selected.binding) !== fingerprint(plan.sponsor.binding) ||
         !record(policies) ||
         policies.gas_limit_estimation !== false ||
@@ -117,12 +145,75 @@ export function createTransferExecutionProvider(
           value: toQuantity(0n),
           data: plan.data,
           gas_limit: Number(sponsor.gasLimit),
-          max_fee_per_gas: Number(sponsor.maxFeePerGas),
-          max_priority_fee_per_gas: Number(sponsor.maxPriorityFeePerGas),
+          max_fee_per_gas: Number(initialFees(plan).maxFeePerGas),
+          max_priority_fee_per_gas: Number(
+            initialFees(plan).maxPriorityFeePerGas,
+          ),
           valid_until: plan.action.expires_at,
         }),
       );
       return response(plan, accepted).id;
+    },
+    async replace(plan, transactionId, proposal, authorizeEffect) {
+      if (!plan.replacement || !uuid.test(transactionId))
+        throw new WalletProviderError('wallet_authorization_denied');
+      const current = await client.binding(plan.sponsor.accountId);
+      if (
+        !current ||
+        fingerprint(current.binding) !== fingerprint(plan.sponsor.binding) ||
+        current.metadata.wpk_replacement_contract !==
+          replacementProviderContract ||
+        !record(current.metadata.policies) ||
+        current.metadata.policies.gas_limit_estimation !== false ||
+        current.metadata.policies.eip1559_pricing !== true ||
+        current.metadata.policies.gas_price_cap !==
+          Number(plan.sponsor.maxFeePerGas)
+      )
+        throw new WalletProviderError('wallet_provider_configuration');
+      const path = `/relayers/${plan.sponsor.binding.relayerId}/transactions/${transactionId}`;
+      const previous = await client.call('GET', path);
+      const original = response(plan, previous);
+      if (
+        !previous ||
+        original.id !== transactionId ||
+        original.hash !== proposal.previousTransactionHash ||
+        String(previous.nonce) !== proposal.nonce ||
+        String(previous.max_fee_per_gas) !== proposal.previousMaxFeePerGas ||
+        String(previous.max_priority_fee_per_gas) !==
+          proposal.previousMaxPriorityFeePerGas ||
+        !['pending', 'sent', 'submitted'].includes(String(previous.status)) ||
+        BigInt(proposal.maxFeePerGas) > BigInt(plan.sponsor.maxFeePerGas) ||
+        BigInt(proposal.maxPriorityFeePerGas) >
+          BigInt(plan.sponsor.maxPriorityFeePerGas)
+      )
+        throw new WalletProviderError('wallet_authorization_denied');
+      await authorizeEffect();
+      if (Date.parse(plan.action.expires_at) <= Date.now())
+        throw new WalletProviderError('wallet_authorization_denied');
+      const value = await client.call(
+        'PUT',
+        path,
+        JSON.stringify({
+          to: String(plan.action.payload.domain.verifyingContract),
+          value: toQuantity(0n),
+          data: plan.data,
+          gas_limit: Number(plan.sponsor.gasLimit),
+          max_fee_per_gas: Number(proposal.maxFeePerGas),
+          max_priority_fee_per_gas: Number(proposal.maxPriorityFeePerGas),
+          valid_until: plan.action.expires_at,
+        }),
+      );
+      const accepted = response(plan, value);
+      if (
+        !value ||
+        accepted.id !== transactionId ||
+        !accepted.hash ||
+        String(value.nonce) !== proposal.nonce ||
+        String(value.max_fee_per_gas) !== proposal.maxFeePerGas ||
+        String(value.max_priority_fee_per_gas) !== proposal.maxPriorityFeePerGas
+      )
+        throw new WalletProviderError('wallet_provider_response', 'unknown');
+      return accepted.hash;
     },
     async inspect(plan, transactionId) {
       if (!uuid.test(transactionId))

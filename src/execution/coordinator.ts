@@ -1,5 +1,7 @@
+import { assertReplacement, pinReplacementPolicy } from './replacement.js';
 import {
   recordPayer,
+  recordReplacement,
   payerKey,
   emptyOperationsState,
   type PayerOperations,
@@ -168,6 +170,9 @@ export class ApprovedExecutionCoordinator {
       execution_id: execution.executionId,
       dispatch_status: dispatch,
       observation_revision: execution.observationRevision,
+      ...(execution.replacementStatus
+        ? { replacement: execution.replacementStatus }
+        : {}),
       ...(execution.recovery ? { recovery: execution.recovery } : {}),
       outcome_scope: record.intent
         ? record.intent.input.kind === 'swap'
@@ -360,6 +365,11 @@ export class ApprovedExecutionCoordinator {
     if (!record.execution) unknown();
     if (!record.execution.plan) {
       if (
+        this.config.replacement &&
+        !(await this.provider.supportsReplacement?.())
+      )
+        deny();
+      if (
         await this.actions.onboarding.store.transaction(
           (state) =>
             !!state.sponsorQuarantines?.[
@@ -394,6 +404,9 @@ export class ApprovedExecutionCoordinator {
           ? { tokenCodeHash: this.config.rpc.tokenCodeHash! }
           : {}),
         scanFromBlock,
+        ...(this.config.replacement
+          ? { replacement: pinReplacementPolicy(this.config.replacement) }
+          : {}),
         ...(record.intent ? { intent: structuredClone(record.intent) } : {}),
         data: record.intent
           ? approvedCallData(record.approval.action, signature.serialized)
@@ -524,6 +537,7 @@ export class ApprovedExecutionCoordinator {
       (state) => state.supportedActions?.[input.action_id],
     );
     const execution = record?.execution;
+    if (input.replacement) return this.authorizeReplacement(input, record);
     if (
       !execution?.dispatchPrincipal ||
       !execution.plan ||
@@ -540,6 +554,135 @@ export class ApprovedExecutionCoordinator {
     if (!claim || !['pending', 'unknown'].includes(claim.state)) deny();
     await this.authorize(execution.dispatchPrincipal, input.action_id, request);
     if (execution.dispatchLeaseUntil <= Date.now()) deny();
+    return { allowed: true as const, ...input };
+  }
+  private async authorizeReplacement(
+    input: ExecutionAuthorityRequest,
+    stored: TransferRecord | undefined,
+  ) {
+    input = structuredClone(input);
+    const authorization = input.replacement ?? deny();
+    const proposal = authorization.proposal;
+    const execution = stored?.execution;
+    if (
+      !stored ||
+      !execution?.plan?.replacement ||
+      !execution.dispatchPrincipal ||
+      !this.observer.nonceSnapshot ||
+      execution.executionId !== input.execution_id ||
+      execution.planHash !== input.plan_hash ||
+      execution.configurationHash !== this.configurationHash ||
+      execution.integrityFailure ||
+      execution.effectObserved ||
+      !execution.dispatchPrincipal.scopes.includes('wallet:execute') ||
+      !execution.dispatchPrincipal.scopes.includes('wallet:sign') ||
+      this.request(stored).requestHash !== input.request_hash
+    )
+      deny();
+    const request = this.request(stored);
+    let claim = await this.database.journal.read(request);
+    if (claim?.state === 'unknown') {
+      await this.recover(stored);
+      claim = await this.database.journal.read(request);
+    }
+    if (
+      claim?.state !== 'succeeded' ||
+      claim.result.kind !== 'relay_transaction' ||
+      claim.result.transactionId !== execution.executionId
+    )
+      deny();
+    await this.current(execution.dispatchPrincipal, input.action_id);
+    const snapshot = await this.observer.nonceSnapshot(
+      execution.plan,
+      proposal.previousTransactionHash,
+    );
+    assertReplacement(execution.plan, proposal, snapshot);
+    await this.actions.withAuthorizedTransfer(
+      execution.dispatchPrincipal,
+      input.action_id,
+      (state, record) => {
+        const latest = record.execution ?? deny();
+        if (
+          latest.executionId !== input.execution_id ||
+          latest.planHash !== input.plan_hash ||
+          latest.configurationHash !== this.configurationHash ||
+          latest.integrityFailure ||
+          latest.effectObserved ||
+          fingerprint(latest.plan?.replacement) !==
+            fingerprint(
+              this.config.replacement
+                ? pinReplacementPolicy(this.config.replacement)
+                : null,
+            )
+        )
+          deny();
+        const payer = latest.plan!.sponsor.binding.address.toLowerCase();
+        const blocked =
+          state.sponsorQuarantines?.[fingerprint(['payer', payer])] ?? [];
+        if (
+          !blocked.every((id) => {
+            const entry = Object.values(state.supportedActions ?? {}).find(
+              (entry) => entry.execution?.executionId === id,
+            )?.execution;
+            return (
+              !!entry &&
+              !entry.integrityFailure &&
+              entry.plan?.sponsor.binding.address.toLowerCase() === payer &&
+              (id === latest.executionId
+                ? entry.recovery?.reason === 'pending-too-long'
+                : entry.recovery?.reason === 'nonce-gap-suspected' &&
+                  entry.providerNonce !== undefined &&
+                  BigInt(entry.providerNonce) > BigInt(proposal.nonce))
+            );
+          })
+        )
+          deny();
+        if (
+          latest.providerNonce !== undefined &&
+          latest.providerNonce !== proposal.nonce
+        )
+          deny();
+        latest.providerNonce ??= proposal.nonce;
+        const attempts = (latest.replacements ??= []);
+        let attempt = attempts.find(
+          (entry) => entry.proposal.id === proposal.id,
+        );
+        if (attempt && fingerprint(attempt.proposal) !== fingerprint(proposal))
+          deny();
+        if (!attempt) {
+          const previous = attempts.at(-1);
+          if (
+            authorization.phase !== 'prepare' ||
+            proposal.sequence <= (previous?.proposal.sequence ?? 0) ||
+            proposal.sequence > Number(latest.plan!.replacement!.maxAttempts) ||
+            (previous &&
+              (Date.now() < previous.leaseUntil ||
+                Date.now() - (previous.leaseUntil - 30000) <
+                  Number(latest.plan!.replacement!.intervalSeconds) * 1000 ||
+                (previous.dispatchAuthorizedAt !== undefined &&
+                  (proposal.previousMaxFeePerGas !==
+                    previous.proposal.maxFeePerGas ||
+                    proposal.previousMaxPriorityFeePerGas !==
+                      previous.proposal.maxPriorityFeePerGas))))
+          )
+            deny();
+          attempts.push(
+            (attempt = { proposal, leaseUntil: Date.now() + 30000 }),
+          );
+          state.audit.push({
+            at: Date.now(),
+            event: 'replacement_authorized',
+            resource: input.action_id,
+            revision: this.actions.revision,
+          });
+        }
+        if (attempt.leaseUntil <= Date.now()) deny();
+        if (authorization.phase === 'dispatch') {
+          if (attempt.dispatchAuthorizedAt !== undefined) deny();
+          attempt.dispatchAuthorizedAt = Date.now();
+        }
+      },
+    );
     return { allowed: true as const, ...input };
   }
   private async recover(record: TransferRecord): Promise<string | undefined> {
@@ -749,6 +892,9 @@ export class ApprovedExecutionCoordinator {
         observation,
         ...(recovery ? { recovery } : {}),
         observationRevision: execution.observationRevision + 1,
+        ...(inspection?.replacement
+          ? { replacementStatus: inspection.replacement }
+          : {}),
       },
     });
     const stored = await this.actions.onboarding.store.transaction((state) => {
@@ -767,6 +913,24 @@ export class ApprovedExecutionCoordinator {
         throw new WalletProviderError('wallet_attempt_pending');
       const previous = latest.observation;
       const previousRecovery = latest.recovery;
+      const previousReplacement = latest.replacementStatus;
+      if (inspection?.replacement) {
+        latest.replacementStatus = inspection.replacement;
+        if (
+          this.operations &&
+          state.operations?.['service-v1']?.binding === this.operations.binding
+        )
+          recordReplacement(
+            state.operations['service-v1'],
+            payerKey(plan.sponsor.binding.address),
+            execution.executionId,
+            inspection.replacement,
+            this.operations.configuration,
+            this.operations.targets,
+            this.operations.source,
+          );
+      }
+
       if (
         previous?.chain_status === 'finalized' &&
         (observation.chain_status !== 'finalized' ||
@@ -889,6 +1053,8 @@ export class ApprovedExecutionCoordinator {
       ].slice(0, 8);
       if (
         !previous ||
+        fingerprint(previousReplacement ?? null) !==
+          fingerprint(latest.replacementStatus ?? null) ||
         previousRecovery?.state !== recovery?.state ||
         previousRecovery?.reason !== recovery?.reason ||
         previousRecovery?.quarantined !== recovery?.quarantined ||

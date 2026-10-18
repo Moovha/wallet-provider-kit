@@ -1,3 +1,4 @@
+import { replacementStatusSchema } from './replacement.js';
 import { recoveryDiagnosisSchema } from './recovery.js';
 import { uuidSchema } from '../service/schemas.js';
 
@@ -50,6 +51,7 @@ export const executionReceiptSchema = {
   ],
   properties: {
     recovery: recoveryDiagnosisSchema,
+    replacement: replacementStatusSchema,
     profile: {
       type: 'string',
       enum: [

@@ -464,7 +464,7 @@ export async function registerOnboardingRoutes(
         operationId: 'checkExecutionAuthority',
         security: [{ serviceProof: [] }],
         description:
-          'Read-only callback for the configured designated executor. Requires a pinned signed service request, exact stored plan/attempt and an unexpired handoff lease. Rechecks current owner, grant, KYC, consent, immutable approval and active revision. Application OAuth tokens do not authenticate this endpoint.',
+          'Authority callback for the configured designated executor. Initial dispatch requires the exact stored plan/attempt and an unexpired handoff lease. Optional bounded replacements require a separate durable proposal, fresh RPC nonce/fee evidence and a short replacement lease. Every effect rechecks current owner, grant, KYC, consent, immutable approval and active revision. Application OAuth tokens do not authenticate this endpoint.',
         body: authoritySchema,
         response: { 200: authorityReceiptSchema },
       },

@@ -1,3 +1,4 @@
+import { replacementProviderContract } from './replacement.js';
 import { checkedInspection } from './recovery.js';
 import { WalletProviderError } from '../domain/signing.js';
 import type {
@@ -62,7 +63,27 @@ export function createRemoteExecutionProvider(
       id,
     );
   }
+  async function supportsReplacement(): Promise<boolean> {
+    const value = await call(
+      'capabilities',
+      'GET',
+      '/v1/executor-capabilities',
+    );
+    return (
+      record(value) &&
+      value.contract === 'execution-dispatch-v1' &&
+      Array.isArray(value.providers) &&
+      value.providers.some(
+        (provider) =>
+          record(provider) &&
+          provider.id === selected!.providerId &&
+          provider.revision === selected!.providerRevision &&
+          provider.replacement_contract === replacementProviderContract,
+      )
+    );
+  }
   return {
+    supportsReplacement,
     async prepare() {
       const value = await call(
         'capabilities',
@@ -107,14 +128,15 @@ export function createRemoteExecutionProvider(
     },
     async inspect(plan, id) {
       const result = await status(plan, id);
-      return checkedInspection(
-        result.provider_inspection ?? {
+      return checkedInspection({
+        ...(result.provider_inspection ?? {
           status: result.dispatch_status,
           ...(result.transaction_hash
             ? { transactionHash: result.transaction_hash }
             : {}),
-        },
-      );
+        }),
+        ...(result.replacement ? { replacement: result.replacement } : {}),
+      });
     },
     async transactionHash(plan, id) {
       return (await status(plan, id)).transaction_hash;

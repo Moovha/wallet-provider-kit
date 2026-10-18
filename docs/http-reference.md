@@ -2637,7 +2637,7 @@ Success response schema:
 
 Operation: `checkExecutionAuthority`.
 
-Read-only callback for the configured designated executor. Requires a pinned signed service request, exact stored plan/attempt and an unexpired handoff lease. Rechecks current owner, grant, KYC, consent, immutable approval and active revision. Application OAuth tokens do not authenticate this endpoint.
+Authority callback for the configured designated executor. Initial dispatch requires the exact stored plan/attempt and an unexpired handoff lease. Optional bounded replacements require a separate durable proposal, fresh RPC nonce/fee evidence and a short replacement lease. Every effect rechecks current owner, grant, KYC, consent, immutable approval and active revision. Application OAuth tokens do not authenticate this endpoint.
 
 Request body (application/json):
 
@@ -2654,6 +2654,66 @@ Request body (application/json):
     "provider_revision"
   ],
   "properties": {
+    "replacement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["proposal", "phase"],
+      "properties": {
+        "proposal": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "sequence",
+            "nonce",
+            "previousTransactionHash",
+            "previousMaxFeePerGas",
+            "previousMaxPriorityFeePerGas",
+            "maxFeePerGas",
+            "maxPriorityFeePerGas"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "sequence": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 6
+            },
+            "nonce": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]{0,77})$"
+            },
+            "previousTransactionHash": {
+              "type": "string",
+              "pattern": "^0x[0-9a-f]{64}$"
+            },
+            "previousMaxFeePerGas": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]{0,77})$"
+            },
+            "previousMaxPriorityFeePerGas": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]{0,77})$"
+            },
+            "maxFeePerGas": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]{0,77})$"
+            },
+            "maxPriorityFeePerGas": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]{0,77})$"
+            }
+          }
+        },
+        "phase": {
+          "type": "string",
+          "enum": ["prepare", "dispatch"]
+        }
+      }
+    },
     "provider_id": {
       "type": "string",
       "pattern": "^[A-Za-z0-9._-]{1,64}$"
@@ -2702,6 +2762,66 @@ Success response schema:
     "request_hash"
   ],
   "properties": {
+    "replacement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["proposal", "phase"],
+      "properties": {
+        "proposal": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "sequence",
+            "nonce",
+            "previousTransactionHash",
+            "previousMaxFeePerGas",
+            "previousMaxPriorityFeePerGas",
+            "maxFeePerGas",
+            "maxPriorityFeePerGas"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "sequence": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 6
+            },
+            "nonce": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]{0,77})$"
+            },
+            "previousTransactionHash": {
+              "type": "string",
+              "pattern": "^0x[0-9a-f]{64}$"
+            },
+            "previousMaxFeePerGas": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]{0,77})$"
+            },
+            "previousMaxPriorityFeePerGas": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]{0,77})$"
+            },
+            "maxFeePerGas": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]{0,77})$"
+            },
+            "maxPriorityFeePerGas": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]{0,77})$"
+            }
+          }
+        },
+        "phase": {
+          "type": "string",
+          "enum": ["prepare", "dispatch"]
+        }
+      }
+    },
     "action_id": {
       "type": "string",
       "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
@@ -2965,6 +3085,45 @@ Success response schema:
             "reconcile",
             "operator-review"
           ]
+        }
+      }
+    },
+    "replacement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "attempts"],
+      "properties": {
+        "state": {
+          "type": "string",
+          "enum": [
+            "prepared",
+            "dispatch",
+            "accepted",
+            "unknown",
+            "observed",
+            "abandoned",
+            "exhausted",
+            "blocked",
+            "settled"
+          ]
+        },
+        "attempts": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 6
+        },
+        "reason": {
+          "type": "string",
+          "enum": [
+            "fee-cap",
+            "attempt-limit",
+            "authority-or-preparation-denied",
+            "evidence-unavailable"
+          ]
+        },
+        "last_attempt_at": {
+          "type": "string",
+          "format": "date-time"
         }
       }
     },
@@ -3309,6 +3468,45 @@ Success response schema:
         }
       }
     },
+    "replacement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "attempts"],
+      "properties": {
+        "state": {
+          "type": "string",
+          "enum": [
+            "prepared",
+            "dispatch",
+            "accepted",
+            "unknown",
+            "observed",
+            "abandoned",
+            "exhausted",
+            "blocked",
+            "settled"
+          ]
+        },
+        "attempts": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 6
+        },
+        "reason": {
+          "type": "string",
+          "enum": [
+            "fee-cap",
+            "attempt-limit",
+            "authority-or-preparation-denied",
+            "evidence-unavailable"
+          ]
+        },
+        "last_attempt_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
     "profile": {
       "type": "string",
       "enum": [
@@ -3637,6 +3835,45 @@ Success response schema:
             "reconcile",
             "operator-review"
           ]
+        }
+      }
+    },
+    "replacement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "attempts"],
+      "properties": {
+        "state": {
+          "type": "string",
+          "enum": [
+            "prepared",
+            "dispatch",
+            "accepted",
+            "unknown",
+            "observed",
+            "abandoned",
+            "exhausted",
+            "blocked",
+            "settled"
+          ]
+        },
+        "attempts": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 6
+        },
+        "reason": {
+          "type": "string",
+          "enum": [
+            "fee-cap",
+            "attempt-limit",
+            "authority-or-preparation-denied",
+            "evidence-unavailable"
+          ]
+        },
+        "last_attempt_at": {
+          "type": "string",
+          "format": "date-time"
         }
       }
     },
@@ -4060,6 +4297,45 @@ Success response schema:
                       "reconcile",
                       "operator-review"
                     ]
+                  }
+                }
+              },
+              "replacement": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["state", "attempts"],
+                "properties": {
+                  "state": {
+                    "type": "string",
+                    "enum": [
+                      "prepared",
+                      "dispatch",
+                      "accepted",
+                      "unknown",
+                      "observed",
+                      "abandoned",
+                      "exhausted",
+                      "blocked",
+                      "settled"
+                    ]
+                  },
+                  "attempts": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 6
+                  },
+                  "reason": {
+                    "type": "string",
+                    "enum": [
+                      "fee-cap",
+                      "attempt-limit",
+                      "authority-or-preparation-denied",
+                      "evidence-unavailable"
+                    ]
+                  },
+                  "last_attempt_at": {
+                    "type": "string",
+                    "format": "date-time"
                   }
                 }
               },

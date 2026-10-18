@@ -1,4 +1,8 @@
 import {
+  replacementAuthoritySchema,
+  replacementStatusSchema,
+} from '../execution/replacement.js';
+import {
   providerInspectionSchema,
   recoveryDiagnosisSchema,
 } from '../execution/recovery.js';
@@ -20,6 +24,7 @@ export const authoritySchema = {
     'provider_revision',
   ],
   properties: {
+    replacement: replacementAuthoritySchema,
     provider_id: { type: 'string', pattern: '^[A-Za-z0-9._-]{1,64}$' },
     provider_revision: { type: 'string', pattern: '^[1-9][0-9]{0,19}$' },
     execution_id: uuidSchema,
@@ -41,6 +46,7 @@ export const authorityReceiptSchema = {
     'request_hash',
   ],
   properties: {
+    replacement: replacementAuthoritySchema,
     action_id: uuidSchema,
     allowed: { type: 'boolean', enum: [true] },
     provider_id: { type: 'string', pattern: '^[A-Za-z0-9._-]{1,64}$' },
@@ -56,6 +62,7 @@ export const executorReceiptSchema = {
   required: ['contract', 'execution_id', 'plan_hash', 'dispatch_status'],
   properties: {
     provider_inspection: providerInspectionSchema,
+    replacement: replacementStatusSchema,
     recovery: recoveryDiagnosisSchema,
     contract: { type: 'string', enum: ['execution-dispatch-v1'] },
     execution_id: uuidSchema,
@@ -208,6 +215,24 @@ const transferPlanSchema = {
   }),
   description: dispatchSchema.properties.plan.description,
 };
+Object.assign(transferPlanSchema.properties, {
+  replacement: {
+    type: 'object',
+    additionalProperties: false,
+    required: [
+      'initialFeeBasisPoints',
+      'bumpBasisPoints',
+      'maxAttempts',
+      'intervalSeconds',
+    ],
+    properties: {
+      initialFeeBasisPoints: uint,
+      bumpBasisPoints: uint,
+      maxAttempts: uint,
+      intervalSeconds: uint,
+    },
+  },
+});
 export const executorCapabilitiesSchema = object({
   contract: { type: 'string', enum: ['execution-dispatch-v1'] },
   profiles: {
@@ -220,10 +245,17 @@ export const executorCapabilitiesSchema = object({
   providers: {
     type: 'array',
     maxItems: 32,
-    items: object({
-      id: { type: 'string', pattern: '^[A-Za-z0-9._-]{1,64}$' },
-      revision,
-    }),
+    items: {
+      ...object({
+        id: { type: 'string', pattern: '^[A-Za-z0-9._-]{1,64}$' },
+        revision,
+        replacement_contract: {
+          type: 'string',
+          enum: ['wpk-fee-only-replacement-v1'],
+        },
+      }),
+      required: ['id', 'revision'],
+    },
   },
 });
 

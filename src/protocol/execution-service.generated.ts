@@ -84,6 +84,8 @@ export interface operations {
                         providers: {
                             id: string;
                             revision: string;
+                            /** @enum {string} */
+                            replacement_contract?: "wpk-fee-only-replacement-v1";
                         }[];
                     };
                 };
@@ -194,6 +196,12 @@ export interface operations {
                             l1FeeReserveWei: string;
                             lifetimeBudgetWei: string;
                         };
+                        replacement?: {
+                            initialFeeBasisPoints: string;
+                            bumpBasisPoints: string;
+                            maxAttempts: string;
+                            intervalSeconds: string;
+                        };
                     } | {
                         /** @enum {string} */
                         profile: "approved-evm-executor-v1";
@@ -277,6 +285,12 @@ export interface operations {
                             maxPriorityFeePerGas: string;
                             l1FeeReserveWei: string;
                             lifetimeBudgetWei: string;
+                        };
+                        replacement?: {
+                            initialFeeBasisPoints: string;
+                            bumpBasisPoints: string;
+                            maxAttempts: string;
+                            intervalSeconds: string;
                         };
                         intent: {
                             /** @enum {string} */
@@ -368,9 +382,27 @@ export interface operations {
                 content: {
                     "application/json": {
                         provider_inspection?: {
+                            replacement?: {
+                                /** @enum {string} */
+                                state: "prepared" | "dispatch" | "accepted" | "unknown" | "observed" | "abandoned" | "exhausted" | "blocked" | "settled";
+                                attempts: number;
+                                /** @enum {string} */
+                                reason?: "fee-cap" | "attempt-limit" | "authority-or-preparation-denied" | "evidence-unavailable";
+                                /** Format: date-time */
+                                last_attempt_at?: string;
+                            };
                             status: string;
                             nonce?: string;
                             transactionHash?: string;
+                        };
+                        replacement?: {
+                            /** @enum {string} */
+                            state: "prepared" | "dispatch" | "accepted" | "unknown" | "observed" | "abandoned" | "exhausted" | "blocked" | "settled";
+                            attempts: number;
+                            /** @enum {string} */
+                            reason?: "fee-cap" | "attempt-limit" | "authority-or-preparation-denied" | "evidence-unavailable";
+                            /** Format: date-time */
+                            last_attempt_at?: string;
                         };
                         recovery?: {
                             /** @enum {string} */
@@ -419,9 +451,27 @@ export interface operations {
                 content: {
                     "application/json": {
                         provider_inspection?: {
+                            replacement?: {
+                                /** @enum {string} */
+                                state: "prepared" | "dispatch" | "accepted" | "unknown" | "observed" | "abandoned" | "exhausted" | "blocked" | "settled";
+                                attempts: number;
+                                /** @enum {string} */
+                                reason?: "fee-cap" | "attempt-limit" | "authority-or-preparation-denied" | "evidence-unavailable";
+                                /** Format: date-time */
+                                last_attempt_at?: string;
+                            };
                             status: string;
                             nonce?: string;
                             transactionHash?: string;
+                        };
+                        replacement?: {
+                            /** @enum {string} */
+                            state: "prepared" | "dispatch" | "accepted" | "unknown" | "observed" | "abandoned" | "exhausted" | "blocked" | "settled";
+                            attempts: number;
+                            /** @enum {string} */
+                            reason?: "fee-cap" | "attempt-limit" | "authority-or-preparation-denied" | "evidence-unavailable";
+                            /** Format: date-time */
+                            last_attempt_at?: string;
                         };
                         recovery?: {
                             /** @enum {string} */

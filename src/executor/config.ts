@@ -1,3 +1,4 @@
+import { validateReplacementSponsors } from '../execution/replacement.js';
 import { validateOperations } from '../execution/operations.js';
 import {
   validateApprovedCallPolicy,
@@ -37,6 +38,7 @@ export interface ExecutorProviderConfiguration {
   sponsors: ExecutionSponsor[];
   sponsorPool?: ExecutionConfiguration['sponsorPool'];
   recovery?: ExecutionConfiguration['recovery'];
+  replacement?: ExecutionConfiguration['replacement'];
 }
 export interface ExecutionServiceConfiguration {
   configVersion: 1;
@@ -102,6 +104,11 @@ export function validateExecutionServiceConfiguration(
     }
     const sponsorAddresses = new Map<string, string>();
     for (const provider of config.providers) {
+      if (provider.replacement) {
+        if (!provider.recovery || provider.kind !== 'openzeppelin-relayer')
+          throw new Error();
+        validateReplacementSponsors(provider.replacement, provider.sponsors);
+      }
       if (provider.relayer) serviceOrigin(provider.relayer.url);
       if (provider.contractCalls)
         validateApprovedCallPolicy(provider.contractCalls);

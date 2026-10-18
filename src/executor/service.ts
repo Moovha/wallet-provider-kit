@@ -1,3 +1,4 @@
+import { ReplacementWorker } from './replacement-worker.js';
 import { PayerOperations } from '../execution/operations.js';
 import {
   checkedInspection,
@@ -334,6 +335,58 @@ export async function createExecutionService(
       if (Date.parse(record.dispatch.plan.action.expires_at) <= Date.now())
         throw new WalletProviderError('wallet_authorization_denied');
     }
+    async function authorizeReplacement(
+      record: ExecutorRecord,
+      replacement: import('../execution/replacement.js').ReplacementAuthority,
+    ) {
+      database!.fence();
+      const current = database!.load(
+        record.dispatch.execution_id,
+        record.walletOrigin,
+      );
+      if (
+        !current ||
+        current.identityHash !== record.identityHash ||
+        current.effectObserved ||
+        !config!.callers
+          .find((caller) => caller.origin === record.walletOrigin)
+          ?.providers.includes(record.dispatch.provider_id) ||
+        Date.parse(current.dispatch.plan.action.expires_at) <= Date.now() ||
+        !database!.replacementQuarantineAllowed(
+          current,
+          replacement.proposal.nonce,
+        )
+      )
+        throw new WalletProviderError('wallet_authorization_denied');
+      const proof = {
+        provider_id: record.dispatch.provider_id,
+        provider_revision: record.dispatch.provider_revision,
+        execution_id: record.dispatch.execution_id,
+        action_id: record.dispatch.plan.action.action_id,
+        plan_hash: executionPlanHash(record.dispatch.plan),
+        request_hash: record.dispatch.wallet_attempt.requestHash,
+        replacement,
+      };
+      const callback = signedServiceClient(
+        identity!,
+        record.walletOrigin,
+        options.request,
+      );
+      if (
+        serviceHash(
+          await callback(
+            'authority',
+            'POST',
+            '/v1/internal/execution-authority',
+            proof,
+          ),
+        ) !== serviceHash({ allowed: true, ...proof })
+      )
+        throw new WalletProviderError('wallet_authorization_denied');
+      database!.fence();
+      if (Date.parse(record.dispatch.plan.action.expires_at) <= Date.now())
+        throw new WalletProviderError('wallet_authorization_denied');
+    }
     async function receipt(
       record: ExecutorRecord,
       refresh = false,
@@ -344,6 +397,9 @@ export async function createExecutionService(
         record.dispatch.provider_id + ':' + record.dispatch.provider_revision,
       )!;
       let ownHash: string | undefined;
+      const replacementHash = record.replacements
+        ?.filter((entry) => ['accepted', 'observed'].includes(entry.state))
+        .at(-1)?.transactionHash;
       if (claim?.state === 'unknown' && selected.provider.recover) {
         try {
           const recovered = await selected.provider.recover(
@@ -409,6 +465,7 @@ export async function createExecutionService(
           /* Provider hints remain unavailable; RPC observation is independent. */
         }
       }
+      ownHash = replacementHash ?? ownHash;
       let observedFresh = false;
       if (ownHash && !/^0x[0-9a-fA-F]{64}$/.test(ownHash))
         throw new WalletProviderError('wallet_provider_response');
@@ -479,6 +536,9 @@ export async function createExecutionService(
         );
       }
       return {
+        ...(record.replacementStatus
+          ? { replacement: record.replacementStatus }
+          : {}),
         ...(inspection ? { provider_inspection: inspection } : {}),
         ...(record.recovery ? { recovery: record.recovery } : {}),
         contract: 'execution-dispatch-v1',
@@ -550,6 +610,9 @@ export async function createExecutionService(
             .map((provider) => ({
               id: provider.id,
               revision: provider.revision,
+              ...(provider.replacement
+                ? { replacement_contract: 'wpk-fee-only-replacement-v1' }
+                : {}),
             })),
         };
       },
@@ -730,10 +793,24 @@ export async function createExecutionService(
             ? (recoveryCursor + selected.length) % records.length
             : 0;
           await Promise.allSettled(
-            selected.map((record) => receipt(record, true)),
+            selected.map(async (record) => {
+              await receipt(record, true);
+              const provider = providers.get(
+                record.dispatch.provider_id +
+                  ':' +
+                  record.dispatch.provider_revision,
+              )!;
+              await new ReplacementWorker(
+                database!,
+                provider.provider,
+                provider.observer,
+                authorizeReplacement,
+                operations,
+              ).run(record);
+            }),
           );
         } catch {
-          /* The next bounded read-only poll resumes recovery. */
+          /* Durable claims fence replacement effects when the next bounded cycle resumes. */
         }
         if (!recoveryStopped) {
           recoveryTimer = setTimeout(schedule, 15000);

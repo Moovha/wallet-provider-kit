@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased bounded replacements
+
+- Add the default designated-executor replacement worker for explicitly pinned
+  policies. Initial fee headroom, fixed approved gas/fee caps, fresh wallet
+  authority and durable claims bound each same-nonce, unchanged-call replacement.
+- Preserve uncertainty across concurrent workers, restarts and lost responses;
+  retain original reservations and report replacement conditions through execution
+  receipts, signed payer events and aggregate health.
+- Supply editable gas and replacement defaults for new wizard configurations.
+  Existing configurations and approved plans retain their pinned behavior.
+- Distribute a separate AGPL-3.0-only fee-only patch for OpenZeppelin Relayer
+  v1.8.0 with native source contract tests and deployment instructions. Automatic
+  replacement rejects providers without that contract. Offline evidence does not
+  establish funded provider acceptance or production readiness.
+
 ## Unreleased approved execution foundation
 
 - Add optional durable per-Safe unsigned request queues, authenticated delayed execution, unsigned cancellation and round-robin sponsor pools with independent executor capacity limits. Concurrent offline SQLite/HTTP fixtures cover duplicate admission, signing races and restart recovery; live throughput and provider acceptance remain pending.

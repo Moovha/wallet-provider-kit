@@ -145,7 +145,10 @@ cancellation can force fee bumps past that cap, and Base incurs additional L1
 fees. Account for operator-funded recovery exposure before enabling this profile;
 don't promise bounded total sponsorship or charge unapproved costs to users.
 Replacement/cancellation that changes the original call requires reconciliation.
-No cancel, replace or funding API is exposed here.
+No generic cancel, replace or funding API is exposed here. The designated
+executor can perform [bounded fee-only replacements](automatic-replacements.md)
+using a separately accepted [patched provider build](fee-only-relayer.md), which
+disables autonomous repricing, cancellation and gap filling.
 
 Prove the deployed service/RPC chain, signer isolation, private ingress, credential
 scope, durable Redis/queue configuration, two-process journal concurrency, lost

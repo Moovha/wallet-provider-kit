@@ -42,6 +42,10 @@ Success response:
           "revision": {
             "type": "string",
             "pattern": "^[1-9][0-9]{0,19}$"
+          },
+          "replacement_contract": {
+            "type": "string",
+            "enum": ["wpk-fee-only-replacement-v1"]
           }
         }
       }
@@ -441,6 +445,34 @@ Request body:
                   "pattern": "^(0|[1-9][0-9]{0,77})$"
                 }
               }
+            },
+            "replacement": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "initialFeeBasisPoints",
+                "bumpBasisPoints",
+                "maxAttempts",
+                "intervalSeconds"
+              ],
+              "properties": {
+                "initialFeeBasisPoints": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,77})$"
+                },
+                "bumpBasisPoints": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,77})$"
+                },
+                "maxAttempts": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,77})$"
+                },
+                "intervalSeconds": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,77})$"
+                }
+              }
             }
           },
           "description": "Exact immutable ApprovedExecutionPlan for the selected execution profile. ERC-3009 transfers or Safe calls, owner signature, sponsor, code pins, hashes and all action fields are independently validated against server policy and the current wallet authority callback before effects."
@@ -760,6 +792,34 @@ Request body:
                   "pattern": "^(0|[1-9][0-9]{0,77})$"
                 },
                 "lifetimeBudgetWei": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,77})$"
+                }
+              }
+            },
+            "replacement": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "initialFeeBasisPoints",
+                "bumpBasisPoints",
+                "maxAttempts",
+                "intervalSeconds"
+              ],
+              "properties": {
+                "initialFeeBasisPoints": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,77})$"
+                },
+                "bumpBasisPoints": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,77})$"
+                },
+                "maxAttempts": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,77})$"
+                },
+                "intervalSeconds": {
                   "type": "string",
                   "pattern": "^(0|[1-9][0-9]{0,77})$"
                 }
@@ -1111,6 +1171,45 @@ Success response:
       "additionalProperties": false,
       "required": ["status"],
       "properties": {
+        "replacement": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["state", "attempts"],
+          "properties": {
+            "state": {
+              "type": "string",
+              "enum": [
+                "prepared",
+                "dispatch",
+                "accepted",
+                "unknown",
+                "observed",
+                "abandoned",
+                "exhausted",
+                "blocked",
+                "settled"
+              ]
+            },
+            "attempts": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 6
+            },
+            "reason": {
+              "type": "string",
+              "enum": [
+                "fee-cap",
+                "attempt-limit",
+                "authority-or-preparation-denied",
+                "evidence-unavailable"
+              ]
+            },
+            "last_attempt_at": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        },
         "status": {
           "type": "string",
           "maxLength": 32
@@ -1122,6 +1221,45 @@ Success response:
         "transactionHash": {
           "type": "string",
           "pattern": "^0x[0-9a-f]{64}$"
+        }
+      }
+    },
+    "replacement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "attempts"],
+      "properties": {
+        "state": {
+          "type": "string",
+          "enum": [
+            "prepared",
+            "dispatch",
+            "accepted",
+            "unknown",
+            "observed",
+            "abandoned",
+            "exhausted",
+            "blocked",
+            "settled"
+          ]
+        },
+        "attempts": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 6
+        },
+        "reason": {
+          "type": "string",
+          "enum": [
+            "fee-cap",
+            "attempt-limit",
+            "authority-or-preparation-denied",
+            "evidence-unavailable"
+          ]
+        },
+        "last_attempt_at": {
+          "type": "string",
+          "format": "date-time"
         }
       }
     },
@@ -1250,6 +1388,45 @@ Success response:
       "additionalProperties": false,
       "required": ["status"],
       "properties": {
+        "replacement": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["state", "attempts"],
+          "properties": {
+            "state": {
+              "type": "string",
+              "enum": [
+                "prepared",
+                "dispatch",
+                "accepted",
+                "unknown",
+                "observed",
+                "abandoned",
+                "exhausted",
+                "blocked",
+                "settled"
+              ]
+            },
+            "attempts": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 6
+            },
+            "reason": {
+              "type": "string",
+              "enum": [
+                "fee-cap",
+                "attempt-limit",
+                "authority-or-preparation-denied",
+                "evidence-unavailable"
+              ]
+            },
+            "last_attempt_at": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        },
         "status": {
           "type": "string",
           "maxLength": 32
@@ -1261,6 +1438,45 @@ Success response:
         "transactionHash": {
           "type": "string",
           "pattern": "^0x[0-9a-f]{64}$"
+        }
+      }
+    },
+    "replacement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "attempts"],
+      "properties": {
+        "state": {
+          "type": "string",
+          "enum": [
+            "prepared",
+            "dispatch",
+            "accepted",
+            "unknown",
+            "observed",
+            "abandoned",
+            "exhausted",
+            "blocked",
+            "settled"
+          ]
+        },
+        "attempts": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 6
+        },
+        "reason": {
+          "type": "string",
+          "enum": [
+            "fee-cap",
+            "attempt-limit",
+            "authority-or-preparation-denied",
+            "evidence-unavailable"
+          ]
+        },
+        "last_attempt_at": {
+          "type": "string",
+          "format": "date-time"
         }
       }
     },

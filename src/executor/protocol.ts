@@ -1,3 +1,4 @@
+import { pinReplacementPolicy } from '../execution/replacement.js';
 import {
   validateApprovedCallAction,
   approvedCallData,
@@ -36,8 +37,10 @@ export interface ExecutionAuthorityRequest {
   action_id: string;
   plan_hash: string;
   request_hash: string;
+  replacement?: import('../execution/replacement.js').ReplacementAuthority;
 }
 export interface ExecutorReceipt {
+  replacement?: import('../execution/replacement.js').ReplacementStatus;
   provider_inspection?: import('../execution/recovery.js').ProviderInspection;
   recovery?: import('../execution/recovery.js').RecoveryDiagnosis;
   contract: 'execution-dispatch-v1';
@@ -71,6 +74,7 @@ export function executorProviderIdentity(
       ? { contractCalls: provider.contractCalls }
       : {}),
     sponsors: provider.sponsors,
+    ...(provider.replacement ? { replacement: provider.replacement } : {}),
     ...(provider.recovery ? { recovery: provider.recovery } : {}),
     ...(provider.sponsorPool ? { sponsorPool: provider.sponsorPool } : {}),
     genesisHash: provider.rpc.genesisHash,
@@ -114,6 +118,7 @@ export function validateExecutionDispatch(
       'data',
       'scanFromBlock',
       ...(plan.intent ? ['intent'] : []),
+      ...(plan.replacement ? ['replacement'] : []),
     ]);
     if (
       input.contract !== 'execution-dispatch-v1' ||
@@ -130,6 +135,15 @@ export function validateExecutionDispatch(
       (!plan.intent &&
         (!plan.tokenCodeHash ||
           plan.tokenCodeHash !== provider.rpc.tokenCodeHash))
+    )
+      throw new Error();
+    if (
+      serviceHash(plan.replacement ?? null) !==
+      serviceHash(
+        provider.replacement
+          ? pinReplacementPolicy(provider.replacement)
+          : null,
+      )
     )
       throw new Error();
     const sponsor = provider.sponsors.find(

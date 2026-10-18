@@ -200,7 +200,7 @@ comes from exact request binding, fresh wallet authority and both durable journa
 
 Immediately before handoff, the wallet records the verified original caller and
 a 30-second handoff lease on the exact execution. No OAuth token is persisted.
-The executor calls the wallet's read-only
+The executor calls the wallet's authenticated
 `POST /v1/internal/execution-authority` using its own signed service proof.
 
 The callback must match the configured executor, selected provider ID/revision,
@@ -211,7 +211,10 @@ active policy and observed-effect fences. The executor performs that check befor
 admission, after preparation and claim, and immediately before provider effects.
 A signed service request, valid owner signature or cached approval is insufficient.
 
-Status polling and background observation never renew the lease or dispatch.
+Status polling and background observation never renew the original handoff lease
+or repeat its provider dispatch. With an explicitly pinned replacement policy,
+the default executor worker obtains separate short-lived wallet authority for
+each durable fee-only proposal; see [automatic replacements](automatic-replacements.md).
 An explicit authorized `/execute` retry can renew the original handoff lease
 while the action remains valid. The executor's journal still prevents another
 provider dispatch if that effect is pending, accepted, failed or unknown.

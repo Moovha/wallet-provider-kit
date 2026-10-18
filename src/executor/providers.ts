@@ -46,6 +46,8 @@ export async function createExecutorProvider(
         resolveSecret(config.relayer!.apiKey),
         request,
       );
+      if (config.replacement && !(await provider.supportsReplacement?.()))
+        throw new Error();
       const local = (plan: TransferExecutionPlan) => ({
         ...structuredClone(plan),
         sponsor: structuredClone(
@@ -56,6 +58,8 @@ export async function createExecutorProvider(
       });
       return {
         prepare: (plan) => provider.prepare(local(plan)),
+        replace: (plan, id, proposal, authorize) =>
+          provider.replace!(local(plan), id, proposal, authorize),
         submit: (plan, context) => provider.submit(local(plan), context),
         transactionHash: (plan, id) =>
           provider.transactionHash(local(plan), id),

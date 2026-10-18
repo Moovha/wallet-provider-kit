@@ -1,6 +1,11 @@
+import type {
+  ReplacementAttempt,
+  ReplacementStatus,
+} from '../execution/replacement.js';
 import {
   emptyOperationsState,
   recordPayer,
+  recordReplacement,
   payerKey,
   type OperationsState,
   type PayerOperations,
@@ -38,6 +43,8 @@ export interface ExecutorRecord {
   startedAt?: number;
   providerNonce?: string;
   recovery?: RecoveryDiagnosis;
+  replacements?: ReplacementAttempt[];
+  replacementStatus?: ReplacementStatus;
   scanNextBlock?: string;
   transactionHashes?: string[];
   integrityFailure?: boolean;
@@ -183,6 +190,90 @@ export function openExecutorDatabase(
   }
   return {
     quarantined,
+    replacementTransaction<T>(
+      record: ExecutorRecord,
+      operation: (current: ExecutorRecord) => T,
+      operations?: PayerOperations,
+    ): T {
+      return connection.transaction(() => {
+        const current = load(record.dispatch.execution_id, record.walletOrigin);
+        if (!current || current.identityHash !== record.identityHash)
+          throw new WalletProviderError('wallet_authorization_denied');
+        const previous = serviceHash(current.replacementStatus ?? null);
+        const previousAttempt = serviceHash(
+          current.replacements?.at(-1) ?? null,
+        );
+        const result = operation(current);
+        const last = current.replacements?.at(-1);
+        if (
+          last &&
+          previousAttempt !== serviceHash(last) &&
+          previous === serviceHash(current.replacementStatus ?? null)
+        )
+          current.replacementStatus = {
+            state: last.state,
+            attempts: current.replacements!.length,
+            last_attempt_at: new Date(last.startedAt).toISOString(),
+          };
+        if (previous !== serviceHash(current.replacementStatus ?? null)) {
+          connection.audit(
+            'executor_replacement_observed',
+            current.dispatch.execution_id,
+          );
+          if (operations && current.replacementStatus) {
+            const state =
+              getRecord<OperationsState>('operations', 'service-v1') ??
+              emptyOperationsState();
+            recordReplacement(
+              state,
+              payerKey(current.dispatch.plan.sponsor.binding.address),
+              current.dispatch.execution_id,
+              current.replacementStatus,
+              operations.configuration,
+              operations.targets,
+              operations.source,
+            );
+            save('operations', 'service-v1', state);
+          }
+        }
+        save('executorDispatches', current.dispatch.execution_id, current);
+        return result;
+      });
+    },
+    replacementQuarantineAllowed(
+      record: ExecutorRecord,
+      nonce: string,
+    ): boolean {
+      fence();
+      const address =
+        record.dispatch.plan.sponsor.binding.address.toLowerCase();
+      const blocked =
+        getRecord<{ executionIds: string[] }>(
+          'executorQuarantines',
+          quarantineKey(address),
+        )?.executionIds ?? [];
+      const records = connection
+        .all(
+          "SELECT record FROM onboarding_records WHERE collection='executorDispatches'",
+        )
+        .map((row) => JSON.parse(String(row.record)) as ExecutorRecord);
+      return blocked.every((id) => {
+        const entry = records.find(
+          (entry) => entry.dispatch.execution_id === id,
+        );
+        return (
+          !!entry &&
+          !entry.integrityFailure &&
+          entry.dispatch.plan.sponsor.binding.address.toLowerCase() ===
+            address &&
+          (id === record.dispatch.execution_id
+            ? entry.recovery?.reason === 'pending-too-long'
+            : entry.recovery?.reason === 'nonce-gap-suspected' &&
+              entry.providerNonce !== undefined &&
+              BigInt(entry.providerNonce) > BigInt(nonce))
+        );
+      });
+    },
     operations<T>(operation: (state: OperationsState) => T): Promise<T> {
       return Promise.resolve(
         connection.transaction(() => {
@@ -205,7 +296,9 @@ export function openExecutorDatabase(
         .map((row) => JSON.parse(String(row.record)) as ExecutorRecord)
         .filter(
           (record) =>
-            record.observation?.chain_status !== 'finalized' &&
+            (record.observation?.chain_status !== 'finalized' ||
+              (record.replacementStatus &&
+                record.replacementStatus.state !== 'settled')) &&
             config.providers.some(
               (provider) =>
                 provider.id === record.dispatch.provider_id &&

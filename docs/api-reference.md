@@ -2388,6 +2388,8 @@ Import from `@moovha/wallet-provider-kit/deployment`. [Integration guide](setup.
 - [createExecutionService](#createexecutionservice)
 - [createServiceIdentity](#createserviceidentity)
 - [createTransferExecutionProvider](#createtransferexecutionprovider)
+- [defaultReplacementPolicy](#defaultreplacementpolicy)
+- [defaultSponsorGas](#defaultsponsorgas)
 - [ExecutionAuthorityRequest](#executionauthorityrequest)
 - [ExecutionCloudEvent](#executioncloudevent)
 - [ExecutionConfiguration](#executionconfiguration)
@@ -2411,12 +2413,17 @@ Import from `@moovha/wallet-provider-kit/deployment`. [Integration guide](setup.
 - [PayerEvent](#payerevent)
 - [payerKey](#payerkey)
 - [PinnedContract](#pinnedcontract)
+- [PinnedReplacementPolicy](#pinnedreplacementpolicy)
 - [ProviderConfiguration](#providerconfiguration)
 - [ProviderInspection](#providerinspection)
 - [QuorumExecutionObserver](#quorumexecutionobserver)
 - [QuorumTransferObserver](#quorumtransferobserver)
 - [RecoveryConfiguration](#recoveryconfiguration)
 - [RecoveryDiagnosis](#recoverydiagnosis)
+- [ReplacementAuthority](#replacementauthority)
+- [ReplacementPolicy](#replacementpolicy)
+- [ReplacementProposal](#replacementproposal)
+- [ReplacementStatus](#replacementstatus)
 - [SafeAccountBinding](#safeaccountbinding)
 - [SafeExecutionQueue](#safeexecutionqueue)
 - [SafeQueueRecord](#safequeuerecord)
@@ -2584,6 +2591,7 @@ export declare class ApprovedExecutionCoordinator {
     action_id: string;
     plan_hash: string;
     request_hash: string;
+    replacement?: import('./replacement.js').ReplacementAuthority;
     allowed: true;
   }>;
   read(principal: VerifiedPrincipal, id: string): Promise<ExecutionReceipt>;
@@ -2625,6 +2633,7 @@ export interface ApprovedExecutionPlan {
   data: string;
   scanFromBlock: string;
   intent?: import('./approved-calls.js').ApprovedCallIntent;
+  replacement?: import('./replacement.js').PinnedReplacementPolicy;
 }
 ```
 
@@ -2774,6 +2783,29 @@ export declare function createTransferExecutionProvider(
 ): ExecutionProvider;
 ```
 
+### defaultReplacementPolicy
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/defaults.ts).
+
+```ts
+export declare const defaultReplacementPolicy: Readonly<ReplacementPolicy>;
+```
+
+### defaultSponsorGas
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/defaults.ts).
+
+```ts
+/** Editable starting configuration for Base Sepolia; deployment simulation and funding acceptance remain required. */
+export declare const defaultSponsorGas: Readonly<{
+  gasLimit: '500000';
+  maxFeePerGas: '3000000000';
+  maxPriorityFeePerGas: '1000000000';
+  l1FeeReserveWei: '1000000000000';
+  lifetimeBudgetWei: '10000000000000000';
+}>;
+```
+
 ### ExecutionAuthorityRequest
 
 [Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/executor/protocol.ts).
@@ -2786,6 +2818,7 @@ export interface ExecutionAuthorityRequest {
   action_id: string;
   plan_hash: string;
   request_hash: string;
+  replacement?: import('../execution/replacement.js').ReplacementAuthority;
 }
 ```
 
@@ -2842,6 +2875,7 @@ export interface ExecutionConfiguration {
     maxWaitSeconds: number;
   };
   recovery?: import('./recovery.js').RecoveryConfiguration;
+  replacement?: import('./replacement.js').ReplacementPolicy;
   pollIntervalSeconds: number;
   maxLogRange: number;
 }
@@ -2916,6 +2950,13 @@ export type ExecutionProfile =
 
 ```ts
 export interface ExecutionProvider {
+  supportsReplacement?(): Promise<boolean>;
+  replace?(
+    plan: TransferExecutionPlan,
+    transactionId: string,
+    proposal: import('./replacement.js').ReplacementProposal,
+    authorizeEffect: () => Promise<void>,
+  ): Promise<string>;
   inspect?(
     plan: TransferExecutionPlan,
     transactionId: string,
@@ -2957,6 +2998,7 @@ export interface ExecutionProviderAdapterV1 {
 
 ```ts
 export interface ExecutionReceipt extends ChainObservation {
+  replacement?: import('./replacement.js').ReplacementStatus;
   recovery?: import('./recovery.js').RecoveryDiagnosis;
   profile: ExecutionProfile;
   profile_revision: '1';
@@ -3056,6 +3098,7 @@ export interface ExecutorProviderConfiguration {
   sponsors: ExecutionSponsor[];
   sponsorPool?: ExecutionConfiguration['sponsorPool'];
   recovery?: ExecutionConfiguration['recovery'];
+  replacement?: ExecutionConfiguration['replacement'];
 }
 ```
 
@@ -3065,6 +3108,7 @@ export interface ExecutorProviderConfiguration {
 
 ```ts
 export interface ExecutorReceipt {
+  replacement?: import('../execution/replacement.js').ReplacementStatus;
   provider_inspection?: import('../execution/recovery.js').ProviderInspection;
   recovery?: import('../execution/recovery.js').RecoveryDiagnosis;
   contract: 'execution-dispatch-v1';
@@ -3113,6 +3157,10 @@ export interface NonceSnapshot {
   balanceWei: string;
   baseFeePerGas: string;
   transactionNonce?: string;
+  transactionHash?: string;
+  transactionMaxFeePerGas?: string;
+  transactionMaxPriorityFeePerGas?: string;
+  transactionPending?: boolean;
   safeNonce?: string;
 }
 ```
@@ -3150,6 +3198,10 @@ export interface OperationsHealth {
   webhook_unroutable: number;
   oldest_delivery_age_ms: number;
   last_webhook_delivery_at?: string;
+  replacement_pending: number;
+  replacement_unknown: number;
+  replacement_blocked: number;
+  replacement_exhausted: number;
 }
 ```
 
@@ -3172,6 +3224,7 @@ export interface PayerEvent {
     reason: string;
     balance_wei?: string;
     threshold_wei: string;
+    replacement?: PayerCondition['replacement'];
   };
 }
 ```
@@ -3197,6 +3250,16 @@ export interface PinnedContract {
     codeHash: string;
   };
 }
+```
+
+### PinnedReplacementPolicy
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/replacement.ts).
+
+```ts
+export type PinnedReplacementPolicy = {
+  [Key in keyof ReplacementPolicy]: string;
+};
 ```
 
 ### ProviderConfiguration
@@ -3292,6 +3355,7 @@ export interface ProviderInspection {
   status: string;
   nonce?: string;
   transactionHash?: string;
+  replacement?: ReplacementStatus;
 }
 ```
 
@@ -3421,6 +3485,64 @@ export interface RecoveryDiagnosis {
     | 'review-provider-nonces'
     | 'reconcile'
     | 'operator-review';
+}
+```
+
+### ReplacementAuthority
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/replacement.ts).
+
+```ts
+export interface ReplacementAuthority {
+  proposal: ReplacementProposal;
+  phase: 'prepare' | 'dispatch';
+}
+```
+
+### ReplacementPolicy
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/replacement.ts).
+
+```ts
+export interface ReplacementPolicy {
+  initialFeeBasisPoints: number;
+  bumpBasisPoints: number;
+  maxAttempts: number;
+  intervalSeconds: number;
+}
+```
+
+### ReplacementProposal
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/replacement.ts).
+
+```ts
+export interface ReplacementProposal {
+  id: string;
+  sequence: number;
+  nonce: string;
+  previousTransactionHash: string;
+  previousMaxFeePerGas: string;
+  previousMaxPriorityFeePerGas: string;
+  maxFeePerGas: string;
+  maxPriorityFeePerGas: string;
+}
+```
+
+### ReplacementStatus
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/replacement.ts).
+
+```ts
+export interface ReplacementStatus {
+  state: ReplacementAttempt['state'] | 'exhausted' | 'blocked' | 'settled';
+  attempts: number;
+  reason?:
+    | 'fee-cap'
+    | 'attempt-limit'
+    | 'authority-or-preparation-denied'
+    | 'evidence-unavailable';
+  last_attempt_at?: string;
 }
 ```
 
@@ -3665,6 +3787,7 @@ export declare class ApprovedExecutionCoordinator {
     action_id: string;
     plan_hash: string;
     request_hash: string;
+    replacement?: import('./replacement.js').ReplacementAuthority;
     allowed: true;
   }>;
   read(principal: VerifiedPrincipal, id: string): Promise<ExecutionReceipt>;

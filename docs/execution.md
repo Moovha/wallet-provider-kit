@@ -145,8 +145,9 @@ For direct Relayer compatibility, supply these deployment-specific values:
   blocks. RPC sources must support receipt history, log queries, historical token
   code and `safe`/`finalized` block tags.
 
-No concrete fee values are recommended by the toolkit. Measure the exact token
-call and network costs during your staging acceptance. The gas reservation is an
+The setup wizard supplies editable Base Sepolia evaluation defaults, described in
+[automatic replacements](automatic-replacements.md). Measure each exact call and
+network costs during staging acceptance; starter values are not gas estimates. The gas reservation is an
 admission control, not an absolute cap on actual L1 data fees or vendor recovery
 and cancellation transactions. OpenZeppelin documents
 [recovery behavior and gas policies](https://docs.openzeppelin.com/relayer/1.8.x/evm).

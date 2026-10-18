@@ -89,3 +89,15 @@ export type {
   PayerEvent,
 } from '../execution/operations.js';
 export { payerKey } from '../execution/operations.js';
+
+export {
+  defaultReplacementPolicy,
+  defaultSponsorGas,
+} from '../execution/defaults.js';
+export type {
+  ReplacementPolicy,
+  PinnedReplacementPolicy,
+  ReplacementProposal,
+  ReplacementAuthority,
+  ReplacementStatus,
+} from '../execution/replacement.js';
