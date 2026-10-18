@@ -1,3 +1,4 @@
+import { executionAttemptInput } from '../executor/protocol.js';
 import { assertReplacement, pinReplacementPolicy } from './replacement.js';
 import {
   recordPayer,
@@ -91,7 +92,9 @@ export class ApprovedExecutionCoordinator {
       fingerprint(execution.plan.action) !==
         fingerprint(record.approval.action) ||
       fingerprint(execution.plan.intent ?? null) !==
-        fingerprint(record.intent ?? null)
+        fingerprint(record.intent ?? null) ||
+      fingerprint(execution.plan.runtimePolicy ?? null) !==
+        fingerprint(record.runtimePolicy ?? null)
     )
       unknown();
     return createWalletAttemptRequest(
@@ -101,7 +104,7 @@ export class ApprovedExecutionCoordinator {
       record.approval.account.accountId,
       execution.executionId,
       record.approval.action.action_id,
-      execution.plan,
+      executionAttemptInput(execution.plan),
     );
   }
   private async current(
@@ -109,12 +112,17 @@ export class ApprovedExecutionCoordinator {
     id: string,
     allowExpired = false,
   ) {
-    return this.actions.withAuthorizedTransfer(
-      principal,
-      id,
-      (_state, record) => record,
-      allowExpired,
-    );
+    return allowExpired
+      ? this.actions.withExecutionRead(
+          principal,
+          id,
+          (_state, record) => record,
+        )
+      : this.actions.withAuthorizedTransfer(
+          principal,
+          id,
+          (_state, record) => record,
+        );
   }
   private async authorize(
     principal: VerifiedPrincipal,
@@ -408,6 +416,9 @@ export class ApprovedExecutionCoordinator {
           ? { replacement: pinReplacementPolicy(this.config.replacement) }
           : {}),
         ...(record.intent ? { intent: structuredClone(record.intent) } : {}),
+        ...(record.runtimePolicy
+          ? { runtimePolicy: structuredClone(record.runtimePolicy) }
+          : {}),
         data: record.intent
           ? approvedCallData(record.approval.action, signature.serialized)
           : transferInterface
@@ -726,7 +737,7 @@ export class ApprovedExecutionCoordinator {
       !uuid.test(context.idempotencyKey)
     )
       deny();
-    await this.actions.withAuthorizedTransfer(
+    await this.actions.withExecutionRead(
       context.principal,
       id,
       (state, record) => {
@@ -743,7 +754,6 @@ export class ApprovedExecutionCoordinator {
           throw new WalletProviderError('wallet_attempt_conflict');
         state.idempotency[key] = { id, hash };
       },
-      true,
     );
     await this.refresh(id);
     return this.receipt(await this.current(context.principal, id, true));
@@ -755,29 +765,24 @@ export class ApprovedExecutionCoordinator {
       !Number.isSafeInteger(Number(after))
     )
       throw new WalletProviderError('wallet_provider_input');
-    return this.actions.withAuthorizedTransfer(
-      principal,
-      id,
-      (_state, record) => {
-        const execution = record.execution;
-        if (!execution || execution.integrityFailure) unknown();
-        const sequence = execution.eventSequence ?? 0;
-        if (Number(after) > sequence)
-          throw new WalletProviderError('wallet_attempt_conflict');
-        const events = execution.events ?? [];
-        const oldest = events[0]?.sequence ?? 0;
-        return {
-          profile: this.profile,
-          profile_revision: '1',
-          action_id: id,
-          events: events.filter((event) => event.sequence > Number(after)),
-          oldest_sequence: oldest,
-          next_sequence: sequence,
-          history_truncated: oldest > Number(after) + 1,
-        };
-      },
-      true,
-    );
+    return this.actions.withExecutionRead(principal, id, (_state, record) => {
+      const execution = record.execution;
+      if (!execution || execution.integrityFailure) unknown();
+      const sequence = execution.eventSequence ?? 0;
+      if (Number(after) > sequence)
+        throw new WalletProviderError('wallet_attempt_conflict');
+      const events = execution.events ?? [];
+      const oldest = events[0]?.sequence ?? 0;
+      return {
+        profile: this.profile,
+        profile_revision: '1',
+        action_id: id,
+        events: events.filter((event) => event.sequence > Number(after)),
+        oldest_sequence: oldest,
+        next_sequence: sequence,
+        history_truncated: oldest > Number(after) + 1,
+      };
+    });
   }
   /** Trusted read-only observer entry point. It never signs, claims, submits or releases reservations. */
   async refresh(id: string): Promise<void> {

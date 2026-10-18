@@ -55,6 +55,7 @@ export interface ExecutionConfiguration {
 
 /** Immutable private plan. Requests may propose policy-controlled calls; execute uses only this stored envelope and server-selected sponsor. */
 export interface ApprovedExecutionPlan {
+  runtimePolicy?: import('../runtime-configuration/authority.js').RuntimePolicySnapshot;
   profile: ExecutionProfile;
   revision: '1';
   action: TypedDataAction;

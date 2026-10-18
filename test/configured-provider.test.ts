@@ -17,6 +17,7 @@ import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import {
   Wallet,
+  Interface,
   TypedDataEncoder,
   recoverAddress,
   keccak256,
@@ -558,6 +559,9 @@ async function designatedFixture(withReplacement = false) {
     },
     get executorConfig() {
       return executorConfig;
+    },
+    useWallet(app: typeof walletApp) {
+      walletApp = app;
     },
     async restart() {
       await f.restart();
@@ -3853,3 +3857,405 @@ it.each(['contract-call', 'swap', 'vault-deposit'] as const)(
     }
   },
 );
+
+/** Offline application-led wallet and authenticated executor, with independent persistent stores. */
+async function runtimeFinancialFixture(queue = false) {
+  const t = await designatedFixture();
+  const config = validateProviderConfiguration(
+    JSON.parse(await readFile('docs/provider.config.example.json', 'utf8')),
+  );
+  config.policy.provider = t.f.config.policy.provider;
+  config.policy.applications[0].issuer = t.f.config.oauth.issuer;
+  config.policy.applications[0].clientId =
+    t.f.config.policy.applications[0].clientId;
+  config.policy.applications[0].permissions = [
+    'account:read',
+    'operations:request',
+    'contracts:request',
+  ];
+  config.oauth = t.f.config.oauth;
+  config.activation = t.f.config.activation;
+  config.storage.directory = await folder();
+  const initial = openProviderDatabase({
+    directory: config.storage.directory,
+    initialize: true,
+  });
+  initial.close();
+  let app = await createConfiguredProvider(config);
+  servers.push(app);
+  const headers = { authorization: await t.f.token() };
+  const post = (url: string, payload: object) =>
+    app.inject({
+      method: 'POST',
+      url,
+      headers: {
+        ...headers,
+        'idempotency-key': randomUUID(),
+        ...(url.endsWith('/execute')
+          ? {
+              'execution-profile': 'approved-evm-executor-v1',
+              'execution-profile-revision': '1',
+            }
+          : {}),
+      },
+      payload,
+    });
+  const readTerms = async () => {
+    const result = await app.inject({ url: '/v1/access-policy', headers });
+    expect(result.statusCode, result.body).toBe(200);
+    return result.json();
+  };
+  const firstTerms = await readTerms();
+  const user = {
+    id: 'runtime-user',
+    identity: {
+      reference: 'runtime-identity',
+      level: 'verified',
+      verified_at: new Date(Date.now() - 1000).toISOString(),
+      fields: { country: 'ZA' } as Record<string, string>,
+    },
+    consent: {
+      reference: 'runtime-consent',
+      granted_at: new Date(Date.now() - 1000).toISOString(),
+      expires_at: new Date(Date.now() + 86400000).toISOString(),
+      policy_revision: firstTerms.policy_revision,
+      action_policy_revision: undefined as string | undefined,
+    },
+  };
+  const created = await post('/v1/access-requests', {
+    mode: 'create',
+    user,
+    authorization_details: [
+      {
+        type: 'https://moovha.com/wallet/account-access',
+        actions: ['account:read', 'operations:request'],
+      },
+    ],
+  });
+  expect(created.statusCode, created.body).toBe(200);
+  const accountId: string = created.json().account_id;
+  expect(
+    (await post('/v1/accounts/' + accountId + '/provision', {})).statusCode,
+  ).toBe(200);
+  const calls = approvedCallsFixture(
+    accountId,
+    t.f.wallet.address,
+    t.f.execution!,
+  );
+  t.f.execution!.request = calls.request;
+  config.approvedCalls = { policy: calls.policy, maxValiditySeconds: 300 };
+  config.execution = {
+    ...t.f.config.execution!,
+    profile: 'approved-evm-executor-v1',
+  };
+  if (queue) {
+    config.execution.safeQueue = { maxDepthPerSafe: 10, maxWaitSeconds: 300 };
+    config.execution.pollIntervalSeconds = 5;
+  }
+  config.runtimeConfiguration = {
+    authorizeContracts: true,
+    operators: [
+      {
+        issuer: config.oauth.issuer,
+        clientId: 'runtime-operator',
+        subject: 'runtime-operator',
+      },
+    ],
+  };
+  t.executorConfig.providers[0].contractCalls = calls.policy;
+  t.executorConfig.providers[0].runtimeContracts = true;
+  t.executorConfig.providers[0].revision = '2';
+  config.execution.service!.providerRevision = '2';
+  t.f.config.execution!.service!.providerRevision = '2';
+  await t.restart();
+  const restart = async () => {
+    await app.close();
+    app = await createConfiguredProvider(config);
+    servers.push(app);
+    t.useWallet(app);
+  };
+  await restart();
+  const { runtimeApplicationId } =
+    await import('../src/runtime-configuration/service.js');
+  const applicationId = runtimeApplicationId(
+    config.oauth.issuer,
+    config.policy.applications[0].clientId,
+  );
+  const operatorToken = await t.f.token(
+    'wallet:configuration:write',
+    'runtime-operator',
+    'runtime-operator',
+  );
+  let revision = '0';
+  const abi = new Interface([
+    'function customMethod(uint256,address)',
+    'function anotherMethod(bytes32)',
+  ]);
+  const document = {
+    version: '1' as const,
+    enabled: true,
+    chain_id: 'eip155:84532' as const,
+    maximum_calls: 2,
+    maximum_native_value_wei: '10',
+    max_validity_seconds: 120,
+    contracts: [
+      {
+        address: Wallet.createRandom().address,
+        code_hash: keccak256('0x6001600055'),
+        methods: [
+          {
+            signature: 'customMethod(uint256,address)',
+            maximum_value_wei: '2',
+          },
+        ],
+      },
+    ],
+    claim_requirements: [
+      { name: 'country', allowed_values: ['ZA'], max_age_seconds: 3600 },
+      { name: 'risk', allowed_values: ['low'], max_age_seconds: 120 },
+    ],
+  };
+  // RPC fixtures use the same bytecode hash for all configured contracts.
+  document.contracts[0].code_hash = calls.policy.contracts[0].codeHash;
+  const publish = async () => {
+    const result = await app.inject({
+      method: 'POST',
+      url:
+        '/v1/runtime-configuration/applications/' +
+        applicationId +
+        '/revisions',
+      headers: {
+        authorization: operatorToken,
+        'idempotency-key': randomUUID(),
+      },
+      payload: { expected_revision: revision, policy: document },
+    });
+    expect(result.statusCode, result.body).toBe(200);
+    revision = result.json().revision;
+    return result.json();
+  };
+  const consent = async () => {
+    const terms = await readTerms();
+    user.identity.fields.risk = 'low';
+    user.identity.verified_at = new Date(Date.now() - 1000).toISOString();
+    user.consent.action_policy_revision = terms.action_policy_revision;
+    user.consent.reference = randomUUID();
+    return post('/v1/access-requests', {
+      mode: 'connect',
+      account_id: accountId,
+      user,
+      authorization_details: [
+        {
+          type: 'https://moovha.com/wallet/account-access',
+          actions: ['account:read', 'operations:request', 'contracts:request'],
+        },
+      ],
+    });
+  };
+  const input = () => ({
+    account_id: accountId,
+    kind: 'contract-call' as const,
+    calls: [
+      {
+        to: document.contracts[0].address,
+        value: '1',
+        data: abi.encodeFunctionData(
+          document.contracts[0].methods[0].signature,
+          document.contracts[0].methods[0].signature.startsWith('custom')
+            ? [7, t.f.wallet.address]
+            : ['0x' + '1'.repeat(64)],
+        ),
+      },
+    ],
+  });
+  const request = async (body = input()) => {
+    const result = await post('/v1/actions/contract-calls', body);
+    if (result.statusCode === 200) {
+      calls.state.intent = result.json().intent;
+      calls.state.digest = result.json().payload_hash;
+    }
+    return result;
+  };
+  await publish();
+  expect((await consent()).json().status).toBe('granted');
+  return {
+    t,
+    config,
+    calls,
+    user,
+    document,
+    post,
+    request,
+    input,
+    publish,
+    consent,
+    readTerms,
+    restart,
+    get app() {
+      return app;
+    },
+  };
+}
+
+it('executes newly registered application methods without restarting either service and retains submitted evidence after publication', async () => {
+  const f = await runtimeFinancialFixture();
+  const running = f.app,
+    executor = f.t.executor;
+  const terms = await f.readTerms();
+  expect(terms.required_fields).toEqual(['country', 'risk']);
+  expect(terms.runtime_contract_terms.revision).toBe('1');
+  expect(terms.contract_call_terms.maxValiditySeconds).toBe(120);
+  expect(terms.contract_call_terms.policy).not.toHaveProperty('accounts');
+  const action = await f.request();
+  expect(action.statusCode, action.body).toBe(200);
+  const execution = await f.post(
+    '/v1/actions/' + action.json().action_id + '/execute',
+    {},
+  );
+  expect(execution.statusCode, execution.body).toBe(200);
+  expect(execution.json().dispatch_status).toBe('accepted');
+  expect(f.calls.state.posts).toBe(1);
+  f.document.contracts[0].address = Wallet.createRandom().address;
+  f.document.contracts[0].methods = [
+    { signature: 'anotherMethod(bytes32)', maximum_value_wei: '2' },
+  ];
+  await f.publish();
+  expect((await f.request()).statusCode).toBe(403);
+  // Already dispatched work remains observable under account-read authority.
+  const observed = await f.app.inject({
+    url: '/v1/actions/' + action.json().action_id + '/execution',
+    headers: {
+      authorization: await f.t.f.token(),
+      'execution-profile': 'approved-evm-executor-v1',
+      'execution-profile-revision': '1',
+    },
+  });
+  expect(observed.statusCode, observed.body).toBe(200);
+  expect((await f.consent()).json().status).toBe('granted');
+  f.calls.state.nonce = '1';
+  const next = await f.request();
+  expect(next.statusCode, next.body).toBe(200);
+  expect(f.app).toBe(running);
+  expect(f.t.executor).toBe(executor);
+  const db = openProviderDatabase({ directory: f.config.storage.directory });
+  const snapshots = await db.onboardingStore.transaction((state) =>
+    Object.values(state.supportedActions!).map(
+      (action) => action.runtimePolicy?.revision,
+    ),
+  );
+  db.close();
+  expect(snapshots).toEqual(['1', '2']);
+  await f.restart();
+  expect(
+    (
+      await f.app.inject({
+        url: '/v1/transfer-authorizations/' + next.json().action_id,
+        headers: { authorization: await f.t.f.token() },
+      })
+    ).statusCode,
+  ).toBe(200);
+});
+
+it.each([
+  'method value',
+  'batch count',
+  'malformed arguments',
+  'claim value',
+  'claim age',
+  'disabled',
+  'consent revision',
+] as const)('rejects runtime %s before signing or submission', async (kind) => {
+  const f = await runtimeFinancialFixture();
+  const body = f.input();
+  if (kind === 'method value') body.calls[0].value = '3';
+  if (kind === 'batch count') body.calls.push(body.calls[0], body.calls[0]);
+  if (kind === 'malformed arguments') body.calls[0].data += '00';
+  if (kind === 'claim value' || kind === 'claim age') {
+    const db = openProviderDatabase({ directory: f.config.storage.directory });
+    await db.onboardingStore.transaction((state) => {
+      const request = Object.values(state.requests).find(
+        (request) => request.input.user?.identity.fields.risk,
+      )!;
+      if (kind === 'claim value')
+        request.input.user!.identity.fields.risk = 'high';
+      else
+        request.input.user!.identity.verified_at = new Date(
+          Date.now() - 121000,
+        ).toISOString();
+    });
+    db.close();
+  }
+  if (kind === 'disabled') {
+    f.document.enabled = false;
+    await f.publish();
+  }
+  if (kind === 'consent revision') {
+    await f.publish();
+  }
+  const result = await f.request(body);
+  expect(result.statusCode, result.body).toBe(403);
+  expect(injected.backend!.signTypedData).not.toHaveBeenCalled();
+  expect(f.calls.state.posts).toBe(0);
+});
+
+it('blocks a runtime policy change at the final executor callback and retains the original action snapshot', async () => {
+  const f = await runtimeFinancialFixture();
+  const action = await f.request();
+  expect(action.statusCode, action.body).toBe(200);
+  f.t.state.beforeAuthority = async () => {
+    f.t.state.beforeAuthority = undefined;
+    await f.publish();
+  };
+  await f.post('/v1/actions/' + action.json().action_id + '/execute', {});
+  expect(f.calls.state.posts).toBe(0);
+  const db = openProviderDatabase({ directory: f.config.storage.directory });
+  expect(
+    await db.onboardingStore.transaction(
+      (state) =>
+        state.supportedActions![action.json().action_id].runtimePolicy
+          ?.revision,
+    ),
+  ).toBe('1');
+  db.close();
+});
+
+it('rechecks the runtime publication after signing admission and before the wallet backend effect', async () => {
+  const f = await runtimeFinancialFixture();
+  const action = await f.request();
+  expect(action.statusCode).toBe(200);
+  const authorize = SupportedActions.prototype.authorize;
+  let calls = 0;
+  vi.spyOn(SupportedActions.prototype, 'authorize').mockImplementation(
+    async function (this: SupportedActions, context, approval) {
+      if (++calls === 3) await f.publish();
+      return authorize.call(this, context, approval);
+    },
+  );
+  const result = await f.post(
+    '/v1/actions/' + action.json().action_id + '/execute',
+    {},
+  );
+  expect(result.statusCode).toBe(403);
+  expect(calls).toBeGreaterThanOrEqual(3);
+  expect(injected.backend!.signTypedData).not.toHaveBeenCalled();
+  expect(f.calls.state.posts).toBe(0);
+});
+it('caps queued runtime requests to the publication lifetime and binds their materialized snapshot', async () => {
+  const f = await runtimeFinancialFixture(true);
+  const queued = await f.post('/v1/contract-call-requests', f.input());
+  expect(queued.statusCode, queued.body).toBe(202);
+  expect(Date.parse(queued.json().expires_at)).toBeLessThanOrEqual(
+    Date.now() + 120000,
+  );
+  const id = queued.json().request_id;
+  await vi.waitFor(() => expect(f.calls.state.posts).toBe(1), {
+    timeout: 7500,
+    interval: 100,
+  });
+  const result = await f.app.inject({
+    url: '/v1/contract-call-requests/' + id,
+    headers: { authorization: await f.t.f.token() },
+  });
+  expect(result.statusCode, result.body).toBe(200);
+  expect(result.json().status).toBe('executing');
+}, 15000);

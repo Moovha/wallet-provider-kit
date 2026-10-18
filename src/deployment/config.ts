@@ -126,6 +126,13 @@ export function validateProviderConfiguration(
     if (config.operations) validateOperations(config.operations);
     if (config.operations && !config.execution) throw new Error();
     const resolvedPolicy = defineOnboardingPolicy(config.policy);
+    if (
+      config.runtimeConfiguration?.authorizeContracts &&
+      (config.policy.access?.mode !== 'application' ||
+        !config.approvedCalls ||
+        config.execution?.profile !== 'approved-evm-executor-v1')
+    )
+      throw new Error();
     if (config.runtimeConfiguration) {
       validateRuntimeConfiguration(config.runtimeConfiguration, resolvedPolicy);
       if (

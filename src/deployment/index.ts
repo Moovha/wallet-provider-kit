@@ -1,3 +1,4 @@
+export type { RuntimePolicySnapshot } from '../runtime-configuration/authority.js';
 export { createConfiguredProvider } from './provider.js';
 export {
   RuntimeConfigurationService,

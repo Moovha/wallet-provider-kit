@@ -13,6 +13,7 @@ export const runtimeConfigurationSchema = {
   additionalProperties: false,
   required: ['operators'],
   properties: {
+    authorizeContracts: { type: 'boolean' },
     operators: {
       type: 'array',
       minItems: 1,
@@ -102,6 +103,17 @@ export const runtimePolicySchema = {
         },
       },
     },
+  },
+};
+export const runtimeSnapshotSchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['application_id', 'revision', 'policy_hash', 'policy'],
+  properties: {
+    application_id: applicationIdSchema,
+    revision: revisionSchema,
+    policy_hash: applicationIdSchema,
+    policy: runtimePolicySchema,
   },
 };
 export const policyChangeSchema = {
