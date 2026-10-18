@@ -44,7 +44,7 @@ export const settings = {
   sponsorPool: setting(
     'Durable round-robin payer selection with an unfinished-execution limit per address.',
     'Distinct funded addresses can serve the same application. Retrying an execution retains its selected payer. Unknown attempts hold capacity, while the application lifetime gas budget remains shared.',
-    'Enable pools on both wallet and executor configurations, then register distinct sponsor account IDs, addresses and bindings for each application. Set capacity from accepted provider tests. Full pools leave unsigned queue heads waiting. Enable recovery quarantine to exclude affected payers from new admission. Nonce repair remains a separately reviewed provider operation.',
+    'Enable pools and add gas sponsors for the application. Bundled setup creates distinct encrypted keys and managed bindings for those entries. Existing designated execution services need matching independent pool limits. Set capacity from accepted provider tests. Full pools leave unsigned queue heads waiting. Enable recovery quarantine to exclude affected payers from new admission. Nonce repair remains a separately reviewed provider operation.',
     'safe-queue-and-sponsor-pools.html',
   ),
   executionRpc: setting(
@@ -60,15 +60,15 @@ export const settings = {
     'execution.html#configure-and-accept-execution',
   ),
   executionSponsor: setting(
-    'A preconfigured application-funded sponsor account and explicit funding agreement.',
+    'An application gas sponsor and explicit funding agreement.',
     'Sponsors are selected by the authenticated application, never by an API body. Sponsor queues and signers must be separate from owner-wallet signing bindings.',
-    'Create and fund the dedicated sponsor outside the toolkit using your approved process. Match its address, account identity, gas policy and binding revision on both services. Vendor-specific IDs belong in the designated executor; direct Relayer mode also needs its Relayer and signer IDs. Record the application funding agreement; API scopes and owner wallet consent do not authorize sponsor funding. Use an HTTPS Relayer origin and an environment variable name for its API key.',
+    'Bundled setup creates and retains the encrypted sponsor key, public address and Relayer/signer bindings automatically. Record the application funding agreement, set gas limits and fund the saved public address before activation. With an existing service, match its retained address, account identity, gas policy and binding revision; direct Relayer connections also need that service’s Relayer and signer IDs, HTTPS origin and API key reference. API scopes and owner-wallet consent do not authorize sponsor funding.',
     'execution.html#configure-and-accept-execution',
   ),
   executionGas: setting(
     'Exact decimal gas and native-fee admission limits in wei.',
     'A durable dispatch reserves gas limit × maximum fee per gas plus the L1 reserve against the application lifetime budget. Unknown and failed work retains reservations; a new policy does not reset them.',
-    'Set limits from measured staging transactions and your reviewed funding budget. Configure Relayer gas_limit_estimation=false and a positive gas_price_cap no greater than the approved maximum. Account separately for actual L1 fees and recovery/cancellation costs; the admission reservation is not a hard bound on every upstream cost.',
+    'Set limits from measured staging transactions and your reviewed funding budget. Bundled setup disables Relayer gas estimation and applies the configured fee cap automatically. Existing Relayer services must enforce gas_limit_estimation=false and a positive gas_price_cap no greater than the approved maximum. Account separately for actual L1 fees and recovery/cancellation costs; the admission reservation is not a hard bound on every upstream cost.',
     'execution.html#configure-and-accept-execution',
   ),
   executionEvidence: setting(

@@ -126,7 +126,14 @@ evidence; there is no public reset or reconciliation mutation.
 
 In the wizard's **Deployment** screen, enable **Configure transfer execution and
 RPC verification** after enabling delegated transfer signing in **Policies**.
-For the designated service, follow its [two-service configuration guide](execution-service.md).
+Keep the bundled local submission path selected. Setup supplies the private
+engine connection, credentials, encrypted sponsor keys and managed bindings.
+Configure independent RPC sources, accepted hashes, gas limits and the funding
+agreement below. Fund the saved sponsor public address before activation; no
+external Relayer or signer registration is needed.
+
+An existing execution service is optional. For that path, follow its
+[two-service configuration guide](execution-service.md).
 For direct Relayer compatibility, supply these deployment-specific values:
 
 - A private HTTPS Relayer origin and API key environment variable, with a

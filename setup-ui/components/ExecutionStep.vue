@@ -531,8 +531,8 @@ function toggleReplacement(value: unknown) {
           <p class="help-text">
             Health exposes aggregate counts. Webhooks use signed CloudEvents
             with durable retries. Low balance alerts do not fund a payer or
-            change transaction authority. Configure equivalent monitoring and
-            recovery on the execution service.
+            change transaction authority. With an existing execution service,
+            configure its monitoring and recovery too.
           </p>
         </template>
       </section>
@@ -555,11 +555,12 @@ function toggleReplacement(value: unknown) {
           validation="required|between:1,100"
         />
         <p class="help-text">
-          With pools enabled, add distinct sponsor addresses for the same
-          application below. Selection is durable; retries retain their payer.
-          Unknown attempts occupy capacity. Configure the executor's independent
-          pool limits too. The application lifetime gas budget is shared across
-          pool members.
+          With pools enabled, add gas sponsors for the same application below.
+          Bundled setup supplies distinct keys and bindings. Selection is
+          durable; retries retain their payer, and unknown attempts occupy
+          capacity. Existing execution services need matching independent pool
+          limits. The application lifetime gas budget is shared across pool
+          members.
         </p>
         <template v-if="model.execution.profile === 'approved-evm-executor-v1'">
           <SetupField
