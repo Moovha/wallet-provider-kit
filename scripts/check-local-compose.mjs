@@ -1,4 +1,4 @@
-/** Verify Compose and secret mounts with offline containers; no database or provider effects. */
+/** Verify bundled Compose with isolated offline fixtures; no wallet or provider effects. */
 import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

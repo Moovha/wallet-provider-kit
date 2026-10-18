@@ -7,7 +7,7 @@ saved commands you will encounter. Setup starts with wallet operations disabled
 so you can complete deployment acceptance before activation.
 
 This is the recommended local evaluation path, including the bundled token
-service and OWS engine. It builds the
+service, OWS engine and a private OpenZeppelin Relayer with persistent Valkey queues. It builds the
 same repository Dockerfile used by the single-host container deployment: pinned
 Node base image, production dependencies, unprivileged user, read-only filesystem,
 private persistent SQLite storage and read-only configuration. Docker manages the

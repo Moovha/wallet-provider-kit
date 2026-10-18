@@ -13,8 +13,10 @@ as part of the same setup.
 
 The current service is experimental and supports one active POSIX host on Base
 Sepolia. Production custody acceptance and mainnet support remain pending. You
-can explore the wizard without external credentials; running the service requires
-your selected backend, token issuer and deployment infrastructure.
+can explore the wizard without external credentials. The recommended setup supplies
+the wallet engine, application token service, private execution engine, durable
+storage and HTTPS gateway. Record your provider domain, policies and application
+gas funding agreements through the wizard.
 
 <span id="install-and-open-the-local-wizard"></span>
 
@@ -70,7 +72,12 @@ stable across restarts and credential rotations.
 Your API needs to identify each calling application. Keep the bundled OAuth token
 service: setup registers enabled applications and generates credentials privately.
 The provider origin determines the issuer, audience and public-key URL.
-Existing authorization servers are optional. See [bundled setup](bundled-setup.md).
+Keep the bundled **OpenZeppelin Relayer and Valkey** local execution engine
+selected too. Local setup starts it automatically on private networks, with
+persistent queues and generated credentials. Configure approved-action policies,
+RPC verification and gas budgets before enabling spending. Setup creates encrypted
+local sponsor keys when those policies are configured. Existing authorization
+servers and execution services are optional. See [bundled setup](bundled-setup.md).
 
 Follow [Services fields](setup-wizard.md#_3-services) and the
 [token registration requirements](operator-services.md#register-the-application-api-and-clients).
