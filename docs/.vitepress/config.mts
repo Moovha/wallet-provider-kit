@@ -128,6 +128,11 @@ export default defineConfig({
             text: 'Runtime configuration',
             link: '/docs/runtime-configuration',
           },
+          {
+            text: 'Runtime operator workspace',
+            link: '/docs/runtime-workspace',
+          },
+          { text: 'Standard wallet calls', link: '/docs/wallet-calls' },
           { text: 'Enterprise v1 standards', link: '/docs/v1-standards' },
         ],
       },
@@ -234,6 +239,11 @@ export default defineConfig({
             text: 'Runtime configuration',
             link: '/docs/runtime-configuration',
           },
+          {
+            text: 'Runtime operator workspace',
+            link: '/docs/runtime-workspace',
+          },
+          { text: 'Standard wallet calls', link: '/docs/wallet-calls' },
           { text: 'Enterprise v1 standards', link: '/docs/v1-standards' },
         ],
       },

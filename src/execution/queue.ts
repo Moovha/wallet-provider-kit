@@ -1,3 +1,6 @@
+import { executionPlanHash } from '../executor/protocol.js';
+import { WalletCallsError } from '../wallet-calls/errors.js';
+import type { WalletCallsMetadata } from '../wallet-calls/types.js';
 import type { ProviderState } from '../onboarding/types.js';
 import { randomUUID } from 'node:crypto';
 import type {
@@ -16,6 +19,7 @@ import type { ApprovedExecutionCoordinator } from './coordinator.js';
 import type { ExecutionConfiguration } from './types.js';
 
 export interface SafeQueueRecord {
+  walletCalls?: WalletCallsMetadata;
   id: string;
   input: ApprovedCallInput;
   principal: VerifiedPrincipal;
@@ -184,9 +188,14 @@ export class SafeExecutionQueue {
       return entry;
     });
   }
-  async enqueue(context: AuthorityContext, input: ApprovedCallInput) {
+  async enqueue(
+    context: AuthorityContext,
+    input: ApprovedCallInput,
+    walletCalls?: WalletCallsMetadata,
+  ) {
     context = structuredClone(context);
     input = structuredClone(input);
+    walletCalls = walletCalls && structuredClone(walletCalls);
     if (
       !uuid.test(context.idempotencyKey) ||
       !['wallet:actions', 'wallet:sign', 'wallet:execute'].every((scope) =>
@@ -201,7 +210,11 @@ export class SafeExecutionQueue {
       context.principal.clientId,
       context.idempotencyKey,
     ]);
-    const hash = fingerprint([input, this.actions.revision]);
+    const hash = fingerprint([
+      input,
+      this.actions.revision,
+      ...(walletCalls ? [walletCalls] : []),
+    ]);
     const previous = await this.actions.onboarding.store.transaction(
       (state) => state.idempotency[key],
     );
@@ -238,6 +251,26 @@ export class SafeExecutionQueue {
         )
           deny();
         const entries = (state.safeRequests ??= {});
+        if (walletCalls) {
+          const publication = state.requests[grant.requestId]?.runtimePolicy;
+          if (
+            walletCalls.sender.toLowerCase() !== authority.safeAddress ||
+            !publication ||
+            publication.policy_hash !== walletCalls.policyHash ||
+            publication.revision !== walletCalls.policyRevision
+          )
+            deny();
+          if (
+            Object.values(entries).some(
+              (entry) =>
+                entry.walletCalls?.id === walletCalls.id &&
+                entry.safeAddress === authority.safeAddress &&
+                entry.principal.issuer === context.principal.issuer &&
+                entry.principal.clientId === context.principal.clientId,
+            )
+          )
+            return undefined;
+        }
         const replay = state.idempotency[key];
         if (replay) {
           if (replay.hash !== hash || !entries[replay.id])
@@ -257,6 +290,7 @@ export class SafeExecutionQueue {
         if (!Number.isSafeInteger(sequence)) deny();
         const entry: SafeQueueRecord = {
           id: randomUUID(),
+          ...(walletCalls ? { walletCalls } : {}),
           input,
           principal: context.principal,
           ...authority,
@@ -280,8 +314,132 @@ export class SafeExecutionQueue {
         return entry;
       },
     );
+    if (!entry) throw new WalletCallsError(5720);
     await this.authorized(context.principal, entry);
     return this.receipt(entry);
+  }
+  /** Read batch evidence without renewing financial consent or permitting a new effect. */
+  async walletCallsRecord(
+    principal: VerifiedPrincipal,
+    accountId: string,
+    id: string,
+  ) {
+    const result = await this.actions.onboarding.withAccountAccess(
+      principal,
+      accountId,
+      'account:read',
+      (state, grant) => {
+        if (
+          state.deploymentBindings?.['service-v1']?.activeRevision !==
+          this.actions.revision
+        )
+          deny();
+        const entry = Object.values(state.safeRequests ?? {}).find(
+          (entry) =>
+            entry.walletCalls?.id === id &&
+            entry.input.account_id === accountId &&
+            entry.owner === grant.owner &&
+            entry.principal.issuer === principal.issuer &&
+            entry.principal.clientId === principal.clientId &&
+            entry.principal.subject === principal.subject,
+        );
+        if (!entry) return undefined;
+        this.check(entry);
+        this.checkAction(state, entry);
+        return { ...entry, execution: this.walletCallsExecution(state, entry) };
+      },
+    );
+    if (!result) throw new WalletCallsError(5730);
+    return result;
+  }
+  private walletCallsExecution(state: ProviderState, entry: SafeQueueRecord) {
+    const record = entry.actionId
+      ? state.supportedActions?.[entry.actionId]
+      : undefined;
+    const execution = record?.execution;
+    if (
+      execution?.plan &&
+      (execution.planHash !== executionPlanHash(execution.plan) ||
+        fingerprint(execution.plan.action) !==
+          fingerprint(record!.approval.action) ||
+        fingerprint(execution.plan.intent ?? null) !==
+          fingerprint(record!.intent ?? null) ||
+        fingerprint(execution.plan.runtimePolicy ?? null) !==
+          fingerprint(record!.runtimePolicy ?? null))
+    )
+      throw new WalletProviderError('wallet_attempt_unavailable', 'unknown');
+    if (
+      execution?.observation?.verification === 'rpc-quorum' &&
+      !execution.plan
+    )
+      throw new WalletProviderError('wallet_attempt_unavailable', 'unknown');
+    return execution;
+  }
+  async walletCallsList(
+    principal: VerifiedPrincipal,
+    authorizeOperator?: (state: ProviderState) => void,
+  ) {
+    if (!authorizeOperator && !principal.scopes.includes('wallet:execute:read'))
+      deny();
+    const entries = await this.actions.onboarding.store.transaction((state) => {
+      if (
+        state.deploymentBindings?.['service-v1']?.activeRevision !==
+        this.actions.revision
+      )
+        deny();
+      authorizeOperator?.(state);
+      return Object.values(state.safeRequests ?? {})
+        .filter(
+          (entry) =>
+            entry.walletCalls &&
+            entry.revision === this.actions.revision &&
+            (authorizeOperator ||
+              (entry.principal.issuer === principal.issuer &&
+                entry.principal.clientId === principal.clientId &&
+                entry.principal.subject === principal.subject)),
+        )
+        .sort((a, b) => b.sequence - a.sequence || a.id.localeCompare(b.id));
+    });
+    const records = [];
+    for (const entry of entries) {
+      if (records.length >= 100) break;
+      if (authorizeOperator) {
+        records.push(
+          await this.actions.onboarding.store.transaction((state) => {
+            if (
+              state.deploymentBindings?.['service-v1']?.activeRevision !==
+              this.actions.revision
+            )
+              deny();
+            authorizeOperator(state);
+            const latest = state.safeRequests?.[entry.id] ?? deny();
+            this.check(latest);
+            this.checkAction(state, latest);
+            return {
+              ...latest,
+              execution: this.walletCallsExecution(state, latest),
+            };
+          }),
+        );
+      } else {
+        try {
+          records.push(
+            await this.walletCallsRecord(
+              principal,
+              entry.input.account_id,
+              entry.walletCalls!.id,
+            ),
+          );
+        } catch (error) {
+          if (!(
+            error instanceof WalletProviderError &&
+            error.code === 'wallet_authorization_denied'
+          ))
+            throw error;
+        }
+      }
+    }
+    return { records, truncated: entries.length > records.length };
   }
   async read(principal: VerifiedPrincipal, id: string) {
     if (!principal.scopes.includes('wallet:execute:read')) deny();

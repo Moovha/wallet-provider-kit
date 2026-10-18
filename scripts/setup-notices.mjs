@@ -1,3 +1,4 @@
+import { createRequire } from 'node:module';
 import { readFile, writeFile, copyFile, mkdir } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -20,11 +21,28 @@ const packages = [
   '@vue/reactivity',
   '@vue/runtime-core',
   '@vue/runtime-dom',
+  'ethers',
+  '@noble/hashes',
+  '@noble/curves',
+  '@adraffy/ens-normalize',
+  'aes-js',
 ];
 let notices =
-  'Bundled operator setup interface: third-party license notices\n\n';
+  'Bundled setup and runtime workspace interfaces: third-party license notices\n\n';
+const runtimeDependency = createRequire(import.meta.resolve('ethers'));
+const runtimeEntries = {
+  ethers: 'ethers',
+  '@noble/hashes': '@noble/hashes/sha3',
+  '@noble/curves': '@noble/curves/abstract/utils',
+  '@adraffy/ens-normalize': '@adraffy/ens-normalize',
+  'aes-js': 'aes-js',
+};
 for (const name of packages) {
-  let folder = dirname(fileURLToPath(import.meta.resolve(name)));
+  let folder = dirname(
+    runtimeEntries[name]
+      ? runtimeDependency.resolve(runtimeEntries[name])
+      : fileURLToPath(import.meta.resolve(name)),
+  );
   let manifest;
   while (!manifest) {
     try {
@@ -42,7 +60,13 @@ for (const name of packages) {
     }
   }
   const { version } = JSON.parse(await readFile(manifest, 'utf8'));
-  notices += `${name}@${version}\n${await readFile(join(dirname(manifest), 'LICENSE'), 'utf8')}\n\n`;
+  const license =
+    name === 'ethers'
+      ? 'LICENSE.md'
+      : name === 'aes-js'
+        ? 'LICENSE.txt'
+        : 'LICENSE';
+  notices += `${name}@${version}\n${await readFile(join(dirname(manifest), license), 'utf8')}\n\n`;
 }
 await copyFile(
   new URL('../setup-ui/ASSETS.md', import.meta.url),

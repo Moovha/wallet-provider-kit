@@ -7,7 +7,7 @@ import {
 import { serviceHash } from '../executor/auth.js';
 import {
   buildApprovedCallIntent,
-  approvedCallPayload,
+  buildApprovedCallAction,
   validateApprovedCallAction,
   type ApprovedCallInput,
   type ApprovedCallIntent,
@@ -508,6 +508,48 @@ export class SupportedActions {
       address: account.address!,
     };
   }
+  /** The transaction sender is the configured Safe, distinct from its EOA signing owner. */
+  async walletCallsAccount(principal: VerifiedPrincipal, accountId: string) {
+    if (!this.onboarding.runtimeContracts) deny();
+    await this.binding(principal, accountId, 'contracts:request');
+    const authority = await this.callAuthority(principal);
+    const binding =
+      authority.policy.accounts.find(
+        (account) => account.accountId === accountId,
+      ) ?? deny();
+    return { address: binding.address, snapshot: authority.snapshot ?? deny() };
+  }
+  /** Pure preview under current authority; it reserves no budget, nonce, action or signing attempt. */
+  async previewWalletCalls(
+    principal: VerifiedPrincipal,
+    input: ApprovedCallInput,
+  ) {
+    const { account } = await this.binding(
+      principal,
+      input.account_id,
+      'contracts:request',
+    );
+    const authority = await this.callAuthority(principal);
+    const snapshot = authority.snapshot ?? deny();
+    validateRuntimeCalls(snapshot, input);
+    const expiresAt = this.queueExpiry(authority.validity);
+    const intent = buildApprovedCallIntent(
+      authority.policy,
+      input,
+      String(2n ** 256n - 1n),
+      expiresAt,
+    );
+    return {
+      intent,
+      runtimePolicy: snapshot,
+      action: buildApprovedCallAction(
+        intent,
+        account.address!,
+        expiresAt,
+        randomUUID(),
+      ),
+    };
+  }
   async applicationQueueExpiry(
     principal: VerifiedPrincipal,
     maximumSeconds: number,
@@ -646,31 +688,13 @@ export class SupportedActions {
           revision: this.revision,
         });
       }
-      const id = randomUUID(),
-        payload = approvedCallPayload(intent),
-        digest = TypedDataEncoder.hash(
-          payload.domain,
-          payload.types,
-          payload.message,
-        );
-      const action: TypedDataAction = {
-        action_id: id,
-        operation_id: id,
-        kind: 'sign_typed_data',
-        profile: 'evm_eoa_v1',
-        profile_revision: '1',
-        status: 'ready',
-        chain_id: 'eip155:84532',
-        chain_account_id: 'eip155:84532:' + account.address,
-        binding_revision: '1',
-        capability_revision: '1',
-        plan_revision: '1',
-        plan_hash: digest,
-        payload_hash: digest,
-        expires_at: expiresAt,
-        dependencies: [],
-        payload,
-      };
+      const id = randomUUID();
+      const action = buildApprovedCallAction(
+        intent,
+        account.address!,
+        expiresAt,
+        id,
+      );
       const created: TransferRecord = {
         intent,
         ...(authority.snapshot ? { runtimePolicy: authority.snapshot } : {}),

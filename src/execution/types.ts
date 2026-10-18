@@ -70,6 +70,7 @@ export interface ApprovedExecutionPlan {
 }
 
 export interface ChainObservation {
+  callsReceipt?: import('../wallet-calls/types.js').WalletCallsReceipt;
   chain_status:
     'unobserved' | 'pending' | 'included' | 'safe' | 'finalized' | 'reorged';
   verification: 'unverified' | 'rpc-quorum';
@@ -111,7 +112,10 @@ export interface TransferExecutionRecord {
   lastDispatchStatus?: ExecutionReceipt['dispatch_status'];
 }
 
-export interface ExecutionReceipt extends ChainObservation {
+export interface ExecutionReceipt extends Omit<
+  ChainObservation,
+  'callsReceipt'
+> {
   replacement?: import('./replacement.js').ReplacementStatus;
   recovery?: import('./recovery.js').RecoveryDiagnosis;
   profile: ExecutionProfile;

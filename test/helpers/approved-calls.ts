@@ -59,7 +59,12 @@ export function approvedCallsFixture(
     minimumEffects: true,
     safeSuccess: true,
     mutate: undefined as
-      | ((method: string, result: unknown, origin: string) => unknown)
+      | ((
+          method: string,
+          result: unknown,
+          origin: string,
+          params: unknown[],
+        ) => unknown)
       | undefined,
   };
   function logs() {
@@ -218,6 +223,7 @@ export function approvedCallsFixture(
             from: original.configuration.sponsors[0].binding.address,
             to: state.target,
             status: '0x1',
+            gasUsed: '0x186a0',
             logs: logs(),
           }
         : null;
@@ -264,7 +270,7 @@ export function approvedCallsFixture(
         jsonrpc: '2.0',
         id: 1,
         result: state.mutate
-          ? state.mutate(method, result, url.origin)
+          ? state.mutate(method, result, url.origin, params)
           : result,
       }),
     );

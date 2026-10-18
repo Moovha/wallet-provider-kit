@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import RuntimeConfigurationFields from './RuntimeConfigurationFields.vue';
 import SetupField from './SetupField.vue';
 import AccessPolicyFields from './AccessPolicyFields.vue';
 import PriceFields from './PriceFields.vue';
@@ -475,4 +476,5 @@ function financial(enabled: unknown) {
       </button>
     </div>
   </template>
+  <RuntimeConfigurationFields v-model="model" />
 </template>

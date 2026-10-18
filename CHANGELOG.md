@@ -1,5 +1,37 @@
 # Changelog
 
+## Unreleased contract method discovery
+
+- Load verified Base Sepolia contract methods and bytecode pins from Sourcify in
+  the runtime workspace, including a single EIP-1967 proxy implementation.
+- Select discovered methods through checkboxes, with all methods selected by
+  default within the existing 32-method limit; support ABI upload/paste and
+  manual pin entry when verification is unavailable.
+- Keep public metadata lookup separate from provider credentials, publication,
+  current owner consent and independent execution-time code checks.
+
+## Unreleased runtime operator workspace
+
+- Add a deployed `/operator/` workspace with structured contract/method forms,
+  policy previews, provider publication and bounded proposal/publication history.
+  The setup wizard configures separate runtime operator identities.
+- Default the provider's application approval form to automatic contract/method
+  acceptance. Publish valid registrations only within unchanged enabled provider
+  terms; retain provider-controlled claims, limits, consent and execution gates.
+- Add scoped batch lists with provider ledger access, current owner-bound
+  application access, retained finalized receipts and individual standard status
+  refreshes. List/status reads never sign, submit or retry batches.
+- Retain immutable publications, auditable review decisions, idempotent retries
+  and separate policy/review concurrency checks in the existing SQLite JSON
+  records. No SQL migration or application deployment is performed.
+
+## Unreleased standard wallet calls
+
+- Add the optional EIP-5792 2.0.0 account-scoped JSON-RPC interface for runtime-authorized Safe batch submission, capability discovery and status.
+- Reserve unpredictable or caller-supplied batch IDs atomically with queue admission; reject duplicates across concurrency and restart. Current consent, method/claim rules, sponsor and shared budgets still govern effects.
+- Retain quorum-verified receipt metadata, atomic Safe failure status and reorg/uncertainty handling. Polling never resubmits an unknown effect.
+- Export the dependency-free wallet-calls request adapter with an explicit host UI callback for wallet_showCallsStatus. Document method, capability, chain, authentication and size limits. Offline evidence does not establish live wallet/provider acceptance.
+
 ## Unreleased runtime contract authority
 
 - Bind published application policies to application-led owner consent, prepared

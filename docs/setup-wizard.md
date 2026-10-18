@@ -300,3 +300,11 @@ configuration. The GUI never accepts private PEM values or deploys the dispatche
 ### Approved contract actions
 
 In Deployment choose **Approved EVM actions through designated service**, then enable **Approved contract-call policy**. Configure existing Safe account bindings, code pins, allowed contract functions and optional swap/vault routes. The policy is independent of transfer signing. Enable `contracts:request` for accepted applications in Policies; new owner consent is required for the configured action-policy revision. The wizard does not create or fund smart accounts. Follow [approved contract calls](approved-contract-calls.md) before activation.
+
+## Configure the runtime workspace
+
+In **Policies**, enable **Runtime configuration** and enter the separate provider
+operator issuer, client ID and subject. After deploying that configuration, open
+`/operator/` on the provider host to register contracts, publish policies, choose
+automatic registration review and track batches. See the [runtime workspace
+guide](runtime-workspace.md) for roles, tokens and the automatic acceptance boundary.

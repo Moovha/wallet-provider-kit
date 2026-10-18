@@ -102,6 +102,15 @@ test('a new operator configures application-led access without user login, vendo
     await expect(
       page.getByRole('button', { name: 'Add reviewer', exact: true }),
     ).toHaveCount(0);
+    await page
+      .getByLabel('Enable runtime configuration', { exact: true })
+      .check();
+    await page
+      .getByLabel('Operator OAuth client ID', { exact: true })
+      .fill('runtime-provider-operator');
+    await page
+      .getByLabel('Operator token subject', { exact: true })
+      .fill('runtime-provider-subject');
     await page.getByRole('button', { name: 'Next', exact: true }).click();
     await expect(
       page.getByLabel('Enable wallet operations in this configuration', {
@@ -137,6 +146,15 @@ test('a new operator configures application-led access without user login, vendo
     expect(config.policy.identity.application).toEqual({
       verificationLevel: 'enhanced',
       requiredFields: ['country', 'customer_type'],
+    });
+    expect(config.runtimeConfiguration).toEqual({
+      operators: [
+        {
+          issuer: 'https://apps.example.test',
+          clientId: 'runtime-provider-operator',
+          subject: 'runtime-provider-subject',
+        },
+      ],
     });
     expect(config.ownerLogin).toBeUndefined();
     expect(config.reviewers).toBeUndefined();
@@ -197,7 +215,7 @@ test('a new operator configures application-led access without user login, vendo
       .getByRole('button', { name: 'API reference', exact: true })
       .click();
     await page.locator('.swagger-ui .opblock').first().waitFor();
-    await expect(page.locator('.swagger-ui .opblock')).toHaveCount(34);
+    await expect(page.locator('.swagger-ui .opblock')).toHaveCount(38);
     await page
       .getByLabel('Example endpoint', { exact: true })
       .selectOption('requestAccountAccess');

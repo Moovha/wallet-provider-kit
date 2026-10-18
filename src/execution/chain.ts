@@ -1,3 +1,5 @@
+import { serviceHash } from '../executor/auth.js';
+import type { WalletCallsReceipt } from '../wallet-calls/types.js';
 import type { NonceSnapshot } from './recovery.js';
 import {
   implementationSlot,
@@ -66,6 +68,49 @@ function address(value: unknown): string {
   if (typeof value !== 'string' || !/^0x[0-9a-fA-F]{40}$/.test(value))
     unavailable();
   return value.toLowerCase();
+}
+
+/** Receipt metadata is retained only with validated ordering and exact transaction/block bindings. */
+function callsReceipt(
+  receipt: Record<string, unknown>,
+  candidate: string,
+  blockHash: string,
+  blockNumber: bigint,
+  safe: string,
+): WalletCallsReceipt | undefined {
+  if (receipt.gasUsed === undefined) return undefined;
+  const logs: WalletCallsReceipt['logs'] = [];
+  let previous = -1n;
+  for (const value of receipt.logs as unknown[]) {
+    const log = checked(value),
+      index = quantity(log.logIndex);
+    if (
+      log.removed !== false ||
+      hash(log.transactionHash) !== candidate ||
+      hash(log.blockHash) !== blockHash ||
+      quantity(log.blockNumber) !== blockNumber ||
+      index <= previous ||
+      typeof log.data !== 'string' ||
+      !bytesPattern.test(log.data) ||
+      log.data.length > 131074 ||
+      !Array.isArray(log.topics) ||
+      log.topics.length > 4
+    )
+      unavailable();
+    previous = index;
+    const topics = log.topics.map(hash);
+    const emitter = address(log.address);
+    if (emitter !== safe.toLowerCase())
+      logs.push({ address: emitter, data: log.data.toLowerCase(), topics });
+  }
+  return {
+    logs,
+    status: toQuantity(quantity(receipt.status)),
+    blockHash,
+    blockNumber: toQuantity(blockNumber),
+    gasUsed: toQuantity(quantity(receipt.gasUsed)),
+    transactionHash: candidate,
+  };
 }
 
 /** Read-only JSON-RPC transport with fixed methods, bounded responses and no automatic retries. */
@@ -559,6 +604,7 @@ export class QuorumExecutionObserver implements ExecutionObserver {
       return null;
     if (!Array.isArray(receipt.logs) || receipt.logs.length > 512)
       unavailable();
+    let callFailed = false;
     if (status === 1n) {
       const successes = receipt.logs.filter((entry) => {
         const log = checked(entry);
@@ -578,7 +624,34 @@ export class QuorumExecutionObserver implements ExecutionObserver {
           return false;
         }
       });
-      if (successes.length !== 1) return null;
+      const failures = receipt.logs.filter((entry) => {
+        const log = checked(entry);
+        if (address(log.address) !== intent.account.address.toLowerCase())
+          return false;
+        try {
+          const parsed = safeInterface.parseLog({
+            topics: log.topics as string[],
+            data: String(log.data),
+          });
+          return (
+            parsed?.name === 'ExecutionFailure' &&
+            parsed.args.txHash.toLowerCase() === plan.action.payload_hash &&
+            parsed.args.payment === 0n
+          );
+        } catch {
+          return false;
+        }
+      });
+      if (successes.length !== 1 || failures.length) {
+        if (
+          plan.runtimePolicy &&
+          intent.input.kind === 'contract-call' &&
+          !successes.length &&
+          failures.length === 1
+        )
+          callFailed = true;
+        else return null;
+      }
       if (intent.input.kind !== 'contract-call') {
         const token = intent.effects[0].token,
           spender = intent.calls[2].to;
@@ -688,8 +761,18 @@ export class QuorumExecutionObserver implements ExecutionObserver {
           : heads.safe >= blockNumber
             ? 'safe'
             : 'included',
-      outcome = status === 1n ? 'succeeded' : 'reverted';
+      outcome = status === 1n && !callFailed ? 'succeeded' : 'reverted';
+    const metadata = plan.runtimePolicy
+      ? callsReceipt(
+          receipt,
+          candidate,
+          blockHash,
+          blockNumber,
+          intent.account.address,
+        )
+      : undefined;
     return {
+      ...(metadata ? { callsReceipt: metadata } : {}),
       chain_status: chainStatus,
       verification: 'rpc-quorum',
       outcome,
@@ -1133,7 +1216,9 @@ export class QuorumExecutionObserver implements ExecutionObserver {
             value.block_hash !== values[0].block_hash ||
             value.block_number !== values[0].block_number ||
             value.outcome !== values[0].outcome ||
-            value.execution_origin !== values[0].execution_origin,
+            value.execution_origin !== values[0].execution_origin ||
+            serviceHash(value.callsReceipt ?? null) !==
+              serviceHash(values[0].callsReceipt ?? null),
         )
       )
         unavailable();

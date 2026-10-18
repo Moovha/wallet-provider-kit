@@ -73,6 +73,9 @@ export function operationStatus(
     financial: !!config.financial,
     execution: !!config.execution,
     safeQueue: !!config.execution?.safeQueue,
+    walletCalls:
+      !!config.runtimeConfiguration?.authorizeContracts &&
+      !!config.execution?.safeQueue,
     runtimeConfiguration: !!config.runtimeConfiguration,
     executionService: !!config.execution?.service,
     contractCalls: !!config.approvedCalls?.policy,
@@ -198,6 +201,19 @@ export function requestExample(
       vendor: config.identity.didit ? 'didit' : 'sumsub',
       share_token: '<SHARED_IDENTITY_TOKEN>',
     };
+  if (id === 'setRuntimeReviewMode')
+    return {
+      expected_revision: '1',
+      expected_review_revision: '0',
+      mode: 'automatic',
+    };
+  if (id === 'walletCallsRpc')
+    return {
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'wallet_getCapabilities',
+      params: ['0x1111111111111111111111111111111111111111', ['0x14a34']],
+    };
   if (id === 'requestContractCall' || id === 'enqueueContractCall')
     return {
       account_id: exampleId,
@@ -286,6 +302,23 @@ export function responseExample(
   config?: ProviderConfiguration,
   requestedPermissions?: string[],
 ): object {
+  if (id === 'readRuntimeWorkspace')
+    return {
+      role: 'application',
+      applications: [
+        {
+          application_id: 'a'.repeat(64),
+          name: 'Example application',
+          active_revision: '0',
+          proposals: [],
+          proposals_truncated: false,
+          publications: [],
+        },
+      ],
+    };
+  if (id === 'listRuntimeBatches') return { truncated: false, batches: [] };
+  if (id === 'setRuntimeReviewMode')
+    return { mode: 'automatic', revision: '1', approved_by: 'c'.repeat(64) };
   if (
     [
       'readRuntimeConfiguration',
@@ -310,6 +343,12 @@ export function responseExample(
       policy_hash: 'b'.repeat(64),
       policy: runtimePolicyExample,
       created_at: '2030-01-01T00:00:00.000Z',
+    };
+  if (id === 'walletCallsRpc')
+    return {
+      jsonrpc: '2.0',
+      id: 1,
+      result: { '0x14a34': { atomic: { status: 'supported' } } },
     };
   if (
     id === 'publishRuntimeConfiguration' ||

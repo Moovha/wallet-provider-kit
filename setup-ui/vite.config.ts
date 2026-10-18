@@ -9,5 +9,11 @@ export default defineConfig({
     outDir: '../dist/setup-ui',
     emptyOutDir: true,
     sourcemap: false,
+    rolldownOptions: {
+      input: {
+        setup: fileURLToPath(new URL('index.html', import.meta.url)),
+        operator: fileURLToPath(new URL('operator.html', import.meta.url)),
+      },
+    },
   },
 });

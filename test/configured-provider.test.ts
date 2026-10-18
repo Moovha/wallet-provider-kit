@@ -1,3 +1,4 @@
+import { runtimeApplicationId } from '../src/runtime-configuration/service.js';
 import { replacementWire } from './helpers/replacements.js';
 import { defaultReplacementPolicy } from '../src/execution/replacement.js';
 import { buildApprovedCallIntent } from '../src/execution/approved-calls.js';
@@ -4081,6 +4082,7 @@ async function runtimeFinancialFixture(queue = false) {
   return {
     t,
     config,
+    operatorToken,
     calls,
     user,
     document,
@@ -4259,3 +4261,507 @@ it('caps queued runtime requests to the publication lifetime and binds their mat
   expect(result.statusCode, result.body).toBe(200);
   expect(result.json().status).toBe('executing');
 }, 15000);
+
+async function walletCallsFixture() {
+  let worker: SafeExecutionQueue;
+  vi.spyOn(SafeExecutionQueue.prototype, 'start').mockImplementation(function (
+    this: SafeExecutionQueue,
+  ) {
+    worker = this;
+  });
+  const f = await runtimeFinancialFixture(true);
+  vi.mocked(injected.backend!.signTypedData).mockImplementation(
+    async (_account, action) => {
+      f.calls.state.digest = action.payload_hash;
+      return f.t.f.wallet.signTypedData(
+        action.payload.domain,
+        action.payload.types,
+        action.payload.message,
+      );
+    },
+  );
+  const accountId = f.input().account_id;
+  let correlation = 0;
+  const rpc = async (
+    method: string,
+    params: unknown[],
+    authorization?: string,
+  ) => {
+    const id = ++correlation;
+    const response = await f.app.inject({
+      method: 'POST',
+      url: '/v1/accounts/' + accountId + '/wallet',
+      headers: { authorization: authorization ?? (await f.t.f.token()) },
+      payload: { jsonrpc: '2.0', id, method, params },
+    });
+    expect(response.statusCode, response.body).toBe(200);
+    expect(response.json().id).toBe(id);
+    return response.json();
+  };
+  const batch = () => ({
+    version: '2.0.0',
+    chainId: '0x14a34',
+    from: f.calls.policy.accounts[0].address,
+    atomicRequired: true,
+    calls: f.input().calls.map((call) => ({ ...call, value: '0x1' })),
+  });
+  return { ...f, rpc, batch, process: () => worker!.process() };
+}
+
+describe('EIP-5792 runtime wallet calls', () => {
+  it('discovers the Safe sender, submits an atomic batch once and returns verified standard receipts across restart and policy changes', async () => {
+    const f = await walletCallsFixture();
+    expect(
+      (
+        await f.rpc('wallet_getCapabilities', [
+          f.calls.policy.accounts[0].address,
+          ['0x01', '0x14A34'],
+        ])
+      ).error?.code,
+    ).toBe(-32602);
+    expect(
+      (
+        await f.rpc('wallet_getCapabilities', [
+          f.calls.policy.accounts[0].address,
+          ['0x1', '0x14A34'],
+        ])
+      ).result,
+    ).toEqual({ '0x14a34': { atomic: { status: 'supported' } } });
+    expect(
+      (
+        await f.rpc('wallet_getCapabilities', [
+          f.calls.policy.accounts[0].address,
+          ['0x1'],
+        ])
+      ).result,
+    ).toEqual({});
+    const batch = f.batch();
+    batch.calls.push({ ...batch.calls[0] });
+    const sent = await f.rpc('wallet_sendCalls', [batch]);
+    expect(sent.error).toBeUndefined();
+    const id = sent.result.id;
+    expect(id).toMatch(/^0x[0-9a-f]{64}$/);
+    expect((await f.rpc('wallet_getCallsStatus', [id])).result).toMatchObject({
+      version: '2.0.0',
+      id,
+      chainId: '0x14a34',
+      status: 100,
+      atomic: true,
+    });
+    expect(f.calls.state.posts).toBe(0);
+    await f.process();
+    expect(f.calls.state.posts).toBe(1);
+    expect((await f.rpc('wallet_getCallsStatus', [id])).result.status).toBe(
+      100,
+    );
+    f.calls.state.included = true;
+    const included = await f.rpc('wallet_getCallsStatus', [id]);
+    expect(included.error).toBeUndefined();
+    expect(included.result).toMatchObject({
+      status: 200,
+      atomic: true,
+      receipts: [
+        {
+          transactionHash: f.t.f.execution!.transactionHash,
+          blockNumber: '0x65',
+          gasUsed: '0x186a0',
+          status: '0x1',
+          logs: [],
+        },
+      ],
+    });
+    await f.publish();
+    await f.restart();
+    expect((await f.rpc('wallet_getCallsStatus', [id])).result.status).toBe(
+      200,
+    );
+    expect(f.calls.state.posts).toBe(1);
+  });
+  it('atomically rejects duplicate caller IDs across concurrent sends and restart, without a second queued effect', async () => {
+    const f = await walletCallsFixture(),
+      batch = { ...f.batch(), id: '0x' + 'a'.repeat(64) };
+    const responses = await Promise.all([
+      f.rpc('wallet_sendCalls', [batch]),
+      f.rpc('wallet_sendCalls', [batch]),
+    ]);
+    expect(responses.filter((value) => value.result).length).toBe(1);
+    expect(responses.find((value) => value.error)?.error.code).toBe(5720);
+    await f.restart();
+    expect((await f.rpc('wallet_sendCalls', [batch])).error.code).toBe(5720);
+    await f.process();
+    expect(f.calls.state.posts).toBe(1);
+  });
+  it.each([
+    'chain',
+    'version',
+    'required capability',
+    'call capability',
+    'sender',
+    'leading zero value',
+    'too many calls',
+    'method',
+    'claim age',
+    'scope',
+  ] as const)('denies %s before admission or signing', async (kind) => {
+    const f = await walletCallsFixture();
+    const batch: Record<string, unknown> = f.batch();
+    if (kind === 'chain') batch.chainId = '0x1';
+    if (kind === 'version') batch.version = '1.0';
+    if (kind === 'required capability')
+      batch.capabilities = {
+        paymasterService: { url: 'https://untrusted.example.test' },
+      };
+    if (kind === 'call capability')
+      (batch.calls as object[])[0] = {
+        ...(batch.calls as object[])[0],
+        capabilities: { unknown: {} },
+      };
+    if (kind === 'sender') batch.from = f.t.f.wallet.address;
+    if (kind === 'leading zero value')
+      (batch.calls as { value: string }[])[0].value = '0x01';
+    if (kind === 'too many calls')
+      batch.calls = Array(17).fill((batch.calls as unknown[])[0]);
+    if (kind === 'method')
+      (batch.calls as { data: string }[])[0].data = '0x12345678';
+    if (kind === 'claim age') {
+      const db = openProviderDatabase({
+        directory: f.config.storage.directory,
+      });
+      await db.onboardingStore.transaction((state) => {
+        for (const request of Object.values(state.requests))
+          if (request.input.user?.identity.fields.risk)
+            request.input.user.identity.verified_at = new Date(
+              Date.now() - 121000,
+            ).toISOString();
+      });
+      db.close();
+    }
+    const token =
+      kind === 'scope'
+        ? await f.t.f.token('wallet:access:read wallet:execute:read')
+        : undefined;
+    const result = await f.rpc('wallet_sendCalls', [batch], token);
+    expect(result.error).toBeDefined();
+    expect(result.error.code).toBe(
+      kind === 'chain'
+        ? 5710
+        : kind.includes('capability')
+          ? 5700
+          : kind === 'version' || kind === 'leading zero value'
+            ? -32602
+            : kind === 'too many calls'
+              ? 5740
+              : 4100,
+    );
+    await f.process();
+    expect(f.calls.state.posts).toBe(0);
+    expect(injected.backend!.signTypedData).not.toHaveBeenCalled();
+  });
+  it('ignores optional capabilities without fetching their URLs and fences foreign status callers', async () => {
+    const f = await walletCallsFixture();
+    const batch = {
+      ...f.batch(),
+      atomicRequired: false,
+      id: 'application-chosen-id',
+      capabilities: {
+        paymasterService: {
+          optional: true,
+          url: 'https://untrusted.example.test',
+        },
+      },
+    };
+    const sent = await f.rpc('wallet_sendCalls', [batch]);
+    expect(sent.result).toEqual({ id: 'application-chosen-id' });
+    expect((await f.rpc('wallet_getCallsStatus', ['missing'])).error.code).toBe(
+      5730,
+    );
+    const foreign = await f.t.f.token(undefined, undefined, 'another-subject');
+    expect(
+      (await f.rpc('wallet_getCallsStatus', [batch.id], foreign)).error.code,
+    ).toBe(4100);
+    expect((await f.rpc('wallet_showCallsStatus', [batch.id])).error.code).toBe(
+      4200,
+    );
+    await f.process();
+    expect(f.calls.state.posts).toBe(1);
+  });
+  it('returns offchain failure for unsigned policy cancellation and preserves uncertain dispatched states', async () => {
+    const f = await walletCallsFixture();
+    const sent = await f.rpc('wallet_sendCalls', [f.batch()]);
+    await f.publish();
+    await f.process();
+    expect(
+      (await f.rpc('wallet_getCallsStatus', [sent.result.id])).result.status,
+    ).toBe(400);
+    expect(f.calls.state.posts).toBe(0);
+  });
+  it('reports complete Safe call failure using the verified outer transaction receipt, not a success or a partial batch', async () => {
+    const f = await walletCallsFixture();
+    const sent = await f.rpc('wallet_sendCalls', [f.batch()]);
+    await f.process();
+    f.calls.state.included = true;
+    f.calls.state.safeSuccess = false;
+    const result = await f.rpc('wallet_getCallsStatus', [sent.result.id]);
+    expect(result.result).toMatchObject({
+      status: 500,
+      atomic: true,
+      receipts: [{ status: '0x1' }],
+    });
+    expect(f.calls.state.posts).toBe(1);
+  });
+  it('downgrades an included batch on a reorg and refuses mismatching receipt metadata from RPC operators', async () => {
+    const f = await walletCallsFixture();
+    const sent = await f.rpc('wallet_sendCalls', [f.batch()]);
+    await f.process();
+    f.calls.state.included = true;
+    const heads = (method: string, result: unknown, params: unknown[]) =>
+      method === 'eth_getBlockByNumber' &&
+      ['safe', 'finalized'].includes(String(params[0]))
+        ? { ...(result as object), number: '0x64' }
+        : result;
+    f.calls.state.mutate = (method, result, _origin, params) =>
+      heads(method, result, params);
+    expect(
+      (await f.rpc('wallet_getCallsStatus', [sent.result.id])).result.status,
+    ).toBe(200);
+    f.calls.state.mutate = (method, result, origin, params) =>
+      method === 'eth_getTransactionReceipt' && origin.includes('secondary')
+        ? { ...(result as object), gasUsed: '0x1' }
+        : heads(method, result, params);
+    const disputed = await f.rpc('wallet_getCallsStatus', [sent.result.id]);
+    expect(disputed.result.status).toBe(100);
+    expect(disputed.result.receipts).toBeUndefined();
+    f.calls.state.mutate = undefined;
+    f.calls.state.included = false;
+    expect(
+      (await f.rpc('wallet_getCallsStatus', [sent.result.id])).result.status,
+    ).toBe(100);
+  });
+});
+
+it('returns JSON-RPC parse/envelope/method errors without admitting malformed wallet batches', async () => {
+  const f = await walletCallsFixture();
+  const headers = {
+    authorization: await f.t.f.token(),
+    'content-type': 'application/json',
+  };
+  const url = '/v1/accounts/' + f.input().account_id + '/wallet';
+  const malformed = await f.app.inject({
+    method: 'POST',
+    url,
+    headers,
+    payload: '{',
+  });
+  expect(malformed.statusCode, malformed.body).toBe(200);
+  expect(malformed.json()).toEqual({
+    jsonrpc: '2.0',
+    id: null,
+    error: { code: -32700, message: 'Parse error' },
+  });
+  for (const payload of [
+    { jsonrpc: '2.0', method: 'wallet_sendCalls', params: [f.batch()] },
+    [
+      {
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'wallet_sendCalls',
+        params: [f.batch()],
+      },
+    ],
+  ]) {
+    const response = await f.app.inject({
+      method: 'POST',
+      url,
+      headers,
+      payload,
+    });
+    expect(response.json().error.code).toBe(-32600);
+  }
+  expect((await f.rpc('unsupported_method', [])).error.code).toBe(-32601);
+  expect((await f.rpc('wallet_getCallsStatus', [])).error.code).toBe(-32602);
+  const anonymous = await f.app.inject({
+    method: 'POST',
+    url,
+    payload: {
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'wallet_sendCalls',
+      params: [f.batch()],
+    },
+  });
+  expect(anonymous.statusCode).toBe(401);
+  await f.process();
+  expect(f.calls.state.posts).toBe(0);
+});
+
+it('retains an uncertain wallet-call dispatch through polling and restart without resubmitting', async () => {
+  const f = await walletCallsFixture();
+  f.calls.state.lostResponse = true;
+  const sent = await f.rpc('wallet_sendCalls', [
+    { ...f.batch(), id: 'uncertain-batch' },
+  ]);
+  await f.process();
+  expect(f.calls.state.posts).toBe(1);
+  expect(
+    (await f.rpc('wallet_getCallsStatus', [sent.result.id])).result.status,
+  ).toBe(100);
+  await f.restart();
+  expect(
+    (await f.rpc('wallet_getCallsStatus', [sent.result.id])).result.status,
+  ).toBe(100);
+  await f.process();
+  expect(f.calls.state.posts).toBe(1);
+});
+it('refuses wallet-call status when its retained execution plan no longer matches the journal hash', async () => {
+  const f = await walletCallsFixture();
+  const sent = await f.rpc('wallet_sendCalls', [f.batch()]);
+  await f.process();
+  f.calls.state.included = true;
+  expect(
+    (await f.rpc('wallet_getCallsStatus', [sent.result.id])).result.status,
+  ).toBe(200);
+  const database = openProviderDatabase({
+    directory: f.config.storage.directory,
+  });
+  await database.onboardingStore.transaction((state) => {
+    const execution = Object.values(state.supportedActions!)[0].execution!;
+    execution.plan!.scanFromBlock = '0';
+  });
+  database.close();
+  const result = await f.rpc('wallet_getCallsStatus', [sent.result.id]);
+  expect(result.error.code).toBe(4900);
+  expect(f.calls.state.posts).toBe(1);
+});
+it('rejects aggregate calldata beyond the Safe profile limit before queue admission or signing', async () => {
+  const f = await walletCallsFixture();
+  f.document.contracts[0].methods = [
+    { signature: 'blob(bytes)', maximum_value_wei: '0' },
+  ];
+  await f.publish();
+  await f.consent();
+  const data = new Interface(['function blob(bytes)']).encodeFunctionData(
+    'blob',
+    ['0x' + '11'.repeat(1680)],
+  );
+  const batch = {
+    version: '2.0.0',
+    chainId: '0x14a34',
+    atomicRequired: true,
+    calls: [
+      { to: f.document.contracts[0].address, value: '0x0', data },
+      { to: f.document.contracts[0].address, value: '0x0', data },
+    ],
+  };
+  expect(
+    Buffer.byteLength(
+      JSON.stringify([
+        (await f.readTerms()).runtime_contract_terms,
+        batch.calls.map((call) => ({ ...call, value: '0' })),
+      ]),
+    ),
+  ).toBeLessThan(8192);
+  const result = await f.rpc('wallet_sendCalls', [batch]);
+  expect(result.error.code).toBe(5740);
+  const db = openProviderDatabase({ directory: f.config.storage.directory });
+  expect(
+    await db.onboardingStore.transaction(
+      (state) => Object.keys(state.safeRequests ?? {}).length,
+    ),
+  ).toBe(0);
+  db.close();
+  expect(injected.backend!.signTypedData).not.toHaveBeenCalled();
+  expect(f.calls.state.posts).toBe(0);
+});
+
+it('lists wallet batches with owner-bound application access and a separately authorized provider ledger', async () => {
+  const f = await walletCallsFixture();
+  const sent = await f.rpc('wallet_sendCalls', [
+    { ...f.batch(), id: 'operator-ui-batch' },
+  ]);
+  expect(sent.result.id).toBe('operator-ui-batch');
+  const list = (authorization: string) =>
+    f.app.inject({
+      method: 'GET',
+      url: '/v1/runtime-configuration/batches',
+      headers: { authorization },
+    });
+  const appToken = await f.t.f.token('wallet:execute:read');
+  const applicationList = await list(appToken);
+  expect(applicationList.statusCode, applicationList.body).toBe(200);
+  expect(applicationList.json().batches).toEqual([
+    expect.objectContaining({
+      id: 'operator-ui-batch',
+      status: 100,
+      queue_stage: 'queued',
+    }),
+  ]);
+  expect(applicationList.body).not.toContain('consentReference');
+  expect(applicationList.body).not.toContain('principal');
+  const providerList = await list(f.operatorToken);
+  expect(providerList.statusCode, providerList.body).toBe(200);
+  expect(providerList.json()).toEqual(applicationList.json());
+  const otherSubject = await list(
+    await f.t.f.token('wallet:execute:read', undefined, 'different-subject'),
+  );
+  expect(otherSubject.statusCode).toBe(200);
+  expect(otherSubject.json().batches).toEqual([]);
+  expect(
+    (await list(await f.t.f.token('wallet:configuration:write'))).statusCode,
+  ).toBe(403);
+  await f.publish();
+  expect((await list(appToken)).json().batches).toHaveLength(1);
+  expect(f.calls.state.posts).toBe(0);
+  const db = openProviderDatabase({ directory: f.config.storage.directory });
+  try {
+    await db.onboardingStore.transaction((state) => {
+      for (const grant of Object.values(state.grants)) grant.state = 'revoked';
+    });
+  } finally {
+    await db.close();
+  }
+  expect((await list(appToken)).json().batches).toEqual([]);
+  expect((await list(f.operatorToken)).json().batches).toHaveLength(1);
+  expect(f.calls.state.posts).toBe(0);
+});
+
+it('requires renewed financial consent after a provider-allowed application automatically registers a method', async () => {
+  const f = await runtimeFinancialFixture();
+  const appId = runtimeApplicationId(
+    f.config.oauth.issuer,
+    f.config.policy.applications[0].clientId,
+  );
+  const review = await f.app.inject({
+    method: 'POST',
+    url: `/v1/runtime-configuration/applications/${appId}/review`,
+    headers: {
+      authorization: f.operatorToken,
+      'idempotency-key': randomUUID(),
+    },
+    payload: {
+      expected_revision: '1',
+      expected_review_revision: '0',
+      mode: 'automatic',
+    },
+  });
+  expect(review.statusCode, review.body).toBe(200);
+  f.document.contracts[0].methods.unshift({
+    signature: 'anotherMethod(bytes32)',
+    maximum_value_wei: '2',
+  });
+  const proposed = await f.app.inject({
+    method: 'POST',
+    url: '/v1/runtime-configuration/proposals',
+    headers: {
+      authorization: await f.t.f.token('wallet:configuration:propose'),
+      'idempotency-key': randomUUID(),
+    },
+    payload: { expected_revision: '1', policy: f.document },
+  });
+  expect(proposed.statusCode, proposed.body).toBe(200);
+  expect((await f.request()).statusCode).toBe(403);
+  expect(f.calls.state.posts).toBe(0);
+  expect((await f.consent()).json().status).toBe('granted');
+  const admitted = await f.request();
+  expect(admitted.statusCode, admitted.body).toBe(200);
+  expect(f.calls.state.posts).toBe(0);
+});

@@ -66,6 +66,10 @@ const guides = {
     'api.md#core-wallet-service',
   ],
   './deployment': ['Configuration-first provider service', 'setup.md'],
+  './wallet-calls': [
+    'Standard wallet calls request adapter',
+    'wallet-calls.md',
+  ],
   './backend': ['Supplied stored-action backend', 'stored-backend.md'],
   './storage': [
     'Built-in SQLite storage and financial authority',

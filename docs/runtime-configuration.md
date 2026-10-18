@@ -13,6 +13,12 @@ preparation, signing and designated execution. Registration alone grants no wall
 access or spending authority. Without the explicit financial opt-in, the registry
 remains a configuration-only service and existing startup policies keep their behavior.
 
+Use the [runtime workspace](runtime-workspace.md) for contract registration,
+policy review/publication and batch tracking through forms. Providers explicitly
+allow automatic contract/method acceptance per application; provider requirements
+remain controlled by the published policy. The setup wizard can configure the
+operator boundary without editing JSON.
+
 ## Configure the operator boundary
 
 Add this optional section to your provider configuration before starting the
@@ -259,5 +265,6 @@ report `contract-execution`, not proof of swap output, vault shares or beneficia
 settlement. Native-value limits do not bound token approvals or downstream calls;
 review permitted methods and their argument semantics accordingly. New execution
 mechanisms, business-effect verifiers and policy rule types require implementation.
-The EIP-5792 adapter, operator GUI and real test-network/provider/recovery acceptance
-remain pending. See the [enterprise standards record](v1-standards.md).
+The [EIP-5792 adapter](wallet-calls.md) supplies standard batch submission and
+status for this Safe profile. Operator GUI and real test-network/provider/recovery
+acceptance remain pending. See the [enterprise standards record](v1-standards.md).
