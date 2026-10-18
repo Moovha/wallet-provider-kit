@@ -1,3 +1,4 @@
+import type { WalletCallsDriver } from '../sponsorship/execution-types.js';
 import type { ProviderState } from '../onboarding/types.js';
 import { runtimeApplicationId } from '../runtime-configuration/service.js';
 import { randomBytes, randomUUID } from 'node:crypto';
@@ -44,54 +45,86 @@ function address(value: unknown): string {
     return invalid();
   }
 }
-function capabilities(value: unknown) {
+function capabilities(value: unknown, paymasterSupported = false) {
   if (value === undefined) return;
   if (!object(value) || Object.keys(value).length > 16) invalid();
-  for (const capability of Object.values(value)) {
+  for (const [name, capability] of Object.entries(value)) {
     if (
       !object(capability) ||
       (capability.optional !== undefined &&
         typeof capability.optional !== 'boolean')
     )
       invalid();
+    if (name === 'paymasterService' && paymasterSupported) continue;
     if (capability.optional !== true) throw new WalletCallsError(5700);
   }
 }
-/** Account-scoped EIP-5792 adapter. Only the durable Safe queue can admit new effects. */
+/** Account-scoped EIP-5792 adapter. The server selects the durable execution driver for each account. */
 export class WalletCallsService {
+  private readonly queue?: SafeExecutionQueue;
+  private readonly execution?: ApprovedExecutionCoordinator;
+  private readonly driver?: WalletCallsDriver;
+  constructor(actions: SupportedActions, driver: WalletCallsDriver);
+  constructor(
+    actions: SupportedActions,
+    queue: SafeExecutionQueue,
+    execution: ApprovedExecutionCoordinator,
+    driver?: WalletCallsDriver,
+  );
   constructor(
     private readonly actions: SupportedActions,
-    private readonly queue: SafeExecutionQueue,
-    private readonly execution: ApprovedExecutionCoordinator,
+    queueOrDriver: SafeExecutionQueue | WalletCallsDriver,
+    execution?: ApprovedExecutionCoordinator,
+    driver?: WalletCallsDriver,
   ) {
     if (!actions.onboarding.runtimeContracts)
       throw new WalletProviderError('wallet_provider_configuration');
+    if (execution) {
+      this.queue = queueOrDriver as SafeExecutionQueue;
+      this.execution = execution;
+      this.driver = driver;
+    } else this.driver = queueOrDriver as WalletCallsDriver;
+  }
+  private selected(accountId: string) {
+    if (this.driver?.handles(accountId)) return this.driver;
+    if (!this.queue) throw new WalletCallsError(4100);
+    return undefined;
   }
   async list(
     principal: VerifiedPrincipal,
     authorizeOperator?: (state: ProviderState) => void,
   ) {
+    if (!this.queue) return this.driver!.list(principal, authorizeOperator);
     const { records, truncated } = await this.queue.walletCallsList(
       principal,
       authorizeOperator,
     );
+    const extra = this.driver
+      ? await this.driver.list(principal, authorizeOperator)
+      : { truncated: false, batches: [] };
     return {
-      truncated,
-      batches: records.map((record) => ({
-        account_id: record.input.account_id,
-        sender: record.walletCalls!.sender,
-        queue_stage: record.status,
-        policy_revision: record.walletCalls!.policyRevision,
-        expires_at: record.expiresAt,
-        application_id: runtimeApplicationId(
-          record.principal.issuer,
-          record.principal.clientId,
-        ),
-        ...this.status(
-          record,
-          record.execution?.observation?.chain_status === 'finalized',
-        ),
-      })),
+      truncated:
+        truncated ||
+        extra.truncated ||
+        records.length + extra.batches.length > 100,
+      batches: [
+        ...records.map((record) => ({
+          account_id: record.input.account_id,
+          sender: record.walletCalls!.sender,
+          queue_stage: record.status,
+          policy_revision: record.walletCalls!.policyRevision,
+          expires_at: record.expiresAt,
+          application_id: runtimeApplicationId(
+            record.principal.issuer,
+            record.principal.clientId,
+          ),
+          ...this.status(
+            record,
+            record.execution?.observation?.chain_status === 'finalized',
+          ),
+        })),
+        ...extra.batches,
+      ].slice(0, 100),
     };
   }
   async request(
@@ -130,9 +163,16 @@ export class WalletCallsService {
       throw new WalletCallsError(4100);
     const binding = await this.actions.walletCallsAccount(principal, accountId);
     if (sender !== binding.address) throw new WalletCallsError(4100);
+    const driver = this.selected(accountId);
+    if (driver) await driver.capabilities(principal, accountId);
     return chains === undefined ||
       (chains as string[]).some((chain) => BigInt(chain) === 84532n)
-      ? { '0x14a34': { atomic: { status: 'supported' } } }
+      ? {
+          '0x14a34': {
+            atomic: { status: 'supported' },
+            ...(driver ? { paymasterService: { supported: true } } : {}),
+          },
+        }
       : {};
   }
   private async sendCalls(
@@ -166,7 +206,14 @@ export class WalletCallsService {
       invalid();
     if (BigInt(input.chainId) !== 84532n) throw new WalletCallsError(5710);
     if (input.calls.length > 16) throw new WalletCallsError(5740);
-    capabilities(input.capabilities);
+    const driver = this.selected(accountId);
+    capabilities(input.capabilities, !!driver);
+    if (driver)
+      driver.acceptPaymaster(
+        object(input.capabilities)
+          ? input.capabilities.paymasterService
+          : undefined,
+      );
     const from = input.from === undefined ? undefined : address(input.from);
     const calls = input.calls.map((call) => {
       if (!object(call, ['to', 'data', 'value', 'capabilities'])) invalid();
@@ -200,7 +247,11 @@ export class WalletCallsService {
     )
       throw new WalletCallsError(5740);
     try {
-      await this.execution.assertWalletCallsSize(principal, {
+      await (
+        driver
+          ? driver.assertSize.bind(driver)
+          : this.execution!.assertWalletCallsSize.bind(this.execution!)
+      )(principal, {
         account_id: accountId,
         kind: 'contract-call',
         calls,
@@ -216,7 +267,11 @@ export class WalletCallsService {
     const id =
       (input.id as string | undefined) ??
       '0x' + randomBytes(32).toString('hex');
-    await this.queue.enqueue(
+    await (
+      driver
+        ? driver.enqueue.bind(driver)
+        : this.queue!.enqueue.bind(this.queue!)
+    )(
       { principal, idempotencyKey: randomUUID() },
       { account_id: accountId, kind: 'contract-call', calls },
       {
@@ -238,15 +293,17 @@ export class WalletCallsService {
     if (!principal.scopes.includes('wallet:execute:read'))
       throw new WalletCallsError(4100);
     const id = params[0];
-    let stored = await this.queue.walletCallsRecord(principal, accountId, id);
+    const driver = this.selected(accountId);
+    if (driver) return driver.status(principal, accountId, id);
+    let stored = await this.queue!.walletCallsRecord(principal, accountId, id);
     let fresh = true;
     if (stored.actionId) {
       try {
-        await this.execution.refresh(stored.actionId);
+        await this.execution!.refresh(stored.actionId);
       } catch {
         fresh = false;
       }
-      stored = await this.queue.walletCallsRecord(principal, accountId, id);
+      stored = await this.queue!.walletCallsRecord(principal, accountId, id);
     }
     return this.status(stored, fresh);
   }

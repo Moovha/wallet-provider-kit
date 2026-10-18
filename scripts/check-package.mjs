@@ -107,6 +107,9 @@ try {
         for (const [key, value] of Object.entries(surface)) assert.equal(root[key], value);
       }
     }
+    const sponsorship = await import('@moovha/wallet-provider-kit/sponsorship');
+    for (const name of ['UserOperationExecutionCoordinator', 'UserOperationWalletCallsDriver', 'UserOperationReceiptObserver', 'createBundlerClientV07']) assert.equal(typeof sponsorship[name], 'function');
+    assert.equal(typeof (await import('@moovha/wallet-provider-kit/http')).WalletCallsService, 'function');
     await assert.rejects(import('@moovha/wallet-provider-kit/dist/main.js'), { code: 'ERR_PACKAGE_PATH_NOT_EXPORTED' });
     const schema = JSON.parse(await readFile(new URL(import.meta.resolve('@moovha/wallet-provider-kit/spec/provider-api.json')), 'utf8'));
     assert.ok(schema.paths['/v1/actions/{actionId}/sign']);

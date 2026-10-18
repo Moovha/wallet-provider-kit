@@ -35,3 +35,25 @@ export type {
   Safe4337SigningOptions,
   SponsorshipConsentTerms,
 } from './signing.js';
+
+export {
+  createBundlerClientV07,
+  signedUserOperationHash,
+  packedUserOperation,
+} from './bundler.js';
+export type {
+  BundlerConfigurationV07,
+  SignedUserOperationV07,
+} from './bundler.js';
+export { UserOperationReceiptObserver } from './receipts.js';
+export {
+  UserOperationExecutionCoordinator,
+  userOperationExecutionBinding,
+} from './execution.js';
+export { UserOperationWalletCallsDriver } from './wallet-calls.js';
+export type { UserOperationWalletCallsConfiguration } from './wallet-calls.js';
+export type {
+  WalletCallsDriver,
+  UserOperationExecution,
+  UserOperationObservation,
+} from './execution-types.js';

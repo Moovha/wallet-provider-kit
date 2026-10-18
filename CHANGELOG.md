@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased bundled wallet execution
+
+- Connect an explicitly selected ERC-4337 driver to EIP-5792 batch admission,
+  status, operator summaries and provider-bound ERC-7677 capability discovery.
+- Persist exact signed UserOperations and local hashes before a single fenced
+  bundler dispatch; retain uncertain outcomes without retries or relayer fallback.
+- Recover receipts through independent chain reads, exact EntryPoint payload and
+  event checks, per-operation logs/gas, finality observations and reorg handling.
+- Retain shared runtime authority, operation/gas reservations and mechanism locks.
+  Keep configured wizard activation and real-service acceptance gated.
+
 ## Unreleased durable SafeOp admission and signing
 
 - Bind each stored operation to one mechanism before relayer signing/submission or ERC-4337

@@ -3,8 +3,9 @@
 Advanced embedded hosts can use `Safe4337SigningService` to reserve sponsorship
 and sign exact Safe operations through their protected wallet backend. The
 configured CLI, setup wizard and HTTP service do not enable this adapter yet.
-Bundler submission, receipt reconciliation and `paymasterService` discovery remain
-separate release milestones. Existing relayer execution remains supported.
+The separate [bundler execution adapter](user-operation-execution.md) supplies
+durable submission, independent receipt recovery and `paymasterService` discovery
+for embedded hosts. Existing relayer execution remains supported.
 
 ## Bind one stored operation to one mechanism
 
@@ -119,8 +120,8 @@ final stub skips the second RPC. Dispatch, lost responses, expired leases and
 unknown signing outcomes never become retry permission or a relayer fallback.
 The adapter conservatively retains both reservations after failures, including
 when a post-claim authority check prevents contact. It does not automatically
-refund usage or retry with changed estimates. Reconciliation and evidence-based
-release remain later execution/recovery work.
+refund usage or retry with changed estimates. The bundler adapter records independently
+verified actual gas cost; automatic evidence-based budget release remains unsupported.
 
 The adapter persists usable sponsorship data and signatures in the private
 SQLite database. Protect the volume and backups as authorization material. Keep

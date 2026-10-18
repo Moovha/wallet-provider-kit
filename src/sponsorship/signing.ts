@@ -1,3 +1,4 @@
+import { safeUserOperationCallData } from './preparation.js';
 import { fingerprint, deny, uuid } from '../onboarding/policy.js';
 import type { AuthorityContext } from '../domain/principal.js';
 import {
@@ -40,6 +41,7 @@ import {
 import type { SponsorshipAdmission } from './admission.js';
 
 export interface Safe4337SigningConfiguration {
+  submissionBinding?: string;
   acceptance: Safe4337Acceptance;
   basePolicy: ApprovedCallPolicy;
   sponsors: ApplicationGasAllowance[];
@@ -131,13 +133,120 @@ export class Safe4337SigningService {
     context: AuthorityContext,
     input: ApprovedCallInput,
     operation: UserOperationV07,
+    expiresAt?: string,
   ) {
     context = structuredClone(context);
     operation = normalizeUserOperationV07(operation);
-    const source = await this.actions.requestCalls(context, input, async () =>
-      BigInt(operation.nonce).toString(),
+    const source = await this.actions.requestCalls(
+      context,
+      input,
+      async () => BigInt(operation.nonce).toString(),
+      undefined,
+      expiresAt,
     );
     return this.admit(context, source.action_id, operation);
+  }
+  executionBinding() {
+    return {
+      configurationHash: this.configurationHash,
+      submissionBinding: this.config.submissionBinding,
+      acceptance: structuredClone(this.config.acceptance),
+      paymasterUrl: this.config.paymaster.url,
+      accountIds: this.config.basePolicy.accounts.map((a) => a.accountId),
+    };
+  }
+  async prepareCalls(
+    principal: import('../domain/principal.js').VerifiedPrincipal,
+    input: ApprovedCallInput,
+    gas: Pick<
+      UserOperationV07,
+      | 'callGasLimit'
+      | 'verificationGasLimit'
+      | 'preVerificationGas'
+      | 'maxFeePerGas'
+      | 'maxPriorityFeePerGas'
+    >,
+  ) {
+    const preview = await this.actions.previewWalletCalls(principal, input);
+    const nonce = await this.verifier.verify(
+      preview.intent,
+      preview.action.chain_account_id.split(':')[2],
+    );
+    const intent = { ...preview.intent, nonce };
+    return normalizeUserOperationV07({
+      ...gas,
+      sender: intent.account.address,
+      nonce: '0x' + BigInt(nonce).toString(16),
+      callData: safeUserOperationCallData(intent),
+    });
+  }
+  async assertAccepted(
+    principal: import('../domain/principal.js').VerifiedPrincipal,
+    accountId: string,
+  ) {
+    if (
+      BigInt(
+        applicationGasBudgetLimit(this.config.sponsors, principal.clientId),
+      ) === 0n
+    )
+      deny();
+    const binding = await this.actions.walletCallsAccount(principal, accountId);
+    const account =
+      this.config.basePolicy.accounts.find((a) => a.accountId === accountId) ??
+      deny();
+    const owner = await this.actions.onboarding.withAccountAccess(
+      principal,
+      accountId,
+      'contracts:request',
+      (state) => state.accounts[accountId].address ?? deny(),
+    );
+    if (binding.address.toLowerCase() !== account.address.toLowerCase()) deny();
+    await this.verifier.verify(
+      {
+        account,
+        multiSend: this.config.basePolicy.multiSend,
+        calls: [],
+        contracts: [],
+      },
+      owner,
+    );
+  }
+  async authorizeSubmission(context: AuthorityContext, id: string) {
+    await this.current(context, this.load(id));
+  }
+  async withExecutionRead<T>(
+    principal: import('../domain/principal.js').VerifiedPrincipal,
+    id: string,
+    operation: (
+      state: import('../onboarding/types.js').ProviderState,
+      record: SponsorshipAdmission,
+    ) => T,
+  ) {
+    const record = this.load(id);
+    return this.actions.onboarding.withAccountAccess(
+      principal,
+      record.source.account.accountId,
+      'account:read',
+      (state, grant) => {
+        if (
+          record.configurationHash !== this.configurationHash ||
+          state.deploymentBindings?.['service-v1']?.activeRevision !==
+            this.actions.revision ||
+          grant.owner !== record.source.ownerSubject ||
+          ['issuer', 'subject', 'clientId'].some(
+            (key) =>
+              principal[key as 'issuer' | 'subject' | 'clientId'] !==
+              record.source.caller[key as 'issuer' | 'subject' | 'clientId'],
+          ) ||
+          state.accounts[grant.accountId].address?.toLowerCase() !==
+            record.source.account.address.toLowerCase() ||
+          fingerprint(state.supportedActions?.[id]?.approval) !==
+            fingerprint(record.source)
+        )
+          deny();
+        return operation(state, record);
+      },
+    );
   }
   private load(id: string) {
     return this.database.sponsorship.load(id) ?? deny();

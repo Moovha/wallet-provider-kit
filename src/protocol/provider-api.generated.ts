@@ -439,7 +439,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Optional account-scoped EIP-5792 2.0.0 JSON-RPC transport. Runtime financial authority, Safe queue, current owner consent and method-specific scopes remain required. wallet_sendCalls admits a durable atomic batch without waiting for chain inclusion. Headless wallet_showCallsStatus returns unsupported method; the client adapter can present status through an explicit host callback. */
+        /** @description Optional account-scoped EIP-5792 2.0.0 JSON-RPC transport. Runtime financial authority, an explicitly bound Safe relayer or ERC-4337 driver, current owner consent and method-specific scopes remain required. wallet_sendCalls admits a durable atomic batch without waiting for chain inclusion. Headless wallet_showCallsStatus returns unsupported method; the client adapter can present status through an explicit host callback. */
         post: operations["walletCallsRpc"];
         delete?: never;
         options?: never;
@@ -5935,6 +5935,10 @@ export interface operations {
                             }[];
                         } | {
                             "0x14a34"?: {
+                                paymasterService?: {
+                                    /** @enum {boolean} */
+                                    supported: true;
+                                };
                                 atomic: {
                                     /** @enum {string} */
                                     status: "supported";

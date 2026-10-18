@@ -22,3 +22,13 @@ export interface WalletCallsMetadata {
   policyHash: string;
   policyRevision: string;
 }
+
+export interface WalletCallsBatchSummary extends WalletCallsStatus {
+  account_id: string;
+  sender: string;
+  queue_stage:
+    'cancelled' | 'expired' | 'blocked' | 'succeeded' | 'queued' | 'executing';
+  policy_revision: string;
+  expires_at: string;
+  application_id: string;
+}

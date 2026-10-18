@@ -261,6 +261,16 @@ export class SafeExecutionQueue {
           )
             deny();
           if (
+            Object.values(state.userOperationBatches ?? {}).some(
+              (entry) =>
+                entry.metadata.id === walletCalls.id &&
+                entry.metadata.sender.toLowerCase() === authority.safeAddress &&
+                entry.context.principal.issuer === context.principal.issuer &&
+                entry.context.principal.clientId === context.principal.clientId,
+            )
+          )
+            return undefined;
+          if (
             Object.values(entries).some(
               (entry) =>
                 entry.walletCalls?.id === walletCalls.id &&
