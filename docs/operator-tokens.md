@@ -1,9 +1,11 @@
 # Get and renew application tokens in the GUI
 
-These optional controls authenticate **staff who obtain application API tokens**.
-They do not require wallet users to sign in to the provider. Standard user access
-remains [application-led](application-access.md). Enabling these controls requires
-optional staff login in Services; a reviewer account is unnecessary.
+Staff testing the deployed API can obtain short-lived application tokens directly
+in Swagger instead of moving them between tools. Enable these optional controls
+in [Deployment](setup-wizard.md#_5-deployment), then configure staff login in
+Services and an explicit operator allowlist. Staff login authorizes token
+controls; users continue to authenticate and consent within the connected
+application. This guide explains setup, issuance, renewal and troubleshooting.
 
 The optional **Application tokens** panel in deployed Swagger lets an authorized
 operator obtain a short-lived calling-application token, renew it and use it for

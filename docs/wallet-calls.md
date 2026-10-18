@@ -1,10 +1,12 @@
 # Submit and track standard wallet calls
 
-Applications can use the [EIP-5792 Wallet Call API](https://eips.ethereum.org/EIPS/eip-5792)
-version `2.0.0` to submit atomic batches through the runtime-authorized Safe queue.
-The transport implements `wallet_sendCalls`, `wallet_getCallsStatus` and
-`wallet_getCapabilities`. The optional request adapter implements
-`wallet_showCallsStatus` through an explicit application UI callback. The headless
+Applications can submit and track atomic wallet batches through a standard API
+while retaining your existing contract permissions. Configure the
+[runtime policy](setup-wizard.md#_4-policies) and
+[Safe queue execution](setup-wizard.md#_5-deployment) first. The EIP-5792 version
+`2.0.0` transport exposes `wallet_sendCalls`, `wallet_getCallsStatus` and
+`wallet_getCapabilities`; the optional request adapter supplies
+`wallet_showCallsStatus` through your application's UI callback. The headless
 server returns `4200` for that display method.
 
 This is a Base Sepolia (`0x14a34`) profile of the existing Safe 1.4.1 mechanism.

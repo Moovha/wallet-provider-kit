@@ -96,7 +96,7 @@ const guides = {
     'openzeppelin-relayer.md',
   ],
 };
-let markdown = `# TypeScript API reference\n\nUse this reference for the public package exports and TypeScript declarations.\nFor contributing or regeneration, see the [development guide](../CONTRIBUTING.md#development).\n\nStart with the [API guide](api.md) for composition, ownership and errors, or the\n[runnable integration tutorial](integration-example.md). These declaration excerpts\nare a reference, not standalone programs. Read [roles and terms](concepts.md)\nfor owners, application clients, host authority, wallet backends and journals.\nSupporting names and schema aliases\nretain their source declaration names; follow the declaration link for their imports.\n\nThe root \`@moovha/wallet-provider-kit\` re-exports core, HTTP, onboarding,\nidentity, telemetry, storage and deployment. Provider adapters require their explicit subpaths.\n\n`;
+let markdown = `# TypeScript API reference\n\nUse these declarations when extending the backend selected in\n[Backend](setup-wizard.md#_2-backend), or embedding the service in your own server.\nThe configured wizard service does not require library composition. For the API\nyour connected applications call after deployment, use the [HTTP guide](http-api.md).\nFor contributing or regeneration, see the [development guide](../CONTRIBUTING.md#development).\n\nStart with the [API guide](api.md) for composition, ownership and errors, or the\n[runnable integration tutorial](integration-example.md). These declaration excerpts\nare a reference, not standalone programs. Read [roles and terms](concepts.md)\nfor owners, application clients, host authority, wallet backends and journals.\nSupporting names and schema aliases\nretain their source declaration names; follow the declaration link for their imports.\n\nThe root \`@moovha/wallet-provider-kit\` re-exports core, HTTP, onboarding,\nidentity, telemetry, storage and deployment. Provider adapters require their explicit subpaths.\n\n`;
 for (const [path, target] of surfaces.filter(([path]) => path !== '.')) {
   const source = typed.getSourceFile(resolve(root, target.types));
   assert.ok(source, `Missing declarations for ${path}`);
@@ -155,7 +155,7 @@ const schema = JSON.parse(
   await readFile(resolve(root, 'spec/provider-api.json'), 'utf8'),
 );
 let http =
-  '# HTTP schema reference\n\nUse these request and response schemas with the\n[implemented provider contract](../spec/provider-api.json). For contributing or\nregeneration, see the [development guide](../CONTRIBUTING.md#development).\nRead the [HTTP usage guide](http-api.md) for authentication, scopes, error handling\nand integration profiles. Optional-profile routes are present in the contract even\nwhen the corresponding service is not configured. Read [roles and terms](concepts.md)\nfor application clients, account owners, authority and journals.\n\n';
+  '# HTTP schema reference\n\nAfter [Export and deployment](setup-wizard.md#_6-export), use these schemas to\nimplement application access and permitted wallet actions. They describe the\n[implemented provider contract](../spec/provider-api.json); the [HTTP guide](http-api.md)\nexplains the request sequence and the [access guide](application-access.md) connects\nidentity, consent and grants to the policy configured in the wizard. For contributing or\nregeneration, see the [development guide](../CONTRIBUTING.md#development).\nRead the [HTTP usage guide](http-api.md) for authentication, scopes, error handling\nand integration profiles. Optional-profile routes are present in the contract even\nwhen the corresponding service is not configured. Read [roles and terms](concepts.md)\nfor application clients, account owners, authority and journals.\n\n';
 for (const [path, methods] of Object.entries(schema.paths)) {
   for (const [method, operation] of Object.entries(methods)) {
     if (!['get', 'post', 'delete', 'put', 'patch'].includes(method)) continue;
@@ -187,7 +187,7 @@ const executorSchema = JSON.parse(
   await readFile(resolve(root, 'spec/execution-api.json'), 'utf8'),
 );
 let executorHttp =
-  '# Execution service HTTP reference\n\nUse the [designated execution service guide](execution-service.md) for deployment, signed service requests, current wallet authority and recovery. This is a separate process and API from the wallet service. The [generated OpenAPI contract](../spec/execution-api.json) includes all implemented service operations.\n\n';
+  '# Execution service HTTP reference\n\nUse these schemas when connecting the designated executor selected in\n[Deployment](setup-wizard.md#_5-deployment). The [execution service guide](execution-service.md)\nexplains its separate process, signed requests, current wallet authority and\nrecovery. Application API tokens cannot authenticate this service boundary. The [generated OpenAPI contract](../spec/execution-api.json) includes all implemented service operations.\n\n';
 for (const [path, methods] of Object.entries(executorSchema.paths)) {
   for (const [method, operation] of Object.entries(methods)) {
     if (!['get', 'post'].includes(method)) continue;

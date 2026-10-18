@@ -1,6 +1,9 @@
 # Execution service HTTP reference
 
-Use the [designated execution service guide](execution-service.md) for deployment, signed service requests, current wallet authority and recovery. This is a separate process and API from the wallet service. The [generated OpenAPI contract](../spec/execution-api.json) includes all implemented service operations.
+Use these schemas when connecting the designated executor selected in
+[Deployment](setup-wizard.md#_5-deployment). The [execution service guide](execution-service.md)
+explains its separate process, signed requests, current wallet authority and
+recovery. Application API tokens cannot authenticate this service boundary. The [generated OpenAPI contract](../spec/execution-api.json) includes all implemented service operations.
 
 ## GET /v1/executor-capabilities
 

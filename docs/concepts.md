@@ -1,8 +1,10 @@
 # Understand the roles and terms
 
-Start here if you are new to the kit. The same names appear in the README,
-configuration, examples and API reference. This page explains the roles first,
-then maps the technical names to the code you will integrate.
+The wizard asks you to connect a provider, backend and applications because each
+has a different responsibility for the user's wallet. Use this guide alongside
+[Provider](setup-wizard.md#_1-provider) to understand those roles, then return to
+the relevant setup step. Technical names are included where they help you relate
+settings to API requests or an optional library integration.
 
 These are blockchain wallets: their addresses hold on-chain assets, and approved
 signatures can authorise transactions involving token contracts. USDC and ZARP
@@ -150,14 +152,16 @@ it retries with the same idempotency key. If success was recorded and access is
 still allowed, it receives the original signature. If the outcome is unknown,
 the service preserves that uncertainty instead of signing again.
 
-Application logs and telemetry don't replace this journal. You supply reviewed
-persistent storage for financial attempts; the offline example's in-memory journal
-is only a fixture. Bundled onboarding has a separate provisioning-only journal
-and doesn't enable financial signing. See [durable attempts](durable-attempts.md)
+Application logs and telemetry do not replace this journal. The configured
+service supplies persistent SQLite journals for its enabled profiles; select their
+private directory in Deployment. Embedded hosts supply accepted persistent storage.
+The offline example uses an in-memory fixture, and the programmatic onboarding-only
+profile has a provisioning journal that cannot authorize financial signing. See [durable attempts](durable-attempts.md)
 for storage, concurrency and recovery requirements.
 
-## Continue with an integration
+## Continue with setup
 
-[Install the package](package.md), then [run the provider walkthrough](integration-example.md).
-Use the [backend guide](backend-guide.md) to replace its signing engine and the
-[provider guide](provider-guide.md) to connect your host's real authority and storage.
+Return to the [wizard guide](setup-wizard.md) to configure your service. Its steps
+connect these roles to backend selection, token registrations, policy and storage.
+For an embedded or custom integration, use the [developer API guide](api.md),
+[offline tutorial](integration-example.md) and [backend interfaces](backend-guide.md).

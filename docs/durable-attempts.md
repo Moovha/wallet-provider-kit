@@ -1,12 +1,11 @@
 # Keep provider attempts across retries and restarts
 
-A **journal** is a private, persistent record of attempts and their results.
-An **attempt** is one admitted execution of account creation or an approved signing
-action. Retrying the same request keeps that attempt's identity. Your **host**,
-the wallet service's server application, supplies the journal storage and current
-permission checks. The **backend** is the account/signing engine being called.
-See [roles and terms](concepts.md#actions-attempts-and-the-journal) for a worked
-retry example and the difference between an action, attempt and idempotency key.
+A retry must not create another wallet or sign an uncertain action again. The
+service records each attempt and its result in a private, persistent **journal**.
+Choose its supplied storage in [Deployment](setup-wizard.md#_5-deployment) and
+follow [storage recovery](storage.md#recovery-backup-and-operations) for backups.
+This guide explains the journal interfaces for developers embedding the toolkit
+or supplying custom storage; configured-service operators do not implement them.
 
 Wrap your signing backend with `createJournaledWalletProvider` when you compose
 `EmbeddedWalletService`. The wrapper commits a dispatch claim before calling the

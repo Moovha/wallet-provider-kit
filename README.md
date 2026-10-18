@@ -289,70 +289,79 @@ Experimental adapters connect [Coinbase CDP](docs/provider-guide.md#current-adap
 network, key-control and recovery profile. Relayer also offers a separate
 library-only execution profile.
 
-**Experimental · 0.1.0 · unpublished.** The default service stays unconfigured.
-The bundled onboarding-only profile manages access and provisioning. The
-configured service supplies policy-authorized ERC-3009 transfers and optional Safe contract calls, swaps and vault deposits on Base Sepolia, backed by durable financial journals. Other execution mechanisms require advanced host integration. The [built-in SQLite database](docs/storage.md)
-stores onboarding, approvals, budgets and financial attempts on one persistent
-POSIX host, with required current host-policy checks. The original file store
-remains available for onboarding.
+The current version, **0.1.0**, is experimental and available from source rather
+than npm. You can configure account access and provisioning, add delegated
+ERC-3009 transfer signing, and optionally execute approved Safe contract calls,
+swaps and vault deposits on **Base Sepolia**. Start with the
+[setup guide](docs/README.md); it follows the same six steps as the wizard.
 
-USDC and ZARP describe the wider project's asset use cases; they are not a claim
-that this experimental profile supports every token or mainnet operation. Its
-configured token contract and signing domain need independent verification.
+Your first deployment stays disabled while you test your backend, application
+permissions and recovery. The supported runtime uses one active POSIX host with
+persistent [SQLite storage](docs/storage.md). Production custody acceptance and
+mainnet support remain pending. USDC and ZARP illustrate the wider project's
+asset use cases; verify the exact test-token contract and signing domain before
+configuring transfers.
 
-Production custody acceptance remains pending. Mainnet, automatic smart-account provisioning, WalletConnect and ERC-1271/4337/7702 are unsupported. General calls require explicitly bound, pre-existing Safe 1.4.1 accounts. The separate
-[orchestration draft](spec/orchestration-draft.json) is a reference for Moovha's
-business API; those business orchestration routes aren't implemented here. The
-optional [execution coordinator](docs/execution.md) and [approved contract calls, swaps and vault deposits](docs/approved-contract-calls.md) supplies dedicated sponsor
-submission and verified token-transfer status. Its [designated execution service](docs/execution-service.md)
-runs separately with configurable providers, authenticated dispatch, fresh wallet
-authority callbacks and an independent durable journal. See the
-[enterprise v1 standards and release gates](docs/v1-standards.md) for extension
-boundaries and pending acceptance. The sponsorship commitment belongs to the connected application's
-execution rail; installing the kit or approving access does not activate it.
-Use the [acceptance requirements](docs/conformance.md) to assess your integration.
+## Configure your wallet service
 
-## Developer learning: offline provider flow
+The wizard brings the provider's setup decisions together in the order you make
+them. Users authenticate, complete identity checks and consent within the
+connected application. You decide which applications to trust and what their
+requests must satisfy.
 
-Use Node **24.22.0** and npm **11.11.1**:
+1. **[Provider](docs/setup-wizard.md#_1-provider)** — identify your service with its
+   name, public HTTPS origin and privacy notice.
+2. **[Backend](docs/setup-wizard.md#_2-backend)** — choose where accounts are
+   created and approved actions are signed, then prepare that backend's
+   credentials and recovery arrangements.
+3. **[Services](docs/setup-wizard.md#_3-services)** — connect the token issuer that
+   authenticates applications to your API.
+4. **[Policies](docs/setup-wizard.md#_4-policies)** — register trusted applications,
+   define identity and consent requirements, and choose permitted actions and limits.
+5. **[Deployment](docs/setup-wizard.md#_5-deployment)** — choose persistent storage,
+   API tools and any sponsored execution features. Keep initial activation off.
+6. **[Export](docs/setup-wizard.md#_6-export)** — validate your settings, run a local
+   deployment or download its files, then test and activate the service.
 
-```sh
-git clone https://github.com/Moovha/wallet-provider-kit.git
-cd wallet-provider-kit
-npm ci
-npm run example:provider
-```
+The [setup guide](docs/README.md) explains how to open the wizard. Each step links
+to the relevant preparation, API and operating details. You can configure the
+supplied service without writing policy callbacks, storage adapters or signing code.
 
-The offline example walks through authentication, account provisioning, approved
-signing, result replay, revocation, current-KYC denial and an uncertain outcome.
-It uses ephemeral fixtures, opens no listener and requires no live credentials
-or funds. Follow the [tutorial](docs/integration-example.md) to understand each
-step and the production integrations you must supply.
+## Connect and operate
 
-To consume the toolkit in your own application, run `npm run pack:local` and
-follow the [package installation guide](docs/package.md). npm publication remains
-disabled. For a new provider, continue with the [operator wizard](docs/setup-wizard.md); for an existing embedded host,
-start with the [API guide](docs/api.md) and [durable attempts](docs/durable-attempts.md).
+After deployment, give your application developer the provider origin, token
+registration and [HTTP contract](docs/http-api.md). Applications read your current
+policy, submit identity and consent evidence, receive a revocable grant and
+provision the wallet. Optional signing and execution need their own explicit
+permissions and accepted policies. The [access guide](docs/application-access.md)
+describes this sequence; the [staging walkthrough](docs/staging-walkthrough.md)
+helps you test it with your own services.
 
-For designated execution, see [automatic bounded replacements](docs/automatic-replacements.md)
-and the [optional fee-only Relayer build](docs/fee-only-relayer.md). New wizard
-configurations supply editable evaluation gas defaults; every accepted execution
-retains fixed approved caps and current wallet authority checks.
+An authorization signature, transaction submission, verified chain result and
+business settlement describe different outcomes. The connected application
+arranges gas funding through its accepted execution rail. For the supplied
+coordinator, configure [execution](docs/execution.md) in Deployment. General calls
+require pre-existing, explicitly bound Safe 1.4.1 accounts; the wizard does not
+create smart accounts. Mainnet, WalletConnect and ERC-1271/4337/7702 execution are
+not enabled by this service. The separate
+[orchestration draft](spec/orchestration-draft.json) describes business API routes
+that this kit does not implement.
 
-## Build with us
+## Extend the service
 
-The [documentation site](https://moovha.github.io/wallet-provider-kit/) takes you
-from installation through backend integration, host authority, APIs and operations,
-with grouped navigation and local search. The
-[contributor guide](CONTRIBUTING.md#preview-and-publish-documentation) explains local
-previews and how to publish reviewed documentation updates.
+If the supported configuration does not meet your requirements, use the
+[developer API guide](docs/api.md) to choose an embedded integration or a
+[custom adapter](docs/custom-adapters.md). The
+[offline provider tutorial](docs/integration-example.md) demonstrates authentication,
+provisioning, signing, replay and revocation with ephemeral fixtures and no funds.
+These developer paths are optional; they are not prerequisites for wizard setup.
 
-Contributions follow the [contributor guide](CONTRIBUTING.md),
-[governance](GOVERNANCE.md) and [code of conduct](CODE_OF_CONDUCT.md).
+## Contribute
+
 Use [GitHub issues](https://github.com/Moovha/wallet-provider-kit/issues) for bugs
-and integration questions.
+and integration questions. Contributions follow the [contributor guide](CONTRIBUTING.md),
+[governance](GOVERNANCE.md) and [code of conduct](CODE_OF_CONDUCT.md).
 Report vulnerabilities through [SECURITY.md](SECURITY.md). See the
-[changelog](CHANGELOG.md) and [release process](docs/releases.md) for project
-history and release requirements.
+[changelog](CHANGELOG.md) and [release process](docs/releases.md) for version history.
 
 [Apache-2.0](LICENSE). See [NOTICE](NOTICE) and [provenance](docs/extraction.json).

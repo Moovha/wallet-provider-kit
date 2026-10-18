@@ -1,10 +1,10 @@
 # Test an application-led staging deployment
 
-Use a reviewed toolkit revision and its matching wizard. This walkthrough tests
-the standard application-led flow on an isolated, unfunded Base Sepolia deployment.
-Users stay in the application. Hosted compatibility deployments use the separate
-[hosted guide](onboarding.md); no provider user login or staff review is part of
-this standard acceptance run.
+After [Export](setup-wizard.md#_6-export), test that your selected backend,
+application evidence and recovery process work together before admitting users.
+This walkthrough uses an isolated, unfunded Base Sepolia deployment and the same
+six-step wizard. Users authenticate and consent inside the application.
+Keep a reviewed toolkit revision and its matching configuration throughout the run.
 
 ## 1. Check prerequisites and record gaps
 

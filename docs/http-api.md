@@ -1,12 +1,12 @@
 # Use the provider HTTP API
 
-This is the toolkit’s **provider-operated** API. Standard access is application-led. Use a base URL chosen by the
-wallet provider operating the service. It is distinct from Moovha's planned
-business-operation API; see [the application/provider boundary](architecture.md#applications-and-wallet-control). The
-[generated schema reference](http-reference.md) records all implemented request
-and response schemas. Swagger UI is available at `/docs/` in the inspection
-service; configured deployments disable it by default. See [service setup](setup.md)
-for configuration and API consumption without a custom host implementation.
+After [Export and deployment](setup-wizard.md#_6-export), give your application
+developer this guide and your provider's HTTPS origin. The API lets a registered
+application discover policy, submit user identity and consent evidence, obtain
+access and request permitted wallet actions. It is the wallet provider's API;
+Moovha's separate business-operation routes are not implemented here. The
+[HTTP schema reference](http-reference.md) provides exact request/response shapes.
+Enable the optional deployed explorer in Deployment to test them at `/docs/`.
 
 The local [setup wizard's API reference](setup-wizard.md#explore-the-provider-api)
 provides bundled Swagger schemas, example requests/responses and configuration

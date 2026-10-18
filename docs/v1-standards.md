@@ -1,11 +1,11 @@
 # Enterprise v1 standards and compatibility decisions
 
-This decision record defines the implemented foundation, extension boundaries and
-release gates for an enterprise v1. It is not a production release declaration.
-The package remains experimental. Standards status was checked against the linked
-primary specifications on 16 October 2026; ERC-4337/7677 sponsorship additions
-were checked on 18 October 2026; a final standard does not establish
-implementation support or security certification.
+Use this support reference when the backend and execution choices in
+[the wizard](setup-wizard.md) need to meet a particular protocol or deployment
+requirement. It distinguishes implemented interfaces, unsupported extensions and
+acceptance still required from your team. Version 0.1.0 remains experimental;
+this page does not declare a production release. Linked specifications were
+reviewed on 16 October 2026, with ERC-4337/7677 additions reviewed on 18 October 2026. A standard's maturity does not establish toolkit support or certification.
 
 The deployment baseline is one active host with local SQLite and a tested passive
 recovery target. Applications use provider-authorized immutable actions, one

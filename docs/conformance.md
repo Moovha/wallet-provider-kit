@@ -1,10 +1,12 @@
 # Check your integration
 
-Use these checks after [connecting your backend](backend-guide.md) and
-[integrating host authority](provider-guide.md). Keep acceptance evidence with your
-deployment/release records. For the configured service, start with the
-[staging walkthrough](staging-walkthrough.md); custom hosts also need the
-authority and backend checks below.
+Before enabling wallet operations, establish that your own backend, application
+permissions and recovery process work together. Plan these checks while choosing
+activation in [Deployment](setup-wizard.md#_5-deployment), then perform them after
+[Export](setup-wizard.md#_6-export) in an isolated deployment. Start with the
+[staging walkthrough](staging-walkthrough.md). Custom integrations also need the
+host-authority and adapter checks below. Keep evidence with your private
+deployment records; an offline test pass does not certify your provider.
 
 <figure class="wallet-visual">
   <img src="./public/diagrams/operations-and-evidence.webp" alt="Diagram: telemetry is separate from private approvals, attempt results and recovery evidence; monitoring has no signing authority." width="1536" height="1024" loading="lazy" decoding="async">
@@ -12,23 +14,6 @@ authority and backend checks below.
 </figure>
 
 [View full-size diagram](public/diagrams/operations-and-evidence.webp)
-
-Start with the automated tests, then collect evidence for your actual deployment.
-The suite runs offline with temporary, unfunded keys; passing it doesn't certify
-a provider. `test/embedded-wallet.test.ts`
-exercises the CDP adapter through a mocked HTTP boundary with real JWT/EIP-712
-cryptography; `test/service.test.ts` exercises RFC 9068 verification, current KYC,
-two client/owner isolation, body/idempotency validation and sanitized outcomes.
-`test/telemetry.test.ts` captures actual OTLP exports locally;
-`test/startup.test.ts` verifies unsafe/incomplete configuration fails without
-credential disclosure. No test creates a vendor account or moves funds.
-
-For each new backend, add equivalent fixtures through its public adapter interface.
-Record adapter/version, environment, account/key-control profile, supported chains,
-action kinds, signature encoding, payload limits, recovery method and submission
-ownership. Do not advertise a profile based only on a vendor SDK method name.
-Use shared payload/digest/signature vectors when two adapters claim the same
-profile; include success, denial and uncertain-outcome cases.
 
 Before you enable an integration, keep evidence for these cases:
 
@@ -74,8 +59,29 @@ filesystem, backup and crash behavior on your deployment. Financial integrations
 need current authority and a persistent financial journal. The configured transfer
 service supplies these for its supported profile; embedded hosts must compose
 them explicitly. The default CLI starts unconfigured. Live CDP evidence is
-limited to the exercise below. Orchestration, sponsorship, settlement and device
-recovery require separate implementations and acceptance evidence.
+limited to the exercise below. Business orchestration and device recovery require separate implementations.
+Configured sponsorship and chain verification require their own acceptance
+evidence; they do not establish downstream business settlement.
+
+## What the offline suite establishes
+
+Use automated checks to evaluate the toolkit’s internal contracts before collecting
+evidence for your actual deployment.
+The suite runs offline with temporary, unfunded keys; passing it doesn't certify
+a provider. `test/embedded-wallet.test.ts`
+exercises the CDP adapter through a mocked HTTP boundary with real JWT/EIP-712
+cryptography; `test/service.test.ts` exercises RFC 9068 verification, current KYC,
+two client/owner isolation, body/idempotency validation and sanitized outcomes.
+`test/telemetry.test.ts` captures actual OTLP exports locally;
+`test/startup.test.ts` verifies unsafe/incomplete configuration fails without
+credential disclosure. No test creates a vendor account or moves funds.
+
+For each new backend, add equivalent fixtures through its public adapter interface.
+Record adapter/version, environment, account/key-control profile, supported chains,
+action kinds, signature encoding, payload limits, recovery method and submission
+ownership. Do not advertise a profile based only on a vendor SDK method name.
+Use shared payload/digest/signature vectors when two adapters claim the same
+profile; include success, denial and uncertain-outcome cases.
 
 ## Isolated CDP staging exercise 16 October 2026
 

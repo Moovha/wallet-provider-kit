@@ -1,6 +1,11 @@
 # Hosted application-record evaluation
 
-This is an **unfunded hosted compatibility evaluation**, not the standard application-led access contract. It deliberately requires provider user login and staff review. For applications that already authenticate users and complete KYC, use [application-led access](application-access.md), including its explicit application trust agreement and consent evidence.
+Use this evaluation only when maintaining a
+[provider-hosted compatibility deployment](onboarding.md) that needs unfunded
+wallet creation from application-supplied records. Select it in
+[Policies](setup-wizard.md#_4-policies). It requires provider user login and staff
+review. For the usual setup, configure application trust and evidence requirements
+in the same Policies step and follow the [access contract](application-access.md).
 
 Hosted compatibility mode offers **application-record evaluation**. The standard wizard and CLI template use [application-led access](application-access.md). An
 application you admit can discover your required fields and submit its records

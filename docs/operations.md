@@ -1,10 +1,11 @@
 # Run and monitor the service
 
-For the configured service, start with [deployment and supervision](operator-deployment.md).
-For an embedded host, complete [backend integration](backend-guide.md),
-[host composition](provider-guide.md) and [acceptance checks](conformance.md).
-This guide covers monitoring and the optional local development stack. Your
-deployment controls financial readiness and recovery.
+Once [Export and acceptance](setup-wizard.md#_6-export) are complete, monitor the
+service and retain the evidence needed to investigate failures. This guide covers
+request traces, metrics and an optional local Grafana stack. Begin with the
+[deployment guide](operator-deployment.md) for service supervision and backups;
+telemetry supports operations while durable records preserve authority and
+attempt outcomes.
 
 You can send traces and metrics to your existing OpenTelemetry collector using
 OTLP/HTTP. For local development, the optional Grafana `otel-lgtm` image bundles

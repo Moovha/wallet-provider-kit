@@ -1,94 +1,18 @@
-# Prepare services, registrations and secrets
+# Prepare the values for each wizard step
 
-Use this checklist before completing the [setup wizard](setup-wizard.md).
-The standard [application-led flow](application-access.md) accepts identity and
-consent attestations from explicitly trusted applications. Provider user login,
-manual review and provider-initiated vendor verification are not prerequisites.
-The hosted compatibility sections below describe those optional features.
+The wizard connects your wallet service to systems your team operates or has
+registered with a vendor. Use this reference when a field asks for a domain,
+backend credential, token registration or agreement. Prepare each value as you
+reach its step; you can explore the forms without external accounts.
 
-You can explore the wizard without these accounts, but placeholder values cannot run a
-working provider. Examples use reserved `.example` domains and invented IDs.
+Users authenticate, complete identity checks and consent in the connected
+application. Your service needs that application's API registration and a reviewed
+agreement to trust its attestations. Provider user login and identity-vendor
+accounts are only needed for the optional features described at the end.
 
-The **operator** prepares accounts, registrations, policy and deployment. The
-**application developer** obtains API tokens and integrates the access/signing
-flow. Your identity administrator may need to configure token issuance. Supported
-registrations require configuration; an incompatible token service may require an
-advanced integration. The kit does not supply an identity provider or token issuer. For a fresh setup,
-use the [Auth0 dashboard recipe](auth0-setup.md); it covers both registrations.
-
-Standard application-led access needs an API token issuer, admitted applications,
-reviewed identity/consent trust agreements and a wallet backend. Users authenticate
-and complete checks within the application. No separate provider user login,
-reviewer account or identity-vendor credential is required. See
-[the application-led contract](application-access.md).
-
-## Application identity and consent trust
-
-Agree each application's authority to attest its users, verification level,
-required fields, evidence freshness, consent terms and withdrawal process.
-Record `policy.applications[].assertionTrust.agreement` in Policies. Choose stable
-user IDs scoped to that application; names and email addresses cannot link wallets
-across applications. Configure `policy.identity.application` in Policies. An API
-scope or a set of populated fields cannot replace this trust agreement.
-
-The application records consent for the provider's current policy revision, obtained
-from `GET /v1/access-policy`. Financial delegation also binds the exact transfer
-policy revision. Applications must communicate withdrawals through the grant
-revocation endpoint. The provider checks its current local grant before effects.
-
-## What must exist
-
-| Service or decision                 | Why it is needed                                       | Who supplies it                                                 |
-| ----------------------------------- | ------------------------------------------------------ | --------------------------------------------------------------- |
-| Public domain and privacy notice    | Stable provider identity and application API endpoint  | Your domain/hosting administrator and privacy owner             |
-| One wallet backend                  | Creates accounts and signs admitted actions            | CDP project, local OWS engine/vault, or your Relayer deployment |
-| Optional staff/hosted login service | Staff token controls or hosted compatibility only      | Your OIDC identity provider administrator                       |
-| Application token service           | Authenticates each connected application to the API    | Your OAuth authorization-server administrator                   |
-| Didit, Sumsub or both               | Collects or imports identity evidence                  | Your identity-verification vendor account administrator         |
-| Hosted identity funding agreements  | Authorizes and bounds verification/import costs        | Your team, vendor and connected application                     |
-| Hosted review staff                 | Independently accepts identity evidence                | Named staff accounts in the owner login service                 |
-| Persistent host and secret storage  | Runs the service and retains its authoritative records | Your infrastructure operator                                    |
-
-**OIDC** (OpenID Connect) is the login protocol. **OAuth** supplies access tokens
-for API requests. An **issuer** is the exact HTTPS identity of the service issuing
-a token. A **client ID** identifies a registered application; it is not a password.
-A **client secret** authenticates a confidential server application. A **JWKS URL**
-publishes public verification keys, not signing secrets. An **audience** names the
-API a token is intended for. A **subject**, written `sub` in a token, identifies the
-signed-in person or authenticated caller at that issuer.
-
-## Put references in the wizard, values in the deployment
-
-A field labelled “secret variable name” expects a name such as
-`PROVIDER_LOGIN_SECRET`, not the issued secret. The exported configuration contains
-`{"env":"PROVIDER_LOGIN_SECRET"}`. At startup, the service reads that variable
-from its process environment. You choose the names; keep the default names unless
-your secret-store convention requires others. Names use uppercase letters, digits
-and underscores, beginning with a letter.
-
-| Default variable            | Actual value to store                             | Where it comes from                        |
-| --------------------------- | ------------------------------------------------- | ------------------------------------------ |
-| `PROVIDER_LOGIN_SECRET`     | Owner-login confidential client secret            | Login-service client registration          |
-| `WALLET_CDP_API_KEY_ID`     | CDP Secret API Key ID                             | CDP project API Keys dashboard             |
-| `WALLET_CDP_API_KEY_SECRET` | Matching CDP Secret API Key secret                | Same key creation/download                 |
-| `WALLET_CDP_WALLET_SECRET`  | CDP project Wallet Secret                         | CDP wallet dashboard security section      |
-| `OWS_OWNER_PASSPHRASE`      | Dedicated vault owner passphrase                  | Generate and retain in your secret manager |
-| `RELAYER_API_KEY`           | Bearer API key accepted by your Relayer           | Your Relayer deployment administrator      |
-| `DIDIT_API_KEY`             | API key for the recipient application/environment | Didit Business Console                     |
-| `SUMSUB_APP_TOKEN`          | Sumsub application token                          | Sumsub Dashboard Dev space                 |
-| `SUMSUB_SECRET_KEY`         | Secret paired with that app token                 | Same Sumsub token creation                 |
-
-Only your selected backend/vendor variables are required. The application API
-client's own secret belongs to the calling application's secret store; the wallet
-service verifies its access tokens using public keys. If you enable
-[operator token controls](operator-tokens.md), the provider also needs the
-selected application's secret to request tokens through the configured issuer.
-The [deployment walkthrough](operator-deployment.md#supply-the-secret-values)
-shows how to fill the downloaded variable template without writing application code.
-For [automated local setup](local-setup.md), the executor offers a separate private
-secret-entry screen after validation. It saves values in an owner-only file outside
-the checkout and mounts that file read-only. The service-setting fields and downloads
-still contain names only.
+The wizard stores secret variable names, while your deployment supplies their
+values. Examples use invented IDs and reserved domains. Return to the
+[step-by-step wizard](setup-wizard.md) to enter the prepared values.
 
 ## Provider domain and privacy notice
 
@@ -102,7 +26,7 @@ Arrange DNS and HTTPS using the [ingress instructions](operator-deployment.md#pu
 Publish your own privacy notice at an accessible HTTPS URL. The kit does not host
 or generate that notice. Explain the actual backend's key control, identity
 vendors, information use, retention and recovery arrangements with your team.
-Use your real provider display name; owners see it during consent.
+Use your real provider display name so applications and users can identify your service.
 
 ## Choose one wallet backend
 
@@ -180,54 +104,6 @@ key or wallet address. Keep it unchanged through credential rotations and restar
 The database binds accounts to it, the provider implementation and public origin.
 Never change it to work around a failed or uncertain wallet operation.
 
-## Register owner login
-
-**Optional staff login or hosted compatibility only.** Standard wallet users do not sign in to the provider. Configure this registration only for staff token controls or the explicit hosted flow.
-
-Ask your identity administrator to register a **confidential web application** for
-the wallet service. This client logs in owners and staff; it is separate from the
-application API clients below. An existing issuer can serve both purposes if it
-supports both required profiles.
-
-Give the administrator this configuration checklist:
-
-1. Enable OpenID Connect authorization-code flow, `openid` scope and PKCE with S256.
-2. Register the exact callback shown by the wizard:
-   `https://wallet.your-company.com/onboarding/callback`. No wildcard callback.
-3. Enable `client_secret_post` authentication at the token endpoint. Issue a client
-   ID and client secret; store the latter as `PROVIDER_LOGIN_SECRET`.
-4. Sign ID tokens with RS256 (the wizard default) or ES256. Select the matching
-   algorithm in the wizard. Set lifetime to at most **600 seconds**.
-5. Honor `max_age=300` and include `auth_time`; authentication must be no older than
-   **five minutes**. The kit also validates state, nonce, issuer and audience.
-6. Supply the exact HTTPS issuer from discovery. Discovery, authorization, token
-   and public-key endpoints must use HTTPS. Do not substitute the login page URL
-   or append `/.well-known/openid-configuration` to the wizard's issuer field.
-7. Configure user registration, MFA and account recovery in the identity service.
-   The kit does not implement those account-management functions.
-
-These requirements follow the kit's implemented OIDC client; the
-[OIDC specification](https://openid.net/specs/openid-connect-core-1_0.html) explains
-the protocol. Ask the administrator to demonstrate a fresh login on your staging
-provider before accepting the integration. A vendor's “OIDC supported” label
-alone does not confirm these settings.
-
-### Identify reviewers
-
-**Hosted compatibility only.** Application-led access is decided by configured policy and does not require reviewer accounts.
-
-Create staff accounts at that same issuer and obtain each account's exact OIDC
-`sub` from the identity administrator's user record or a verified test login.
-Enter those subjects in **Policies → Provider identity reviewers**. Do not enter
-email addresses, names, application client IDs or a subject from another issuer.
-Keep at least one working reviewer. Reviewers use
-`https://wallet.your-company.com/onboarding/review`; owners use
-`https://wallet.your-company.com/onboarding/access`.
-
-Train reviewers to check the evidence, actual verification date and correspondence
-to the signed-in owner. A vendor's approved status alone is not provider acceptance.
-The [onboarding guide](onboarding.md) describes review and uncertain provisioning.
-
 ## Register the application API and clients
 
 The wallet service is an OAuth **resource server**: it accepts and checks tokens;
@@ -283,6 +159,136 @@ not OAuth scope names. Transfer delegation is explicitly consented to during
 onboarding; the provider checks each exact request without asking again.
 `operations:request` remains a request-only permission for advanced hosts. A permitted API scope still requires a current owner grant and policy.
 See [HTTP authentication](http-api.md#authentication-and-profiles).
+
+## Put references in the wizard, values in the deployment
+
+A field labelled “secret variable name” expects a name such as
+`PROVIDER_LOGIN_SECRET`, not the issued secret. The exported configuration contains
+`{"env":"PROVIDER_LOGIN_SECRET"}`. At startup, the service reads that variable
+from its process environment. You choose the names; keep the default names unless
+your secret-store convention requires others. Names use uppercase letters, digits
+and underscores, beginning with a letter.
+
+| Default variable            | Actual value to store                             | Where it comes from                        |
+| --------------------------- | ------------------------------------------------- | ------------------------------------------ |
+| `PROVIDER_LOGIN_SECRET`     | Owner-login confidential client secret            | Login-service client registration          |
+| `WALLET_CDP_API_KEY_ID`     | CDP Secret API Key ID                             | CDP project API Keys dashboard             |
+| `WALLET_CDP_API_KEY_SECRET` | Matching CDP Secret API Key secret                | Same key creation/download                 |
+| `WALLET_CDP_WALLET_SECRET`  | CDP project Wallet Secret                         | CDP wallet dashboard security section      |
+| `OWS_OWNER_PASSPHRASE`      | Dedicated vault owner passphrase                  | Generate and retain in your secret manager |
+| `RELAYER_API_KEY`           | Bearer API key accepted by your Relayer           | Your Relayer deployment administrator      |
+| `DIDIT_API_KEY`             | API key for the recipient application/environment | Didit Business Console                     |
+| `SUMSUB_APP_TOKEN`          | Sumsub application token                          | Sumsub Dashboard Dev space                 |
+| `SUMSUB_SECRET_KEY`         | Secret paired with that app token                 | Same Sumsub token creation                 |
+
+Only your selected backend/vendor variables are required. The application API
+client's own secret belongs to the calling application's secret store; the wallet
+service verifies its access tokens using public keys. If you enable
+[operator token controls](operator-tokens.md), the provider also needs the
+selected application's secret to request tokens through the configured issuer.
+The [deployment walkthrough](operator-deployment.md#supply-the-secret-values)
+shows how to fill the downloaded variable template without writing application code.
+For [automated local setup](local-setup.md), the executor offers a separate private
+secret-entry screen after validation. It saves values in an owner-only file outside
+the checkout and mounts that file read-only. The service-setting fields and downloads
+still contain names only.
+
+## Application identity and consent trust
+
+Agree each application's authority to attest its users, verification level,
+required fields, evidence freshness, consent terms and withdrawal process.
+Record `policy.applications[].assertionTrust.agreement` in Policies. Choose stable
+user IDs scoped to that application; names and email addresses cannot link wallets
+across applications. Configure `policy.identity.application` in Policies. An API
+scope or a set of populated fields cannot replace this trust agreement.
+
+The application records consent for the provider's current policy revision, obtained
+from `GET /v1/access-policy`. Financial delegation also binds the exact transfer
+policy revision. Applications must communicate withdrawals through the grant
+revocation endpoint. The provider checks its current local grant before effects.
+
+## Optional token signing policy
+
+Leave transfer signing off if you only need onboarding/provisioning. To enable it,
+your token/integration specialist must supply a verified **ERC-3009 token on Base
+Sepolia**, its contract address, EIP-712 signing-domain name/version, symbol and
+decimals, plus allowed recipient addresses. Obtain these from the deployed token's
+verified contract and issuer documentation, then independently test the exact
+contract/domain. A ticker, mainnet address or sample address is insufficient.
+
+Decide per-action and lifetime account/token limits in integer base units. With
+six decimals, `1000000` means one token. The lifetime limit must be at least the
+per-action limit; uncertain attempts keep reservations. Authorization validity
+is 60–3600 seconds. Already-issued signatures can remain executable until their
+on-chain expiry even after application access is revoked. The kit cannot cancel an issued authorization. Broadcasting is performed by the
+application’s execution rail or the optional [execution coordinator](execution.md).
+Verified token-transfer finality does not establish downstream business settlement. Read the [financial profile](setup.md#supported-financial-policy)
+and record token acceptance before activation.
+
+## Optional designated execution service
+
+Prepare the [separate dispatcher](execution-service.md) when the wallet service
+should delegate submission to an operator-selected execution provider. It needs
+its own HTTPS origin, private local database, service signing key and registered
+wallet public keys, provider registry and application sponsor credentials. The
+wallet needs the executor's public keys and callback connectivity in return.
+Application OAuth clients do not authenticate this service boundary. Owner
+signing keys remain with the wallet backend; gas funding remains explicit.
+
+## Optional staff and hosted services
+
+Configure the following only when you enable staff token controls in
+[Deployment](setup-wizard.md#_5-deployment), or maintain an explicit
+[hosted compatibility deployment](onboarding.md). They do not add a login or
+review step to the application's wallet-user journey.
+
+## Register owner login
+
+**Optional staff login or hosted compatibility only.** Standard wallet users do not sign in to the provider. Configure this registration only for staff token controls or the explicit hosted flow.
+
+Ask your identity administrator to register a **confidential web application** for
+the wallet service. This client logs in owners and staff; it is separate from the
+application API clients below. An existing issuer can serve both purposes if it
+supports both required profiles.
+
+Give the administrator this configuration checklist:
+
+1. Enable OpenID Connect authorization-code flow, `openid` scope and PKCE with S256.
+2. Register the exact callback shown by the wizard:
+   `https://wallet.your-company.com/onboarding/callback`. No wildcard callback.
+3. Enable `client_secret_post` authentication at the token endpoint. Issue a client
+   ID and client secret; store the latter as `PROVIDER_LOGIN_SECRET`.
+4. Sign ID tokens with RS256 (the wizard default) or ES256. Select the matching
+   algorithm in the wizard. Set lifetime to at most **600 seconds**.
+5. Honor `max_age=300` and include `auth_time`; authentication must be no older than
+   **five minutes**. The kit also validates state, nonce, issuer and audience.
+6. Supply the exact HTTPS issuer from discovery. Discovery, authorization, token
+   and public-key endpoints must use HTTPS. Do not substitute the login page URL
+   or append `/.well-known/openid-configuration` to the wizard's issuer field.
+7. Configure user registration, MFA and account recovery in the identity service.
+   The kit does not implement those account-management functions.
+
+These requirements follow the kit's implemented OIDC client; the
+[OIDC specification](https://openid.net/specs/openid-connect-core-1_0.html) explains
+the protocol. Ask the administrator to demonstrate a fresh login on your staging
+provider before accepting the integration. A vendor's “OIDC supported” label
+alone does not confirm these settings.
+
+### Identify reviewers
+
+**Hosted compatibility only.** Application-led access is decided by configured policy and does not require reviewer accounts.
+
+Create staff accounts at that same issuer and obtain each account's exact OIDC
+`sub` from the identity administrator's user record or a verified test login.
+Enter those subjects in **Policies → Provider identity reviewers**. Do not enter
+email addresses, names, application client IDs or a subject from another issuer.
+Keep at least one working reviewer. Reviewers use
+`https://wallet.your-company.com/onboarding/review`; owners use
+`https://wallet.your-company.com/onboarding/access`.
+
+Train reviewers to check the evidence, actual verification date and correspondence
+to the signed-in owner. A vendor's approved status alone is not provider acceptance.
+The [onboarding guide](onboarding.md) describes review and uncertain provisioning.
 
 ## Prepare identity verification
 
@@ -356,37 +362,10 @@ agreement.** Missing price/funding returns `funding_approval_required` and preve
 new vendor work. Configure both routes if you offer both. Unknown vendor outcomes
 retain reservations. Do not clear records or create new requests to bypass a cap.
 
-## Optional token signing policy
+## Return to your setup
 
-Leave transfer signing off if you only need onboarding/provisioning. To enable it,
-your token/integration specialist must supply a verified **ERC-3009 token on Base
-Sepolia**, its contract address, EIP-712 signing-domain name/version, symbol and
-decimals, plus allowed recipient addresses. Obtain these from the deployed token's
-verified contract and issuer documentation, then independently test the exact
-contract/domain. A ticker, mainnet address or sample address is insufficient.
-
-Decide per-action and lifetime account/token limits in integer base units. With
-six decimals, `1000000` means one token. The lifetime limit must be at least the
-per-action limit; uncertain attempts keep reservations. Authorization validity
-is 60–3600 seconds. Already-issued signatures can remain executable until their
-on-chain expiry even after application access is revoked. The kit does not cancel,
-broadcast them unless the optional [execution coordinator](execution.md) is configured.
-Verified token-transfer finality does not establish downstream business settlement. Read the [financial profile](setup.md#supported-financial-policy)
-and record token acceptance before activation.
-
-## Ready to open the wizard
-
-You should now have real public registration values, secret-store entries, reviewer
-subjects, vendor terms and application funding decisions. Continue with the
-[six-screen walkthrough](setup-wizard.md#complete-the-six-steps), then
-[deployment and acceptance](operator-deployment.md).
-
-## Optional designated execution service
-
-Prepare the [separate dispatcher](execution-service.md) when the wallet service
-should delegate submission to an operator-selected execution provider. It needs
-its own HTTPS origin, private local database, service signing key and registered
-wallet public keys, provider registry and application sponsor credentials. The
-wallet needs the executor's public keys and callback connectivity in return.
-Application OAuth clients do not authenticate this service boundary. Owner
-signing keys remain with the wallet backend; gas funding remains explicit.
+Continue at the [wizard step](setup-wizard.md#complete-the-six-steps) that requested
+these values. Provider identity belongs in Provider, wallet credentials in Backend,
+token connections in Services, trust agreements and transfer limits in Policies,
+and execution/storage choices in Deployment. Export validates those settings
+together before local or manual deployment.

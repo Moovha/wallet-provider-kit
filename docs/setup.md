@@ -1,9 +1,11 @@
 # Configuration and financial profile reference
 
-For the complete operator path, start with [getting started](README.md),
-[services and credentials](operator-services.md), [Auth0 setup](auth0-setup.md) and
-[deploying the export](operator-deployment.md). This page is the technical reference
-for the configuration produced by the GUI.
+Use this reference to understand the configuration exported by the
+[six-step wizard](setup-wizard.md), or when your deployment process needs to
+validate JSON directly. The settings connect your provider identity, backend,
+application token service, policies and runtime. Start with [getting started](README.md)
+for the guided setup; the field names, commands and financial details below
+explain how that configuration is implemented.
 
 For graphical setup, run `wallet-provider-kit setup` and follow the
 [FormKit operator wizard](setup-wizard.md). It exports this same validated
@@ -57,32 +59,25 @@ against the configuration file's directory.
 
 ## Register external integrations
 
-The standard configuration explicitly selects `policy.access.mode: "application"`.
-Set `policy.identity.application.verificationLevel` and `requiredFields`, and
-`policy.applications[].assertionTrust.agreement` for each trusted application.
-The application authenticates its users, performs identity checks and records
-consent before requesting access. No provider user login or manual review is
-required. The [application-led contract](application-access.md) defines the request,
-current policy revisions, user binding, expiry and withdrawal.
+The wizard's Services step configures `oauth`: the application token issuer,
+dedicated audience and HTTPS JWKS URL. Issue RFC 9068 `at+jwt` access tokens with
+`client_id` and a maximum 600-second lifetime. In Policies, register the exact
+issuer/client pair in `policy.applications`, together with permissions and
+`assertionTrust.agreement`. The [registration reference](operator-services.md#register-the-application-api-and-clients)
+explains the token claims and where each value comes from.
 
-Existing configurations without `access.mode` retain hosted compatibility behavior.
-`ownerLogin`, reviewers, vendor credentials and vendor funding below are required
-only for that hosted flow (or optional staff login where noted). An occupied store
-cannot switch access mode without a reviewed ownership migration.
+The standard configuration selects `policy.access.mode: "application"`.
+Set `policy.identity.application.verificationLevel` and `requiredFields` to the
+checks agreed with applications. Applications authenticate users, perform those
+checks and record consent before requesting access. The
+[access contract](application-access.md) defines current revisions, user binding,
+expiry and withdrawal. API tokens alone cannot establish this user authority.
 
-| Setting               | External setup                                                                                                                                                                                                           |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `ownerLogin`          | Register a confidential OIDC client with exact callback `<provider-origin>/onboarding/callback`; enable code flow, PKCE S256, RS256/ES256 ID tokens and `auth_time`. Your IdP owns registration, MFA and recovery.       |
-| `oauth`               | Configure the application API issuer, dedicated audience and HTTPS JWKS; issue RFC 9068 `at+jwt` access tokens with `client_id`, at most ten minutes old.                                                                |
-| `policy.applications` | Register connected application API clients and their explicit assertion trust agreements. Optional staff/hosted login uses a separate client. Match each checked issuer/client pair.                                     |
-| `reviewers`           | Hosted compatibility only: configure provider staff's login subject IDs. Provider review establishes identity acceptance; a vendor approval alone cannot accept a user.                                                  |
-| `identity`            | Leave empty for application-record evaluation, with required fields in `policy.identity.records`. For external verification, supply Didit or Sumsub settings, confirmed price limits and application funding agreements. |
-| `backend`             | Select a bundled CDP, OWS or OpenZeppelin Relayer backend using the configurations below. Prove its Base Sepolia EOA lifecycle and recovery independently.                                                               |
-
-The [onboarding guide](onboarding.md) explains acceptance, identity sharing, cost
-reservations and access management. Login clients, vendor accounts and commercial
-agreements must exist at the selected external services; the kit does not create
-those accounts from credentials.
+Optional staff token controls need a separate `ownerLogin` registration. Hosted
+compatibility additionally uses reviewer subjects and, when selected, identity
+vendors and funding agreements. Use [hosted setup](onboarding.md) for those
+settings. Existing configurations without `access.mode` retain hosted behavior;
+changing an occupied store's ownership mode requires a reviewed migration.
 
 ## Select a built-in backend
 
@@ -228,31 +223,11 @@ stable user ID, current identity evidence and recorded consent to
 IDs without a consent URL. Provision separately, read account details, and call
 `POST /v1/access-grants/{grantId}/revoke` when the user withdraws. Follow
 [application-led access](application-access.md) for the full payload and limits.
-The hosted sequence below applies only to compatibility deployments.
-
-An application written in any language uses the
-[implemented OpenAPI](../spec/provider-api.json) with its scoped access token. `GET /v1/capabilities` reports readiness and the
-configured action profiles.
-POST requests require a UUIDv4 `Idempotency-Key`; keep it when retrying the same
-request. Application credentials alone do not establish owner consent or transfer delegation.
-
-1. Read `GET /v1/access-policy`. In record mode, submit required fields through
-   `POST /v1/access-records`, or include `identity_record` in
-   `POST /v1/access-requests` to create/connect; open its provider consent URL in
-   the user's browser. The provider owns login, consent and identity-review pages.
-2. Poll `GET /v1/access-requests/{id}` for the approved account/grant and expiry.
-3. `POST /v1/accounts/{id}/provision` with `{}`; the kit creates the account once
-   and stores its result. `GET /v1/accounts/{id}` reads the current account.
-4. When the financial profile is present, include `transfers:request` in onboarding
-   consent. Request a transfer on the user's behalf; the provider authorises its
-   exact details against policy. Sign the stored action without another owner prompt.
-
-Users pause/revoke access at `/onboarding/access`; staff review identity and
-reconcile uncertain account creation at `/onboarding/review`. These hosted pages
-can be linked from your product. Frame embedding is blocked; use browser navigation
-and server-side API consumption. Callback state and the consent URLs contain no
-private keys. Your product may return users through its own navigation after polling;
-there is no arbitrary caller-supplied return URL.
+The [HTTP guide](http-api.md) documents token scopes, account reads, signing and
+retry outcomes. Protected requests need current grants as well as API scopes.
+Keep the original UUIDv4 `Idempotency-Key` when retrying a POST with the same
+content. Provider-hosted login and review are covered in the optional
+[hosted compatibility guide](onboarding.md).
 
 ## Supported financial policy
 

@@ -1,9 +1,11 @@
 # Use OpenZeppelin Relayer
 
-A separately operated **OpenZeppelin Relayer** supplies its configured signer,
-transaction queue, nonce allocation, broadcasting and status tracking. The kit
-keeps host authorization and approved-action handling, using the same attempt
-journal as its signing adapters. It adds no competing nonce or broadcast engine.
+Choose Relayer in [Backend](setup-wizard.md#_2-backend) when your team already
+operates a signer service and can assign distinct signers to wallet accounts.
+Configure its [signer pool](operator-services.md#openzeppelin-relayer) through the
+wizard. Separately, Deployment can use Relayer to submit transactions from
+application sponsor accounts. This guide distinguishes signing from execution,
+then describes their supported profiles, library interfaces and recovery needs.
 
 The compatibility target is **v1.8.0**, source commit
 [`b8cf360a49c5739e43491ca5d2f6bbc934b7438e`](https://github.com/OpenZeppelin/openzeppelin-relayer/tree/b8cf360a49c5739e43491ca5d2f6bbc934b7438e).

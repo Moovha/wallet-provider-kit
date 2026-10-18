@@ -1,11 +1,12 @@
 # Replace stuck transactions within approved fees
 
-The designated execution service can raise fees for the same pending transaction
-without changing its sponsor, outer nonce, recipient, value, calldata or gas limit.
-This applies to ERC-3009 transfers and approved Safe contract calls, swaps and
-vault deposits. The original owner signature and full gas reservation remain in
-place. The application funds the sponsor and reads status; it does not submit a
-second wallet action to recover an uncertain execution.
+A pending transaction may need higher network fees while its approved effects
+remain the same. Configure bounded replacement in the designated execution
+settings under [Deployment](setup-wizard.md#_5-deployment) when you operate the
+required fee-only provider build. The service can raise fees without changing the
+sponsor, outer nonce, recipient, value, calldata or gas limit. ERC-3009 transfers
+and approved Safe calls retain their original signature and full gas reservation;
+the application reads status rather than creating another wallet action.
 
 Automatic replacement requires the [pinned fee-only Relayer build](fee-only-relayer.md).
 An ordinary OpenZeppelin Relayer deployment or custom provider adapter cannot

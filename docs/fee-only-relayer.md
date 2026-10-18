@@ -1,11 +1,11 @@
 # Build the fee-only Relayer provider
 
-Use this optional provider build when enabling the designated executor's
-[automatic replacement policy](automatic-replacements.md). It retains
-OpenZeppelin Relayer's signer, nonce allocator and durable provider record while
-requiring explicit EIP-1559 fees and immutable calls for replacement. It is a
-separate deployment artifact; installing the toolkit does not deploy or modify a
-running Relayer.
+Bounded fee replacement needs a submission provider that preserves the original
+transaction while accepting only approved fee changes. Use this separate provider
+build when selecting [automatic replacements](automatic-replacements.md) in
+[Deployment](setup-wizard.md#_5-deployment). It retains Relayer's signer, nonce
+allocator and durable record. Building the toolkit does not install this artifact
+or modify your running Relayer.
 
 The patch targets OpenZeppelin Relayer **v1.8.0**, commit
 `b8cf360a49c5739e43491ca5d2f6bbc934b7438e`. Apply it only to that exact source:

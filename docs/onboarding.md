@@ -1,6 +1,11 @@
 # Provider-hosted access (compatibility)
 
-This guide covers the **provider-hosted compatibility flow**, with provider login, consent pages and staff identity review. The standard [application-led flow](application-access.md) keeps users in their application and grants access from trusted identity and consent attestations. Select `policy.access.mode: "hosted"` to use this guide; omitted mode in legacy configurations also retains hosted behavior.
+Use this guide for an existing deployment that explicitly needs provider-hosted
+login, consent pages and staff identity review. Select that compatibility mode in
+[Policies](setup-wizard.md#_4-policies); omitted mode in legacy configurations also
+retains it. The usual wallet setup keeps identity and consent in the connected
+application, as described in the [access contract](application-access.md).
+Do not switch an occupied store between these ownership models without a reviewed migration.
 
 For this compatibility deployment, [configure the service](setup.md) with hosted access explicitly selected.
 The programmatic onboarding-only profile below remains available for advanced

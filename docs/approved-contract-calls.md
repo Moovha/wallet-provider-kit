@@ -1,10 +1,12 @@
 # Approve contract calls, swaps and vault deposits
 
-The `approved-evm-executor-v1` profile extends the execution foundation beyond
-transfers. Applications propose contract calls or supported swap/deposit inputs;
-the wallet authorizes and stores an immutable action. Execution uses its stored
-ID, authenticated dispatch, an independent executor journal and read-only
-recovery. OAuth scopes alone never authorize a call.
+Applications may need to call contracts, swap assets or deposit into a vault
+within permissions their users have accepted. Configure this optional capability
+in [Deployment](setup-wizard.md#_5-deployment), and allow `contracts:request` for
+intended applications in Policies. The `approved-evm-executor-v1` profile stores
+the exact authorized action, executes through a designated service and verifies
+the relevant chain result. This guide explains the Safe bindings, policies and
+two-service settings required before your application can use it.
 
 The current general-call mechanism uses a pre-existing **Safe 1.4.1 account with
 exactly one EOA owner, threshold one and no enabled modules**, on Base Sepolia. The toolkit's wallet
@@ -218,8 +220,8 @@ account migration, reset or fund movement is part of recovery.
 The approved action, execution profile/revision, mechanism, ordered calls, owner
 signature, selected sponsor/provider and immutable request hash are distinct
 contracts. New mechanisms and operation adapters must retain those boundaries
-and define their own policy and verified outcome. Current Safe support is not
-ERC-4337, ERC-1271 or EIP-5792 conformance; those remain separately versioned future
-adapters in the [enterprise standards record](v1-standards.md).
+and define their own policy and verified outcome. The [EIP-5792 adapter](wallet-calls.md) exposes standard batch submission and
+status for this runtime-authorized Safe profile. ERC-4337 execution and ERC-1271
+validation are not enabled; see the [standards and support reference](v1-standards.md).
 
 See [durable Safe queues and sponsor pools](safe-queue-and-sponsor-pools.md) for concurrent request admission, per-Safe ordering, pool configuration and recovery limits.

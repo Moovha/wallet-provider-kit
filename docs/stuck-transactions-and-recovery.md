@@ -1,9 +1,11 @@
 # Diagnose and recover stuck transactions
 
-This runbook is for operators of the wallet service and designated execution
-service. Use the accepted provider version, both durable stores and independent
-RPC sources. Recovery never turns an application report, missing receipt or local
-pending nonce count into spending authority.
+When a sponsored transaction stops progressing, establish what happened to its
+original attempt before taking another action. Configure detection and containment
+in [Deployment](setup-wizard.md#_5-deployment), then use this runbook for the wallet
+and designated execution services. Work from both durable stores and independent
+RPC evidence; a missing receipt or an application's report cannot authorize
+replacement spending.
 
 ## Enable detection and containment
 

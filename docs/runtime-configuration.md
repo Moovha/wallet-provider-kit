@@ -1,10 +1,11 @@
 # Register application contracts and publish policies
 
-The optional runtime configuration API stores application contract registrations
-and provider policy revisions while the service remains running. Registered
-applications submit proposals. A separately configured provider operator publishes
-an accepted proposal or a replacement policy. Applications can read current and
-historical revisions immediately, without rebuilding or restarting the service.
+Applications may need to register additional contracts without a service restart.
+Enable runtime configuration in [Policies](setup-wizard.md#_4-policies) to let
+registered applications propose methods and separately authorized provider
+operators publish versioned policies. The [runtime workspace](runtime-workspace.md)
+offers forms for this task. This guide describes its API, revision rules and
+optional financial authority so your application developer can implement the same flow.
 
 Application-led providers can opt into runtime contract authority for the existing
 Base Sepolia Safe 1.4.1 execution mechanism. Published targets, methods, native-value
@@ -258,7 +259,9 @@ service/journal envelope bounds still apply to complete execution requests; a
 registration's 24 KiB storage allowance is not a promise that every combination
 of document and calldata fits an execution envelope.
 
-## Remaining release gates
+<span id="remaining-release-gates"></span>
+
+## Outcome and support limits
 
 Runtime registration does not infer a method's business meaning. Arbitrary calls
 report `contract-execution`, not proof of swap output, vault shares or beneficiary
@@ -266,5 +269,6 @@ settlement. Native-value limits do not bound token approvals or downstream calls
 review permitted methods and their argument semantics accordingly. New execution
 mechanisms, business-effect verifiers and policy rule types require implementation.
 The [EIP-5792 adapter](wallet-calls.md) supplies standard batch submission and
-status for this Safe profile. Operator GUI and real test-network/provider/recovery
-acceptance remain pending. See the [enterprise standards record](v1-standards.md).
+status for this Safe profile. Use the [runtime workspace](runtime-workspace.md) for operator forms. Real
+test-network, provider and recovery acceptance remain required for your deployment;
+see the [support and acceptance reference](v1-standards.md).

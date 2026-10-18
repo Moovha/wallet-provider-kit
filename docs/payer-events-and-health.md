@@ -1,10 +1,11 @@
 # Payer events and health
 
-Operators can monitor native gas balances and transaction recovery incidents in
-both the wallet service and designated execution service. Optional signed
-webhooks deliver operational transitions to trusted receivers. These events
-report payer conditions; financial results continue to require the existing
-independent transaction verification and current authorization checks.
+Sponsors need enough native currency to pay gas, and operators need timely
+notice when a payer is low or a transaction needs recovery. Configure optional
+monitoring alongside execution in [Deployment](setup-wizard.md#_5-deployment).
+Both wallet and execution services can record payer conditions and deliver signed
+webhooks to trusted receivers. These operational alerts do not establish a
+financial result or replace independent transaction verification.
 
 ## Configure monitoring
 

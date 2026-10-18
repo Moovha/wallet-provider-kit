@@ -1,8 +1,11 @@
 # Extend the configured service
 
-The default path is [configuration, deployment and API consumption](setup.md).
-A custom backend adapter replaces the wallet engine while retaining toolkit-owned
-login, grants, exact provider authorization, financial policy and durable journals.
+Use a custom adapter when the built-in choices in
+[Backend](setup-wizard.md#_2-backend) cannot connect your wallet engine. The adapter
+replaces account creation and signing mechanics while the configured service
+retains application access, grants, financial policy and durable journals. This
+is a developer extension; start with the [wizard](README.md) when a supported
+backend meets your needs.
 
 ## Versioned startup module
 
