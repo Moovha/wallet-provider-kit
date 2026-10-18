@@ -1,10 +1,11 @@
 <script setup lang="ts">
+import AdvancedSettings from './AdvancedSettings.vue';
 import RuntimeConfigurationFields from './RuntimeConfigurationFields.vue';
 import SetupField from './SetupField.vue';
 import AccessPolicyFields from './AccessPolicyFields.vue';
 import PriceFields from './PriceFields.vue';
 import { computed } from 'vue';
-import { docs } from '../model';
+import { docs, newClientId } from '../model';
 import type { ProviderConfiguration } from '../model';
 const model = defineModel<ProviderConfiguration>({ required: true });
 const emit = defineEmits<{ 'configure-services': [] }>();
@@ -84,13 +85,15 @@ function financial(enabled: unknown) {
     v-model="model"
     @configure-services="emit('configure-services')"
   />
-  <SetupField
-    guide="policyVersion"
-    v-model="model.policy.version"
-    type="text"
-    label="Policy version"
-    validation="required|length:1,256"
-  />
+  <AdvancedSettings label="Advanced policy metadata">
+    <SetupField
+      guide="policyVersion"
+      v-model="model.policy.version"
+      type="text"
+      label="Policy version"
+      validation="required|length:1,256"
+    />
+  </AdvancedSettings>
   <div class="field-grid">
     <SetupField
       guide="identityAge"
@@ -150,7 +153,7 @@ function financial(enabled: unknown) {
       @click="
         model.policy.applications.push({
           issuer: model.oauth.issuer,
-          clientId: '',
+          clientId: model.authorizationServer ? newClientId('application') : '',
           name: '',
           ...(model.policy.access?.mode === 'application'
             ? { assertionTrust: { agreement: '' } }
@@ -175,23 +178,43 @@ function financial(enabled: unknown) {
         type="text"
         label="Application name"
         validation="required|length:1,100"
-      /><SetupField
+      />
+    </div>
+    <p v-if="model.authorizationServer" class="help-text">
+      Client ID: <code>{{ application.clientId }}</code
+      >. Share it with this application's integration team alongside its private
+      credential.
+    </p>
+    <AdvancedSettings
+      v-if="model.authorizationServer"
+      label="Advanced application identity"
+    >
+      <SetupField
         guide="applicationClient"
         v-model="application.clientId"
         type="text"
         label="Application client ID"
         validation="required|length:1,256"
       />
-    </div>
-    <SetupField
-      guide="applicationIssuer"
-      v-model="application.issuer"
-      type="url"
-      label="Application issuer"
-      validation="required|https_url"
-      :placeholder="model.oauth.issuer"
-      readonly
-    />
+    </AdvancedSettings>
+    <template v-else>
+      <SetupField
+        guide="applicationClient"
+        v-model="application.clientId"
+        type="text"
+        label="Application client ID"
+        validation="required|length:1,256"
+      />
+      <SetupField
+        guide="applicationIssuer"
+        v-model="application.issuer"
+        type="url"
+        label="Application issuer"
+        validation="required|https_url"
+        :placeholder="model.oauth.issuer"
+        readonly
+      />
+    </template>
     <SetupField
       guide="permissions"
       v-model="application.permissions"

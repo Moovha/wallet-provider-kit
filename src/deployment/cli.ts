@@ -1,3 +1,4 @@
+import { newClientId, newWalletBinding } from './setup-identifiers.js';
 import { createBundledAuthorizationServer } from './authorization-server.js';
 import { generateDeploymentSecrets } from './deployment-secrets.js';
 import { setupEnvironment } from './setup-executor.js';
@@ -219,18 +220,33 @@ export async function setupCommand(args: string[]): Promise<boolean> {
     return true;
   }
   if (args[0] === 'init' && args.length <= 2) {
-    const example = await readFile(
-      new URL(
-        '../../docs/provider.config.bundled.example.json',
-        import.meta.url,
+    const example: ProviderConfiguration = JSON.parse(
+      await readFile(
+        new URL(
+          '../../docs/provider.config.bundled.example.json',
+          import.meta.url,
+        ),
+        'utf8',
       ),
     );
-    await writeFile(resolve(args[1] ?? 'provider.config.json'), example, {
-      flag: 'wx',
-      mode: 0o600,
-    });
+    example.backend.binding = newWalletBinding();
+    for (const application of example.policy.applications) {
+      const registration = example.authorizationServer!.clients.find(
+        (client) => client.clientId === application.clientId,
+      )!;
+      application.clientId = newClientId('application');
+      registration.clientId = application.clientId;
+    }
+    await writeFile(
+      resolve(args[1] ?? 'provider.config.json'),
+      JSON.stringify(example, null, 2) + '\n',
+      {
+        flag: 'wx',
+        mode: 0o600,
+      },
+    );
     process.stdout.write(
-      'Configuration created; replace example settings, then validate\n',
+      'Configuration created with generated internal IDs; configure provider identity and reviewed application trust, then validate\n',
     );
     return true;
   }

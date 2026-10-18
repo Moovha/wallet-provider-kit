@@ -17,6 +17,8 @@ import { createServer } from '../src/service/server.js';
 import { createSetupExecutor } from '../src/deployment/setup-executor.js';
 import {
   emptyConfiguration,
+  newBackend,
+  newClientId,
   synchronizeBundledServices,
 } from '../setup-ui/model.js';
 
@@ -404,4 +406,47 @@ it('issues administration tokens only to separately configured provider service 
   config.authorizationServer!.operatorClients[0].clientId =
     config.authorizationServer!.clients[0].clientId;
   expect(() => validateProviderConfiguration(config)).toThrow();
+});
+
+it('supplies unique stable internal identities without granting financial authority', () => {
+  const first = emptyConfiguration(config);
+  const second = emptyConfiguration(config);
+  expect(first.backend.binding).toMatch(/^wallets-[0-9a-f-]{36}$/);
+  expect(first.backend.binding).not.toBe(second.backend.binding);
+  expect(first.policy.applications[0].clientId).not.toBe(
+    second.policy.applications[0].clientId,
+  );
+  expect(newBackend('cdp').binding).not.toBe(first.backend.binding);
+  const clientId = newClientId('application');
+  first.policy.applications.push({
+    issuer: first.oauth.issuer,
+    clientId,
+    name: 'Second application',
+    permissions: ['account:read'],
+    assertionTrust: { agreement: '' },
+  });
+  const operatorId = newClientId('operator');
+  first.runtimeConfiguration = {
+    operators: [
+      { issuer: first.oauth.issuer, clientId: operatorId, subject: operatorId },
+    ],
+  };
+  synchronizeBundledServices(first);
+  const retained = structuredClone(first);
+  synchronizeBundledServices(first);
+  expect(first).toEqual(retained);
+  expect(
+    first.authorizationServer!.clients.map((client) => client.clientId),
+  ).toEqual(first.policy.applications.map((app) => app.clientId));
+  expect(first.authorizationServer!.operatorClients![0].clientId).toBe(
+    operatorId,
+  );
+  expect(
+    first.policy.applications.every(
+      (app) => app.assertionTrust?.agreement === '',
+    ),
+  ).toBe(true);
+  expect(first.financial).toBeUndefined();
+  expect(first.execution).toBeUndefined();
+  expect(first.activation.enabled).toBe(false);
 });

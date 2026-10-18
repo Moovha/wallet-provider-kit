@@ -25,6 +25,9 @@ test('a new operator configures application-led access without user login, vendo
       .fill('https://wallet.example.test/privacy');
     await page.getByRole('button', { name: 'Next', exact: true }).click();
     await page
+      .getByText('Advanced wallet environment settings', { exact: true })
+      .click();
+    await page
       .getByLabel('Wallet environment name', { exact: true })
       .fill('offline-example');
     await page.getByRole('button', { name: 'Next', exact: true }).click();

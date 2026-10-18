@@ -582,6 +582,17 @@ describe('configuration convention and CLI', () => {
     const dir = await folder();
     const init = cli(['init'], dir);
     expect(init.status, init.stderr).toBe(0);
+    const initialized = JSON.parse(
+      await readFile(join(dir, 'provider.config.json'), 'utf8'),
+    );
+    expect(initialized.backend.binding).toMatch(/^wallets-[0-9a-f-]{36}$/);
+    expect(initialized.policy.applications[0].clientId).toMatch(
+      /^application-[0-9a-f-]{36}$/,
+    );
+    expect(initialized.authorizationServer.clients[0].clientId).toBe(
+      initialized.policy.applications[0].clientId,
+    );
+
     expect(cli(['init'], dir).status).toBe(1);
     expect(
       cli(['validate', '--config', 'provider.config.json'], dir).status,

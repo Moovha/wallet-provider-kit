@@ -15,8 +15,12 @@ single-host and Base Sepolia only; production custody acceptance remains pending
 
 You are editing a local draft. Changes reach a service only after you export and
 deploy them. Expand **Why do I need this? Where do I get it?** beside a setting for
-its purpose and source. Secret fields take deployment variable names, such as
-`WALLET_CDP_API_KEY_SECRET`; the values are supplied privately during deployment.
+its purpose and source. Setup generates stable wallet environment and bundled
+client IDs, supplies private storage paths and standard credential variable names,
+and derives token endpoints from your public origin. These settings are collapsed
+under **Advanced** controls; keep their defaults for a first deployment. Secret
+values are generated privately for bundled services or supplied during deployment
+for external services.
 Incomplete drafts cannot be saved. Import a previously exported configuration to
 resume, and keep the page open until you validate and export.
 
@@ -50,18 +54,19 @@ Keep the recommended bundled **Open Wallet Standard** backend, or choose
 **Coinbase CDP** or an existing **OpenZeppelin Relayer** service.
 Prepare the selected backend using [backend services and credentials](operator-services.md#choose-one-wallet-backend):
 
-- **CDP:** enter variable names for its Secret API Key ID, matching key secret and
-  project Wallet Secret. Accounts are created later through the provider API.
-- **OWS:** configure the private vault directory and owner-passphrase variable.
-  Setup includes the pinned native engine, creates the private vault and generates
-  a missing owner passphrase. Keep coordinated vault/database/secret backups;
+- **CDP:** supply its Secret API Key ID, matching key secret and project Wallet
+  Secret privately during deployment. Standard variable names are prefilled under
+  **Advanced CDP credential variables**. Accounts are created later through the API.
+- **OWS:** keep the supplied vault settings. Setup includes the pinned native
+  engine, creates the private vault and generates a missing owner passphrase. Keep coordinated vault/database/secret backups;
   use the [OWS guide](ows-adapter.md) for supported platforms and recovery.
 - **Relayer:** connect an existing service and enter verified, distinct signer-pool
   entries. Each accepted account reserves one signer. The
   [Relayer guide](openzeppelin-relayer.md) explains capacity and acceptance.
 
-Set a stable, non-secret **backend binding** for this environment. Retain it across
-credential rotations and restarts. Never replace a binding or assigned signer to
+The wizard generates a stable, non-secret **backend binding** for this environment.
+Its override is under **Advanced wallet environment settings**. Retain the saved
+value across credential rotations and restarts. Never replace a binding or assigned signer to
 retry an uncertain operation. These configured account backends target Base
 Sepolia EOAs; choosing one does not activate transaction submission or sponsorship.
 
@@ -77,8 +82,11 @@ your service verifies its tokens with public keys.
 
 Keep **Bundled token service** for automatic application registrations and
 five-minute tokens. The issuer, audience and JWKS URL derive from Provider.
-Choose each application's API scopes; setup generates its missing secret privately.
-Record the application's client ID, name and trust agreement in Policies.
+Keep the default access, account-reading and provisioning API scopes. Additional
+scopes are under **Advanced application API permissions**; setup generates each
+application's missing secret privately.
+Name the application and record its trust agreement in Policies; its client ID
+is generated automatically.
 See [bundled setup](bundled-setup.md).
 
 For **Connect an existing authorization server**, configure **Application token
@@ -116,13 +124,16 @@ agreed with your applications. Lowercase names such as `country` identify fields
 Presence alone does not prove KYC or restrict acceptable countries: the agreement
 defines which checks the application must perform.
 
-Set **Policy version**, **Maximum age of identity checks** and **Maximum access
-duration**. Grants end sooner when submitted identity evidence or consent expires.
+Review **Maximum age of identity checks** (initially 90 days) and **Maximum access
+duration** (initially seven days). **Policy version** starts at `1` under
+**Advanced policy metadata**. Grants end sooner when submitted identity evidence or consent expires.
 The [access-policy controls](application-access.md#configure-the-trust-policy)
 explain how these settings constrain requests and which rules require custom code.
 
-Under **Connected applications**, add each application's name and registered
-client ID. Its issuer comes from Services. Select its permitted actions, enter
+Under **Connected applications**, enter each application's name. Bundled client
+IDs are generated once and displayed for integration; their overrides are under
+**Advanced application identity**. With an existing issuer, enter the client ID
+registered there. The issuer comes from Services. Select its permitted actions, enter
 the **Application identity and consent trust agreement** reference and review
 **Application access enabled**. Applications' user IDs are isolated by issuer and
 client; matching names or email addresses do not link wallets across applications.
@@ -151,8 +162,10 @@ a transfer. You choose optional coordinated execution in Deployment.
 ### Runtime contract policies
 
 Enable **Runtime configuration** when applications should register contracts and
-methods after deployment. Enter the separate provider operator issuer, client ID
-and subject. The [runtime workspace](runtime-workspace.md) explains operator
+methods after deployment. The bundled issuer generates a separate operator client
+ID, derives its issuer and subject, and registers it automatically. Inspect or
+override the identity under **Advanced operator identity**. With an existing
+issuer, enter the externally registered operator issuer, client ID and subject. The [runtime workspace](runtime-workspace.md) explains operator
 access, contract proposals, publication and automatic registration review through
 `/operator/`. The [runtime API](runtime-configuration.md) supplies the developer
 contract and the additional opt-ins needed for financial use.
@@ -176,9 +189,11 @@ Continue to **Deployment** to choose storage, API tools and execution.
 ## 5. Deployment
 
 Your service needs to preserve accounts, grants and attempts through restarts.
-Choose **Private data directory**, **Service listen address** and **Service port**
-for one persistent POSIX host. A native service behind a local HTTPS proxy can
-listen on `127.0.0.1`; a container needs `0.0.0.0` internally. Keep the service's
+Keep the supplied `.provider-data` directory, host port `8080` and Caddy gateway
+for one persistent POSIX host. Local setup prepares storage and uses
+`0.0.0.0:8080` inside the container automatically. **Advanced deployment settings**
+contains directory, listen-address, port and gateway overrides; change the host
+port if it is already occupied. The native service defaults to `127.0.0.1`. Keep the service's
 public origin from Provider behind HTTPS ingress. The
 [storage guide](storage.md) explains backup and single-active-host recovery.
 

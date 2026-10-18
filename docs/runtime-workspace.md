@@ -10,9 +10,11 @@ access or spending authority.
 ## Set up access
 
 In the local setup wizard's **Policies** step, enable **Runtime configuration**,
-then choose a separate provider operator client ID. With bundled authentication,
-the issuer and token subject are filled automatically, and setup registers the
-operator and generates its missing secret privately. With an existing issuer,
+which generates a separate provider operator client ID with bundled
+authentication. The issuer and token subject are filled automatically, and setup
+registers the operator and generates its missing secret privately. Retain the
+identity in your saved configuration; its override is under **Advanced operator
+identity**. With an existing issuer,
 register the separate operator client there and enter its issuer and token subject;
 the issuer must match Services. Deploy the exported
 configuration using the normal deployment process. The runtime workspace becomes

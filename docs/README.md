@@ -39,8 +39,9 @@ no Pro subscription. The kit is available from source, not npm. The
 [package guide](package.md) covers installing a reviewed tarball instead.
 
 Expand **Why do I need this? Where do I get it?** beside a setting for field help.
-Enter secret variable names in configuration; supply values privately during
-local deployment or through your deployment's secret store. Import a saved
+Keep the supplied internal IDs, storage paths and credential variable names;
+advanced controls expose their overrides. Supply external-service secret values
+privately during local deployment or through your deployment's secret store. Import a saved
 `provider.config.json` to resume. Incomplete drafts cannot be saved, and refreshing
 or closing the browser loses unsaved edits.
 

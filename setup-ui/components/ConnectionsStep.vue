@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AdvancedSettings from './AdvancedSettings.vue';
 import { defaultLocalExecution } from '../../src/deployment/local-execution-contract';
 import SetupField from './SetupField.vue';
 import { docs, synchronizeBundledServices } from '../model';
@@ -204,34 +205,49 @@ const flow = computed(() => model.value.policy.access?.mode ?? 'hosted');
         Audience: <code>{{ model.oauth.audience }}</code>
       </p>
     </div>
-    <SecretField
-      guide="issuerSigningKey"
-      v-model="model.authorizationServer.signingKey"
-      label="Application token signing key"
-    />
+    <AdvancedSettings label="Advanced token signing variable">
+      <SecretField
+        guide="issuerSigningKey"
+        v-model="model.authorizationServer.signingKey"
+        label="Application token signing key"
+      />
+    </AdvancedSettings>
     <fieldset
       v-for="client in model.authorizationServer.clients"
       :key="client.clientId"
       class="repeat-row"
     >
       <legend>
-        {{ client.clientId || 'Name this application in Policies' }}
+        {{
+          model.policy.applications.find(
+            (app) => app.clientId === client.clientId,
+          )?.name || 'Application'
+        }}
       </legend>
-      <SecretField
-        guide="bundledClientSecret"
-        v-model="client.clientSecret"
-        label="Application client secret"
-      />
-      <SetupField
-        guide="bundledScopes"
-        type="checkbox"
-        label="Allowed API scopes"
-        v-model="client.scopes"
-        :options="
-          applicationScopes.map((scope) => ({ label: scope, value: scope }))
-        "
-        validation="required|min:1"
-      />
+      <AdvancedSettings label="Advanced application credential variable">
+        <SecretField
+          guide="bundledClientSecret"
+          v-model="client.clientSecret"
+          label="Application client secret"
+        />
+      </AdvancedSettings>
+      <p class="help-text">
+        {{ client.scopes.length }} API scopes configured. New registrations
+        allow wallet access, account reading and provisioning. Review advanced
+        permissions before enabling additional API routes.
+      </p>
+      <AdvancedSettings label="Advanced application API permissions">
+        <SetupField
+          guide="bundledScopes"
+          type="checkbox"
+          label="Allowed API scopes"
+          v-model="client.scopes"
+          :options="
+            applicationScopes.map((scope) => ({ label: scope, value: scope }))
+          "
+          validation="required|min:1"
+        />
+      </AdvancedSettings>
       <p class="help-text">
         Give each server application only its own secret. OAuth scopes allow API
         admission; wallet grants, identity, consent and action authority are
@@ -245,13 +261,15 @@ const flow = computed(() => model.value.policy.access?.mode ?? 'hosted');
     >
       <legend>
         Provider operator:
-        {{ operator.clientId || 'Choose a client ID in Policies' }}
+        {{ operator.clientId }}
       </legend>
-      <SecretField
-        guide="bundledOperatorSecret"
-        v-model="operator.clientSecret"
-        label="Provider operator client secret"
-      />
+      <AdvancedSettings label="Advanced operator credential variable">
+        <SecretField
+          guide="bundledOperatorSecret"
+          v-model="operator.clientSecret"
+          label="Provider operator client secret"
+        />
+      </AdvancedSettings>
       <p class="help-text">
         This separate service client can administer runtime policies. Its token
         subject equals its client ID. Keep its credentials with the provider;

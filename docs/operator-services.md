@@ -11,8 +11,10 @@ application. Your service needs that application's API registration and a review
 agreement to trust its attestations. Provider user login and identity-vendor
 accounts are only needed for the optional features described at the end.
 
-The wizard stores secret variable names, while your deployment supplies their
-values. Examples use invented IDs and reserved domains. Return to the
+The wizard supplies credential variable names and derives bundled service
+settings automatically. Advanced controls expose overrides. Local setup generates
+missing bundled secrets privately; supply external-service credentials during
+deployment. Examples use invented IDs and reserved domains. Return to the
 [step-by-step wizard](setup-wizard.md) to enter the prepared values.
 
 ## Provider domain and privacy notice
@@ -101,9 +103,11 @@ submission. If your team cannot operate a separate Relayer, choose another backe
 
 ### Stable backend binding
 
-For any backend, choose a unique, non-secret name for this environment, such as
+The wizard and `init` generate a unique, non-secret ID for this environment.
+Keep it in the saved configuration through credential rotations and restarts.
+An advanced override is available for a reviewed binding such as
 `acme-cdp-base-sepolia-01`. It is an operator-owned identifier, not an issued API
-key or wallet address. Keep it unchanged through credential rotations and restarts.
+key or wallet address.
 The database binds accounts to it, the provider implementation and public origin.
 Never change it to work around a failed or uncertain wallet operation.
 
@@ -112,8 +116,8 @@ Never change it to work around a failed or uncertain wallet operation.
 The default bundled service registers enabled applications from Policies and
 issues five-minute RFC 9068 tokens. Services derives the issuer, audience and
 JWKS URL from your provider origin. Setup generates and retains credentials; no
-separate administrator registration is needed. Select allowed API scopes in
-Services and record application trust and wallet permissions in Policies.
+separate administrator registration is needed. Review **Advanced application API permissions** in
+Services when enabling additional API routes and record application trust and wallet permissions in Policies.
 See [application connection](bundled-setup.md#connect-a-server-application).
 
 **Existing authorization server only:** create a dedicated API/resource audience,

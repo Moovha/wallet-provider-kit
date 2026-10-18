@@ -118,10 +118,13 @@ test('field guidance follows backend choices and explains service registrations,
 }) => {
   await imported(page);
   await step(page, 'Backend');
+  await page
+    .getByText('Advanced wallet environment settings', { exact: true })
+    .click();
   const bindingHelp = page.locator('[data-setting="binding"]');
   await bindingHelp.locator('summary').click();
   await expect(bindingHelp).toContainText('No vendor issues this value');
-  await expect(bindingHelp).toContainText('Keep it unchanged');
+  await expect(bindingHelp).toContainText('Keep the generated ID unchanged');
   await page
     .getByRole('button', { name: 'Open Wallet Standard', exact: true })
     .click();
@@ -236,6 +239,9 @@ test('an operator configures CDP without JSON, exports valid files, and editing 
   ).toBeVisible();
   await page.getByRole('button', { name: 'Coinbase CDP', exact: true }).click();
   await page
+    .getByText('Advanced wallet environment settings', { exact: true })
+    .click();
+  await page
     .getByLabel('Wallet environment name', { exact: true })
     .fill('acme-sepolia');
   await step(page, 'Policies');
@@ -331,6 +337,9 @@ test('OWS and Sumsub can be selected with their references and exported without 
     .getByRole('button', { name: 'Open Wallet Standard', exact: true })
     .click();
   await page
+    .getByText('Advanced wallet environment settings', { exact: true })
+    .click();
+  await page
     .getByLabel('Wallet environment name', { exact: true })
     .fill('acme-ows');
   await expect(
@@ -382,6 +391,9 @@ test('Relayer signer pool, applications, financial policies and activation are c
   await step(page, 'Backend');
   await page
     .getByRole('button', { name: 'OpenZeppelin Relayer', exact: true })
+    .click();
+  await page
+    .getByText('Advanced wallet environment settings', { exact: true })
     .click();
   await page
     .getByLabel('Wallet environment name', { exact: true })
@@ -567,6 +579,9 @@ test('step validation accepts variable names, shows HTTPS errors, and supports k
     page.getByRole('tab', { name: 'Services', exact: true }),
   ).toHaveAttribute('aria-selected', 'true');
   await step(page, 'Backend');
+  await page
+    .getByText('Advanced CDP credential variables', { exact: true })
+    .click();
   const secretName = page.getByLabel('CDP API key secret variable name', {
     exact: true,
   });
@@ -1447,9 +1462,16 @@ test('a new provider exports the bundled issuer, OWS vault and Caddy profile wit
   await expect(
     page.getByRole('button', { name: 'Open Wallet Standard', exact: true }),
   ).toHaveAttribute('aria-pressed', 'true');
-  await page
+  await expect(
+    page.getByLabel('Wallet environment name', { exact: true }),
+  ).not.toBeVisible();
+  const binding = await page
     .getByLabel('Wallet environment name', { exact: true })
-    .fill('bundled-example');
+    .inputValue();
+  expect(binding).toMatch(/^wallets-[0-9a-f-]{36}$/);
+  await expect(
+    page.getByLabel('OWS vault directory', { exact: true }),
+  ).not.toBeVisible();
   await page.getByRole('button', { name: 'Next', exact: true }).click();
   await expect(
     page.getByLabel('Application authentication', { exact: true }),
@@ -1461,15 +1483,25 @@ test('a new provider exports the bundled issuer, OWS vault and Caddy profile wit
     page.getByLabel('wallet:sign', { exact: true }),
   ).not.toBeChecked();
   await expect(
+    page.getByLabel('wallet:sign', { exact: true }),
+  ).not.toBeVisible();
+  await expect(
     page.getByText('https://wallet.example.test/oauth', { exact: true }),
   ).toBeVisible();
   await page.getByRole('button', { name: 'Next', exact: true }).click();
   await page
     .getByLabel('Application name', { exact: true })
     .fill('Example Server');
-  await page
+  await expect(
+    page.getByLabel('Application client ID', { exact: true }),
+  ).not.toBeVisible();
+  const clientId = await page
     .getByLabel('Application client ID', { exact: true })
-    .fill('example-server');
+    .inputValue();
+  expect(clientId).toMatch(/^application-[0-9a-f-]{36}$/);
+  await expect(
+    page.getByLabel('Policy version', { exact: true }),
+  ).not.toBeVisible();
   await page
     .getByLabel('Application identity and consent trust agreement', {
       exact: true,
@@ -1478,26 +1510,34 @@ test('a new provider exports the bundled issuer, OWS vault and Caddy profile wit
   await page
     .getByLabel('Enable runtime configuration', { exact: true })
     .check();
-  await page
+  await expect(
+    page.getByLabel('Operator OAuth client ID', { exact: true }),
+  ).not.toBeVisible();
+  const operatorId = await page
     .getByLabel('Operator OAuth client ID', { exact: true })
-    .fill('provider-operator');
+    .inputValue();
+  expect(operatorId).toMatch(/^operator-[0-9a-f-]{36}$/);
   await expect(
     page.getByLabel('Operator token subject', { exact: true }),
-  ).toHaveValue('provider-operator');
+  ).toHaveValue(operatorId);
   await page.getByRole('button', { name: 'Next', exact: true }).click();
   await expect(page.getByLabel('HTTPS gateway', { exact: true })).toHaveValue(
     'caddy',
   );
+  await expect(
+    page.getByLabel('Service port', { exact: true }),
+  ).not.toBeVisible();
   const config = await exported(page);
+  expect(config.backend.binding).toBe(binding);
   expect(config.backend.kind).toBe('ows');
   expect(config.authorizationServer.operatorClients).toEqual([
-    expect.objectContaining({ clientId: 'provider-operator' }),
+    expect.objectContaining({ clientId: operatorId }),
   ]);
   expect(config.http.ingress).toBe('caddy');
   expect(config.activation.enabled).toBe(false);
   expect(config.authorizationServer.clients).toEqual([
     expect.objectContaining({
-      clientId: 'example-server',
+      clientId,
       scopes: [
         'wallet:access',
         'wallet:access:read',
@@ -1512,9 +1552,8 @@ test('a new provider exports the bundled issuer, OWS vault and Caddy profile wit
     jwksUrl: 'https://wallet.example.test/oauth/jwks',
   });
   await imported(page, config);
-  expect((await exported(page)).authorizationServer).toEqual(
-    config.authorizationServer,
-  );
+  const restored = await exported(page);
+  expect(restored).toEqual(config);
 });
 
 test('bundled execution starts selected and supplies managed sponsor bindings', async ({
@@ -1558,4 +1597,97 @@ test('bundled execution starts selected and supplies managed sponsor bindings', 
       exact: true,
     }),
   ).not.toBeChecked();
+});
+
+test('advanced overrides and additional bundled registrations retain their identities across export and import', async ({
+  page,
+}) => {
+  const bundled = JSON.parse(
+    await readFile(
+      new URL(
+        '../../docs/provider.config.bundled.example.json',
+        import.meta.url,
+      ),
+      'utf8',
+    ),
+  );
+  await imported(page, bundled);
+  await step(page, 'Backend');
+  const environment = page.getByText('Advanced wallet environment settings', {
+    exact: true,
+  });
+  await environment.focus();
+  await environment.press('Enter');
+  await page
+    .getByLabel('Wallet environment name', { exact: true })
+    .fill('reviewed-environment');
+  await page.getByText('Advanced vault settings', { exact: true }).click();
+  await page
+    .getByLabel('OWS vault directory', { exact: true })
+    .fill('private-vault');
+  await page
+    .getByLabel('OWS owner passphrase variable name', { exact: true })
+    .fill('RETAINED_VAULT_PASSPHRASE');
+  await step(page, 'Policies');
+  await page
+    .getByRole('button', { name: 'Add application', exact: true })
+    .click();
+  const applications = page.getByLabel('Application client ID', {
+    exact: true,
+  });
+  expect(await applications.nth(0).inputValue()).toBe('application-1');
+  const addedClient = await applications.nth(1).inputValue();
+  expect(addedClient).toMatch(/^application-[0-9a-f-]{36}$/);
+  await page
+    .getByLabel('Application name', { exact: true })
+    .nth(1)
+    .fill('Second application');
+  await page
+    .getByLabel('Application identity and consent trust agreement', {
+      exact: true,
+    })
+    .nth(1)
+    .fill('reviewed-second-application');
+  await page
+    .getByLabel('Enable runtime configuration', { exact: true })
+    .check();
+  await page
+    .getByRole('button', { name: 'Add runtime operator', exact: true })
+    .click();
+  const operators = page.getByLabel('Operator OAuth client ID', {
+    exact: true,
+  });
+  expect(await operators.nth(0).inputValue()).not.toBe(
+    await operators.nth(1).inputValue(),
+  );
+  await step(page, 'Services');
+  await page
+    .getByText('Advanced application API permissions', { exact: true })
+    .nth(1)
+    .click();
+  await page.getByText('wallet:actions:read', { exact: true }).nth(1).click();
+  await step(page, 'Deployment');
+  await page.getByText('Advanced deployment settings', { exact: true }).click();
+  await page
+    .getByLabel('Private data directory', { exact: true })
+    .fill('private-data');
+  await page.getByLabel('Service port', { exact: true }).fill('9090');
+  const saved = await exported(page);
+  expect(saved.backend).toEqual({
+    ...bundled.backend,
+    binding: 'reviewed-environment',
+    vaultDirectory: 'private-vault',
+    passphrase: { env: 'RETAINED_VAULT_PASSPHRASE' },
+  });
+  expect(saved.storage.directory).toBe('private-data');
+  expect(saved.http.port).toBe(9090);
+  expect(saved.policy.applications[1].clientId).toBe(addedClient);
+  expect(saved.authorizationServer.clients[1].scopes).toContain(
+    'wallet:actions:read',
+  );
+  expect(saved.authorizationServer.clients[0]).toEqual(
+    bundled.authorizationServer.clients[0],
+  );
+  await imported(page, saved);
+  expect(await exported(page)).toEqual(saved);
 });

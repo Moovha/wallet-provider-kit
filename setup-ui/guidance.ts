@@ -127,9 +127,9 @@ export const settings = {
     'operator-services.html#provider-domain-and-privacy-notice',
   ),
   binding: setting(
-    'A permanent name you choose for this wallet environment. No vendor issues this value.',
+    'A permanent, non-secret ID generated for this wallet environment. No vendor issues this value.',
     'Stored accounts use it to stay attached to the same wallet backend through restarts and credential changes. Changing it is not a way to recover a failed operation.',
-    'Choose a unique, non-secret name such as acme-cdp-base-sepolia-01. Keep it unchanged for this deployment.',
+    'Keep the generated ID unchanged for this deployment. Import your saved configuration to retain it; use the advanced override only when establishing a reviewed environment binding.',
     'operator-services.html#stable-backend-binding',
   ),
   cdpKeyId: setting(
@@ -357,7 +357,7 @@ export const settings = {
   applicationClient: setting(
     'The ID of this calling application’s registration at your token service.',
     'The kit matches verified tokens to this allowed application and its stored permissions.',
-    'Copy its client ID from the separate API client registration or ask the application developer. Do not reuse the wallet service’s owner-login client ID.',
+    'The bundled issuer generates this ID automatically; share it with the application developer. For an existing issuer, copy its registered API client ID. Do not reuse the owner-login client ID.',
     'operator-services.html#register-the-application-api-and-clients',
   ),
   applicationIssuer: setting(

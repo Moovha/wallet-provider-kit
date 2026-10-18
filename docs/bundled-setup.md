@@ -26,20 +26,46 @@ profile, not a claim of superior production custody or certification. See the
 [Caddy HTTPS documentation](https://caddyserver.com/docs/automatic-https) and
 [OWS control and recovery](ows-adapter.md).
 
+## Supplied settings and explicit decisions
+
+A new wizard draft generates unique wallet environment and bundled application
+IDs. Enabling the runtime workspace generates a separate operator ID. These are
+non-secret identifiers, retained in the configuration through export and import;
+setup never replaces them on restart. Import the saved configuration when editing
+an existing deployment. Starting a fresh draft or running `init` creates new IDs
+for a new deployment. Names are display labels and do not determine identity.
+
+The wizard prefills `.provider-vault`, `.provider-data`, host port `8080`, policy
+version `1`, identity freshness of 90 days and access duration of seven days.
+Bundled service credential variable names are supplied, and setup generates
+missing secret values once. Advanced controls expose overrides for integration
+and host requirements. Existing-issuer client IDs and external service endpoints
+must match their actual registrations.
+
+Provider identity, domain ownership, privacy notice, reviewed trust agreements,
+permissions, accepted financial contracts, gas budgets, RPC independence and
+acceptance evidence require your decisions. Defaults do not invent agreements,
+grant financial scopes, fund accounts or activate wallet operations.
+
 ## Configure through the wizard
 
 1. **Provider:** enter your public HTTPS origin, display name and privacy notice.
-2. **Backend:** keep **Open Wallet Standard**, choose a stable environment binding
-   and retain the supplied vault and secret-variable names.
+2. **Backend:** keep **Open Wallet Standard**. The wizard generates a stable
+   environment binding and supplies the private vault and credential-variable
+   settings. Overrides are collapsed under advanced settings.
 3. **Services:** keep **Bundled token service** and **Bundled OpenZeppelin Relayer and Valkey**. Issuer, audience and public-key
    endpoint derive from your provider origin. Initially only access, account
-   reading and provisioning API scopes are selected.
-4. **Policies:** choose each application's client ID and name and record its
+   reading and provisioning API scopes are selected. Overrides are under
+   **Advanced application API permissions**.
+4. **Policies:** name each application and record its
    reviewed identity/consent trust agreement. The bundled issuer registers each
-   enabled application automatically. User authentication and identity checks
+   enabled application with a generated client ID automatically. Retain that ID
+   in the saved configuration and give it to the application's integration team.
+   User authentication and identity checks
    remain in the connected application.
-5. **Deployment:** keep **Bundled Caddy automatic HTTPS** and leave wallet
-   activation disabled. Financial signing and execution are explicit policy
+5. **Deployment:** keep the supplied private data path, port and **Bundled Caddy
+   automatic HTTPS** settings and leave wallet activation disabled. Their
+   overrides are under **Advanced deployment settings**. Financial signing and execution are explicit policy
    choices. Their default submission path is the bundled local engine. Set independent RPC sources, accepted chain/token hashes, application gas budgets and a funding agreement. Setup generates each sponsor binding and encrypted key; no external Relayer account or signer registration is required.
 6. **Export:** validate and choose **Set up and run locally**. Review the plan and
    start setup. Missing issuer keys, client secrets and the vault passphrase are
@@ -120,8 +146,9 @@ A token identifies the application; it does not prove user ownership or authoriz
 spending. The existing owner, grant, current identity, consent, exact action and
 durable attempt checks remain mandatory before wallet effects.
 
-When you enable the runtime workspace in Policies, configure a separate provider
-operator client ID. The bundle registers this service client separately, generates
+When you enable the runtime workspace in Policies, the wizard generates a
+separate provider operator client ID. Its override is under **Advanced operator
+identity**. The bundle registers this service client separately, generates
 its secret and sets its token subject to its client ID. It can request
 `wallet:configuration:read`, `wallet:configuration:write` and
 `wallet:execute:read`. Keep its secret with the provider. Application registrations

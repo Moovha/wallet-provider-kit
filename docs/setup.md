@@ -35,8 +35,9 @@ npx --no-install wallet-provider-kit init provider.config.json
 npx --no-install wallet-provider-kit validate --config provider.config.json
 ```
 
-`init` writes the [bundled application-led template](provider.config.bundled.example.json) without overwriting
-an existing file. Editors can use the packaged
+`init` writes the [bundled application-led template](provider.config.bundled.example.json)
+with generated wallet environment and application client IDs, without overwriting
+an existing file. Retain those IDs when editing the saved configuration. Editors can use the packaged
 [JSON Schema](../spec/provider-config.schema.json). Version 1 rejects unknown fields,
 unsupported profiles, plaintext credentials, invalid policies and incomplete
 activation settings. `validate` is offline: it does not read secrets, load adapter
@@ -50,8 +51,9 @@ hosted compatibility adds provider reviewers, existing login and configured
 identity vendors or unfunded record evaluation. Keep
 credentials in environment variables supplied by your secret store; configuration
 contains only references such as `{"env":"PROVIDER_LOGIN_SECRET"}`. The command does
-not automatically read `.env` files. Set `backend.binding` to a stable public identifier for this wallet-backend
-environment; retain it across credential rotations. The service binds its database
+not automatically read `.env` files. `init` supplies `backend.binding`, a stable
+non-secret identifier for this wallet-backend environment; retain it across
+credential rotations. The service binds its database
 to this identifier, provider implementation and HTTPS origin. Changing them, or
 adopting an existing embedded-host database, requires a reviewed migration rather
 than automatic replacement wallets. Config and backend selection are deployment

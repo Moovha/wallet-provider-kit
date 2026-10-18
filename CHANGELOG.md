@@ -14,6 +14,11 @@
 
 ## Unreleased bundled setup
 
+- Generate stable wallet environment, application and operator IDs for new
+  configurations. Keep storage paths, credential variable names, API scope
+  overrides and deployment details under advanced wizard controls; preserve
+  imported identities and overrides.
+
 - Start a private OpenZeppelin Relayer and persistent Valkey by default in bundled setup; generate encrypted local gas-sponsor keys and bindings for configured approved actions. Existing execution services remain optional.
 
 - Default new wizard and CLI configurations to a bundled oidc-provider application

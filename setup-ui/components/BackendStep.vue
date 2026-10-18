@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AdvancedSettings from './AdvancedSettings.vue';
 import SetupField from './SetupField.vue';
 import { computed } from 'vue';
 import {
@@ -92,63 +93,59 @@ function removeSigner(index: number) {
       >Kit adapter guide ↗</a
     >
   </div>
-  <SetupField
-    guide="binding"
-    v-model="model.backend.binding"
-    type="text"
-    label="Wallet environment name"
-    placeholder="acme-sepolia-wallets"
-    validation="required|length:1,256"
-  />
   <template v-if="model.backend.kind === 'cdp'">
     <div class="callout">
       <strong>Prepare your CDP project</strong>
       <p>
-        Create API and wallet credentials in your existing CDP project. Enter
-        the names of their deployment variables below.
+        Supply API and wallet credentials from your existing CDP project
+        privately during deployment. Standard variable names are supplied.
       </p>
     </div>
-    <SecretField
-      guide="cdpKeyId"
-      v-model="model.backend.apiKeyId"
-      label="CDP API key ID"
-    />
-    <SecretField
-      guide="cdpKeySecret"
-      v-model="model.backend.apiKeySecret"
-      label="CDP API key secret"
-    />
-    <SecretField
-      guide="cdpWalletSecret"
-      v-model="model.backend.walletSecret"
-      label="CDP wallet secret"
-    />
+    <AdvancedSettings label="Advanced CDP credential variables">
+      <SecretField
+        guide="cdpKeyId"
+        v-model="model.backend.apiKeyId"
+        label="CDP API key ID"
+      />
+      <SecretField
+        guide="cdpKeySecret"
+        v-model="model.backend.apiKeySecret"
+        label="CDP API key secret"
+      />
+      <SecretField
+        guide="cdpWalletSecret"
+        v-model="model.backend.walletSecret"
+        label="CDP wallet secret"
+      />
+    </AdvancedSettings>
   </template>
   <template v-if="model.backend.kind === 'ows'">
     <div class="callout">
-      <strong>Prepare your local vault</strong>
+      <strong>Your local vault is included</strong>
       <p>
         The pinned engine is included in the standard image. Setup creates a
         private, persistent vault and generates a missing owner passphrase.
         Retain the environment file and back up both vault and database.
       </p>
     </div>
-    <SetupField
-      guide="vault"
-      v-model="model.backend.vaultDirectory"
-      type="text"
-      label="OWS vault directory"
-      validation="required|length:1,256"
-    />
-    <SecretField
-      guide="passphrase"
-      v-model="model.backend.passphrase"
-      label="OWS owner passphrase"
-    />
-    <p class="help-text">
-      Use an owner passphrase of 16–4096 characters at deployment. Agent tokens
-      cannot be used.
-    </p>
+    <AdvancedSettings label="Advanced vault settings">
+      <SetupField
+        guide="vault"
+        v-model="model.backend.vaultDirectory"
+        type="text"
+        label="OWS vault directory"
+        validation="required|length:1,256"
+      />
+      <SecretField
+        guide="passphrase"
+        v-model="model.backend.passphrase"
+        label="OWS owner passphrase"
+      />
+      <p class="help-text">
+        Use an owner passphrase of 16–4096 characters at deployment. Agent
+        tokens cannot be used.
+      </p>
+    </AdvancedSettings>
   </template>
   <template v-if="model.backend.kind === 'openzeppelin-relayer'">
     <SetupField
@@ -159,11 +156,13 @@ function removeSigner(index: number) {
       placeholder="https://relayer.acme.com"
       validation="required|https_origin"
     />
-    <SecretField
-      guide="relayerKey"
-      v-model="relayer.apiKey"
-      label="Relayer API key"
-    />
+    <AdvancedSettings label="Advanced Relayer credential variable">
+      <SecretField
+        guide="relayerKey"
+        v-model="relayer.apiKey"
+        label="Relayer API key"
+      />
+    </AdvancedSettings>
     <div class="section-heading">
       <h3>Existing signer pool</h3>
       <button
@@ -213,6 +212,20 @@ function removeSigner(index: number) {
       </button>
     </fieldset>
   </template>
+  <p class="help-text">
+    Setup supplies a stable wallet environment ID. Keep it with your saved
+    configuration across restarts and credential rotations.
+  </p>
+  <AdvancedSettings label="Advanced wallet environment settings">
+    <SetupField
+      guide="binding"
+      v-model="model.backend.binding"
+      type="text"
+      label="Wallet environment name"
+      placeholder="acme-sepolia-wallets"
+      validation="required|length:1,256"
+    />
+  </AdvancedSettings>
   <p class="help-text">
     Need another backend?
     <a

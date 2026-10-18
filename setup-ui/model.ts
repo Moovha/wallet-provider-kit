@@ -1,3 +1,8 @@
+import {
+  newClientId,
+  newWalletBinding,
+} from '../src/deployment/setup-identifiers.js';
+export { newClientId } from '../src/deployment/setup-identifiers.js';
 import { defaultLocalExecution } from '../src/deployment/local-execution-contract.js';
 import {
   bundledOAuth,
@@ -45,17 +50,18 @@ export const backends = [
 ];
 
 export function newBackend(kind: BackendKind): Backend {
+  const binding = newWalletBinding();
   if (kind === 'ows')
     return {
       kind,
-      binding: '',
+      binding,
       vaultDirectory: '.provider-vault',
       passphrase: { env: 'OWS_OWNER_PASSPHRASE' },
     };
   if (kind === 'openzeppelin-relayer')
     return {
       kind,
-      binding: '',
+      binding,
       url: '',
       apiKey: { env: 'RELAYER_API_KEY' },
       signers: [
@@ -64,7 +70,7 @@ export function newBackend(kind: BackendKind): Backend {
     };
   return {
     kind,
-    binding: '',
+    binding,
     apiKeyId: { env: 'WALLET_CDP_API_KEY_ID' },
     apiKeySecret: { env: 'WALLET_CDP_API_KEY_SECRET' },
     walletSecret: { env: 'WALLET_CDP_WALLET_SECRET' },
@@ -90,7 +96,7 @@ export function emptyConfiguration(
     signingKey: { env: 'WALLET_OAUTH_SIGNING_KEY' },
     clients: [],
   };
-  config.policy.applications[0].clientId = 'application-1';
+  config.policy.applications[0].clientId = newClientId('application');
   delete config.ownerLogin;
   delete config.reviewers;
   config.identity = {};

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AdvancedSettings from './AdvancedSettings.vue';
 import SetupField from './SetupField.vue';
 import ExecutionStep from './ExecutionStep.vue';
 import ContractCallsStep from './ContractCallsStep.vue';
@@ -30,67 +31,76 @@ function updateHttp(
     <span class="eyebrow">Deployment inputs</span>
     <h2>Prepare the deployment</h2>
     <p>
-      Choose where the service keeps records and how it listens on the
-      deployment host.
+      Review the supplied deployment settings, then choose any optional features
+      and acceptance requirements.
     </p>
   </div>
   <div class="callout step-orientation">
     <strong>Prepare where the exported service will run</strong>
     <p>
-      Your deployment host is the server that will run the wallet service. For a
-      native service behind an HTTPS gateway on the same server, the supplied
-      data folder, local listen address and port are a starting point.
-      Containers need the container listen address. The instructions beside each
-      field explain the choice.
+      Setup prepares private persistent storage and container networking
+      automatically. The default host port is 8080, and bundled Caddy supplies
+      the HTTPS gateway configuration. Expand advanced settings to use a
+      different data directory, port or existing gateway.
     </p>
     <p>
       The API testing tools are optional. Leave activation off for your first
       deployment; test your integrations and recovery before enabling it.
     </p>
   </div>
-  <SetupField
-    guide="storage"
-    v-model="model.storage.directory"
-    type="text"
-    label="Private data directory"
-    validation="required|length:1,256"
-  />
-  <div class="field-grid">
+  <p class="help-text">
+    Private data: <code>{{ model.storage.directory }}</code> · Host port:
+    <code>{{ http.port ?? 8080 }}</code> · HTTPS gateway:
+    {{ http.ingress === 'caddy' ? 'bundled Caddy' : 'existing gateway' }}.
+  </p>
+  <AdvancedSettings label="Advanced deployment settings">
     <SetupField
-      guide="listenHost"
-      type="select"
-      label="Service listen address"
-      :modelValue="http.host ?? '127.0.0.1'"
-      :options="[
-        { label: 'Local IPv4 · 127.0.0.1', value: '127.0.0.1' },
-        { label: 'Container / all IPv4 · 0.0.0.0', value: '0.0.0.0' },
-        { label: 'Local IPv6 · ::1', value: '::1' },
-        { label: 'All IPv6 · ::', value: '::' },
-      ]"
-      @update:modelValue="updateHttp('host', $event)"
-    /><SetupField
-      guide="port"
-      type="number"
-      :number="true"
-      label="Service port"
-      :modelValue="http.port ?? 8080"
-      min="1"
-      max="65535"
-      validation="required|between:1,65535"
-      @update:modelValue="updateHttp('port', $event)"
+      guide="storage"
+      v-model="model.storage.directory"
+      type="text"
+      label="Private data directory"
+      validation="required|length:1,256"
     />
-  </div>
-  <SetupField
-    guide="httpsGateway"
-    type="select"
-    label="HTTPS gateway"
-    :modelValue="http.ingress ?? 'existing'"
-    :options="[
-      { label: 'Bundled Caddy automatic HTTPS (recommended)', value: 'caddy' },
-      { label: 'Connect an existing HTTPS gateway', value: 'existing' },
-    ]"
-    @update:modelValue="updateHttp('ingress', $event)"
-  />
+    <div class="field-grid">
+      <SetupField
+        guide="listenHost"
+        type="select"
+        label="Service listen address"
+        :modelValue="http.host ?? '127.0.0.1'"
+        :options="[
+          { label: 'Local IPv4 · 127.0.0.1', value: '127.0.0.1' },
+          { label: 'Container / all IPv4 · 0.0.0.0', value: '0.0.0.0' },
+          { label: 'Local IPv6 · ::1', value: '::1' },
+          { label: 'All IPv6 · ::', value: '::' },
+        ]"
+        @update:modelValue="updateHttp('host', $event)"
+      /><SetupField
+        guide="port"
+        type="number"
+        :number="true"
+        label="Service port"
+        :modelValue="http.port ?? 8080"
+        min="1"
+        max="65535"
+        validation="required|between:1,65535"
+        @update:modelValue="updateHttp('port', $event)"
+      />
+    </div>
+    <SetupField
+      guide="httpsGateway"
+      type="select"
+      label="HTTPS gateway"
+      :modelValue="http.ingress ?? 'existing'"
+      :options="[
+        {
+          label: 'Bundled Caddy automatic HTTPS (recommended)',
+          value: 'caddy',
+        },
+        { label: 'Connect an existing HTTPS gateway', value: 'existing' },
+      ]"
+      @update:modelValue="updateHttp('ingress', $event)"
+    />
+  </AdvancedSettings>
   <p class="help-text">
     Local setup saves the gateway configuration. Public HTTPS starts separately
     after your domain points to the deployment host and ports 80/443 are
