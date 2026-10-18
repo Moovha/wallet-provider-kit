@@ -1,3 +1,12 @@
+import {
+  localExecutionOrigin,
+  localSponsorIds,
+  type LocalExecutionConfiguration,
+} from './local-execution-contract.js';
+import {
+  bundledOAuth,
+  type BundledAuthorizationConfiguration,
+} from './authorization-contract.js';
 import { validateReplacementSponsors } from '../execution/replacement.js';
 import {
   validateRuntimeConfiguration,
@@ -28,10 +37,12 @@ export interface SecretReference {
 }
 export interface ProviderConfiguration {
   runtimeConfiguration?: RuntimeConfigurationOptions;
+  localExecution?: LocalExecutionConfiguration;
   configVersion: 1;
   profile: 'provider-service-v1';
   policy: OnboardingPolicy;
   oauth: OAuthConfiguration;
+  authorizationServer?: BundledAuthorizationConfiguration;
   apiExplorer?: ExplorerTokensConfiguration;
   ownerLogin?: {
     issuer: string;
@@ -99,6 +110,7 @@ export interface ProviderConfiguration {
     host?: '127.0.0.1' | '0.0.0.0' | '::1' | '::';
     port?: number;
     documentation?: boolean;
+    ingress?: 'caddy' | 'existing';
   };
 }
 export class ConfigurationError extends Error {
@@ -123,6 +135,28 @@ export function validateProviderConfiguration(
     );
   const config = structuredClone(input) as unknown as ProviderConfiguration;
   try {
+    if (config.localExecution) {
+      const names = [
+        config.localExecution.apiKey.env,
+        config.localExecution.keystorePassphrase.env,
+        config.localExecution.storageKey.env,
+      ];
+      if (
+        new Set(names).size !== 3 ||
+        names.some((name) =>
+          secretReferences({
+            ...config,
+            localExecution: undefined,
+            execution: config.execution?.local
+              ? { ...config.execution, relayer: undefined }
+              : config.execution,
+          }).some((ref) => ref.env === name),
+        )
+      )
+        throw new ConfigurationError([
+          '/localExecution: use separate private secret variables',
+        ]);
+    }
     if (config.operations) validateOperations(config.operations);
     if (config.operations && !config.execution) throw new Error();
     const resolvedPolicy = defineOnboardingPolicy(config.policy);
@@ -174,7 +208,61 @@ export function validateProviderConfiguration(
       throw new ConfigurationError([
         '/identity: select application records or an identity vendor',
       ]);
+    if (
+      config.http?.ingress === 'caddy' &&
+      new URL(config.policy.provider.origin).port
+    )
+      throw new ConfigurationError([
+        '/http/ingress: bundled HTTPS requires the standard HTTPS port 443',
+      ]);
     createAuthenticator(config.oauth);
+    if (config.authorizationServer) {
+      const expected = bundledOAuth(config.policy.provider.origin);
+      const clients = config.authorizationServer.clients;
+      const enabled = config.policy.applications.filter(
+        (app) => app.enabled !== false,
+      );
+      const operatorClients = config.authorizationServer.operatorClients ?? [];
+      const operators = config.runtimeConfiguration?.operators ?? [];
+      const allClients = [...clients, ...operatorClients];
+      const refs = [
+        config.authorizationServer.signingKey.env,
+        ...allClients.map((entry) => entry.clientSecret.env),
+      ];
+      if (
+        Object.entries(expected).some(
+          ([key, value]) =>
+            config.oauth[key as keyof OAuthConfiguration] !== value,
+        ) ||
+        new Set(refs).size !== refs.length ||
+        refs.some((name) =>
+          secretReferences({
+            ...config,
+            authorizationServer: undefined,
+            apiExplorer: undefined,
+          }).some((ref) => ref.env === name),
+        ) ||
+        new Set(allClients.map((entry) => entry.clientId)).size !==
+          allClients.length ||
+        operatorClients.length !== operators.length ||
+        operatorClients.some(
+          (entry) =>
+            !operators.some(
+              (operator) =>
+                operator.clientId === entry.clientId &&
+                operator.subject === entry.clientId &&
+                operator.issuer === config.oauth.issuer,
+            ),
+        ) ||
+        clients.length !== enabled.length ||
+        clients.some(
+          (entry) => !enabled.some((app) => app.clientId === entry.clientId),
+        )
+      )
+        throw new ConfigurationError([
+          '/authorizationServer: use the provider OAuth endpoints, unique secret variables, one registration per enabled application and separate configured service operators with subject equal to client ID',
+        ]);
+    }
     if (config.ownerLogin) trustedHttpsUrl(config.ownerLogin.issuer);
     if (
       config.policy.applications.some(
@@ -183,6 +271,22 @@ export function validateProviderConfiguration(
     )
       throw new ConfigurationError([
         '/policy/applications: issuers must match /oauth/issuer',
+      ]);
+    if (
+      config.apiExplorer &&
+      config.authorizationServer &&
+      config.apiExplorer.clients.some(
+        (entry) =>
+          !config.authorizationServer!.clients.some(
+            (client) =>
+              client.clientId === entry.clientId &&
+              client.clientSecret.env === entry.clientSecret.env &&
+              entry.scopes.every((scope) => client.scopes.includes(scope)),
+          ),
+      )
+    )
+      throw new ConfigurationError([
+        '/apiExplorer: bundled token controls must match the registered client secret and allowed scopes',
       ]);
     if (config.apiExplorer) {
       if (
@@ -241,6 +345,19 @@ export function validateProviderConfiguration(
     }
     if (config.execution) {
       const execution = config.execution;
+      if (
+        execution.local &&
+        (!config.localExecution ||
+          execution.service ||
+          execution.relayer?.url !== localExecutionOrigin ||
+          execution.relayer.apiKey.env !== config.localExecution.apiKey.env ||
+          execution.replacement)
+      )
+        throw new ConfigurationError([
+          '/execution/local: use the bundled engine connection without a designated service or replacement policy',
+        ]);
+      if (!execution.local && execution.relayer?.url === localExecutionOrigin)
+        throw new Error();
       if (execution.replacement) {
         if (!execution.service || !execution.recovery) throw new Error();
         validateReplacementSponsors(execution.replacement, execution.sponsors);
@@ -297,12 +414,36 @@ export function validateProviderConfiguration(
         if (
           new Set(
             execution.sponsors.map((entry) =>
-              (entry.binding[field] ?? '').toLowerCase(),
+              execution.local &&
+              field === 'address' &&
+              entry.binding.address === 'managed'
+                ? entry.accountId
+                : (entry.binding[field] ?? '').toLowerCase(),
             ),
           ).size !== execution.sponsors.length
         )
           throw new Error();
       for (const sponsor of execution.sponsors) {
+        if (
+          execution.local &&
+          (sponsor.binding.relayerId !==
+            localSponsorIds(sponsor.accountId).relayerId ||
+            sponsor.binding.signerId !==
+              localSponsorIds(sponsor.accountId).signerId ||
+            sponsor.binding.bindingRevision !== '1')
+        )
+          throw new ConfigurationError([
+            '/execution/sponsors: retain the managed local sponsor IDs',
+          ]);
+        const managed =
+          execution.local && sponsor.binding.address === 'managed';
+        if (
+          sponsor.binding.address === 'managed' &&
+          (!managed || config.activation.enabled)
+        )
+          throw new ConfigurationError([
+            '/execution/sponsors: complete local setup before activation',
+          ]);
         const app = config.policy.applications.find(
           (candidate) =>
             candidate.clientId === sponsor.clientId &&
@@ -332,11 +473,11 @@ export function validateProviderConfiguration(
           ? {
               relayerId: binding.relayerId,
               signerId: binding.signerId,
-              address: getAddress(binding.address),
+              address: managed ? binding.address : getAddress(binding.address),
               bindingRevision: binding.bindingRevision,
             }
           : {
-              address: getAddress(binding.address),
+              address: managed ? binding.address : getAddress(binding.address),
               bindingRevision: binding.bindingRevision,
             };
         if (
@@ -357,7 +498,7 @@ export function validateProviderConfiguration(
       validateApprovedCallPolicy(config.approvedCalls.policy);
       if (
         config.execution?.profile !== 'approved-evm-executor-v1' ||
-        !config.execution.service
+        (!config.execution.service && !config.execution.local)
       )
         throw new Error();
     }
@@ -403,6 +544,24 @@ export function secretReferences(
   config: ProviderConfiguration,
 ): SecretReference[] {
   return [
+    ...(config.localExecution
+      ? [
+          config.localExecution.apiKey,
+          config.localExecution.keystorePassphrase,
+          config.localExecution.storageKey,
+        ]
+      : []),
+    ...(config.authorizationServer
+      ? [
+          config.authorizationServer.signingKey,
+          ...(config.authorizationServer.operatorClients ?? []).map(
+            (entry) => entry.clientSecret,
+          ),
+          ...config.authorizationServer.clients.map(
+            (entry) => entry.clientSecret,
+          ),
+        ]
+      : []),
     ...(config.operations?.webhooks.flatMap((entry) => [
       entry.endpoint,
       ...entry.signingSecrets,

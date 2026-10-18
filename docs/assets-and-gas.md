@@ -24,8 +24,8 @@ different tokens with different units; a share balance must not be presented as
 the same amount of its underlying asset.
 
 The experimental Base Sepolia profiles support ERC-3009 transfer authorizations
-and separately approved Safe contract calls, original Uniswap V3 swaps and
-bounded ERC-4626 router deposits. The optional coordinator uses a configured
+and generic Safe call batches, including explicitly permitted native transfers.
+Optional policy adapters add supported token-transfer, swap and vault checks. The optional coordinator uses a configured
 application sponsor and verifies the evidence required for each operation.
 These are test-network capabilities, not production acceptance for USDC, ZARP or
 any particular protocol. See [transfer execution](execution.md) and

@@ -1,3 +1,13 @@
+import {
+  newClientId,
+  newWalletBinding,
+} from '../src/deployment/setup-identifiers.js';
+export { newClientId } from '../src/deployment/setup-identifiers.js';
+import { defaultLocalExecution } from '../src/deployment/local-execution-contract.js';
+import {
+  bundledOAuth,
+  initialApplicationScopes,
+} from '../src/deployment/authorization-contract.js';
 import type { ProviderConfiguration } from '../src/deployment/config.js';
 export type { ProviderConfiguration };
 export type Backend = Exclude<
@@ -9,6 +19,16 @@ export type BackendKind = Backend['kind'];
 export const docs = 'https://moovha.github.io/wallet-provider-kit/docs/';
 export const backends = [
   {
+    kind: 'ows' as const,
+    name: 'Open Wallet Standard',
+    image: 'ows.png',
+    description:
+      'Run the included engine with a private vault created during setup.',
+    detail: 'Recommended · bundled wallet engine',
+    url: 'https://docs.openwallet.sh/',
+    guide: `${docs}ows-adapter.html`,
+  },
+  {
     kind: 'cdp' as const,
     name: 'Coinbase CDP',
     image: 'coinbase.png',
@@ -16,15 +36,6 @@ export const backends = [
     detail: 'Managed wallet API',
     url: 'https://docs.cdp.coinbase.com/',
     guide: `${docs}setup.html#select-a-built-in-backend`,
-  },
-  {
-    kind: 'ows' as const,
-    name: 'Open Wallet Standard',
-    image: 'ows.png',
-    description: 'Use a private, persistent wallet vault on your own host.',
-    detail: 'Local wallet engine',
-    url: 'https://docs.openwallet.sh/',
-    guide: `${docs}ows-adapter.html`,
   },
   {
     kind: 'openzeppelin-relayer' as const,
@@ -39,17 +50,18 @@ export const backends = [
 ];
 
 export function newBackend(kind: BackendKind): Backend {
+  const binding = newWalletBinding();
   if (kind === 'ows')
     return {
       kind,
-      binding: '',
+      binding,
       vaultDirectory: '.provider-vault',
       passphrase: { env: 'OWS_OWNER_PASSPHRASE' },
     };
   if (kind === 'openzeppelin-relayer')
     return {
       kind,
-      binding: '',
+      binding,
       url: '',
       apiKey: { env: 'RELAYER_API_KEY' },
       signers: [
@@ -58,7 +70,7 @@ export function newBackend(kind: BackendKind): Backend {
     };
   return {
     kind,
-    binding: '',
+    binding,
     apiKeyId: { env: 'WALLET_CDP_API_KEY_ID' },
     apiKeySecret: { env: 'WALLET_CDP_API_KEY_SECRET' },
     walletSecret: { env: 'WALLET_CDP_WALLET_SECRET' },
@@ -79,7 +91,12 @@ export function emptyConfiguration(
       assertionTrust: { agreement: '' },
     },
   ];
-  config.oauth = { issuer: '', audience: '', jwksUrl: '' };
+  config.oauth = bundledOAuth('');
+  config.authorizationServer = {
+    signingKey: { env: 'WALLET_OAUTH_SIGNING_KEY' },
+    clients: [],
+  };
+  config.policy.applications[0].clientId = newClientId('application');
   delete config.ownerLogin;
   delete config.reviewers;
   config.identity = {};
@@ -91,8 +108,54 @@ export function emptyConfiguration(
   delete config.financial;
   delete config.execution;
   delete config.activation.executionAcceptance;
-  config.backend = newBackend('cdp');
+  config.backend = newBackend('ows');
+  config.localExecution = defaultLocalExecution();
+  config.http = { ...config.http, ingress: 'caddy' };
+  synchronizeBundledServices(config);
   return config;
+}
+
+/** Keep generated service registrations aligned with the operator's admitted applications. */
+export function synchronizeBundledServices(config: ProviderConfiguration) {
+  if (!config.authorizationServer) return;
+  config.oauth = bundledOAuth(config.policy.provider.origin);
+  for (const app of config.policy.applications)
+    app.issuer = config.oauth.issuer;
+  if (config.runtimeConfiguration) {
+    for (const operator of config.runtimeConfiguration.operators) {
+      operator.issuer = config.oauth.issuer;
+      operator.subject = operator.clientId;
+    }
+    const previousOperators = config.authorizationServer.operatorClients ?? [];
+    const operators = config.runtimeConfiguration.operators.map(
+      (operator) =>
+        previousOperators.find(
+          (entry) => entry.clientId === operator.clientId,
+        ) ?? {
+          clientId: operator.clientId,
+          clientSecret: {
+            env: `WALLET_OPERATOR_${crypto.randomUUID().replaceAll('-', '').toUpperCase()}_SECRET`,
+          },
+        },
+    );
+    if (JSON.stringify(previousOperators) !== JSON.stringify(operators))
+      config.authorizationServer.operatorClients = operators;
+  } else delete config.authorizationServer.operatorClients;
+  const previous = config.authorizationServer.clients;
+  const clients = config.policy.applications
+    .filter((app) => app.enabled !== false)
+    .map(
+      (app) =>
+        previous.find((entry) => entry.clientId === app.clientId) ?? {
+          clientId: app.clientId,
+          clientSecret: {
+            env: `WALLET_APPLICATION_${crypto.randomUUID().replaceAll('-', '').toUpperCase()}_SECRET`,
+          },
+          scopes: [...initialApplicationScopes],
+        },
+    );
+  if (JSON.stringify(previous) !== JSON.stringify(clients))
+    config.authorizationServer.clients = clients;
 }
 
 export function deploymentChecklist(
@@ -122,7 +185,9 @@ export function deploymentChecklist(
           '- Configure OIDC code flow, PKCE S256, client_secret_post and fresh signed ID tokens for staff/hosted login.',
         ]
       : []),
-    '- Register connected application clients separately. Issue dedicated-audience RFC 9068 at+jwt API tokens with the required wallet scopes and a lifetime no longer than ten minutes.',
+    config.authorizationServer
+      ? '- Bundled application registrations are included. New-deployment setup generates missing issuer/client secrets once; retain provider.env and give each application only its own client secret through a private channel. Tokens use client_credentials, client_secret_post and selected scopes at /oauth/token.'
+      : '- Connect existing application clients at your chosen issuer. Use dedicated-audience RFC 9068 at+jwt tokens with a lifetime no longer than ten minutes.',
     ...(config.policy.access?.mode === 'application'
       ? [
           '- Review each application trust agreement. Test identity and consent attestations, user isolation, revocation and stale evidence through the access API. Users remain in the application.',
@@ -142,7 +207,7 @@ export function deploymentChecklist(
   ];
   if (config.backend.kind === 'ows')
     lines.push(
-      '- Install @open-wallet-standard/core@1.4.3 and prepare a private vault (0700). Back up the vault AND SQLite. Supply an owner passphrase of 16–4096 characters, never an agent token. The reference Docker image omits the OWS engine.',
+      '- The pinned @open-wallet-standard/core@1.4.3 engine is included. New-deployment setup prepares a private vault (0700) and generates a missing owner passphrase. Back up the vault, SQLite and retained secrets together.',
     );
   if (config.backend.kind === 'openzeppelin-relayer')
     lines.push(
@@ -170,13 +235,13 @@ export function deploymentChecklist(
     'chmod 700 "$PROVIDER_STATE"',
     '```',
     '',
-    'Use your private persistent deployment directory instead if preferred. Copy all three downloaded files there using your approved file-transfer tool. Rename provider.env.example to provider.env in that directory, then protect the files:',
+    'Use your private persistent deployment directory instead if preferred. Copy all three downloaded files there using your approved file-transfer tool. For existing external services, copy provider.env.example to provider.env. For bundled services, create provider.env with init-secrets --config instead; never replace a retained environment file. Then protect the files:',
     '',
     '```sh',
     'chmod 600 "$PROVIDER_STATE/provider.config.json" "$PROVIDER_STATE/provider.env" "$PROVIDER_STATE/provider-setup.md"',
     '```',
     '',
-    'Open provider.env privately and fill its NAME=value entries with the issued secrets. Do not paste values into shell commands or source the file as a shell script. The service does not load this file automatically; the native commands below explicitly load it. If your secret manager injects these variables directly, omit --env-file. Existing process variables take precedence.',
+    'For bundled services, run init-secrets --config with the private configuration path before creating provider.env; it writes generated secrets once and refuses to overwrite that file. The downloaded provider.env.example is only a list of variable names. Open provider.env privately and fill any external-service secrets. Do not paste values into shell commands or source the file as a shell script. The service does not load this file automatically; the native commands below explicitly load it. If your secret manager injects these variables directly, omit --env-file. Existing process variables take precedence.',
     'Relative data and vault directories resolve beside provider.config.json. Follow the deployment guide to prepare private directories and, for OWS, its separate retained vault. Use the reference container instructions for Docker rather than these native start commands.',
     '',
     '## Validate, initialize once and start disabled',

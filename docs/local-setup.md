@@ -1,12 +1,13 @@
 # Install the local runtime and run your service
 
 At [Export](setup-wizard.md#_6-export), choose **Set up and run locally** to turn
-your validated CDP or Relayer configuration into a running Docker Compose service.
+your validated OWS, CDP or existing Relayer configuration into a running Docker Compose service.
 This guide explains the runtime preparation, private secret entry, progress and
 saved commands you will encounter. Setup starts with wallet operations disabled
 so you can complete deployment acceptance before activation.
 
-This is the recommended local evaluation path for CDP and Relayer. It builds the
+This is the recommended local evaluation path, including the bundled token
+service, OWS engine and a private OpenZeppelin Relayer with persistent Valkey queues. It builds the
 same repository Dockerfile used by the single-host container deployment: pinned
 Node base image, production dependencies, unprivileged user, read-only filesystem,
 private persistent SQLite storage and read-only configuration. Docker manages the
@@ -55,9 +56,9 @@ Docker service, change Docker group membership or configure startup at login.
 Docker administrators can access container secrets; use a trusted machine.
 
 Prepare isolated backend credentials and application trust settings through
-[services and credentials](operator-services.md). Setup does not create vendor
-accounts or issue credentials. OWS uses a separate native vault and engine omitted
-from the reference image; use the [native deployment path](operator-deployment.md).
+[services and credentials](operator-services.md). Setup generates missing bundled issuer/client credentials and the OWS passphrase
+privately. The bundled local execution engine and Valkey start automatically, with separate generated API, storage and keystore credentials. Approved-action policies add encrypted local sponsor keys; you configure RPC verification, gas limits and funding. It creates no vendor accounts. The OWS engine is included in the image;
+its vault is a private persistent bind mount. See [bundled setup](bundled-setup.md).
 
 ![Runtime prerequisite review using offline responses](public/screenshots/local-runtime.webp)
 
@@ -76,7 +77,8 @@ machine changes; the screenshot does not establish live installation acceptance.
    config uses `0.0.0.0:8080` internally and `.provider-data` storage. Your selected
    port is published only on `127.0.0.1`; policies and the public HTTPS origin are
    retained. Manual downloads preserve the original form settings.
-4. Supply missing secret values. Referenced secrets already in the wizard process
+4. Bundled credentials marked **Generated during setup** need no manual entry.
+   Supply any missing external-service secret values. Referenced secrets already in the wizard process
    environment are copied into the private file. Values entered here are sent to
    the authenticated loopback API and saved as plaintext in owner-only `provider.env`.
    They are cleared from the form after submission, excluded from downloads and
@@ -143,14 +145,16 @@ HTTPS origin. Local HTTP alone does not complete that connection.
 
 The private directory under `~/.wallet-provider-kit-deployments/` contains:
 
-| File or directory            | Purpose                                                                   |
-| ---------------------------- | ------------------------------------------------------------------------- |
-| `provider.config.json`       | Normalized container configuration, with activation disabled.             |
-| `provider.env`               | Actual secret values, mode 0600; keep private.                            |
-| `compose.json`               | Service definition, mounts, loopback port and restart policy.             |
-| `provider-setup.md`          | Status, stop, restart, diagnosis and acceptance instructions.             |
-| `provider-setup.status.json` | Last observed setup step, including failures or an interrupted action.    |
-| `.provider-data/`            | Persistent private records; never erase to repair an uncertain operation. |
+| File or directory              | Purpose                                                                   |
+| ------------------------------ | ------------------------------------------------------------------------- |
+| `provider.config.json`         | Normalized container configuration, with activation disabled.             |
+| `provider.env`                 | Actual secret values, mode 0600; keep private.                            |
+| `compose.json`                 | Service definition, mounts, loopback port and restart policy.             |
+| `provider-setup.md`            | Status, stop, restart, diagnosis and acceptance instructions.             |
+| `provider-setup.status.json`   | Last observed setup step, including failures or an interrupted action.    |
+| `.provider-data/`              | Persistent private records; never erase to repair an uncertain operation. |
+| `.provider-vault/`             | OWS vault, when selected; back up with SQLite and retained secrets.       |
+| `caddy.json`, `.provider-tls/` | Selected HTTPS gateway configuration and private certificate state.       |
 
 Closing the browser or wizard does not stop the container. Docker must remain
 running. Start Docker Desktop or `colima start wallet-provider-kit` after reboot,
@@ -197,7 +201,8 @@ their saved commands and the reviewed [maintenance process](operator-deployment.
 
 Reuse the reviewed revision, image and container security pattern on one persistent
 final host. Supply that environment's separate secrets, origin, backend binding and
-private storage. Add HTTPS ingress, monitoring and encrypted backups. Do not clone
+private storage. Start the supplied Caddy HTTPS profile or connect an existing gateway; add
+monitoring and encrypted backups. See [public HTTPS setup](bundled-setup.md#configure-through-the-wizard). Do not clone
 the local database to create a second authoritative provider.
 
 Follow [deployment](operator-deployment.md) and the [staging walkthrough](staging-walkthrough.md)

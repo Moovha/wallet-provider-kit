@@ -272,6 +272,15 @@ const changes = computed(() => {
     result.push(
       'Application claim requirements change. Review the required names, allowed values and evidence ages below.',
     );
+  for (const [key, name] of [
+    ['native_transfers', 'Native recipient permissions'],
+    ['call_adapters', 'Optional operation adapters'],
+  ] as const) {
+    if (JSON.stringify(current[key]) !== JSON.stringify(draft.value[key]))
+      result.push(
+        `${name} change. Review the complete policy before publishing.`,
+      );
+  }
   for (const contract of current.contracts)
     if (
       !draft.value.contracts.some(

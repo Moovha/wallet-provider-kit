@@ -6,7 +6,12 @@ The initial wallet foundation was extracted from Moovha/swap commit
 holder confirmed ownership and authorized Apache-2.0 licensing for this
 standalone foundation. The source repository license is retained only as
 historical provenance in docs/LICENSE.source; it is not this project license.
-Third-party dependencies retain their own licenses. No contract implementation,
+Third-party dependencies retain their own licenses. The bundled OAuth service
+uses oidc-provider (MIT); the bundled local engine uses Open Wallet Standard core
+(MIT). The default local dispatcher uses the separate official OpenZeppelin Relayer
+1.8.0 container image (AGPL-3.0-only) and Valkey 9.1.2 (BSD-3-Clause).
+The generated HTTPS profile references the official Caddy container image
+(Apache-2.0), operated separately from the Node service. No contract implementation,
 customer data, production secret or source repository history was imported.
 
 The bundled FormKit/Vue operator interface includes MIT-licensed components;

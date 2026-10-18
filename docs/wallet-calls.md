@@ -106,7 +106,9 @@ chain/value quantities and ordered calls:
 These addresses are fictional. The example encodes `transfer(address,uint256)`;
 your provider must publish that actual contract/method and accept the resulting
 authority before it can be used. A missing `value` means zero. A missing `data`
-means empty bytes, which cannot match a registered method. Contract creation,
+means empty bytes. Empty calldata with a positive value is supported for an
+explicitly accepted native recipient, with matching provider/runtime permissions
+and code pins. Otherwise it cannot match a registered method. Contract creation,
 other chains and non-Safe senders are unsupported.
 
 The result is `{"id":"0x1234567890abcdef"}` inside the JSON-RPC `result` field.
@@ -240,5 +242,7 @@ original batch ID rather than treating a transport failure as permission to rese
 
 Offline tests cover these wire contracts and financial fences. They do not prove
 live-provider acceptance or certify general wallet interoperability. Arbitrary
-contract execution still requires separately implemented business-effect verification
-for claims such as swap minimums, vault shares or beneficiary settlement.
+contract execution alone does not prove business outcomes. Explicitly selected
+[operation adapters](approved-contract-calls.md#select-optional-operation-adapters)
+verify their supported token, swap and vault effects. Other business claims
+require their own accepted verification.

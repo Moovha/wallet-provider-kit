@@ -168,14 +168,14 @@ export const operationGuides: Record<string, OperationGuide> = {
       '200: cancelled. A signed or uncertain action returns conflict and retains its Safe nonce and queue position; cancellation cannot recall an issued signature.',
   },
   requestContractCall: {
-    title: 'Approve contract calls, swaps or vault deposits',
+    title: 'Authorize generic wallet calls',
     group: 'Approved contract calls',
     scope: 'wallet:actions',
     approvedAction: true,
     execution: true,
     permission: 'contracts:request',
     prerequisite:
-      'Enable approved-evm-executor-v1 and the contract-call policy. Obtain contracts:request consent to the exact policy revision and use an explicitly bound Safe 1.4.1 account. Contract targets/functions, swap routes and vault routes are operator policies. Callers cannot supply signing data, a nonce or provider identity.',
+      'Enable approved-evm-executor-v1 and the contract-call policy. Obtain contracts:request consent to the exact policy revision and use an explicitly bound Safe 1.4.1 account. Contract methods and native recipients follow published policy; optional adapters supply explicitly selected protocol checks. Callers cannot supply signing data, a nonce or provider identity.',
     success:
       '200: the immutable action, exact calls and Safe authorization. Execute by stored action ID. Contract-call signatures are retained for coordinated dispatch; /sign does not export them. Execution success alone does not establish an arbitrary business outcome.',
   },
@@ -472,4 +472,4 @@ export function operationUnavailableReason(
   return undefined;
 }
 
-export const transactionBoundaryDescription = `Signing, execution and transaction reports are separate contracts. POST /v1/transfer-authorizations stores an exact authorized ERC-3009 transfer; POST /v1/actions/{actionId}/sign returns its transfer signature without broadcasting. POST /v1/actions/contract-calls stores exact policy-approved contract calls, swaps or vault deposits for an explicitly bound Safe account; those signatures remain private to coordinated execution. With an optional explicitly selected execution profile, POST /v1/actions/{actionId}/execute coordinates signing, simulation, gas-budget admission and one durable direct-provider dispatch or authenticated designated-service handoff. The designated service has its own provider journal and calls back for fresh wallet authority. GET /v1/actions/{actionId}/execution independently checks chain effects through configured RPC sources and separates inclusion, safe and finalized status. Applications can still arrange submission separately when coordination is absent. Transaction-event reports remain unverified and never determine settlement or release budgets. Monitoring metrics and traces are exported separately to an OTLP collector.`;
+export const transactionBoundaryDescription = `Signing, execution and transaction reports are separate contracts. POST /v1/transfer-authorizations stores an exact authorized ERC-3009 transfer; POST /v1/actions/{actionId}/sign returns its transfer signature without broadcasting. POST /v1/actions/contract-calls stores exact policy-approved generic calls, including accepted native transfers and optional adapter protections, for an explicitly bound Safe account; those signatures remain private to coordinated execution. With an optional explicitly selected execution profile, POST /v1/actions/{actionId}/execute coordinates signing, simulation, gas-budget admission and one durable direct-provider dispatch or authenticated designated-service handoff. The designated service has its own provider journal and calls back for fresh wallet authority. GET /v1/actions/{actionId}/execution independently checks chain effects through configured RPC sources and separates inclusion, safe and finalized status. Applications can still arrange submission separately when coordination is absent. Transaction-event reports remain unverified and never determine settlement or release budgets. Monitoring metrics and traces are exported separately to an OTLP collector.`;

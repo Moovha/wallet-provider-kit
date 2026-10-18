@@ -5,12 +5,12 @@ your service should sign an approved transfer internally, submit it through an
 application-funded sponsor and verify its chain result. The application still
 needs the transfer delegation configured in Policies. This guide follows that
 request from the stored authorization to its verified status, then explains the
-settings and acceptance tests. Use `erc3009-executor-v1` for the
+settings and acceptance tests. New setups use the [bundled local Relayer and Valkey](bundled-setup.md#local-execution-persistence-and-recovery), enabled in Services. Configure policies, RPC verification and sponsor funding; setup supplies keys and bindings. The local transfer path uses `erc3009-relayer-v1` with `execution.local: true`. Use `erc3009-executor-v1` for an optional existing
 [designated service](execution-service.md), or `erc3009-relayer-v1` for direct
 Relayer compatibility. Both are experimental Base Sepolia EOA profiles;
 configuration and offline tests do not establish live execution or custody acceptance.
 
-General contract calls, swaps and vault deposits use the same execution and recovery foundation through `approved-evm-executor-v1`. They require separate contract delegation and explicitly bound Safe accounts; see [approved contract calls](approved-contract-calls.md). The steps below describe the ERC-3009 transfer operation.
+Generic wallet calls, including explicitly allowed native transfers and optional operation adapters, use the same execution and recovery foundation through `approved-evm-executor-v1`. They require separate contract delegation and explicitly bound Safe accounts; see [approved contract calls](approved-contract-calls.md). The steps below describe the ERC-3009 transfer operation.
 
 ## Standard application flow
 
@@ -126,7 +126,14 @@ evidence; there is no public reset or reconciliation mutation.
 
 In the wizard's **Deployment** screen, enable **Configure transfer execution and
 RPC verification** after enabling delegated transfer signing in **Policies**.
-For the designated service, follow its [two-service configuration guide](execution-service.md).
+Keep the bundled local submission path selected. Setup supplies the private
+engine connection, credentials, encrypted sponsor keys and managed bindings.
+Configure independent RPC sources, accepted hashes, gas limits and the funding
+agreement below. Fund the saved sponsor public address before activation; no
+external Relayer or signer registration is needed.
+
+An existing execution service is optional. For that path, follow its
+[two-service configuration guide](execution-service.md).
 For direct Relayer compatibility, supply these deployment-specific values:
 
 - A private HTTPS Relayer origin and API key environment variable, with a

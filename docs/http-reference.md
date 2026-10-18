@@ -789,7 +789,7 @@ Success response schema:
                           },
                           "data": {
                             "type": "string",
-                            "pattern": "^0x(?:[0-9a-f]{2}){4,4096}$"
+                            "pattern": "^0x(?:[0-9a-f]{2}){0,4096}$"
                           }
                         }
                       }
@@ -982,7 +982,7 @@ Success response schema:
                   },
                   "data": {
                     "type": "string",
-                    "pattern": "^0x(?:[0-9a-f]{2}){4,4096}$"
+                    "pattern": "^0x(?:[0-9a-f]{2}){0,4096}$"
                   }
                 }
               }
@@ -1053,6 +1053,113 @@ Success response schema:
             "nonce": {
               "type": "string",
               "pattern": "^(0|[1-9][0-9]{0,77})$"
+            },
+            "nativeRecipients": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 16,
+              "items": {
+                "type": "string",
+                "pattern": "^0x[0-9a-fA-F]{40}$"
+              }
+            },
+            "adapterInput": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "account_id",
+                    "kind",
+                    "route",
+                    "amount_in",
+                    "minimum_out",
+                    "deadline"
+                  ],
+                  "properties": {
+                    "account_id": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": ["swap"]
+                    },
+                    "route": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z0-9._-]{1,64}$"
+                    },
+                    "amount_in": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]{0,77})$"
+                    },
+                    "minimum_out": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]{0,77})$"
+                    },
+                    "deadline": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]{0,77})$"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "account_id",
+                    "kind",
+                    "route",
+                    "assets",
+                    "minimum_shares"
+                  ],
+                  "properties": {
+                    "account_id": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": ["vault-deposit"]
+                    },
+                    "route": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z0-9._-]{1,64}$"
+                    },
+                    "assets": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]{0,77})$"
+                    },
+                    "minimum_shares": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]{0,77})$"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["kind", "token", "recipient", "amount"],
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": ["token-transfer"]
+                    },
+                    "token": {
+                      "type": "string",
+                      "pattern": "^0x[0-9a-fA-F]{40}$"
+                    },
+                    "recipient": {
+                      "type": "string",
+                      "pattern": "^0x[0-9a-fA-F]{40}$"
+                    },
+                    "amount": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]{0,77})$"
+                    }
+                  }
+                }
+              ]
             }
           }
         }
@@ -1442,7 +1549,7 @@ Success response schema:
                           },
                           "data": {
                             "type": "string",
-                            "pattern": "^0x(?:[0-9a-f]{2}){4,4096}$"
+                            "pattern": "^0x(?:[0-9a-f]{2}){0,4096}$"
                           }
                         }
                       }
@@ -1635,7 +1742,7 @@ Success response schema:
                   },
                   "data": {
                     "type": "string",
-                    "pattern": "^0x(?:[0-9a-f]{2}){4,4096}$"
+                    "pattern": "^0x(?:[0-9a-f]{2}){0,4096}$"
                   }
                 }
               }
@@ -1706,6 +1813,113 @@ Success response schema:
             "nonce": {
               "type": "string",
               "pattern": "^(0|[1-9][0-9]{0,77})$"
+            },
+            "nativeRecipients": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 16,
+              "items": {
+                "type": "string",
+                "pattern": "^0x[0-9a-fA-F]{40}$"
+              }
+            },
+            "adapterInput": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "account_id",
+                    "kind",
+                    "route",
+                    "amount_in",
+                    "minimum_out",
+                    "deadline"
+                  ],
+                  "properties": {
+                    "account_id": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": ["swap"]
+                    },
+                    "route": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z0-9._-]{1,64}$"
+                    },
+                    "amount_in": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]{0,77})$"
+                    },
+                    "minimum_out": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]{0,77})$"
+                    },
+                    "deadline": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]{0,77})$"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "account_id",
+                    "kind",
+                    "route",
+                    "assets",
+                    "minimum_shares"
+                  ],
+                  "properties": {
+                    "account_id": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": ["vault-deposit"]
+                    },
+                    "route": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z0-9._-]{1,64}$"
+                    },
+                    "assets": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]{0,77})$"
+                    },
+                    "minimum_shares": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]{0,77})$"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["kind", "token", "recipient", "amount"],
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": ["token-transfer"]
+                    },
+                    "token": {
+                      "type": "string",
+                      "pattern": "^0x[0-9a-fA-F]{40}$"
+                    },
+                    "recipient": {
+                      "type": "string",
+                      "pattern": "^0x[0-9a-fA-F]{40}$"
+                    },
+                    "amount": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]{0,77})$"
+                    }
+                  }
+                }
+              ]
             }
           }
         }
@@ -1760,7 +1974,7 @@ Request body (application/json):
               },
               "data": {
                 "type": "string",
-                "pattern": "^0x(?:[0-9a-f]{2}){4,4096}$"
+                "pattern": "^0x(?:[0-9a-f]{2}){0,4096}$"
               }
             }
           }
@@ -2071,7 +2285,7 @@ Request body (application/json):
               },
               "data": {
                 "type": "string",
-                "pattern": "^0x(?:[0-9a-f]{2}){4,4096}$"
+                "pattern": "^0x(?:[0-9a-f]{2}){0,4096}$"
               }
             }
           }
@@ -2365,7 +2579,7 @@ Success response schema:
                       },
                       "data": {
                         "type": "string",
-                        "pattern": "^0x(?:[0-9a-f]{2}){4,4096}$"
+                        "pattern": "^0x(?:[0-9a-f]{2}){0,4096}$"
                       }
                     }
                   }
@@ -2558,7 +2772,7 @@ Success response schema:
               },
               "data": {
                 "type": "string",
-                "pattern": "^0x(?:[0-9a-f]{2}){4,4096}$"
+                "pattern": "^0x(?:[0-9a-f]{2}){0,4096}$"
               }
             }
           }
@@ -2629,6 +2843,113 @@ Success response schema:
         "nonce": {
           "type": "string",
           "pattern": "^(0|[1-9][0-9]{0,77})$"
+        },
+        "nativeRecipients": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 16,
+          "items": {
+            "type": "string",
+            "pattern": "^0x[0-9a-fA-F]{40}$"
+          }
+        },
+        "adapterInput": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "account_id",
+                "kind",
+                "route",
+                "amount_in",
+                "minimum_out",
+                "deadline"
+              ],
+              "properties": {
+                "account_id": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": ["swap"]
+                },
+                "route": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9._-]{1,64}$"
+                },
+                "amount_in": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,77})$"
+                },
+                "minimum_out": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,77})$"
+                },
+                "deadline": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,77})$"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "account_id",
+                "kind",
+                "route",
+                "assets",
+                "minimum_shares"
+              ],
+              "properties": {
+                "account_id": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": ["vault-deposit"]
+                },
+                "route": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9._-]{1,64}$"
+                },
+                "assets": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,77})$"
+                },
+                "minimum_shares": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,77})$"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["kind", "token", "recipient", "amount"],
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": ["token-transfer"]
+                },
+                "token": {
+                  "type": "string",
+                  "pattern": "^0x[0-9a-fA-F]{40}$"
+                },
+                "recipient": {
+                  "type": "string",
+                  "pattern": "^0x[0-9a-fA-F]{40}$"
+                },
+                "amount": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,77})$"
+                }
+              }
+            }
+          ]
         }
       }
     }
@@ -5151,9 +5472,7 @@ Success response schema:
             "multiSend",
             "maximumNativeValueWei",
             "lifetimeOperations",
-            "contracts",
-            "swaps",
-            "vaults"
+            "contracts"
           ],
           "properties": {
             "mechanism": {
@@ -5477,6 +5796,333 @@ Success response schema:
                   }
                 }
               }
+            },
+            "adapters": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "tokenTransfers": {
+                  "type": "array",
+                  "maxItems": 128,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["token", "recipients", "maximumAmount"],
+                    "properties": {
+                      "token": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "implementation": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": ["address", "codeHash"],
+                            "properties": {
+                              "address": {
+                                "type": "string",
+                                "pattern": "^0x[0-9a-fA-F]{40}$"
+                              },
+                              "codeHash": {
+                                "type": "string",
+                                "pattern": "^0x[0-9a-f]{64}$"
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "recipients": {
+                        "type": "array",
+                        "minItems": 1,
+                        "maxItems": 128,
+                        "uniqueItems": true,
+                        "items": {
+                          "type": "string",
+                          "pattern": "^0x[0-9a-fA-F]{40}$"
+                        }
+                      },
+                      "maximumAmount": {
+                        "type": "string",
+                        "pattern": "^(0|[1-9][0-9]{0,77})$"
+                      }
+                    }
+                  }
+                },
+                "swaps": {
+                  "type": "array",
+                  "maxItems": 128,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "id",
+                      "router",
+                      "tokenIn",
+                      "tokenOut",
+                      "fee",
+                      "maximumInput"
+                    ],
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z0-9._-]{1,64}$"
+                      },
+                      "router": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "implementation": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": ["address", "codeHash"],
+                            "properties": {
+                              "address": {
+                                "type": "string",
+                                "pattern": "^0x[0-9a-fA-F]{40}$"
+                              },
+                              "codeHash": {
+                                "type": "string",
+                                "pattern": "^0x[0-9a-f]{64}$"
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "tokenIn": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "implementation": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": ["address", "codeHash"],
+                            "properties": {
+                              "address": {
+                                "type": "string",
+                                "pattern": "^0x[0-9a-fA-F]{40}$"
+                              },
+                              "codeHash": {
+                                "type": "string",
+                                "pattern": "^0x[0-9a-f]{64}$"
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "tokenOut": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "implementation": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": ["address", "codeHash"],
+                            "properties": {
+                              "address": {
+                                "type": "string",
+                                "pattern": "^0x[0-9a-fA-F]{40}$"
+                              },
+                              "codeHash": {
+                                "type": "string",
+                                "pattern": "^0x[0-9a-f]{64}$"
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "fee": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 999999
+                      },
+                      "maximumInput": {
+                        "type": "string",
+                        "pattern": "^(0|[1-9][0-9]{0,77})$"
+                      }
+                    }
+                  }
+                },
+                "vaults": {
+                  "type": "array",
+                  "maxItems": 128,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "id",
+                      "router",
+                      "vault",
+                      "asset",
+                      "maximumAssets"
+                    ],
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z0-9._-]{1,64}$"
+                      },
+                      "router": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "implementation": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": ["address", "codeHash"],
+                            "properties": {
+                              "address": {
+                                "type": "string",
+                                "pattern": "^0x[0-9a-fA-F]{40}$"
+                              },
+                              "codeHash": {
+                                "type": "string",
+                                "pattern": "^0x[0-9a-f]{64}$"
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "vault": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "implementation": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": ["address", "codeHash"],
+                            "properties": {
+                              "address": {
+                                "type": "string",
+                                "pattern": "^0x[0-9a-fA-F]{40}$"
+                              },
+                              "codeHash": {
+                                "type": "string",
+                                "pattern": "^0x[0-9a-f]{64}$"
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "asset": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "implementation": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": ["address", "codeHash"],
+                            "properties": {
+                              "address": {
+                                "type": "string",
+                                "pattern": "^0x[0-9a-fA-F]{40}$"
+                              },
+                              "codeHash": {
+                                "type": "string",
+                                "pattern": "^0x[0-9a-f]{64}$"
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "maximumAssets": {
+                        "type": "string",
+                        "pattern": "^(0|[1-9][0-9]{0,77})$"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "nativeTransfers": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["recipients"],
+              "properties": {
+                "recipients": {
+                  "type": "array",
+                  "maxItems": 128,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["address", "codeHash", "maximumValueWei"],
+                    "properties": {
+                      "address": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                      },
+                      "codeHash": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-f]{64}$"
+                      },
+                      "maximumValueWei": {
+                        "type": "string",
+                        "pattern": "^(0|[1-9][0-9]{0,77})$"
+                      }
+                    }
+                  }
+                }
+              }
             }
           }
         },
@@ -5580,6 +6226,326 @@ Success response schema:
                         }
                       }
                     }
+                  }
+                }
+              }
+            },
+            "call_adapters": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "tokenTransfers": {
+                  "type": "array",
+                  "maxItems": 128,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["token", "recipients", "maximumAmount"],
+                    "properties": {
+                      "token": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "implementation": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": ["address", "codeHash"],
+                            "properties": {
+                              "address": {
+                                "type": "string",
+                                "pattern": "^0x[0-9a-fA-F]{40}$"
+                              },
+                              "codeHash": {
+                                "type": "string",
+                                "pattern": "^0x[0-9a-f]{64}$"
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "recipients": {
+                        "type": "array",
+                        "minItems": 1,
+                        "maxItems": 128,
+                        "uniqueItems": true,
+                        "items": {
+                          "type": "string",
+                          "pattern": "^0x[0-9a-fA-F]{40}$"
+                        }
+                      },
+                      "maximumAmount": {
+                        "type": "string",
+                        "pattern": "^(0|[1-9][0-9]{0,77})$"
+                      }
+                    }
+                  }
+                },
+                "swaps": {
+                  "type": "array",
+                  "maxItems": 128,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "id",
+                      "router",
+                      "tokenIn",
+                      "tokenOut",
+                      "fee",
+                      "maximumInput"
+                    ],
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z0-9._-]{1,64}$"
+                      },
+                      "router": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "implementation": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": ["address", "codeHash"],
+                            "properties": {
+                              "address": {
+                                "type": "string",
+                                "pattern": "^0x[0-9a-fA-F]{40}$"
+                              },
+                              "codeHash": {
+                                "type": "string",
+                                "pattern": "^0x[0-9a-f]{64}$"
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "tokenIn": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "implementation": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": ["address", "codeHash"],
+                            "properties": {
+                              "address": {
+                                "type": "string",
+                                "pattern": "^0x[0-9a-fA-F]{40}$"
+                              },
+                              "codeHash": {
+                                "type": "string",
+                                "pattern": "^0x[0-9a-f]{64}$"
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "tokenOut": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "implementation": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": ["address", "codeHash"],
+                            "properties": {
+                              "address": {
+                                "type": "string",
+                                "pattern": "^0x[0-9a-fA-F]{40}$"
+                              },
+                              "codeHash": {
+                                "type": "string",
+                                "pattern": "^0x[0-9a-f]{64}$"
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "fee": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 999999
+                      },
+                      "maximumInput": {
+                        "type": "string",
+                        "pattern": "^(0|[1-9][0-9]{0,77})$"
+                      }
+                    }
+                  }
+                },
+                "vaults": {
+                  "type": "array",
+                  "maxItems": 128,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "id",
+                      "router",
+                      "vault",
+                      "asset",
+                      "maximumAssets"
+                    ],
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z0-9._-]{1,64}$"
+                      },
+                      "router": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "implementation": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": ["address", "codeHash"],
+                            "properties": {
+                              "address": {
+                                "type": "string",
+                                "pattern": "^0x[0-9a-fA-F]{40}$"
+                              },
+                              "codeHash": {
+                                "type": "string",
+                                "pattern": "^0x[0-9a-f]{64}$"
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "vault": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "implementation": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": ["address", "codeHash"],
+                            "properties": {
+                              "address": {
+                                "type": "string",
+                                "pattern": "^0x[0-9a-fA-F]{40}$"
+                              },
+                              "codeHash": {
+                                "type": "string",
+                                "pattern": "^0x[0-9a-f]{64}$"
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "asset": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "implementation": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": ["address", "codeHash"],
+                            "properties": {
+                              "address": {
+                                "type": "string",
+                                "pattern": "^0x[0-9a-fA-F]{40}$"
+                              },
+                              "codeHash": {
+                                "type": "string",
+                                "pattern": "^0x[0-9a-f]{64}$"
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "maximumAssets": {
+                        "type": "string",
+                        "pattern": "^(0|[1-9][0-9]{0,77})$"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "native_transfers": {
+              "type": "array",
+              "maxItems": 32,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["address", "code_hash", "maximum_value_wei"],
+                "properties": {
+                  "address": {
+                    "type": "string",
+                    "pattern": "^0x[0-9a-fA-F]{40}$"
+                  },
+                  "code_hash": {
+                    "type": "string",
+                    "pattern": "^0x[0-9a-f]{64}$"
+                  },
+                  "maximum_value_wei": {
+                    "type": "string",
+                    "pattern": "^(0|[1-9][0-9]{0,77})$"
                   }
                 }
               }
@@ -6709,6 +7675,326 @@ Success response schema:
                       }
                     }
                   },
+                  "call_adapters": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "tokenTransfers": {
+                        "type": "array",
+                        "maxItems": 128,
+                        "items": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": ["token", "recipients", "maximumAmount"],
+                          "properties": {
+                            "token": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": ["address", "codeHash"],
+                              "properties": {
+                                "address": {
+                                  "type": "string",
+                                  "pattern": "^0x[0-9a-fA-F]{40}$"
+                                },
+                                "codeHash": {
+                                  "type": "string",
+                                  "pattern": "^0x[0-9a-f]{64}$"
+                                },
+                                "implementation": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "required": ["address", "codeHash"],
+                                  "properties": {
+                                    "address": {
+                                      "type": "string",
+                                      "pattern": "^0x[0-9a-fA-F]{40}$"
+                                    },
+                                    "codeHash": {
+                                      "type": "string",
+                                      "pattern": "^0x[0-9a-f]{64}$"
+                                    }
+                                  }
+                                }
+                              }
+                            },
+                            "recipients": {
+                              "type": "array",
+                              "minItems": 1,
+                              "maxItems": 128,
+                              "uniqueItems": true,
+                              "items": {
+                                "type": "string",
+                                "pattern": "^0x[0-9a-fA-F]{40}$"
+                              }
+                            },
+                            "maximumAmount": {
+                              "type": "string",
+                              "pattern": "^(0|[1-9][0-9]{0,77})$"
+                            }
+                          }
+                        }
+                      },
+                      "swaps": {
+                        "type": "array",
+                        "maxItems": 128,
+                        "items": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "id",
+                            "router",
+                            "tokenIn",
+                            "tokenOut",
+                            "fee",
+                            "maximumInput"
+                          ],
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "pattern": "^[A-Za-z0-9._-]{1,64}$"
+                            },
+                            "router": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": ["address", "codeHash"],
+                              "properties": {
+                                "address": {
+                                  "type": "string",
+                                  "pattern": "^0x[0-9a-fA-F]{40}$"
+                                },
+                                "codeHash": {
+                                  "type": "string",
+                                  "pattern": "^0x[0-9a-f]{64}$"
+                                },
+                                "implementation": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "required": ["address", "codeHash"],
+                                  "properties": {
+                                    "address": {
+                                      "type": "string",
+                                      "pattern": "^0x[0-9a-fA-F]{40}$"
+                                    },
+                                    "codeHash": {
+                                      "type": "string",
+                                      "pattern": "^0x[0-9a-f]{64}$"
+                                    }
+                                  }
+                                }
+                              }
+                            },
+                            "tokenIn": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": ["address", "codeHash"],
+                              "properties": {
+                                "address": {
+                                  "type": "string",
+                                  "pattern": "^0x[0-9a-fA-F]{40}$"
+                                },
+                                "codeHash": {
+                                  "type": "string",
+                                  "pattern": "^0x[0-9a-f]{64}$"
+                                },
+                                "implementation": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "required": ["address", "codeHash"],
+                                  "properties": {
+                                    "address": {
+                                      "type": "string",
+                                      "pattern": "^0x[0-9a-fA-F]{40}$"
+                                    },
+                                    "codeHash": {
+                                      "type": "string",
+                                      "pattern": "^0x[0-9a-f]{64}$"
+                                    }
+                                  }
+                                }
+                              }
+                            },
+                            "tokenOut": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": ["address", "codeHash"],
+                              "properties": {
+                                "address": {
+                                  "type": "string",
+                                  "pattern": "^0x[0-9a-fA-F]{40}$"
+                                },
+                                "codeHash": {
+                                  "type": "string",
+                                  "pattern": "^0x[0-9a-f]{64}$"
+                                },
+                                "implementation": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "required": ["address", "codeHash"],
+                                  "properties": {
+                                    "address": {
+                                      "type": "string",
+                                      "pattern": "^0x[0-9a-fA-F]{40}$"
+                                    },
+                                    "codeHash": {
+                                      "type": "string",
+                                      "pattern": "^0x[0-9a-f]{64}$"
+                                    }
+                                  }
+                                }
+                              }
+                            },
+                            "fee": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 999999
+                            },
+                            "maximumInput": {
+                              "type": "string",
+                              "pattern": "^(0|[1-9][0-9]{0,77})$"
+                            }
+                          }
+                        }
+                      },
+                      "vaults": {
+                        "type": "array",
+                        "maxItems": 128,
+                        "items": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "id",
+                            "router",
+                            "vault",
+                            "asset",
+                            "maximumAssets"
+                          ],
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "pattern": "^[A-Za-z0-9._-]{1,64}$"
+                            },
+                            "router": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": ["address", "codeHash"],
+                              "properties": {
+                                "address": {
+                                  "type": "string",
+                                  "pattern": "^0x[0-9a-fA-F]{40}$"
+                                },
+                                "codeHash": {
+                                  "type": "string",
+                                  "pattern": "^0x[0-9a-f]{64}$"
+                                },
+                                "implementation": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "required": ["address", "codeHash"],
+                                  "properties": {
+                                    "address": {
+                                      "type": "string",
+                                      "pattern": "^0x[0-9a-fA-F]{40}$"
+                                    },
+                                    "codeHash": {
+                                      "type": "string",
+                                      "pattern": "^0x[0-9a-f]{64}$"
+                                    }
+                                  }
+                                }
+                              }
+                            },
+                            "vault": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": ["address", "codeHash"],
+                              "properties": {
+                                "address": {
+                                  "type": "string",
+                                  "pattern": "^0x[0-9a-fA-F]{40}$"
+                                },
+                                "codeHash": {
+                                  "type": "string",
+                                  "pattern": "^0x[0-9a-f]{64}$"
+                                },
+                                "implementation": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "required": ["address", "codeHash"],
+                                  "properties": {
+                                    "address": {
+                                      "type": "string",
+                                      "pattern": "^0x[0-9a-fA-F]{40}$"
+                                    },
+                                    "codeHash": {
+                                      "type": "string",
+                                      "pattern": "^0x[0-9a-f]{64}$"
+                                    }
+                                  }
+                                }
+                              }
+                            },
+                            "asset": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": ["address", "codeHash"],
+                              "properties": {
+                                "address": {
+                                  "type": "string",
+                                  "pattern": "^0x[0-9a-fA-F]{40}$"
+                                },
+                                "codeHash": {
+                                  "type": "string",
+                                  "pattern": "^0x[0-9a-f]{64}$"
+                                },
+                                "implementation": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "required": ["address", "codeHash"],
+                                  "properties": {
+                                    "address": {
+                                      "type": "string",
+                                      "pattern": "^0x[0-9a-fA-F]{40}$"
+                                    },
+                                    "codeHash": {
+                                      "type": "string",
+                                      "pattern": "^0x[0-9a-f]{64}$"
+                                    }
+                                  }
+                                }
+                              }
+                            },
+                            "maximumAssets": {
+                              "type": "string",
+                              "pattern": "^(0|[1-9][0-9]{0,77})$"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "native_transfers": {
+                    "type": "array",
+                    "maxItems": 32,
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["address", "code_hash", "maximum_value_wei"],
+                      "properties": {
+                        "address": {
+                          "type": "string",
+                          "pattern": "^0x[0-9a-fA-F]{40}$"
+                        },
+                        "code_hash": {
+                          "type": "string",
+                          "pattern": "^0x[0-9a-f]{64}$"
+                        },
+                        "maximum_value_wei": {
+                          "type": "string",
+                          "pattern": "^(0|[1-9][0-9]{0,77})$"
+                        }
+                      }
+                    }
+                  },
                   "maximum_calls": {
                     "type": "integer",
                     "minimum": 1,
@@ -6878,6 +8164,334 @@ Success response schema:
                                 }
                               }
                             }
+                          }
+                        }
+                      }
+                    },
+                    "call_adapters": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "tokenTransfers": {
+                          "type": "array",
+                          "maxItems": 128,
+                          "items": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "token",
+                              "recipients",
+                              "maximumAmount"
+                            ],
+                            "properties": {
+                              "token": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": ["address", "codeHash"],
+                                "properties": {
+                                  "address": {
+                                    "type": "string",
+                                    "pattern": "^0x[0-9a-fA-F]{40}$"
+                                  },
+                                  "codeHash": {
+                                    "type": "string",
+                                    "pattern": "^0x[0-9a-f]{64}$"
+                                  },
+                                  "implementation": {
+                                    "type": "object",
+                                    "additionalProperties": false,
+                                    "required": ["address", "codeHash"],
+                                    "properties": {
+                                      "address": {
+                                        "type": "string",
+                                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                                      },
+                                      "codeHash": {
+                                        "type": "string",
+                                        "pattern": "^0x[0-9a-f]{64}$"
+                                      }
+                                    }
+                                  }
+                                }
+                              },
+                              "recipients": {
+                                "type": "array",
+                                "minItems": 1,
+                                "maxItems": 128,
+                                "uniqueItems": true,
+                                "items": {
+                                  "type": "string",
+                                  "pattern": "^0x[0-9a-fA-F]{40}$"
+                                }
+                              },
+                              "maximumAmount": {
+                                "type": "string",
+                                "pattern": "^(0|[1-9][0-9]{0,77})$"
+                              }
+                            }
+                          }
+                        },
+                        "swaps": {
+                          "type": "array",
+                          "maxItems": 128,
+                          "items": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "id",
+                              "router",
+                              "tokenIn",
+                              "tokenOut",
+                              "fee",
+                              "maximumInput"
+                            ],
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "pattern": "^[A-Za-z0-9._-]{1,64}$"
+                              },
+                              "router": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": ["address", "codeHash"],
+                                "properties": {
+                                  "address": {
+                                    "type": "string",
+                                    "pattern": "^0x[0-9a-fA-F]{40}$"
+                                  },
+                                  "codeHash": {
+                                    "type": "string",
+                                    "pattern": "^0x[0-9a-f]{64}$"
+                                  },
+                                  "implementation": {
+                                    "type": "object",
+                                    "additionalProperties": false,
+                                    "required": ["address", "codeHash"],
+                                    "properties": {
+                                      "address": {
+                                        "type": "string",
+                                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                                      },
+                                      "codeHash": {
+                                        "type": "string",
+                                        "pattern": "^0x[0-9a-f]{64}$"
+                                      }
+                                    }
+                                  }
+                                }
+                              },
+                              "tokenIn": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": ["address", "codeHash"],
+                                "properties": {
+                                  "address": {
+                                    "type": "string",
+                                    "pattern": "^0x[0-9a-fA-F]{40}$"
+                                  },
+                                  "codeHash": {
+                                    "type": "string",
+                                    "pattern": "^0x[0-9a-f]{64}$"
+                                  },
+                                  "implementation": {
+                                    "type": "object",
+                                    "additionalProperties": false,
+                                    "required": ["address", "codeHash"],
+                                    "properties": {
+                                      "address": {
+                                        "type": "string",
+                                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                                      },
+                                      "codeHash": {
+                                        "type": "string",
+                                        "pattern": "^0x[0-9a-f]{64}$"
+                                      }
+                                    }
+                                  }
+                                }
+                              },
+                              "tokenOut": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": ["address", "codeHash"],
+                                "properties": {
+                                  "address": {
+                                    "type": "string",
+                                    "pattern": "^0x[0-9a-fA-F]{40}$"
+                                  },
+                                  "codeHash": {
+                                    "type": "string",
+                                    "pattern": "^0x[0-9a-f]{64}$"
+                                  },
+                                  "implementation": {
+                                    "type": "object",
+                                    "additionalProperties": false,
+                                    "required": ["address", "codeHash"],
+                                    "properties": {
+                                      "address": {
+                                        "type": "string",
+                                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                                      },
+                                      "codeHash": {
+                                        "type": "string",
+                                        "pattern": "^0x[0-9a-f]{64}$"
+                                      }
+                                    }
+                                  }
+                                }
+                              },
+                              "fee": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 999999
+                              },
+                              "maximumInput": {
+                                "type": "string",
+                                "pattern": "^(0|[1-9][0-9]{0,77})$"
+                              }
+                            }
+                          }
+                        },
+                        "vaults": {
+                          "type": "array",
+                          "maxItems": 128,
+                          "items": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "id",
+                              "router",
+                              "vault",
+                              "asset",
+                              "maximumAssets"
+                            ],
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "pattern": "^[A-Za-z0-9._-]{1,64}$"
+                              },
+                              "router": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": ["address", "codeHash"],
+                                "properties": {
+                                  "address": {
+                                    "type": "string",
+                                    "pattern": "^0x[0-9a-fA-F]{40}$"
+                                  },
+                                  "codeHash": {
+                                    "type": "string",
+                                    "pattern": "^0x[0-9a-f]{64}$"
+                                  },
+                                  "implementation": {
+                                    "type": "object",
+                                    "additionalProperties": false,
+                                    "required": ["address", "codeHash"],
+                                    "properties": {
+                                      "address": {
+                                        "type": "string",
+                                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                                      },
+                                      "codeHash": {
+                                        "type": "string",
+                                        "pattern": "^0x[0-9a-f]{64}$"
+                                      }
+                                    }
+                                  }
+                                }
+                              },
+                              "vault": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": ["address", "codeHash"],
+                                "properties": {
+                                  "address": {
+                                    "type": "string",
+                                    "pattern": "^0x[0-9a-fA-F]{40}$"
+                                  },
+                                  "codeHash": {
+                                    "type": "string",
+                                    "pattern": "^0x[0-9a-f]{64}$"
+                                  },
+                                  "implementation": {
+                                    "type": "object",
+                                    "additionalProperties": false,
+                                    "required": ["address", "codeHash"],
+                                    "properties": {
+                                      "address": {
+                                        "type": "string",
+                                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                                      },
+                                      "codeHash": {
+                                        "type": "string",
+                                        "pattern": "^0x[0-9a-f]{64}$"
+                                      }
+                                    }
+                                  }
+                                }
+                              },
+                              "asset": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": ["address", "codeHash"],
+                                "properties": {
+                                  "address": {
+                                    "type": "string",
+                                    "pattern": "^0x[0-9a-fA-F]{40}$"
+                                  },
+                                  "codeHash": {
+                                    "type": "string",
+                                    "pattern": "^0x[0-9a-f]{64}$"
+                                  },
+                                  "implementation": {
+                                    "type": "object",
+                                    "additionalProperties": false,
+                                    "required": ["address", "codeHash"],
+                                    "properties": {
+                                      "address": {
+                                        "type": "string",
+                                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                                      },
+                                      "codeHash": {
+                                        "type": "string",
+                                        "pattern": "^0x[0-9a-f]{64}$"
+                                      }
+                                    }
+                                  }
+                                }
+                              },
+                              "maximumAssets": {
+                                "type": "string",
+                                "pattern": "^(0|[1-9][0-9]{0,77})$"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "native_transfers": {
+                      "type": "array",
+                      "maxItems": 32,
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "address",
+                          "code_hash",
+                          "maximum_value_wei"
+                        ],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "code_hash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "maximum_value_wei": {
+                            "type": "string",
+                            "pattern": "^(0|[1-9][0-9]{0,77})$"
                           }
                         }
                       }
@@ -7077,6 +8691,334 @@ Success response schema:
                                 }
                               }
                             }
+                          }
+                        }
+                      }
+                    },
+                    "call_adapters": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "tokenTransfers": {
+                          "type": "array",
+                          "maxItems": 128,
+                          "items": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "token",
+                              "recipients",
+                              "maximumAmount"
+                            ],
+                            "properties": {
+                              "token": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": ["address", "codeHash"],
+                                "properties": {
+                                  "address": {
+                                    "type": "string",
+                                    "pattern": "^0x[0-9a-fA-F]{40}$"
+                                  },
+                                  "codeHash": {
+                                    "type": "string",
+                                    "pattern": "^0x[0-9a-f]{64}$"
+                                  },
+                                  "implementation": {
+                                    "type": "object",
+                                    "additionalProperties": false,
+                                    "required": ["address", "codeHash"],
+                                    "properties": {
+                                      "address": {
+                                        "type": "string",
+                                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                                      },
+                                      "codeHash": {
+                                        "type": "string",
+                                        "pattern": "^0x[0-9a-f]{64}$"
+                                      }
+                                    }
+                                  }
+                                }
+                              },
+                              "recipients": {
+                                "type": "array",
+                                "minItems": 1,
+                                "maxItems": 128,
+                                "uniqueItems": true,
+                                "items": {
+                                  "type": "string",
+                                  "pattern": "^0x[0-9a-fA-F]{40}$"
+                                }
+                              },
+                              "maximumAmount": {
+                                "type": "string",
+                                "pattern": "^(0|[1-9][0-9]{0,77})$"
+                              }
+                            }
+                          }
+                        },
+                        "swaps": {
+                          "type": "array",
+                          "maxItems": 128,
+                          "items": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "id",
+                              "router",
+                              "tokenIn",
+                              "tokenOut",
+                              "fee",
+                              "maximumInput"
+                            ],
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "pattern": "^[A-Za-z0-9._-]{1,64}$"
+                              },
+                              "router": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": ["address", "codeHash"],
+                                "properties": {
+                                  "address": {
+                                    "type": "string",
+                                    "pattern": "^0x[0-9a-fA-F]{40}$"
+                                  },
+                                  "codeHash": {
+                                    "type": "string",
+                                    "pattern": "^0x[0-9a-f]{64}$"
+                                  },
+                                  "implementation": {
+                                    "type": "object",
+                                    "additionalProperties": false,
+                                    "required": ["address", "codeHash"],
+                                    "properties": {
+                                      "address": {
+                                        "type": "string",
+                                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                                      },
+                                      "codeHash": {
+                                        "type": "string",
+                                        "pattern": "^0x[0-9a-f]{64}$"
+                                      }
+                                    }
+                                  }
+                                }
+                              },
+                              "tokenIn": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": ["address", "codeHash"],
+                                "properties": {
+                                  "address": {
+                                    "type": "string",
+                                    "pattern": "^0x[0-9a-fA-F]{40}$"
+                                  },
+                                  "codeHash": {
+                                    "type": "string",
+                                    "pattern": "^0x[0-9a-f]{64}$"
+                                  },
+                                  "implementation": {
+                                    "type": "object",
+                                    "additionalProperties": false,
+                                    "required": ["address", "codeHash"],
+                                    "properties": {
+                                      "address": {
+                                        "type": "string",
+                                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                                      },
+                                      "codeHash": {
+                                        "type": "string",
+                                        "pattern": "^0x[0-9a-f]{64}$"
+                                      }
+                                    }
+                                  }
+                                }
+                              },
+                              "tokenOut": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": ["address", "codeHash"],
+                                "properties": {
+                                  "address": {
+                                    "type": "string",
+                                    "pattern": "^0x[0-9a-fA-F]{40}$"
+                                  },
+                                  "codeHash": {
+                                    "type": "string",
+                                    "pattern": "^0x[0-9a-f]{64}$"
+                                  },
+                                  "implementation": {
+                                    "type": "object",
+                                    "additionalProperties": false,
+                                    "required": ["address", "codeHash"],
+                                    "properties": {
+                                      "address": {
+                                        "type": "string",
+                                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                                      },
+                                      "codeHash": {
+                                        "type": "string",
+                                        "pattern": "^0x[0-9a-f]{64}$"
+                                      }
+                                    }
+                                  }
+                                }
+                              },
+                              "fee": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 999999
+                              },
+                              "maximumInput": {
+                                "type": "string",
+                                "pattern": "^(0|[1-9][0-9]{0,77})$"
+                              }
+                            }
+                          }
+                        },
+                        "vaults": {
+                          "type": "array",
+                          "maxItems": 128,
+                          "items": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "id",
+                              "router",
+                              "vault",
+                              "asset",
+                              "maximumAssets"
+                            ],
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "pattern": "^[A-Za-z0-9._-]{1,64}$"
+                              },
+                              "router": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": ["address", "codeHash"],
+                                "properties": {
+                                  "address": {
+                                    "type": "string",
+                                    "pattern": "^0x[0-9a-fA-F]{40}$"
+                                  },
+                                  "codeHash": {
+                                    "type": "string",
+                                    "pattern": "^0x[0-9a-f]{64}$"
+                                  },
+                                  "implementation": {
+                                    "type": "object",
+                                    "additionalProperties": false,
+                                    "required": ["address", "codeHash"],
+                                    "properties": {
+                                      "address": {
+                                        "type": "string",
+                                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                                      },
+                                      "codeHash": {
+                                        "type": "string",
+                                        "pattern": "^0x[0-9a-f]{64}$"
+                                      }
+                                    }
+                                  }
+                                }
+                              },
+                              "vault": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": ["address", "codeHash"],
+                                "properties": {
+                                  "address": {
+                                    "type": "string",
+                                    "pattern": "^0x[0-9a-fA-F]{40}$"
+                                  },
+                                  "codeHash": {
+                                    "type": "string",
+                                    "pattern": "^0x[0-9a-f]{64}$"
+                                  },
+                                  "implementation": {
+                                    "type": "object",
+                                    "additionalProperties": false,
+                                    "required": ["address", "codeHash"],
+                                    "properties": {
+                                      "address": {
+                                        "type": "string",
+                                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                                      },
+                                      "codeHash": {
+                                        "type": "string",
+                                        "pattern": "^0x[0-9a-f]{64}$"
+                                      }
+                                    }
+                                  }
+                                }
+                              },
+                              "asset": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": ["address", "codeHash"],
+                                "properties": {
+                                  "address": {
+                                    "type": "string",
+                                    "pattern": "^0x[0-9a-fA-F]{40}$"
+                                  },
+                                  "codeHash": {
+                                    "type": "string",
+                                    "pattern": "^0x[0-9a-f]{64}$"
+                                  },
+                                  "implementation": {
+                                    "type": "object",
+                                    "additionalProperties": false,
+                                    "required": ["address", "codeHash"],
+                                    "properties": {
+                                      "address": {
+                                        "type": "string",
+                                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                                      },
+                                      "codeHash": {
+                                        "type": "string",
+                                        "pattern": "^0x[0-9a-f]{64}$"
+                                      }
+                                    }
+                                  }
+                                }
+                              },
+                              "maximumAssets": {
+                                "type": "string",
+                                "pattern": "^(0|[1-9][0-9]{0,77})$"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "native_transfers": {
+                      "type": "array",
+                      "maxItems": 32,
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "address",
+                          "code_hash",
+                          "maximum_value_wei"
+                        ],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "code_hash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "maximum_value_wei": {
+                            "type": "string",
+                            "pattern": "^(0|[1-9][0-9]{0,77})$"
                           }
                         }
                       }
@@ -7543,6 +9485,326 @@ Success response schema:
                 }
               }
             },
+            "call_adapters": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "tokenTransfers": {
+                  "type": "array",
+                  "maxItems": 128,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["token", "recipients", "maximumAmount"],
+                    "properties": {
+                      "token": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "implementation": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": ["address", "codeHash"],
+                            "properties": {
+                              "address": {
+                                "type": "string",
+                                "pattern": "^0x[0-9a-fA-F]{40}$"
+                              },
+                              "codeHash": {
+                                "type": "string",
+                                "pattern": "^0x[0-9a-f]{64}$"
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "recipients": {
+                        "type": "array",
+                        "minItems": 1,
+                        "maxItems": 128,
+                        "uniqueItems": true,
+                        "items": {
+                          "type": "string",
+                          "pattern": "^0x[0-9a-fA-F]{40}$"
+                        }
+                      },
+                      "maximumAmount": {
+                        "type": "string",
+                        "pattern": "^(0|[1-9][0-9]{0,77})$"
+                      }
+                    }
+                  }
+                },
+                "swaps": {
+                  "type": "array",
+                  "maxItems": 128,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "id",
+                      "router",
+                      "tokenIn",
+                      "tokenOut",
+                      "fee",
+                      "maximumInput"
+                    ],
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z0-9._-]{1,64}$"
+                      },
+                      "router": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "implementation": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": ["address", "codeHash"],
+                            "properties": {
+                              "address": {
+                                "type": "string",
+                                "pattern": "^0x[0-9a-fA-F]{40}$"
+                              },
+                              "codeHash": {
+                                "type": "string",
+                                "pattern": "^0x[0-9a-f]{64}$"
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "tokenIn": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "implementation": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": ["address", "codeHash"],
+                            "properties": {
+                              "address": {
+                                "type": "string",
+                                "pattern": "^0x[0-9a-fA-F]{40}$"
+                              },
+                              "codeHash": {
+                                "type": "string",
+                                "pattern": "^0x[0-9a-f]{64}$"
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "tokenOut": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "implementation": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": ["address", "codeHash"],
+                            "properties": {
+                              "address": {
+                                "type": "string",
+                                "pattern": "^0x[0-9a-fA-F]{40}$"
+                              },
+                              "codeHash": {
+                                "type": "string",
+                                "pattern": "^0x[0-9a-f]{64}$"
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "fee": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 999999
+                      },
+                      "maximumInput": {
+                        "type": "string",
+                        "pattern": "^(0|[1-9][0-9]{0,77})$"
+                      }
+                    }
+                  }
+                },
+                "vaults": {
+                  "type": "array",
+                  "maxItems": 128,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "id",
+                      "router",
+                      "vault",
+                      "asset",
+                      "maximumAssets"
+                    ],
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z0-9._-]{1,64}$"
+                      },
+                      "router": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "implementation": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": ["address", "codeHash"],
+                            "properties": {
+                              "address": {
+                                "type": "string",
+                                "pattern": "^0x[0-9a-fA-F]{40}$"
+                              },
+                              "codeHash": {
+                                "type": "string",
+                                "pattern": "^0x[0-9a-f]{64}$"
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "vault": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "implementation": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": ["address", "codeHash"],
+                            "properties": {
+                              "address": {
+                                "type": "string",
+                                "pattern": "^0x[0-9a-fA-F]{40}$"
+                              },
+                              "codeHash": {
+                                "type": "string",
+                                "pattern": "^0x[0-9a-f]{64}$"
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "asset": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "implementation": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": ["address", "codeHash"],
+                            "properties": {
+                              "address": {
+                                "type": "string",
+                                "pattern": "^0x[0-9a-fA-F]{40}$"
+                              },
+                              "codeHash": {
+                                "type": "string",
+                                "pattern": "^0x[0-9a-f]{64}$"
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "maximumAssets": {
+                        "type": "string",
+                        "pattern": "^(0|[1-9][0-9]{0,77})$"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "native_transfers": {
+              "type": "array",
+              "maxItems": 32,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["address", "code_hash", "maximum_value_wei"],
+                "properties": {
+                  "address": {
+                    "type": "string",
+                    "pattern": "^0x[0-9a-fA-F]{40}$"
+                  },
+                  "code_hash": {
+                    "type": "string",
+                    "pattern": "^0x[0-9a-f]{64}$"
+                  },
+                  "maximum_value_wei": {
+                    "type": "string",
+                    "pattern": "^(0|[1-9][0-9]{0,77})$"
+                  }
+                }
+              }
+            },
             "maximum_calls": {
               "type": "integer",
               "minimum": 1,
@@ -7766,6 +10028,326 @@ Success response schema:
                         }
                       }
                     }
+                  }
+                }
+              }
+            },
+            "call_adapters": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "tokenTransfers": {
+                  "type": "array",
+                  "maxItems": 128,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["token", "recipients", "maximumAmount"],
+                    "properties": {
+                      "token": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "implementation": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": ["address", "codeHash"],
+                            "properties": {
+                              "address": {
+                                "type": "string",
+                                "pattern": "^0x[0-9a-fA-F]{40}$"
+                              },
+                              "codeHash": {
+                                "type": "string",
+                                "pattern": "^0x[0-9a-f]{64}$"
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "recipients": {
+                        "type": "array",
+                        "minItems": 1,
+                        "maxItems": 128,
+                        "uniqueItems": true,
+                        "items": {
+                          "type": "string",
+                          "pattern": "^0x[0-9a-fA-F]{40}$"
+                        }
+                      },
+                      "maximumAmount": {
+                        "type": "string",
+                        "pattern": "^(0|[1-9][0-9]{0,77})$"
+                      }
+                    }
+                  }
+                },
+                "swaps": {
+                  "type": "array",
+                  "maxItems": 128,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "id",
+                      "router",
+                      "tokenIn",
+                      "tokenOut",
+                      "fee",
+                      "maximumInput"
+                    ],
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z0-9._-]{1,64}$"
+                      },
+                      "router": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "implementation": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": ["address", "codeHash"],
+                            "properties": {
+                              "address": {
+                                "type": "string",
+                                "pattern": "^0x[0-9a-fA-F]{40}$"
+                              },
+                              "codeHash": {
+                                "type": "string",
+                                "pattern": "^0x[0-9a-f]{64}$"
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "tokenIn": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "implementation": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": ["address", "codeHash"],
+                            "properties": {
+                              "address": {
+                                "type": "string",
+                                "pattern": "^0x[0-9a-fA-F]{40}$"
+                              },
+                              "codeHash": {
+                                "type": "string",
+                                "pattern": "^0x[0-9a-f]{64}$"
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "tokenOut": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "implementation": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": ["address", "codeHash"],
+                            "properties": {
+                              "address": {
+                                "type": "string",
+                                "pattern": "^0x[0-9a-fA-F]{40}$"
+                              },
+                              "codeHash": {
+                                "type": "string",
+                                "pattern": "^0x[0-9a-f]{64}$"
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "fee": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 999999
+                      },
+                      "maximumInput": {
+                        "type": "string",
+                        "pattern": "^(0|[1-9][0-9]{0,77})$"
+                      }
+                    }
+                  }
+                },
+                "vaults": {
+                  "type": "array",
+                  "maxItems": 128,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "id",
+                      "router",
+                      "vault",
+                      "asset",
+                      "maximumAssets"
+                    ],
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z0-9._-]{1,64}$"
+                      },
+                      "router": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "implementation": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": ["address", "codeHash"],
+                            "properties": {
+                              "address": {
+                                "type": "string",
+                                "pattern": "^0x[0-9a-fA-F]{40}$"
+                              },
+                              "codeHash": {
+                                "type": "string",
+                                "pattern": "^0x[0-9a-f]{64}$"
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "vault": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "implementation": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": ["address", "codeHash"],
+                            "properties": {
+                              "address": {
+                                "type": "string",
+                                "pattern": "^0x[0-9a-fA-F]{40}$"
+                              },
+                              "codeHash": {
+                                "type": "string",
+                                "pattern": "^0x[0-9a-f]{64}$"
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "asset": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "implementation": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": ["address", "codeHash"],
+                            "properties": {
+                              "address": {
+                                "type": "string",
+                                "pattern": "^0x[0-9a-fA-F]{40}$"
+                              },
+                              "codeHash": {
+                                "type": "string",
+                                "pattern": "^0x[0-9a-f]{64}$"
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "maximumAssets": {
+                        "type": "string",
+                        "pattern": "^(0|[1-9][0-9]{0,77})$"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "native_transfers": {
+              "type": "array",
+              "maxItems": 32,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["address", "code_hash", "maximum_value_wei"],
+                "properties": {
+                  "address": {
+                    "type": "string",
+                    "pattern": "^0x[0-9a-fA-F]{40}$"
+                  },
+                  "code_hash": {
+                    "type": "string",
+                    "pattern": "^0x[0-9a-f]{64}$"
+                  },
+                  "maximum_value_wei": {
+                    "type": "string",
+                    "pattern": "^(0|[1-9][0-9]{0,77})$"
                   }
                 }
               }
@@ -7997,6 +10579,326 @@ Success response schema:
                 }
               }
             },
+            "call_adapters": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "tokenTransfers": {
+                  "type": "array",
+                  "maxItems": 128,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["token", "recipients", "maximumAmount"],
+                    "properties": {
+                      "token": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "implementation": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": ["address", "codeHash"],
+                            "properties": {
+                              "address": {
+                                "type": "string",
+                                "pattern": "^0x[0-9a-fA-F]{40}$"
+                              },
+                              "codeHash": {
+                                "type": "string",
+                                "pattern": "^0x[0-9a-f]{64}$"
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "recipients": {
+                        "type": "array",
+                        "minItems": 1,
+                        "maxItems": 128,
+                        "uniqueItems": true,
+                        "items": {
+                          "type": "string",
+                          "pattern": "^0x[0-9a-fA-F]{40}$"
+                        }
+                      },
+                      "maximumAmount": {
+                        "type": "string",
+                        "pattern": "^(0|[1-9][0-9]{0,77})$"
+                      }
+                    }
+                  }
+                },
+                "swaps": {
+                  "type": "array",
+                  "maxItems": 128,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "id",
+                      "router",
+                      "tokenIn",
+                      "tokenOut",
+                      "fee",
+                      "maximumInput"
+                    ],
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z0-9._-]{1,64}$"
+                      },
+                      "router": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "implementation": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": ["address", "codeHash"],
+                            "properties": {
+                              "address": {
+                                "type": "string",
+                                "pattern": "^0x[0-9a-fA-F]{40}$"
+                              },
+                              "codeHash": {
+                                "type": "string",
+                                "pattern": "^0x[0-9a-f]{64}$"
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "tokenIn": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "implementation": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": ["address", "codeHash"],
+                            "properties": {
+                              "address": {
+                                "type": "string",
+                                "pattern": "^0x[0-9a-fA-F]{40}$"
+                              },
+                              "codeHash": {
+                                "type": "string",
+                                "pattern": "^0x[0-9a-f]{64}$"
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "tokenOut": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "implementation": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": ["address", "codeHash"],
+                            "properties": {
+                              "address": {
+                                "type": "string",
+                                "pattern": "^0x[0-9a-fA-F]{40}$"
+                              },
+                              "codeHash": {
+                                "type": "string",
+                                "pattern": "^0x[0-9a-f]{64}$"
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "fee": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 999999
+                      },
+                      "maximumInput": {
+                        "type": "string",
+                        "pattern": "^(0|[1-9][0-9]{0,77})$"
+                      }
+                    }
+                  }
+                },
+                "vaults": {
+                  "type": "array",
+                  "maxItems": 128,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "id",
+                      "router",
+                      "vault",
+                      "asset",
+                      "maximumAssets"
+                    ],
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z0-9._-]{1,64}$"
+                      },
+                      "router": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "implementation": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": ["address", "codeHash"],
+                            "properties": {
+                              "address": {
+                                "type": "string",
+                                "pattern": "^0x[0-9a-fA-F]{40}$"
+                              },
+                              "codeHash": {
+                                "type": "string",
+                                "pattern": "^0x[0-9a-f]{64}$"
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "vault": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "implementation": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": ["address", "codeHash"],
+                            "properties": {
+                              "address": {
+                                "type": "string",
+                                "pattern": "^0x[0-9a-fA-F]{40}$"
+                              },
+                              "codeHash": {
+                                "type": "string",
+                                "pattern": "^0x[0-9a-f]{64}$"
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "asset": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "implementation": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": ["address", "codeHash"],
+                            "properties": {
+                              "address": {
+                                "type": "string",
+                                "pattern": "^0x[0-9a-fA-F]{40}$"
+                              },
+                              "codeHash": {
+                                "type": "string",
+                                "pattern": "^0x[0-9a-f]{64}$"
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "maximumAssets": {
+                        "type": "string",
+                        "pattern": "^(0|[1-9][0-9]{0,77})$"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "native_transfers": {
+              "type": "array",
+              "maxItems": 32,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["address", "code_hash", "maximum_value_wei"],
+                "properties": {
+                  "address": {
+                    "type": "string",
+                    "pattern": "^0x[0-9a-fA-F]{40}$"
+                  },
+                  "code_hash": {
+                    "type": "string",
+                    "pattern": "^0x[0-9a-f]{64}$"
+                  },
+                  "maximum_value_wei": {
+                    "type": "string",
+                    "pattern": "^(0|[1-9][0-9]{0,77})$"
+                  }
+                }
+              }
+            },
             "maximum_calls": {
               "type": "integer",
               "minimum": 1,
@@ -8164,6 +11066,320 @@ Request body (application/json):
                     }
                   }
                 }
+              }
+            }
+          }
+        },
+        "call_adapters": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "tokenTransfers": {
+              "type": "array",
+              "maxItems": 128,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["token", "recipients", "maximumAmount"],
+                "properties": {
+                  "token": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["address", "codeHash"],
+                    "properties": {
+                      "address": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                      },
+                      "codeHash": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-f]{64}$"
+                      },
+                      "implementation": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "recipients": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 128,
+                    "uniqueItems": true,
+                    "items": {
+                      "type": "string",
+                      "pattern": "^0x[0-9a-fA-F]{40}$"
+                    }
+                  },
+                  "maximumAmount": {
+                    "type": "string",
+                    "pattern": "^(0|[1-9][0-9]{0,77})$"
+                  }
+                }
+              }
+            },
+            "swaps": {
+              "type": "array",
+              "maxItems": 128,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "router",
+                  "tokenIn",
+                  "tokenOut",
+                  "fee",
+                  "maximumInput"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9._-]{1,64}$"
+                  },
+                  "router": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["address", "codeHash"],
+                    "properties": {
+                      "address": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                      },
+                      "codeHash": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-f]{64}$"
+                      },
+                      "implementation": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "tokenIn": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["address", "codeHash"],
+                    "properties": {
+                      "address": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                      },
+                      "codeHash": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-f]{64}$"
+                      },
+                      "implementation": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "tokenOut": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["address", "codeHash"],
+                    "properties": {
+                      "address": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                      },
+                      "codeHash": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-f]{64}$"
+                      },
+                      "implementation": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "fee": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 999999
+                  },
+                  "maximumInput": {
+                    "type": "string",
+                    "pattern": "^(0|[1-9][0-9]{0,77})$"
+                  }
+                }
+              }
+            },
+            "vaults": {
+              "type": "array",
+              "maxItems": 128,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["id", "router", "vault", "asset", "maximumAssets"],
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9._-]{1,64}$"
+                  },
+                  "router": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["address", "codeHash"],
+                    "properties": {
+                      "address": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                      },
+                      "codeHash": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-f]{64}$"
+                      },
+                      "implementation": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "vault": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["address", "codeHash"],
+                    "properties": {
+                      "address": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                      },
+                      "codeHash": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-f]{64}$"
+                      },
+                      "implementation": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "asset": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["address", "codeHash"],
+                    "properties": {
+                      "address": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                      },
+                      "codeHash": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-f]{64}$"
+                      },
+                      "implementation": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "maximumAssets": {
+                    "type": "string",
+                    "pattern": "^(0|[1-9][0-9]{0,77})$"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "native_transfers": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["address", "code_hash", "maximum_value_wei"],
+            "properties": {
+              "address": {
+                "type": "string",
+                "pattern": "^0x[0-9a-fA-F]{40}$"
+              },
+              "code_hash": {
+                "type": "string",
+                "pattern": "^0x[0-9a-f]{64}$"
+              },
+              "maximum_value_wei": {
+                "type": "string",
+                "pattern": "^(0|[1-9][0-9]{0,77})$"
               }
             }
           }
@@ -8340,6 +11556,320 @@ Success response schema:
                     }
                   }
                 }
+              }
+            }
+          }
+        },
+        "call_adapters": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "tokenTransfers": {
+              "type": "array",
+              "maxItems": 128,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["token", "recipients", "maximumAmount"],
+                "properties": {
+                  "token": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["address", "codeHash"],
+                    "properties": {
+                      "address": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                      },
+                      "codeHash": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-f]{64}$"
+                      },
+                      "implementation": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "recipients": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 128,
+                    "uniqueItems": true,
+                    "items": {
+                      "type": "string",
+                      "pattern": "^0x[0-9a-fA-F]{40}$"
+                    }
+                  },
+                  "maximumAmount": {
+                    "type": "string",
+                    "pattern": "^(0|[1-9][0-9]{0,77})$"
+                  }
+                }
+              }
+            },
+            "swaps": {
+              "type": "array",
+              "maxItems": 128,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "router",
+                  "tokenIn",
+                  "tokenOut",
+                  "fee",
+                  "maximumInput"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9._-]{1,64}$"
+                  },
+                  "router": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["address", "codeHash"],
+                    "properties": {
+                      "address": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                      },
+                      "codeHash": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-f]{64}$"
+                      },
+                      "implementation": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "tokenIn": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["address", "codeHash"],
+                    "properties": {
+                      "address": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                      },
+                      "codeHash": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-f]{64}$"
+                      },
+                      "implementation": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "tokenOut": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["address", "codeHash"],
+                    "properties": {
+                      "address": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                      },
+                      "codeHash": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-f]{64}$"
+                      },
+                      "implementation": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "fee": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 999999
+                  },
+                  "maximumInput": {
+                    "type": "string",
+                    "pattern": "^(0|[1-9][0-9]{0,77})$"
+                  }
+                }
+              }
+            },
+            "vaults": {
+              "type": "array",
+              "maxItems": 128,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["id", "router", "vault", "asset", "maximumAssets"],
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9._-]{1,64}$"
+                  },
+                  "router": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["address", "codeHash"],
+                    "properties": {
+                      "address": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                      },
+                      "codeHash": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-f]{64}$"
+                      },
+                      "implementation": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "vault": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["address", "codeHash"],
+                    "properties": {
+                      "address": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                      },
+                      "codeHash": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-f]{64}$"
+                      },
+                      "implementation": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "asset": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["address", "codeHash"],
+                    "properties": {
+                      "address": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                      },
+                      "codeHash": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-f]{64}$"
+                      },
+                      "implementation": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "maximumAssets": {
+                    "type": "string",
+                    "pattern": "^(0|[1-9][0-9]{0,77})$"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "native_transfers": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["address", "code_hash", "maximum_value_wei"],
+            "properties": {
+              "address": {
+                "type": "string",
+                "pattern": "^0x[0-9a-fA-F]{40}$"
+              },
+              "code_hash": {
+                "type": "string",
+                "pattern": "^0x[0-9a-f]{64}$"
+              },
+              "maximum_value_wei": {
+                "type": "string",
+                "pattern": "^(0|[1-9][0-9]{0,77})$"
               }
             }
           }
@@ -8530,6 +12060,320 @@ Success response schema:
                     }
                   }
                 }
+              }
+            }
+          }
+        },
+        "call_adapters": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "tokenTransfers": {
+              "type": "array",
+              "maxItems": 128,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["token", "recipients", "maximumAmount"],
+                "properties": {
+                  "token": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["address", "codeHash"],
+                    "properties": {
+                      "address": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                      },
+                      "codeHash": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-f]{64}$"
+                      },
+                      "implementation": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "recipients": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 128,
+                    "uniqueItems": true,
+                    "items": {
+                      "type": "string",
+                      "pattern": "^0x[0-9a-fA-F]{40}$"
+                    }
+                  },
+                  "maximumAmount": {
+                    "type": "string",
+                    "pattern": "^(0|[1-9][0-9]{0,77})$"
+                  }
+                }
+              }
+            },
+            "swaps": {
+              "type": "array",
+              "maxItems": 128,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "router",
+                  "tokenIn",
+                  "tokenOut",
+                  "fee",
+                  "maximumInput"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9._-]{1,64}$"
+                  },
+                  "router": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["address", "codeHash"],
+                    "properties": {
+                      "address": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                      },
+                      "codeHash": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-f]{64}$"
+                      },
+                      "implementation": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "tokenIn": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["address", "codeHash"],
+                    "properties": {
+                      "address": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                      },
+                      "codeHash": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-f]{64}$"
+                      },
+                      "implementation": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "tokenOut": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["address", "codeHash"],
+                    "properties": {
+                      "address": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                      },
+                      "codeHash": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-f]{64}$"
+                      },
+                      "implementation": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "fee": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 999999
+                  },
+                  "maximumInput": {
+                    "type": "string",
+                    "pattern": "^(0|[1-9][0-9]{0,77})$"
+                  }
+                }
+              }
+            },
+            "vaults": {
+              "type": "array",
+              "maxItems": 128,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["id", "router", "vault", "asset", "maximumAssets"],
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9._-]{1,64}$"
+                  },
+                  "router": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["address", "codeHash"],
+                    "properties": {
+                      "address": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                      },
+                      "codeHash": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-f]{64}$"
+                      },
+                      "implementation": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "vault": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["address", "codeHash"],
+                    "properties": {
+                      "address": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                      },
+                      "codeHash": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-f]{64}$"
+                      },
+                      "implementation": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "asset": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["address", "codeHash"],
+                    "properties": {
+                      "address": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                      },
+                      "codeHash": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-f]{64}$"
+                      },
+                      "implementation": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "maximumAssets": {
+                    "type": "string",
+                    "pattern": "^(0|[1-9][0-9]{0,77})$"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "native_transfers": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["address", "code_hash", "maximum_value_wei"],
+            "properties": {
+              "address": {
+                "type": "string",
+                "pattern": "^0x[0-9a-fA-F]{40}$"
+              },
+              "code_hash": {
+                "type": "string",
+                "pattern": "^0x[0-9a-f]{64}$"
+              },
+              "maximum_value_wei": {
+                "type": "string",
+                "pattern": "^(0|[1-9][0-9]{0,77})$"
               }
             }
           }
@@ -8742,6 +12586,320 @@ Success response schema:
             }
           }
         },
+        "call_adapters": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "tokenTransfers": {
+              "type": "array",
+              "maxItems": 128,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["token", "recipients", "maximumAmount"],
+                "properties": {
+                  "token": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["address", "codeHash"],
+                    "properties": {
+                      "address": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                      },
+                      "codeHash": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-f]{64}$"
+                      },
+                      "implementation": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "recipients": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 128,
+                    "uniqueItems": true,
+                    "items": {
+                      "type": "string",
+                      "pattern": "^0x[0-9a-fA-F]{40}$"
+                    }
+                  },
+                  "maximumAmount": {
+                    "type": "string",
+                    "pattern": "^(0|[1-9][0-9]{0,77})$"
+                  }
+                }
+              }
+            },
+            "swaps": {
+              "type": "array",
+              "maxItems": 128,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "router",
+                  "tokenIn",
+                  "tokenOut",
+                  "fee",
+                  "maximumInput"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9._-]{1,64}$"
+                  },
+                  "router": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["address", "codeHash"],
+                    "properties": {
+                      "address": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                      },
+                      "codeHash": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-f]{64}$"
+                      },
+                      "implementation": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "tokenIn": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["address", "codeHash"],
+                    "properties": {
+                      "address": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                      },
+                      "codeHash": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-f]{64}$"
+                      },
+                      "implementation": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "tokenOut": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["address", "codeHash"],
+                    "properties": {
+                      "address": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                      },
+                      "codeHash": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-f]{64}$"
+                      },
+                      "implementation": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "fee": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 999999
+                  },
+                  "maximumInput": {
+                    "type": "string",
+                    "pattern": "^(0|[1-9][0-9]{0,77})$"
+                  }
+                }
+              }
+            },
+            "vaults": {
+              "type": "array",
+              "maxItems": 128,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["id", "router", "vault", "asset", "maximumAssets"],
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9._-]{1,64}$"
+                  },
+                  "router": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["address", "codeHash"],
+                    "properties": {
+                      "address": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                      },
+                      "codeHash": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-f]{64}$"
+                      },
+                      "implementation": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "vault": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["address", "codeHash"],
+                    "properties": {
+                      "address": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                      },
+                      "codeHash": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-f]{64}$"
+                      },
+                      "implementation": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "asset": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["address", "codeHash"],
+                    "properties": {
+                      "address": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                      },
+                      "codeHash": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-f]{64}$"
+                      },
+                      "implementation": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "maximumAssets": {
+                    "type": "string",
+                    "pattern": "^(0|[1-9][0-9]{0,77})$"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "native_transfers": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["address", "code_hash", "maximum_value_wei"],
+            "properties": {
+              "address": {
+                "type": "string",
+                "pattern": "^0x[0-9a-fA-F]{40}$"
+              },
+              "code_hash": {
+                "type": "string",
+                "pattern": "^0x[0-9a-f]{64}$"
+              },
+              "maximum_value_wei": {
+                "type": "string",
+                "pattern": "^(0|[1-9][0-9]{0,77})$"
+              }
+            }
+          }
+        },
         "maximum_calls": {
           "type": "integer",
           "minimum": 1,
@@ -8904,6 +13062,320 @@ Request body (application/json):
                     }
                   }
                 }
+              }
+            }
+          }
+        },
+        "call_adapters": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "tokenTransfers": {
+              "type": "array",
+              "maxItems": 128,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["token", "recipients", "maximumAmount"],
+                "properties": {
+                  "token": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["address", "codeHash"],
+                    "properties": {
+                      "address": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                      },
+                      "codeHash": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-f]{64}$"
+                      },
+                      "implementation": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "recipients": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 128,
+                    "uniqueItems": true,
+                    "items": {
+                      "type": "string",
+                      "pattern": "^0x[0-9a-fA-F]{40}$"
+                    }
+                  },
+                  "maximumAmount": {
+                    "type": "string",
+                    "pattern": "^(0|[1-9][0-9]{0,77})$"
+                  }
+                }
+              }
+            },
+            "swaps": {
+              "type": "array",
+              "maxItems": 128,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "router",
+                  "tokenIn",
+                  "tokenOut",
+                  "fee",
+                  "maximumInput"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9._-]{1,64}$"
+                  },
+                  "router": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["address", "codeHash"],
+                    "properties": {
+                      "address": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                      },
+                      "codeHash": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-f]{64}$"
+                      },
+                      "implementation": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "tokenIn": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["address", "codeHash"],
+                    "properties": {
+                      "address": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                      },
+                      "codeHash": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-f]{64}$"
+                      },
+                      "implementation": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "tokenOut": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["address", "codeHash"],
+                    "properties": {
+                      "address": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                      },
+                      "codeHash": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-f]{64}$"
+                      },
+                      "implementation": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "fee": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 999999
+                  },
+                  "maximumInput": {
+                    "type": "string",
+                    "pattern": "^(0|[1-9][0-9]{0,77})$"
+                  }
+                }
+              }
+            },
+            "vaults": {
+              "type": "array",
+              "maxItems": 128,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["id", "router", "vault", "asset", "maximumAssets"],
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9._-]{1,64}$"
+                  },
+                  "router": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["address", "codeHash"],
+                    "properties": {
+                      "address": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                      },
+                      "codeHash": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-f]{64}$"
+                      },
+                      "implementation": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "vault": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["address", "codeHash"],
+                    "properties": {
+                      "address": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                      },
+                      "codeHash": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-f]{64}$"
+                      },
+                      "implementation": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "asset": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["address", "codeHash"],
+                    "properties": {
+                      "address": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                      },
+                      "codeHash": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-f]{64}$"
+                      },
+                      "implementation": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "maximumAssets": {
+                    "type": "string",
+                    "pattern": "^(0|[1-9][0-9]{0,77})$"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "native_transfers": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["address", "code_hash", "maximum_value_wei"],
+            "properties": {
+              "address": {
+                "type": "string",
+                "pattern": "^0x[0-9a-fA-F]{40}$"
+              },
+              "code_hash": {
+                "type": "string",
+                "pattern": "^0x[0-9a-f]{64}$"
+              },
+              "maximum_value_wei": {
+                "type": "string",
+                "pattern": "^(0|[1-9][0-9]{0,77})$"
               }
             }
           }
@@ -9081,6 +13553,320 @@ Success response schema:
                     }
                   }
                 }
+              }
+            }
+          }
+        },
+        "call_adapters": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "tokenTransfers": {
+              "type": "array",
+              "maxItems": 128,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["token", "recipients", "maximumAmount"],
+                "properties": {
+                  "token": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["address", "codeHash"],
+                    "properties": {
+                      "address": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                      },
+                      "codeHash": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-f]{64}$"
+                      },
+                      "implementation": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "recipients": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 128,
+                    "uniqueItems": true,
+                    "items": {
+                      "type": "string",
+                      "pattern": "^0x[0-9a-fA-F]{40}$"
+                    }
+                  },
+                  "maximumAmount": {
+                    "type": "string",
+                    "pattern": "^(0|[1-9][0-9]{0,77})$"
+                  }
+                }
+              }
+            },
+            "swaps": {
+              "type": "array",
+              "maxItems": 128,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "router",
+                  "tokenIn",
+                  "tokenOut",
+                  "fee",
+                  "maximumInput"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9._-]{1,64}$"
+                  },
+                  "router": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["address", "codeHash"],
+                    "properties": {
+                      "address": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                      },
+                      "codeHash": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-f]{64}$"
+                      },
+                      "implementation": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "tokenIn": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["address", "codeHash"],
+                    "properties": {
+                      "address": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                      },
+                      "codeHash": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-f]{64}$"
+                      },
+                      "implementation": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "tokenOut": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["address", "codeHash"],
+                    "properties": {
+                      "address": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                      },
+                      "codeHash": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-f]{64}$"
+                      },
+                      "implementation": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "fee": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 999999
+                  },
+                  "maximumInput": {
+                    "type": "string",
+                    "pattern": "^(0|[1-9][0-9]{0,77})$"
+                  }
+                }
+              }
+            },
+            "vaults": {
+              "type": "array",
+              "maxItems": 128,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["id", "router", "vault", "asset", "maximumAssets"],
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9._-]{1,64}$"
+                  },
+                  "router": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["address", "codeHash"],
+                    "properties": {
+                      "address": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                      },
+                      "codeHash": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-f]{64}$"
+                      },
+                      "implementation": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "vault": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["address", "codeHash"],
+                    "properties": {
+                      "address": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                      },
+                      "codeHash": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-f]{64}$"
+                      },
+                      "implementation": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "asset": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["address", "codeHash"],
+                    "properties": {
+                      "address": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                      },
+                      "codeHash": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-f]{64}$"
+                      },
+                      "implementation": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "maximumAssets": {
+                    "type": "string",
+                    "pattern": "^(0|[1-9][0-9]{0,77})$"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "native_transfers": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["address", "code_hash", "maximum_value_wei"],
+            "properties": {
+              "address": {
+                "type": "string",
+                "pattern": "^0x[0-9a-fA-F]{40}$"
+              },
+              "code_hash": {
+                "type": "string",
+                "pattern": "^0x[0-9a-f]{64}$"
+              },
+              "maximum_value_wei": {
+                "type": "string",
+                "pattern": "^(0|[1-9][0-9]{0,77})$"
               }
             }
           }

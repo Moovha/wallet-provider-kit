@@ -247,9 +247,11 @@ The effective native-value limit is the lower of the publication and provider
 ceiling. The lifetime operation budget, sponsor budget and nonce reservations
 remain shared across publications; a policy update does not reset usage. Runtime
 queue requests use the shorter publication lifetime and require current consent
-again when they become actions. Startup swap/vault convenience routes remain
-available in static mode; in runtime mode encode those protocols as explicitly
-registered contract calls.
+again when they become actions. Native transfers use optional `native_transfers`
+recipient/code/value permissions and a provider `nativeTransfers` opt-in. Optional
+`call_adapters` supply explicitly reviewed protocol checks for generic calls.
+Changes to either are provider terms; automatic contract registration cannot
+publish them. See [call authorization](approved-contract-calls.md).
 
 Unknown and already signed/submitted effects retain their original plans,
 signatures, nonces and reservations. Publishing narrower terms cannot recall a
@@ -263,9 +265,9 @@ of document and calldata fits an execution envelope.
 
 ## Outcome and support limits
 
-Runtime registration does not infer a method's business meaning. Arbitrary calls
-report `contract-execution`, not proof of swap output, vault shares or beneficiary
-settlement. Native-value limits do not bound token approvals or downstream calls;
+Runtime registration does not infer a method's business meaning. Generic calls
+prove execution; explicitly selected adapters can verify supported token, swap
+or vault effects. They do not certify beneficiary settlement. Native-value limits do not bound token approvals or downstream calls;
 review permitted methods and their argument semantics accordingly. New execution
 mechanisms, business-effect verifiers and policy rule types require implementation.
 The [EIP-5792 adapter](wallet-calls.md) supplies standard batch submission and

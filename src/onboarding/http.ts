@@ -1452,7 +1452,7 @@ ${
 <ul>${view.permissions.map((p) => `<li>${escape(permissionLabels[p])}</li>`).join('')}</ul>
 ${
   view.permissions.includes('contracts:request')
-    ? `<p>Contract-call delegation on Base Sepolia: you permit calls to the configured contracts and functions, swaps on the configured routes and deposits into the configured vaults. Limits and account bindings: <code>${escape(JSON.stringify(actions().callConsentTerms()))}</code>. Contract-call signatures remain private to coordinated execution. Safe signatures have no native expiry; revocation stops new service dispatch but cannot recall an already submitted authorization.</p>`
+    ? `<p>Wallet-call delegation on Base Sepolia: you permit exact calls within the accepted policy, including explicitly allowed native recipients and any selected optional operation adapters. Limits and account bindings: <code>${escape(JSON.stringify(actions().callConsentTerms()))}</code>. Contract-call signatures remain private to coordinated execution. Safe signatures have no native expiry; revocation stops new service dispatch but cannot recall an already submitted authorization.</p>`
     : ''
 }
 ${

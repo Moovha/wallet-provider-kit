@@ -82,7 +82,10 @@ export async function createSetupServer(options: {
   if (!files.has('/index.html')) throw new Error('Setup assets unavailable');
   const example = JSON.parse(
     await readFile(
-      new URL('../../docs/provider.config.example.json', import.meta.url),
+      new URL(
+        '../../docs/provider.config.bundled.example.json',
+        import.meta.url,
+      ),
       'utf8',
     ),
   );
@@ -186,12 +189,9 @@ export async function createSetupServer(options: {
       runtimeIdle();
       executor.resetPlan();
       const config = validateProviderConfiguration(request.body);
-      if (
-        config.activation.enabled ||
-        !['cdp', 'openzeppelin-relayer'].includes(config.backend.kind)
-      )
+      if (config.activation.enabled || config.backend.kind === 'custom')
         throw new ConfigurationError([
-          'Local setup requires CDP or Relayer with wallet operations disabled.',
+          'Local setup requires a built-in backend with wallet operations disabled.',
         ]);
       preparing = true;
       owned = true;

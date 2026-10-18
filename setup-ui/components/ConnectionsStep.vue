@@ -1,6 +1,9 @@
 <script setup lang="ts">
+import AdvancedSettings from './AdvancedSettings.vue';
+import { defaultLocalExecution } from '../../src/deployment/local-execution-contract';
 import SetupField from './SetupField.vue';
-import { docs } from '../model';
+import { docs, synchronizeBundledServices } from '../model';
+import { applicationScopes } from '../../src/deployment/authorization-contract';
 import { computed, watch } from 'vue';
 import type { ProviderConfiguration } from '../model';
 import SecretField from './SecretField.vue';
@@ -14,6 +17,28 @@ watch(
       application.issuer = issuer;
   },
 );
+function setAuthorization(value: unknown) {
+  if (value === 'bundled') {
+    model.value.authorizationServer = {
+      signingKey: { env: 'WALLET_OAUTH_SIGNING_KEY' },
+      clients: [],
+    };
+    synchronizeBundledServices(model.value);
+  } else {
+    delete model.value.authorizationServer;
+    model.value.oauth = { issuer: '', audience: '', jwksUrl: '' };
+  }
+}
+function setExecution(value: unknown) {
+  if (value === 'bundled') model.value.localExecution = defaultLocalExecution();
+  else {
+    if (model.value.execution?.local) {
+      delete model.value.execution;
+      delete model.value.operations;
+    }
+    delete model.value.localExecution;
+  }
+}
 function didit(enabled: unknown) {
   if (enabled)
     model.value.identity.didit = {
@@ -37,10 +62,10 @@ const flow = computed(() => model.value.policy.access?.mode ?? 'hosted');
 <template>
   <div class="step-heading">
     <span class="eyebrow">Connected services</span>
-    <h2>Connect your services</h2>
+    <h2>Configure your services</h2>
     <p>
-      Configure how the provider authenticates applications. Add login and
-      identity-vendor connections when your selected access flow needs them.
+      Use the bundled application token service, or connect an existing issuer.
+      Optional staff and hosted features have separate connection settings.
     </p>
   </div>
   <div class="callout step-orientation">
@@ -59,6 +84,27 @@ const flow = computed(() => model.value.policy.access?.mode ?? 'hosted');
       connection or application-record evaluation selected in Policies.
     </p>
   </div>
+  <SetupField
+    type="select"
+    guide="executionEnabled"
+    label="Local execution engine"
+    :modelValue="model.localExecution ? 'bundled' : 'external'"
+    :options="[
+      {
+        label: 'Bundled OpenZeppelin Relayer and Valkey (recommended)',
+        value: 'bundled',
+      },
+      { label: 'Existing services or custom adapter', value: 'external' },
+    ]"
+    @update:modelValue="setExecution"
+  />
+  <p v-if="model.localExecution" class="callout">
+    Local setup starts the execution engine and its persistent queue
+    automatically on private networks. Configure approved-action policies, then
+    set independent RPC sources and gas budgets in Deployment. Setup creates
+    encrypted sponsor keys locally; you fund their public addresses before
+    enabling execution. OWS remains the separate owner-wallet engine.
+  </p>
   <template v-if="model.ownerLogin">
     <h3>
       {{
@@ -126,46 +172,155 @@ const flow = computed(() => model.value.policy.access?.mode ?? 'hosted');
   </template>
   <h3>Access tokens for connected applications</h3>
   <SetupField
-    guide="tokenIssuer"
-    v-model="model.oauth.issuer"
-    type="url"
-    label="Application token issuer"
-    placeholder="https://applications.acme.com"
-    validation="required|https_url"
+    guide="authorizationMode"
+    type="select"
+    label="Application authentication"
+    :modelValue="model.authorizationServer ? 'bundled' : 'external'"
+    :options="[
+      { label: 'Bundled token service (recommended)', value: 'bundled' },
+      { label: 'Connect an existing authorization server', value: 'external' },
+    ]"
+    @update:modelValue="setAuthorization"
   />
-  <div class="field-grid">
+  <template v-if="model.authorizationServer">
+    <div class="callout">
+      <strong>Application authentication is included</strong>
+      <p>
+        The bundled OAuth service uses oidc-provider. Setup registers the
+        enabled applications from Policies and generates missing credentials
+        privately. No separate token-service installation is required. Server
+        applications obtain five-minute tokens using client_credentials; users
+        stay in the connected application.
+      </p>
+      <p>
+        Issuer:
+        <code>{{
+          model.oauth.issuer || 'Set the public service address in Provider'
+        }}</code>
+      </p>
+      <p>
+        Token endpoint: <code>{{ model.oauth.issuer }}/token</code>
+      </p>
+      <p>
+        Audience: <code>{{ model.oauth.audience }}</code>
+      </p>
+    </div>
+    <AdvancedSettings label="Advanced token signing variable">
+      <SecretField
+        guide="issuerSigningKey"
+        v-model="model.authorizationServer.signingKey"
+        label="Application token signing key"
+      />
+    </AdvancedSettings>
+    <fieldset
+      v-for="client in model.authorizationServer.clients"
+      :key="client.clientId"
+      class="repeat-row"
+    >
+      <legend>
+        {{
+          model.policy.applications.find(
+            (app) => app.clientId === client.clientId,
+          )?.name || 'Application'
+        }}
+      </legend>
+      <AdvancedSettings label="Advanced application credential variable">
+        <SecretField
+          guide="bundledClientSecret"
+          v-model="client.clientSecret"
+          label="Application client secret"
+        />
+      </AdvancedSettings>
+      <p class="help-text">
+        {{ client.scopes.length }} API scopes configured. New registrations
+        allow wallet access, account reading and provisioning. Review advanced
+        permissions before enabling additional API routes.
+      </p>
+      <AdvancedSettings label="Advanced application API permissions">
+        <SetupField
+          guide="bundledScopes"
+          type="checkbox"
+          label="Allowed API scopes"
+          v-model="client.scopes"
+          :options="
+            applicationScopes.map((scope) => ({ label: scope, value: scope }))
+          "
+          validation="required|min:1"
+        />
+      </AdvancedSettings>
+      <p class="help-text">
+        Give each server application only its own secret. OAuth scopes allow API
+        admission; wallet grants, identity, consent and action authority are
+        checked separately. Financial scopes are off initially.
+      </p>
+    </fieldset>
+    <fieldset
+      v-for="operator in model.authorizationServer.operatorClients ?? []"
+      :key="operator.clientId"
+      class="repeat-row"
+    >
+      <legend>
+        Provider operator:
+        {{ operator.clientId }}
+      </legend>
+      <AdvancedSettings label="Advanced operator credential variable">
+        <SecretField
+          guide="bundledOperatorSecret"
+          v-model="operator.clientSecret"
+          label="Provider operator client secret"
+        />
+      </AdvancedSettings>
+      <p class="help-text">
+        This separate service client can administer runtime policies. Its token
+        subject equals its client ID. Keep its credentials with the provider;
+        application registrations cannot request these administrative scopes.
+      </p>
+    </fieldset>
+  </template>
+  <template v-else>
     <SetupField
-      guide="audience"
-      v-model="model.oauth.audience"
-      type="text"
-      label="Wallet API audience"
-      validation="required|length:1,256"
-    /><SetupField
-      guide="jwks"
-      v-model="model.oauth.jwksUrl"
+      guide="tokenIssuer"
+      v-model="model.oauth.issuer"
       type="url"
-      label="Token verification keys URL (JWKS)"
+      label="Application token issuer"
+      placeholder="https://applications.acme.com"
       validation="required|https_url"
     />
-  </div>
-  <details class="compatibility-help">
-    <summary>Application token compatibility checklist</summary>
-    <p>
-      Use separate application client registrations and RFC 9068 at+jwt access
-      tokens with the required wallet scopes and a lifetime no longer than ten
-      minutes. Ordinary ID tokens or vendor API keys cannot replace these. Ask
-      your token-service administrator to confirm this profile before
-      deployment.
-    </p>
-    <a
-      :href="
-        docs + 'operator-services.html#register-the-application-api-and-clients'
-      "
-      target="_blank"
-      rel="noopener noreferrer"
-      >Exact required token fields ↗</a
-    >
-  </details>
+    <div class="field-grid">
+      <SetupField
+        guide="audience"
+        v-model="model.oauth.audience"
+        type="text"
+        label="Wallet API audience"
+        validation="required|length:1,256"
+      /><SetupField
+        guide="jwks"
+        v-model="model.oauth.jwksUrl"
+        type="url"
+        label="Token verification keys URL (JWKS)"
+        validation="required|https_url"
+      />
+    </div>
+    <details class="compatibility-help">
+      <summary>Application token compatibility checklist</summary>
+      <p>
+        Use separate application client registrations and RFC 9068 at+jwt access
+        tokens with the required wallet scopes and a lifetime no longer than ten
+        minutes. Ordinary ID tokens or vendor API keys cannot replace these.
+        Confirm this profile on your selected external token service before
+        deployment.
+      </p>
+      <a
+        :href="
+          docs +
+          'operator-services.html#register-the-application-api-and-clients'
+        "
+        target="_blank"
+        rel="noopener noreferrer"
+        >Exact required token fields ↗</a
+      >
+    </details>
+  </template>
   <template v-if="flow === 'hosted'">
     <h3>Hosted identity-vendor connections</h3>
     <p v-if="model.policy.identity?.records" class="help-text">

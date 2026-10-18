@@ -1850,6 +1850,29 @@ export interface operations {
                                 maximum?: string;
                             }[];
                             nonce: string;
+                            nativeRecipients?: string[];
+                            adapterInput?: {
+                                account_id: string;
+                                /** @enum {string} */
+                                kind: "swap";
+                                route: string;
+                                amount_in: string;
+                                minimum_out: string;
+                                deadline: string;
+                            } | {
+                                account_id: string;
+                                /** @enum {string} */
+                                kind: "vault-deposit";
+                                route: string;
+                                assets: string;
+                                minimum_shares: string;
+                            } | {
+                                /** @enum {string} */
+                                kind: "token-transfer";
+                                token: string;
+                                recipient: string;
+                                amount: string;
+                            };
                         };
                     };
                 };
@@ -2198,6 +2221,29 @@ export interface operations {
                                 maximum?: string;
                             }[];
                             nonce: string;
+                            nativeRecipients?: string[];
+                            adapterInput?: {
+                                account_id: string;
+                                /** @enum {string} */
+                                kind: "swap";
+                                route: string;
+                                amount_in: string;
+                                minimum_out: string;
+                                deadline: string;
+                            } | {
+                                account_id: string;
+                                /** @enum {string} */
+                                kind: "vault-deposit";
+                                route: string;
+                                assets: string;
+                                minimum_shares: string;
+                            } | {
+                                /** @enum {string} */
+                                kind: "token-transfer";
+                                token: string;
+                                recipient: string;
+                                amount: string;
+                            };
                         };
                     };
                 };
@@ -2664,6 +2710,29 @@ export interface operations {
                                 maximum?: string;
                             }[];
                             nonce: string;
+                            nativeRecipients?: string[];
+                            adapterInput?: {
+                                account_id: string;
+                                /** @enum {string} */
+                                kind: "swap";
+                                route: string;
+                                amount_in: string;
+                                minimum_out: string;
+                                deadline: string;
+                            } | {
+                                account_id: string;
+                                /** @enum {string} */
+                                kind: "vault-deposit";
+                                route: string;
+                                assets: string;
+                                minimum_shares: string;
+                            } | {
+                                /** @enum {string} */
+                                kind: "token-transfer";
+                                token: string;
+                                recipient: string;
+                                amount: string;
+                            };
                         };
                     };
                 };
@@ -4612,7 +4681,7 @@ export interface operations {
                                         codeHash: string;
                                     };
                                 }[];
-                                swaps: {
+                                swaps?: {
                                     id: string;
                                     router: {
                                         address: string;
@@ -4641,7 +4710,7 @@ export interface operations {
                                     fee: number;
                                     maximumInput: string;
                                 }[];
-                                vaults: {
+                                vaults?: {
                                     id: string;
                                     router: {
                                         address: string;
@@ -4669,6 +4738,84 @@ export interface operations {
                                     };
                                     maximumAssets: string;
                                 }[];
+                                adapters?: {
+                                    tokenTransfers?: {
+                                        token: {
+                                            address: string;
+                                            codeHash: string;
+                                            implementation?: {
+                                                address: string;
+                                                codeHash: string;
+                                            };
+                                        };
+                                        recipients: string[];
+                                        maximumAmount: string;
+                                    }[];
+                                    swaps?: {
+                                        id: string;
+                                        router: {
+                                            address: string;
+                                            codeHash: string;
+                                            implementation?: {
+                                                address: string;
+                                                codeHash: string;
+                                            };
+                                        };
+                                        tokenIn: {
+                                            address: string;
+                                            codeHash: string;
+                                            implementation?: {
+                                                address: string;
+                                                codeHash: string;
+                                            };
+                                        };
+                                        tokenOut: {
+                                            address: string;
+                                            codeHash: string;
+                                            implementation?: {
+                                                address: string;
+                                                codeHash: string;
+                                            };
+                                        };
+                                        fee: number;
+                                        maximumInput: string;
+                                    }[];
+                                    vaults?: {
+                                        id: string;
+                                        router: {
+                                            address: string;
+                                            codeHash: string;
+                                            implementation?: {
+                                                address: string;
+                                                codeHash: string;
+                                            };
+                                        };
+                                        vault: {
+                                            address: string;
+                                            codeHash: string;
+                                            implementation?: {
+                                                address: string;
+                                                codeHash: string;
+                                            };
+                                        };
+                                        asset: {
+                                            address: string;
+                                            codeHash: string;
+                                            implementation?: {
+                                                address: string;
+                                                codeHash: string;
+                                            };
+                                        };
+                                        maximumAssets: string;
+                                    }[];
+                                };
+                                nativeTransfers?: {
+                                    recipients: {
+                                        address: string;
+                                        codeHash: string;
+                                        maximumValueWei: string;
+                                    }[];
+                                };
                             };
                             maxValiditySeconds: number;
                         };
@@ -4693,6 +4840,82 @@ export interface operations {
                                         signature: string;
                                         maximum_value_wei: string;
                                     }[];
+                                }[];
+                                call_adapters?: {
+                                    tokenTransfers?: {
+                                        token: {
+                                            address: string;
+                                            codeHash: string;
+                                            implementation?: {
+                                                address: string;
+                                                codeHash: string;
+                                            };
+                                        };
+                                        recipients: string[];
+                                        maximumAmount: string;
+                                    }[];
+                                    swaps?: {
+                                        id: string;
+                                        router: {
+                                            address: string;
+                                            codeHash: string;
+                                            implementation?: {
+                                                address: string;
+                                                codeHash: string;
+                                            };
+                                        };
+                                        tokenIn: {
+                                            address: string;
+                                            codeHash: string;
+                                            implementation?: {
+                                                address: string;
+                                                codeHash: string;
+                                            };
+                                        };
+                                        tokenOut: {
+                                            address: string;
+                                            codeHash: string;
+                                            implementation?: {
+                                                address: string;
+                                                codeHash: string;
+                                            };
+                                        };
+                                        fee: number;
+                                        maximumInput: string;
+                                    }[];
+                                    vaults?: {
+                                        id: string;
+                                        router: {
+                                            address: string;
+                                            codeHash: string;
+                                            implementation?: {
+                                                address: string;
+                                                codeHash: string;
+                                            };
+                                        };
+                                        vault: {
+                                            address: string;
+                                            codeHash: string;
+                                            implementation?: {
+                                                address: string;
+                                                codeHash: string;
+                                            };
+                                        };
+                                        asset: {
+                                            address: string;
+                                            codeHash: string;
+                                            implementation?: {
+                                                address: string;
+                                                codeHash: string;
+                                            };
+                                        };
+                                        maximumAssets: string;
+                                    }[];
+                                };
+                                native_transfers?: {
+                                    address: string;
+                                    code_hash: string;
+                                    maximum_value_wei: string;
                                 }[];
                                 maximum_calls: number;
                                 maximum_native_value_wei: string;
@@ -6052,6 +6275,82 @@ export interface operations {
                                             maximum_value_wei: string;
                                         }[];
                                     }[];
+                                    call_adapters?: {
+                                        tokenTransfers?: {
+                                            token: {
+                                                address: string;
+                                                codeHash: string;
+                                                implementation?: {
+                                                    address: string;
+                                                    codeHash: string;
+                                                };
+                                            };
+                                            recipients: string[];
+                                            maximumAmount: string;
+                                        }[];
+                                        swaps?: {
+                                            id: string;
+                                            router: {
+                                                address: string;
+                                                codeHash: string;
+                                                implementation?: {
+                                                    address: string;
+                                                    codeHash: string;
+                                                };
+                                            };
+                                            tokenIn: {
+                                                address: string;
+                                                codeHash: string;
+                                                implementation?: {
+                                                    address: string;
+                                                    codeHash: string;
+                                                };
+                                            };
+                                            tokenOut: {
+                                                address: string;
+                                                codeHash: string;
+                                                implementation?: {
+                                                    address: string;
+                                                    codeHash: string;
+                                                };
+                                            };
+                                            fee: number;
+                                            maximumInput: string;
+                                        }[];
+                                        vaults?: {
+                                            id: string;
+                                            router: {
+                                                address: string;
+                                                codeHash: string;
+                                                implementation?: {
+                                                    address: string;
+                                                    codeHash: string;
+                                                };
+                                            };
+                                            vault: {
+                                                address: string;
+                                                codeHash: string;
+                                                implementation?: {
+                                                    address: string;
+                                                    codeHash: string;
+                                                };
+                                            };
+                                            asset: {
+                                                address: string;
+                                                codeHash: string;
+                                                implementation?: {
+                                                    address: string;
+                                                    codeHash: string;
+                                                };
+                                            };
+                                            maximumAssets: string;
+                                        }[];
+                                    };
+                                    native_transfers?: {
+                                        address: string;
+                                        code_hash: string;
+                                        maximum_value_wei: string;
+                                    }[];
                                     maximum_calls: number;
                                     maximum_native_value_wei: string;
                                     max_validity_seconds: number;
@@ -6088,6 +6387,82 @@ export interface operations {
                                             signature: string;
                                             maximum_value_wei: string;
                                         }[];
+                                    }[];
+                                    call_adapters?: {
+                                        tokenTransfers?: {
+                                            token: {
+                                                address: string;
+                                                codeHash: string;
+                                                implementation?: {
+                                                    address: string;
+                                                    codeHash: string;
+                                                };
+                                            };
+                                            recipients: string[];
+                                            maximumAmount: string;
+                                        }[];
+                                        swaps?: {
+                                            id: string;
+                                            router: {
+                                                address: string;
+                                                codeHash: string;
+                                                implementation?: {
+                                                    address: string;
+                                                    codeHash: string;
+                                                };
+                                            };
+                                            tokenIn: {
+                                                address: string;
+                                                codeHash: string;
+                                                implementation?: {
+                                                    address: string;
+                                                    codeHash: string;
+                                                };
+                                            };
+                                            tokenOut: {
+                                                address: string;
+                                                codeHash: string;
+                                                implementation?: {
+                                                    address: string;
+                                                    codeHash: string;
+                                                };
+                                            };
+                                            fee: number;
+                                            maximumInput: string;
+                                        }[];
+                                        vaults?: {
+                                            id: string;
+                                            router: {
+                                                address: string;
+                                                codeHash: string;
+                                                implementation?: {
+                                                    address: string;
+                                                    codeHash: string;
+                                                };
+                                            };
+                                            vault: {
+                                                address: string;
+                                                codeHash: string;
+                                                implementation?: {
+                                                    address: string;
+                                                    codeHash: string;
+                                                };
+                                            };
+                                            asset: {
+                                                address: string;
+                                                codeHash: string;
+                                                implementation?: {
+                                                    address: string;
+                                                    codeHash: string;
+                                                };
+                                            };
+                                            maximumAssets: string;
+                                        }[];
+                                    };
+                                    native_transfers?: {
+                                        address: string;
+                                        code_hash: string;
+                                        maximum_value_wei: string;
                                     }[];
                                     maximum_calls: number;
                                     maximum_native_value_wei: string;
@@ -6132,6 +6507,82 @@ export interface operations {
                                             signature: string;
                                             maximum_value_wei: string;
                                         }[];
+                                    }[];
+                                    call_adapters?: {
+                                        tokenTransfers?: {
+                                            token: {
+                                                address: string;
+                                                codeHash: string;
+                                                implementation?: {
+                                                    address: string;
+                                                    codeHash: string;
+                                                };
+                                            };
+                                            recipients: string[];
+                                            maximumAmount: string;
+                                        }[];
+                                        swaps?: {
+                                            id: string;
+                                            router: {
+                                                address: string;
+                                                codeHash: string;
+                                                implementation?: {
+                                                    address: string;
+                                                    codeHash: string;
+                                                };
+                                            };
+                                            tokenIn: {
+                                                address: string;
+                                                codeHash: string;
+                                                implementation?: {
+                                                    address: string;
+                                                    codeHash: string;
+                                                };
+                                            };
+                                            tokenOut: {
+                                                address: string;
+                                                codeHash: string;
+                                                implementation?: {
+                                                    address: string;
+                                                    codeHash: string;
+                                                };
+                                            };
+                                            fee: number;
+                                            maximumInput: string;
+                                        }[];
+                                        vaults?: {
+                                            id: string;
+                                            router: {
+                                                address: string;
+                                                codeHash: string;
+                                                implementation?: {
+                                                    address: string;
+                                                    codeHash: string;
+                                                };
+                                            };
+                                            vault: {
+                                                address: string;
+                                                codeHash: string;
+                                                implementation?: {
+                                                    address: string;
+                                                    codeHash: string;
+                                                };
+                                            };
+                                            asset: {
+                                                address: string;
+                                                codeHash: string;
+                                                implementation?: {
+                                                    address: string;
+                                                    codeHash: string;
+                                                };
+                                            };
+                                            maximumAssets: string;
+                                        }[];
+                                    };
+                                    native_transfers?: {
+                                        address: string;
+                                        code_hash: string;
+                                        maximum_value_wei: string;
                                     }[];
                                     maximum_calls: number;
                                     maximum_native_value_wei: string;
@@ -6796,6 +7247,82 @@ export interface operations {
                                         maximum_value_wei: string;
                                     }[];
                                 }[];
+                                call_adapters?: {
+                                    tokenTransfers?: {
+                                        token: {
+                                            address: string;
+                                            codeHash: string;
+                                            implementation?: {
+                                                address: string;
+                                                codeHash: string;
+                                            };
+                                        };
+                                        recipients: string[];
+                                        maximumAmount: string;
+                                    }[];
+                                    swaps?: {
+                                        id: string;
+                                        router: {
+                                            address: string;
+                                            codeHash: string;
+                                            implementation?: {
+                                                address: string;
+                                                codeHash: string;
+                                            };
+                                        };
+                                        tokenIn: {
+                                            address: string;
+                                            codeHash: string;
+                                            implementation?: {
+                                                address: string;
+                                                codeHash: string;
+                                            };
+                                        };
+                                        tokenOut: {
+                                            address: string;
+                                            codeHash: string;
+                                            implementation?: {
+                                                address: string;
+                                                codeHash: string;
+                                            };
+                                        };
+                                        fee: number;
+                                        maximumInput: string;
+                                    }[];
+                                    vaults?: {
+                                        id: string;
+                                        router: {
+                                            address: string;
+                                            codeHash: string;
+                                            implementation?: {
+                                                address: string;
+                                                codeHash: string;
+                                            };
+                                        };
+                                        vault: {
+                                            address: string;
+                                            codeHash: string;
+                                            implementation?: {
+                                                address: string;
+                                                codeHash: string;
+                                            };
+                                        };
+                                        asset: {
+                                            address: string;
+                                            codeHash: string;
+                                            implementation?: {
+                                                address: string;
+                                                codeHash: string;
+                                            };
+                                        };
+                                        maximumAssets: string;
+                                    }[];
+                                };
+                                native_transfers?: {
+                                    address: string;
+                                    code_hash: string;
+                                    maximum_value_wei: string;
+                                }[];
                                 maximum_calls: number;
                                 maximum_native_value_wei: string;
                                 max_validity_seconds: number;
@@ -7030,6 +7557,82 @@ export interface operations {
                                         signature: string;
                                         maximum_value_wei: string;
                                     }[];
+                                }[];
+                                call_adapters?: {
+                                    tokenTransfers?: {
+                                        token: {
+                                            address: string;
+                                            codeHash: string;
+                                            implementation?: {
+                                                address: string;
+                                                codeHash: string;
+                                            };
+                                        };
+                                        recipients: string[];
+                                        maximumAmount: string;
+                                    }[];
+                                    swaps?: {
+                                        id: string;
+                                        router: {
+                                            address: string;
+                                            codeHash: string;
+                                            implementation?: {
+                                                address: string;
+                                                codeHash: string;
+                                            };
+                                        };
+                                        tokenIn: {
+                                            address: string;
+                                            codeHash: string;
+                                            implementation?: {
+                                                address: string;
+                                                codeHash: string;
+                                            };
+                                        };
+                                        tokenOut: {
+                                            address: string;
+                                            codeHash: string;
+                                            implementation?: {
+                                                address: string;
+                                                codeHash: string;
+                                            };
+                                        };
+                                        fee: number;
+                                        maximumInput: string;
+                                    }[];
+                                    vaults?: {
+                                        id: string;
+                                        router: {
+                                            address: string;
+                                            codeHash: string;
+                                            implementation?: {
+                                                address: string;
+                                                codeHash: string;
+                                            };
+                                        };
+                                        vault: {
+                                            address: string;
+                                            codeHash: string;
+                                            implementation?: {
+                                                address: string;
+                                                codeHash: string;
+                                            };
+                                        };
+                                        asset: {
+                                            address: string;
+                                            codeHash: string;
+                                            implementation?: {
+                                                address: string;
+                                                codeHash: string;
+                                            };
+                                        };
+                                        maximumAssets: string;
+                                    }[];
+                                };
+                                native_transfers?: {
+                                    address: string;
+                                    code_hash: string;
+                                    maximum_value_wei: string;
                                 }[];
                                 maximum_calls: number;
                                 maximum_native_value_wei: string;
@@ -7266,6 +7869,82 @@ export interface operations {
                                         maximum_value_wei: string;
                                     }[];
                                 }[];
+                                call_adapters?: {
+                                    tokenTransfers?: {
+                                        token: {
+                                            address: string;
+                                            codeHash: string;
+                                            implementation?: {
+                                                address: string;
+                                                codeHash: string;
+                                            };
+                                        };
+                                        recipients: string[];
+                                        maximumAmount: string;
+                                    }[];
+                                    swaps?: {
+                                        id: string;
+                                        router: {
+                                            address: string;
+                                            codeHash: string;
+                                            implementation?: {
+                                                address: string;
+                                                codeHash: string;
+                                            };
+                                        };
+                                        tokenIn: {
+                                            address: string;
+                                            codeHash: string;
+                                            implementation?: {
+                                                address: string;
+                                                codeHash: string;
+                                            };
+                                        };
+                                        tokenOut: {
+                                            address: string;
+                                            codeHash: string;
+                                            implementation?: {
+                                                address: string;
+                                                codeHash: string;
+                                            };
+                                        };
+                                        fee: number;
+                                        maximumInput: string;
+                                    }[];
+                                    vaults?: {
+                                        id: string;
+                                        router: {
+                                            address: string;
+                                            codeHash: string;
+                                            implementation?: {
+                                                address: string;
+                                                codeHash: string;
+                                            };
+                                        };
+                                        vault: {
+                                            address: string;
+                                            codeHash: string;
+                                            implementation?: {
+                                                address: string;
+                                                codeHash: string;
+                                            };
+                                        };
+                                        asset: {
+                                            address: string;
+                                            codeHash: string;
+                                            implementation?: {
+                                                address: string;
+                                                codeHash: string;
+                                            };
+                                        };
+                                        maximumAssets: string;
+                                    }[];
+                                };
+                                native_transfers?: {
+                                    address: string;
+                                    code_hash: string;
+                                    maximum_value_wei: string;
+                                }[];
                                 maximum_calls: number;
                                 maximum_native_value_wei: string;
                                 max_validity_seconds: number;
@@ -7488,6 +8167,82 @@ export interface operations {
                                 maximum_value_wei: string;
                             }[];
                         }[];
+                        call_adapters?: {
+                            tokenTransfers?: {
+                                token: {
+                                    address: string;
+                                    codeHash: string;
+                                    implementation?: {
+                                        address: string;
+                                        codeHash: string;
+                                    };
+                                };
+                                recipients: string[];
+                                maximumAmount: string;
+                            }[];
+                            swaps?: {
+                                id: string;
+                                router: {
+                                    address: string;
+                                    codeHash: string;
+                                    implementation?: {
+                                        address: string;
+                                        codeHash: string;
+                                    };
+                                };
+                                tokenIn: {
+                                    address: string;
+                                    codeHash: string;
+                                    implementation?: {
+                                        address: string;
+                                        codeHash: string;
+                                    };
+                                };
+                                tokenOut: {
+                                    address: string;
+                                    codeHash: string;
+                                    implementation?: {
+                                        address: string;
+                                        codeHash: string;
+                                    };
+                                };
+                                fee: number;
+                                maximumInput: string;
+                            }[];
+                            vaults?: {
+                                id: string;
+                                router: {
+                                    address: string;
+                                    codeHash: string;
+                                    implementation?: {
+                                        address: string;
+                                        codeHash: string;
+                                    };
+                                };
+                                vault: {
+                                    address: string;
+                                    codeHash: string;
+                                    implementation?: {
+                                        address: string;
+                                        codeHash: string;
+                                    };
+                                };
+                                asset: {
+                                    address: string;
+                                    codeHash: string;
+                                    implementation?: {
+                                        address: string;
+                                        codeHash: string;
+                                    };
+                                };
+                                maximumAssets: string;
+                            }[];
+                        };
+                        native_transfers?: {
+                            address: string;
+                            code_hash: string;
+                            maximum_value_wei: string;
+                        }[];
                         maximum_calls: number;
                         maximum_native_value_wei: string;
                         max_validity_seconds: number;
@@ -7529,6 +8284,82 @@ export interface operations {
                                     signature: string;
                                     maximum_value_wei: string;
                                 }[];
+                            }[];
+                            call_adapters?: {
+                                tokenTransfers?: {
+                                    token: {
+                                        address: string;
+                                        codeHash: string;
+                                        implementation?: {
+                                            address: string;
+                                            codeHash: string;
+                                        };
+                                    };
+                                    recipients: string[];
+                                    maximumAmount: string;
+                                }[];
+                                swaps?: {
+                                    id: string;
+                                    router: {
+                                        address: string;
+                                        codeHash: string;
+                                        implementation?: {
+                                            address: string;
+                                            codeHash: string;
+                                        };
+                                    };
+                                    tokenIn: {
+                                        address: string;
+                                        codeHash: string;
+                                        implementation?: {
+                                            address: string;
+                                            codeHash: string;
+                                        };
+                                    };
+                                    tokenOut: {
+                                        address: string;
+                                        codeHash: string;
+                                        implementation?: {
+                                            address: string;
+                                            codeHash: string;
+                                        };
+                                    };
+                                    fee: number;
+                                    maximumInput: string;
+                                }[];
+                                vaults?: {
+                                    id: string;
+                                    router: {
+                                        address: string;
+                                        codeHash: string;
+                                        implementation?: {
+                                            address: string;
+                                            codeHash: string;
+                                        };
+                                    };
+                                    vault: {
+                                        address: string;
+                                        codeHash: string;
+                                        implementation?: {
+                                            address: string;
+                                            codeHash: string;
+                                        };
+                                    };
+                                    asset: {
+                                        address: string;
+                                        codeHash: string;
+                                        implementation?: {
+                                            address: string;
+                                            codeHash: string;
+                                        };
+                                    };
+                                    maximumAssets: string;
+                                }[];
+                            };
+                            native_transfers?: {
+                                address: string;
+                                code_hash: string;
+                                maximum_value_wei: string;
                             }[];
                             maximum_calls: number;
                             maximum_native_value_wei: string;
@@ -7755,6 +8586,82 @@ export interface operations {
                                     signature: string;
                                     maximum_value_wei: string;
                                 }[];
+                            }[];
+                            call_adapters?: {
+                                tokenTransfers?: {
+                                    token: {
+                                        address: string;
+                                        codeHash: string;
+                                        implementation?: {
+                                            address: string;
+                                            codeHash: string;
+                                        };
+                                    };
+                                    recipients: string[];
+                                    maximumAmount: string;
+                                }[];
+                                swaps?: {
+                                    id: string;
+                                    router: {
+                                        address: string;
+                                        codeHash: string;
+                                        implementation?: {
+                                            address: string;
+                                            codeHash: string;
+                                        };
+                                    };
+                                    tokenIn: {
+                                        address: string;
+                                        codeHash: string;
+                                        implementation?: {
+                                            address: string;
+                                            codeHash: string;
+                                        };
+                                    };
+                                    tokenOut: {
+                                        address: string;
+                                        codeHash: string;
+                                        implementation?: {
+                                            address: string;
+                                            codeHash: string;
+                                        };
+                                    };
+                                    fee: number;
+                                    maximumInput: string;
+                                }[];
+                                vaults?: {
+                                    id: string;
+                                    router: {
+                                        address: string;
+                                        codeHash: string;
+                                        implementation?: {
+                                            address: string;
+                                            codeHash: string;
+                                        };
+                                    };
+                                    vault: {
+                                        address: string;
+                                        codeHash: string;
+                                        implementation?: {
+                                            address: string;
+                                            codeHash: string;
+                                        };
+                                    };
+                                    asset: {
+                                        address: string;
+                                        codeHash: string;
+                                        implementation?: {
+                                            address: string;
+                                            codeHash: string;
+                                        };
+                                    };
+                                    maximumAssets: string;
+                                }[];
+                            };
+                            native_transfers?: {
+                                address: string;
+                                code_hash: string;
+                                maximum_value_wei: string;
                             }[];
                             maximum_calls: number;
                             maximum_native_value_wei: string;
@@ -7990,6 +8897,82 @@ export interface operations {
                                     maximum_value_wei: string;
                                 }[];
                             }[];
+                            call_adapters?: {
+                                tokenTransfers?: {
+                                    token: {
+                                        address: string;
+                                        codeHash: string;
+                                        implementation?: {
+                                            address: string;
+                                            codeHash: string;
+                                        };
+                                    };
+                                    recipients: string[];
+                                    maximumAmount: string;
+                                }[];
+                                swaps?: {
+                                    id: string;
+                                    router: {
+                                        address: string;
+                                        codeHash: string;
+                                        implementation?: {
+                                            address: string;
+                                            codeHash: string;
+                                        };
+                                    };
+                                    tokenIn: {
+                                        address: string;
+                                        codeHash: string;
+                                        implementation?: {
+                                            address: string;
+                                            codeHash: string;
+                                        };
+                                    };
+                                    tokenOut: {
+                                        address: string;
+                                        codeHash: string;
+                                        implementation?: {
+                                            address: string;
+                                            codeHash: string;
+                                        };
+                                    };
+                                    fee: number;
+                                    maximumInput: string;
+                                }[];
+                                vaults?: {
+                                    id: string;
+                                    router: {
+                                        address: string;
+                                        codeHash: string;
+                                        implementation?: {
+                                            address: string;
+                                            codeHash: string;
+                                        };
+                                    };
+                                    vault: {
+                                        address: string;
+                                        codeHash: string;
+                                        implementation?: {
+                                            address: string;
+                                            codeHash: string;
+                                        };
+                                    };
+                                    asset: {
+                                        address: string;
+                                        codeHash: string;
+                                        implementation?: {
+                                            address: string;
+                                            codeHash: string;
+                                        };
+                                    };
+                                    maximumAssets: string;
+                                }[];
+                            };
+                            native_transfers?: {
+                                address: string;
+                                code_hash: string;
+                                maximum_value_wei: string;
+                            }[];
                             maximum_calls: number;
                             maximum_native_value_wei: string;
                             max_validity_seconds: number;
@@ -8211,6 +9194,82 @@ export interface operations {
                                 maximum_value_wei: string;
                             }[];
                         }[];
+                        call_adapters?: {
+                            tokenTransfers?: {
+                                token: {
+                                    address: string;
+                                    codeHash: string;
+                                    implementation?: {
+                                        address: string;
+                                        codeHash: string;
+                                    };
+                                };
+                                recipients: string[];
+                                maximumAmount: string;
+                            }[];
+                            swaps?: {
+                                id: string;
+                                router: {
+                                    address: string;
+                                    codeHash: string;
+                                    implementation?: {
+                                        address: string;
+                                        codeHash: string;
+                                    };
+                                };
+                                tokenIn: {
+                                    address: string;
+                                    codeHash: string;
+                                    implementation?: {
+                                        address: string;
+                                        codeHash: string;
+                                    };
+                                };
+                                tokenOut: {
+                                    address: string;
+                                    codeHash: string;
+                                    implementation?: {
+                                        address: string;
+                                        codeHash: string;
+                                    };
+                                };
+                                fee: number;
+                                maximumInput: string;
+                            }[];
+                            vaults?: {
+                                id: string;
+                                router: {
+                                    address: string;
+                                    codeHash: string;
+                                    implementation?: {
+                                        address: string;
+                                        codeHash: string;
+                                    };
+                                };
+                                vault: {
+                                    address: string;
+                                    codeHash: string;
+                                    implementation?: {
+                                        address: string;
+                                        codeHash: string;
+                                    };
+                                };
+                                asset: {
+                                    address: string;
+                                    codeHash: string;
+                                    implementation?: {
+                                        address: string;
+                                        codeHash: string;
+                                    };
+                                };
+                                maximumAssets: string;
+                            }[];
+                        };
+                        native_transfers?: {
+                            address: string;
+                            code_hash: string;
+                            maximum_value_wei: string;
+                        }[];
                         maximum_calls: number;
                         maximum_native_value_wei: string;
                         max_validity_seconds: number;
@@ -8252,6 +9311,82 @@ export interface operations {
                                     signature: string;
                                     maximum_value_wei: string;
                                 }[];
+                            }[];
+                            call_adapters?: {
+                                tokenTransfers?: {
+                                    token: {
+                                        address: string;
+                                        codeHash: string;
+                                        implementation?: {
+                                            address: string;
+                                            codeHash: string;
+                                        };
+                                    };
+                                    recipients: string[];
+                                    maximumAmount: string;
+                                }[];
+                                swaps?: {
+                                    id: string;
+                                    router: {
+                                        address: string;
+                                        codeHash: string;
+                                        implementation?: {
+                                            address: string;
+                                            codeHash: string;
+                                        };
+                                    };
+                                    tokenIn: {
+                                        address: string;
+                                        codeHash: string;
+                                        implementation?: {
+                                            address: string;
+                                            codeHash: string;
+                                        };
+                                    };
+                                    tokenOut: {
+                                        address: string;
+                                        codeHash: string;
+                                        implementation?: {
+                                            address: string;
+                                            codeHash: string;
+                                        };
+                                    };
+                                    fee: number;
+                                    maximumInput: string;
+                                }[];
+                                vaults?: {
+                                    id: string;
+                                    router: {
+                                        address: string;
+                                        codeHash: string;
+                                        implementation?: {
+                                            address: string;
+                                            codeHash: string;
+                                        };
+                                    };
+                                    vault: {
+                                        address: string;
+                                        codeHash: string;
+                                        implementation?: {
+                                            address: string;
+                                            codeHash: string;
+                                        };
+                                    };
+                                    asset: {
+                                        address: string;
+                                        codeHash: string;
+                                        implementation?: {
+                                            address: string;
+                                            codeHash: string;
+                                        };
+                                    };
+                                    maximumAssets: string;
+                                }[];
+                            };
+                            native_transfers?: {
+                                address: string;
+                                code_hash: string;
+                                maximum_value_wei: string;
                             }[];
                             maximum_calls: number;
                             maximum_native_value_wei: string;

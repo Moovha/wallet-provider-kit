@@ -55,6 +55,7 @@ export default defineConfig({
         text: 'Get started',
         items: [
           { text: 'Open the setup wizard', link: '/docs/' },
+          { text: 'Bundled setup defaults', link: '/docs/bundled-setup' },
           { text: '1. Provider', link: '/docs/setup-wizard#_1-provider' },
           { text: '2. Backend', link: '/docs/setup-wizard#_2-backend' },
           { text: '3. Services', link: '/docs/setup-wizard#_3-services' },
@@ -95,6 +96,7 @@ export default defineConfig({
         items: [
           { text: 'What the kit does', link: '/' },
           { text: 'Open the setup wizard', link: '/docs/' },
+          { text: 'Bundled setup defaults', link: '/docs/bundled-setup' },
           { text: 'Roles and terms', link: '/docs/concepts' },
         ],
       },
@@ -193,7 +195,7 @@ export default defineConfig({
                 link: '/docs/execution-service',
               },
               {
-                text: 'Approved contract calls',
+                text: 'Call policies and adapters',
                 link: '/docs/approved-contract-calls',
               },
               {

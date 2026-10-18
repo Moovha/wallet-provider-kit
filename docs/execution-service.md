@@ -9,7 +9,7 @@ authority, signing and independent chain verification; applications request
 execution by stored action ID.
 
 Select `approved-evm-executor-v1` revision 1 for [approved general EVM operations](approved-contract-calls.md), or `erc3009-executor-v1` revision 1 to use this boundary. The direct
-`erc3009-relayer-v1` profile remains available for existing deployments. The transfer profiles support exact ERC-3009 token transfers with EOA signatures on Base Sepolia. The general profile also supports explicitly bound Safe 1.4.1 contract calls, swaps and vault deposits on that chain. The service is experimental: offline conformance
+`erc3009-relayer-v1` profile remains available for existing deployments. The transfer profiles support exact ERC-3009 token transfers with EOA signatures on Base Sepolia. The general profile supports explicitly bound Safe 1.4.1 generic calls and native transfers, with separately selected optional operation adapters on that chain. The service is experimental: offline conformance
 does not establish live vendor acceptance, production custody suitability or a
 completed enterprise security assessment.
 

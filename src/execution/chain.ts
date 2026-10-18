@@ -1,8 +1,11 @@
+import { verifyAdapterEffects } from './adapter-effects.js';
+import { adapterInput } from './operation-adapters.js';
 import { serviceHash } from '../executor/auth.js';
 import type { WalletCallsReceipt } from '../wallet-calls/types.js';
 import type { NonceSnapshot } from './recovery.js';
 import {
   implementationSlot,
+  allowsEmptyRecipientCode,
   safeInterface,
   tokenInterface,
   vaultInterface,
@@ -410,7 +413,8 @@ export class QuorumExecutionObserver implements ExecutionObserver {
       const code = await reader.call('eth_getCode', [contract.address, tag]);
       if (
         typeof code !== 'string' ||
-        code === '0x' ||
+        (code === '0x' &&
+          !allowsEmptyRecipientCode(intent, contract.address)) ||
         keccak256(code) !== contract.codeHash
       )
         unavailable();
@@ -432,7 +436,7 @@ export class QuorumExecutionObserver implements ExecutionObserver {
           unavailable();
       }
     }
-    if (intent.input.kind === 'vault-deposit') {
+    if (adapterInput(intent).kind === 'vault-deposit') {
       const vault = intent.effects[1].token,
         asset = intent.effects[0].token;
       const result = await reader.call('eth_call', [
@@ -652,108 +656,23 @@ export class QuorumExecutionObserver implements ExecutionObserver {
           callFailed = true;
         else return null;
       }
-      if (intent.input.kind !== 'contract-call') {
-        const token = intent.effects[0].token,
-          spender = intent.calls[2].to;
-        const result = await reader.call('eth_call', [
-          {
-            to: token,
-            data: tokenInterface.encodeFunctionData('allowance', [
-              intent.account.address,
-              spender,
-            ]),
-          },
+      if (
+        !callFailed &&
+        !(await verifyAdapterEffects(
+          reader,
+          intent,
+          receipt.logs.map((entry) => {
+            const l = checked(entry);
+            return {
+              address: address(l.address),
+              topics: l.topics as string[],
+              data: String(l.data),
+            };
+          }),
           tag,
-        ]);
-        if (
-          tokenInterface.decodeFunctionResult(
-            'allowance',
-            String(result),
-          )[0] !== 0n
-        )
-          return null;
-        if (intent.input.kind === 'vault-deposit') {
-          const approval = await reader.call('eth_call', [
-            {
-              to: token,
-              data: tokenInterface.encodeFunctionData('allowance', [
-                spender,
-                intent.effects[1].token,
-              ]),
-            },
-            tag,
-          ]);
-          if (
-            tokenInterface.decodeFunctionResult(
-              'allowance',
-              String(approval),
-            )[0] !== 0n
-          )
-            return null;
-        }
-      }
-      for (const effect of intent.effects) {
-        let net = 0n;
-        for (const entry of receipt.logs) {
-          const log = checked(entry);
-          if (address(log.address) !== effect.token.toLowerCase()) continue;
-          try {
-            const event = tokenInterface.parseLog({
-              topics: log.topics as string[],
-              data: String(log.data),
-            });
-            if (event?.name !== 'Transfer') continue;
-            const from = String(event.args.from).toLowerCase(),
-              to = String(event.args.to).toLowerCase(),
-              value = BigInt(event.args.value);
-            if (effect.from === '*') {
-              if (to === effect.to.toLowerCase()) net += value;
-              if (from === effect.to.toLowerCase()) net -= value;
-            } else if (effect.to === '*') {
-              if (from === effect.from.toLowerCase()) net += value;
-              if (to === effect.from.toLowerCase()) net -= value;
-            } else if (
-              from === effect.from.toLowerCase() &&
-              to === effect.to.toLowerCase()
-            )
-              net += value;
-          } catch {
-            /* Non-Transfer events are not asset evidence. */
-          }
-        }
-        if (
-          net < BigInt(effect.minimum) ||
-          (effect.maximum && net > BigInt(effect.maximum))
-        )
-          return null;
-      }
-      if (intent.input.kind === 'vault-deposit') {
-        const deposits = receipt.logs.filter((entry) => {
-          const log = checked(entry);
-          if (address(log.address) !== intent.effects[1].token.toLowerCase())
-            return false;
-          try {
-            const event = vaultInterface.parseLog({
-              topics: log.topics as string[],
-              data: String(log.data),
-            });
-            return (
-              event?.name === 'Deposit' &&
-              String(event.args.owner).toLowerCase() ===
-                intent.account.address.toLowerCase() &&
-              event.args.assets.toString() ===
-                (intent.input as { assets: string }).assets &&
-              event.args.shares >=
-                BigInt(
-                  (intent.input as { minimum_shares: string }).minimum_shares,
-                )
-            );
-          } catch {
-            return false;
-          }
-        });
-        if (deposits.length !== 1) return null;
-      }
+        ))
+      )
+        return null;
     }
     const chainStatus =
         heads.finalized >= blockNumber

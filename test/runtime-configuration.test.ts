@@ -593,6 +593,8 @@ describe('operator workspace and delegated contract registration', () => {
     'maximum_calls',
     'maximum_native_value_wei',
     'max_validity_seconds',
+    'native_transfers',
+    'call_adapters',
     'enabled',
   ] as const)(
     'keeps proposals changing %s pending even in automatic mode',
@@ -610,6 +612,16 @@ describe('operator workspace and delegated contract registration', () => {
       });
       const value = document();
       if (field === 'claim_requirements') value.claim_requirements = [];
+      else if (field === 'native_transfers')
+        value.native_transfers = [
+          {
+            address: '0x2222222222222222222222222222222222222222',
+            code_hash: '0x' + '2'.repeat(64),
+            maximum_value_wei: '1',
+          },
+        ];
+      else if (field === 'call_adapters')
+        value.call_adapters = { tokenTransfers: [] };
       else if (field === 'enabled') value.enabled = false;
       else if (field === 'maximum_native_value_wei')
         value.maximum_native_value_wei = '11';

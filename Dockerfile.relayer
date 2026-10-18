@@ -1,0 +1,3 @@
+FROM openzeppelin/openzeppelin-relayer:1.8.0@sha256:a0d8751b065bb269977a91292df8759bc48ffaaecd0a162bda1f96c32c899e77
+COPY scripts/bundled-relayer-launcher.mjs /app/wpk-launcher.mjs
+ENTRYPOINT ["node", "/app/wpk-launcher.mjs"]

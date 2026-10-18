@@ -1,3 +1,4 @@
+import { adapterInput } from '../execution/operation-adapters.js';
 import {
   currentRuntimePolicy,
   runtimeCallPolicy,
@@ -566,7 +567,7 @@ export class SupportedActions {
         1000,
     ).toISOString();
   }
-  /** Admit exact contract calls only under the separately consented contract policy. */
+  /** Admit exact generic calls under the separately consented call policy. */
   async requestCalls(
     inputContext: AuthorityContext,
     input: ApprovedCallInput,
@@ -635,8 +636,9 @@ export class SupportedActions {
         expiresAt,
       );
     if (
-      intent.input.kind === 'swap' &&
-      Number(intent.input.deadline) * 1000 <= Date.now()
+      adapterInput(intent).kind === 'swap' &&
+      Number((adapterInput(intent) as { deadline: string }).deadline) * 1000 <=
+        Date.now()
     )
       deny();
     const record = await this.onboarding.store.transaction((state) => {

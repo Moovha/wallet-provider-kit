@@ -1,3 +1,5 @@
+import { allowsEmptyRecipientCode } from '../execution/approved-calls.js';
+import { vaultInterface } from '../execution/operation-interfaces.js';
 import { Interface, keccak256, toQuantity, zeroPadValue } from 'ethers';
 import { RpcReader } from '../execution/chain.js';
 import {
@@ -61,8 +63,9 @@ export class Safe4337Verifier {
   async verify(
     intent: Pick<
       ApprovedCallIntent,
-      'account' | 'multiSend' | 'calls' | 'contracts'
-    >,
+      'account' | 'multiSend' | 'calls' | 'contracts' | 'nativeRecipients'
+    > &
+      Partial<Pick<ApprovedCallIntent, 'adapterInput' | 'effects'>>,
     owner: string,
     nonce?: string,
   ) {
@@ -114,7 +117,7 @@ export class Safe4337Verifier {
             const code = await r.call('eth_getCode', [p.address, tag]);
             if (
               typeof code !== 'string' ||
-              code === '0x' ||
+              (code === '0x' && !allowsEmptyRecipientCode(intent, p.address)) ||
               keccak256(code) !== p.codeHash
             )
               throw new Error();
@@ -146,6 +149,23 @@ export class Safe4337Verifier {
               ...intent.contracts,
             ].map(pin),
           );
+          if (intent.adapterInput?.kind === 'vault-deposit') {
+            if (!intent.effects || intent.effects.length !== 2)
+              throw new Error();
+            const result = await r.call('eth_call', [
+              {
+                to: intent.effects[1].token,
+                data: vaultInterface.encodeFunctionData('asset'),
+              },
+              tag,
+            ]);
+            if (
+              String(
+                vaultInterface.decodeFunctionResult('asset', String(result))[0],
+              ).toLowerCase() !== intent.effects[0].token.toLowerCase()
+            )
+              throw new Error();
+          }
           const call = async (name: string, args: unknown[] = []) =>
             safeInterface.decodeFunctionResult(
               name,

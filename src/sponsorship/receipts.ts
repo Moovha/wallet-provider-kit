@@ -1,3 +1,4 @@
+import { verifyAdapterEffects } from '../execution/adapter-effects.js';
 import {
   AbiCoder,
   Interface,
@@ -8,6 +9,7 @@ import {
 import { RpcReader } from '../execution/chain.js';
 import {
   implementationSlot,
+  allowsEmptyRecipientCode,
   type PinnedContract,
 } from '../execution/approved-calls.js';
 import { WalletProviderError } from '../domain/signing.js';
@@ -89,11 +91,16 @@ export class UserOperationReceiptObserver {
       .reduce((min, h) => (min < h.latest ? min : h.latest), heads[0].latest)
       .toString();
   }
-  private async pin(reader: RpcReader, pin: PinnedContract, tag: string) {
+  private async pin(
+    reader: RpcReader,
+    pin: PinnedContract,
+    tag: string,
+    allowEmpty = false,
+  ) {
     const code = await reader.call('eth_getCode', [pin.address, tag]);
     if (
       typeof code !== 'string' ||
-      code === '0x' ||
+      (code === '0x' && !allowEmpty) ||
       keccak256(code) !== pin.codeHash
     )
       unavailable();
@@ -174,6 +181,13 @@ export class UserOperationReceiptObserver {
       }
     } else unavailable();
     if (!operations.length || operations.length > 128) unavailable();
+    for (const contract of plan.intent.contracts)
+      await this.pin(
+        reader,
+        contract,
+        tag,
+        allowsEmptyRecipientCode(plan.intent, contract.address),
+      );
     const coder = AbiCoder.defaultAbiCoder(),
       expected = coder.encode(
         [packedOperationTuple],
@@ -278,6 +292,11 @@ export class UserOperationReceiptObserver {
       .slice(boundary + 1, target)
       .filter((l) => !excluded.has(l.address))
       .map(({ index: _, ...log }) => log);
+    if (
+      event.args.success &&
+      !(await verifyAdapterEffects(reader, plan.intent, isolated, tag))
+    )
+      unavailable();
     const after = object(
       await reader.call('eth_getBlockByNumber', [tag, false]),
     );

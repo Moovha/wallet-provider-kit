@@ -28,6 +28,12 @@ export interface RuntimeConfigurationOptions {
 }
 export interface RuntimePolicy {
   version: '1';
+  native_transfers?: {
+    address: string;
+    code_hash: string;
+    maximum_value_wei: string;
+  }[];
+  call_adapters?: import('../execution/operation-adapters.js').OperationAdapters;
   enabled: boolean;
   chain_id: 'eip155:84532';
   contracts: {
@@ -148,6 +154,54 @@ export function normalizeRuntimePolicy(
     if (BigInt(value) >= 2n ** 256n) invalid();
   };
   uint(policy.maximum_native_value_wei);
+  const recipients = new Set<string>();
+  for (const recipient of policy.native_transfers ?? []) {
+    try {
+      recipient.address = getAddress(recipient.address);
+    } catch {
+      invalid();
+    }
+    if (
+      recipient.address === ZeroAddress ||
+      recipients.has(recipient.address) ||
+      BigInt(recipient.maximum_value_wei) === 0n ||
+      BigInt(recipient.maximum_value_wei) >
+        BigInt(policy.maximum_native_value_wei)
+    )
+      invalid();
+    recipients.add(recipient.address);
+  }
+  policy.native_transfers?.sort((a, b) => lexical(a.address, b.address));
+  const normalizePin = (pin: {
+    address: string;
+    codeHash: string;
+    implementation?: { address: string; codeHash: string };
+  }) => {
+    try {
+      pin.address = getAddress(pin.address);
+      if (pin.implementation)
+        pin.implementation.address = getAddress(pin.implementation.address);
+    } catch {
+      invalid();
+    }
+  };
+  for (const transfer of policy.call_adapters?.tokenTransfers ?? []) {
+    normalizePin(transfer.token);
+    try {
+      transfer.recipients = transfer.recipients.map(getAddress).sort();
+    } catch {
+      invalid();
+    }
+    uint(transfer.maximumAmount);
+  }
+  for (const swap of policy.call_adapters?.swaps ?? []) {
+    [swap.router, swap.tokenIn, swap.tokenOut].forEach(normalizePin);
+    uint(swap.maximumInput);
+  }
+  for (const vault of policy.call_adapters?.vaults ?? []) {
+    [vault.router, vault.vault, vault.asset].forEach(normalizePin);
+    uint(vault.maximumAssets);
+  }
   const contracts = new Set<string>();
   for (const contract of policy.contracts) {
     try {

@@ -32,7 +32,7 @@ export const settings = {
   executionEnabled: setting(
     'Coordinate stored approved actions and independently verify their execution.',
     'The provider signs and dispatches stored approved transfers or explicitly configured Safe calls under current authority. An application-funded sponsor covers gas; observation does not confer spending authority.',
-    'Configure transfer or contract-call policy first. Use the designated execution service for approved Safe operations or the direct Relayer compatibility profile for transfers. Configure application sponsors and two independent RPC sources. Keep activation off until execution, chain checks and lost-response recovery have deployment-specific acceptance evidence.',
+    'Keep the bundled local engine selected in Services for automatic private Relayer and Valkey startup. Configure transfer or contract-call policy, gas budgets and two independent RPC sources. Setup generates encrypted sponsor keys and bindings. Existing execution services remain optional. Keep activation off until execution, chain checks and lost-response recovery have deployment-specific acceptance evidence.',
     'execution.html',
   ),
   safeQueue: setting(
@@ -44,7 +44,7 @@ export const settings = {
   sponsorPool: setting(
     'Durable round-robin payer selection with an unfinished-execution limit per address.',
     'Distinct funded addresses can serve the same application. Retrying an execution retains its selected payer. Unknown attempts hold capacity, while the application lifetime gas budget remains shared.',
-    'Enable pools on both wallet and executor configurations, then register distinct sponsor account IDs, addresses and bindings for each application. Set capacity from accepted provider tests. Full pools leave unsigned queue heads waiting. Enable recovery quarantine to exclude affected payers from new admission. Nonce repair remains a separately reviewed provider operation.',
+    'Enable pools and add gas sponsors for the application. Bundled setup creates distinct encrypted keys and managed bindings for those entries. Existing designated execution services need matching independent pool limits. Set capacity from accepted provider tests. Full pools leave unsigned queue heads waiting. Enable recovery quarantine to exclude affected payers from new admission. Nonce repair remains a separately reviewed provider operation.',
     'safe-queue-and-sponsor-pools.html',
   ),
   executionRpc: setting(
@@ -60,15 +60,15 @@ export const settings = {
     'execution.html#configure-and-accept-execution',
   ),
   executionSponsor: setting(
-    'A preconfigured application-funded sponsor account and explicit funding agreement.',
+    'An application gas sponsor and explicit funding agreement.',
     'Sponsors are selected by the authenticated application, never by an API body. Sponsor queues and signers must be separate from owner-wallet signing bindings.',
-    'Create and fund the dedicated sponsor outside the toolkit using your approved process. Match its address, account identity, gas policy and binding revision on both services. Vendor-specific IDs belong in the designated executor; direct Relayer mode also needs its Relayer and signer IDs. Record the application funding agreement; API scopes and owner wallet consent do not authorize sponsor funding. Use an HTTPS Relayer origin and an environment variable name for its API key.',
+    'Bundled setup creates and retains the encrypted sponsor key, public address and Relayer/signer bindings automatically. Record the application funding agreement, set gas limits and fund the saved public address before activation. With an existing service, match its retained address, account identity, gas policy and binding revision; direct Relayer connections also need that service’s Relayer and signer IDs, HTTPS origin and API key reference. API scopes and owner-wallet consent do not authorize sponsor funding.',
     'execution.html#configure-and-accept-execution',
   ),
   executionGas: setting(
     'Exact decimal gas and native-fee admission limits in wei.',
     'A durable dispatch reserves gas limit × maximum fee per gas plus the L1 reserve against the application lifetime budget. Unknown and failed work retains reservations; a new policy does not reset them.',
-    'Set limits from measured staging transactions and your reviewed funding budget. Configure Relayer gas_limit_estimation=false and a positive gas_price_cap no greater than the approved maximum. Account separately for actual L1 fees and recovery/cancellation costs; the admission reservation is not a hard bound on every upstream cost.',
+    'Set limits from measured staging transactions and your reviewed funding budget. Bundled setup disables Relayer gas estimation and applies the configured fee cap automatically. Existing Relayer services must enforce gas_limit_estimation=false and a positive gas_price_cap no greater than the approved maximum. Account separately for actual L1 fees and recovery/cancellation costs; the admission reservation is not a hard bound on every upstream cost.',
     'execution.html#configure-and-accept-execution',
   ),
   executionEvidence: setting(
@@ -127,9 +127,9 @@ export const settings = {
     'operator-services.html#provider-domain-and-privacy-notice',
   ),
   binding: setting(
-    'A permanent name you choose for this wallet environment. No vendor issues this value.',
+    'A permanent, non-secret ID generated for this wallet environment. No vendor issues this value.',
     'Stored accounts use it to stay attached to the same wallet backend through restarts and credential changes. Changing it is not a way to recover a failed operation.',
-    'Choose a unique, non-secret name such as acme-cdp-base-sepolia-01. Keep it unchanged for this deployment.',
+    'Keep the generated ID unchanged for this deployment. Import your saved configuration to retain it; use the advanced override only when establishing a reviewed environment binding.',
     'operator-services.html#stable-backend-binding',
   ),
   cdpKeyId: setting(
@@ -150,16 +150,52 @@ export const settings = {
     'Obtain the Wallet Secret from your CDP project’s wallet security settings and retain it in your secret manager. Supply its value at deployment.',
     'operator-services.html#coinbase-cdp',
   ),
+  httpsGateway: setting(
+    'The gateway that exposes your configured domain over HTTPS.',
+    'The bundled Caddy profile handles certificates and forwards HTTPS traffic to the private API.',
+    'Keep Caddy for a new container deployment. Local setup leaves its public profile off. On the final host, point DNS to the host, allow ports 80/443 and start the saved https profile. Native deployments may use an existing gateway.',
+    'bundled-setup.html',
+  ),
+  authorizationMode: setting(
+    'Choose the included application token service or connect an existing issuer.',
+    'The bundled service creates static server-application registrations from Policies and issues short-lived access tokens.',
+    'Keep the bundled option for a new deployment. Use an existing authorization server only when it supplies the required RFC 9068 profile. Optional staff or hosted login has its own connection.',
+    'bundled-setup.html',
+  ),
+  bundledScopes: setting(
+    'API routes this application may call with its access token.',
+    'Scopes admit API requests; they never establish wallet ownership or spending authority.',
+    'Start with access, account reading and provisioning. Enable financial scopes only for an application covered by the corresponding consent and policy.',
+    'operator-services.html#register-the-application-api-and-clients',
+  ),
+  bundledOperatorSecret: setting(
+    'The retained secret variable for this dedicated provider service operator.',
+    'This separate registration can request runtime administration scopes. Ordinary applications cannot obtain those scopes.',
+    'Configure the operator client ID in Policies. Setup generates the missing secret privately. Keep it in the provider’s secret store and obtain five-minute client-credentials tokens from the bundled token endpoint for operator work.',
+    'bundled-setup.html#connect-a-server-application',
+  ),
+  bundledClientSecret: setting(
+    'The private deployment variable holding this server application’s client secret.',
+    'The bundled issuer checks this credential before issuing the application’s allowed API tokens.',
+    'Keep the supplied variable name. Setup generates a missing secret once. Deliver only this application’s secret to its server through a private channel; retain all other credentials with the provider.',
+    'bundled-setup.html#connect-a-server-application',
+  ),
+  issuerSigningKey: setting(
+    'The private deployment variable containing the bundled issuer signing JWK.',
+    'This key signs application access tokens; it is separate from wallet signing keys.',
+    'Keep the supplied variable name. New-deployment setup generates a missing 3072-bit RSA key once and retains it in provider.env. Never regenerate it to fix startup; back up retained secrets privately.',
+    'bundled-setup.html',
+  ),
   vault: setting(
     'The private folder on your server where the local wallet engine keeps its vault.',
     'The vault holds wallet material and must survive restarts. Recovery needs both the vault and the service database.',
-    'Keep .provider-vault for a native deployment, or choose a private persistent directory on your deployment host. Relative paths start beside the configuration file. Install the pinned OWS engine separately; the reference Docker image does not include it.',
+    'Keep .provider-vault for a native deployment, or choose a private persistent directory on your deployment host. Relative paths start beside the configuration file. The pinned engine is included. Local setup creates its private vault automatically.',
     'operator-deployment.html#prepare-the-optional-ows-vault',
   ),
   passphrase: setting(
     'The variable that will hold the password protecting your OWS vault.',
     'The local engine needs the owner passphrase to open the vault. Losing it can prevent recovery.',
-    'Generate and retain a strong passphrase in your secret manager, then supply it at deployment. It must be 16–4096 characters; an OWS agent token cannot replace it.',
+    'Local setup generates a missing passphrase and saves it privately. For native setup, run init-secrets once and retain the resulting environment file. It must be 16–4096 characters; an OWS agent token cannot replace it.',
     'operator-services.html#open-wallet-standard-ows',
   ),
   relayerOrigin: setting(
@@ -321,7 +357,7 @@ export const settings = {
   applicationClient: setting(
     'The ID of this calling application’s registration at your token service.',
     'The kit matches verified tokens to this allowed application and its stored permissions.',
-    'Copy its client ID from the separate API client registration or ask the application developer. Do not reuse the wallet service’s owner-login client ID.',
+    'The bundled issuer generates this ID automatically; share it with the application developer. For an existing issuer, copy its registered API client ID. Do not reuse the owner-login client ID.',
     'operator-services.html#register-the-application-api-and-clients',
   ),
   applicationIssuer: setting(

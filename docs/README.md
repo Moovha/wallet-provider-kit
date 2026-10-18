@@ -13,8 +13,10 @@ as part of the same setup.
 
 The current service is experimental and supports one active POSIX host on Base
 Sepolia. Production custody acceptance and mainnet support remain pending. You
-can explore the wizard without external credentials; running the service requires
-your selected backend, token issuer and deployment infrastructure.
+can explore the wizard without external credentials. The recommended setup supplies
+the wallet engine, application token service, private execution engine, durable
+storage and HTTPS gateway. Record your provider domain, policies and application
+gas funding agreements through the wizard.
 
 <span id="install-and-open-the-local-wizard"></span>
 
@@ -37,8 +39,9 @@ no Pro subscription. The kit is available from source, not npm. The
 [package guide](package.md) covers installing a reviewed tarball instead.
 
 Expand **Why do I need this? Where do I get it?** beside a setting for field help.
-Enter secret variable names in configuration; supply values privately during
-local deployment or through your deployment's secret store. Import a saved
+Keep the supplied internal IDs, storage paths and credential variable names;
+advanced controls expose their overrides. Supply external-service secret values
+privately during local deployment or through your deployment's secret store. Import a saved
 `provider.config.json` to resume. Incomplete drafts cannot be saved, and refreshing
 or closing the browser loses unsaved edits.
 
@@ -59,20 +62,27 @@ Choose the service or engine that creates accounts and signs permitted actions.
 This choice determines who controls keys, how credentials are protected and what
 you must preserve to recover an account.
 
-Follow [Backend fields](setup-wizard.md#_2-backend), then prepare
-[CDP, OWS or Relayer](operator-services.md#choose-one-wallet-backend). Each profile
+Keep the recommended bundled OWS engine or select an existing service in
+[Backend fields](setup-wizard.md#_2-backend). See
+[backend choices](operator-services.md#choose-one-wallet-backend). Each profile
 has its own recovery and operating requirements. Keep its environment binding
 stable across restarts and credential rotations.
 
 ## 3. Services
 
-Your API needs to identify each calling application. Connect an OAuth token issuer
-using its exact issuer, wallet API audience and public verification keys URL.
-The application keeps its own credentials and obtains short-lived API tokens.
+Your API needs to identify each calling application. Keep the bundled OAuth token
+service: setup registers enabled applications and generates credentials privately.
+The provider origin determines the issuer, audience and public-key URL.
+Keep the bundled **OpenZeppelin Relayer and Valkey** local execution engine
+selected too. Local setup starts it automatically on private networks, with
+persistent queues and generated credentials. Configure approved-action policies,
+RPC verification and gas budgets before enabling spending. Setup creates encrypted
+local sponsor keys when those policies are configured. Existing authorization
+servers and execution services are optional. See [bundled setup](bundled-setup.md).
 
 Follow [Services fields](setup-wizard.md#_3-services) and the
 [token registration requirements](operator-services.md#register-the-application-api-and-clients).
-The [Auth0 recipe](auth0-setup.md) demonstrates a compatible registration. Optional
+For an existing issuer, the [Auth0 recipe](auth0-setup.md) demonstrates a compatible registration. Optional
 staff login is needed only if you later enable staff token controls in Deployment.
 
 ## 4. Policies

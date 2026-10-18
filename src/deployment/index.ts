@@ -124,3 +124,11 @@ export type {
   ReplacementAuthority,
   ReplacementStatus,
 } from '../execution/replacement.js';
+export type { BundledAuthorizationConfiguration } from './authorization-contract.js';
+
+export { compileOperationAdapter } from '../execution/operation-adapters.js';
+export type {
+  OperationAdapters,
+  TokenTransferAdapter,
+  AdapterInput,
+} from '../execution/operation-adapters.js';

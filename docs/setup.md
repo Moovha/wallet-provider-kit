@@ -35,8 +35,9 @@ npx --no-install wallet-provider-kit init provider.config.json
 npx --no-install wallet-provider-kit validate --config provider.config.json
 ```
 
-`init` writes the [application-led template](provider.config.example.json) without overwriting
-an existing file. Editors can use the packaged
+`init` writes the [bundled application-led template](provider.config.bundled.example.json)
+with generated wallet environment and application client IDs, without overwriting
+an existing file. Retain those IDs when editing the saved configuration. Editors can use the packaged
 [JSON Schema](../spec/provider-config.schema.json). Version 1 rejects unknown fields,
 unsupported profiles, plaintext credentials, invalid policies and incomplete
 activation settings. `validate` is offline: it does not read secrets, load adapter
@@ -44,22 +45,30 @@ modules, create storage or call identity/wallet services. Diagnostics contain pa
 and validation rules rather than input values.
 
 Set your provider's HTTPS origin/privacy notice, allowed application issuer/client
-IDs and permissions, provider reviewers and existing login. The default
-[application-record evaluation](application-records.md) needs no identity vendor.
-Select Didit or Sumsub when your policy requires externally verified evidence. Keep
+IDs, trust agreements and permissions. Standard users remain in the connected
+application, which supplies accepted identity and consent attestations. Optional
+hosted compatibility adds provider reviewers, existing login and configured
+identity vendors or unfunded record evaluation. Keep
 credentials in environment variables supplied by your secret store; configuration
 contains only references such as `{"env":"PROVIDER_LOGIN_SECRET"}`. The command does
-not automatically read `.env` files. Set `backend.binding` to a stable public identifier for this wallet-backend
-environment; retain it across credential rotations. The service binds its database
+not automatically read `.env` files. `init` supplies `backend.binding`, a stable
+non-secret identifier for this wallet-backend environment; retain it across
+credential rotations. The service binds its database
 to this identifier, provider implementation and HTTPS origin. Changing them, or
 adopting an existing embedded-host database, requires a reviewed migration rather
 than automatic replacement wallets. Config and backend selection are deployment
 inputs, never request inputs. Relative storage and custom-module paths resolve
 against the configuration file's directory.
 
-## Register external integrations
+## Configure application authentication
 
-The wizard's Services step configures `oauth`: the application token issuer,
+The wizard defaults to the bundled token service and OWS wallet engine.
+`wallet-provider-kit init` uses the [bundled template](provider.config.bundled.example.json).
+Run `init-secrets` once in a private deployment directory to generate missing
+issuer keys, client secrets and the OWS passphrase. Existing-issuer settings remain
+available through Services; see [bundled setup](bundled-setup.md).
+
+For an existing issuer, Services configures `oauth`: the application token issuer,
 dedicated audience and HTTPS JWKS URL. Issue RFC 9068 `at+jwt` access tokens with
 `client_id` and a maximum 600-second lifetime. In Policies, register the exact
 issuer/client pair in `policy.applications`, together with permissions and
@@ -84,10 +93,11 @@ changing an occupied store's ownership mode requires a reviewed migration.
 The template selects CDP with environment-backed credentials. All built-in backends
 use toolkit-owned authority and journals; no adapter code is required.
 
-For **OWS**, install the pinned optional engine in the deployment application:
+For **OWS**, the package and standard image include the pinned engine. Keep its
+native platform dependency installed. Confirm the version in the deployment application:
 
 ```sh
-npm install --save-exact @open-wallet-standard/core@1.4.3
+npm ls @open-wallet-standard/core
 ```
 
 Create a private persistent vault directory, then configure:
@@ -105,7 +115,7 @@ The engine and vault are separate from SQLite. The owner passphrase must have
 16–4096 characters and cannot be an agent token. Preserve both vault and database
 backups. The kit creates wallets through the existing OWS adapter and never exports
 keys. See [OWS custody and recovery](ows-adapter.md). Use a supported glibc Linux or
-macOS deployment; the reference Docker image omits this optional engine. An OWS
+macOS deployment; the standard image includes the native engine. An OWS
 container deployment must install it and separately mount its persistent vault.
 
 For **OpenZeppelin Relayer**, configure an existing signer pool:

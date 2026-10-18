@@ -176,9 +176,9 @@ onMounted(() => {
     </p>
     <p>
       Setup checks Docker, Compose and the image builder on macOS or Linux. If
-      tools are missing, install them here and continue automatically. CDP and
-      Relayer are supported; use the native deployment guide for OWS. The first
-      image build needs network access and may take several minutes.
+      tools are missing, install them here and continue automatically. The
+      bundled OWS engine, CDP and existing Relayer services are supported. The
+      first image build needs network access and may take several minutes.
     </p>
     <p>
       Wallet operations must stay disabled. This creates a new isolated
@@ -274,7 +274,11 @@ onMounted(() => {
           :key="secret.name"
           class="setup-secret"
         >
-          <p v-if="secret.available">
+          <p v-if="secret.generated">
+            <strong>{{ secret.name }}</strong> — generated during setup and
+            retained privately.
+          </p>
+          <p v-else-if="secret.available">
             <strong>{{ secret.name }}</strong> — available in the wizard process
             environment; it will be copied to the private file.
           </p>

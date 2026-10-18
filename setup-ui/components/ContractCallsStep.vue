@@ -203,7 +203,7 @@ function toggle(enabled: unknown) {
         <button
           type="button"
           class="secondary"
-          @click="model.approvedCalls.policy.swaps.splice(index, 1)"
+          @click="model.approvedCalls.policy.swaps?.splice(index, 1)"
         >
           Remove swap route
         </button>
@@ -212,7 +212,7 @@ function toggle(enabled: unknown) {
         type="button"
         class="secondary"
         @click="
-          model.approvedCalls.policy.swaps.push({
+          (model.approvedCalls.policy.swaps ??= []).push({
             id: '',
             router: pin(),
             tokenIn: pin(),
@@ -253,7 +253,7 @@ function toggle(enabled: unknown) {
         <button
           type="button"
           class="secondary"
-          @click="model.approvedCalls.policy.vaults.splice(index, 1)"
+          @click="model.approvedCalls.policy.vaults?.splice(index, 1)"
         >
           Remove vault route
         </button>
@@ -262,7 +262,7 @@ function toggle(enabled: unknown) {
         type="button"
         class="secondary"
         @click="
-          model.approvedCalls.policy.vaults.push({
+          (model.approvedCalls.policy.vaults ??= []).push({
             id: '',
             router: pin(),
             vault: pin(),

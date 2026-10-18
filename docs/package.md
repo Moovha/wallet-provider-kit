@@ -201,7 +201,7 @@ npm run check:package
 ```
 
 This builds, packs and installs into a temporary directory outside the checkout,
-with development dependencies and the optional OWS engine omitted. It checks
+with development dependencies omitted and the bundled OWS engine installed. It checks
 public ESM imports, root compatibility, declarations and the typed configuration
 example, packaged OpenAPI, both runnable examples (including typechecked provider-flow
 fixtures), and the installed executable's

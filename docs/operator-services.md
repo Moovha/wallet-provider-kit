@@ -1,8 +1,9 @@
 # Prepare the values for each wizard step
 
-The wizard connects your wallet service to systems your team operates or has
-registered with a vendor. Use this reference when a field asks for a domain,
-backend credential, token registration or agreement. Prepare each value as you
+The wizard supplies a recommended [bundled setup](bundled-setup.md): application
+token issuance, the OWS wallet engine, a running OpenZeppelin Relayer with durable Valkey queues, SQLite and a saved Caddy HTTPS profile.
+Use this reference for domain ownership, policy agreements or optional existing
+services and vendor credentials. Prepare each value as you
 reach its step; you can explore the forms without external accounts.
 
 Users authenticate, complete identity checks and consent in the connected
@@ -10,8 +11,10 @@ application. Your service needs that application's API registration and a review
 agreement to trust its attestations. Provider user login and identity-vendor
 accounts are only needed for the optional features described at the end.
 
-The wizard stores secret variable names, while your deployment supplies their
-values. Examples use invented IDs and reserved domains. Return to the
+The wizard supplies credential variable names and derives bundled service
+settings automatically. Advanced controls expose overrides. Local setup generates
+missing bundled secrets privately; supply external-service credentials during
+deployment. Examples use invented IDs and reserved domains. Return to the
 [step-by-step wizard](setup-wizard.md) to enter the prepared values.
 
 ## Provider domain and privacy notice
@@ -22,7 +25,9 @@ slash, path, username, query or fragment. It must match the externally visible
 service and the login callback. This origin becomes part of the persisted binding;
 changing it later needs reviewed migration planning.
 
-Arrange DNS and HTTPS using the [ingress instructions](operator-deployment.md#publish-through-https).
+Point DNS to the deployment host. The bundled Caddy profile supplies automatic
+HTTPS when started on that host; an existing gateway is optional. See
+[bundled HTTPS setup](bundled-setup.md#configure-through-the-wizard).
 Publish your own privacy notice at an accessible HTTPS URL. The kit does not host
 or generate that notice. Explain the actual backend's key control, identity
 vendors, information use, retention and recovery arrangements with your team.
@@ -34,8 +39,7 @@ All three configured backends currently target **Base Sepolia**, chain ID `84532
 with externally owned accounts (EOAs: accounts controlled by signing keys). These
 are experimental profiles. Choosing a vendor does not establish production custody
 acceptance. No RPC URL or gas key is required by the kit's configured signing
-service. Broadcasting and gas sponsorship need the application's separate execution
-rail; see [assets and gas](assets-and-gas.md).
+service. The bundled local execution engine supplies broadcasting once approved-action policies, RPC verification and sponsor funding are configured; see [assets and gas](assets-and-gas.md).
 
 ### Coinbase CDP
 
@@ -55,18 +59,19 @@ Review the [CDP profile and acceptance limits](provider-guide.md#current-adapter
 
 ### Open Wallet Standard (OWS)
 
-OWS runs locally. You need the pinned `@open-wallet-standard/core@1.4.3` engine,
-a persistent private vault directory and an owner passphrase. The
-[native deployment instructions](operator-deployment.md#prepare-the-optional-ows-vault)
-install the engine and create the directory. Generate a strong random passphrase
-with your secret manager, retain it securely and supply `OWS_OWNER_PASSPHRASE`.
+OWS is the recommended bundled local backend. The pinned
+`@open-wallet-standard/core@1.4.3` engine and native binding ship with the package
+and standard image. New-deployment setup creates a private persistent vault and
+generates a missing owner passphrase in the retained private environment file.
+For manual setup, run `init-secrets` once, then `init-storage`; see
+[bundled setup](bundled-setup.md#manual-and-existing-service-paths).
 It must be 16–4096 characters and cannot be an `ows_key_` agent token.
 
 The toolkit creates wallets later; there is no prerequisite CLI wallet creation
 or seed export. Both the OWS vault and SQLite records need coordinated recovery.
 OWS is supported here on macOS or glibc Linux, arm64/x64; Windows and Alpine are
-unverified. The reference Docker image omits the engine and vault. Use the native
-path for OWS, or treat a custom container image as an advanced deployment. Read
+unverified. The standard image includes the engine; the persistent vault lives
+on a private host bind mount. Read
 [OWS control and recovery](ows-adapter.md) and [upstream documentation](https://docs.openwallet.sh/).
 
 ### OpenZeppelin Relayer
@@ -98,18 +103,26 @@ submission. If your team cannot operate a separate Relayer, choose another backe
 
 ### Stable backend binding
 
-For any backend, choose a unique, non-secret name for this environment, such as
+The wizard and `init` generate a unique, non-secret ID for this environment.
+Keep it in the saved configuration through credential rotations and restarts.
+An advanced override is available for a reviewed binding such as
 `acme-cdp-base-sepolia-01`. It is an operator-owned identifier, not an issued API
-key or wallet address. Keep it unchanged through credential rotations and restarts.
+key or wallet address.
 The database binds accounts to it, the provider implementation and public origin.
 Never change it to work around a failed or uncertain wallet operation.
 
 ## Register the application API and clients
 
-The wallet service is an OAuth **resource server**: it accepts and checks tokens;
-it does not issue them. Ask your authorization-server administrator to create a
-dedicated API/resource audience, for example `acme-wallet-provider`, and separate
-client registrations for each admitted application. Copy the exact issuer,
+The default bundled service registers enabled applications from Policies and
+issues five-minute RFC 9068 tokens. Services derives the issuer, audience and
+JWKS URL from your provider origin. Setup generates and retains credentials; no
+separate administrator registration is needed. Review **Advanced application API permissions** in
+Services when enabling additional API routes and record application trust and wallet permissions in Policies.
+See [application connection](bundled-setup.md#connect-a-server-application).
+
+**Existing authorization server only:** create a dedicated API/resource audience,
+for example `acme-wallet-provider`, and separate client registrations for each
+admitted application. Copy the exact issuer,
 audience and HTTPS JWKS URL into **Services**. Copy each registered client ID into
 **Policies**, alongside a human-readable application name shown during consent.
 Application issuer fields inherit the Services issuer.
@@ -133,24 +146,28 @@ relax this. Confirm that your issuer produces the required profile before
 deployment; this guide does not certify a third-party authorization server.
 Resolve incompatible token formats with your identity administrator.
 
-Give application developers the issuer's own token endpoint, supported grant type,
+For an existing issuer, give application developers its token endpoint, supported grant type,
 client credentials/PKCE instructions and audience/scope request syntax. Those are
 issuer-specific and are not generated by the wizard. Server applications keep
 client secrets on their servers; browser/mobile clients need an appropriate public
 client flow configured by the administrator. Do not distribute a confidential
 client secret in a browser or mobile app.
 
-| Application task                                 | Token scope           |
-| ------------------------------------------------ | --------------------- |
-| Create access request; submit an identity import | `wallet:access`       |
-| Poll an access request                           | `wallet:access:read`  |
-| Read a granted account                           | `wallet:account:read` |
-| Provision an accepted account                    | `wallet:provision`    |
-| Request provider transfer authorization          | `wallet:actions`      |
-| Read transfer authorization status               | `wallet:actions:read` |
-| Sign an authorized transfer                      | `wallet:sign`         |
-| Report transaction observations                  | `wallet:events`       |
-| Read transaction event reports                   | `wallet:events:read`  |
+| Application task                                 | Token scope                    |
+| ------------------------------------------------ | ------------------------------ |
+| Create access request; submit an identity import | `wallet:access`                |
+| Poll an access request                           | `wallet:access:read`           |
+| Read a granted account                           | `wallet:account:read`          |
+| Provision an accepted account                    | `wallet:provision`             |
+| Request provider transfer authorization          | `wallet:actions`               |
+| Read transfer authorization status               | `wallet:actions:read`          |
+| Sign an authorized transfer                      | `wallet:sign`                  |
+| Report transaction observations                  | `wallet:events`                |
+| Read transaction event reports                   | `wallet:events:read`           |
+| Execute an approved action                       | `wallet:execute`               |
+| Read verified execution status                   | `wallet:execute:read`          |
+| Read application runtime configuration           | `wallet:configuration:read`    |
+| Propose application contract policies            | `wallet:configuration:propose` |
 
 Authorize only needed scopes. Do not give connected apps staff review authority.
 The wizard's **Read wallet accounts** (`account:read`) and **Request transfers on
@@ -169,21 +186,24 @@ from its process environment. You choose the names; keep the default names unles
 your secret-store convention requires others. Names use uppercase letters, digits
 and underscores, beginning with a letter.
 
-| Default variable            | Actual value to store                             | Where it comes from                        |
-| --------------------------- | ------------------------------------------------- | ------------------------------------------ |
-| `PROVIDER_LOGIN_SECRET`     | Owner-login confidential client secret            | Login-service client registration          |
-| `WALLET_CDP_API_KEY_ID`     | CDP Secret API Key ID                             | CDP project API Keys dashboard             |
-| `WALLET_CDP_API_KEY_SECRET` | Matching CDP Secret API Key secret                | Same key creation/download                 |
-| `WALLET_CDP_WALLET_SECRET`  | CDP project Wallet Secret                         | CDP wallet dashboard security section      |
-| `OWS_OWNER_PASSPHRASE`      | Dedicated vault owner passphrase                  | Generate and retain in your secret manager |
-| `RELAYER_API_KEY`           | Bearer API key accepted by your Relayer           | Your Relayer deployment administrator      |
-| `DIDIT_API_KEY`             | API key for the recipient application/environment | Didit Business Console                     |
-| `SUMSUB_APP_TOKEN`          | Sumsub application token                          | Sumsub Dashboard Dev space                 |
-| `SUMSUB_SECRET_KEY`         | Secret paired with that app token                 | Same Sumsub token creation                 |
+| Default variable            | Actual value to store                             | Where it comes from                                                 |
+| --------------------------- | ------------------------------------------------- | ------------------------------------------------------------------- |
+| `PROVIDER_LOGIN_SECRET`     | Owner-login confidential client secret            | Login-service client registration                                   |
+| `WALLET_CDP_API_KEY_ID`     | CDP Secret API Key ID                             | CDP project API Keys dashboard                                      |
+| `WALLET_CDP_API_KEY_SECRET` | Matching CDP Secret API Key secret                | Same key creation/download                                          |
+| `WALLET_CDP_WALLET_SECRET`  | CDP project Wallet Secret                         | CDP wallet dashboard security section                               |
+| `OWS_OWNER_PASSPHRASE`      | Dedicated vault owner passphrase                  | Generated once by bundled setup, or supplied by your secret manager |
+| `RELAYER_API_KEY`           | Bearer API key accepted by your Relayer           | Your Relayer deployment administrator                               |
+| `DIDIT_API_KEY`             | API key for the recipient application/environment | Didit Business Console                                              |
+| `SUMSUB_APP_TOKEN`          | Sumsub application token                          | Sumsub Dashboard Dev space                                          |
+| `SUMSUB_SECRET_KEY`         | Secret paired with that app token                 | Same Sumsub token creation                                          |
 
-Only your selected backend/vendor variables are required. The application API
+Bundled setup also creates `WALLET_OAUTH_SIGNING_KEY` and separate application
+client-secret variables. Retain them privately; give each application only its
+own client secret. Only your selected backend/vendor variables are required. The application API
 client's own secret belongs to the calling application's secret store; the wallet
-service verifies its access tokens using public keys. If you enable
+service verifies its access tokens using public keys. The bundled issuer retains
+its own separate copy of each registered client secret for token issuance. If you enable
 [operator token controls](operator-tokens.md), the provider also needs the
 selected application's secret to request tokens through the configured issuer.
 The [deployment walkthrough](operator-deployment.md#supply-the-secret-values)

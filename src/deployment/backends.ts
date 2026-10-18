@@ -56,7 +56,7 @@ export async function createConfiguredBackend(
       createRequire(import.meta.url).resolve('@open-wallet-standard/core');
     } catch {
       throw new ConfigurationError([
-        '/backend: install the pinned optional OWS engine',
+        '/backend: reinstall dependencies with the pinned OWS engine and native platform binding',
       ]);
     }
     const passphrase = resolveSecret(config.passphrase);

@@ -25,6 +25,9 @@ test('a new operator configures application-led access without user login, vendo
       .fill('https://wallet.example.test/privacy');
     await page.getByRole('button', { name: 'Next', exact: true }).click();
     await page
+      .getByText('Advanced wallet environment settings', { exact: true })
+      .click();
+    await page
       .getByLabel('Wallet environment name', { exact: true })
       .fill('offline-example');
     await page.getByRole('button', { name: 'Next', exact: true }).click();
@@ -47,6 +50,9 @@ test('a new operator configures application-led access without user login, vendo
         .getByText('Users stay in the application.', { exact: false })
         .first(),
     ).toBeVisible();
+    await page
+      .getByLabel('Application authentication', { exact: true })
+      .selectOption('external');
     await page
       .getByLabel('Application token issuer', { exact: true })
       .fill('https://apps.example.test');
@@ -206,7 +212,7 @@ test('a new operator configures application-led access without user login, vendo
       (await (await variablesDownload).path())!,
       'utf8',
     );
-    expect(variables).toContain('WALLET_CDP_API_KEY_SECRET=\n');
+    expect(variables).toContain('OWS_OWNER_PASSPHRASE=\n');
     const external: string[] = [];
     page.on('request', (request) => {
       if (!request.url().startsWith(url)) external.push(request.url());

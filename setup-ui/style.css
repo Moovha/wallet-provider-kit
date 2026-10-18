@@ -896,3 +896,17 @@ footer img {
   font: inherit;
   -webkit-text-security: disc;
 }
+
+.advanced-settings {
+  margin: 1rem 0;
+  border: 1px solid var(--fk-color-border);
+  border-radius: 0.75rem;
+  padding: 0.85rem 1rem;
+}
+.advanced-settings > summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.advanced-settings-content {
+  padding-top: 1rem;
+}

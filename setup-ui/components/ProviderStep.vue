@@ -18,10 +18,11 @@ const model = defineModel<ProviderConfiguration>({ required: true });
     <strong>What you’ll do and take away</strong>
     <ol class="setup-journey">
       <li>
-        <strong>Choose your settings.</strong> Name the service, connect an
-        existing wallet backend and token issuer, then define application trust,
-        permissions and limits. Enter secret variable names here; supply their
-        values privately during local setup or on your deployment server.
+        <strong>Choose your settings.</strong> Name the service, keep the
+        bundled wallet engine, token service and local execution engine, then
+        define application trust, permissions and limits. Setup supplies
+        internal IDs, private storage paths and credential variable names
+        automatically. Existing services remain optional.
       </li>
       <li>
         <strong>Validate and start.</strong> In Export, check your settings and

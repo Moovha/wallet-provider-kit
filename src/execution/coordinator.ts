@@ -1,3 +1,4 @@
+import { adapterInput } from './operation-adapters.js';
 import {
   applicationGasBudgetId,
   applicationGasBudgetLimit,
@@ -292,11 +293,13 @@ export class ApprovedExecutionCoordinator {
         : {}),
       ...(execution.recovery ? { recovery: execution.recovery } : {}),
       outcome_scope: record.intent
-        ? record.intent.input.kind === 'swap'
+        ? adapterInput(record.intent).kind === 'swap'
           ? 'swap-effects'
-          : record.intent.input.kind === 'vault-deposit'
+          : adapterInput(record.intent).kind === 'vault-deposit'
             ? 'vault-deposit-effects'
-            : 'contract-execution'
+            : adapterInput(record.intent).kind === 'token-transfer'
+              ? 'token-transfer'
+              : 'contract-execution'
         : 'token-transfer',
       next_poll_after_ms: this.config.pollIntervalSeconds * 1000,
       ...publicObservation,

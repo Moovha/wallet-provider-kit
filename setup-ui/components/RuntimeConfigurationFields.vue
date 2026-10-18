@@ -1,12 +1,17 @@
 <script setup lang="ts">
-import type { ProviderConfiguration } from '../model';
+import AdvancedSettings from './AdvancedSettings.vue';
+import { newClientId, type ProviderConfiguration } from '../model';
+function newOperator() {
+  const clientId = model.value.authorizationServer
+    ? newClientId('operator')
+    : '';
+  return { issuer: model.value.oauth.issuer, clientId, subject: clientId };
+}
 const model = defineModel<ProviderConfiguration>({ required: true });
 function enable(enabled: boolean) {
   if (enabled && !model.value.runtimeConfiguration)
     model.value.runtimeConfiguration = {
-      operators: [
-        { issuer: model.value.oauth.issuer, clientId: '', subject: '' },
-      ],
+      operators: [newOperator()],
     };
   else if (!enabled) delete model.value.runtimeConfiguration;
 }
@@ -28,7 +33,13 @@ function enable(enabled: boolean) {
       Enable runtime configuration</label
     >
     <template v-if="model.runtimeConfiguration">
-      <p>
+      <p v-if="model.authorizationServer">
+        The bundled issuer registers separate provider service operators and
+        generates their credentials during setup. The token subject equals the
+        operator client ID. Keep these credentials with the provider; connected
+        applications cannot obtain operator tokens.
+      </p>
+      <p v-else>
         Use a separate provider operator OAuth client. The API explorer's
         application token controls cannot issue provider write authority.
         Operator identity and trust roots are deployment settings; runtime
@@ -39,24 +50,57 @@ function enable(enabled: boolean) {
         :key="index"
       >
         <legend>Runtime operator {{ index + 1 }}</legend>
-        <FormKit
-          type="url"
-          label="Operator issuer"
-          v-model="operator.issuer"
-          validation="required|https_url"
-        />
-        <FormKit
-          type="text"
-          label="Operator OAuth client ID"
-          v-model="operator.clientId"
-          validation="required"
-        />
-        <FormKit
-          type="text"
-          label="Operator token subject"
-          v-model="operator.subject"
-          validation="required"
-        />
+        <p v-if="model.authorizationServer" class="help-text">
+          Operator client ID: <code>{{ operator.clientId }}</code
+          >. Setup registers this identity and generates its private credential.
+        </p>
+        <AdvancedSettings
+          v-if="model.authorizationServer"
+          label="Advanced operator identity"
+        >
+          <FormKit
+            type="url"
+            :readonly="!!model.authorizationServer"
+            label="Operator issuer"
+            v-model="operator.issuer"
+            validation="required|https_url"
+          />
+          <FormKit
+            type="text"
+            label="Operator OAuth client ID"
+            v-model="operator.clientId"
+            validation="required"
+          />
+          <FormKit
+            type="text"
+            :readonly="!!model.authorizationServer"
+            label="Operator token subject"
+            v-model="operator.subject"
+            validation="required"
+          />
+        </AdvancedSettings>
+        <template v-else>
+          <FormKit
+            type="url"
+            :readonly="!!model.authorizationServer"
+            label="Operator issuer"
+            v-model="operator.issuer"
+            validation="required|https_url"
+          />
+          <FormKit
+            type="text"
+            label="Operator OAuth client ID"
+            v-model="operator.clientId"
+            validation="required"
+          />
+          <FormKit
+            type="text"
+            :readonly="!!model.authorizationServer"
+            label="Operator token subject"
+            v-model="operator.subject"
+            validation="required"
+          />
+        </template>
         <button
           type="button"
           v-if="model.runtimeConfiguration.operators.length > 1"
@@ -68,13 +112,7 @@ function enable(enabled: boolean) {
       <button
         type="button"
         :disabled="model.runtimeConfiguration.operators.length >= 16"
-        @click="
-          model.runtimeConfiguration.operators.push({
-            issuer: model.oauth.issuer,
-            clientId: '',
-            subject: '',
-          })
-        "
+        @click="model.runtimeConfiguration.operators.push(newOperator())"
       >
         Add runtime operator
       </button>

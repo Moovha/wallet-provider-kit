@@ -69,8 +69,9 @@ Keep the terminal open. The wizard is bundled; it needs no FormKit Pro subscript
 The package is experimental and not published to npm; a registry install by name
 is not available. See [getting started](docs/README.md) for installation help.
 
-The wizard turns your settings into a deployment. After validation, choose
-**Set up and run locally** for CDP or Relayer: review the plan, supply missing
+The recommended bundle includes an OAuth application token service, the OWS wallet
+engine, SQLite and a saved Caddy automatic-HTTPS profile. The local execution engine starts automatically alongside OWS, with private OpenZeppelin Relayer and durable Valkey queues. Configure action policies, RPC verification and gas funding to use it. Existing services and custom adapters are optional paths. See [the bundled setup](docs/bundled-setup.md).
+After validation, choose **Set up and run locally**: review the plan, supply missing
 secrets privately and watch setup save files, build the Docker image, initialize
 new storage, diagnose and start the service. It uses the single-host container
 security pattern and starts with wallet operations disabled. The wizard checks
@@ -81,7 +82,7 @@ Administrator prompts, when needed for Homebrew, stay in a terminal. See [local 
 
 You can instead download `provider.config.json` (settings and policy),
 `provider.env.example` (secret variable names) and `provider-setup.md` (deployment
-checklist) for [manual deployment](docs/operator-deployment.md), including native OWS.
+checklist) for [manual deployment](docs/operator-deployment.md), including native deployments.
 Existing deployments are updated through the reviewed maintenance process.
 The [policy controls table](docs/application-access.md#configure-the-trust-policy)
 explains which access rules you can customize in the GUI and how they are enforced.
@@ -93,21 +94,21 @@ explains which access rules you can customize in the GUI and how they are enforc
 _Example configuration only. Validation checks the configuration; it does not test
 vendor services or certify readiness. Initial activation remains disabled._
 
-1. **[Prepare services](docs/operator-services.md):** domain, wallet backend and
-   application token issuer. Review which applications may attest user identity
+1. **[Choose your settings](docs/bundled-setup.md):** provider domain, bundled
+   wallet engine and application registrations. Review which applications may attest user identity
    and consent, and the evidence your policy requires.
 2. **[Configure the six screens](docs/setup-wizard.md):** Provider, Backend, Services,
    Policies, Deployment and Export. Application-led access is selected by default.
    Record application trust agreements and enter secret variable names, not values.
 3. **[Run locally and accept](docs/local-setup.md):** let setup save private files,
-   initialize new storage once and start a disabled container. Add HTTPS, test
+   initialize new storage once and start a disabled container. Start the supplied HTTPS profile on the final host, test
    authority, backend and recovery behavior, then explicitly activate. Manual
    deployments follow the [deployment guide](docs/operator-deployment.md).
 4. **[Connect your product](docs/application-access.md):** read access policy,
    submit current identity and consent evidence, receive a grant, create the wallet
    and revoke access when the user withdraws. Select the optional
    [execution coordinator](docs/execution.md) for transfers or
-   [approved contract calls, swaps and vault deposits](docs/approved-contract-calls.md),
+   [generic calls and optional operation adapters](docs/approved-contract-calls.md),
    or use an accepted application submission rail. Optional
    [Safe queues and sponsor pools](docs/safe-queue-and-sponsor-pools.md),
    [stuck-transaction recovery](docs/stuck-transactions-and-recovery.md) and

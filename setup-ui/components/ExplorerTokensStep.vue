@@ -51,7 +51,9 @@ function toggleClient(clientId: string, index: number, enabled: unknown) {
   if (enabled)
     model.value.apiExplorer.clients.push({
       clientId,
-      clientSecret: { env: `WALLET_EXPLORER_APP_${index + 1}_SECRET` },
+      clientSecret: model.value.authorizationServer?.clients.find(
+        (entry) => entry.clientId === clientId,
+      )?.clientSecret ?? { env: `WALLET_EXPLORER_APP_${index + 1}_SECRET` },
       scopes: ['wallet:access:read', 'wallet:account:read'],
     });
 }

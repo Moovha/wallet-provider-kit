@@ -1,5 +1,40 @@
 # Changelog
 
+## Unreleased generic calls and optional adapters
+
+- Authorize native transfers through the common stored-call and wallet-calls
+  pipeline using explicit recipient/code pins, provider opt-in and value limits.
+- Extract protocol construction and receipt checks into optional policy adapters;
+  share their verification across relayer and ERC-4337 execution.
+- Keep generic calls independent of compatibility route settings. Explicitly
+  selected adapters recognize exact supported calldata without caller labels.
+- Preserve static swap/vault requests, their signing payloads and ERC-3009 transfer
+  compatibility. Keep cumulative asset-budget migration and dedicated form controls
+  as separate acceptance gates.
+
+## Unreleased bundled setup
+
+- Generate stable wallet environment, application and operator IDs for new
+  configurations. Keep storage paths, credential variable names, API scope
+  overrides and deployment details under advanced wizard controls; preserve
+  imported identities and overrides.
+
+- Start a private OpenZeppelin Relayer and persistent Valkey by default in bundled setup; generate encrypted local gas-sponsor keys and bindings for configured approved actions. Existing execution services remain optional.
+
+- Default new wizard and CLI configurations to a bundled oidc-provider application
+  token service, pinned OWS engine, private vault and SQLite authority records.
+- Register configured server applications, generate missing deployment credentials
+  once and preserve issuer keys, client secrets and vault passphrases across restarts.
+- Register dedicated provider service operators separately for runtime workspace
+  administration; application clients cannot obtain operator write scopes.
+- Supply a digest-pinned Caddy automatic-HTTPS profile with private certificate
+  storage; local evaluation leaves public ingress off and wallet operations disabled.
+- Retain existing issuers, CDP, Relayer and custom adapters as optional paths;
+  imported configurations preserve their selected integrations.
+- Keep Base Sepolia, current wallet authority, durable attempts and deployment
+  acceptance boundaries unchanged. Bundling does not establish production custody
+  or live provider/TLS acceptance.
+
 ## Unreleased bundled wallet execution
 
 - Connect an explicitly selected ERC-4337 driver to EIP-5792 batch admission,

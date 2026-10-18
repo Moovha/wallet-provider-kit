@@ -116,6 +116,7 @@
     "@fastify/rate-limit": "11.2.1",
     "@fastify/swagger": "9.9.2",
     "@fastify/swagger-ui": "6.1.2",
+    "@open-wallet-standard/core": "1.4.3",
     "@opentelemetry/api": "1.9.1",
     "@opentelemetry/exporter-metrics-otlp-http": "0.223.0",
     "@opentelemetry/exporter-trace-otlp-http": "0.223.0",
@@ -126,6 +127,7 @@
     "ethers": "6.17.0",
     "fastify": "5.12.7",
     "jose": "6.2.12",
+    "oidc-provider": "9.12.2",
     "openid-client": "6.8.8"
   },
   "devDependencies": {
@@ -133,10 +135,10 @@
     "@formkit/icons": "2.1.2",
     "@formkit/themes": "2.1.2",
     "@formkit/vue": "2.1.2",
-    "@open-wallet-standard/core": "1.4.3",
     "@playwright/test": "1.64.1",
     "@secretlint/secretlint-rule-preset-recommend": "13.0.7",
     "@types/node": "24.19.2",
+    "@types/oidc-provider": "9.12.1",
     "@vitejs/plugin-vue": "6.0.10",
     "ajv-formats": "3.0.1",
     "mermaid": "12.2.0",
@@ -151,14 +153,6 @@
     "vitest": "5.0.4",
     "vue": "3.5.44",
     "vue-tsc": "3.3.13"
-  },
-  "peerDependencies": {
-    "@open-wallet-standard/core": "1.4.3"
-  },
-  "peerDependenciesMeta": {
-    "@open-wallet-standard/core": {
-      "optional": true
-    }
   },
   "repository": {
     "type": "git",
