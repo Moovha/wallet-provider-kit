@@ -66,6 +66,10 @@
     "./wallet-calls": {
       "types": "./dist/wallet-calls/client.d.ts",
       "import": "./dist/wallet-calls/client.js"
+    },
+    "./sponsorship": {
+      "types": "./dist/sponsorship/index.d.ts",
+      "import": "./dist/sponsorship/index.js"
     }
   },
   "files": [

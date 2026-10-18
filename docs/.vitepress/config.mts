@@ -133,6 +133,10 @@ export default defineConfig({
             link: '/docs/runtime-workspace',
           },
           { text: 'Standard wallet calls', link: '/docs/wallet-calls' },
+          {
+            text: 'Account abstraction sponsorship',
+            link: '/docs/account-abstraction-sponsorship',
+          },
           { text: 'Enterprise v1 standards', link: '/docs/v1-standards' },
         ],
       },
@@ -244,6 +248,10 @@ export default defineConfig({
             link: '/docs/runtime-workspace',
           },
           { text: 'Standard wallet calls', link: '/docs/wallet-calls' },
+          {
+            text: 'Account abstraction sponsorship',
+            link: '/docs/account-abstraction-sponsorship',
+          },
           { text: 'Enterprise v1 standards', link: '/docs/v1-standards' },
         ],
       },

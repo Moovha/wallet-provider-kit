@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased account abstraction sponsorship foundation
+
+- Add a pinned EntryPoint v0.7 unsigned UserOperation profile, exact runtime-policy
+  Safe call encoding, operation hashes and conservative paymaster gas-cost bounds.
+- Preserve one application gas-budget identity and the lowest sponsor-pool ceiling
+  across relayer and user-operation preparations; keep the existing relayer path.
+- Add a bounded ERC-7677 client with explicit trusted-host authority/reservation
+  gates before either RPC, strict response checks and no automatic retries.
+- Record staged signing, admission, bundler, receipt and operator acceptance gates.
+  The configured service does not yet activate ERC-4337 or advertise paymasterService.
+
 ## Unreleased contract method discovery
 
 - Load verified Base Sepolia contract methods and bytecode pins from Sourcify in

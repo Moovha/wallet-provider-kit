@@ -4467,3 +4467,273 @@ export interface WalletCallsStatus {
   receipts?: WalletCallsReceipt[];
 }
 ```
+
+## ERC-4337 and ERC-7677 sponsorship foundation
+
+Import from `@moovha/wallet-provider-kit/sponsorship`. [Integration guide](account-abstraction-sponsorship.md).
+
+- [ApplicationGasAllowance](#applicationgasallowance)
+- [applicationGasBudgetId](#applicationgasbudgetid)
+- [applicationGasBudgetLimit](#applicationgasbudgetlimit)
+- [createPaymasterClientV07](#createpaymasterclientv07)
+- [maximumUserOperationCostV07](#maximumuseroperationcostv07)
+- [normalizeUserOperationV07](#normalizeuseroperationv07)
+- [PaymasterClientOptionsV07](#paymasterclientoptionsv07)
+- [PaymasterContext](#paymastercontext)
+- [PaymasterDataV07](#paymasterdatav07)
+- [PaymasterStubV07](#paymasterstubv07)
+- [prepareRuntimeUserOperationV07](#prepareruntimeuseroperationv07)
+- [RuntimeUserOperationPreparationOptions](#runtimeuseroperationpreparationoptions)
+- [safeUserOperationCallData](#safeuseroperationcalldata)
+- [UserOperationDomainV07](#useroperationdomainv07)
+- [userOperationHashV07](#useroperationhashv07)
+- [UserOperationV07](#useroperationv07)
+
+### ApplicationGasAllowance
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/sponsorship/budget.ts).
+
+```ts
+export interface ApplicationGasAllowance {
+  clientId: string;
+  lifetimeBudgetWei: string;
+}
+```
+
+### applicationGasBudgetId
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/sponsorship/budget.ts).
+
+```ts
+/** One application gas ledger across execution mechanisms and payer pool members. */
+export declare function applicationGasBudgetId(
+  origin: string,
+  issuer: string,
+  clientId: string,
+): string;
+```
+
+### applicationGasBudgetLimit
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/sponsorship/budget.ts).
+
+```ts
+/** Pool members cannot multiply the application's configured lifetime allowance. */
+export declare function applicationGasBudgetLimit(
+  sponsors: readonly ApplicationGasAllowance[],
+  clientId: string,
+): string;
+```
+
+### createPaymasterClientV07
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/sponsorship/paymaster.ts).
+
+```ts
+/** ERC-7677 transport for trusted embedded hosts. No public sponsorship endpoint or automatic retry. */
+export declare function createPaymasterClientV07(
+  options: PaymasterClientOptionsV07,
+  request?: typeof fetch,
+): {
+  stub: (
+    operation: UserOperationV07,
+    context: PaymasterContext,
+  ) => Promise<PaymasterStubV07>;
+  data: (
+    operation: UserOperationV07,
+    context: PaymasterContext,
+  ) => Promise<PaymasterStubV07>;
+};
+```
+
+### maximumUserOperationCostV07
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/sponsorship/user-operation.ts).
+
+```ts
+/** Conservative native-fee reservation, including paymaster validation/post-operation gas. */
+export declare function maximumUserOperationCostV07(
+  input: UserOperationV07,
+  l1FeeReserveWei?: string,
+): string;
+```
+
+### normalizeUserOperationV07
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/sponsorship/user-operation.ts).
+
+```ts
+export declare function normalizeUserOperationV07(
+  input: UserOperationV07,
+): UserOperationV07;
+```
+
+### PaymasterClientOptionsV07
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/sponsorship/paymaster.ts).
+
+```ts
+export interface PaymasterClientOptionsV07 {
+  url: string;
+  domain: UserOperationDomainV07;
+  paymaster: string;
+  maximumVerificationGas: string;
+  maximumPostOpGas: string;
+  maximumCostWei: string;
+  l1FeeReserveWei: string;
+  /** Server-owned credential supplier; never use an application-provided URL or secret. */
+  authorization(): Promise<string>;
+  /** Trusted host gate. Both methods can issue usable sponsorship. Require a durable worst-case reservation and fresh owner/grant/consent/claim authority. */
+  authorizeRequest(request: {
+    method: 'pm_getPaymasterStubData' | 'pm_getPaymasterData';
+    operation: UserOperationV07;
+    domain: UserOperationDomainV07;
+    context: PaymasterContext;
+    maximumCostWei: string;
+  }): Promise<boolean>;
+}
+```
+
+### PaymasterContext
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/sponsorship/paymaster.ts).
+
+```ts
+export interface PaymasterContext {
+  applicationId: string;
+  policyRevision: string;
+  policyHash: string;
+  actionId: string;
+  policyId?: string;
+}
+```
+
+### PaymasterDataV07
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/sponsorship/paymaster.ts).
+
+```ts
+export interface PaymasterDataV07 {
+  paymaster: string;
+  paymasterData: string;
+  paymasterVerificationGasLimit: string;
+  paymasterPostOpGasLimit: string;
+}
+```
+
+### PaymasterStubV07
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/sponsorship/paymaster.ts).
+
+```ts
+export interface PaymasterStubV07 extends PaymasterDataV07 {
+  isFinal: boolean;
+  sponsor?: {
+    name: string;
+  };
+}
+```
+
+### prepareRuntimeUserOperationV07
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/sponsorship/preparation.ts).
+
+```ts
+/** Pure policy/encoding preparation. It does not establish current owner authority or reserve funds. */
+export declare function prepareRuntimeUserOperationV07(
+  options: RuntimeUserOperationPreparationOptions,
+): {
+  profile: 'safe-4337-v07-preparation-v1';
+  authorizes_spending: false;
+  authorizes_sponsorship: false;
+  operation: UserOperationV07;
+  domain: UserOperationDomainV07;
+  intent: ApprovedCallIntent;
+  runtimePolicy: RuntimePolicySnapshot;
+  expiresAt: string;
+  userOperationHash: string;
+  intentHash: string;
+  budget: {
+    id: string;
+    maximum: string;
+    maximumCostWei: string;
+  };
+};
+```
+
+### RuntimeUserOperationPreparationOptions
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/sponsorship/preparation.ts).
+
+```ts
+export interface RuntimeUserOperationPreparationOptions {
+  providerOrigin: string;
+  principal: Pick<VerifiedPrincipal, 'issuer' | 'clientId'>;
+  runtimePolicy: RuntimePolicySnapshot;
+  basePolicy: ApprovedCallPolicy;
+  input: ApprovedCallInput;
+  operation: UserOperationV07;
+  domain: UserOperationDomainV07;
+  sponsors: readonly ApplicationGasAllowance[];
+  expiresAt: string;
+  maxValiditySeconds: number;
+  l1FeeReserveWei: string;
+}
+```
+
+### safeUserOperationCallData
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/sponsorship/preparation.ts).
+
+```ts
+/** Encode the same ordered CALL-only intent used by the relayer's SafeTx path. */
+export declare function safeUserOperationCallData(
+  intent: ApprovedCallIntent,
+): string;
+```
+
+### UserOperationDomainV07
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/sponsorship/user-operation.ts).
+
+```ts
+export interface UserOperationDomainV07 {
+  entryPointVersion: '0.7';
+  entryPoint: string;
+  chainId: '0x14a34';
+}
+```
+
+### userOperationHashV07
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/sponsorship/user-operation.ts).
+
+```ts
+/** EntryPoint v0.7 hashing; signatures are not accepted by this unsigned preparation profile. */
+export declare function userOperationHashV07(
+  input: UserOperationV07,
+  domain: UserOperationDomainV07,
+): string;
+```
+
+### UserOperationV07
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/sponsorship/user-operation.ts).
+
+```ts
+/** Deployed-account, EntryPoint v0.7 wire profile. No factories or EIP-7702 delegation. */
+export interface UserOperationV07 {
+  sender: string;
+  nonce: string;
+  callData: string;
+  callGasLimit: string;
+  verificationGasLimit: string;
+  preVerificationGas: string;
+  maxFeePerGas: string;
+  maxPriorityFeePerGas: string;
+  paymaster?: string;
+  paymasterVerificationGasLimit?: string;
+  paymasterPostOpGasLimit?: string;
+  paymasterData?: string;
+}
+```

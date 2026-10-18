@@ -66,6 +66,10 @@ const guides = {
     'api.md#core-wallet-service',
   ],
   './deployment': ['Configuration-first provider service', 'setup.md'],
+  './sponsorship': [
+    'ERC-4337 and ERC-7677 sponsorship foundation',
+    'account-abstraction-sponsorship.md',
+  ],
   './wallet-calls': [
     'Standard wallet calls request adapter',
     'wallet-calls.md',

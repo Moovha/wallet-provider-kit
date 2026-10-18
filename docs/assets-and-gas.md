@@ -160,3 +160,10 @@ exhaustion and uncertain funding before advertising gas coverage. Continue with
 [provider integration](provider-guide.md) and [acceptance checks](conformance.md).
 
 See [durable Safe queues and sponsor pools](safe-queue-and-sponsor-pools.md) for concurrent request admission, per-Safe ordering, pool configuration and recovery limits.
+
+## Account abstraction sponsorship
+
+The [ERC-4337/7677 release milestones](account-abstraction-sponsorship.md) retain
+the relayer mechanisms and one application gas ledger. Unsigned runtime-policy
+preparation and paymaster transport helpers are implemented; configured signing,
+bundler submission, capability wiring and staged acceptance remain pending.

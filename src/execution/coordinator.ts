@@ -1,3 +1,7 @@
+import {
+  applicationGasBudgetId,
+  applicationGasBudgetLimit,
+} from '../sponsorship/budget.js';
 import { canonicalServiceJson } from '../executor/auth.js';
 import { executionAttemptInput } from '../executor/protocol.js';
 import { assertReplacement, pinReplacementPolicy } from './replacement.js';
@@ -534,18 +538,14 @@ export class ApprovedExecutionCoordinator {
     await this.provider.prepare(plan);
     await this.observer.preflight(plan);
     await this.authorize(context.principal, id, request);
-    const budgetId = fingerprint([
-      'execution-gas',
+    const budgetId = applicationGasBudgetId(
       this.actions.onboarding.policy.provider.origin,
       context.principal.issuer,
       sponsor.clientId,
-    ]);
+    );
     await this.database.setBudget(
       budgetId,
-      sponsors
-        .map((entry) => BigInt(entry.lifetimeBudgetWei))
-        .reduce((a, b) => (a < b ? a : b))
-        .toString(),
+      applicationGasBudgetLimit(sponsors, sponsor.clientId),
       this.actions.revision,
     );
     const units = (

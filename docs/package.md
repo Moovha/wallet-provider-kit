@@ -117,21 +117,22 @@ responsibility explicit and let core consumers avoid loading HTTP and
 onboarding modules. They are entry points within one package, not independently
 installed packages; runtime dependencies are still installed together.
 
-| Import after `@moovha/wallet-provider-kit` | Use it for                                                | Main exports                                                                                              |
-| ------------------------------------------ | --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| (root)                                     | Existing integrations or convenience imports              | All core, HTTP, onboarding, identity, telemetry and storage exports                                       |
-| `/core`                                    | Host-owned authority and durable signing attempts         | `EmbeddedWalletService`, `WalletSigningProvider`, `createJournaledWalletProvider`, `WalletAttemptJournal` |
-| `/backend`                                 | Supplied lifecycle for existing stored-action hosts       | `createStoredWalletBackend`, `createDurableSigningService`, trusted authority adapter contracts           |
-| `/storage`                                 | Built-in SQLite persistence and financial authority       | `openProviderDatabase`, `FinancialApproval`, `FinancialAuthorization`                                     |
-| `/http`                                    | OAuth authentication and HTTP composition                 | `createServer`, `createAuthenticator`, `ServerOptions`, `ProviderPaths`                                   |
-| `/onboarding`                              | Application-led grants and optional hosted consent/review | `createOnboardingProvider`, `OnboardingPolicy`, owner login, stores and vendor adapters                   |
-| `/identity`                                | Existing host's OIDC Identity Assurance enrollment        | `EnrollmentService`, `createIdentityVerifier`                                                             |
-| `/telemetry`                               | Optional OTLP traces and metrics                          | `startTelemetry`                                                                                          |
-| `/cdp`                                     | Experimental CDP signing backend                          | `createCdpWalletProvider`                                                                                 |
-| `/ows`                                     | Experimental local OWS backend                            | `createOwsWalletProvider`                                                                                 |
-| `/openzeppelin-relayer`                    | Experimental external signer/relayer integration          | Wallet provider and separate executor factories                                                           |
-| `/spec/provider-api.json`                  | Implemented HTTP contract                                 | OpenAPI JSON                                                                                              |
-| `/spec/orchestration-draft.json`           | Reference action/orchestration design                     | Draft JSON; its orchestration routes are not implemented                                                  |
+| Import after `@moovha/wallet-provider-kit` | Use it for                                                        | Main exports                                                                                              |
+| ------------------------------------------ | ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| (root)                                     | Existing integrations or convenience imports                      | All core, HTTP, onboarding, identity, telemetry and storage exports                                       |
+| `/core`                                    | Host-owned authority and durable signing attempts                 | `EmbeddedWalletService`, `WalletSigningProvider`, `createJournaledWalletProvider`, `WalletAttemptJournal` |
+| `/backend`                                 | Supplied lifecycle for existing stored-action hosts               | `createStoredWalletBackend`, `createDurableSigningService`, trusted authority adapter contracts           |
+| `/sponsorship`                             | Unsigned ERC-4337 preparation and trusted-host ERC-7677 transport | `prepareRuntimeUserOperationV07`, `createPaymasterClientV07`, shared gas-budget helpers                   |
+| `/storage`                                 | Built-in SQLite persistence and financial authority               | `openProviderDatabase`, `FinancialApproval`, `FinancialAuthorization`                                     |
+| `/http`                                    | OAuth authentication and HTTP composition                         | `createServer`, `createAuthenticator`, `ServerOptions`, `ProviderPaths`                                   |
+| `/onboarding`                              | Application-led grants and optional hosted consent/review         | `createOnboardingProvider`, `OnboardingPolicy`, owner login, stores and vendor adapters                   |
+| `/identity`                                | Existing host's OIDC Identity Assurance enrollment                | `EnrollmentService`, `createIdentityVerifier`                                                             |
+| `/telemetry`                               | Optional OTLP traces and metrics                                  | `startTelemetry`                                                                                          |
+| `/cdp`                                     | Experimental CDP signing backend                                  | `createCdpWalletProvider`                                                                                 |
+| `/ows`                                     | Experimental local OWS backend                                    | `createOwsWalletProvider`                                                                                 |
+| `/openzeppelin-relayer`                    | Experimental external signer/relayer integration                  | Wallet provider and separate executor factories                                                           |
+| `/spec/provider-api.json`                  | Implemented HTTP contract                                         | OpenAPI JSON                                                                                              |
+| `/spec/orchestration-draft.json`           | Reference action/orchestration design                             | Draft JSON; its orchestration routes are not implemented                                                  |
 
 For example, in an ESM application:
 
