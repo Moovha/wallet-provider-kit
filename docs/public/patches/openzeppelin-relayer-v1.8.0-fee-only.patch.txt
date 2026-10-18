@@ -15,10 +15,22 @@ index 15c2429..d3615e9 100644
              .network_repository
              .get_by_name(NetworkType::Evm, &self.relayer.network)
 diff --git a/src/domain/transaction/evm/evm_transaction.rs b/src/domain/transaction/evm/evm_transaction.rs
-index a2414c8..b4b1ceb 100644
+index a2414c8..b412f33 100644
 --- a/src/domain/transaction/evm/evm_transaction.rs
 +++ b/src/domain/transaction/evm/evm_transaction.rs
-@@ -708,6 +708,9 @@ where
+@@ -647,6 +647,11 @@ where
+ 
+         let mut evm_data = tx.network_data.get_evm_transaction_data()?;
+         let relayer = self.relayer();
++        if crate::wpk::enabled() && evm_data.gas_limit.is_none() {
++            return Err(TransactionError::ValidationError(
++                "fee-only contract requires an explicit gas limit".into(),
++            ));
++        }
+ 
+         if evm_data.gas_limit.is_none() {
+             match self
+@@ -708,6 +713,9 @@ where
              .price_calculator
              .get_transaction_price_params(&evm_data, relayer)
              .await?;
@@ -28,7 +40,7 @@ index a2414c8..b4b1ceb 100644
  
          debug!(
              tx_id = %tx.id,
-@@ -1054,6 +1057,9 @@ where
+@@ -1054,6 +1062,9 @@ where
          &self,
          tx: TransactionRepoModel,
      ) -> Result<TransactionRepoModel, TransactionError> {
@@ -38,7 +50,7 @@ index a2414c8..b4b1ceb 100644
          debug!(
              tx_id = %tx.id,
              relayer_id = %tx.relayer_id,
-@@ -1235,6 +1241,11 @@ where
+@@ -1235,6 +1246,11 @@ where
          &self,
          tx: TransactionRepoModel,
      ) -> Result<TransactionRepoModel, TransactionError> {
@@ -50,7 +62,7 @@ index a2414c8..b4b1ceb 100644
          info!(tx_id = %tx.id, status = ?tx.status, "cancelling transaction");
  
          // Validate state: can only cancel transactions that are still pending
-@@ -1334,6 +1345,9 @@ where
+@@ -1334,6 +1350,9 @@ where
              }
          };
  
@@ -60,7 +72,7 @@ index a2414c8..b4b1ceb 100644
          let network_repo_model = self
              .network_repository()
              .get_by_chain_id(NetworkType::Evm, old_evm_data.chain_id)
-@@ -1370,6 +1384,9 @@ where
+@@ -1370,6 +1389,9 @@ where
  
          debug!(price_params = ?price_params, "replacement price params");
  
@@ -70,7 +82,7 @@ index a2414c8..b4b1ceb 100644
          // Apply the calculated price parameters to the updated EVM data
          let evm_data_with_price_params = updated_evm_data.with_price_params(price_params.clone());
  
-@@ -1387,7 +1404,30 @@ where
+@@ -1387,7 +1409,30 @@ where
          let final_evm_data =
              evm_data_with_price_params.with_signed_transaction_data(sig_result.into_evm()?);
  
@@ -355,10 +367,10 @@ index 9e7ae0a..344a829 100644
              signature: None,
 diff --git a/src/wpk.rs b/src/wpk.rs
 new file mode 100644
-index 0000000..67a0026
+index 0000000..e0debc2
 --- /dev/null
 +++ b/src/wpk.rs
-@@ -0,0 +1,129 @@
+@@ -0,0 +1,132 @@
 +// SPDX-License-Identifier: AGPL-3.0-only
 +//! Optional fee-only deployment contract. Existing signed artifacts can be
 +//! submitted unchanged; fresh fee signatures require an authenticated caller.
@@ -434,6 +446,9 @@ index 0000000..67a0026
 +            total_cost: Default::default(),
 +        };
 +        assert!(prices(&data, &computed).is_ok());
++        let mut missing_limit = data.clone();
++        missing_limit.gas_limit = None;
++        assert!(prices(&missing_limit, &computed).is_err());
 +        computed.max_fee_per_gas = Some(101);
 +        assert!(prices(&data, &computed).is_err());
 +        computed.max_fee_per_gas = Some(100);
