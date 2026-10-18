@@ -119,6 +119,7 @@ export interface OwnerIdentity {
   authenticatedAt: number;
 }
 export interface AccessRequest {
+  runtimePolicy?: import('../runtime-configuration/authority.js').RuntimePolicySnapshot;
   id: string;
   caller: Pick<VerifiedPrincipal, 'issuer' | 'subject' | 'clientId'>;
   input: AccessInput;

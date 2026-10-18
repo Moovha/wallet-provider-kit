@@ -146,6 +146,7 @@ export async function createConfiguredProvider(
       identity,
       backend,
       actionPolicyRevision,
+      config.runtimeConfiguration?.authorizeContracts,
     );
     const login = config.ownerLogin
       ? await createOwnerLogin(

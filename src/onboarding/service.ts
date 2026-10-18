@@ -1,3 +1,7 @@
+import {
+  currentRuntimePolicy,
+  validateRuntimeClaims,
+} from '../runtime-configuration/authority.js';
 import { checkApplicationAssertion } from './application-access.js';
 import { randomUUID } from 'node:crypto';
 import type {
@@ -68,12 +72,15 @@ export class OnboardingService {
     adapters: IdentityAdapter[] = [],
     private readonly walletReader?: Pick<WalletSigningProvider, 'findAccount'>,
     private readonly transferPolicyRevision?: string,
+    readonly runtimeContracts = false,
   ) {
     const resolved = defineOnboardingPolicy(input);
     if (
       (resolved.identity.records &&
         (adapters.length || transferPolicyRevision)) ||
-      (resolved.access.mode === 'application' && adapters.length > 0)
+      (resolved.access.mode === 'application' && adapters.length > 0) ||
+      (runtimeContracts &&
+        (resolved.access.mode !== 'application' || !transferPolicyRevision))
     )
       throw new WalletProviderError('wallet_provider_configuration');
     this.policy = Object.freeze({
@@ -115,6 +122,46 @@ export class OnboardingService {
     application(this.policy, context.principal);
     return context;
   }
+  private actionRevision(
+    state: ProviderState,
+    principal: AccessRequest['caller'],
+  ) {
+    return this.runtimeContracts
+      ? fingerprint([
+          this.transferPolicyRevision,
+          currentRuntimePolicy(state, principal),
+        ])
+      : this.transferPolicyRevision;
+  }
+  private requestRevisionCurrent(state: ProviderState, request: AccessRequest) {
+    try {
+      return (
+        request.transferPolicyRevision ===
+        this.actionRevision(state, request.caller)
+      );
+    } catch {
+      return false;
+    }
+  }
+  async applicationAccessPolicy(principal: VerifiedPrincipal) {
+    return this.store.transaction((state) => {
+      const terms = this.accessPolicy(principal);
+      if (!this.runtimeContracts) return terms;
+      const snapshot = currentRuntimePolicy(state, principal);
+      return {
+        ...terms,
+        action_policy_revision: this.actionRevision(state, principal),
+        transfer_policy_revision: this.actionRevision(state, principal),
+        required_fields: [
+          ...new Set([
+            ...terms.required_fields,
+            ...snapshot.policy.claim_requirements.map((claim) => claim.name),
+          ]),
+        ],
+        runtime_contract_terms: snapshot,
+      };
+    });
+  }
   private current(
     state: ProviderState,
     id: string,
@@ -129,7 +176,7 @@ export class OnboardingService {
         ['transfers:request', 'contracts:request'].includes(permission),
       ) &&
         (!this.transferPolicyRevision ||
-          request.transferPolicyRevision !== this.transferPolicyRevision))
+          !this.requestRevisionCurrent(state, request)))
     )
       deny();
     application(this.policy, { ...request.caller, scopes: [] });
@@ -158,7 +205,7 @@ export class OnboardingService {
       (request.input.authorization_details[0].actions.some((permission) =>
         ['transfers:request', 'contracts:request'].includes(permission),
       ) &&
-        request.transferPolicyRevision !== this.transferPolicyRevision)
+        !this.requestRevisionCurrent(state, request))
     )
       return 'policy_changed';
     if (request.grantId) {
@@ -227,15 +274,6 @@ export class OnboardingService {
         ['transfers:request', 'contracts:request'].includes(permission),
     );
     if (delegatesTransfers && !this.transferPolicyRevision) deny();
-    const assertion =
-      this.policy.access.mode === 'application'
-        ? checkApplicationAssertion(
-            this.policy,
-            context.principal,
-            input.user,
-            delegatesTransfers ? this.transferPolicyRevision : undefined,
-          )
-        : undefined;
     const key = fingerprint([
       context.principal.issuer,
       context.principal.subject,
@@ -243,10 +281,28 @@ export class OnboardingService {
       'request',
       context.idempotencyKey,
     ]);
-    const hash = delegatesTransfers
-      ? fingerprint([input, this.transferPolicyRevision])
-      : fingerprint(input);
     return this.store.transaction((state) => {
+      const snapshot =
+        delegatesTransfers && this.runtimeContracts
+          ? currentRuntimePolicy(state, context.principal)
+          : undefined;
+      const actionRevision = delegatesTransfers
+        ? this.actionRevision(state, context.principal)
+        : undefined;
+      const assertion =
+        this.policy.access.mode === 'application'
+          ? checkApplicationAssertion(
+              this.policy,
+              context.principal,
+              input.user,
+              actionRevision,
+              snapshot?.policy.claim_requirements.map((claim) => claim.name),
+            )
+          : undefined;
+      if (snapshot) validateRuntimeClaims(snapshot, input.user);
+      const hash = delegatesTransfers
+        ? fingerprint([input, actionRevision])
+        : fingerprint(input);
       const previous = state.idempotency[key];
       if (previous) {
         if (previous.hash !== hash) conflict();
@@ -260,9 +316,10 @@ export class OnboardingService {
           clientId: context.principal.clientId,
         },
         input,
+        ...(snapshot ? { runtimePolicy: snapshot } : {}),
         revision: this.policy.revision,
         ...(delegatesTransfers
-          ? { transferPolicyRevision: this.transferPolicyRevision }
+          ? { transferPolicyRevision: actionRevision }
           : {}),
         createdAt: Date.now(),
         expiresAt: Date.now() + day,
@@ -1131,8 +1188,10 @@ export class OnboardingService {
       const consent = request?.consent;
       if (
         !this.transferPolicyRevision ||
-        grant.transferPolicyRevision !== this.transferPolicyRevision ||
-        request?.transferPolicyRevision !== this.transferPolicyRevision ||
+        grant.transferPolicyRevision !==
+          this.actionRevision(state, principal) ||
+        !request ||
+        !this.requestRevisionCurrent(state, request) ||
         !consent ||
         !Number.isFinite(consent.at) ||
         consent.at > Date.now() ||
@@ -1150,6 +1209,11 @@ export class OnboardingService {
         }).permissions?.includes(permission)
       )
         deny();
+      if (this.runtimeContracts)
+        validateRuntimeClaims(
+          currentRuntimePolicy(state, principal),
+          request.input.user,
+        );
     }
     return grant;
   }

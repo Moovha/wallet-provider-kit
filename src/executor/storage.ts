@@ -1,3 +1,4 @@
+import { executionAttemptInput } from './protocol.js';
 import type {
   ReplacementAttempt,
   ReplacementStatus,
@@ -152,7 +153,7 @@ export function openExecutorDatabase(
       record.dispatch.plan.sponsor.accountId,
       record.dispatch.execution_id,
       record.walletOrigin + ':' + record.dispatch.plan.action.action_id,
-      record.dispatch,
+      { ...record.dispatch, plan: executionAttemptInput(record.dispatch.plan) },
     );
   }
   function load(id: string, walletOrigin: string) {

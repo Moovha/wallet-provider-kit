@@ -1,3 +1,4 @@
+import { runtimeSnapshotSchema } from '../runtime-configuration/schemas.js';
 import type { SafeExecutionQueue } from '../execution/queue.js';
 import {
   approvedCallInputSchema,
@@ -828,6 +829,7 @@ export async function registerOnboardingRoutes(
               transfer_policy_revision: { type: 'string' },
               transfer_terms: providerConfigurationSchema.properties.financial,
               contract_call_terms: callTermsSchema,
+              runtime_contract_terms: runtimeSnapshotSchema,
               max_identity_age_days: { type: 'integer' },
               max_access_days: { type: 'integer' },
               verification_level: { type: 'string' },
@@ -836,21 +838,22 @@ export async function registerOnboardingRoutes(
         },
       },
     },
-    async (request) => ({
-      ...service().accessPolicy(
-        (await context(request, 'wallet:access:read')).principal,
-      ),
-      ...(options?.actions
-        ? {
-            ...(options.actions.consentTerms()
-              ? { transfer_terms: options.actions.consentTerms() }
-              : {}),
-            ...(options.actions.callConsentTerms()
-              ? { contract_call_terms: options.actions.callConsentTerms() }
-              : {}),
-          }
-        : {}),
-    }),
+    async (request) => {
+      const principal = (await context(request, 'wallet:access:read'))
+        .principal;
+      const terms = await service().applicationAccessPolicy(principal);
+      const snapshot =
+        'runtime_contract_terms' in terms
+          ? terms.runtime_contract_terms
+          : undefined;
+      const calls = options?.actions?.callConsentTerms(snapshot);
+      const transfer = options?.actions?.consentTerms();
+      return {
+        ...terms,
+        ...(calls ? { contract_call_terms: calls } : {}),
+        ...(transfer ? { transfer_terms: transfer } : {}),
+      };
+    },
   );
   app.post<{ Params: { grantId: string }; Body: Record<string, never> }>(
     '/v1/access-grants/:grantId/revoke',

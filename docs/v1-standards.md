@@ -39,10 +39,12 @@ entrypoint and verify the resulting business effect separately.
 
 The [runtime configuration control plane](runtime-configuration.md) supports
 application-scoped contract/method proposals and live provider policy publication.
-Its immutable revisions, compare-and-set updates and history do not yet feed
-financial signing/execution. Enterprise acceptance requires exact owner consent
-and action snapshots, current evidence/revocation checks, independent executor
-validation and recovery across policy changes. Configuration changes must not
+Its optional application-led Safe integration binds immutable publications to
+owner consent, exact actions and execution plans, rechecks current attested
+claims/revisions before effects and independently validates executor dispatch.
+Retained execution status uses the original snapshot after publication changes.
+Enterprise acceptance still requires live provider, recovery and security evidence;
+the EIP-5792 adapter and broader policy-evidence types remain pending. Configuration changes must not
 reinterpret a transfer-only grant as arbitrary-call authority.
 
 The implemented execution profile is selected with both `Execution-Profile` and

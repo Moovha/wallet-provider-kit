@@ -35,6 +35,7 @@ export interface ExecutorProviderConfiguration {
   rpc: ExecutionConfiguration['rpc'];
   token?: TransferPolicy['token'];
   contractCalls?: ApprovedCallPolicy;
+  runtimeContracts?: boolean;
   sponsors: ExecutionSponsor[];
   sponsorPool?: ExecutionConfiguration['sponsorPool'];
   recovery?: ExecutionConfiguration['recovery'];
@@ -110,6 +111,8 @@ export function validateExecutionServiceConfiguration(
         validateReplacementSponsors(provider.replacement, provider.sponsors);
       }
       if (provider.relayer) serviceOrigin(provider.relayer.url);
+      if (provider.runtimeContracts && !provider.contractCalls)
+        throw new Error();
       if (provider.contractCalls)
         validateApprovedCallPolicy(provider.contractCalls);
       if (

@@ -44,8 +44,11 @@ batches; MultiSend does not interpret an ERC-20 `false` return as a revert.
 
 The optional [runtime registry](runtime-configuration.md) stores application
 contract/method proposals and provider policy publications without a restart.
-Those records do not yet replace the execution policy below. Current Safe
-signing/execution continues to use its configured startup policy.
+Application-led wallets and their designated executors can explicitly opt into
+runtime financial authority. Published targets and methods then supply application
+policy while the infrastructure and ceilings below remain provider-controlled.
+See the registry guide for consent, fresh claim checks and execution steps.
+Static deployments retain their configured policy behavior.
 
 Use the disabled [wallet example](provider.config.contracts.example.json) and matching [executor example](executor.contracts.config.example.json) as format references. All addresses, hashes and account IDs are fictional; replace them with independently verified bindings.
 

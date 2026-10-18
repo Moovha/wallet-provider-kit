@@ -1,4 +1,11 @@
 import {
+  currentRuntimePolicy,
+  runtimeCallPolicy,
+  validateRuntimeCalls,
+  type RuntimePolicySnapshot,
+} from '../runtime-configuration/authority.js';
+import { serviceHash } from '../executor/auth.js';
+import {
   buildApprovedCallIntent,
   approvedCallPayload,
   validateApprovedCallAction,
@@ -55,6 +62,7 @@ export interface TransactionEventReport extends TransactionEventInput {
   verification: 'unverified';
 }
 export interface TransferRecord {
+  runtimePolicy?: RuntimePolicySnapshot;
   intent?: import('../execution/approved-calls.js').ApprovedCallIntent;
   nonceReleased?: boolean;
   execution?: TransferExecutionRecord;
@@ -125,13 +133,54 @@ export class SupportedActions {
       ? structuredClone(this.transferPolicy)
       : undefined;
   }
-  callConsentTerms() {
-    if (!this.callConfiguration) return undefined;
-    const { accounts: _accounts, ...policy } = this.callConfiguration.policy;
+  callConsentTerms(snapshot?: RuntimePolicySnapshot) {
+    if (
+      !this.callConfiguration ||
+      (this.onboarding.runtimeContracts && !snapshot)
+    )
+      return undefined;
+    const effective = snapshot
+      ? runtimeCallPolicy(this.callConfiguration.policy, snapshot)
+      : this.callConfiguration.policy;
+    const { accounts: _accounts, ...policy } = effective;
     return structuredClone({
-      maxValiditySeconds: this.callConfiguration.maxValiditySeconds,
+      maxValiditySeconds: Math.min(
+        this.callConfiguration.maxValiditySeconds,
+        snapshot?.policy.max_validity_seconds ??
+          this.callConfiguration.maxValiditySeconds,
+      ),
       policy,
     });
+  }
+  private async callAuthority(principal: VerifiedPrincipal) {
+    if (!this.callConfiguration) deny();
+    const snapshot = this.onboarding.runtimeContracts
+      ? await this.onboarding.store.transaction((state) =>
+          currentRuntimePolicy(state, principal),
+        )
+      : undefined;
+    return {
+      snapshot,
+      policy: snapshot
+        ? runtimeCallPolicy(this.callConfiguration.policy, snapshot)
+        : this.callConfiguration.policy,
+      validity: Math.min(
+        this.callConfiguration.maxValiditySeconds,
+        snapshot?.policy.max_validity_seconds ??
+          this.callConfiguration.maxValiditySeconds,
+      ),
+    };
+  }
+  private currentRuntime(state: ProviderState, record: TransferRecord) {
+    if (
+      record.intent &&
+      this.onboarding.runtimeContracts &&
+      (!record.runtimePolicy ||
+        serviceHash(currentRuntimePolicy(state, record.approval.caller)) !==
+          serviceHash(record.runtimePolicy))
+    )
+      deny();
+    if (record.runtimePolicy && !this.onboarding.runtimeContracts) deny();
   }
   private current(
     record: TransferRecord,
@@ -141,6 +190,15 @@ export class SupportedActions {
     try {
       const { action, account, units } = record.approval;
       if (record.intent) {
+        const policy = record.runtimePolicy
+          ? runtimeCallPolicy(
+              this.callConfiguration?.policy ?? deny(),
+              record.runtimePolicy,
+            )
+          : this.callConfiguration?.policy;
+        if (this.onboarding.runtimeContracts !== !!record.runtimePolicy) deny();
+        if (record.runtimePolicy)
+          validateRuntimeCalls(record.runtimePolicy, record.intent.input);
         if (
           !this.callConfiguration?.policy ||
           record.intent.account.accountId !== account.accountId ||
@@ -150,7 +208,13 @@ export class SupportedActions {
           (!allowExpired && Date.parse(action.expires_at) <= Date.now()) ||
           !Number.isFinite(Date.parse(action.expires_at)) ||
           Date.parse(action.expires_at) >
-            Date.now() + this.callConfiguration!.maxValiditySeconds * 1000 ||
+            Date.now() +
+              Math.min(
+                this.callConfiguration!.maxValiditySeconds,
+                record.runtimePolicy?.policy.max_validity_seconds ??
+                  this.callConfiguration!.maxValiditySeconds,
+              ) *
+                1000 ||
           units !== '1' ||
           action.operation_id !== action.action_id ||
           action.chain_id !== 'eip155:84532' ||
@@ -159,11 +223,7 @@ export class SupportedActions {
           action.status !== 'ready'
         )
           deny();
-        validateApprovedCallAction(
-          this.callConfiguration?.policy,
-          record.intent,
-          action,
-        );
+        validateApprovedCallAction(policy ?? deny(), record.intent, action);
         return;
       }
       const { domain, message, types, primaryType } = action.payload;
@@ -240,6 +300,9 @@ export class SupportedActions {
     allowExpired = false,
   ) {
     this.current(record, includeDenied, allowExpired);
+    await this.onboarding.store.transaction((state) =>
+      this.currentRuntime(state, record),
+    );
     const approval = record.approval;
     if (!sameCaller(principal, approval.caller)) deny();
     const { grant, account } = await this.binding(
@@ -429,8 +492,10 @@ export class SupportedActions {
       input.account_id,
       'contracts:request',
     );
+    const authority = await this.callAuthority(principal);
+    if (authority.snapshot) validateRuntimeCalls(authority.snapshot, input);
     const intent = buildApprovedCallIntent(
-      this.callConfiguration.policy,
+      authority.policy,
       input,
       '0',
       expiresAt,
@@ -442,6 +507,14 @@ export class SupportedActions {
       safeAddress: intent.account.address.toLowerCase(),
       address: account.address!,
     };
+  }
+  async applicationQueueExpiry(
+    principal: VerifiedPrincipal,
+    maximumSeconds: number,
+  ) {
+    return this.queueExpiry(
+      Math.min(maximumSeconds, (await this.callAuthority(principal)).validity),
+    );
   }
   queueExpiry(maximumSeconds: number) {
     if (!this.callConfiguration) deny();
@@ -475,6 +548,8 @@ export class SupportedActions {
       input.account_id,
       'contracts:request',
     );
+    const authority = await this.callAuthority(context.principal);
+    if (authority.snapshot) validateRuntimeCalls(authority.snapshot, input);
     const key = fingerprint([
       'supported-call',
       context.principal.issuer,
@@ -482,7 +557,11 @@ export class SupportedActions {
       context.principal.clientId,
       context.idempotencyKey,
     ]);
-    const hash = fingerprint([input, this.revision]);
+    const hash = fingerprint([
+      input,
+      this.revision,
+      ...(authority.snapshot ? [authority.snapshot] : []),
+    ]);
     const previous = await this.onboarding.store.transaction((state) => {
       const entry = state.idempotency[key];
       if (!entry) return undefined;
@@ -490,19 +569,16 @@ export class SupportedActions {
         throw new WalletProviderError('wallet_attempt_conflict');
       return state.supportedActions[entry.id];
     });
-    const expiresAt =
-      queued?.expiresAt ??
-      this.queueExpiry(this.callConfiguration!.maxValiditySeconds);
+    const expiresAt = queued?.expiresAt ?? this.queueExpiry(authority.validity);
     if (
       Date.parse(expiresAt) <= Date.now() ||
-      Date.parse(expiresAt) >
-        Date.now() + this.callConfiguration.maxValiditySeconds * 1000
+      Date.parse(expiresAt) > Date.now() + authority.validity * 1000
     )
       deny();
     const intent =
       previous?.intent ??
       buildApprovedCallIntent(
-        this.callConfiguration?.policy,
+        authority.policy,
         input,
         await nonce(
           this.callConfiguration?.policy.accounts.find(
@@ -597,6 +673,7 @@ export class SupportedActions {
       };
       const created: TransferRecord = {
         intent,
+        ...(authority.snapshot ? { runtimePolicy: authority.snapshot } : {}),
         revision: this.revision,
         status: 'authorizing',
         approval: {
@@ -619,6 +696,7 @@ export class SupportedActions {
           units: '1',
         },
       };
+      this.currentRuntime(state, created);
       records[id] = created;
       state.idempotency[key] = { id, hash };
       state.audit.push({
@@ -644,6 +722,7 @@ export class SupportedActions {
         fingerprint(latest.approval) !== fingerprint(record.approval)
       )
         deny();
+      this.currentRuntime(state, latest);
       this.current(latest);
       latest.status = 'authorized';
     });
@@ -673,6 +752,38 @@ export class SupportedActions {
       if (!record) deny();
       return record;
     });
+  }
+  /** Read retained runtime execution evidence under current account-read access, without granting dispatch authority. */
+  async withExecutionRead<T>(
+    principal: VerifiedPrincipal,
+    id: string,
+    operation: (state: ProviderState, record: TransferRecord) => T,
+  ): Promise<T> {
+    const record = await this.load(id);
+    if (!record.runtimePolicy)
+      return this.withAuthorizedTransfer(principal, id, operation, true);
+    if (!sameCaller(principal, record.approval.caller)) deny();
+    return this.onboarding.withAccountAccess(
+      principal,
+      record.approval.account.accountId,
+      'account:read',
+      (state, grant) => {
+        const latest = state.supportedActions?.[id];
+        if (
+          !latest?.runtimePolicy ||
+          !latest.execution?.plan ||
+          grant.owner !== latest.approval.ownerSubject ||
+          fingerprint(latest.approval) !== fingerprint(record.approval) ||
+          state.accounts[grant.accountId]?.address !==
+            latest.approval.account.address ||
+          state.deploymentBindings?.['service-v1']?.activeRevision !==
+            this.revision
+        )
+          deny();
+        this.current(latest, false, true);
+        return operation(state, latest);
+      },
+    );
   }
   /** Current exact transfer authority, checked again inside the storage transaction. */
   async withAuthorizedTransfer<T>(
@@ -706,6 +817,7 @@ export class SupportedActions {
             this.revision
         )
           deny();
+        this.currentRuntime(state, latest);
         this.current(latest, false, allowExpired);
         return operation(state, latest);
       },

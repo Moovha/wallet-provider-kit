@@ -369,6 +369,38 @@ export interface operations {
                             }[];
                             nonce: string;
                         };
+                        runtimePolicy?: {
+                            application_id: string;
+                            revision: string;
+                            policy_hash: string;
+                            policy: {
+                                /** @enum {string} */
+                                version: "1";
+                                enabled: boolean;
+                                /** @enum {string} */
+                                chain_id: "eip155:84532";
+                                contracts: {
+                                    address: string;
+                                    code_hash: string;
+                                    implementation?: {
+                                        address: string;
+                                        code_hash: string;
+                                    };
+                                    methods: {
+                                        signature: string;
+                                        maximum_value_wei: string;
+                                    }[];
+                                }[];
+                                maximum_calls: number;
+                                maximum_native_value_wei: string;
+                                max_validity_seconds: number;
+                                claim_requirements: {
+                                    name: string;
+                                    allowed_values: string[];
+                                    max_age_seconds: number;
+                                }[];
+                            };
+                        };
                     };
                 };
             };

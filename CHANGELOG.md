@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased runtime contract authority
+
+- Bind published application policies to application-led owner consent, prepared
+  Safe actions, current signing authority and immutable execution plans.
+- Add explicit wallet/executor opt-ins for runtime contract targets and canonical
+  methods while retaining provider-owned infrastructure, shared budgets and code
+  checks. Enforce method/batch native values, call counts, validity and current
+  application-attested claim values/ages.
+- Require fresh consent after publication changes, deny stale new dispatches and
+  retain original execution evidence for status/reconciliation under account-read
+  authority. Static configurations keep their existing behavior.
+- Document the application flow and unsupported policy semantics, business-effect
+  verification and EIP-5792 adapter. Offline fixtures do not establish live-provider
+  or production acceptance.
+
 ## Unreleased runtime configuration control plane
 
 - Add application-scoped contract/method proposals and separate provider operator
@@ -8,9 +23,9 @@
 - Retain immutable policy history, canonical method/hash validation, idempotent
   receipts, compare-and-set concurrency and deployment/transport fencing in the
   existing SQLite v1 JSON deployment record, with no SQL migration.
-- Publish generated API contracts and operator/developer guidance. Runtime policy
-  documents do not yet authorize signing or execution; current configured
-  financial policies and production acceptance gates remain unchanged.
+- Publish generated API contracts and operator/developer guidance. Registration
+  alone grants no financial authority; runtime financial use requires the separate
+  wallet/executor opt-ins and current owner consent.
 
 ## Unreleased bounded replacements
 

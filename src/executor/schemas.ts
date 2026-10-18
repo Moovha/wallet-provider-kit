@@ -1,3 +1,4 @@
+import { runtimeSnapshotSchema } from '../runtime-configuration/schemas.js';
 import {
   replacementAuthoritySchema,
   replacementStatusSchema,
@@ -273,6 +274,7 @@ const callPlan = {
     ...transferPlanSchema.properties,
     profile: { type: 'string', enum: ['approved-evm-executor-v1'] },
     intent: approvedCallIntentSchema,
+    runtimePolicy: runtimeSnapshotSchema,
     action: callAction,
     data: { type: 'string', pattern: '^0x[0-9a-f]+$', maxLength: 32768 },
   },

@@ -1,3 +1,7 @@
+import {
+  runtimeCallPolicy,
+  validateRuntimeCalls,
+} from '../runtime-configuration/authority.js';
 import { pinReplacementPolicy } from '../execution/replacement.js';
 import {
   validateApprovedCallAction,
@@ -20,7 +24,7 @@ import {
 } from '../execution/types.js';
 import { transferInterface } from '../execution/chain.js';
 import type { ExecutorProviderConfiguration } from './config.js';
-import { serviceHash } from './auth.js';
+import { canonicalServiceJson, serviceHash } from './auth.js';
 
 export interface ExecutionDispatch {
   contract: 'execution-dispatch-v1';
@@ -73,6 +77,7 @@ export function executorProviderIdentity(
     ...(provider.contractCalls
       ? { contractCalls: provider.contractCalls }
       : {}),
+    ...(provider.runtimeContracts ? { runtimeContracts: true } : {}),
     sponsors: provider.sponsors,
     ...(provider.replacement ? { replacement: provider.replacement } : {}),
     ...(provider.recovery ? { recovery: provider.recovery } : {}),
@@ -82,6 +87,12 @@ export function executorProviderIdentity(
       ? { tokenCodeHash: provider.rpc.tokenCodeHash }
       : {}),
   };
+}
+/** Preserve existing journal identities; runtime policy numbers are bound as canonical JSON text. */
+export function executionAttemptInput(plan: TransferExecutionPlan) {
+  return plan.runtimePolicy
+    ? { ...plan, runtimePolicy: canonicalServiceJson(plan.runtimePolicy) }
+    : plan;
 }
 export function executionPlanHash(plan: TransferExecutionPlan): string {
   return plan.profile === executionProfile
@@ -118,6 +129,7 @@ export function validateExecutionDispatch(
       'data',
       'scanFromBlock',
       ...(plan.intent ? ['intent'] : []),
+      ...(plan.runtimePolicy ? ['runtimePolicy'] : []),
       ...(plan.replacement ? ['replacement'] : []),
     ]);
     if (
@@ -180,6 +192,8 @@ export function validateExecutionDispatch(
       'dependencies',
       'payload',
     ]);
+    if (plan.runtimePolicy && (!plan.intent || !provider.runtimeContracts))
+      throw new Error();
     if (plan.intent) {
       if (
         plan.profile !== 'approved-evm-executor-v1' ||
@@ -188,7 +202,18 @@ export function validateExecutionDispatch(
         plan.intent.account.accountId !== input.wallet_attempt.accountId
       )
         throw new Error();
-      validateApprovedCallAction(provider.contractCalls, plan.intent, action);
+      const policy = plan.runtimePolicy
+        ? runtimeCallPolicy(provider.contractCalls, plan.runtimePolicy)
+        : provider.contractCalls;
+      if (plan.runtimePolicy) {
+        validateRuntimeCalls(plan.runtimePolicy, plan.intent.input);
+        if (
+          Date.parse(action.expires_at) >
+          Date.now() + plan.runtimePolicy.policy.max_validity_seconds * 1000
+        )
+          throw new Error();
+      }
+      validateApprovedCallAction(policy, plan.intent, action);
       const parsed = safeInterface.parseTransaction({ data: plan.data });
       const signature = String(parsed?.args.signatures);
       if (
@@ -218,7 +243,7 @@ export function validateExecutionDispatch(
         input.wallet_attempt.accountId,
         input.execution_id,
         action.action_id,
-        plan,
+        executionAttemptInput(plan),
       );
       if (serviceHash(expected) !== serviceHash(input.wallet_attempt))
         throw new Error();

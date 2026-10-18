@@ -37,6 +37,7 @@ export function checkApplicationAssertion(
   principal: VerifiedPrincipal,
   value: ApplicationUserAssertion | undefined,
   transferRevision?: string,
+  additionalFields: string[] = [],
 ) {
   const app = application(policy, principal);
   const rules = policy.identity.application;
@@ -61,7 +62,10 @@ export function checkApplicationAssertion(
     !text(user.identity.reference) ||
     !text(user.identity.level, 100) ||
     !text(user.consent.reference) ||
-    !object(user.identity.fields, rules.requiredFields) ||
+    !object(user.identity.fields, [
+      ...rules.requiredFields,
+      ...additionalFields,
+    ]) ||
     rules.requiredFields.some(
       (field) =>
         !Object.hasOwn(user.identity.fields, field) ||

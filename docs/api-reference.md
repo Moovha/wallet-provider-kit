@@ -941,6 +941,7 @@ export interface OnboardingProviderConfiguration {
 /** Provider decisions are stored locally. Vendor results, OAuth scopes and share tokens cannot grant access. */
 export declare class OnboardingService {
   readonly store: OnboardingStore;
+  readonly runtimeContracts: boolean;
   readonly policy: Readonly<{
     revision: string;
     identity: {
@@ -969,7 +970,43 @@ export declare class OnboardingService {
     adapters?: IdentityAdapter[],
     walletReader?: Pick<WalletSigningProvider, 'findAccount'> | undefined,
     transferPolicyRevision?: string | undefined,
+    runtimeContracts?: boolean,
   );
+  applicationAccessPolicy(principal: VerifiedPrincipal): Promise<
+    | {
+        source: string;
+        evaluation_only: boolean;
+        required_fields: string[];
+        maximum_field_characters: number;
+        owner_consent_required: boolean;
+        provider_login_required: boolean;
+        provider_review_required: boolean;
+        verification_level?: string | undefined;
+        max_identity_age_days: number;
+        max_access_days: number;
+        transfer_policy_revision?: string | undefined;
+        action_policy_revision?: string | undefined;
+        flow: 'application' | 'hosted';
+        policy_revision: string;
+      }
+    | {
+        action_policy_revision: string | undefined;
+        transfer_policy_revision: string | undefined;
+        required_fields: string[];
+        runtime_contract_terms: import('../runtime-configuration/authority.js').RuntimePolicySnapshot;
+        source: string;
+        evaluation_only: boolean;
+        maximum_field_characters: number;
+        owner_consent_required: boolean;
+        provider_login_required: boolean;
+        provider_review_required: boolean;
+        verification_level?: string | undefined;
+        max_identity_age_days: number;
+        max_access_days: number;
+        flow: 'application' | 'hosted';
+        policy_revision: string;
+      }
+  >;
   request(
     inputContext: AuthorityContext,
     value: AccessInput,
@@ -2433,6 +2470,7 @@ Import from `@moovha/wallet-provider-kit/deployment`. [Integration guide](setup.
 - [RuntimePolicyChange](#runtimepolicychange)
 - [RuntimePolicyProposal](#runtimepolicyproposal)
 - [RuntimePolicyRevision](#runtimepolicyrevision)
+- [RuntimePolicySnapshot](#runtimepolicysnapshot)
 - [SafeAccountBinding](#safeaccountbinding)
 - [SafeExecutionQueue](#safeexecutionqueue)
 - [SafeQueueRecord](#safequeuerecord)
@@ -2632,6 +2670,7 @@ export declare class ApprovedExecutionCoordinator {
 ```ts
 /** Immutable private plan. Requests may propose policy-controlled calls; execute uses only this stored envelope and server-selected sponsor. */
 export interface ApprovedExecutionPlan {
+  runtimePolicy?: import('../runtime-configuration/authority.js').RuntimePolicySnapshot;
   profile: ExecutionProfile;
   revision: '1';
   action: TypedDataAction;
@@ -3104,6 +3143,7 @@ export interface ExecutorProviderConfiguration {
   rpc: ExecutionConfiguration['rpc'];
   token?: TransferPolicy['token'];
   contractCalls?: ApprovedCallPolicy;
+  runtimeContracts?: boolean;
   sponsors: ExecutionSponsor[];
   sponsorPool?: ExecutionConfiguration['sponsorPool'];
   recovery?: ExecutionConfiguration['recovery'];
@@ -3573,6 +3613,7 @@ export declare const runtimeApplicationId: (
 
 ```ts
 export interface RuntimeConfigurationOptions {
+  authorizeContracts?: boolean;
   operators: {
     issuer: string;
     clientId: string;
@@ -3709,6 +3750,20 @@ export interface RuntimePolicyRevision {
   policy: RuntimePolicy;
   published_at: string;
   proposal_id?: string;
+}
+```
+
+### RuntimePolicySnapshot
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/runtime-configuration/authority.ts).
+
+```ts
+/** Immutable application publication carried with consent, actions and execution plans. */
+export interface RuntimePolicySnapshot {
+  application_id: string;
+  revision: string;
+  policy_hash: string;
+  policy: RuntimePolicy;
 }
 ```
 

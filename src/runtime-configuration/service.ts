@@ -23,6 +23,7 @@ import { trustedHttpsUrl } from '../service/auth.js';
 import { policyChangeSchema, runtimeConfigurationSchema } from './schemas.js';
 
 export interface RuntimeConfigurationOptions {
+  authorizeContracts?: boolean;
   operators: { issuer: string; clientId: string; subject: string }[];
 }
 export interface RuntimePolicy {
@@ -125,7 +126,9 @@ function lexical(a: string, b: string) {
   if (a > b) return 1;
   return 0;
 }
-function normalize(change: RuntimePolicyChange): RuntimePolicyChange {
+export function normalizeRuntimePolicy(
+  change: RuntimePolicyChange,
+): RuntimePolicyChange {
   if (
     !validChange(change) ||
     Buffer.byteLength(JSON.stringify(change)) > 24576 ||
@@ -331,7 +334,7 @@ export class RuntimeConfigurationService {
       'propose',
       applicationId,
     );
-    const change = normalize(input);
+    const change = normalizeRuntimePolicy(input);
     const hash = serviceHash(change);
     return this.transaction((registry, state) => {
       const previous = this.receipt(registry, key, hash);
@@ -466,7 +469,7 @@ export class RuntimeConfigurationService {
       'update',
       applicationId,
     );
-    const change = normalize(input),
+    const change = normalizeRuntimePolicy(input),
       hash = serviceHash(change);
     return this.transaction((registry, state) => {
       const previous = this.receipt(registry, key, hash);

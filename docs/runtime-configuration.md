@@ -6,11 +6,12 @@ applications submit proposals. A separately configured provider operator publish
 an accepted proposal or a replacement policy. Applications can read current and
 historical revisions immediately, without rebuilding or restarting the service.
 
-**Published policies are not yet consumed by signing or execution.** Registration
-does not grant wallet access, broaden consent or enable financial operations.
-Existing transfer and Safe policies retain their current enforcement and restart
-behavior. Runtime claim requirements and value bounds are validated and stored;
-they are not spending controls until financial integration is implemented.
+Application-led providers can opt into runtime contract authority for the existing
+Base Sepolia Safe 1.4.1 execution mechanism. Published targets, methods, native-value
+limits and application-attested claim requirements then govern consent, action
+preparation, signing and designated execution. Registration alone grants no wallet
+access or spending authority. Without the explicit financial opt-in, the registry
+remains a configuration-only service and existing startup policies keep their behavior.
 
 ## Configure the operator boundary
 
@@ -136,8 +137,10 @@ POST /v1/runtime-configuration/applications/{applicationId}/revisions
 Read the current application document as an operator through
 `GET /v1/runtime-configuration/applications/{applicationId}` before updating it.
 Use the current `expected_revision`. `policy.enabled: false` publishes a disabled
-document; registry state does not itself suspend a wallet/grant or revoke issued
-signatures. Applications can propose changes but cannot publish them.
+document. In runtime financial mode, publication immediately invalidates financial
+consent for earlier revisions; a disabled document stops new financial effects.
+It cannot revoke issued signatures. Applications can propose changes but cannot
+publish them.
 
 Stale proposals/updates return 409. Read the latest policy, review changes and
 submit a new proposal against that revision. Do not refresh a stale predecessor
@@ -167,11 +170,94 @@ and 1,024 publications per application; reaching a limit returns conflict. There
 is no automatic pruning or retention migration. Establish supported capacity and
 retention before enterprise adoption.
 
-## Financial integration release gates
+## Use registered contracts for consent and execution
 
-The next milestones must bind revisions to owner consent, exact prepared actions
-and current dispatch checks; enforce evidence provenance/freshness and shared
-exposure limits; and carry immutable snapshots into the independently verifying
-executor. Operator GUI controls, wallet-call adapters and actual test-network/
-recovery acceptance remain pending. Registration/publication alone passes none
-of these financial gates. See the [enterprise standards record](v1-standards.md).
+Configure both services once before enabling runtime financial use:
+
+- On the wallet, use application-led access, a reviewed `assertionTrust` agreement,
+  `approvedCalls`, `execution.profile: "approved-evm-executor-v1"` and
+  `runtimeConfiguration.authorizeContracts: true`. Register `contracts:request`
+  in the application's permitted owner delegations.
+- On the designated executor's selected provider, set `runtimeContracts: true`
+  alongside `contractCalls`. Changing this immutable provider configuration needs
+  a new provider revision and a matching wallet service binding.
+- Keep the Safe accounts/singletons, MultiSendCallOnly, native-value ceiling,
+  lifetime operation budget and sponsors in reviewed bootstrap configuration on
+  both services. Applications cannot replace this infrastructure through registry
+  publication. An opted-in executor accepts runtime snapshots only through its
+  authenticated, configured wallet-service callers and fresh authority callback.
+
+After this initial setup, publish application policies through the API without
+restarting either service. Applications use this sequence:
+
+1. Read `GET /v1/access-policy` using `wallet:access:read`. The response includes
+   `runtime_contract_terms` with application ID, publication revision, policy hash
+   and exact policy, plus the opaque `action_policy_revision` to consent to.
+   `contract_call_terms` shows the effective targets and provider ceilings without
+   exposing other account bindings. Review these terms with the account owner.
+2. Submit the usual application-led `POST /v1/access-requests` assertion with
+   `contracts:request`, `account:read` and any required provisioning permissions.
+   Set `user.consent.action_policy_revision` to the discovery value and
+   `policy_revision` to the base access-policy value. Supply required claims in
+   `user.identity.fields`. An OAuth scope or transfer-only grant cannot
+   authorize contract calls.
+3. Submit `POST /v1/actions/contract-calls` with `kind: "contract-call"`, the granted
+   account ID and ordered `{to, value, data}` calls. Calldata must be canonical ABI
+   encoding for a registered method. Only direct calls are admitted; a reviewed
+   MultiSendCallOnly batch supplies atomic ordering. The service prepares the
+   exact nonce-bound SafeTx and stores the publication snapshot with it.
+4. Call `POST /v1/actions/{actionId}/execute` with an empty body, a new idempotency
+   key, `Execution-Profile: approved-evm-executor-v1` and
+   `Execution-Profile-Revision: 1`. Normal wallet action, sign and execute scopes
+   remain required. The wallet signs internally; contract signatures are not
+   exported. The executor independently checks the snapshot, methods, limits,
+   Safe/account state, code pins, exact signed plan, sponsor and current wallet
+   authority before submitting.
+5. Poll `GET /v1/actions/{actionId}/execution` or its execution-event feed with
+   read scope. Use the existing reconciliation endpoint after uncertainty.
+   Status reads of retained runtime executions require current `account:read`
+   access from the same authenticated application subject and owner. They preserve
+   the original snapshot even after a new publication, without authorizing dispatch.
+
+Every publication creates a new financial consent revision, including a rollback
+to earlier terms. Existing grants do not acquire broader authority. Obtain fresh
+owner consent before preparing or dispatching work under the new publication.
+When a transfer policy coexists in runtime mode, its financial grants also bind
+this combined revision; the static transfer terms still constrain transfers.
+Nonfinancial account access remains available under its normal grant rules.
+
+Runtime claim rules accept exact string values and a maximum age. Values come
+from the authenticated application's user assertion under its trust agreement;
+they are not independently verified KYC facts or arbitrary per-action flags.
+All these claims share `identity.verified_at`. The service checks their presence,
+allowed values and age at consent and again before new financial effects. Refresh
+identity evidence and consent when claims expire. Separate claim issuers,
+per-claim timestamps, signed external attestations and numeric/range rules are not
+implemented.
+
+Per-method and batch native-value limits, call count and validity are enforced.
+The effective native-value limit is the lower of the publication and provider
+ceiling. The lifetime operation budget, sponsor budget and nonce reservations
+remain shared across publications; a policy update does not reset usage. Runtime
+queue requests use the shorter publication lifetime and require current consent
+again when they become actions. Startup swap/vault convenience routes remain
+available in static mode; in runtime mode encode those protocols as explicitly
+registered contract calls.
+
+Unknown and already signed/submitted effects retain their original plans,
+signatures, nonces and reservations. Publishing narrower terms cannot recall a
+Safe signature or stop a transaction already broadcast. Status and reconciliation
+never rebuild a dispatched plan from the new registry head. The existing 32 KiB
+service/journal envelope bounds still apply to complete execution requests; a
+registration's 24 KiB storage allowance is not a promise that every combination
+of document and calldata fits an execution envelope.
+
+## Remaining release gates
+
+Runtime registration does not infer a method's business meaning. Arbitrary calls
+report `contract-execution`, not proof of swap output, vault shares or beneficiary
+settlement. Native-value limits do not bound token approvals or downstream calls;
+review permitted methods and their argument semantics accordingly. New execution
+mechanisms, business-effect verifiers and policy rule types require implementation.
+The EIP-5792 adapter, operator GUI and real test-network/provider/recovery acceptance
+remain pending. See the [enterprise standards record](v1-standards.md).

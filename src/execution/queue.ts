@@ -96,7 +96,12 @@ export class SafeExecutionQueue {
     const action = state.supportedActions?.[binding.id];
     if (
       !action ||
-      binding.hash !== fingerprint([entry.input, entry.revision]) ||
+      binding.hash !==
+        fingerprint([
+          entry.input,
+          entry.revision,
+          ...(action?.runtimePolicy ? [action.runtimePolicy] : []),
+        ]) ||
       !action.intent ||
       fingerprint(action.intent.input) !== fingerprint(entry.input) ||
       action.intent.account.address.toLowerCase() !== entry.safeAddress ||
@@ -207,7 +212,8 @@ export class SafeExecutionQueue {
       await this.authorized(context.principal, entry);
       return this.receipt(entry);
     }
-    const expiresAt = this.actions.queueExpiry(
+    const expiresAt = await this.actions.applicationQueueExpiry(
+      context.principal,
       this.configuration.maxWaitSeconds,
     );
     if (input.kind === 'swap' && Number(input.deadline) * 1000 <= Date.now())
