@@ -1,5 +1,10 @@
+import { buildApprovedCallIntent } from '../src/execution/approved-calls.js';
+import { SafeExecutionQueue } from '../src/execution/queue.js';
+import { OnboardingService } from '../src/onboarding/service.js';
+import { QuorumExecutionObserver } from '../src/execution/chain.js';
+import { WalletProviderError } from '../src/domain/signing.js';
 import { approvedCallsFixture } from './helpers/approved-calls.js';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, randomBytes } from 'node:crypto';
 import { DatabaseSync, backup } from 'node:sqlite';
 import { createRequire } from 'node:module';
 import type { Permission, ProviderState } from '../src/onboarding/types.js';
@@ -2173,7 +2178,7 @@ it('runs application-led policy, provisioning and delegated signing without user
   );
 });
 
-async function generalFixture(contractOnly = false) {
+async function generalFixture(contractOnly = false, queue = false) {
   const t = await designatedFixture(),
     f = t.f;
   const calls = approvedCallsFixture(
@@ -2184,6 +2189,11 @@ async function generalFixture(contractOnly = false) {
   f.execution!.request = calls.request;
   f.config.approvedCalls = { policy: calls.policy, maxValiditySeconds: 300 };
   f.config.execution!.profile = 'approved-evm-executor-v1';
+  if (queue)
+    f.config.execution!.safeQueue = {
+      maxDepthPerSafe: 20,
+      maxWaitSeconds: 300,
+    };
   f.config.policy.applications[0].permissions!.push('contracts:request');
   t.executorConfig.providers[0].contractCalls = calls.policy;
   t.executorConfig.providers[0].revision = '2';
@@ -2485,4 +2495,1006 @@ describe('approved EVM execution foundation', () => {
     expect(action.statusCode).toBe(503);
     expect(t.calls.state.posts).toBe(0);
   });
+});
+
+function queueInput(t: Awaited<ReturnType<typeof generalFixture>>) {
+  return {
+    account_id: t.f.grant.account_id,
+    kind: 'contract-call' as const,
+    calls: [
+      {
+        to: t.calls.policy.contracts[0].address,
+        value: '0',
+        data: '0x12345678',
+      },
+    ],
+  };
+}
+async function queueWorker(t: Awaited<ReturnType<typeof generalFixture>>) {
+  const database = openProviderDatabase({
+    directory: t.f.config.storage.directory,
+  });
+  const revision = await database.onboardingStore.transaction(
+    (state) => state.deploymentBindings!['service-v1'].activeRevision!,
+  );
+  const onboarding = new OnboardingService(
+    t.f.config.policy,
+    database.onboardingStore,
+    [
+      {
+        vendor: 'didit',
+        policyFingerprint: 'offline',
+        importShared: async () => {
+          throw new Error('Unused offline boundary');
+        },
+        read: async () => {
+          throw new Error('Unused offline boundary');
+        },
+      },
+    ],
+    injected.backend,
+    fingerprint([t.f.config.financial ?? null, t.f.config.approvedCalls]),
+  );
+  const actions = new SupportedActions(
+    onboarding,
+    database,
+    t.f.config.financial,
+    revision,
+    t.f.config.approvedCalls,
+  );
+  const observer = new QuorumExecutionObserver(
+    ['https://primary.example.test', 'https://secondary.example.test'],
+    t.f.config.execution!.rpc.genesisHash,
+    10000,
+  );
+  const execution = {
+    async refresh(id: string) {
+      const response = await t.f.app.inject({
+        url: '/v1/actions/' + id + '/execution',
+        headers: {
+          authorization: await t.f.token(),
+          'execution-profile': 'approved-evm-executor-v1',
+          'execution-profile-revision': '1',
+        },
+      });
+      if (response.statusCode !== 200)
+        throw new WalletProviderError(
+          response.statusCode === 403
+            ? 'wallet_authorization_denied'
+            : 'wallet_attempt_unavailable',
+        );
+    },
+    async execute(
+      context: import('../src/domain/principal.js').AuthorityContext,
+      id: string,
+    ) {
+      const response = await t.f.api(
+        '/v1/actions/' + id + '/execute',
+        {},
+        context.idempotencyKey,
+      );
+      if (response.statusCode !== 200)
+        throw new WalletProviderError(
+          response.statusCode === 403
+            ? 'wallet_authorization_denied'
+            : 'wallet_attempt_unavailable',
+        );
+      return response.json() as import('../src/execution/types.js').ExecutionReceipt;
+    },
+  };
+  const queue = new SafeExecutionQueue(
+    actions,
+    database,
+    execution,
+    (binding, owner) => observer.contractNonce(binding, owner),
+    t.f.config.execution!.safeQueue!,
+    300,
+  );
+  return { queue, database };
+}
+function recordQueueSignature(t: Awaited<ReturnType<typeof generalFixture>>) {
+  vi.mocked(injected.backend!.signTypedData).mockImplementation(
+    async (_account, action) => {
+      t.calls.state.digest = action.payload_hash;
+      t.calls.state.intent = buildApprovedCallIntent(
+        t.calls.policy,
+        queueInput(t),
+        String(action.payload.message.nonce),
+        action.expires_at,
+      );
+      return t.f.wallet.signTypedData(
+        action.payload.domain,
+        action.payload.types,
+        action.payload.message,
+      );
+    },
+  );
+}
+async function queueRead(
+  t: Awaited<ReturnType<typeof generalFixture>>,
+  id: string,
+) {
+  return t.f.app.inject({
+    url: '/v1/contract-call-requests/' + id,
+    headers: { authorization: await t.f.token() },
+  });
+}
+describe('durable Safe request queue with authenticated execution', () => {
+  it('bounds a concurrent burst, preserves FIFO and dispatches one head across independent SQLite connections and overlapping workers', async () => {
+    const t = await generalFixture(true, true);
+    recordQueueSignature(t);
+    const requests = await Promise.all(
+      Array.from({ length: 25 }, () =>
+        t.f.api('/v1/contract-call-requests', queueInput(t)),
+      ),
+    );
+    expect(
+      requests.filter((response) => response.statusCode === 202),
+    ).toHaveLength(20);
+    expect(
+      requests
+        .filter((response) => response.statusCode !== 202)
+        .every((response) => [409, 503].includes(response.statusCode)),
+    ).toBe(true);
+    expect(injected.backend!.signTypedData).toHaveBeenCalledTimes(0);
+    const a = await queueWorker(t),
+      b = await queueWorker(t);
+    try {
+      await Promise.all(
+        Array.from({ length: 8 }, (_, index) =>
+          (index % 2 ? a : b).queue.process(),
+        ),
+      );
+      expect(t.calls.state.posts).toBe(1);
+      expect(injected.backend!.signTypedData).toHaveBeenCalledTimes(1);
+      const records = await a.database.onboardingStore.transaction((state) =>
+        Object.values(state.safeRequests!).sort(
+          (x, y) => x.sequence - y.sequence,
+        ),
+      );
+      expect(records.map((entry) => entry.sequence)).toEqual(
+        Array.from({ length: 20 }, (_, index) => index + 1),
+      );
+      expect(records.filter((entry) => entry.actionId)).toHaveLength(1);
+      expect(records[0].status).toBe('executing');
+      expect((await t.request()).statusCode).toBe(409);
+      const status = await queueRead(t, records[0].id);
+      expect(status.statusCode, status.body).toBe(200);
+      expect(status.json().action_id).toBe(records[0].actionId);
+    } finally {
+      a.database.close();
+      b.database.close();
+    }
+  });
+  it('binds enqueue replays, rejects scope-only execution and never lets status reads advance work', async () => {
+    const t = await generalFixture(true, true),
+      key = randomUUID();
+    const responses = await Promise.all(
+      Array.from({ length: 8 }, () =>
+        t.f.api('/v1/contract-call-requests', queueInput(t), key),
+      ),
+    );
+    expect(responses.every((response) => response.statusCode === 202)).toBe(
+      true,
+    );
+    expect(
+      new Set(responses.map((response) => response.json().request_id)).size,
+    ).toBe(1);
+    expect(
+      (
+        await t.f.api(
+          '/v1/contract-call-requests',
+          {
+            ...queueInput(t),
+            calls: [{ ...queueInput(t).calls[0], value: '1' }],
+          },
+          key,
+        )
+      ).statusCode,
+    ).toBe(409);
+    const denied = await t.f.app.inject({
+      method: 'POST',
+      url: '/v1/contract-call-requests',
+      headers: {
+        authorization: await t.f.token('wallet:actions'),
+        'idempotency-key': randomUUID(),
+      },
+      payload: queueInput(t),
+    });
+    expect(denied.statusCode).toBe(403);
+    for (let index = 0; index < 3; index++)
+      expect(
+        (await queueRead(t, responses[0].json().request_id)).json().status,
+      ).toBe('queued');
+    expect(injected.backend!.signTypedData).toHaveBeenCalledTimes(0);
+    expect(t.calls.state.posts).toBe(0);
+  });
+  it('cancels unsigned followers and fences cancellation once signing has been admitted', async () => {
+    const t = await generalFixture(true, true);
+    recordQueueSignature(t);
+    const first = await t.f.api('/v1/contract-call-requests', queueInput(t)),
+      second = await t.f.api('/v1/contract-call-requests', queueInput(t));
+    expect(
+      (
+        await t.f.api(
+          '/v1/contract-call-requests/' + second.json().request_id + '/cancel',
+          {},
+        )
+      ).json().status,
+    ).toBe('cancelled');
+    const w = await queueWorker(t);
+    try {
+      await w.queue.process();
+      expect(t.calls.state.posts).toBe(1);
+      const cancel = await t.f.api(
+        '/v1/contract-call-requests/' + first.json().request_id + '/cancel',
+        {},
+      );
+      expect(cancel.statusCode, cancel.body).toBe(409);
+      expect((await queueRead(t, first.json().request_id)).json().status).toBe(
+        'executing',
+      );
+      expect((await queueRead(t, second.json().request_id)).json().status).toBe(
+        'cancelled',
+      );
+    } finally {
+      w.database.close();
+    }
+  });
+  it('recovers a crash after action insertion without duplicating the action and can cancel it while unsigned', async () => {
+    const t = await generalFixture(true, true),
+      response = await t.f.api('/v1/contract-call-requests', queueInput(t));
+    const original = SupportedActions.prototype.requestCalls;
+    vi.spyOn(SupportedActions.prototype, 'requestCalls').mockImplementationOnce(
+      async function (this: SupportedActions, ...args) {
+        await original.apply(this, args);
+        throw new WalletProviderError('wallet_attempt_unavailable', 'unknown');
+      },
+    );
+    const w = await queueWorker(t);
+    try {
+      await w.queue.process();
+      const before = await w.database.onboardingStore.transaction(
+        (state) => state.safeRequests![response.json().request_id],
+      );
+      expect(before.actionId).toBeUndefined();
+      const cancelled = await t.f.api(
+        '/v1/contract-call-requests/' + before.id + '/cancel',
+        {},
+      );
+      expect(cancelled.statusCode, cancelled.body).toBe(200);
+      expect(cancelled.json().status).toBe('cancelled');
+      const actions = await w.database.onboardingStore.transaction((state) =>
+        Object.values(state.supportedActions!).filter((entry) => entry.intent),
+      );
+      expect(actions).toHaveLength(1);
+      expect(actions[0].nonceReleased).toBe(true);
+      expect(actions[0].status).toBe('denied');
+      expect(injected.backend!.signTypedData).toHaveBeenCalledTimes(0);
+    } finally {
+      w.database.close();
+    }
+  });
+  it('expires unsigned requests and rechecks revoked delegation before creating a signing action', async () => {
+    const t = await generalFixture(true, true),
+      response = await t.f.api('/v1/contract-call-requests', queueInput(t));
+    const w = await queueWorker(t);
+    try {
+      await w.database.onboardingStore.transaction((state) => {
+        state.grants[t.grant.grant_id].state = 'revoked';
+      });
+      await w.queue.process();
+      expect(
+        (
+          await w.database.onboardingStore.transaction(
+            (state) => state.safeRequests![response.json().request_id],
+          )
+        ).status,
+      ).toBe('cancelled');
+      expect(injected.backend!.signTypedData).toHaveBeenCalledTimes(0);
+      expect(t.calls.state.posts).toBe(0);
+    } finally {
+      w.database.close();
+    }
+    const e = await generalFixture(true, true),
+      queued = await e.f.api('/v1/contract-call-requests', queueInput(e)),
+      worker = await queueWorker(e);
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 301000);
+    try {
+      await worker.queue.process();
+      expect(
+        (
+          await worker.database.onboardingStore.transaction(
+            (state) => state.safeRequests![queued.json().request_id],
+          )
+        ).status,
+      ).toBe('expired');
+      expect(e.calls.state.posts).toBe(0);
+    } finally {
+      clock.mockRestore();
+      worker.database.close();
+    }
+  });
+  it('retains an uncertain head through restart and advances only after independent finalized success', async () => {
+    const t = await generalFixture(true, true);
+    recordQueueSignature(t);
+    const first = await t.f.api('/v1/contract-call-requests', queueInput(t)),
+      second = await t.f.api('/v1/contract-call-requests', queueInput(t));
+    let w = await queueWorker(t);
+    t.state.loseAfterHandoff = true;
+    await w.queue.process();
+    expect(t.calls.state.posts).toBe(1);
+    w.database.close();
+    t.state.loseAfterHandoff = false;
+    await t.restart();
+    w = await queueWorker(t);
+    try {
+      await w.queue.process();
+      expect(t.calls.state.posts).toBe(1);
+      expect(
+        (await queueRead(t, second.json().request_id)).json().action_id,
+      ).toBeUndefined();
+      t.calls.state.included = true;
+      await w.queue.process();
+      expect((await queueRead(t, first.json().request_id)).json().status).toBe(
+        'succeeded',
+      );
+      expect((await queueRead(t, second.json().request_id)).json().status).toBe(
+        'queued',
+      );
+      // The next head reads the advanced Safe nonce; it never reserves a speculative future nonce.
+      t.calls.state.included = false;
+      t.calls.state.nonce = '1';
+      await w.queue.process();
+      const next = await w.database.onboardingStore.transaction(
+        (state) =>
+          state.supportedActions![
+            state.safeRequests![second.json().request_id].actionId!
+          ],
+      );
+      expect(next.intent!.nonce).toBe('1');
+      expect(t.calls.state.posts).toBe(2);
+    } finally {
+      w.database.close();
+    }
+  });
+});
+
+it('serializes duplicate enqueue admission across independent operating-system processes', async () => {
+  const t = await generalFixture(true, true),
+    key = randomUUID();
+  const { spawn } = await import('node:child_process');
+  const data = JSON.stringify({
+    config: t.f.config,
+    input: queueInput(t),
+    context: {
+      idempotencyKey: key,
+      principal: {
+        issuer: t.f.config.oauth.issuer,
+        subject: 'application-service',
+        clientId: t.f.config.policy.applications[0].clientId,
+        scopes: ['wallet:actions', 'wallet:execute', 'wallet:sign'],
+      },
+    },
+  });
+  const results = await Promise.all(
+    Array.from(
+      { length: 6 },
+      () =>
+        new Promise<boolean>((resolve, reject) => {
+          const child = spawn(
+            process.execPath,
+            ['--import', 'tsx', 'test/helpers/safe-queue-worker.ts'],
+            { stdio: ['pipe', 'pipe', 'pipe'] },
+          );
+          let output = '';
+          child.stdout.on('data', (chunk) => (output += String(chunk)));
+          child.stderr.resume();
+          child.once('error', reject);
+          child.once('close', (code) =>
+            code === 0
+              ? resolve(JSON.parse(output).accepted)
+              : reject(new Error('Offline queue process failed')),
+          );
+          child.stdin.end(data);
+        }),
+    ),
+  );
+  expect(results).toEqual(Array(6).fill(true));
+  const db = openProviderDatabase({ directory: t.f.config.storage.directory });
+  try {
+    expect(
+      await db.onboardingStore.transaction(
+        (state) => Object.values(state.safeRequests!).length,
+      ),
+    ).toBe(1);
+    expect(
+      await db.onboardingStore.transaction(
+        (state) =>
+          Object.values(state.supportedActions ?? {}).filter(
+            (entry) => entry.intent,
+          ).length,
+      ),
+    ).toBe(0);
+  } finally {
+    db.close();
+  }
+}, 15000);
+
+async function sponsorPoolFixture(enableRecovery = false) {
+  const t = await designatedFixture(),
+    configuration = t.f.config.execution!;
+  configuration.sponsorPool = {
+    strategy: 'round-robin',
+    maxInFlightPerSponsor: 2,
+  };
+  configuration.service!.providerRevision = '3';
+  const second = {
+    ...structuredClone(configuration.sponsors[0]),
+    accountId: randomUUID(),
+    binding: { address: Wallet.createRandom().address, bindingRevision: '1' },
+  };
+  configuration.sponsors.push(second);
+  const provider = t.executorConfig.providers[0];
+  provider.revision = '3';
+  provider.sponsorPool = configuration.sponsorPool;
+  if (enableRecovery) {
+    configuration.recovery = { stuckAfterSeconds: 30, quarantineOnStuck: true };
+    provider.recovery = configuration.recovery;
+  }
+  provider.sponsors.push({
+    ...structuredClone(second),
+    binding: {
+      ...second.binding,
+      relayerId: 'sponsor-relayer-two',
+      signerId: 'sponsor-signer-two',
+    },
+  });
+  const original = t.f.execution!.request;
+  const transactions = new Map<string, Record<string, unknown>>();
+  const submitted: string[] = [];
+  t.f.execution!.request = (async (input, options) => {
+    const url = new URL(String(input));
+    if (url.origin !== t.f.execution!.configuration.relayer.url)
+      return original(input, options);
+    const relayer = provider.sponsors.find(
+      (entry) => url.pathname.split('/')[4] === entry.binding.relayerId,
+    );
+    if (!relayer) return original(input, options);
+    if (url.pathname.endsWith('/transactions') && options?.method === 'POST') {
+      const body = JSON.parse(String(options.body)),
+        id = randomUUID();
+      const nonce = submitted.filter(
+        (address) => address === relayer.binding.address,
+      ).length;
+      submitted.push(relayer.binding.address);
+      const value = {
+        nonce,
+        id,
+        relayer_id: relayer.binding.relayerId,
+        from: relayer.binding.address,
+        to: body.to,
+        value: body.value,
+        data: body.data,
+        gas_limit: body.gas_limit,
+        max_fee_per_gas: body.max_fee_per_gas,
+        status: 'submitted',
+        hash: '0x' + id.replaceAll('-', '').repeat(2),
+      };
+      transactions.set(id, value);
+      return new Response(JSON.stringify({ success: true, data: value }));
+    }
+    if (url.pathname.includes('/transactions/'))
+      return new Response(
+        JSON.stringify({
+          success: true,
+          data: transactions.get(url.pathname.split('/').at(-1)!),
+        }),
+      );
+    return new Response(
+      JSON.stringify({
+        success: true,
+        data: {
+          id: relayer.binding.relayerId,
+          signer_id: relayer.binding.signerId,
+          address: relayer.binding.address,
+          network: 'base-sepolia',
+          network_type: 'evm',
+          paused: false,
+          system_disabled: false,
+          policies: { gas_limit_estimation: false, gas_price_cap: 3000000000 },
+        },
+      }),
+    );
+  }) as typeof fetch;
+  await t.restart();
+  return { ...t, submitted, transactions };
+}
+describe('durable application sponsor pools', () => {
+  it('round-robins a concurrent burst with atomic per-address limits and preserves selected payers across retry and restart', async () => {
+    const t = await sponsorPoolFixture();
+    const requests = await Promise.all(
+      Array.from({ length: 12 }, () => t.f.request('1')),
+    );
+    expect(requests.every((response) => response.statusCode === 200)).toBe(
+      true,
+    );
+    const results = await Promise.all(
+      requests.map((response) =>
+        t.f.api('/v1/actions/' + response.json().action_id + '/execute', {}),
+      ),
+    );
+    expect(
+      results.filter((response) => response.statusCode === 200),
+    ).toHaveLength(4);
+    expect(t.submitted).toHaveLength(4);
+    for (const sponsor of t.f.config.execution!.sponsors)
+      expect(
+        t.submitted.filter((address) => address === sponsor.binding.address),
+      ).toHaveLength(2);
+    const db = openProviderDatabase({
+      directory: t.f.config.storage.directory,
+    });
+    let before: unknown;
+    try {
+      before = await db.onboardingStore.transaction((state) =>
+        Object.values(state.supportedActions!)
+          .filter((entry) => entry.execution)
+          .map((entry) => ({
+            action: entry.approval.action.action_id,
+            execution: entry.execution!.executionId,
+            sponsor: entry.execution!.sponsorAccountId,
+            hash: entry.execution!.planHash,
+          })),
+      );
+    } finally {
+      db.close();
+    }
+    await t.restart();
+    const accepted = requests.filter(
+      (_, index) => results[index].statusCode === 200,
+    );
+    await Promise.all(
+      accepted.map((response) =>
+        t.f.api('/v1/actions/' + response.json().action_id + '/execute', {}),
+      ),
+    );
+    expect(t.submitted).toHaveLength(4);
+    const after = openProviderDatabase({
+      directory: t.f.config.storage.directory,
+    });
+    try {
+      expect(
+        await after.onboardingStore.transaction((state) =>
+          Object.values(state.supportedActions!)
+            .filter((entry) => entry.execution)
+            .map((entry) => ({
+              action: entry.approval.action.action_id,
+              execution: entry.execution!.executionId,
+              sponsor: entry.execution!.sponsorAccountId,
+              hash: entry.execution!.planHash,
+            })),
+        ),
+      ).toEqual(before);
+    } finally {
+      after.close();
+    }
+    const blocked = await t.f.api(
+      '/v1/actions/' +
+        requests.find((_, index) => results[index].statusCode !== 200)!.json()
+          .action_id +
+        '/execute',
+      {},
+    );
+    expect([409, 503]).toContain(blocked.statusCode);
+    expect(t.submitted).toHaveLength(4);
+  });
+  it('rejects duplicate client sponsors without an explicit pool and never shares a payer across applications', async () => {
+    const t = await sponsorPoolFixture(),
+      changed = structuredClone(t.f.config);
+    delete changed.execution!.sponsorPool;
+    expect(() => validateProviderConfiguration(changed)).toThrow();
+    changed.execution!.sponsorPool = {
+      strategy: 'round-robin',
+      maxInFlightPerSponsor: 2,
+    };
+    changed.execution!.sponsors[1].binding.address =
+      changed.execution!.sponsors[0].binding.address;
+    expect(() => validateProviderConfiguration(changed)).toThrow();
+  });
+});
+
+it('allows a different Safe head to dispatch while another Safe is paused at its authenticated authority callback', async () => {
+  const t = await generalFixture(true, true),
+    secondAccount = randomUUID();
+  const safe = {
+    ...structuredClone(t.calls.policy.accounts[0]),
+    accountId: secondAccount,
+    address: Wallet.createRandom().address,
+  };
+  t.calls.policy.accounts.push(safe);
+  t.executorConfig.providers[0].revision = '3';
+  t.f.config.execution!.service!.providerRevision = '3';
+  await t.restart();
+  const db = openProviderDatabase({ directory: t.f.config.storage.directory });
+  try {
+    // Trusted offline acceptance records for two accounts controlled by the same fixture owner.
+    const policyRevision = fingerprint([null, t.f.config.approvedCalls]);
+    await db.onboardingStore.transaction((state) => {
+      const grant = state.grants[t.grant.grant_id],
+        request = state.requests[grant.requestId];
+      grant.state = 'active';
+      grant.transferPolicyRevision = policyRevision;
+      request.transferPolicyRevision = policyRevision;
+      const account = structuredClone(state.accounts[t.f.grant.account_id]);
+      account.id = secondAccount;
+      state.accounts[secondAccount] = account;
+      const newGrant = structuredClone(grant);
+      newGrant.id = randomUUID();
+      newGrant.accountId = secondAccount;
+      const newRequest = structuredClone(request);
+      newRequest.id = randomUUID();
+      newRequest.accountId = secondAccount;
+      newRequest.grantId = newGrant.id;
+      state.requests[newRequest.id] = newRequest;
+      newGrant.requestId = newRequest.id;
+      state.grants[newGrant.id] = newGrant;
+    });
+  } finally {
+    db.close();
+  }
+  recordQueueSignature(t);
+  const first = await t.f.api('/v1/contract-call-requests', queueInput(t)),
+    second = await t.f.api('/v1/contract-call-requests', {
+      ...queueInput(t),
+      account_id: secondAccount,
+    });
+  expect(first.statusCode, first.body).toBe(202);
+  expect(second.statusCode, second.body).toBe(202);
+  let release!: () => void,
+    entered = 0;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  t.state.beforeAuthority = async () => {
+    if (entered++ === 0) await gate;
+  };
+  const w = await queueWorker(t),
+    processing = w.queue.process();
+  try {
+    await vi.waitFor(() => expect(t.calls.state.posts).toBe(1));
+    release();
+    await processing;
+    expect(t.calls.state.posts).toBe(2);
+    expect((await queueRead(t, first.json().request_id)).json().status).toBe(
+      'executing',
+    );
+    expect((await queueRead(t, second.json().request_id)).json().status).toBe(
+      'executing',
+    );
+  } finally {
+    release();
+    await processing;
+    w.database.close();
+  }
+});
+
+it('rejects cancellation racing with an admitted signature without skipping the Safe head', async () => {
+  const t = await generalFixture(true, true);
+  recordQueueSignature(t);
+  const first = await t.f.api('/v1/contract-call-requests', queueInput(t));
+  let release!: () => void,
+    entered = false;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const sign = vi
+    .mocked(injected.backend!.signTypedData)
+    .getMockImplementation()!;
+  vi.mocked(injected.backend!.signTypedData).mockImplementation(
+    async (...args) => {
+      entered = true;
+      await gate;
+      return sign(...args);
+    },
+  );
+  const w = await queueWorker(t),
+    processing = w.queue.process();
+  try {
+    await vi.waitFor(() => expect(entered).toBe(true));
+    expect(
+      (
+        await t.f.api(
+          '/v1/contract-call-requests/' + first.json().request_id + '/cancel',
+          {},
+        )
+      ).statusCode,
+    ).toBe(409);
+    release();
+    await processing;
+    expect(t.calls.state.posts).toBe(1);
+  } finally {
+    release();
+    await processing;
+    w.database.close();
+  }
+});
+
+it('automatically executes a queued head in the configured service without a status read or application broadcast', async () => {
+  const t = await generalFixture(true, true);
+  t.f.config.execution!.pollIntervalSeconds = 5;
+  await t.restart();
+  recordQueueSignature(t);
+  const response = await t.f.api('/v1/contract-call-requests', queueInput(t));
+  expect(response.statusCode, response.body).toBe(202);
+  await vi.waitFor(() => expect(t.calls.state.posts).toBe(1), {
+    timeout: 7500,
+    interval: 100,
+  });
+  expect((await queueRead(t, response.json().request_id)).json().status).toBe(
+    'executing',
+  );
+  expect(injected.backend!.signTypedData).toHaveBeenCalledTimes(1);
+}, 15000);
+
+it('fences a corrupted queue action link before it can release a Safe head', async () => {
+  const t = await generalFixture(true, true);
+  recordQueueSignature(t);
+  const request = await t.f.api('/v1/contract-call-requests', queueInput(t)),
+    w = await queueWorker(t);
+  try {
+    await w.queue.process();
+    expect(t.calls.state.posts).toBe(1);
+    await w.database.onboardingStore.transaction((state) => {
+      state.safeRequests![request.json().request_id].actionId = randomUUID();
+    });
+    await expect(w.queue.process()).rejects.toThrow();
+    expect((await queueRead(t, request.json().request_id)).statusCode).toBe(
+      403,
+    );
+    expect(t.calls.state.posts).toBe(1);
+  } finally {
+    w.database.close();
+  }
+});
+
+it('rejects substitution of a renewed grant between queued authority and action materialization', async () => {
+  const t = await generalFixture(true, true),
+    request = await t.f.api('/v1/contract-call-requests', queueInput(t)),
+    w = await queueWorker(t);
+  const original = SupportedActions.prototype.requestCalls;
+  vi.spyOn(SupportedActions.prototype, 'requestCalls').mockImplementationOnce(
+    async function (this: SupportedActions, ...args) {
+      await w.database.onboardingStore.transaction((state) => {
+        const previous = state.grants[t.grant.grant_id];
+        previous.state = 'revoked';
+        const next = structuredClone(previous);
+        next.id = randomUUID();
+        next.state = 'active';
+        const consent = structuredClone(state.requests[previous.requestId]);
+        consent.id = randomUUID();
+        consent.grantId = next.id;
+        state.requests[consent.id] = consent;
+        next.requestId = consent.id;
+        state.grants[next.id] = next;
+      });
+      return original.apply(this, args);
+    },
+  );
+  try {
+    await w.queue.process();
+    expect(
+      await w.database.onboardingStore.transaction(
+        (state) => state.safeRequests![request.json().request_id].status,
+      ),
+    ).toBe('cancelled');
+    expect(injected.backend!.signTypedData).toHaveBeenCalledTimes(0);
+    expect(t.calls.state.posts).toBe(0);
+  } finally {
+    w.database.close();
+  }
+});
+
+it('quarantines a stuck payer durably, routes new executions to another member and never treats reconciliation as dispatch', async () => {
+  const t = await sponsorPoolFixture(true),
+    first = await t.f.request('1');
+  const id = first.json().action_id;
+  expect((await t.f.api('/v1/actions/' + id + '/execute', {})).statusCode).toBe(
+    200,
+  );
+  const db = openProviderDatabase({ directory: t.f.config.storage.directory });
+  let payer: string;
+  try {
+    payer = await db.onboardingStore.transaction((state) => {
+      const execution = state.supportedActions![id].execution!;
+      execution.startedAt = Date.now() - 31000;
+      return execution.sponsorAddress!;
+    });
+  } finally {
+    db.close();
+  }
+  const reconciliation = await t.f.app.inject({
+    method: 'POST',
+    url: '/v1/actions/' + id + '/reconcile',
+    headers: {
+      authorization: await t.f.token(),
+      'idempotency-key': randomUUID(),
+      'execution-profile': 'erc3009-executor-v1',
+      'execution-profile-revision': '1',
+    },
+    payload: {},
+  });
+  expect(reconciliation.statusCode, reconciliation.body).toBe(200);
+  expect(reconciliation.json().recovery).toMatchObject({
+    state: 'suspected-stuck',
+    reason: 'transaction-not-visible',
+    quarantined: true,
+    sponsor_nonce: '0',
+  });
+  expect(t.submitted).toHaveLength(1);
+  await t.restart();
+  const second = await t.f.request('1');
+  expect(
+    (await t.f.api('/v1/actions/' + second.json().action_id + '/execute', {}))
+      .statusCode,
+  ).toBe(200);
+  expect(t.submitted).toHaveLength(2);
+  expect(t.submitted[1]).not.toBe(payer!);
+  const repeat = await t.f.app.inject({
+    method: 'POST',
+    url: '/v1/actions/' + id + '/reconcile',
+    headers: {
+      authorization: await t.f.token(),
+      'idempotency-key': randomUUID(),
+      'execution-profile': 'erc3009-executor-v1',
+      'execution-profile-revision': '1',
+    },
+    payload: {},
+  });
+  expect(repeat.statusCode, repeat.body).toBe(200);
+  expect(repeat.json().recovery.quarantined).toBe(true);
+  expect(t.submitted).toHaveLength(2);
+});
+
+it('clears wallet and executor quarantines only after exact finalized recovery and retains them during evidence outages', async () => {
+  const t = await designatedFixture();
+  vi.stubEnv('PAYER_WEBHOOK_URL', 'https://payer-events.example.test/ingest');
+  vi.stubEnv(
+    'PAYER_WEBHOOK_KEY',
+    'whsec_' + randomBytes(32).toString('base64'),
+  );
+  t.f.config.operations = {
+    pollIntervalSeconds: 5,
+    lowBalanceWei: '1000000000000000000000000',
+    webhooks: [
+      {
+        id: 'alerts',
+        endpoint: { env: 'PAYER_WEBHOOK_URL' },
+        signingSecrets: [{ env: 'PAYER_WEBHOOK_KEY' }],
+      },
+    ],
+  };
+  t.executorConfig.operations = t.f.config.operations;
+  t.f.config.execution!.recovery = {
+    stuckAfterSeconds: 30,
+    quarantineOnStuck: true,
+  };
+  t.f.config.execution!.service!.providerRevision = '2';
+  t.executorConfig.providers[0].revision = '2';
+  t.executorConfig.providers[0].recovery = t.f.config.execution!.recovery;
+  await t.restart();
+  const action = await t.f.request('1'),
+    id = action.json().action_id;
+  expect((await t.f.api('/v1/actions/' + id + '/execute', {})).statusCode).toBe(
+    200,
+  );
+  const walletDb = openProviderDatabase({
+    directory: t.f.config.storage.directory,
+  });
+  try {
+    await walletDb.onboardingStore.transaction((state) => {
+      state.supportedActions![id].execution!.startedAt = Date.now() - 31000;
+    });
+  } finally {
+    walletDb.close();
+  }
+  const rawExecutor = new DatabaseSync(
+    join(t.executorConfig.storage.directory, 'provider.sqlite'),
+  );
+  const rows = rawExecutor
+    .prepare(
+      "SELECT id,record FROM onboarding_records WHERE collection='executorDispatches'",
+    )
+    .all();
+  const record = JSON.parse(String(rows[0].record));
+  record.startedAt = Date.now() - 31000;
+  rawExecutor
+    .prepare(
+      "UPDATE onboarding_records SET record=? WHERE collection='executorDispatches' AND id=?",
+    )
+    .run(JSON.stringify(record), String(rows[0].id));
+  rawExecutor.close();
+  const inspect = async () =>
+    t.f.app.inject({
+      url: '/v1/actions/' + id + '/execution',
+      headers: {
+        authorization: await t.f.token(),
+        'execution-profile': 'erc3009-executor-v1',
+        'execution-profile-revision': '1',
+      },
+    });
+  const stuck = await inspect();
+  expect(stuck.statusCode, stuck.body).toBe(200);
+  expect(stuck.json().recovery.quarantined).toBe(true);
+  await vi.waitFor(async () => {
+    for (const app of [t.f.app, t.executor]) {
+      const health = await app.inject('/health/ready');
+      expect(health.statusCode).toBe(200);
+      expect(health.json().operations).toMatchObject({
+        status: 'degraded',
+        affected_payers: 1,
+        low_balance_payers: 1,
+      });
+      expect(JSON.stringify(health.json())).not.toContain(
+        t.f.config.execution!.sponsors[0].binding.address,
+      );
+    }
+  });
+  const eventDb = openProviderDatabase({
+    directory: t.f.config.storage.directory,
+  });
+  try {
+    const events = await eventDb.onboardingStore.transaction((state) =>
+      Object.values(state.operations!['service-v1'].deliveries),
+    );
+    expect(events.some((entry) => entry.event.data.affected)).toBe(true);
+  } finally {
+    eventDb.close();
+  }
+
+  t.f.execution!.state.mutate = (method, result) =>
+    method === 'eth_getTransactionCount' ? null : result;
+  const unavailable = await inspect();
+  expect(unavailable.statusCode, unavailable.body).toBe(200);
+  expect(unavailable.json().recovery.quarantined).toBe(true);
+  t.f.execution!.state.mutate = undefined;
+  t.f.execution!.state.included = true;
+  t.f.execution!.state.finality = 'finalized';
+  const recovered = await inspect();
+  expect(recovered.statusCode, recovered.body).toBe(200);
+  for (const app of [t.f.app, t.executor])
+    expect((await app.inject('/health/ready')).json().operations).toMatchObject(
+      { affected_payers: 0, low_balance_payers: 1 },
+    );
+  expect(recovered.json().recovery).toMatchObject({
+    state: 'finalized',
+    quarantined: false,
+  });
+  expect(recovered.json().settlement).toBe('succeeded');
+  expect(t.f.execution!.state.posts).toBe(1);
+  const db = openProviderDatabase({ directory: t.f.config.storage.directory });
+  try {
+    expect(
+      await db.onboardingStore.transaction((state) =>
+        Object.values(state.sponsorQuarantines!).flat(),
+      ),
+    ).toHaveLength(0);
+  } finally {
+    db.close();
+  }
+  const executorDb = new DatabaseSync(
+    join(t.executorConfig.storage.directory, 'provider.sqlite'),
+  );
+  try {
+    const quarantines = executorDb
+      .prepare(
+        "SELECT record FROM onboarding_records WHERE collection='executorQuarantines'",
+      )
+      .all();
+    expect(
+      quarantines.flatMap((row) => JSON.parse(String(row.record)).executionIds),
+    ).toHaveLength(0);
+  } finally {
+    executorDb.close();
+  }
 });

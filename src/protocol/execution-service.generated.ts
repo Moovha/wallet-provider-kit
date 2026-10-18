@@ -367,6 +367,27 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
+                        provider_inspection?: {
+                            status: string;
+                            nonce?: string;
+                            transactionHash?: string;
+                        };
+                        recovery?: {
+                            /** @enum {string} */
+                            state: "observing" | "suspected-stuck" | "awaiting-finality" | "finalized" | "unavailable" | "blocked";
+                            /** @enum {string} */
+                            reason: "within-threshold" | "pending-too-long" | "nonce-gap-suspected" | "nonce-consumed-without-result" | "safe-nonce-advanced" | "insufficient-sponsor-funds" | "fee-cap-below-base-fee" | "transaction-not-visible" | "provider-nonce-conflict" | "evidence-unavailable" | "awaiting-finality" | "verified-finality";
+                            /** Format: date-time */
+                            observed_at: string;
+                            pending_age_ms: number;
+                            quarantined: boolean;
+                            sponsor_nonce?: string;
+                            confirmed_nonce?: string;
+                            finalized_nonce?: string;
+                            safe_nonce?: string;
+                            /** @enum {string} */
+                            next_action: "wait" | "restore-evidence" | "fund-sponsor" | "review-provider-fees" | "review-provider-nonces" | "reconcile" | "operator-review";
+                        };
                         /** @enum {string} */
                         contract: "execution-dispatch-v1";
                         execution_id: string;
@@ -397,6 +418,27 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
+                        provider_inspection?: {
+                            status: string;
+                            nonce?: string;
+                            transactionHash?: string;
+                        };
+                        recovery?: {
+                            /** @enum {string} */
+                            state: "observing" | "suspected-stuck" | "awaiting-finality" | "finalized" | "unavailable" | "blocked";
+                            /** @enum {string} */
+                            reason: "within-threshold" | "pending-too-long" | "nonce-gap-suspected" | "nonce-consumed-without-result" | "safe-nonce-advanced" | "insufficient-sponsor-funds" | "fee-cap-below-base-fee" | "transaction-not-visible" | "provider-nonce-conflict" | "evidence-unavailable" | "awaiting-finality" | "verified-finality";
+                            /** Format: date-time */
+                            observed_at: string;
+                            pending_age_ms: number;
+                            quarantined: boolean;
+                            sponsor_nonce?: string;
+                            confirmed_nonce?: string;
+                            finalized_nonce?: string;
+                            safe_nonce?: string;
+                            /** @enum {string} */
+                            next_action: "wait" | "restore-evidence" | "fund-sponsor" | "review-provider-fees" | "review-provider-nonces" | "reconcile" | "operator-review";
+                        };
                         /** @enum {string} */
                         contract: "execution-dispatch-v1";
                         execution_id: string;

@@ -1,3 +1,4 @@
+import type { SafeExecutionQueue } from '../execution/queue.js';
 import {
   approvedCallInputSchema,
   approvedCallIntentSchema,
@@ -76,6 +77,7 @@ export interface OnboardingHttpOptions {
   /** Configuration-first provider-authorized transfers; absent in the onboarding-only profile. */
   actions?: SupportedActions;
   execution?: TransferExecutionCoordinator;
+  safeQueue?: SafeExecutionQueue;
   executionIdentity?: ServiceIdentity;
   contractNonce?: (
     binding: SafeAccountBinding,
@@ -315,6 +317,93 @@ export async function registerOnboardingRoutes(
         request.params.actionId,
       ),
   );
+  const queueReceiptSchema = {
+    type: 'object',
+    additionalProperties: false,
+    required: [
+      'request_id',
+      'account_id',
+      'status',
+      'expires_at',
+      'next_poll_after_ms',
+    ],
+    properties: {
+      request_id: uuidSchema,
+      account_id: uuidSchema,
+      action_id: uuidSchema,
+      status: {
+        type: 'string',
+        enum: [
+          'queued',
+          'executing',
+          'succeeded',
+          'cancelled',
+          'expired',
+          'blocked',
+        ],
+      },
+      expires_at: { type: 'string', format: 'date-time' },
+      next_poll_after_ms: { type: 'integer', minimum: 5000, maximum: 300000 },
+    },
+  };
+  app.post<{ Body: ApprovedCallInput }>(
+    '/v1/contract-call-requests',
+    {
+      schema: {
+        ...schema('enqueueContractCall', approvedCallInputSchema),
+        response: { 202: queueReceiptSchema },
+      },
+    },
+    async (request, reply) => {
+      const queue = options?.safeQueue ?? unavailable();
+      const result = await queue.enqueue(
+        await context(request, 'wallet:actions'),
+        request.body,
+      );
+      return reply.code(202).send(result);
+    },
+  );
+  app.get<{ Params: { requestId: string } }>(
+    '/v1/contract-call-requests/:requestId',
+    {
+      schema: {
+        ...schema('readContractCallRequest'),
+        params: {
+          type: 'object',
+          required: ['requestId'],
+          properties: { requestId: uuidSchema },
+        },
+        response: { 200: queueReceiptSchema },
+      },
+    },
+    async (request) =>
+      (options?.safeQueue ?? unavailable()).read(
+        (await context(request, 'wallet:execute:read')).principal,
+        request.params.requestId,
+      ),
+  );
+  app.post<{ Params: { requestId: string } }>(
+    '/v1/contract-call-requests/:requestId/cancel',
+    {
+      schema: {
+        ...schema('cancelContractCallRequest', {
+          type: 'object',
+          additionalProperties: false,
+        }),
+        params: {
+          type: 'object',
+          required: ['requestId'],
+          properties: { requestId: uuidSchema },
+        },
+        response: { 200: queueReceiptSchema },
+      },
+    },
+    async (request) =>
+      (options?.safeQueue ?? unavailable()).cancel(
+        await context(request, 'wallet:execute'),
+        request.params.requestId,
+      ),
+  );
   app.post<{ Body: ApprovedCallInput }>(
     '/v1/actions/contract-calls',
     {
@@ -450,6 +539,32 @@ export async function registerOnboardingRoutes(
         })),
       };
     },
+  );
+  app.post<{ Params: { actionId: string } }>(
+    '/v1/actions/:actionId/reconcile',
+    {
+      schema: {
+        ...schema(
+          'reconcileExecution',
+          { type: 'object', additionalProperties: false },
+          actionParams,
+        ),
+        headers: {
+          ...executionHeaders,
+          required: [...executionHeaders.required, 'idempotency-key'],
+          properties: {
+            ...executionHeaders.properties,
+            'idempotency-key': uuidSchema,
+          },
+        },
+        response: { 200: executionReceiptSchema },
+      },
+    },
+    async (request) =>
+      execution(request).reconcile(
+        await context(request, 'wallet:execute:read'),
+        request.params.actionId,
+      ),
   );
   const executionDescription =
     'Optional immutable approved-action execution with exact version selection, current owner/grant/identity/consent/approval checks, durable signing and submission authority, application gas sponsorship and independent RPC receipt/finality verification. Unknown provider submission outcomes never permit redispatch. Contract calls require the approved-evm-executor-v1 profile and a stored policy-approved action; execute never accepts replacement calldata.';

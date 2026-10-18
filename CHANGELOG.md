@@ -2,6 +2,9 @@
 
 ## Unreleased approved execution foundation
 
+- Add optional durable per-Safe unsigned request queues, authenticated delayed execution, unsigned cancellation and round-robin sponsor pools with independent executor capacity limits. Concurrent offline SQLite/HTTP fixtures cover duplicate admission, signing races and restart recovery; live throughput and provider acceptance remain pending.
+- Add optional stuck execution/nonce diagnostics, durable payer quarantine, authenticated read-only reconciliation, signed payer webhooks and aggregate operational health. Provider repair mutations and signed Safe invalidation remain separately reviewed operator procedures.
+
 - Generalize designated dispatch to immutable approved EVM actions, retaining current owner, grant, identity, consent, budget, attempt and recovery checks.
 - Add separate contract delegation and configuration for approved calls, original Uniswap V3 exact-input swaps and bounded ERC-4626 router deposits through explicitly bound single-owner Safe 1.4.1 accounts on Base Sepolia.
 - Reserve exact Safe nonces, retain contract-call signatures for coordinated execution, validate code/proxy pins and verify operation-specific outcomes independently of provider acceptance.

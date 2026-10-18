@@ -38,6 +38,8 @@ export interface ExecutionAuthorityRequest {
   request_hash: string;
 }
 export interface ExecutorReceipt {
+  provider_inspection?: import('../execution/recovery.js').ProviderInspection;
+  recovery?: import('../execution/recovery.js').RecoveryDiagnosis;
   contract: 'execution-dispatch-v1';
   execution_id: string;
   plan_hash: string;
@@ -69,6 +71,8 @@ export function executorProviderIdentity(
       ? { contractCalls: provider.contractCalls }
       : {}),
     sponsors: provider.sponsors,
+    ...(provider.recovery ? { recovery: provider.recovery } : {}),
+    ...(provider.sponsorPool ? { sponsorPool: provider.sponsorPool } : {}),
     genesisHash: provider.rpc.genesisHash,
     ...(provider.rpc.tokenCodeHash
       ? { tokenCodeHash: provider.rpc.tokenCodeHash }

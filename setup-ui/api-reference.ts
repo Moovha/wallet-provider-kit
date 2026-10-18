@@ -72,6 +72,7 @@ export function operationStatus(
     wallet: true,
     financial: !!config.financial,
     execution: !!config.execution,
+    safeQueue: !!config.execution?.safeQueue,
     executionService: !!config.execution?.service,
     contractCalls: !!config.approvedCalls?.policy,
     flow: config.policy.access?.mode ?? 'hosted',
@@ -186,7 +187,7 @@ export function requestExample(
       vendor: config.identity.didit ? 'didit' : 'sumsub',
       share_token: '<SHARED_IDENTITY_TOKEN>',
     };
-  if (id === 'requestContractCall')
+  if (id === 'requestContractCall' || id === 'enqueueContractCall')
     return {
       account_id: exampleId,
       kind: 'contract-call',
@@ -214,7 +215,9 @@ export function requestExample(
     id === 'provisionAccount' ||
     id === 'signAction' ||
     id === 'revokeAccountAccess' ||
-    id === 'executeTransfer'
+    id === 'executeTransfer' ||
+    id === 'reconcileExecution' ||
+    id === 'cancelContractCallRequest'
   )
     return {};
 }
@@ -254,6 +257,20 @@ export function responseExample(
   config?: ProviderConfiguration,
   requestedPermissions?: string[],
 ): object {
+  if (
+    [
+      'enqueueContractCall',
+      'readContractCallRequest',
+      'cancelContractCallRequest',
+    ].includes(id)
+  )
+    return {
+      request_id: exampleId,
+      account_id: exampleId,
+      status: id === 'cancelContractCallRequest' ? 'cancelled' : 'queued',
+      expires_at: '2030-01-01T00:05:00.000Z',
+      next_poll_after_ms: 15000,
+    };
   const applicationLed = config?.policy.access?.mode === 'application';
   if (id === 'revokeAccountAccess')
     return { grant_id: exampleId, status: 'revoked' };
@@ -398,7 +415,11 @@ export function responseExample(
       next_sequence: 0,
       history_truncated: false,
     };
-  if (id === 'executeTransfer' || id === 'getTransferExecution')
+  if (
+    id === 'executeTransfer' ||
+    id === 'getTransferExecution' ||
+    id === 'reconcileExecution'
+  )
     return {
       profile: config?.execution?.profile ?? 'erc3009-relayer-v1',
       profile_revision: '1',
@@ -575,7 +596,7 @@ export function referenceSpec(
       op.requestBody.content['application/json'].example = item.body;
     const success =
       op.responses[
-        item.operation.operationId === 'beginEnrollment' ? '201' : '200'
+        Object.keys(op.responses).find((code) => code.startsWith('2'))!
       ];
     if (success) {
       success.description = item.guide.success;

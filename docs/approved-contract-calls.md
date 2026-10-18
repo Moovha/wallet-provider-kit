@@ -158,7 +158,7 @@ provider, sponsor, typed-data domain or Safe transaction is accepted.
 The wallet verifies the account's proxy, singleton, version, exact owner,
 threshold and common nonce through independent RPC sources before constructing
 the action. It stores the SafeTx authorization and reserves that Safe nonce for
-one action. Replays preserve the same action and nonce. A different request at that nonce conflicts. An expired action can release its reservation only when the shared storage transaction proves that no signing admission ever existed; the old action is permanently denied. Any signing admission retains the reservation after expiry or revocation because an authorization may remain usable. There is no public nonce-reset endpoint.
+one action. Replays preserve the same action and nonce. A different immediate action at that nonce conflicts. The optional durable queue holds unsigned requests and only assigns the current nonce to its head; it does not reserve future nonces. An expired action can release its reservation only when the shared storage transaction proves that no signing admission ever existed; the old action is permanently denied. Any signing admission retains the reservation after expiry or revocation because an authorization may remain usable. There is no public nonce-reset endpoint.
 
 Execute the returned action ID using `{}`, `wallet:execute` plus `wallet:sign`,
 a stable UUIDv4 idempotency key and:
@@ -213,3 +213,5 @@ contracts. New mechanisms and operation adapters must retain those boundaries
 and define their own policy and verified outcome. Current Safe support is not
 ERC-4337, ERC-1271 or EIP-5792 conformance; those remain separately versioned future
 adapters in the [enterprise standards record](v1-standards.md).
+
+See [durable Safe queues and sponsor pools](safe-queue-and-sponsor-pools.md) for concurrent request admission, per-Safe ordering, pool configuration and recovery limits.

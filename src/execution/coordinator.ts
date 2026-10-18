@@ -1,3 +1,15 @@
+import {
+  recordPayer,
+  payerKey,
+  emptyOperationsState,
+  type PayerOperations,
+} from './operations.js';
+import {
+  diagnoseExecution,
+  checkedInspection,
+  type ProviderInspection,
+  type NonceSnapshot,
+} from './recovery.js';
 import { approvedCallData } from './approved-calls.js';
 import {
   executionPlanHash,
@@ -55,6 +67,7 @@ export class ApprovedExecutionCoordinator {
     configuration: ExecutionConfiguration,
     private readonly provider: ExecutionProvider,
     private readonly observer: ExecutionObserver,
+    private readonly operations?: PayerOperations,
   ) {
     this.config = structuredClone(configuration);
     this.profile = configuration.profile;
@@ -114,6 +127,18 @@ export class ApprovedExecutionCoordinator {
       record.execution.effectObserved
     )
       deny();
+    {
+      const quarantined = await this.actions.onboarding.store.transaction(
+        (state) =>
+          (state.sponsorQuarantines?.[
+            fingerprint([
+              'payer',
+              record.execution!.plan!.sponsor.binding.address.toLowerCase(),
+            ])
+          ]?.length ?? 0) > 0,
+      );
+      if (quarantined) deny();
+    }
     return true;
   }
   private async claim(
@@ -143,6 +168,7 @@ export class ApprovedExecutionCoordinator {
       execution_id: execution.executionId,
       dispatch_status: dispatch,
       observation_revision: execution.observationRevision,
+      ...(execution.recovery ? { recovery: execution.recovery } : {}),
       outcome_scope: record.intent
         ? record.intent.input.kind === 'swap'
           ? 'swap-effects'
@@ -171,10 +197,10 @@ export class ApprovedExecutionCoordinator {
       !uuid.test(context.idempotencyKey)
     )
       deny();
-    const sponsor = this.config.sponsors.find(
+    const sponsors = this.config.sponsors.filter(
       (candidate) => candidate.clientId === context.principal.clientId,
     );
-    if (!sponsor) deny();
+    if (!sponsors.length) deny();
     const key = fingerprint([
       'execute-transfer',
       context.principal.issuer,
@@ -199,6 +225,75 @@ export class ApprovedExecutionCoordinator {
           latest.execution.configurationHash !== this.configurationHash
         )
           deny();
+        const previousSponsor =
+          latest.execution?.sponsorAccountId ??
+          latest.execution?.plan?.sponsor.accountId;
+        let sponsor = previousSponsor
+          ? sponsors.find((entry) => entry.accountId === previousSponsor)
+          : sponsors[0];
+        if (latest.execution && !sponsor) deny();
+        if (!latest.execution && this.config.sponsorPool) {
+          const poolKey = fingerprint([
+            'sponsor-pool',
+            context.principal.clientId,
+            this.configurationHash,
+          ]);
+          const cursor = (state.executionPools ??= {})[poolKey] ?? 0;
+          sponsor = Array.from(
+            { length: sponsors.length },
+            (_, index) => sponsors[(cursor + index) % sponsors.length],
+          ).find((candidate) => {
+            if (
+              state.sponsorQuarantines?.[
+                fingerprint(['payer', candidate.binding.address.toLowerCase()])
+              ]?.length
+            )
+              return false;
+            const occupied = Object.values(state.supportedActions ?? {}).filter(
+              (entry) => {
+                const execution = entry.execution;
+                if (
+                  !execution ||
+                  execution.sponsorClientId !== candidate.clientId ||
+                  (
+                    execution.plan?.sponsor.binding.address ??
+                    execution.sponsorAddress ??
+                    sponsors.find(
+                      (member) =>
+                        member.accountId === execution.sponsorAccountId,
+                    )?.binding.address ??
+                    sponsors[0].binding.address
+                  ).toLowerCase() !== candidate.binding.address.toLowerCase()
+                )
+                  return false;
+                if (
+                  execution.observation?.chain_status === 'finalized' &&
+                  execution.observation.verification === 'rpc-quorum' &&
+                  !execution.integrityFailure
+                )
+                  return false;
+                return (
+                  Date.parse(entry.approval.action.expires_at) > Date.now() ||
+                  this.database.hasActionAttempts(
+                    entry.approval.action.action_id,
+                  )
+                );
+              },
+            ).length;
+            return occupied < this.config.sponsorPool!.maxInFlightPerSponsor;
+          });
+          if (!sponsor) throw new WalletProviderError('wallet_attempt_pending');
+          state.executionPools[poolKey] =
+            (sponsors.indexOf(sponsor) + 1) % sponsors.length;
+        }
+        if (!sponsor) deny();
+        if (
+          !latest.execution &&
+          state.sponsorQuarantines?.[
+            fingerprint(['payer', sponsor.binding.address.toLowerCase()])
+          ]?.length
+        )
+          throw new WalletProviderError('wallet_attempt_pending');
         if (
           sponsor.binding.address.toLowerCase() ===
           latest.approval.account.address.toLowerCase()
@@ -220,6 +315,9 @@ export class ApprovedExecutionCoordinator {
               : {}),
             configurationHash: this.configurationHash,
             sponsorClientId: sponsor.clientId,
+            sponsorAccountId: sponsor.accountId,
+            sponsorAddress: sponsor.binding.address,
+            startedAt: Date.now(),
             observationRevision: 0,
           };
         state.idempotency[key] = {
@@ -230,6 +328,14 @@ export class ApprovedExecutionCoordinator {
       },
       true,
     );
+    const sponsor =
+      sponsors.find(
+        (entry) =>
+          entry.accountId ===
+          (record.execution?.sponsorAccountId ??
+            record.execution?.plan?.sponsor.accountId ??
+            sponsors[0].accountId),
+      ) ?? deny();
     if (record.intent && this.profile !== 'approved-evm-executor-v1') deny();
     const existing = await this.claim(record);
     if (existing || record.execution?.effectObserved) {
@@ -253,6 +359,15 @@ export class ApprovedExecutionCoordinator {
     record = await this.current(context.principal, id);
     if (!record.execution) unknown();
     if (!record.execution.plan) {
+      if (
+        await this.actions.onboarding.store.transaction(
+          (state) =>
+            !!state.sponsorQuarantines?.[
+              fingerprint(['payer', sponsor.binding.address.toLowerCase()])
+            ]?.length,
+        )
+      )
+        deny();
       const scanFromBlock = await this.observer.anchor();
       const signature = Signature.from(
         await this.wallet.sign(
@@ -331,7 +446,10 @@ export class ApprovedExecutionCoordinator {
     ]);
     await this.database.setBudget(
       budgetId,
-      sponsor.lifetimeBudgetWei,
+      sponsors
+        .map((entry) => BigInt(entry.lifetimeBudgetWei))
+        .reduce((a, b) => (a < b ? a : b))
+        .toString(),
       this.actions.revision,
     );
     const units = (
@@ -455,6 +573,38 @@ export class ApprovedExecutionCoordinator {
     if (record.execution.plan) await this.refresh(id);
     return this.receipt(await this.current(principal, id, true));
   }
+  async reconcile(
+    context: AuthorityContext,
+    id: string,
+  ): Promise<ExecutionReceipt> {
+    context = structuredClone(context);
+    if (
+      !context.principal.scopes.includes('wallet:execute:read') ||
+      !uuid.test(context.idempotencyKey)
+    )
+      deny();
+    await this.actions.withAuthorizedTransfer(
+      context.principal,
+      id,
+      (state, record) => {
+        if (!record.execution) deny();
+        const key = fingerprint([
+          'reconcile',
+          context.principal.issuer,
+          context.principal.subject,
+          context.principal.clientId,
+          context.idempotencyKey,
+        ]);
+        const hash = fingerprint([id, record.execution.executionId]);
+        if (state.idempotency[key] && state.idempotency[key].hash !== hash)
+          throw new WalletProviderError('wallet_attempt_conflict');
+        state.idempotency[key] = { id, hash };
+      },
+      true,
+    );
+    await this.refresh(id);
+    return this.receipt(await this.current(context.principal, id, true));
+  }
   async events(principal: VerifiedPrincipal, id: string, after = '0') {
     if (!principal.scopes.includes('wallet:execute:read')) deny();
     if (
@@ -494,7 +644,9 @@ export class ApprovedExecutionCoordinator {
         this.actions.revision
       )
         deny();
-      return state.supportedActions?.[id];
+      const record = state.supportedActions?.[id];
+      if (record?.execution) record.execution.startedAt ??= Date.now();
+      return record;
     });
     if (!record?.execution?.plan || record.execution.integrityFailure) return;
     const execution = record.execution;
@@ -523,23 +675,79 @@ export class ApprovedExecutionCoordinator {
         /* Preserve uncertainty; never resubmit. */
       }
     }
+    let inspection: ProviderInspection | undefined;
+    if (
+      this.config.recovery &&
+      this.provider.inspect &&
+      claim?.state === 'succeeded' &&
+      claim.result.kind === 'relay_transaction'
+    ) {
+      try {
+        inspection = checkedInspection(
+          await this.provider.inspect(plan, claim.result.transactionId),
+        );
+      } catch {
+        /* Preserve unavailable provider evidence. */
+      }
+    }
     const candidates = [
       ...(execution.transactionHashes ?? []),
       ...(record.transactionEvents ?? [])
         .slice(-4)
         .map((event) => event.transaction_hash),
     ];
-    const { scanNextBlock, ...observation } = await this.observer.observe(
-      plan,
-      candidates,
-      ownHash,
-      execution.scanNextBlock,
-    );
+    let observedFresh = true;
+    let observed: Awaited<ReturnType<ExecutionObserver['observe']>>;
+    try {
+      observed = await this.observer.observe(
+        plan,
+        candidates,
+        ownHash,
+        execution.scanNextBlock,
+      );
+    } catch (error) {
+      if (!this.config.recovery) throw error;
+      observedFresh = false;
+      observed = execution.observation ?? {
+        chain_status: 'unobserved',
+        verification: 'unverified',
+        outcome: 'unknown',
+        settlement: 'pending',
+        observed_at: new Date().toISOString(),
+      };
+    }
+    const { scanNextBlock, ...observation } = observed;
+    let snapshot: NonceSnapshot | undefined;
+    if (this.config.recovery && this.observer.nonceSnapshot) {
+      try {
+        snapshot = await this.observer.nonceSnapshot(
+          plan,
+          ownHash ?? inspection?.transactionHash,
+        );
+      } catch {
+        /* Diagnostic uncertainty never manufactures nonce or settlement evidence. */
+      }
+    }
+    const recovery = this.config.recovery
+      ? diagnoseExecution({
+          plan,
+          configuration: this.config.recovery,
+          startedAt: execution.startedAt!,
+          observation:
+            observedFresh || execution.observation?.chain_status === 'finalized'
+              ? observation
+              : undefined,
+          inspection,
+          knownNonce: execution.providerNonce,
+          snapshot,
+        })
+      : undefined;
     const eventData = await this.receipt({
       ...record,
       execution: {
         ...execution,
         observation,
+        ...(recovery ? { recovery } : {}),
         observationRevision: execution.observationRevision + 1,
       },
     });
@@ -558,6 +766,7 @@ export class ApprovedExecutionCoordinator {
       )
         throw new WalletProviderError('wallet_attempt_pending');
       const previous = latest.observation;
+      const previousRecovery = latest.recovery;
       if (
         previous?.chain_status === 'finalized' &&
         (observation.chain_status !== 'finalized' ||
@@ -567,6 +776,29 @@ export class ApprovedExecutionCoordinator {
           observation.outcome !== previous.outcome)
       ) {
         latest.integrityFailure = true;
+        if (
+          this.operations &&
+          state.operations?.['service-v1']?.binding === this.operations.binding
+        )
+          recordPayer(
+            ((state.operations ??= {})['service-v1'] ??=
+              emptyOperationsState()),
+            payerKey(plan.sponsor.binding.address),
+            { affected: true, reason: 'integrity-failure' },
+            this.operations.configuration,
+            this.operations.targets,
+            this.operations.source,
+          );
+        if (this.config.recovery?.quarantineOnStuck) {
+          const payer = fingerprint([
+            'payer',
+            plan.sponsor.binding.address.toLowerCase(),
+          ]);
+          const quarantines = (state.sponsorQuarantines ??= {});
+          quarantines[payer] = [
+            ...new Set([...(quarantines[payer] ?? []), execution.executionId]),
+          ];
+        }
         state.audit.push({
           at: Date.now(),
           event: 'execution_integrity_failure',
@@ -574,6 +806,69 @@ export class ApprovedExecutionCoordinator {
           revision: this.actions.revision,
         });
         return false;
+      }
+      if (recovery) {
+        latest.recovery = recovery;
+        latest.providerNonce ??= recovery.sponsor_nonce;
+        const payer = fingerprint([
+          'payer',
+          plan.sponsor.binding.address.toLowerCase(),
+        ]);
+        const quarantines = (state.sponsorQuarantines ??= {});
+        const blocked = quarantines[payer] ?? [];
+        if (recovery.quarantined)
+          quarantines[payer] = [
+            ...new Set([...blocked, execution.executionId]),
+          ];
+        else if (observedFresh && recovery.state === 'finalized')
+          quarantines[payer] = blocked.filter(
+            (id) => id !== execution.executionId,
+          );
+        recovery.quarantined = !!quarantines[payer]?.length;
+        if (
+          this.operations &&
+          state.operations?.['service-v1']?.binding === this.operations.binding
+        ) {
+          const affected =
+            !!quarantines[payer]?.length ||
+            Object.values(state.supportedActions ?? {}).some(
+              (entry) =>
+                entry.execution?.plan?.sponsor.binding.address.toLowerCase() ===
+                  plan.sponsor.binding.address.toLowerCase() &&
+                (entry.execution.integrityFailure ||
+                  (entry.execution.observation?.chain_status !== 'finalized' &&
+                    ['suspected-stuck', 'blocked', 'unavailable'].includes(
+                      entry.execution.recovery?.state ?? '',
+                    ))),
+            );
+          recordPayer(
+            ((state.operations ??= {})['service-v1'] ??=
+              emptyOperationsState()),
+            payerKey(plan.sponsor.binding.address),
+            {
+              affected,
+              reason: affected
+                ? recovery.quarantined
+                  ? 'payer-quarantined'
+                  : recovery.reason
+                : 'none',
+            },
+            this.operations.configuration,
+            this.operations.targets,
+            this.operations.source,
+          );
+        }
+
+        if (
+          previousRecovery?.state !== recovery.state ||
+          previousRecovery?.reason !== recovery.reason
+        )
+          state.audit.push({
+            at: Date.now(),
+            event: 'execution_recovery_observed',
+            resource: id,
+            revision: this.actions.revision,
+          });
       }
       if (scanNextBlock) latest.scanNextBlock = scanNextBlock;
       latest.observation = observation;
@@ -594,6 +889,9 @@ export class ApprovedExecutionCoordinator {
       ].slice(0, 8);
       if (
         !previous ||
+        previousRecovery?.state !== recovery?.state ||
+        previousRecovery?.reason !== recovery?.reason ||
+        previousRecovery?.quarantined !== recovery?.quarantined ||
         previous.chain_status !== observation.chain_status ||
         previous.block_hash !== observation.block_hash ||
         previous.transaction_hash !== observation.transaction_hash ||

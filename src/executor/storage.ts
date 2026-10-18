@@ -1,3 +1,11 @@
+import {
+  emptyOperationsState,
+  recordPayer,
+  payerKey,
+  type OperationsState,
+  type PayerOperations,
+} from '../execution/operations.js';
+import type { RecoveryDiagnosis } from '../execution/recovery.js';
 import { resolve } from 'node:path';
 import { StorageConnection } from '../storage/connection.js';
 import {
@@ -27,6 +35,9 @@ export interface ExecutorRecord {
   providerHash: string;
   observation?: ChainObservation;
   observationRevision: number;
+  startedAt?: number;
+  providerNonce?: string;
+  recovery?: RecoveryDiagnosis;
   scanNextBlock?: string;
   transactionHashes?: string[];
   integrityFailure?: boolean;
@@ -48,7 +59,12 @@ export function openExecutorDatabase(
     profile: config.profile,
   };
   function getRecord<T>(
-    collection: 'executorBindings' | 'executorDispatches' | 'executorNonces',
+    collection:
+      | 'executorBindings'
+      | 'executorDispatches'
+      | 'executorNonces'
+      | 'executorQuarantines'
+      | 'operations',
     id: string,
   ): T | undefined {
     const row = connection.get(
@@ -59,7 +75,12 @@ export function openExecutorDatabase(
     return row ? (JSON.parse(String(row.record)) as T) : undefined;
   }
   function save(
-    collection: 'executorBindings' | 'executorDispatches' | 'executorNonces',
+    collection:
+      | 'executorBindings'
+      | 'executorDispatches'
+      | 'executorNonces'
+      | 'executorQuarantines'
+      | 'operations',
     id: string,
     record: unknown,
   ) {
@@ -150,7 +171,146 @@ export function openExecutorDatabase(
       throw new WalletProviderError('wallet_authorization_denied');
     return record;
   }
+  function quarantineKey(address: string) {
+    return serviceHash(['payer', address.toLowerCase()]);
+  }
+  function quarantined(address: string) {
+    fence();
+    return !!getRecord<{ executionIds: string[] }>(
+      'executorQuarantines',
+      quarantineKey(address),
+    )?.executionIds.length;
+  }
   return {
+    quarantined,
+    operations<T>(operation: (state: OperationsState) => T): Promise<T> {
+      return Promise.resolve(
+        connection.transaction(() => {
+          fence();
+          const state =
+            getRecord<OperationsState>('operations', 'service-v1') ??
+            emptyOperationsState();
+          const result = operation(state);
+          save('operations', 'service-v1', state);
+          return result;
+        }),
+      );
+    },
+    pendingRecovery() {
+      fence();
+      return connection
+        .all(
+          "SELECT record FROM onboarding_records WHERE collection='executorDispatches'",
+        )
+        .map((row) => JSON.parse(String(row.record)) as ExecutorRecord)
+        .filter(
+          (record) =>
+            record.observation?.chain_status !== 'finalized' &&
+            config.providers.some(
+              (provider) =>
+                provider.id === record.dispatch.provider_id &&
+                provider.revision === record.dispatch.provider_revision &&
+                provider.recovery,
+            ),
+        );
+    },
+    recovery(
+      record: ExecutorRecord,
+      diagnosis: RecoveryDiagnosis,
+      fresh: boolean,
+      operations?: PayerOperations,
+    ) {
+      return connection.transaction(() => {
+        const latest = load(record.dispatch.execution_id, record.walletOrigin);
+        if (
+          !latest ||
+          latest.identityHash !== record.identityHash ||
+          latest.observationRevision !== record.observationRevision
+        )
+          throw new WalletProviderError('wallet_attempt_pending');
+        latest.startedAt ??= record.startedAt ?? Date.now();
+        latest.providerNonce ??= diagnosis.sponsor_nonce;
+        const previous = latest.recovery;
+        latest.recovery = diagnosis;
+        latest.observationRevision++;
+        const key = quarantineKey(latest.dispatch.plan.sponsor.binding.address);
+        const current =
+          getRecord<{ executionIds: string[] }>('executorQuarantines', key)
+            ?.executionIds ?? [];
+        if (diagnosis.quarantined)
+          save('executorQuarantines', key, {
+            executionIds: [
+              ...new Set([...current, latest.dispatch.execution_id]),
+            ],
+          });
+        else if (
+          fresh &&
+          diagnosis.state === 'finalized' &&
+          latest.observation?.chain_status === 'finalized' &&
+          latest.observation.verification === 'rpc-quorum' &&
+          !latest.integrityFailure
+        )
+          save('executorQuarantines', key, {
+            executionIds: current.filter(
+              (id) => id !== latest.dispatch.execution_id,
+            ),
+          });
+        diagnosis.quarantined = !!getRecord<{ executionIds: string[] }>(
+          'executorQuarantines',
+          key,
+        )?.executionIds.length;
+        save('executorDispatches', latest.dispatch.execution_id, latest);
+        if (operations) {
+          const payer = latest.dispatch.plan.sponsor.binding.address;
+          const affected =
+            quarantined(payer) ||
+            connection
+              .all(
+                "SELECT record FROM onboarding_records WHERE collection='executorDispatches'",
+              )
+              .map((row) => JSON.parse(String(row.record)) as ExecutorRecord)
+              .some(
+                (entry) =>
+                  entry.dispatch.plan.sponsor.binding.address.toLowerCase() ===
+                    payer.toLowerCase() &&
+                  (entry.integrityFailure ||
+                    (entry.observation?.chain_status !== 'finalized' &&
+                      ['suspected-stuck', 'blocked', 'unavailable'].includes(
+                        entry.recovery?.state ?? '',
+                      ))),
+              );
+          const state =
+            getRecord<OperationsState>('operations', 'service-v1') ??
+            emptyOperationsState();
+          recordPayer(
+            state,
+            payerKey(payer),
+            {
+              affected,
+              reason: affected
+                ? diagnosis.quarantined
+                  ? 'payer-quarantined'
+                  : diagnosis.reason
+                : 'none',
+            },
+            operations.configuration,
+            operations.targets,
+            operations.source,
+          );
+          save('operations', 'service-v1', state);
+        }
+
+        if (
+          previous?.state !== diagnosis.state ||
+          previous?.reason !== diagnosis.reason
+        )
+          connection.audit(
+            'executor_recovery_observed',
+            latest.dispatch.execution_id,
+          );
+        return latest;
+      });
+    },
     journal,
     request,
     load,
@@ -202,6 +362,27 @@ export function openExecutorDatabase(
         const sponsor = provider.sponsors.find(
           (entry) => entry.accountId === dispatch.plan.sponsor.accountId,
         )!;
+        if (quarantined(sponsor.binding.address))
+          throw new WalletProviderError('wallet_attempt_pending');
+        if (provider.sponsorPool) {
+          const active = connection
+            .all(
+              "SELECT record FROM onboarding_records WHERE collection='executorDispatches'",
+            )
+            .map((row) => JSON.parse(String(row.record)) as ExecutorRecord)
+            .filter(
+              (entry) =>
+                entry.dispatch.plan.sponsor.binding.address.toLowerCase() ===
+                  sponsor.binding.address.toLowerCase() &&
+                !(
+                  entry.observation?.chain_status === 'finalized' &&
+                  entry.observation.verification === 'rpc-quorum' &&
+                  !entry.integrityFailure
+                ),
+            );
+          if (active.length >= provider.sponsorPool.maxInFlightPerSponsor)
+            throw new WalletProviderError('wallet_attempt_pending');
+        }
         const budgetId = serviceHash([
           'executor-gas',
           config.origin,
@@ -238,6 +419,7 @@ export function openExecutorDatabase(
           revision,
           providerHash: serviceHash(executorProviderIdentity(provider)),
           observationRevision: 0,
+          startedAt: Date.now(),
         };
         admission(connection, {
           request: request(record),
@@ -255,6 +437,7 @@ export function openExecutorDatabase(
       record: ExecutorRecord,
       observation: ChainObservation,
       scanNextBlock?: string,
+      operations?: PayerOperations,
     ) {
       return connection.transaction(() => {
         const latest = load(record.dispatch.execution_id, record.walletOrigin);
@@ -274,6 +457,38 @@ export function openExecutorDatabase(
             observation.outcome !== previous.outcome)
         ) {
           latest.integrityFailure = true;
+          if (operations) {
+            const state =
+              getRecord<OperationsState>('operations', 'service-v1') ??
+              emptyOperationsState();
+            recordPayer(
+              state,
+              payerKey(latest.dispatch.plan.sponsor.binding.address),
+              { affected: true, reason: 'integrity-failure' },
+              operations.configuration,
+              operations.targets,
+              operations.source,
+            );
+            save('operations', 'service-v1', state);
+          }
+          const provider = config.providers.find(
+            (entry) =>
+              entry.id === latest.dispatch.provider_id &&
+              entry.revision === latest.dispatch.provider_revision,
+          );
+          if (provider?.recovery?.quarantineOnStuck) {
+            const key = quarantineKey(
+              latest.dispatch.plan.sponsor.binding.address,
+            );
+            const previous =
+              getRecord<{ executionIds: string[] }>('executorQuarantines', key)
+                ?.executionIds ?? [];
+            save('executorQuarantines', key, {
+              executionIds: [
+                ...new Set([...previous, latest.dispatch.execution_id]),
+              ],
+            });
+          }
           save('executorDispatches', latest.dispatch.execution_id, latest);
           connection.audit(
             'executor_integrity_failure',

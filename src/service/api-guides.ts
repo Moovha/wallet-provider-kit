@@ -7,6 +7,7 @@ export interface OperationGuide {
   approvedAction?: boolean;
   enrollment?: boolean;
   execution?: boolean;
+  safeQueue?: boolean;
   applicationLed?: boolean;
   records?: boolean;
   vendor?: boolean;
@@ -20,11 +21,44 @@ export interface OperationGuide {
 }
 // Shared operator guidance. Runtime authentication and authority remain authoritative.
 export const operationGuides: Record<string, OperationGuide> = {
+  enqueueContractCall: {
+    title: 'Queue an approved Safe operation for automatic execution',
+    group: 'Safe execution queue',
+    scope: 'wallet:actions',
+    safeQueue: true,
+    permission: 'contracts:request',
+    prerequisite:
+      'Enable the bounded Safe queue and approved-evm-executor-v1. Also require wallet:sign and wallet:execute. This request authorizes delayed execution of the exact policy-controlled input under the original owner, grant, consent and policy until its bounded expiry. The worker rechecks all current authority before signing and dispatch; queued requests contain no signature or assigned Safe nonce.',
+    success:
+      '202: a durable request ID. Per-Safe FIFO ordering survives restart. Only the head materializes an immutable action; action_id appears after admission. Follow this request and then its verified action execution. Unknown signed attempts block the lane. Acceptance is not execution or settlement.',
+  },
+  readContractCallRequest: {
+    title: 'Read a queued Safe request',
+    group: 'Safe execution queue',
+    scope: 'wallet:execute:read',
+    safeQueue: true,
+    permission: 'contracts:request',
+    prerequisite:
+      'Use the original request ID and current owner-bound application access. Reading never signs, dispatches or advances the queue.',
+    success:
+      '200: queued, executing, succeeded, cancelled, expired or blocked and an action_id when materialized. Succeeded requires finalized RPC-quorum execution success. Signed failures and uncertainty require recovery; the queue does not skip or replace them.',
+  },
+  cancelContractCallRequest: {
+    title: 'Cancel an unsigned queued Safe request',
+    group: 'Safe execution queue',
+    scope: 'wallet:execute',
+    safeQueue: true,
+    permission: 'contracts:request',
+    prerequisite:
+      'Use an empty body, UUIDv4 Idempotency-Key and current original-caller authority. Cancellation is allowed only when durable storage proves no signing admission exists, including after a crash during action materialization.',
+    success:
+      '200: cancelled. A signed or uncertain action returns conflict and retains its Safe nonce and queue position; cancellation cannot recall an issued signature.',
+  },
   requestContractCall: {
     title: 'Approve contract calls, swaps or vault deposits',
     group: 'Approved contract calls',
     scope: 'wallet:actions',
-    financial: true,
+    approvedAction: true,
     execution: true,
     permission: 'contracts:request',
     prerequisite:
@@ -154,6 +188,17 @@ export const operationGuides: Record<string, OperationGuide> = {
     success:
       '200: implemented transfer and approved EVM execution profiles on Base Sepolia, their revisions, required scopes and finalized RPC-quorum verification policy. Unsupported wallet/account standards are not advertised as executable capabilities.',
   },
+  reconcileExecution: {
+    title: 'Reconcile an existing execution without provider mutations',
+    group: 'Execution recovery',
+    scope: 'wallet:execute:read',
+    execution: true,
+    approvedAction: true,
+    prerequisite:
+      'Use the original action ID, an empty body, exact execution profile headers and a UUIDv4 Idempotency-Key. Current original caller, owner, grant, identity, consent and approval remain required; status reconciliation is allowed after signing expiry. Optional recovery configuration adds nonce diagnostics and durable payer quarantine.',
+    success:
+      '200: refreshed original execution and operational diagnosis. The procedure performs only read-only provider and RPC lookup, preserves attempts and budgets, and never signs, claims dispatch, reprices, cancels or clears a nonce. Only exact verified finalized receipts clear corresponding quarantine reasons; nonce consumption without matching effects requires operator review.',
+  },
   executeTransfer: {
     title: 'Execute an approved action with a gas sponsor',
     group: 'Execution coordination',
@@ -255,6 +300,7 @@ export interface ApiFeatures {
   enrollment: boolean;
   financial: boolean;
   execution?: boolean;
+  safeQueue?: boolean;
   executionService?: boolean;
   contractCalls?: boolean;
   signing?: boolean;
@@ -272,6 +318,8 @@ export function operationUnavailableReason(
   const guide = operationGuides[id];
   if (!guide || id === 'getCapabilities' || id === 'getExecutionCapabilities')
     return undefined;
+  if (guide.safeQueue && !features.safeQueue)
+    return 'Durable Safe execution queue is not configured';
   if (id === 'requestContractCall' && !features.contractCalls)
     return 'Approved contract-call policy and execution mechanism are not configured';
   if (guide.serviceAuthenticated && !features.executionService)

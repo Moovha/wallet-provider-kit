@@ -594,6 +594,9 @@ export interface ServerOptions {
   onboarding?: OnboardingHttpOptions;
   /** Must check durable authority/recovery dependencies; never infer readiness from env keys. */
   ready?: () => Promise<boolean>;
+  operationsHealth?: () => Promise<
+    import('../execution/operations.js').OperationsHealth
+  >;
   documentation?: boolean;
   /** Optional operator-authenticated client-credentials broker for the deployed explorer. */
   documentationTokens?: DocumentationTokenOptions;
@@ -1340,6 +1343,16 @@ export type Permission = (typeof permissions)[number];
 ```ts
 export interface ProviderState {
   format: 'moovha-onboarding-1';
+  operations?: Record<
+    string,
+    import('../execution/operations.js').OperationsState
+  >;
+  executionPools?: Record<string, number>;
+  sponsorQuarantines?: Record<string, string[]>;
+  safeRequests?: Record<
+    string,
+    import('../execution/queue.js').SafeQueueRecord
+  >;
   supportedActions?: Record<string, TransferRecord>;
   backendAccounts?: Record<
     string,
@@ -2392,11 +2405,21 @@ Import from `@moovha/wallet-provider-kit/deployment`. [Integration guide](setup.
 - [ExecutorReceipt](#executorreceipt)
 - [loadExecutionServiceConfiguration](#loadexecutionserviceconfiguration)
 - [loadProviderConfiguration](#loadproviderconfiguration)
+- [NonceSnapshot](#noncesnapshot)
+- [OperationsConfiguration](#operationsconfiguration)
+- [OperationsHealth](#operationshealth)
+- [PayerEvent](#payerevent)
+- [payerKey](#payerkey)
 - [PinnedContract](#pinnedcontract)
 - [ProviderConfiguration](#providerconfiguration)
+- [ProviderInspection](#providerinspection)
 - [QuorumExecutionObserver](#quorumexecutionobserver)
 - [QuorumTransferObserver](#quorumtransferobserver)
+- [RecoveryConfiguration](#recoveryconfiguration)
+- [RecoveryDiagnosis](#recoverydiagnosis)
 - [SafeAccountBinding](#safeaccountbinding)
+- [SafeExecutionQueue](#safeexecutionqueue)
+- [SafeQueueRecord](#safequeuerecord)
 - [SecretReference](#secretreference)
 - [ServiceIdentity](#serviceidentity)
 - [ServicePeer](#servicepeer)
@@ -2550,6 +2573,7 @@ export declare class ApprovedExecutionCoordinator {
     configuration: ExecutionConfiguration,
     provider: ExecutionProvider,
     observer: ExecutionObserver,
+    operations?: PayerOperations | undefined,
   );
   execute(input: AuthorityContext, id: string): Promise<ExecutionReceipt>;
   /** Authenticated executor callback: a service identity never replaces current wallet authority. */
@@ -2563,6 +2587,7 @@ export declare class ApprovedExecutionCoordinator {
     allowed: true;
   }>;
   read(principal: VerifiedPrincipal, id: string): Promise<ExecutionReceipt>;
+  reconcile(context: AuthorityContext, id: string): Promise<ExecutionReceipt>;
   events(
     principal: VerifiedPrincipal,
     id: string,
@@ -2808,6 +2833,15 @@ export interface ExecutionConfiguration {
     tokenCodeHash?: string;
   };
   sponsors: ExecutionSponsor[];
+  sponsorPool?: {
+    strategy: 'round-robin';
+    maxInFlightPerSponsor: number;
+  };
+  safeQueue?: {
+    maxDepthPerSafe: number;
+    maxWaitSeconds: number;
+  };
+  recovery?: import('./recovery.js').RecoveryConfiguration;
   pollIntervalSeconds: number;
   maxLogRange: number;
 }
@@ -2846,6 +2880,10 @@ export interface ExecutionDispatchContext {
 
 ```ts
 export interface ExecutionObserver {
+  nonceSnapshot?(
+    plan: TransferExecutionPlan,
+    ownHash?: string,
+  ): Promise<import('./recovery.js').NonceSnapshot>;
   anchor(): Promise<string>;
   preflight(plan: TransferExecutionPlan): Promise<void>;
   observe(
@@ -2878,6 +2916,10 @@ export type ExecutionProfile =
 
 ```ts
 export interface ExecutionProvider {
+  inspect?(
+    plan: TransferExecutionPlan,
+    transactionId: string,
+  ): Promise<import('./recovery.js').ProviderInspection>;
   prepare(plan: TransferExecutionPlan): Promise<void>;
   submit(
     plan: TransferExecutionPlan,
@@ -2915,6 +2957,7 @@ export interface ExecutionProviderAdapterV1 {
 
 ```ts
 export interface ExecutionReceipt extends ChainObservation {
+  recovery?: import('./recovery.js').RecoveryDiagnosis;
   profile: ExecutionProfile;
   profile_revision: '1';
   action_id: string;
@@ -2962,6 +3005,7 @@ export interface ExecutionServiceConfiguration {
     providers: string[];
   })[];
   providers: ExecutorProviderConfiguration[];
+  operations?: import('../execution/operations.js').OperationsConfiguration;
   activation: {
     enabled: boolean;
     providerAcceptance?: string;
@@ -3010,6 +3054,8 @@ export interface ExecutorProviderConfiguration {
   token?: TransferPolicy['token'];
   contractCalls?: ApprovedCallPolicy;
   sponsors: ExecutionSponsor[];
+  sponsorPool?: ExecutionConfiguration['sponsorPool'];
+  recovery?: ExecutionConfiguration['recovery'];
 }
 ```
 
@@ -3019,6 +3065,8 @@ export interface ExecutorProviderConfiguration {
 
 ```ts
 export interface ExecutorReceipt {
+  provider_inspection?: import('../execution/recovery.js').ProviderInspection;
+  recovery?: import('../execution/recovery.js').RecoveryDiagnosis;
   contract: 'execution-dispatch-v1';
   execution_id: string;
   plan_hash: string;
@@ -3050,6 +3098,90 @@ export declare function loadProviderConfiguration(path: string): Promise<{
   config: ProviderConfiguration;
   directory: string;
 }>;
+```
+
+### NonceSnapshot
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/recovery.ts).
+
+```ts
+export interface NonceSnapshot {
+  confirmedNonce: string;
+  finalizedNonce: string;
+  pendingNonceMinimum: string;
+  pendingNonceMaximum: string;
+  balanceWei: string;
+  baseFeePerGas: string;
+  transactionNonce?: string;
+  safeNonce?: string;
+}
+```
+
+### OperationsConfiguration
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/operations.ts).
+
+```ts
+export interface OperationsConfiguration {
+  pollIntervalSeconds: number;
+  lowBalanceWei: string;
+  webhooks: {
+    id: string;
+    endpoint: SecretReference;
+    signingSecrets: SecretReference[];
+  }[];
+}
+```
+
+### OperationsHealth
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/operations.ts).
+
+```ts
+export interface OperationsHealth {
+  status: 'healthy' | 'degraded' | 'disabled';
+  payers: number;
+  affected_payers: number;
+  low_balance_payers: number;
+  unavailable_payers: number;
+  stale_payers: number;
+  webhook_pending: number;
+  webhook_failed: number;
+  webhook_unroutable: number;
+  oldest_delivery_age_ms: number;
+  last_webhook_delivery_at?: string;
+}
+```
+
+### PayerEvent
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/operations.ts).
+
+```ts
+export interface PayerEvent {
+  specversion: '1.0';
+  id: string;
+  source: string;
+  type: 'com.moovha.wallet-provider.payer.observed.v1';
+  subject: string;
+  time: string;
+  datacontenttype: 'application/json';
+  data: {
+    balance: PayerCondition['balance'];
+    affected: boolean;
+    reason: string;
+    balance_wei?: string;
+    threshold_wei: string;
+  };
+}
+```
+
+### payerKey
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/operations.ts).
+
+```ts
+export declare const payerKey: (address: string) => string;
 ```
 
 ### PinnedContract
@@ -3142,11 +3274,24 @@ export interface ProviderConfiguration {
   financial?: TransferPolicy;
   approvedCalls?: import('../execution/approved-calls.js').ApprovedCallsConfiguration;
   execution?: ExecutionConfiguration;
+  operations?: import('../execution/operations.js').OperationsConfiguration;
   http?: {
     host?: '127.0.0.1' | '0.0.0.0' | '::1' | '::';
     port?: number;
     documentation?: boolean;
   };
+}
+```
+
+### ProviderInspection
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/recovery.ts).
+
+```ts
+export interface ProviderInspection {
+  status: string;
+  nonce?: string;
+  transactionHash?: string;
 }
 ```
 
@@ -3167,6 +3312,13 @@ export declare class QuorumExecutionObserver implements ExecutionObserver {
   preflight(plan: TransferExecutionPlan): Promise<void>;
   /** Read-only verified account binding and common nonce before constructing an approved action. */
   contractNonce(binding: SafeAccountBinding, owner: string): Promise<string>;
+  /** Native balance at a common canonical block, with chain identity and block-hash agreement. */
+  payerBalance(sponsor: string): Promise<string>;
+  /** Read-only nonce diagnostics at common canonical block heights; pending counts are explicitly local hints. */
+  nonceSnapshot(
+    plan: TransferExecutionPlan,
+    ownHash?: string,
+  ): Promise<NonceSnapshot>;
   observe(
     plan: TransferExecutionPlan,
     candidates: string[],
@@ -3197,6 +3349,13 @@ export declare class QuorumExecutionObserver implements ExecutionObserver {
   preflight(plan: TransferExecutionPlan): Promise<void>;
   /** Read-only verified account binding and common nonce before constructing an approved action. */
   contractNonce(binding: SafeAccountBinding, owner: string): Promise<string>;
+  /** Native balance at a common canonical block, with chain identity and block-hash agreement. */
+  payerBalance(sponsor: string): Promise<string>;
+  /** Read-only nonce diagnostics at common canonical block heights; pending counts are explicitly local hints. */
+  nonceSnapshot(
+    plan: TransferExecutionPlan,
+    ownHash?: string,
+  ): Promise<NonceSnapshot>;
   observe(
     plan: TransferExecutionPlan,
     candidates: string[],
@@ -3210,6 +3369,61 @@ export declare class QuorumExecutionObserver implements ExecutionObserver {
 }
 ```
 
+### RecoveryConfiguration
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/recovery.ts).
+
+```ts
+export interface RecoveryConfiguration {
+  stuckAfterSeconds: number;
+  quarantineOnStuck: boolean;
+}
+```
+
+### RecoveryDiagnosis
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/recovery.ts).
+
+```ts
+export interface RecoveryDiagnosis {
+  state:
+    | 'observing'
+    | 'suspected-stuck'
+    | 'awaiting-finality'
+    | 'finalized'
+    | 'unavailable'
+    | 'blocked';
+  reason:
+    | 'within-threshold'
+    | 'pending-too-long'
+    | 'nonce-gap-suspected'
+    | 'nonce-consumed-without-result'
+    | 'safe-nonce-advanced'
+    | 'insufficient-sponsor-funds'
+    | 'fee-cap-below-base-fee'
+    | 'transaction-not-visible'
+    | 'provider-nonce-conflict'
+    | 'evidence-unavailable'
+    | 'awaiting-finality'
+    | 'verified-finality';
+  observed_at: string;
+  pending_age_ms: number;
+  quarantined: boolean;
+  sponsor_nonce?: string;
+  confirmed_nonce?: string;
+  finalized_nonce?: string;
+  safe_nonce?: string;
+  next_action:
+    | 'wait'
+    | 'restore-evidence'
+    | 'fund-sponsor'
+    | 'review-provider-fees'
+    | 'review-provider-nonces'
+    | 'reconcile'
+    | 'operator-review';
+}
+```
+
 ### SafeAccountBinding
 
 [Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/approved-calls.ts).
@@ -3218,6 +3432,105 @@ export declare class QuorumExecutionObserver implements ExecutionObserver {
 export interface SafeAccountBinding extends PinnedContract {
   accountId: string;
   singleton: PinnedContract;
+}
+```
+
+### SafeExecutionQueue
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/queue.ts).
+
+```ts
+/** Durable FIFO of unsigned requests. Only its head can become an immutable nonce-bound action. */
+export declare class SafeExecutionQueue {
+  constructor(
+    actions: SupportedActions,
+    database: ProviderDatabase,
+    execution: Pick<ApprovedExecutionCoordinator, 'refresh' | 'execute'>,
+    nonce: (binding: SafeAccountBinding, owner: string) => Promise<string>,
+    configuration: NonNullable<ExecutionConfiguration['safeQueue']>,
+    pollIntervalSeconds: number,
+  );
+  enqueue(
+    context: AuthorityContext,
+    input: ApprovedCallInput,
+  ): Promise<{
+    next_poll_after_ms: number;
+    action_id?: string | undefined;
+    request_id: string;
+    account_id: string;
+    status:
+      | 'cancelled'
+      | 'expired'
+      | 'blocked'
+      | 'succeeded'
+      | 'queued'
+      | 'executing';
+    expires_at: string;
+  }>;
+  read(
+    principal: VerifiedPrincipal,
+    id: string,
+  ): Promise<{
+    next_poll_after_ms: number;
+    action_id?: string | undefined;
+    request_id: string;
+    account_id: string;
+    status:
+      | 'cancelled'
+      | 'expired'
+      | 'blocked'
+      | 'succeeded'
+      | 'queued'
+      | 'executing';
+    expires_at: string;
+  }>;
+  cancel(
+    context: AuthorityContext,
+    id: string,
+  ): Promise<{
+    next_poll_after_ms: number;
+    action_id?: string | undefined;
+    request_id: string;
+    account_id: string;
+    status:
+      | 'cancelled'
+      | 'expired'
+      | 'blocked'
+      | 'succeeded'
+      | 'queued'
+      | 'executing';
+    expires_at: string;
+  }>;
+  /** Process a bounded set of independent Safe heads; duplicates join the same signing and dispatch attempts. */
+  process(): Promise<void>;
+  start(): void;
+  close(): Promise<void>;
+}
+```
+
+### SafeQueueRecord
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/queue.ts).
+
+```ts
+export interface SafeQueueRecord {
+  id: string;
+  input: ApprovedCallInput;
+  principal: VerifiedPrincipal;
+  grantId: string;
+  owner: string;
+  consentReference: string;
+  safeAddress: string;
+  address: string;
+  revision: string;
+  expiresAt: string;
+  sequence: number;
+  actionKey: string;
+  executeKey: string;
+  identityHash: string;
+  actionId?: string;
+  status:
+    'queued' | 'executing' | 'succeeded' | 'cancelled' | 'expired' | 'blocked';
 }
 ```
 
@@ -3341,6 +3654,7 @@ export declare class ApprovedExecutionCoordinator {
     configuration: ExecutionConfiguration,
     provider: ExecutionProvider,
     observer: ExecutionObserver,
+    operations?: PayerOperations | undefined,
   );
   execute(input: AuthorityContext, id: string): Promise<ExecutionReceipt>;
   /** Authenticated executor callback: a service identity never replaces current wallet authority. */
@@ -3354,6 +3668,7 @@ export declare class ApprovedExecutionCoordinator {
     allowed: true;
   }>;
   read(principal: VerifiedPrincipal, id: string): Promise<ExecutionReceipt>;
+  reconcile(context: AuthorityContext, id: string): Promise<ExecutionReceipt>;
   events(
     principal: VerifiedPrincipal,
     id: string,

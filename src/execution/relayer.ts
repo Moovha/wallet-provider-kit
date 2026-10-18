@@ -124,6 +124,41 @@ export function createTransferExecutionProvider(
       );
       return response(plan, accepted).id;
     },
+    async inspect(plan, transactionId) {
+      if (!uuid.test(transactionId))
+        throw new WalletProviderError('wallet_authorization_denied');
+      await client.current(
+        plan.sponsor.accountId,
+        plan.sponsor.binding as RelayerBinding,
+      );
+      const value = await client.call(
+        'GET',
+        `/relayers/${plan.sponsor.binding.relayerId}/transactions/${transactionId}`,
+      );
+      const accepted = response(plan, value);
+      if (accepted.id !== transactionId || !value)
+        throw new WalletProviderError('wallet_provider_response', 'unknown');
+      const rawNonce = value.nonce;
+      if (
+        rawNonce != null &&
+        !(
+          typeof rawNonce === 'number' &&
+          Number.isSafeInteger(rawNonce) &&
+          rawNonce >= 0
+        ) &&
+        !(
+          typeof rawNonce === 'string' &&
+          /^(0|[1-9][0-9]{0,19})$/.test(rawNonce) &&
+          BigInt(rawNonce) < 2n ** 64n
+        )
+      )
+        throw new WalletProviderError('wallet_provider_response', 'unknown');
+      return {
+        status: String(value.status),
+        ...(rawNonce != null ? { nonce: String(rawNonce) } : {}),
+        ...(accepted.hash ? { transactionHash: accepted.hash } : {}),
+      };
+    },
     async transactionHash(plan, transactionId) {
       if (!uuid.test(transactionId))
         throw new WalletProviderError('wallet_authorization_denied');

@@ -59,6 +59,7 @@ export async function createExecutorProvider(
         submit: (plan, context) => provider.submit(local(plan), context),
         transactionHash: (plan, id) =>
           provider.transactionHash(local(plan), id),
+        inspect: (plan, id) => provider.inspect!(local(plan), id),
       };
     }
     if (
@@ -86,6 +87,17 @@ export async function createExecutorProvider(
     )
       throw new Error();
     return {
+      ...(provider.inspect
+        ? {
+            async inspect(plan: TransferExecutionPlan, id: string) {
+              try {
+                return await provider.inspect!(snapshot(plan), id);
+              } catch {
+                throw new WalletProviderError('wallet_provider_unavailable');
+              }
+            },
+          }
+        : {}),
       ...(provider.recover
         ? {
             async recover(

@@ -36,6 +36,7 @@ function sponsor() {
 function toggle(value: unknown) {
   if (!value) {
     delete model.value.execution;
+    delete model.value.operations;
     return;
   }
   model.value.execution = {
@@ -60,6 +61,7 @@ function mode(value: unknown) {
   if (!execution) return;
   if (value === 'erc3009-executor-v1' || value === 'approved-evm-executor-v1') {
     execution.profile = value;
+    if (value !== 'approved-evm-executor-v1') delete execution.safeQueue;
     if (value === 'approved-evm-executor-v1' && !model.value.financial)
       delete execution.rpc.tokenCodeHash;
     delete execution.relayer;
@@ -84,6 +86,7 @@ function mode(value: unknown) {
     }
   } else {
     execution.profile = 'erc3009-relayer-v1';
+    delete execution.safeQueue;
     delete execution.service;
     execution.relayer = {
       url: '',
@@ -94,6 +97,50 @@ function mode(value: unknown) {
       entry.binding.signerId = '';
     }
   }
+}
+function togglePool(value: unknown) {
+  const execution = model.value.execution;
+  if (!execution) return;
+  if (value)
+    execution.sponsorPool = {
+      strategy: 'round-robin',
+      maxInFlightPerSponsor: 4,
+    };
+  else delete execution.sponsorPool;
+}
+function toggleQueue(value: unknown) {
+  const execution = model.value.execution;
+  if (!execution) return;
+  if (value) execution.safeQueue = { maxDepthPerSafe: 20, maxWaitSeconds: 300 };
+  else delete execution.safeQueue;
+}
+function toggleRecovery(value: unknown) {
+  if (!model.value.execution) return;
+  if (value)
+    model.value.execution.recovery = {
+      stuckAfterSeconds: 300,
+      quarantineOnStuck: true,
+    };
+  else delete model.value.execution.recovery;
+}
+function toggleOperations(value: unknown) {
+  if (value)
+    model.value.operations = {
+      pollIntervalSeconds: 15,
+      lowBalanceWei: '1000000000000000',
+      webhooks: [],
+    };
+  else delete model.value.operations;
+}
+function addWebhook() {
+  const operations = model.value.operations;
+  if (!operations || operations.webhooks.length >= 8) return;
+  const suffix = operations.webhooks.length + 1;
+  operations.webhooks.push({
+    id: `payer-alerts-${suffix}`,
+    endpoint: { env: `PAYER_WEBHOOK_${suffix}_URL` },
+    signingSecrets: [{ env: `PAYER_WEBHOOK_${suffix}_SECRET` }],
+  });
 }
 </script>
 <template>
@@ -223,9 +270,10 @@ function mode(value: unknown) {
         </button>
       </section>
       <p class="callout">
-        Base Sepolia EOA token transfers only. Configure pre-existing sponsor
-        accounts separately from owner-wallet signers. This does not install a
-        Relayer, fund a sponsor or verify deployment readiness.
+        Base Sepolia EOA transfers and explicitly approved Safe calls. Configure
+        pre-existing sponsor accounts separately from owner-wallet signers. This
+        does not install a Relayer, fund a sponsor or verify deployment
+        readiness.
       </p>
       <div v-if="model.execution.relayer" class="field-grid">
         <SetupField
@@ -275,6 +323,157 @@ function mode(value: unknown) {
         origins. The service requires agreement, checks the chain and genesis,
         and never falls back to a weaker confirmation policy.
       </p>
+      <section class="feature-panel">
+        <h4>Payer monitoring and recovery</h4>
+        <SetupField
+          guide="executionRecovery"
+          type="checkbox"
+          label="Detect stuck execution and nonce problems"
+          :modelValue="!!model.execution.recovery"
+          @update:modelValue="toggleRecovery"
+        />
+        <template v-if="model.execution.recovery">
+          <SetupField
+            guide="executionRecovery"
+            type="number"
+            label="Stuck suspicion threshold in seconds"
+            :number="true"
+            v-model="model.execution.recovery.stuckAfterSeconds"
+            validation="required|between:30,86400"
+          />
+          <SetupField
+            guide="executionRecovery"
+            type="checkbox"
+            label="Quarantine affected payers"
+            v-model="model.execution.recovery.quarantineOnStuck"
+          />
+        </template>
+        <SetupField
+          guide="payerOperations"
+          type="checkbox"
+          label="Monitor payer balances, health and webhooks"
+          :modelValue="!!model.operations"
+          @update:modelValue="toggleOperations"
+        />
+        <template v-if="model.operations">
+          <SetupField
+            guide="payerOperations"
+            type="number"
+            label="Payer monitoring interval in seconds"
+            :number="true"
+            v-model="model.operations.pollIntervalSeconds"
+            validation="required|between:5,300"
+          />
+          <SetupField
+            guide="payerOperations"
+            label="Low gas balance threshold in wei"
+            v-model="model.operations.lowBalanceWei"
+            validation="required"
+          />
+          <div
+            v-for="(webhook, index) in model.operations.webhooks"
+            :key="index"
+            class="feature-panel"
+          >
+            <SetupField
+              guide="payerOperations"
+              label="Webhook destination ID"
+              v-model="webhook.id"
+              validation="required"
+            />
+            <SetupField
+              guide="payerOperations"
+              label="Webhook URL environment variable"
+              v-model="webhook.endpoint.env"
+              validation="required"
+            />
+            <SetupField
+              guide="payerOperations"
+              label="Webhook signing secret environment variable"
+              v-model="webhook.signingSecrets[0].env"
+              validation="required"
+            />
+            <button
+              type="button"
+              @click="model.operations.webhooks.splice(index, 1)"
+            >
+              Remove webhook
+            </button>
+          </div>
+          <button
+            type="button"
+            :disabled="model.operations.webhooks.length >= 8"
+            @click="addWebhook"
+          >
+            Add payer webhook
+          </button>
+          <p class="help-text">
+            Health exposes aggregate counts. Webhooks use signed CloudEvents
+            with durable retries. Low balance alerts do not fund a payer or
+            change transaction authority. Configure equivalent monitoring and
+            recovery on the execution service.
+          </p>
+        </template>
+      </section>
+      <section class="feature-panel">
+        <h4>Sponsor pool and Safe queue</h4>
+        <SetupField
+          guide="sponsorPool"
+          type="checkbox"
+          label="Enable round-robin sponsor pools"
+          :modelValue="!!model.execution.sponsorPool"
+          @update:modelValue="togglePool"
+        />
+        <SetupField
+          v-if="model.execution.sponsorPool"
+          guide="sponsorPool"
+          type="number"
+          label="Maximum unfinished executions per sponsor"
+          :number="true"
+          v-model="model.execution.sponsorPool.maxInFlightPerSponsor"
+          validation="required|between:1,100"
+        />
+        <p class="help-text">
+          With pools enabled, add distinct sponsor addresses for the same
+          application below. Selection is durable; retries retain their payer.
+          Unknown attempts occupy capacity. Configure the executor's independent
+          pool limits too. The application lifetime gas budget is shared across
+          pool members.
+        </p>
+        <template v-if="model.execution.profile === 'approved-evm-executor-v1'">
+          <SetupField
+            guide="safeQueue"
+            type="checkbox"
+            label="Enable durable per-Safe request queues"
+            :modelValue="!!model.execution.safeQueue"
+            @update:modelValue="toggleQueue"
+          />
+          <template v-if="model.execution.safeQueue">
+            <SetupField
+              guide="safeQueue"
+              type="number"
+              label="Maximum pending requests per Safe"
+              :number="true"
+              v-model="model.execution.safeQueue.maxDepthPerSafe"
+              validation="required|between:1,100"
+            />
+            <SetupField
+              guide="safeQueue"
+              type="number"
+              label="Maximum queue validity in seconds"
+              :number="true"
+              v-model="model.execution.safeQueue.maxWaitSeconds"
+              validation="required|between:30,3600"
+            />
+          </template>
+          <p class="help-text">
+            Applications enqueue exact approved requests for delayed execution.
+            Only the head receives a Safe nonce and signature. Current authority
+            is rechecked before effects. Expiry is also bounded by the contract
+            policy; signed uncertainty blocks the lane.
+          </p>
+        </template>
+      </section>
       <section
         v-for="(entry, index) in model.execution.sponsors"
         :key="entry.accountId"

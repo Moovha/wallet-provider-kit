@@ -1,3 +1,4 @@
+import { validateOperations } from '../execution/operations.js';
 import {
   validateApprovedCallPolicy,
   type ApprovedCallPolicy,
@@ -34,6 +35,8 @@ export interface ExecutorProviderConfiguration {
   token?: TransferPolicy['token'];
   contractCalls?: ApprovedCallPolicy;
   sponsors: ExecutionSponsor[];
+  sponsorPool?: ExecutionConfiguration['sponsorPool'];
+  recovery?: ExecutionConfiguration['recovery'];
 }
 export interface ExecutionServiceConfiguration {
   configVersion: 1;
@@ -44,6 +47,7 @@ export interface ExecutionServiceConfiguration {
   signing: ServiceSigningKey;
   callers: (ServicePeer & { providers: string[] })[];
   providers: ExecutorProviderConfiguration[];
+  operations?: import('../execution/operations.js').OperationsConfiguration;
   activation: {
     enabled: boolean;
     providerAcceptance?: string;
@@ -66,6 +70,7 @@ export function validateExecutionServiceConfiguration(
     input,
   ) as unknown as ExecutionServiceConfiguration;
   try {
+    if (config.operations) validateOperations(config.operations);
     serviceOrigin(config.origin);
     if (
       config.activation.enabled &&
@@ -115,8 +120,9 @@ export function validateExecutionServiceConfiguration(
         if (/^0x0{40}$/i.test(provider.token.address)) throw new Error();
       }
       if (
-        new Set(provider.sponsors.map((sponsor) => sponsor.clientId)).size !==
-          provider.sponsors.length ||
+        (!provider.sponsorPool &&
+          new Set(provider.sponsors.map((sponsor) => sponsor.clientId)).size !==
+            provider.sponsors.length) ||
         new Set(provider.sponsors.map((sponsor) => sponsor.accountId)).size !==
           provider.sponsors.length ||
         new Set(

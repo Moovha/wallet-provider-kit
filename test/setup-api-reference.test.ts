@@ -28,7 +28,7 @@ describe('operator API reference', () => {
   it('uses canonical request/response contracts, includes unavailable advanced profiles and does not mutate them', () => {
     const config = fixture();
     const operations = referenceOperations(contract, config, 0);
-    expect(operations).toHaveLength(23);
+    expect(operations).toHaveLength(27);
     expect(
       Object.values(contract.paths)
         .flatMap((methods) =>
@@ -46,11 +46,15 @@ describe('operator API reference', () => {
       const preview = spec.paths[item.path][item.method];
       expect(
         preview.responses[
-          item.operation.operationId === 'beginEnrollment' ? '201' : '200'
+          Object.keys(item.operation.responses).find((code) =>
+            code.startsWith('2'),
+          )!
         ].content?.['application/json'].schema,
       ).toEqual(
         item.operation.responses[
-          item.operation.operationId === 'beginEnrollment' ? '201' : '200'
+          Object.keys(item.operation.responses).find((code) =>
+            code.startsWith('2'),
+          )!
         ].content?.['application/json'].schema,
       );
       expect(preview.requestBody?.content['application/json'].schema).toEqual(
@@ -137,7 +141,9 @@ describe('operator API reference', () => {
       expect(
         ajv.validate(
           item.operation.responses[
-            item.operation.operationId === 'beginEnrollment' ? '201' : '200'
+            Object.keys(item.operation.responses).find((code) =>
+              code.startsWith('2'),
+            )!
           ].content!['application/json'].schema,
           responseExample(item.operation.operationId),
         ),
@@ -196,7 +202,9 @@ it('previews application-led policy and grants with schema-valid evidence exampl
     const op = spec.paths[item.path][item.method];
     const response =
       op.responses[
-        item.operation.operationId === 'beginEnrollment' ? '201' : '200'
+        Object.keys(item.operation.responses).find((code) =>
+          code.startsWith('2'),
+        )!
       ].content!['application/json'];
     expect(
       ajv.validate(response.schema, response.example),

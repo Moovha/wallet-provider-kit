@@ -187,6 +187,16 @@ export interface StoredAttempt {
 }
 export interface ProviderState {
   format: 'moovha-onboarding-1';
+  operations?: Record<
+    string,
+    import('../execution/operations.js').OperationsState
+  >;
+  executionPools?: Record<string, number>;
+  sponsorQuarantines?: Record<string, string[]>;
+  safeRequests?: Record<
+    string,
+    import('../execution/queue.js').SafeQueueRecord
+  >;
   supportedActions?: Record<string, TransferRecord>;
   backendAccounts?: Record<string, { binding: string; signer: RelayerBinding }>;
   deploymentBindings?: Record<

@@ -105,9 +105,14 @@ vendor services or certify readiness. Initial activation remains disabled._
 4. **[Connect your product](docs/application-access.md):** read access policy,
    submit current identity and consent evidence, receive a grant, create the wallet
    and revoke access when the user withdraws. Select the optional
-   [execution coordinator](docs/execution.md) and [approved contract calls, swaps and vault deposits](docs/approved-contract-calls.md) or an accepted application submission
-   rail. Applications arrange sponsor funding; verified chain status is separate
-   from business settlement.
+   [execution coordinator](docs/execution.md) for transfers or
+   [approved contract calls, swaps and vault deposits](docs/approved-contract-calls.md),
+   or use an accepted application submission rail. Optional
+   [Safe queues and sponsor pools](docs/safe-queue-and-sponsor-pools.md),
+   [stuck-transaction recovery](docs/stuck-transactions-and-recovery.md) and
+   [payer alerts and health](docs/payer-events-and-health.md) support operations.
+   Applications arrange sponsor funding; verified chain status is separate from
+   business settlement.
 
 The GUI's **API reference** uses bundled Swagger UI to show each supported endpoint,
 required scope, configuration prerequisites, request/response schemas and illustrative

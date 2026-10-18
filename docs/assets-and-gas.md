@@ -158,3 +158,5 @@ submission path and activation evidence in your deployment profile. Validate
 zero and existing personal gas balances, multi-step costs, rejection, budget
 exhaustion and uncertain funding before advertising gas coverage. Continue with
 [provider integration](provider-guide.md) and [acceptance checks](conformance.md).
+
+See [durable Safe queues and sponsor pools](safe-queue-and-sponsor-pools.md) for concurrent request admission, per-Safe ordering, pool configuration and recovery limits.

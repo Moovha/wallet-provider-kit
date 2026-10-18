@@ -283,3 +283,5 @@ fencing. Record the reviewed evidence in both activation configurations. Offline
 fixtures cover these internal contracts and backup replay; they do not prove
 external fencing, power-loss durability or live provider acceptance. The
 [enterprise v1 gates](v1-standards.md) still apply.
+
+See [durable Safe queues and sponsor pools](safe-queue-and-sponsor-pools.md) for concurrent request admission, per-Safe ordering, pool configuration and recovery limits.

@@ -1,3 +1,10 @@
+import { PayerOperations } from '../execution/operations.js';
+import {
+  checkedInspection,
+  diagnoseExecution,
+  type ProviderInspection,
+  type NonceSnapshot,
+} from '../execution/recovery.js';
 import Fastify, { type FastifyRequest } from 'fastify';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
@@ -76,6 +83,11 @@ export async function createExecutionService(
   let config: ExecutionServiceConfiguration | undefined;
   let identity: ServiceIdentity | undefined;
   let database: ExecutorDatabase | undefined;
+  let operations: PayerOperations | undefined;
+  let recoveryTimer: ReturnType<typeof setTimeout> | undefined;
+  let recoveryRun: Promise<void> | undefined;
+  let recoveryStopped = false;
+  let recoveryCursor = 0;
   const providers = new Map<
     string,
     { provider: ExecutionProvider; observer: ExecutionObserver }
@@ -111,7 +123,31 @@ export async function createExecutionService(
           ),
         });
     }
-    app.addHook('onClose', async () => database?.close());
+    if (config?.operations && database) {
+      const payers = config.providers.flatMap((provider) => {
+        const observer = providers.get(provider.id + ':' + provider.revision)!
+          .observer as QuorumTransferObserver;
+        return provider.sponsors.map((sponsor) => ({
+          address: sponsor.binding.address,
+          balance: () => observer.payerBalance(sponsor.binding.address),
+        }));
+      });
+      operations = new PayerOperations(
+        config.operations,
+        { transaction: (operation) => database!.operations(operation) },
+        payers,
+        config.origin,
+        resolveSecret,
+        options.request,
+      );
+    }
+    app.addHook('onClose', async () => {
+      await operations?.close();
+      recoveryStopped = true;
+      clearTimeout(recoveryTimer);
+      await recoveryRun;
+      database?.close();
+    });
     await app.register(helmet);
     await app.register(rateLimit, { max: 120, timeWindow: '1 minute' });
     await app.register(swagger, {
@@ -261,6 +297,7 @@ export async function createExecutionService(
         !current ||
         current.identityHash !== record.identityHash ||
         current.effectObserved ||
+        database!.quarantined(current.dispatch.plan.sponsor.binding.address) ||
         Date.parse(current.dispatch.plan.action.expires_at) <= Date.now()
       )
         throw new WalletProviderError('wallet_authorization_denied');
@@ -349,6 +386,30 @@ export async function createExecutionService(
           /* Read-only chain search can recover a missing provider hash. */
         }
       }
+      const providerConfiguration = config!.providers.find(
+        (entry) =>
+          entry.id === record.dispatch.provider_id &&
+          entry.revision === record.dispatch.provider_revision,
+      )!;
+      let inspection: ProviderInspection | undefined;
+      if (
+        providerConfiguration.recovery &&
+        selected.provider.inspect &&
+        claim?.state === 'succeeded' &&
+        claim.result.kind === 'relay_transaction'
+      ) {
+        try {
+          inspection = checkedInspection(
+            await selected.provider.inspect(
+              record.dispatch.plan,
+              claim.result.transactionId,
+            ),
+          );
+        } catch {
+          /* Provider hints remain unavailable; RPC observation is independent. */
+        }
+      }
+      let observedFresh = false;
       if (ownHash && !/^0x[0-9a-fA-F]{64}$/.test(ownHash))
         throw new WalletProviderError('wallet_provider_response');
       if (refresh) {
@@ -360,7 +421,9 @@ export async function createExecutionService(
               ownHash,
               record.scanNextBlock,
             );
-          if (!database!.observe(record, observation, scanNextBlock))
+          if (
+            !database!.observe(record, observation, scanNextBlock, operations)
+          )
             throw new WalletProviderError(
               'wallet_attempt_unavailable',
               'unknown',
@@ -369,6 +432,7 @@ export async function createExecutionService(
             record.dispatch.execution_id,
             record.walletOrigin,
           )!;
+          observedFresh = true;
         } catch (error) {
           // Durable acceptance remains readable during RPC outages; no chain finality is asserted here.
           record = database!.load(
@@ -382,7 +446,41 @@ export async function createExecutionService(
             throw error;
         }
       }
+      if (providerConfiguration.recovery) {
+        let snapshot: NonceSnapshot | undefined;
+        if (selected.observer.nonceSnapshot) {
+          try {
+            snapshot = await selected.observer.nonceSnapshot(
+              record.dispatch.plan,
+              ownHash ?? inspection?.transactionHash,
+            );
+          } catch {
+            /* Operational uncertainty cannot authorize effects. */
+          }
+        }
+        record.startedAt ??= Date.now();
+        const diagnosis = diagnoseExecution({
+          plan: record.dispatch.plan,
+          configuration: providerConfiguration.recovery,
+          startedAt: record.startedAt,
+          observation:
+            observedFresh || record.observation?.chain_status === 'finalized'
+              ? record.observation
+              : undefined,
+          inspection,
+          knownNonce: record.providerNonce,
+          snapshot,
+        });
+        record = database!.recovery(
+          record,
+          diagnosis,
+          observedFresh,
+          operations,
+        );
+      }
       return {
+        ...(inspection ? { provider_inspection: inspection } : {}),
+        ...(record.recovery ? { recovery: record.recovery } : {}),
         contract: 'execution-dispatch-v1',
         execution_id: record.dispatch.execution_id,
         plan_hash: executionPlanHash(record.dispatch.plan),
@@ -411,9 +509,16 @@ export async function createExecutionService(
       { schema: { hide: true } },
       async (_request, reply) => {
         const ready = !!database && (await database.ready());
-        return reply
-          .code(ready ? 200 : 503)
-          .send({ status: ready ? 'ready' : 'unconfigured' });
+        return reply.code(ready ? 200 : 503).send({
+          status: ready ? 'ready' : 'unconfigured',
+          ...(operations
+            ? {
+                operations: await operations
+                  .health()
+                  .catch(() => ({ status: 'unavailable' })),
+              }
+            : {}),
+        });
       },
     );
     app.get(
@@ -606,6 +711,41 @@ export async function createExecutionService(
       },
     );
     await app.ready();
+    if (config?.activation.enabled) operations?.start();
+    if (
+      config?.activation.enabled &&
+      config.providers.some((provider) => provider.recovery)
+    ) {
+      const tick = async () => {
+        try {
+          const records = database!.pendingRecovery();
+          const selected = records.length
+            ? Array.from(
+                { length: Math.min(4, records.length) },
+                (_, index) =>
+                  records[(recoveryCursor + index) % records.length],
+              )
+            : [];
+          recoveryCursor = records.length
+            ? (recoveryCursor + selected.length) % records.length
+            : 0;
+          await Promise.allSettled(
+            selected.map((record) => receipt(record, true)),
+          );
+        } catch {
+          /* The next bounded read-only poll resumes recovery. */
+        }
+        if (!recoveryStopped) {
+          recoveryTimer = setTimeout(schedule, 15000);
+          recoveryTimer.unref();
+        }
+      };
+      const schedule = () => {
+        recoveryRun = tick();
+      };
+      recoveryTimer = setTimeout(schedule, 15000);
+      recoveryTimer.unref();
+    }
     return app;
   } catch (error) {
     await app.close().catch(() => undefined);

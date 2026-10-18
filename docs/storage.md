@@ -282,3 +282,12 @@ Back up both service stores and reconcile each loss window before recovery; an
 executor record cannot reconstruct missing wallet authority.
 
 Approved Safe execution reserves each address/nonce atomically in the executor’s `executorNonces` collection alongside dispatch admission and sponsor budgets. These records use the existing verified `onboarding_records` catalog; no database DDL or migration is introduced. Wallet-side unsigned reservations can expire only when no financial signing admission exists. Signed or uncertain authorizations retain their nonce reservations.
+
+The optional Safe queue stores unsigned request identity, per-Safe FIFO sequence and action idempotency bindings in `safeRequests`; durable pool selection counters use `executionPools`. Both reuse JSON records in the existing verified catalog. The executor enforces pool capacity against its durable dispatch records. See [queues and sponsor pools](safe-queue-and-sponsor-pools.md) for expiry, signing exposure, capacity and recovery.
+
+Optional recovery diagnostics use execution records and the wallet's
+`sponsorQuarantines` / executor's `executorQuarantines` collections. Optional payer
+conditions and webhook delivery intents use `operations` in each separate store.
+They reuse the verified JSON catalog without DDL. Backups can redeliver old events;
+receivers must retain deduplication across the restoration window. See
+[payer events and health](payer-events-and-health.md).

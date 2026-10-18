@@ -1,3 +1,4 @@
+import type { NonceSnapshot } from './recovery.js';
 import {
   implementationSlot,
   safeInterface,
@@ -31,6 +32,7 @@ export const transferInterface = new Interface([
 const hashPattern = /^0x[0-9a-fA-F]{64}$/;
 const bytesPattern = /^0x(?:[0-9a-fA-F]{2})*$/;
 type RpcMethod =
+  | 'eth_getTransactionCount'
   | 'eth_chainId'
   | 'eth_getBlockByNumber'
   | 'eth_getCode'
@@ -881,6 +883,159 @@ export class QuorumExecutionObserver implements ExecutionObserver {
         sender === plan.sponsor.binding.address.toLowerCase()
           ? 'sponsor'
           : 'external',
+    };
+  }
+  /** Native balance at a common canonical block, with chain identity and block-hash agreement. */
+  async payerBalance(sponsor: string): Promise<string> {
+    const heads = await Promise.all(
+      this.readers.map((reader) => this.heads(reader)),
+    );
+    const height = heads.reduce(
+      (minimum, head) => (head.latest < minimum ? head.latest : minimum),
+      heads[0].latest,
+    );
+    const values = await Promise.all(
+      this.readers.map(async (reader) => {
+        const [rawBlock, balance] = await Promise.all([
+          reader.call('eth_getBlockByNumber', [toQuantity(height), false]),
+          reader.call('eth_getBalance', [address(sponsor), toQuantity(height)]),
+        ]);
+        const block = checked(rawBlock);
+        if (quantity(block.number) !== height) unavailable();
+        return {
+          hash: hash(block.hash),
+          balance: quantity(balance).toString(),
+        };
+      }),
+    );
+    if (
+      values.some(
+        (value) => JSON.stringify(value) !== JSON.stringify(values[0]),
+      )
+    )
+      unavailable();
+    return values[0].balance;
+  }
+  /** Read-only nonce diagnostics at common canonical block heights; pending counts are explicitly local hints. */
+  async nonceSnapshot(
+    plan: TransferExecutionPlan,
+    ownHash?: string,
+  ): Promise<NonceSnapshot> {
+    plan = structuredClone(plan);
+    if (plan.genesisHash.toLowerCase() !== this.genesisHash.toLowerCase())
+      unavailable();
+    const heads = await Promise.all(
+      this.readers.map((reader) => this.heads(reader)),
+    );
+    const latest = heads.reduce(
+      (minimum, head) => (head.latest < minimum ? head.latest : minimum),
+      heads[0].latest,
+    );
+    const finalized = heads.reduce(
+      (minimum, head) => (head.finalized < minimum ? head.finalized : minimum),
+      heads[0].finalized,
+    );
+    const values = await Promise.all(
+      this.readers.map(async (reader) => {
+        const sponsor = plan.sponsor.binding.address;
+        const [
+          rawHead,
+          rawFinal,
+          confirmed,
+          finalNonce,
+          pending,
+          balance,
+          transaction,
+        ] = await Promise.all([
+          reader.call('eth_getBlockByNumber', [toQuantity(latest), false]),
+          reader.call('eth_getBlockByNumber', [toQuantity(finalized), false]),
+          reader.call('eth_getTransactionCount', [sponsor, toQuantity(latest)]),
+          reader.call('eth_getTransactionCount', [
+            sponsor,
+            toQuantity(finalized),
+          ]),
+          reader.call('eth_getTransactionCount', [sponsor, 'pending']),
+          reader.call('eth_getBalance', [sponsor, toQuantity(latest)]),
+          ownHash
+            ? reader.call('eth_getTransactionByHash', [hash(ownHash)])
+            : Promise.resolve(null),
+        ]);
+        const head = checked(rawHead),
+          final = checked(rawFinal);
+        if (
+          quantity(head.number) !== latest ||
+          quantity(final.number) !== finalized ||
+          quantity(finalNonce) > quantity(confirmed)
+        )
+          unavailable();
+        let transactionNonce: string | undefined;
+        if (transaction !== null) {
+          const tx = checked(transaction);
+          if (
+            hash(tx.hash) !== hash(ownHash!) ||
+            address(tx.from) !== sponsor.toLowerCase() ||
+            address(tx.to) !==
+              String(
+                plan.action.payload.domain.verifyingContract,
+              ).toLowerCase() ||
+            quantity(tx.value) !== 0n ||
+            quantity(tx.chainId) !== 84532n ||
+            String(tx.input).toLowerCase() !== plan.data.toLowerCase() ||
+            tx.type !== '0x2' ||
+            quantity(tx.gas) !== BigInt(plan.sponsor.gasLimit) ||
+            quantity(tx.maxFeePerGas) > BigInt(plan.sponsor.maxFeePerGas) ||
+            quantity(tx.maxPriorityFeePerGas) >
+              BigInt(plan.sponsor.maxPriorityFeePerGas)
+          )
+            unavailable();
+          transactionNonce = quantity(tx.nonce).toString();
+        }
+        let safeNonce: string | undefined;
+        if (plan.intent) {
+          const account = plan.intent.account;
+          const code = await reader.call('eth_getCode', [
+            account.address,
+            toQuantity(latest),
+          ]);
+          if (typeof code !== 'string' || keccak256(code) !== account.codeHash)
+            unavailable();
+          safeNonce = await this.safeAccount(
+            reader,
+            account,
+            plan.action.chain_account_id.split(':')[2],
+            toQuantity(latest),
+          );
+        }
+        return {
+          headHash: hash(head.hash),
+          finalHash: hash(final.hash),
+          confirmedNonce: quantity(confirmed).toString(),
+          finalizedNonce: quantity(finalNonce).toString(),
+          balanceWei: quantity(balance).toString(),
+          baseFeePerGas: quantity(head.baseFeePerGas).toString(),
+          ...(transactionNonce !== undefined ? { transactionNonce } : {}),
+          ...(safeNonce !== undefined ? { safeNonce } : {}),
+          pending: quantity(pending),
+        };
+      }),
+    );
+    const { pending: _pending, ...first } = values[0];
+    if (
+      values.some(
+        ({ pending: _hint, ...value }) =>
+          JSON.stringify(value) !== JSON.stringify(first),
+      )
+    )
+      unavailable();
+    const { headHash: _head, finalHash: _final, ...snapshot } = first;
+    return {
+      ...snapshot,
+      pendingNonceMinimum: values
+        .reduce((a, v) => (a < v.pending ? a : v.pending), values[0].pending)
+        .toString(),
+      pendingNonceMaximum: values
+        .reduce((a, v) => (a > v.pending ? a : v.pending), values[0].pending)
+        .toString(),
     };
   }
   async observe(

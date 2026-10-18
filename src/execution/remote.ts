@@ -1,3 +1,4 @@
+import { checkedInspection } from './recovery.js';
 import { WalletProviderError } from '../domain/signing.js';
 import type {
   ExecutionConfiguration,
@@ -103,6 +104,17 @@ export function createRemoteExecutionProvider(
       if (result.dispatch_status !== 'accepted')
         throw new WalletProviderError('wallet_provider_unavailable', 'unknown');
       return result.execution_id;
+    },
+    async inspect(plan, id) {
+      const result = await status(plan, id);
+      return checkedInspection(
+        result.provider_inspection ?? {
+          status: result.dispatch_status,
+          ...(result.transaction_hash
+            ? { transactionHash: result.transaction_hash }
+            : {}),
+        },
+      );
     },
     async transactionHash(plan, id) {
       return (await status(plan, id)).transaction_hash;

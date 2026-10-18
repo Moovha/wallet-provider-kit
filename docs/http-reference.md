@@ -1712,6 +1712,315 @@ Success response schema:
 }
 ```
 
+## POST /v1/contract-call-requests
+
+Operation: `enqueueContractCall`.
+
+| Parameter         | Location | Required | Schema                                                                                                |
+| ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
+| `idempotency-key` | header   | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+
+Request body (application/json):
+
+```json
+{
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["account_id", "kind", "calls"],
+      "properties": {
+        "account_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "kind": {
+          "type": "string",
+          "enum": ["contract-call"]
+        },
+        "calls": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 16,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["to", "value", "data"],
+            "properties": {
+              "to": {
+                "type": "string",
+                "pattern": "^0x[0-9a-fA-F]{40}$"
+              },
+              "value": {
+                "type": "string",
+                "pattern": "^(0|[1-9][0-9]{0,77})$"
+              },
+              "data": {
+                "type": "string",
+                "pattern": "^0x(?:[0-9a-f]{2}){4,4096}$"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "account_id",
+        "kind",
+        "route",
+        "amount_in",
+        "minimum_out",
+        "deadline"
+      ],
+      "properties": {
+        "account_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "kind": {
+          "type": "string",
+          "enum": ["swap"]
+        },
+        "route": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._-]{1,64}$"
+        },
+        "amount_in": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,77})$"
+        },
+        "minimum_out": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,77})$"
+        },
+        "deadline": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,77})$"
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["account_id", "kind", "route", "assets", "minimum_shares"],
+      "properties": {
+        "account_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "kind": {
+          "type": "string",
+          "enum": ["vault-deposit"]
+        },
+        "route": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._-]{1,64}$"
+        },
+        "assets": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,77})$"
+        },
+        "minimum_shares": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,77})$"
+        }
+      }
+    }
+  ]
+}
+```
+
+| Status | Content type     | Description      |
+| ------ | ---------------- | ---------------- |
+| 202    | application/json | Default Response |
+
+Success response schema:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "request_id",
+    "account_id",
+    "status",
+    "expires_at",
+    "next_poll_after_ms"
+  ],
+  "properties": {
+    "request_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "account_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "action_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "queued",
+        "executing",
+        "succeeded",
+        "cancelled",
+        "expired",
+        "blocked"
+      ]
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "next_poll_after_ms": {
+      "type": "integer",
+      "minimum": 5000,
+      "maximum": 300000
+    }
+  }
+}
+```
+
+## GET /v1/contract-call-requests/{requestId}
+
+Operation: `readContractCallRequest`.
+
+| Parameter   | Location | Required | Schema                                                                                                |
+| ----------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
+| `requestId` | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+
+| Status | Content type     | Description      |
+| ------ | ---------------- | ---------------- |
+| 200    | application/json | Default Response |
+
+Success response schema:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "request_id",
+    "account_id",
+    "status",
+    "expires_at",
+    "next_poll_after_ms"
+  ],
+  "properties": {
+    "request_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "account_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "action_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "queued",
+        "executing",
+        "succeeded",
+        "cancelled",
+        "expired",
+        "blocked"
+      ]
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "next_poll_after_ms": {
+      "type": "integer",
+      "minimum": 5000,
+      "maximum": 300000
+    }
+  }
+}
+```
+
+## POST /v1/contract-call-requests/{requestId}/cancel
+
+Operation: `cancelContractCallRequest`.
+
+| Parameter         | Location | Required | Schema                                                                                                |
+| ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
+| `requestId`       | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+| `idempotency-key` | header   | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+
+Request body (application/json):
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false
+}
+```
+
+| Status | Content type     | Description      |
+| ------ | ---------------- | ---------------- |
+| 200    | application/json | Default Response |
+
+Success response schema:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "request_id",
+    "account_id",
+    "status",
+    "expires_at",
+    "next_poll_after_ms"
+  ],
+  "properties": {
+    "request_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "account_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "action_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "queued",
+        "executing",
+        "succeeded",
+        "cancelled",
+        "expired",
+        "blocked"
+      ]
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "next_poll_after_ms": {
+      "type": "integer",
+      "minimum": 5000,
+      "maximum": 300000
+    }
+  }
+}
+```
+
 ## POST /v1/actions/contract-calls
 
 Operation: `requestContractCall`.
@@ -2532,6 +2841,335 @@ Success response schema:
 }
 ```
 
+## POST /v1/actions/{actionId}/reconcile
+
+Operation: `reconcileExecution`.
+
+| Parameter                    | Location | Required | Schema                                                                                                |
+| ---------------------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
+| `actionId`                   | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+| `execution-profile`          | header   | yes      | `{"type":"string","enum":["erc3009-relayer-v1","erc3009-executor-v1","approved-evm-executor-v1"]}`    |
+| `execution-profile-revision` | header   | yes      | `{"type":"string","enum":["1"]}`                                                                      |
+| `idempotency-key`            | header   | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+
+Request body (application/json):
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false
+}
+```
+
+| Status | Content type     | Description      |
+| ------ | ---------------- | ---------------- |
+| 200    | application/json | Default Response |
+
+Success response schema:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "profile",
+    "profile_revision",
+    "action_id",
+    "execution_id",
+    "dispatch_status",
+    "observation_revision",
+    "next_poll_after_ms",
+    "chain_status",
+    "verification",
+    "outcome",
+    "settlement",
+    "observed_at"
+  ],
+  "properties": {
+    "recovery": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "reason",
+        "observed_at",
+        "pending_age_ms",
+        "quarantined",
+        "next_action"
+      ],
+      "properties": {
+        "state": {
+          "type": "string",
+          "enum": [
+            "observing",
+            "suspected-stuck",
+            "awaiting-finality",
+            "finalized",
+            "unavailable",
+            "blocked"
+          ]
+        },
+        "reason": {
+          "type": "string",
+          "enum": [
+            "within-threshold",
+            "pending-too-long",
+            "nonce-gap-suspected",
+            "nonce-consumed-without-result",
+            "safe-nonce-advanced",
+            "insufficient-sponsor-funds",
+            "fee-cap-below-base-fee",
+            "transaction-not-visible",
+            "provider-nonce-conflict",
+            "evidence-unavailable",
+            "awaiting-finality",
+            "verified-finality"
+          ]
+        },
+        "observed_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "pending_age_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "quarantined": {
+          "type": "boolean"
+        },
+        "sponsor_nonce": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,77})$"
+        },
+        "confirmed_nonce": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,77})$"
+        },
+        "finalized_nonce": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,77})$"
+        },
+        "safe_nonce": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,77})$"
+        },
+        "next_action": {
+          "type": "string",
+          "enum": [
+            "wait",
+            "restore-evidence",
+            "fund-sponsor",
+            "review-provider-fees",
+            "review-provider-nonces",
+            "reconcile",
+            "operator-review"
+          ]
+        }
+      }
+    },
+    "profile": {
+      "type": "string",
+      "enum": [
+        "erc3009-relayer-v1",
+        "erc3009-executor-v1",
+        "approved-evm-executor-v1"
+      ]
+    },
+    "outcome_scope": {
+      "type": "string",
+      "enum": [
+        "token-transfer",
+        "contract-execution",
+        "swap-effects",
+        "vault-deposit-effects"
+      ],
+      "description": "What verified success establishes: exact token transfer, successful approved calls, or the required swap/vault asset effects. Contract execution alone does not prove an arbitrary business outcome."
+    },
+    "profile_revision": {
+      "type": "string",
+      "enum": ["1"]
+    },
+    "action_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "execution_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "dispatch_status": {
+      "type": "string",
+      "enum": ["not_started", "pending", "accepted", "unknown", "failed"],
+      "description": "Durable submission state. Accepted identifies a durable executor/provider acceptance; it is not chain inclusion or settlement."
+    },
+    "observation_revision": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "next_poll_after_ms": {
+      "type": "integer",
+      "minimum": 5000,
+      "maximum": 300000
+    },
+    "chain_status": {
+      "type": "string",
+      "enum": [
+        "unobserved",
+        "pending",
+        "included",
+        "safe",
+        "finalized",
+        "reorged"
+      ]
+    },
+    "verification": {
+      "type": "string",
+      "enum": ["unverified", "rpc-quorum"],
+      "description": "RPC quorum means agreement of all configured trusted RPC sources on exact receipt effects and canonical block evidence, not a cryptographic light-client proof."
+    },
+    "outcome": {
+      "type": "string",
+      "enum": ["unknown", "succeeded", "reverted"]
+    },
+    "settlement": {
+      "type": "string",
+      "enum": ["pending", "succeeded", "reverted"],
+      "description": "The supported token transfer reaches succeeded/reverted settlement only after matching finalized chain evidence. This is not a claim of general business-operation completion."
+    },
+    "observed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "transaction_hash": {
+      "type": "string",
+      "pattern": "^0x[0-9a-f]{64}$"
+    },
+    "block_hash": {
+      "type": "string",
+      "pattern": "^0x[0-9a-f]{64}$"
+    },
+    "block_number": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,77})$"
+    },
+    "execution_origin": {
+      "type": "string",
+      "enum": ["sponsor", "external"],
+      "description": "An external party can relay the same ERC-3009 authorization. Only its exact verified token effect can establish success."
+    }
+  },
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "verification": {
+          "enum": ["unverified"]
+        },
+        "chain_status": {
+          "enum": ["unobserved", "pending", "reorged"]
+        },
+        "outcome": {
+          "enum": ["unknown"]
+        },
+        "settlement": {
+          "enum": ["pending"]
+        }
+      },
+      "not": {
+        "anyOf": [
+          {
+            "type": "object",
+            "required": ["transaction_hash"]
+          },
+          {
+            "type": "object",
+            "required": ["block_hash"]
+          },
+          {
+            "type": "object",
+            "required": ["block_number"]
+          },
+          {
+            "type": "object",
+            "required": ["execution_origin"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "transaction_hash",
+        "block_hash",
+        "block_number",
+        "execution_origin"
+      ],
+      "properties": {
+        "verification": {
+          "enum": ["rpc-quorum"]
+        },
+        "chain_status": {
+          "enum": ["included", "safe"]
+        },
+        "outcome": {
+          "enum": ["succeeded", "reverted"]
+        },
+        "settlement": {
+          "enum": ["pending"]
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "transaction_hash",
+        "block_hash",
+        "block_number",
+        "execution_origin"
+      ],
+      "properties": {
+        "verification": {
+          "enum": ["rpc-quorum"]
+        },
+        "chain_status": {
+          "enum": ["finalized"]
+        },
+        "outcome": {
+          "enum": ["succeeded"]
+        },
+        "settlement": {
+          "enum": ["succeeded"]
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "transaction_hash",
+        "block_hash",
+        "block_number",
+        "execution_origin"
+      ],
+      "properties": {
+        "verification": {
+          "enum": ["rpc-quorum"]
+        },
+        "chain_status": {
+          "enum": ["finalized"]
+        },
+        "outcome": {
+          "enum": ["reverted"]
+        },
+        "settlement": {
+          "enum": ["reverted"]
+        }
+      }
+    }
+  ]
+}
+```
+
 ## POST /v1/actions/{actionId}/execute
 
 Operation: `executeTransfer`.
@@ -2589,6 +3227,88 @@ Success response schema:
     "observed_at"
   ],
   "properties": {
+    "recovery": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "reason",
+        "observed_at",
+        "pending_age_ms",
+        "quarantined",
+        "next_action"
+      ],
+      "properties": {
+        "state": {
+          "type": "string",
+          "enum": [
+            "observing",
+            "suspected-stuck",
+            "awaiting-finality",
+            "finalized",
+            "unavailable",
+            "blocked"
+          ]
+        },
+        "reason": {
+          "type": "string",
+          "enum": [
+            "within-threshold",
+            "pending-too-long",
+            "nonce-gap-suspected",
+            "nonce-consumed-without-result",
+            "safe-nonce-advanced",
+            "insufficient-sponsor-funds",
+            "fee-cap-below-base-fee",
+            "transaction-not-visible",
+            "provider-nonce-conflict",
+            "evidence-unavailable",
+            "awaiting-finality",
+            "verified-finality"
+          ]
+        },
+        "observed_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "pending_age_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "quarantined": {
+          "type": "boolean"
+        },
+        "sponsor_nonce": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,77})$"
+        },
+        "confirmed_nonce": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,77})$"
+        },
+        "finalized_nonce": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,77})$"
+        },
+        "safe_nonce": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,77})$"
+        },
+        "next_action": {
+          "type": "string",
+          "enum": [
+            "wait",
+            "restore-evidence",
+            "fund-sponsor",
+            "review-provider-fees",
+            "review-provider-nonces",
+            "reconcile",
+            "operator-review"
+          ]
+        }
+      }
+    },
     "profile": {
       "type": "string",
       "enum": [
@@ -2838,6 +3558,88 @@ Success response schema:
     "observed_at"
   ],
   "properties": {
+    "recovery": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "reason",
+        "observed_at",
+        "pending_age_ms",
+        "quarantined",
+        "next_action"
+      ],
+      "properties": {
+        "state": {
+          "type": "string",
+          "enum": [
+            "observing",
+            "suspected-stuck",
+            "awaiting-finality",
+            "finalized",
+            "unavailable",
+            "blocked"
+          ]
+        },
+        "reason": {
+          "type": "string",
+          "enum": [
+            "within-threshold",
+            "pending-too-long",
+            "nonce-gap-suspected",
+            "nonce-consumed-without-result",
+            "safe-nonce-advanced",
+            "insufficient-sponsor-funds",
+            "fee-cap-below-base-fee",
+            "transaction-not-visible",
+            "provider-nonce-conflict",
+            "evidence-unavailable",
+            "awaiting-finality",
+            "verified-finality"
+          ]
+        },
+        "observed_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "pending_age_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "quarantined": {
+          "type": "boolean"
+        },
+        "sponsor_nonce": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,77})$"
+        },
+        "confirmed_nonce": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,77})$"
+        },
+        "finalized_nonce": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,77})$"
+        },
+        "safe_nonce": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,77})$"
+        },
+        "next_action": {
+          "type": "string",
+          "enum": [
+            "wait",
+            "restore-evidence",
+            "fund-sponsor",
+            "review-provider-fees",
+            "review-provider-nonces",
+            "reconcile",
+            "operator-review"
+          ]
+        }
+      }
+    },
     "profile": {
       "type": "string",
       "enum": [
@@ -3179,6 +3981,88 @@ Success response schema:
               "observed_at"
             ],
             "properties": {
+              "recovery": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "state",
+                  "reason",
+                  "observed_at",
+                  "pending_age_ms",
+                  "quarantined",
+                  "next_action"
+                ],
+                "properties": {
+                  "state": {
+                    "type": "string",
+                    "enum": [
+                      "observing",
+                      "suspected-stuck",
+                      "awaiting-finality",
+                      "finalized",
+                      "unavailable",
+                      "blocked"
+                    ]
+                  },
+                  "reason": {
+                    "type": "string",
+                    "enum": [
+                      "within-threshold",
+                      "pending-too-long",
+                      "nonce-gap-suspected",
+                      "nonce-consumed-without-result",
+                      "safe-nonce-advanced",
+                      "insufficient-sponsor-funds",
+                      "fee-cap-below-base-fee",
+                      "transaction-not-visible",
+                      "provider-nonce-conflict",
+                      "evidence-unavailable",
+                      "awaiting-finality",
+                      "verified-finality"
+                    ]
+                  },
+                  "observed_at": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "pending_age_ms": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "quarantined": {
+                    "type": "boolean"
+                  },
+                  "sponsor_nonce": {
+                    "type": "string",
+                    "pattern": "^(0|[1-9][0-9]{0,77})$"
+                  },
+                  "confirmed_nonce": {
+                    "type": "string",
+                    "pattern": "^(0|[1-9][0-9]{0,77})$"
+                  },
+                  "finalized_nonce": {
+                    "type": "string",
+                    "pattern": "^(0|[1-9][0-9]{0,77})$"
+                  },
+                  "safe_nonce": {
+                    "type": "string",
+                    "pattern": "^(0|[1-9][0-9]{0,77})$"
+                  },
+                  "next_action": {
+                    "type": "string",
+                    "enum": [
+                      "wait",
+                      "restore-evidence",
+                      "fund-sponsor",
+                      "review-provider-fees",
+                      "review-provider-nonces",
+                      "reconcile",
+                      "operator-review"
+                    ]
+                  }
+                }
+              },
               "profile": {
                 "type": "string",
                 "enum": [

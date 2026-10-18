@@ -5,6 +5,18 @@ function setting(summary: string, why: string, source: string, guide: string) {
 }
 
 export const settings = {
+  executionRecovery: setting(
+    'Read-only diagnosis of stuck transactions, sponsor nonces, fees and funding.',
+    'Optional durable quarantine stops new signing and dispatch through an affected payer. Missing receipts and pending nonce counts do not authorize another submission. Only fresh verified finality clears an execution quarantine.',
+    'Set a suspicion threshold from accepted network/provider latency, configure recovery on both services, and follow the stuck-transaction runbook. Reconciliation never changes fees, replaces a transaction or skips a signed Safe head.',
+    'stuck-transactions-and-recovery.html',
+  ),
+  payerOperations: setting(
+    'Independent payer balance checks, aggregate health and signed webhook delivery.',
+    'Balance evidence requires agreement from configured RPC sources. Durable retries use a stable webhook ID; receivers verify signatures and deduplicate that ID. Health contains counts without payer addresses or endpoint URLs.',
+    'Set the balance threshold in wei and a 5–300 second interval. Add trusted HTTPS destinations through environment references. Supply a unique whsec_ base64 signing secret per endpoint and test receiver and recovery behavior. Configure both services to observe their independent incidents.',
+    'payer-events-and-health.html',
+  ),
   executionService: setting(
     'The separately deployed dispatcher, selected provider revision and pinned service keys.',
     'Signed requests bind the method, path, destination and exact body. The executor maintains its own durable journal and calls the wallet service for current authority before provider effects. An application OAuth token cannot authorize that callback.',
@@ -12,10 +24,22 @@ export const settings = {
     'execution-service.html',
   ),
   executionEnabled: setting(
-    'Add the fixed approved-transfer execution profile and RPC verification.',
-    'The provider signs and dispatches only stored approved transfers under current authority. A separate application sponsor covers gas; observation does not confer spending authority.',
-    'Configure transfer signing first. Choose the separately deployed execution service or the direct Relayer compatibility profile, configure a dedicated sponsor and two independent RPC sources. Keep activation off until execution, chain checks and lost-response recovery have deployment-specific acceptance evidence.',
+    'Coordinate stored approved actions and independently verify their execution.',
+    'The provider signs and dispatches stored approved transfers or explicitly configured Safe calls under current authority. An application-funded sponsor covers gas; observation does not confer spending authority.',
+    'Configure transfer or contract-call policy first. Use the designated execution service for approved Safe operations or the direct Relayer compatibility profile for transfers. Configure application sponsors and two independent RPC sources. Keep activation off until execution, chain checks and lost-response recovery have deployment-specific acceptance evidence.',
     'execution.html',
+  ),
+  safeQueue: setting(
+    'Bounded FIFO requests for each Safe, with signing deferred until the head.',
+    'Independent Safe heads can progress concurrently. Current original owner, grant, identity, consent and policy are checked before effects. Signed or uncertain heads retain their position; service expiry cannot recall a Safe signature.',
+    'Enable the approved EVM execution profile and contract policy. Set the maximum unfinished requests per Safe and total queue validity; contract-policy validity also applies. Applications use the contract-call-requests API with signing and execution scopes. Status reads never dispatch. Test concurrent admission, unsigned cancellation and recovery before activation.',
+    'safe-queue-and-sponsor-pools.html',
+  ),
+  sponsorPool: setting(
+    'Durable round-robin payer selection with an unfinished-execution limit per address.',
+    'Distinct funded addresses can serve the same application. Retrying an execution retains its selected payer. Unknown attempts hold capacity, while the application lifetime gas budget remains shared.',
+    'Enable pools on both wallet and executor configurations, then register distinct sponsor account IDs, addresses and bindings for each application. Set capacity from accepted provider tests. Full pools leave unsigned queue heads waiting. Enable recovery quarantine to exclude affected payers from new admission. Nonce repair remains a separately reviewed provider operation.',
+    'safe-queue-and-sponsor-pools.html',
   ),
   executionRpc: setting(
     'Trusted RPC sources and bounded read-only transaction observation.',
