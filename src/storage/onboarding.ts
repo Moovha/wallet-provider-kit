@@ -5,6 +5,8 @@ const collections = [
   'supportedActions',
   'executionBindings',
   'sponsorships',
+  'userOperationExecutions',
+  'userOperationBatches',
   'operations',
   'executionPools',
   'sponsorQuarantines',

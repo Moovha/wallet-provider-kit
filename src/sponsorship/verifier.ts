@@ -58,7 +58,14 @@ export class Safe4337Verifier {
       throw new WalletProviderError('wallet_provider_configuration');
     }
   }
-  async verify(intent: ApprovedCallIntent, owner: string, nonce: string) {
+  async verify(
+    intent: Pick<
+      ApprovedCallIntent,
+      'account' | 'multiSend' | 'calls' | 'contracts'
+    >,
+    owner: string,
+    nonce?: string,
+  ) {
     intent = structuredClone(intent);
     const config = this.config;
     try {
@@ -222,8 +229,13 @@ export class Safe4337Verifier {
             entryInterface.decodeFunctionResult(
               'getNonce',
               String(entryNonce),
-            )[0] !== BigInt(nonce) ||
-            BigInt(nonce) >= 2n ** 64n
+            )[0] >=
+              2n ** 64n ||
+            (nonce !== undefined &&
+              entryInterface.decodeFunctionResult(
+                'getNonce',
+                String(entryNonce),
+              )[0] !== BigInt(nonce))
           )
             throw new Error();
           // Reject a reorg that occurred while reading this accepted account profile.
@@ -232,10 +244,22 @@ export class Safe4337Verifier {
             false,
           ])) as { hash: string };
           if (after?.hash !== block.hash) throw new Error();
-          return block.hash;
+          return {
+            hash: block.hash,
+            nonce: entryInterface
+              .decodeFunctionResult('getNonce', String(entryNonce))[0]
+              .toString() as string,
+          };
         }),
       );
-      if (values[0] !== values[1]) throw new Error();
+      if (
+        values.some(
+          (value) =>
+            value.hash !== values[0].hash || value.nonce !== values[0].nonce,
+        )
+      )
+        throw new Error();
+      return values[0].nonce;
     } catch {
       throw new WalletProviderError('wallet_authorization_denied');
     }

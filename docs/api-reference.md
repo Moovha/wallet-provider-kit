@@ -518,6 +518,8 @@ Import from `@moovha/wallet-provider-kit/http`. [Integration guide](api.md#http-
 - [OAuthConfiguration](#oauthconfiguration)
 - [ProviderPaths](#providerpaths)
 - [ServerOptions](#serveroptions)
+- [WalletCallsBatchSummary](#walletcallsbatchsummary)
+- [WalletCallsService](#walletcallsservice)
 
 ### Authenticate
 
@@ -611,6 +613,52 @@ export interface ServerOptions {
   )[];
   /** Release host-owned resources when the service closes. Registered before ready. */
   onClose?: () => Promise<void>;
+}
+```
+
+### WalletCallsBatchSummary
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/wallet-calls/types.ts).
+
+```ts
+export interface WalletCallsBatchSummary extends WalletCallsStatus {
+  account_id: string;
+  sender: string;
+  queue_stage:
+    'cancelled' | 'expired' | 'blocked' | 'succeeded' | 'queued' | 'executing';
+  policy_revision: string;
+  expires_at: string;
+  application_id: string;
+}
+```
+
+### WalletCallsService
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/wallet-calls/service.ts).
+
+```ts
+/** Account-scoped EIP-5792 adapter. The server selects the durable execution driver for each account. */
+export declare class WalletCallsService {
+  constructor(actions: SupportedActions, driver: WalletCallsDriver);
+  constructor(
+    actions: SupportedActions,
+    queue: SafeExecutionQueue,
+    execution: ApprovedExecutionCoordinator,
+    driver?: WalletCallsDriver,
+  );
+  list(
+    principal: VerifiedPrincipal,
+    authorizeOperator?: (state: ProviderState) => void,
+  ): Promise<{
+    truncated: boolean;
+    batches: import('./types.js').WalletCallsBatchSummary[];
+  }>;
+  request(
+    principal: VerifiedPrincipal,
+    accountId: string,
+    method: string,
+    params: unknown[],
+  ): Promise<unknown>;
 }
 ```
 
@@ -1385,6 +1433,14 @@ export type Permission = (typeof permissions)[number];
 ```ts
 export interface ProviderState {
   format: 'moovha-onboarding-1';
+  userOperationExecutions?: Record<
+    string,
+    import('../sponsorship/execution-types.js').UserOperationExecution
+  >;
+  userOperationBatches?: Record<
+    string,
+    import('../sponsorship/execution-types.js').UserOperationBatch
+  >;
   executionBindings?: Record<
     string,
     {
@@ -4375,38 +4431,21 @@ export declare class WalletCallsRpcError extends Error {
 [Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/wallet-calls/service.ts).
 
 ```ts
-/** Account-scoped EIP-5792 adapter. Only the durable Safe queue can admit new effects. */
+/** Account-scoped EIP-5792 adapter. The server selects the durable execution driver for each account. */
 export declare class WalletCallsService {
+  constructor(actions: SupportedActions, driver: WalletCallsDriver);
   constructor(
     actions: SupportedActions,
     queue: SafeExecutionQueue,
     execution: ApprovedExecutionCoordinator,
+    driver?: WalletCallsDriver,
   );
   list(
     principal: VerifiedPrincipal,
     authorizeOperator?: (state: ProviderState) => void,
   ): Promise<{
     truncated: boolean;
-    batches: {
-      version: '2.0.0';
-      id: string;
-      chainId: '0x14a34';
-      status: 100 | 200 | 400 | 500;
-      atomic: true;
-      receipts?: import('./types.js').WalletCallsReceipt[];
-      account_id: string;
-      sender: string;
-      queue_stage:
-        | 'cancelled'
-        | 'expired'
-        | 'blocked'
-        | 'succeeded'
-        | 'queued'
-        | 'executing';
-      policy_revision: string;
-      expires_at: string;
-      application_id: string;
-    }[];
+    batches: import('./types.js').WalletCallsBatchSummary[];
   }>;
   request(
     principal: VerifiedPrincipal,
@@ -4526,9 +4565,12 @@ Import from `@moovha/wallet-provider-kit/sponsorship`. [Integration guide](accou
 - [ApplicationGasAllowance](#applicationgasallowance)
 - [applicationGasBudgetId](#applicationgasbudgetid)
 - [applicationGasBudgetLimit](#applicationgasbudgetlimit)
+- [BundlerConfigurationV07](#bundlerconfigurationv07)
+- [createBundlerClientV07](#createbundlerclientv07)
 - [createPaymasterClientV07](#createpaymasterclientv07)
 - [maximumUserOperationCostV07](#maximumuseroperationcostv07)
 - [normalizeUserOperationV07](#normalizeuseroperationv07)
+- [packedUserOperation](#packeduseroperation)
 - [PaymasterClientOptionsV07](#paymasterclientoptionsv07)
 - [PaymasterContext](#paymastercontext)
 - [PaymasterDataV07](#paymasterdatav07)
@@ -4545,10 +4587,20 @@ Import from `@moovha/wallet-provider-kit/sponsorship`. [Integration guide](accou
 - [safeOpSignatureV07](#safeopsignaturev07)
 - [safeOpTypes](#safeoptypes)
 - [safeUserOperationCallData](#safeuseroperationcalldata)
+- [signedUserOperationHash](#signeduseroperationhash)
+- [SignedUserOperationV07](#signeduseroperationv07)
 - [SponsorshipConsentTerms](#sponsorshipconsentterms)
 - [UserOperationDomainV07](#useroperationdomainv07)
+- [UserOperationExecution](#useroperationexecution)
+- [userOperationExecutionBinding](#useroperationexecutionbinding)
+- [UserOperationExecutionCoordinator](#useroperationexecutioncoordinator)
 - [userOperationHashV07](#useroperationhashv07)
+- [UserOperationObservation](#useroperationobservation)
+- [UserOperationReceiptObserver](#useroperationreceiptobserver)
 - [UserOperationV07](#useroperationv07)
+- [UserOperationWalletCallsConfiguration](#useroperationwalletcallsconfiguration)
+- [UserOperationWalletCallsDriver](#useroperationwalletcallsdriver)
+- [WalletCallsDriver](#walletcallsdriver)
 
 ### ApplicationGasAllowance
 
@@ -4584,6 +4636,39 @@ export declare function applicationGasBudgetLimit(
   sponsors: readonly ApplicationGasAllowance[],
   clientId: string,
 ): string;
+```
+
+### BundlerConfigurationV07
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/sponsorship/bundler.ts).
+
+```ts
+export interface BundlerConfigurationV07 {
+  profile: 'safe4337-bundler-v07';
+  url: string;
+  maxLogRange: number;
+}
+```
+
+### createBundlerClientV07
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/sponsorship/bundler.ts).
+
+```ts
+/** Fixed trusted bundler. No retries or URL selection from wallet calls. */
+export declare function createBundlerClientV07(
+  config: BundlerConfigurationV07,
+  domain: UserOperationDomainV07,
+  authorization: () => Promise<string>,
+  request?: typeof fetch,
+): {
+  ready: () => Promise<void>;
+  send(
+    input: SignedUserOperationV07,
+    authorizeEffect: () => Promise<void>,
+  ): Promise<string>;
+  transactionHint(hash: string): Promise<string | undefined>;
+};
 ```
 
 ### createPaymasterClientV07
@@ -4627,6 +4712,25 @@ export declare function maximumUserOperationCostV07(
 export declare function normalizeUserOperationV07(
   input: UserOperationV07,
 ): UserOperationV07;
+```
+
+### packedUserOperation
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/sponsorship/bundler.ts).
+
+```ts
+/** Packed EntryPoint v0.7 tuple; signatures are compared as well as the operation hash. */
+export declare function packedUserOperation(input: SignedUserOperationV07): {
+  sender: string;
+  nonce: string;
+  initCode: string;
+  callData: string;
+  accountGasLimits: string;
+  preVerificationGas: string;
+  gasFees: string;
+  paymasterAndData: string;
+  signature: string;
+};
 ```
 
 ### PaymasterClientOptionsV07
@@ -4764,6 +4868,7 @@ export interface Safe4337Acceptance {
 
 ```ts
 export interface Safe4337SigningConfiguration {
+  submissionBinding?: string;
   acceptance: Safe4337Acceptance;
   basePolicy: ApprovedCallPolicy;
   sponsors: ApplicationGasAllowance[];
@@ -4818,11 +4923,44 @@ export declare class Safe4337SigningService {
     context: AuthorityContext,
     input: ApprovedCallInput,
     operation: UserOperationV07,
+    expiresAt?: string,
   ): Promise<{
     operation_id: string;
     terms_hash: string;
     maximum_cost_wei: string;
   }>;
+  executionBinding(): {
+    configurationHash: string;
+    submissionBinding: string | undefined;
+    acceptance: Safe4337Acceptance;
+    paymasterUrl: string;
+    accountIds: string[];
+  };
+  prepareCalls(
+    principal: import('../domain/principal.js').VerifiedPrincipal,
+    input: ApprovedCallInput,
+    gas: Pick<
+      UserOperationV07,
+      | 'callGasLimit'
+      | 'verificationGasLimit'
+      | 'preVerificationGas'
+      | 'maxFeePerGas'
+      | 'maxPriorityFeePerGas'
+    >,
+  ): Promise<UserOperationV07>;
+  assertAccepted(
+    principal: import('../domain/principal.js').VerifiedPrincipal,
+    accountId: string,
+  ): Promise<void>;
+  authorizeSubmission(context: AuthorityContext, id: string): Promise<void>;
+  withExecutionRead<T>(
+    principal: import('../domain/principal.js').VerifiedPrincipal,
+    id: string,
+    operation: (
+      state: import('../onboarding/types.js').ProviderState,
+      record: SponsorshipAdmission,
+    ) => T,
+  ): Promise<T>;
   admit(
     context: AuthorityContext,
     id: string,
@@ -4880,10 +5018,13 @@ export declare class Safe4337SigningService {
 export declare class Safe4337Verifier {
   constructor(config: Safe4337Acceptance, request?: typeof fetch);
   verify(
-    intent: ApprovedCallIntent,
+    intent: Pick<
+      ApprovedCallIntent,
+      'account' | 'multiSend' | 'calls' | 'contracts'
+    >,
     owner: string,
-    nonce: string,
-  ): Promise<void>;
+    nonce?: string,
+  ): Promise<string>;
 }
 ```
 
@@ -4952,6 +5093,27 @@ export declare function safeUserOperationCallData(
 ): string;
 ```
 
+### signedUserOperationHash
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/sponsorship/bundler.ts).
+
+```ts
+export declare function signedUserOperationHash(
+  input: SignedUserOperationV07,
+  domain: UserOperationDomainV07,
+): string;
+```
+
+### SignedUserOperationV07
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/sponsorship/bundler.ts).
+
+```ts
+export type SignedUserOperationV07 = UserOperationV07 & {
+  signature: string;
+};
+```
+
 ### SponsorshipConsentTerms
 
 [Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/sponsorship/signing.ts).
@@ -4980,6 +5142,71 @@ export interface UserOperationDomainV07 {
 }
 ```
 
+### UserOperationExecution
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/sponsorship/execution-types.ts).
+
+```ts
+export interface UserOperationExecution {
+  operationId: string;
+  configurationHash: string;
+  sponsorshipHash: string;
+  operation: SignedUserOperationV07;
+  intent: ApprovedCallIntent;
+  userOperationHash: string;
+  scanFromBlock: string;
+  planHash: string;
+  dispatch?: {
+    token: string;
+    expiresAt: number;
+    state: 'dispatch' | 'accepted' | 'unknown';
+  };
+  observation: UserOperationObservation;
+  observationRevision: number;
+}
+```
+
+### userOperationExecutionBinding
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/sponsorship/execution.ts).
+
+```ts
+export declare function userOperationExecutionBinding(
+  config: BundlerConfigurationV07,
+): string;
+```
+
+### UserOperationExecutionCoordinator
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/sponsorship/execution.ts).
+
+```ts
+/** One durable bundler dispatch per admitted operation. Recovery only reads independent chain evidence. */
+export declare class UserOperationExecutionCoordinator {
+  readonly actions: SupportedActions;
+  readonly signing: Safe4337SigningService;
+  readonly configurationHash: string;
+  constructor(
+    actions: SupportedActions,
+    database: ProviderDatabase,
+    signing: Safe4337SigningService,
+    configuration: BundlerConfigurationV07,
+    authorization: () => Promise<string>,
+    request?: typeof fetch,
+  );
+  load(id: string): Promise<UserOperationExecution | null>;
+  execute(
+    context: AuthorityContext,
+    id: string,
+  ): Promise<UserOperationExecution | null>;
+  refresh(id: string): Promise<UserOperationExecution | null>;
+  read(
+    principal: VerifiedPrincipal,
+    id: string,
+  ): Promise<UserOperationExecution | null>;
+}
+```
+
 ### userOperationHashV07
 
 [Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/sponsorship/user-operation.ts).
@@ -4990,6 +5217,42 @@ export declare function userOperationHashV07(
   input: UserOperationV07,
   domain: UserOperationDomainV07,
 ): string;
+```
+
+### UserOperationObservation
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/sponsorship/execution-types.ts).
+
+```ts
+export interface UserOperationObservation {
+  state: 'pending' | 'included' | 'safe' | 'finalized' | 'reorged';
+  receipt?: WalletCallsReceipt;
+  actualGasCost?: string;
+  actualGasUsed?: string;
+  observedAt: string;
+  scanNextBlock: string;
+}
+```
+
+### UserOperationReceiptObserver
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/sponsorship/receipts.ts).
+
+```ts
+/** Independent canonical EntryPoint evidence, including per-operation log boundaries inside a shared bundle. */
+export declare class UserOperationReceiptObserver {
+  constructor(
+    acceptance: Safe4337Acceptance,
+    maxLogRange: number,
+    request?: typeof fetch,
+  );
+  anchor(): Promise<string>;
+  observe(
+    plan: UserOperationExecution,
+    maximumCostWei: string,
+    hint?: string,
+  ): Promise<UserOperationObservation>;
+}
 ```
 
 ### UserOperationV07
@@ -5011,5 +5274,103 @@ export interface UserOperationV07 {
   paymasterVerificationGasLimit?: string;
   paymasterPostOpGasLimit?: string;
   paymasterData?: string;
+}
+```
+
+### UserOperationWalletCallsConfiguration
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/sponsorship/wallet-calls.ts).
+
+```ts
+export interface UserOperationWalletCallsConfiguration {
+  gas: Pick<
+    UserOperationV07,
+    | 'callGasLimit'
+    | 'verificationGasLimit'
+    | 'preVerificationGas'
+    | 'maxFeePerGas'
+    | 'maxPriorityFeePerGas'
+  >;
+  maxDepthPerSafe: number;
+  maxWaitSeconds: number;
+  pollIntervalSeconds: number;
+}
+```
+
+### UserOperationWalletCallsDriver
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/sponsorship/wallet-calls.ts).
+
+```ts
+/** Durable, explicitly selected ERC-4337 batch lane. It never delegates an uncertain batch to a relayer. */
+export declare class UserOperationWalletCallsDriver implements WalletCallsDriver {
+  constructor(
+    actions: SupportedActions,
+    database: ProviderDatabase,
+    execution: UserOperationExecutionCoordinator,
+    configuration: UserOperationWalletCallsConfiguration,
+  );
+  handles(accountId: string): boolean;
+  capabilities(principal: VerifiedPrincipal, accountId: string): Promise<void>;
+  acceptPaymaster(value: unknown): void;
+  assertSize(
+    principal: VerifiedPrincipal,
+    input: ApprovedCallInput,
+  ): Promise<void>;
+  enqueue(
+    context: AuthorityContext,
+    input: ApprovedCallInput,
+    metadata: WalletCallsMetadata,
+  ): Promise<void>;
+  status(
+    principal: VerifiedPrincipal,
+    accountId: string,
+    id: string,
+  ): Promise<WalletCallsStatus>;
+  list(
+    principal: VerifiedPrincipal,
+    authorizeOperator?: (state: ProviderState) => void,
+  ): Promise<{
+    truncated: boolean;
+    batches: WalletCallsBatchSummary[];
+  }>;
+  runOnce(): Promise<void>;
+  start(): void;
+  stop(): Promise<void>;
+}
+```
+
+### WalletCallsDriver
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/sponsorship/execution-types.ts).
+
+```ts
+export interface WalletCallsDriver {
+  handles(accountId: string): boolean;
+  capabilities(principal: VerifiedPrincipal, accountId: string): Promise<void>;
+  acceptPaymaster(value: unknown): void;
+  assertSize(
+    principal: VerifiedPrincipal,
+    input: ApprovedCallInput,
+  ): Promise<void>;
+  enqueue(
+    context: AuthorityContext,
+    input: ApprovedCallInput,
+    metadata: WalletCallsMetadata,
+  ): Promise<void>;
+  status(
+    principal: VerifiedPrincipal,
+    accountId: string,
+    id: string,
+  ): Promise<import('../wallet-calls/types.js').WalletCallsStatus>;
+  list(
+    principal: VerifiedPrincipal,
+    authorizeOperator?: (
+      state: import('../onboarding/types.js').ProviderState,
+    ) => void,
+  ): Promise<{
+    truncated: boolean;
+    batches: WalletCallsBatchSummary[];
+  }>;
 }
 ```

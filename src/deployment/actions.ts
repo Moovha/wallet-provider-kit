@@ -575,6 +575,7 @@ export class SupportedActions {
       owner: string,
     ) => Promise<string>,
     queued?: { id: string; expiresAt: string },
+    requestedExpiresAt?: string,
   ) {
     const context = structuredClone(inputContext);
     input = structuredClone(input);
@@ -611,7 +612,10 @@ export class SupportedActions {
         throw new WalletProviderError('wallet_attempt_conflict');
       return state.supportedActions[entry.id];
     });
-    const expiresAt = queued?.expiresAt ?? this.queueExpiry(authority.validity);
+    const expiresAt =
+      queued?.expiresAt ??
+      requestedExpiresAt ??
+      this.queueExpiry(authority.validity);
     if (
       Date.parse(expiresAt) <= Date.now() ||
       Date.parse(expiresAt) > Date.now() + authority.validity * 1000

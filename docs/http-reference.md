@@ -6091,7 +6091,7 @@ Success response schema:
 
 Operation: `walletCallsRpc`.
 
-Optional account-scoped EIP-5792 2.0.0 JSON-RPC transport. Runtime financial authority, Safe queue, current owner consent and method-specific scopes remain required. wallet_sendCalls admits a durable atomic batch without waiting for chain inclusion. Headless wallet_showCallsStatus returns unsupported method; the client adapter can present status through an explicit host callback.
+Optional account-scoped EIP-5792 2.0.0 JSON-RPC transport. Runtime financial authority, an explicitly bound Safe relayer or ERC-4337 driver, current owner consent and method-specific scopes remain required. wallet_sendCalls admits a durable atomic batch without waiting for chain inclusion. Headless wallet_showCallsStatus returns unsupported method; the client adapter can present status through an explicit host callback.
 
 | Parameter   | Location | Required | Schema                                                                                                |
 | ----------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
@@ -6493,6 +6493,17 @@ Success response schema:
               "additionalProperties": false,
               "required": ["atomic"],
               "properties": {
+                "paymasterService": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["supported"],
+                  "properties": {
+                    "supported": {
+                      "type": "boolean",
+                      "enum": [true]
+                    }
+                  }
+                },
                 "atomic": {
                   "type": "object",
                   "additionalProperties": false,

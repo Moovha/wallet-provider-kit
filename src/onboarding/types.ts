@@ -188,6 +188,14 @@ export interface StoredAttempt {
 }
 export interface ProviderState {
   format: 'moovha-onboarding-1';
+  userOperationExecutions?: Record<
+    string,
+    import('../sponsorship/execution-types.js').UserOperationExecution
+  >;
+  userOperationBatches?: Record<
+    string,
+    import('../sponsorship/execution-types.js').UserOperationBatch
+  >;
   executionBindings?: Record<
     string,
     { mechanism: import('../storage/execution-binding.js').OperationMechanism }

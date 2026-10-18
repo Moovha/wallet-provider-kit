@@ -19,7 +19,9 @@ The advanced [durable SafeOp signing adapter](durable-safe-op-signing.md) adds
 transactional mechanism selection, shared operation/gas reservations, current
 runtime authority and explicit sponsorship consent, durable paymaster phases and
 protected SafeOp signing. It remains an embedded-host integration; configured
-service activation and bundler execution are pending.
+service activation remains gated. The embedded [bundler execution adapter](user-operation-execution.md)
+adds durable submission, EIP-5792 batch handling, ERC-7677 discovery and independent
+receipt recovery.
 
 ## Responsibilities
 
@@ -135,7 +137,7 @@ bundler submission, receipt reconciliation or a `paymasterService` capability.
 The advanced durable SafeOp adapter supplies versioned account/code checks,
 current runtime authority, shared reservations and signing for embedded hosts.
 A complete configured integration still needs operator configuration and consent
-flows, accepted deployments, bundler submission, independent finality and recovery.
+flows, accepted deployments and operational funding/recovery acceptance.
 There is no wizard setting that activates those missing components.
 
 Keep any custom integration explicit about its mechanism, sponsor and supported

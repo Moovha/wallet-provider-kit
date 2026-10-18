@@ -10,7 +10,9 @@ while retaining your existing contract permissions. Configure the
 server returns `4200` for that display method.
 
 This is a Base Sepolia (`0x14a34`) profile of the existing Safe 1.4.1 mechanism.
-It does not add another signing or execution path. Current owner identity,
+The configured service uses the Safe relayer queue. Advanced embedded hosts can
+select the [ERC-4337 bundler driver](user-operation-execution.md) for accepted accounts
+behind the same endpoint. Current owner identity,
 contract delegation, runtime revision, claim freshness, registered methods,
 shared budgets, code pins and independent executor checks still apply.
 
@@ -109,7 +111,7 @@ other chains and non-Safe senders are unsupported.
 
 The result is `{"id":"0x1234567890abcdef"}` inside the JSON-RPC `result` field.
 It confirms durable queue admission, not signing, broadcast or chain success.
-The worker later prepares the exact nonce-bound SafeTx and executes it under
+The worker later prepares the exact nonce-bound Safe transaction or UserOperation and executes it under
 fresh authority without waiting for an application status request. The service
 never waits for a call to reach finality before admitting the remaining calls
 within that atomic batch.
@@ -134,8 +136,10 @@ encoded Safe plan and both journal envelopes, using the largest nonce and block
 quantities and every eligible configured sponsor. Oversized supported-envelope
 requests return `5740` before admission, signing or nonce reservation. Larger transport bodies can receive HTTP 413.
 
-The `atomicRequired` flag is supported directly. No other request capabilities
-are implemented. Unknown top-level or per-call capabilities are rejected with
+The `atomicRequired` flag is supported directly. The embedded ERC-4337 driver
+also accepts a top-level `paymasterService` capability bound to its exact configured
+URL and an empty context; see its [integration guide](user-operation-execution.md).
+The configured relayer profile implements no other request capabilities. Unknown top-level or per-call capabilities are rejected with
 `5700` unless explicitly marked `optional: true`; optional ones are discarded.
 Application-supplied paymaster or callback URLs are never fetched. Sponsorship
 uses the server-selected, configured sponsor and its existing limits.
@@ -172,7 +176,11 @@ receipt distinction rather than inventing a transaction status.
 Provider acceptance alone remains `100`. Missing receipt fields or disputed RPC
 metadata do not produce `200`. Unfinalized inclusion can return to `100` after a
 reorg or fresh-evidence failure; finalized records retain their final evidence
-through temporary RPC unavailability. Polling and recovery never resubmit a batch.
+through temporary RPC unavailability on the relayer profile. The ERC-4337 driver
+requires fresh independent evidence for status confirmation, uses the exact
+UserOperation event outcome and gas usage, and isolates that operation’s logs
+inside a bundle. It returns `100` on fresh-evidence failure, including for a
+previously finalized observation. Polling and recovery never resubmit a batch.
 
 Publication changes require fresh consent for new effects and can cancel unsigned
 queued work. Already signed or submitted work keeps its original policy, plan,
