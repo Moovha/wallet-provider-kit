@@ -1,11 +1,11 @@
 # ERC-4337 and ERC-7677 sponsorship
 
 Account abstraction can let a sponsor pay for compatible smart-account operations.
-The library provides unsigned preparation and paymaster-client helpers for teams
-building that integration. When choosing execution in
+The library provides unsigned preparation, a paymaster client and an advanced
+durable SafeOp signing adapter for teams building that integration. When choosing execution in
 [Deployment](setup-wizard.md#_5-deployment), use the supplied
-[relayer execution](execution.md) for the configured service: these helpers do not
-enable ERC-4337 signing or submission. A custom integration must keep one
+[relayer execution](execution.md) for the configured service: it does not enable
+ERC-4337 signing or submission. A custom integration must keep one
 application gas-budget identity, runtime policy and immutable execution choice.
 
 The `@moovha/wallet-provider-kit/sponsorship` entry point supplies unsigned UserOperation preparation, EntryPoint v0.7
@@ -14,6 +14,12 @@ client. **The configured service does not yet sign or submit ERC-4337 operations
 or advertise `paymasterService`.** The helpers do not enable a new HTTP route,
 account module or funding rail. The supported relayer paths retain their current
 behavior.
+
+The advanced [durable SafeOp signing adapter](durable-safe-op-signing.md) adds
+transactional mechanism selection, shared operation/gas reservations, current
+runtime authority and explicit sponsorship consent, durable paymaster phases and
+protected SafeOp signing. It remains an embedded-host integration; configured
+service activation and bundler execution are pending.
 
 ## Responsibilities
 
@@ -82,9 +88,11 @@ paymaster may incur gas cost when execution reverts.
 Existing SQLite admission and journal claims enforce the shared cap. Offline
 cross-mechanism fixtures prove that combined claims cannot exceed it and that a
 dispatched reservation survives reopening storage. This is accounting evidence,
-not an activated ERC-4337 execution path. The future driver must also bind one
-business operation to one mechanism: a shared budget alone does not prevent the
-same operation from being dispatched twice through different adapters.
+not an activated ERC-4337 execution path. The durable SafeOp adapter additionally
+binds the common stored operation to
+one mechanism before sponsorship or relayer signing admission. A shared budget
+alone does not prevent duplicate execution; retain the same operation identity
+across interfaces and retries.
 
 ## Use the trusted-host paymaster client
 
@@ -124,9 +132,10 @@ exercise those contracts; they do not establish an accepted smart-account deploy
 
 The configured service does not provide ERC-4337 durable admission, owner signing,
 bundler submission, receipt reconciliation or a `paymasterService` capability.
-A complete integration would need accepted account/module/EntryPoint/paymaster
-code bindings, current consent and claims, durable shared reservations before
-paymaster requests, exact operation hashes, independent finality and recovery.
+The advanced durable SafeOp adapter supplies versioned account/code checks,
+current runtime authority, shared reservations and signing for embedded hosts.
+A complete configured integration still needs operator configuration and consent
+flows, accepted deployments, bundler submission, independent finality and recovery.
 There is no wizard setting that activates those missing components.
 
 Keep any custom integration explicit about its mechanism, sponsor and supported

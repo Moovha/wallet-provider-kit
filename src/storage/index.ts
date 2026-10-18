@@ -1,3 +1,4 @@
+import { sqliteSponsorshipStore } from './sponsorship.js';
 import type {
   WalletAttemptRequest,
   WalletAttemptResult,
@@ -41,6 +42,7 @@ export function openProviderDatabase(options: ProviderDatabaseOptions) {
   const connection = new StorageConnection(options);
   return {
     onboardingStore: sqliteOnboardingStore(connection),
+    sponsorship: sqliteSponsorshipStore(connection),
     journal: sqliteJournal(connection),
     ready: () => connection.ready(),
     close: () => connection.close(),

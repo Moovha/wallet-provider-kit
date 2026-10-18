@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased durable SafeOp admission and signing
+
+- Bind each stored operation to one mechanism before relayer signing/submission or ERC-4337
+  sponsorship, preserving historical signing admissions across backend namespaces.
+- Reserve shared operation and application gas allowances atomically, journal
+  both paymaster phases and retain unknown outcomes through process restart.
+- Add the advanced Safe4337Module 0.3.0/v0.7 signing adapter with current runtime
+  authority, explicit sponsorship consent, accepted-account quorum checks and
+  exact SafeOp signatures through protected backends.
+- Keep configured-service activation, bundler submission and receipt recovery
+  gated; existing relayer support remains available.
+
 ## Unreleased account abstraction sponsorship foundation
 
 - Add a pinned EntryPoint v0.7 unsigned UserOperation profile, exact runtime-policy

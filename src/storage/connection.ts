@@ -167,6 +167,10 @@ export class StorageConnection {
       throw new Error();
   }
 
+  requireTransaction() {
+    if (this.closed || this.poisoned || !this.db.isTransaction) unavailable();
+  }
+
   all(sql: string, ...values: StorageValue[]): StorageRow[] {
     if (this.closed || this.poisoned) unavailable();
     try {

@@ -1385,6 +1385,16 @@ export type Permission = (typeof permissions)[number];
 ```ts
 export interface ProviderState {
   format: 'moovha-onboarding-1';
+  executionBindings?: Record<
+    string,
+    {
+      mechanism: import('../storage/execution-binding.js').OperationMechanism;
+    }
+  >;
+  sponsorships?: Record<
+    string,
+    import('../sponsorship/admission.js').SponsorshipAdmission
+  >;
   operations?: Record<
     string,
     import('../execution/operations.js').OperationsState
@@ -2341,6 +2351,44 @@ export declare function openProviderDatabase(
   options: ProviderDatabaseOptions,
 ): {
   onboardingStore: import('../index.js').OnboardingStore;
+  sponsorship: {
+    load: (
+      id: string,
+    ) => import('../sponsorship/admission.js').SponsorshipAdmission | null;
+    reserve(
+      input: Omit<
+        import('../sponsorship/admission.js').SponsorshipAdmission,
+        'phases' | 'signingActionId'
+      >,
+    ): import('../sponsorship/admission.js').SponsorshipAdmission;
+    claim(
+      id: string,
+      stage: 'stub' | 'final',
+      requestHash: string,
+    ):
+      | {
+          state: 'succeeded';
+          result: import('../index.js').PaymasterStubV07;
+          token?: undefined;
+        }
+      | {
+          state: 'dispatch';
+          token: `${string}-${string}-${string}-${string}-${string}`;
+          result?: undefined;
+        };
+    assertDispatch(
+      id: string,
+      stage: 'stub' | 'final',
+      token: string,
+      requestHash: string,
+    ): boolean;
+    complete(
+      id: string,
+      stage: 'stub' | 'final',
+      token: string,
+      result: import('../index.js').PaymasterStubV07 | null,
+    ): void;
+  };
   journal: import('../providers/openzeppelin-relayer.js').RelayerAttemptJournal;
   ready: () => Promise<boolean>;
   close: () => void;
@@ -4487,7 +4535,17 @@ Import from `@moovha/wallet-provider-kit/sponsorship`. [Integration guide](accou
 - [PaymasterStubV07](#paymasterstubv07)
 - [prepareRuntimeUserOperationV07](#prepareruntimeuseroperationv07)
 - [RuntimeUserOperationPreparationOptions](#runtimeuseroperationpreparationoptions)
+- [Safe4337Acceptance](#safe4337acceptance)
+- [Safe4337SigningConfiguration](#safe4337signingconfiguration)
+- [Safe4337SigningOptions](#safe4337signingoptions)
+- [Safe4337SigningService](#safe4337signingservice)
+- [Safe4337Verifier](#safe4337verifier)
+- [safeOpActionV07](#safeopactionv07)
+- [safeOpPayloadV07](#safeoppayloadv07)
+- [safeOpSignatureV07](#safeopsignaturev07)
+- [safeOpTypes](#safeoptypes)
 - [safeUserOperationCallData](#safeuseroperationcalldata)
+- [SponsorshipConsentTerms](#sponsorshipconsentterms)
 - [UserOperationDomainV07](#useroperationdomainv07)
 - [userOperationHashV07](#useroperationhashv07)
 - [UserOperationV07](#useroperationv07)
@@ -4684,6 +4742,205 @@ export interface RuntimeUserOperationPreparationOptions {
 }
 ```
 
+### Safe4337Acceptance
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/sponsorship/verifier.ts).
+
+```ts
+export interface Safe4337Acceptance {
+  profile: 'safe-4337-module-0.3.0-v07';
+  domain: UserOperationDomainV07;
+  entryPoint: PinnedContract;
+  module: PinnedContract;
+  paymaster: PinnedContract;
+  genesisHash: string;
+  rpcUrls: [string, string];
+}
+```
+
+### Safe4337SigningConfiguration
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/sponsorship/signing.ts).
+
+```ts
+export interface Safe4337SigningConfiguration {
+  acceptance: Safe4337Acceptance;
+  basePolicy: ApprovedCallPolicy;
+  sponsors: ApplicationGasAllowance[];
+  maxValiditySeconds: number;
+  paymaster: Omit<
+    PaymasterClientOptionsV07,
+    | 'authorization'
+    | 'authorizeRequest'
+    | 'domain'
+    | 'paymaster'
+    | 'maximumCostWei'
+  >;
+}
+```
+
+### Safe4337SigningOptions
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/sponsorship/signing.ts).
+
+```ts
+export interface Safe4337SigningOptions {
+  /** Unwrapped protected signing backend; this service supplies its financial journal. */
+  backend: WalletSigningProvider;
+  authorization: PaymasterClientOptionsV07['authorization'];
+  /** Resolve fresh persisted owner consent to these exact sponsorship/driver terms. Access scopes or contract registration alone are insufficient. */
+  authorizeSponsorship(
+    context: AuthorityContext,
+    terms: SponsorshipConsentTerms,
+  ): Promise<{
+    termsHash: string;
+    consentReference: string;
+  } | null>;
+}
+```
+
+### Safe4337SigningService
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/sponsorship/signing.ts).
+
+```ts
+/** Advanced embedded-host AS2 adapter. Signs only admitted exact SafeOps; never broadcasts or installs modules. */
+export declare class Safe4337SigningService {
+  constructor(
+    actions: SupportedActions,
+    database: ProviderDatabase,
+    configuration: Safe4337SigningConfiguration,
+    options: Safe4337SigningOptions,
+    request?: typeof fetch,
+  );
+  /** Uses the common stored operation/action and idempotency identity used by the relayer. */
+  requestCalls(
+    context: AuthorityContext,
+    input: ApprovedCallInput,
+    operation: UserOperationV07,
+  ): Promise<{
+    operation_id: string;
+    terms_hash: string;
+    maximum_cost_wei: string;
+  }>;
+  admit(
+    context: AuthorityContext,
+    id: string,
+    operation: UserOperationV07,
+  ): Promise<{
+    operation_id: string;
+    terms_hash: string;
+    maximum_cost_wei: string;
+  }>;
+  /** Replays only recorded successful quotes. Unknown/leased phases cannot contact the paymaster again. */
+  sponsor(
+    context: AuthorityContext,
+    id: string,
+  ): Promise<{
+    paymaster: string;
+    paymasterData: string;
+    paymasterVerificationGasLimit: string;
+    paymasterPostOpGasLimit: string;
+    sender: string;
+    nonce: string;
+    callData: string;
+    callGasLimit: string;
+    verificationGasLimit: string;
+    preVerificationGas: string;
+    maxFeePerGas: string;
+    maxPriorityFeePerGas: string;
+  }>;
+  sign(
+    context: AuthorityContext,
+    id: string,
+  ): Promise<{
+    signature: string;
+    paymaster: string;
+    paymasterData: string;
+    paymasterVerificationGasLimit: string;
+    paymasterPostOpGasLimit: string;
+    sender: string;
+    nonce: string;
+    callData: string;
+    callGasLimit: string;
+    verificationGasLimit: string;
+    preVerificationGas: string;
+    maxFeePerGas: string;
+    maxPriorityFeePerGas: string;
+  }>;
+}
+```
+
+### Safe4337Verifier
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/sponsorship/verifier.ts).
+
+```ts
+/** Independent chain reads at a common block. No module installation or relaxation of the SafeTx verifier. */
+export declare class Safe4337Verifier {
+  constructor(config: Safe4337Acceptance, request?: typeof fetch);
+  verify(
+    intent: ApprovedCallIntent,
+    owner: string,
+    nonce: string,
+  ): Promise<void>;
+}
+```
+
+### safeOpActionV07
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/sponsorship/safe-op.ts).
+
+```ts
+export declare function safeOpActionV07(
+  payload: TypedDataAction['payload'],
+  signer: EmbeddedAccount,
+  actionId: string,
+  operationId: string,
+): TypedDataAction;
+```
+
+### safeOpPayloadV07
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/sponsorship/safe-op.ts).
+
+```ts
+export declare function safeOpPayloadV07(
+  input: UserOperationV07,
+  domain: UserOperationDomainV07,
+  module: string,
+  validAfter: string,
+  validUntil: string,
+): TypedDataAction['payload'];
+```
+
+### safeOpSignatureV07
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/sponsorship/safe-op.ts).
+
+```ts
+/** Strict single-owner EIP-712 signature, prefixed with the validity window expected by Safe4337Module. */
+export declare function safeOpSignatureV07(
+  action: TypedDataAction,
+  owner: string,
+  signature: string,
+): string;
+```
+
+### safeOpTypes
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/sponsorship/safe-op.ts).
+
+```ts
+/** Safe4337Module 0.3.0, EntryPoint v0.7. Field order and uint widths match its SafeOp type hash. */
+export declare const safeOpTypes: {
+  SafeOp: {
+    name: string;
+    type: string;
+  }[];
+};
+```
+
 ### safeUserOperationCallData
 
 [Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/sponsorship/preparation.ts).
@@ -4693,6 +4950,22 @@ export interface RuntimeUserOperationPreparationOptions {
 export declare function safeUserOperationCallData(
   intent: ApprovedCallIntent,
 ): string;
+```
+
+### SponsorshipConsentTerms
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/sponsorship/signing.ts).
+
+```ts
+export interface SponsorshipConsentTerms {
+  operationId: string;
+  sourceApprovalHash: string;
+  configurationHash: string;
+  preparation: ReturnType<typeof prepareRuntimeUserOperationV07>;
+  validAfter: string;
+  validUntil: string;
+  maximumCostWei: string;
+}
 ```
 
 ### UserOperationDomainV07
