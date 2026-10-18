@@ -1,3 +1,5 @@
+import { registerWalletCallsRoutes } from '../wallet-calls/http.js';
+import type { WalletCallsService } from '../wallet-calls/service.js';
 import { readFile } from 'node:fs/promises';
 import { registerRuntimeConfigurationRoutes } from '../runtime-configuration/http.js';
 import type { RuntimeConfigurationService } from '../runtime-configuration/service.js';
@@ -40,6 +42,7 @@ import {
 } from './schemas.js';
 
 export interface ServerOptions {
+  walletCalls?: WalletCallsService;
   runtimeConfiguration?: RuntimeConfigurationService;
   authenticate?: Authenticate;
   service?: EmbeddedWalletService;
@@ -146,6 +149,7 @@ export async function createServer(options: ServerOptions = {}) {
           financial: !!options.onboarding?.actions?.consentTerms(),
           execution: !!options.onboarding?.execution,
           safeQueue: !!options.onboarding?.safeQueue,
+          walletCalls: !!options.walletCalls,
           runtimeConfiguration: !!options.runtimeConfiguration,
           executionService: !!options.onboarding?.executionIdentity,
           contractCalls: !!options.onboarding?.contractNonce,
@@ -549,6 +553,12 @@ export async function createServer(options: ServerOptions = {}) {
   await registerOnboardingRoutes(
     app,
     options.onboarding,
+    options.authenticate,
+    isReady,
+  );
+  await registerWalletCallsRoutes(
+    app,
+    options.walletCalls,
     options.authenticate,
     isReady,
   );

@@ -259,5 +259,6 @@ report `contract-execution`, not proof of swap output, vault shares or beneficia
 settlement. Native-value limits do not bound token approvals or downstream calls;
 review permitted methods and their argument semantics accordingly. New execution
 mechanisms, business-effect verifiers and policy rule types require implementation.
-The EIP-5792 adapter, operator GUI and real test-network/provider/recovery acceptance
-remain pending. See the [enterprise standards record](v1-standards.md).
+The [EIP-5792 adapter](wallet-calls.md) supplies standard batch submission and
+status for this Safe profile. Operator GUI and real test-network/provider/recovery
+acceptance remain pending. See the [enterprise standards record](v1-standards.md).

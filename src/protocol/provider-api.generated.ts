@@ -430,6 +430,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/accounts/{accountId}/wallet": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Optional account-scoped EIP-5792 2.0.0 JSON-RPC transport. Runtime financial authority, Safe queue, current owner consent and method-specific scopes remain required. wallet_sendCalls admits a durable atomic batch without waiting for chain inclusion. Headless wallet_showCallsStatus returns unsupported method; the client adapter can present status through an explicit host callback. */
+        post: operations["walletCallsRpc"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/runtime-configuration": {
         parameters: {
             query?: never;
@@ -5749,6 +5766,178 @@ export interface operations {
                 };
                 content: {
                     "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+        };
+    };
+    walletCallsRpc: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                accountId: string;
+            };
+            cookie?: never;
+        };
+        /** @description Single account-scoped JSON-RPC request. SendCallsParams uses EIP-5792 version 2.0.0. JSON-RPC batch envelopes and notifications are not accepted. */
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    jsonrpc: "2.0";
+                    id: string | number | (never | null);
+                    /** @enum {string} */
+                    method: "wallet_sendCalls";
+                    params: {
+                        /** @enum {string} */
+                        version: "2.0.0";
+                        id?: string;
+                        from?: string;
+                        chainId: string;
+                        atomicRequired: boolean;
+                        capabilities?: {
+                            [key: string]: {
+                                optional?: boolean;
+                            } & {
+                                [key: string]: unknown;
+                            };
+                        };
+                        calls: {
+                            to?: string;
+                            value?: string;
+                            data?: string;
+                            capabilities?: {
+                                [key: string]: {
+                                    optional?: boolean;
+                                } & {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        }[];
+                    }[];
+                } | {
+                    /** @enum {string} */
+                    jsonrpc: "2.0";
+                    id: string | number | (never | null);
+                    /** @enum {string} */
+                    method: "wallet_getCapabilities";
+                    params: (string | string[])[];
+                } | {
+                    /** @enum {string} */
+                    jsonrpc: "2.0";
+                    id: string | number | (never | null);
+                    /** @enum {string} */
+                    method: "wallet_getCallsStatus";
+                    params: string[];
+                } | {
+                    /** @enum {string} */
+                    jsonrpc: "2.0";
+                    id: string | number | (never | null);
+                    /** @enum {string} */
+                    method: "wallet_showCallsStatus";
+                    params: string[];
+                };
+            };
+        };
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        jsonrpc: "2.0";
+                        id: string | number | (never | null);
+                        result?: {
+                            id: string;
+                        } | {
+                            /** @enum {string} */
+                            version: "2.0.0";
+                            id: string;
+                            chainId: string;
+                            /** @enum {integer} */
+                            status: 100 | 200 | 400 | 500;
+                            /** @enum {boolean} */
+                            atomic: true;
+                            receipts?: {
+                                logs: {
+                                    address: string;
+                                    data: string;
+                                    topics: string[];
+                                }[];
+                                /** @enum {string} */
+                                status: "0x0" | "0x1";
+                                blockHash: string;
+                                blockNumber: string;
+                                gasUsed: string;
+                                transactionHash: string;
+                            }[];
+                        } | {
+                            "0x14a34"?: {
+                                atomic: {
+                                    /** @enum {string} */
+                                    status: "supported";
+                                };
+                            };
+                        };
+                        error?: {
+                            code: number;
+                            message: string;
+                        };
+                    };
+                };
+            };
+            /** @description Default Response */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
                         type: string;
                         title: string;
                         status: number;

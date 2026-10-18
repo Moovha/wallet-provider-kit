@@ -10256,6 +10256,441 @@
         }
       }
     },
+    "/v1/accounts/{accountId}/wallet": {
+      "post": {
+        "operationId": "walletCallsRpc",
+        "description": "Optional account-scoped EIP-5792 2.0.0 JSON-RPC transport. Runtime financial authority, Safe queue, current owner consent and method-specific scopes remain required. wallet_sendCalls admits a durable atomic batch without waiting for chain inclusion. Headless wallet_showCallsStatus returns unsupported method; the client adapter can present status through an explicit host callback.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["jsonrpc", "id", "method", "params"],
+                    "properties": {
+                      "jsonrpc": { "type": "string", "enum": ["2.0"] },
+                      "id": {
+                        "anyOf": [
+                          { "type": "string", "maxLength": 256 },
+                          { "type": "integer" },
+                          { "type": "object", "nullable": true, "enum": [null] }
+                        ]
+                      },
+                      "method": {
+                        "type": "string",
+                        "enum": ["wallet_sendCalls"]
+                      },
+                      "params": {
+                        "type": "array",
+                        "minItems": 1,
+                        "maxItems": 1,
+                        "items": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "version",
+                            "chainId",
+                            "atomicRequired",
+                            "calls"
+                          ],
+                          "properties": {
+                            "version": { "type": "string", "enum": ["2.0.0"] },
+                            "id": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 8194
+                            },
+                            "from": {
+                              "type": "string",
+                              "pattern": "^0x[0-9a-fA-F]{40}$"
+                            },
+                            "chainId": {
+                              "type": "string",
+                              "pattern": "^0x(?:0|[1-9a-fA-F][0-9a-fA-F]{0,63})$"
+                            },
+                            "atomicRequired": { "type": "boolean" },
+                            "capabilities": {
+                              "type": "object",
+                              "maxProperties": 16,
+                              "additionalProperties": {
+                                "type": "object",
+                                "properties": {
+                                  "optional": { "type": "boolean" }
+                                },
+                                "additionalProperties": true
+                              }
+                            },
+                            "calls": {
+                              "type": "array",
+                              "minItems": 1,
+                              "maxItems": 16,
+                              "items": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "properties": {
+                                  "to": {
+                                    "type": "string",
+                                    "pattern": "^0x[0-9a-fA-F]{40}$"
+                                  },
+                                  "value": {
+                                    "type": "string",
+                                    "pattern": "^0x(?:0|[1-9a-fA-F][0-9a-fA-F]{0,63})$"
+                                  },
+                                  "data": {
+                                    "type": "string",
+                                    "pattern": "^0x(?:[0-9a-fA-F]{2})*$"
+                                  },
+                                  "capabilities": {
+                                    "type": "object",
+                                    "maxProperties": 16,
+                                    "additionalProperties": {
+                                      "type": "object",
+                                      "properties": {
+                                        "optional": { "type": "boolean" }
+                                      },
+                                      "additionalProperties": true
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["jsonrpc", "id", "method", "params"],
+                    "properties": {
+                      "jsonrpc": { "type": "string", "enum": ["2.0"] },
+                      "id": {
+                        "anyOf": [
+                          { "type": "string", "maxLength": 256 },
+                          { "type": "integer" },
+                          { "type": "object", "nullable": true, "enum": [null] }
+                        ]
+                      },
+                      "method": {
+                        "type": "string",
+                        "enum": ["wallet_getCapabilities"]
+                      },
+                      "params": {
+                        "type": "array",
+                        "minItems": 1,
+                        "maxItems": 2,
+                        "items": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "pattern": "^0x[0-9a-fA-F]{40}$"
+                            },
+                            {
+                              "type": "array",
+                              "maxItems": 64,
+                              "items": {
+                                "type": "string",
+                                "pattern": "^0x(?:0|[1-9a-fA-F][0-9a-fA-F]{0,63})$"
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["jsonrpc", "id", "method", "params"],
+                    "properties": {
+                      "jsonrpc": { "type": "string", "enum": ["2.0"] },
+                      "id": {
+                        "anyOf": [
+                          { "type": "string", "maxLength": 256 },
+                          { "type": "integer" },
+                          { "type": "object", "nullable": true, "enum": [null] }
+                        ]
+                      },
+                      "method": {
+                        "type": "string",
+                        "enum": ["wallet_getCallsStatus"]
+                      },
+                      "params": {
+                        "type": "array",
+                        "minItems": 1,
+                        "maxItems": 1,
+                        "items": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 8194
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["jsonrpc", "id", "method", "params"],
+                    "properties": {
+                      "jsonrpc": { "type": "string", "enum": ["2.0"] },
+                      "id": {
+                        "anyOf": [
+                          { "type": "string", "maxLength": 256 },
+                          { "type": "integer" },
+                          { "type": "object", "nullable": true, "enum": [null] }
+                        ]
+                      },
+                      "method": {
+                        "type": "string",
+                        "enum": ["wallet_showCallsStatus"]
+                      },
+                      "params": {
+                        "type": "array",
+                        "minItems": 1,
+                        "maxItems": 1,
+                        "items": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 8194
+                        }
+                      }
+                    }
+                  }
+                ],
+                "description": "Single account-scoped JSON-RPC request. SendCallsParams uses EIP-5792 version 2.0.0. JSON-RPC batch envelopes and notifications are not accepted."
+              }
+            }
+          },
+          "description": "Single account-scoped JSON-RPC request. SendCallsParams uses EIP-5792 version 2.0.0. JSON-RPC batch envelopes and notifications are not accepted."
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            },
+            "in": "path",
+            "name": "accountId",
+            "required": true
+          }
+        ],
+        "security": [{ "accessToken": [] }],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["jsonrpc", "id"],
+                  "properties": {
+                    "jsonrpc": { "type": "string", "enum": ["2.0"] },
+                    "id": {
+                      "anyOf": [
+                        { "type": "string", "maxLength": 256 },
+                        { "type": "integer" },
+                        { "type": "object", "nullable": true, "enum": [null] }
+                      ]
+                    },
+                    "result": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": ["id"],
+                          "properties": { "id": { "type": "string" } }
+                        },
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "version",
+                            "id",
+                            "chainId",
+                            "status",
+                            "atomic"
+                          ],
+                          "properties": {
+                            "version": { "type": "string", "enum": ["2.0.0"] },
+                            "id": { "type": "string" },
+                            "chainId": {
+                              "type": "string",
+                              "pattern": "^0x(?:0|[1-9a-fA-F][0-9a-fA-F]{0,63})$"
+                            },
+                            "status": {
+                              "type": "integer",
+                              "enum": [100, 200, 400, 500]
+                            },
+                            "atomic": { "type": "boolean", "enum": [true] },
+                            "receipts": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                  "logs",
+                                  "status",
+                                  "blockHash",
+                                  "blockNumber",
+                                  "gasUsed",
+                                  "transactionHash"
+                                ],
+                                "properties": {
+                                  "logs": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "additionalProperties": false,
+                                      "required": ["address", "data", "topics"],
+                                      "properties": {
+                                        "address": {
+                                          "type": "string",
+                                          "pattern": "^0x[0-9a-fA-F]{40}$"
+                                        },
+                                        "data": { "type": "string" },
+                                        "topics": {
+                                          "type": "array",
+                                          "items": { "type": "string" }
+                                        }
+                                      }
+                                    }
+                                  },
+                                  "status": {
+                                    "type": "string",
+                                    "enum": ["0x0", "0x1"]
+                                  },
+                                  "blockHash": { "type": "string" },
+                                  "blockNumber": {
+                                    "type": "string",
+                                    "pattern": "^0x(?:0|[1-9a-fA-F][0-9a-fA-F]{0,63})$"
+                                  },
+                                  "gasUsed": {
+                                    "type": "string",
+                                    "pattern": "^0x(?:0|[1-9a-fA-F][0-9a-fA-F]{0,63})$"
+                                  },
+                                  "transactionHash": { "type": "string" }
+                                }
+                              }
+                            }
+                          }
+                        },
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "0x14a34": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": ["atomic"],
+                              "properties": {
+                                "atomic": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "required": ["status"],
+                                  "properties": {
+                                    "status": {
+                                      "type": "string",
+                                      "enum": ["supported"]
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    "error": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["code", "message"],
+                      "properties": {
+                        "code": { "type": "integer" },
+                        "message": { "type": "string" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/runtime-configuration": {
       "get": {
         "operationId": "readRuntimeConfiguration",

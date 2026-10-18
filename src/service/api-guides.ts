@@ -8,6 +8,7 @@ export interface OperationGuide {
   enrollment?: boolean;
   execution?: boolean;
   safeQueue?: boolean;
+  walletCalls?: boolean;
   runtimeConfiguration?: boolean;
   applicationLed?: boolean;
   records?: boolean;
@@ -22,6 +23,16 @@ export interface OperationGuide {
 }
 // Shared operator guidance. Runtime authentication and authority remain authoritative.
 export const operationGuides: Record<string, OperationGuide> = {
+  walletCallsRpc: {
+    title: 'Submit or inspect a standard wallet call batch',
+    group: 'Wallet calls',
+    scope: 'wallet:access:read',
+    walletCalls: true,
+    prerequisite:
+      'Enable runtime financial authority and the Safe queue. The account endpoint binds the authenticated application and current owner. Send requires wallet:actions, wallet:sign and wallet:execute plus contracts:request consent; status/discovery require wallet:execute:read.',
+    success:
+      '200: a JSON-RPC result or sanitized RPC error. Use EIP-5792 version 2.0.0, retain the batch ID and poll wallet_getCallsStatus. Inclusion is distinct from finality. HTTP authentication/readiness failures use the normal problem envelope.',
+  },
   readRuntimeApplicationConfiguration: {
     title: 'Read an application policy as provider operator',
     group: 'Runtime configuration',
@@ -372,6 +383,7 @@ export interface ApiFeatures {
   financial: boolean;
   execution?: boolean;
   safeQueue?: boolean;
+  walletCalls?: boolean;
   runtimeConfiguration?: boolean;
   executionService?: boolean;
   contractCalls?: boolean;
@@ -394,6 +406,8 @@ export function operationUnavailableReason(
     return features.runtimeConfiguration
       ? undefined
       : 'Runtime configuration control plane is not configured';
+  if (guide.walletCalls && !features.walletCalls)
+    return 'Runtime financial authority and Safe queue are not configured';
   if (guide.safeQueue && !features.safeQueue)
     return 'Durable Safe execution queue is not configured';
   if (id === 'requestContractCall' && !features.contractCalls)

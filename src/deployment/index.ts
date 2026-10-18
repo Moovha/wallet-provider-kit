@@ -1,3 +1,13 @@
+export { WalletCallsService } from '../wallet-calls/service.js';
+export {
+  createWalletCallsProvider,
+  WalletCallsRpcError,
+} from '../wallet-calls/client.js';
+export type { WalletCallsClientOptions } from '../wallet-calls/client.js';
+export type {
+  WalletCallsStatus,
+  WalletCallsReceipt,
+} from '../wallet-calls/types.js';
 export type { RuntimePolicySnapshot } from '../runtime-configuration/authority.js';
 export { createConfiguredProvider } from './provider.js';
 export {

@@ -1,3 +1,4 @@
+import { WalletCallsService } from '../wallet-calls/service.js';
 import {
   PayerOperations,
   emptyOperationsState,
@@ -335,6 +336,13 @@ export async function createConfiguredProvider(
             transportRevision,
       );
     const app = await createServer({
+      walletCalls:
+        config.runtimeConfiguration?.authorizeContracts &&
+        actions &&
+        safeQueue &&
+        execution
+          ? new WalletCallsService(actions, safeQueue, execution)
+          : undefined,
       runtimeConfiguration: config.runtimeConfiguration
         ? new RuntimeConfigurationService(
             onboarding.policy,

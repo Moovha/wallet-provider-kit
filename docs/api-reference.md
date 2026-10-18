@@ -586,6 +586,7 @@ See the [HTTP reference](http-reference.md).
 
 ```ts
 export interface ServerOptions {
+  walletCalls?: WalletCallsService;
   runtimeConfiguration?: RuntimeConfigurationService;
   authenticate?: Authenticate;
   service?: EmbeddedWalletService;
@@ -2427,6 +2428,7 @@ Import from `@moovha/wallet-provider-kit/deployment`. [Integration guide](setup.
 - [createExecutionService](#createexecutionservice)
 - [createServiceIdentity](#createserviceidentity)
 - [createTransferExecutionProvider](#createtransferexecutionprovider)
+- [createWalletCallsProvider](#createwalletcallsprovider)
 - [defaultReplacementPolicy](#defaultreplacementpolicy)
 - [defaultSponsorGas](#defaultsponsorgas)
 - [ExecutionAuthorityRequest](#executionauthorityrequest)
@@ -2491,6 +2493,11 @@ Import from `@moovha/wallet-provider-kit/deployment`. [Integration guide](setup.
 - [validateExecutionServiceConfiguration](#validateexecutionserviceconfiguration)
 - [validateProviderConfiguration](#validateproviderconfiguration)
 - [WalletBackendAdapterV1](#walletbackendadapterv1)
+- [WalletCallsClientOptions](#walletcallsclientoptions)
+- [WalletCallsReceipt](#walletcallsreceipt)
+- [WalletCallsRpcError](#walletcallsrpcerror)
+- [WalletCallsService](#walletcallsservice)
+- [WalletCallsStatus](#walletcallsstatus)
 
 ### ApprovedCallInput
 
@@ -2629,6 +2636,11 @@ export declare class ApprovedExecutionCoordinator {
     observer: ExecutionObserver,
     operations?: PayerOperations | undefined,
   );
+  /** Bound every encoded wallet/executor envelope before accepting a standard batch. No signatures or attempts are issued. */
+  assertWalletCallsSize(
+    principal: VerifiedPrincipal,
+    input: import('./approved-calls.js').ApprovedCallInput,
+  ): Promise<void>;
   execute(input: AuthorityContext, id: string): Promise<ExecutionReceipt>;
   /** Authenticated executor callback: a service identity never replaces current wallet authority. */
   authorizeRemote(input: ExecutionAuthorityRequest): Promise<{
@@ -2705,6 +2717,7 @@ export declare function buildApprovedCallIntent(
 
 ```ts
 export interface ChainObservation {
+  callsReceipt?: import('../wallet-calls/types.js').WalletCallsReceipt;
   chain_status:
     'unobserved' | 'pending' | 'included' | 'safe' | 'finalized' | 'reorged';
   verification: 'unverified' | 'rpc-quorum';
@@ -2829,6 +2842,22 @@ export declare function createTransferExecutionProvider(
   apiKey: string,
   request?: typeof fetch,
 ): ExecutionProvider;
+```
+
+### createWalletCallsProvider
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/wallet-calls/client.ts).
+
+```ts
+/** EIP-1193-shaped request interface for EIP-5792, bound to one provider account endpoint. */
+export declare function createWalletCallsProvider(
+  options: WalletCallsClientOptions,
+): {
+  request: (input: {
+    method: string;
+    params?: readonly unknown[] | object;
+  }) => Promise<unknown>;
+};
 ```
 
 ### defaultReplacementPolicy
@@ -3045,7 +3074,10 @@ export interface ExecutionProviderAdapterV1 {
 [Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/types.ts).
 
 ```ts
-export interface ExecutionReceipt extends ChainObservation {
+export interface ExecutionReceipt extends Omit<
+  ChainObservation,
+  'callsReceipt'
+> {
   replacement?: import('./replacement.js').ReplacementStatus;
   recovery?: import('./recovery.js').RecoveryDiagnosis;
   profile: ExecutionProfile;
@@ -3796,6 +3828,7 @@ export declare class SafeExecutionQueue {
   enqueue(
     context: AuthorityContext,
     input: ApprovedCallInput,
+    walletCalls?: WalletCallsMetadata,
   ): Promise<{
     next_poll_after_ms: number;
     action_id?: string | undefined;
@@ -3809,6 +3842,37 @@ export declare class SafeExecutionQueue {
       | 'queued'
       | 'executing';
     expires_at: string;
+  }>;
+  /** Read batch evidence without renewing financial consent or permitting a new effect. */
+  walletCallsRecord(
+    principal: VerifiedPrincipal,
+    accountId: string,
+    id: string,
+  ): Promise<{
+    execution?: import('./types.js').TransferExecutionRecord | undefined;
+    walletCalls?: WalletCallsMetadata;
+    id: string;
+    input: ApprovedCallInput;
+    principal: VerifiedPrincipal;
+    grantId: string;
+    owner: string;
+    consentReference: string;
+    safeAddress: string;
+    address: string;
+    revision: string;
+    expiresAt: string;
+    sequence: number;
+    actionKey: string;
+    executeKey: string;
+    identityHash: string;
+    actionId?: string;
+    status:
+      | 'queued'
+      | 'executing'
+      | 'succeeded'
+      | 'cancelled'
+      | 'expired'
+      | 'blocked';
   }>;
   read(
     principal: VerifiedPrincipal,
@@ -3857,6 +3921,7 @@ export declare class SafeExecutionQueue {
 
 ```ts
 export interface SafeQueueRecord {
+  walletCalls?: WalletCallsMetadata;
   id: string;
   input: ApprovedCallInput;
   principal: VerifiedPrincipal;
@@ -3999,6 +4064,11 @@ export declare class ApprovedExecutionCoordinator {
     observer: ExecutionObserver,
     operations?: PayerOperations | undefined,
   );
+  /** Bound every encoded wallet/executor envelope before accepting a standard batch. No signatures or attempts are issued. */
+  assertWalletCallsSize(
+    principal: VerifiedPrincipal,
+    input: import('./approved-calls.js').ApprovedCallInput,
+  ): Promise<void>;
   execute(input: AuthorityContext, id: string): Promise<ExecutionReceipt>;
   /** Authenticated executor callback: a service identity never replaces current wallet authority. */
   authorizeRemote(input: ExecutionAuthorityRequest): Promise<{
@@ -4120,5 +4190,174 @@ export interface WalletBackendAdapterV1 {
     options: Record<string, unknown>;
     secret(name: string): string;
   }): Promise<WalletSigningProvider> | WalletSigningProvider;
+}
+```
+
+### WalletCallsClientOptions
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/wallet-calls/client.ts).
+
+```ts
+/** Host-authorized transport. Never place an OAuth client secret in a browser. */
+export interface WalletCallsClientOptions {
+  url: string;
+  authorization: () => Promise<string>;
+  fetch?: typeof fetch;
+  /** Present status in the application's wallet UI; called only after an authenticated status read. */
+  showCallsStatus?: (status: WalletCallsStatus) => Promise<void>;
+}
+```
+
+### WalletCallsReceipt
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/wallet-calls/types.ts).
+
+```ts
+/** EIP-5792 version 2.0.0 wire types for the supported Safe batch profile. */
+export interface WalletCallsReceipt {
+  logs: {
+    address: string;
+    data: string;
+    topics: string[];
+  }[];
+  status: string;
+  blockHash: string;
+  blockNumber: string;
+  gasUsed: string;
+  transactionHash: string;
+}
+```
+
+### WalletCallsRpcError
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/wallet-calls/client.ts).
+
+```ts
+export declare class WalletCallsRpcError extends Error {
+  readonly code: number;
+  constructor(code: number, message: string);
+}
+```
+
+### WalletCallsService
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/wallet-calls/service.ts).
+
+```ts
+/** Account-scoped EIP-5792 adapter. Only the durable Safe queue can admit new effects. */
+export declare class WalletCallsService {
+  constructor(
+    actions: SupportedActions,
+    queue: SafeExecutionQueue,
+    execution: ApprovedExecutionCoordinator,
+  );
+  request(
+    principal: VerifiedPrincipal,
+    accountId: string,
+    method: string,
+    params: unknown[],
+  ): Promise<unknown>;
+}
+```
+
+### WalletCallsStatus
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/wallet-calls/types.ts).
+
+```ts
+export interface WalletCallsStatus {
+  version: '2.0.0';
+  id: string;
+  chainId: '0x14a34';
+  status: 100 | 200 | 400 | 500;
+  atomic: true;
+  receipts?: WalletCallsReceipt[];
+}
+```
+
+## Standard wallet calls request adapter
+
+Import from `@moovha/wallet-provider-kit/wallet-calls`. [Integration guide](wallet-calls.md).
+
+- [createWalletCallsProvider](#createwalletcallsprovider)
+- [WalletCallsClientOptions](#walletcallsclientoptions)
+- [WalletCallsReceipt](#walletcallsreceipt)
+- [WalletCallsRpcError](#walletcallsrpcerror)
+- [WalletCallsStatus](#walletcallsstatus)
+
+### createWalletCallsProvider
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/wallet-calls/client.ts).
+
+```ts
+/** EIP-1193-shaped request interface for EIP-5792, bound to one provider account endpoint. */
+export declare function createWalletCallsProvider(
+  options: WalletCallsClientOptions,
+): {
+  request: (input: {
+    method: string;
+    params?: readonly unknown[] | object;
+  }) => Promise<unknown>;
+};
+```
+
+### WalletCallsClientOptions
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/wallet-calls/client.ts).
+
+```ts
+/** Host-authorized transport. Never place an OAuth client secret in a browser. */
+export interface WalletCallsClientOptions {
+  url: string;
+  authorization: () => Promise<string>;
+  fetch?: typeof fetch;
+  /** Present status in the application's wallet UI; called only after an authenticated status read. */
+  showCallsStatus?: (status: WalletCallsStatus) => Promise<void>;
+}
+```
+
+### WalletCallsReceipt
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/wallet-calls/types.ts).
+
+```ts
+/** EIP-5792 version 2.0.0 wire types for the supported Safe batch profile. */
+export interface WalletCallsReceipt {
+  logs: {
+    address: string;
+    data: string;
+    topics: string[];
+  }[];
+  status: string;
+  blockHash: string;
+  blockNumber: string;
+  gasUsed: string;
+  transactionHash: string;
+}
+```
+
+### WalletCallsRpcError
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/wallet-calls/client.ts).
+
+```ts
+export declare class WalletCallsRpcError extends Error {
+  readonly code: number;
+  constructor(code: number, message: string);
+}
+```
+
+### WalletCallsStatus
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/wallet-calls/types.ts).
+
+```ts
+export interface WalletCallsStatus {
+  version: '2.0.0';
+  id: string;
+  chainId: '0x14a34';
+  status: 100 | 200 | 400 | 500;
+  atomic: true;
+  receipts?: WalletCallsReceipt[];
 }
 ```

@@ -1,3 +1,4 @@
+import { canonicalServiceJson } from '../executor/auth.js';
 import { executionAttemptInput } from '../executor/protocol.js';
 import { assertReplacement, pinReplacementPolicy } from './replacement.js';
 import {
@@ -77,6 +78,102 @@ export class ApprovedExecutionCoordinator {
     this.configurationHash = fingerprint(
       executionConfigurationIdentity(configuration),
     );
+  }
+  private buildPlan(
+    action: import('../domain/signing.js').TypedDataAction,
+    sponsor: ExecutionConfiguration['sponsors'][number],
+    scanFromBlock: string,
+    signature: string,
+    intent?: import('./approved-calls.js').ApprovedCallIntent,
+    runtimePolicy?: import('../runtime-configuration/authority.js').RuntimePolicySnapshot,
+  ): TransferExecutionPlan {
+    const message = action.payload.message;
+    const parsedSignature = Signature.from(signature);
+    return {
+      profile: this.profile,
+      revision: '1',
+      action,
+      sponsor: structuredClone(sponsor),
+      configurationHash: this.configurationHash,
+      genesisHash: this.config.rpc.genesisHash,
+      ...(!intent ? { tokenCodeHash: this.config.rpc.tokenCodeHash! } : {}),
+      scanFromBlock,
+      ...(this.config.replacement
+        ? { replacement: pinReplacementPolicy(this.config.replacement) }
+        : {}),
+      ...(intent ? { intent: structuredClone(intent) } : {}),
+      ...(runtimePolicy
+        ? { runtimePolicy: structuredClone(runtimePolicy) }
+        : {}),
+      data: intent
+        ? approvedCallData(action, signature)
+        : transferInterface
+            .encodeFunctionData('transferWithAuthorization', [
+              message.from,
+              message.to,
+              message.value,
+              message.validAfter,
+              message.validBefore,
+              message.nonce,
+              parsedSignature.v,
+              parsedSignature.r,
+              parsedSignature.s,
+            ])
+            .toLowerCase(),
+    };
+  }
+  /** Bound every encoded wallet/executor envelope before accepting a standard batch. No signatures or attempts are issued. */
+  async assertWalletCallsSize(
+    principal: VerifiedPrincipal,
+    input: import('./approved-calls.js').ApprovedCallInput,
+  ) {
+    if (!this.config.service || this.profile !== 'approved-evm-executor-v1')
+      deny();
+    const preview = await this.actions.previewWalletCalls(principal, input);
+    const sponsors = this.config.sponsors.filter(
+      (sponsor) => sponsor.clientId === principal.clientId,
+    );
+    if (!sponsors.length) deny();
+    const executionId = randomUUID();
+    const signature = '0x' + '1'.repeat(128) + '1b';
+    for (const sponsor of sponsors) {
+      const plan = this.buildPlan(
+        preview.action,
+        sponsor,
+        String(2n ** 256n - 1n),
+        signature,
+        preview.intent,
+        preview.runtimePolicy,
+      );
+      const walletAttempt = createWalletAttemptRequest(
+        'configured-execution-v1',
+        this.profile,
+        'relay_transaction',
+        input.account_id,
+        executionId,
+        plan.action.action_id,
+        executionAttemptInput(plan),
+      );
+      const dispatch = {
+        contract: 'execution-dispatch-v1',
+        execution_id: executionId,
+        provider_id: this.config.service.providerId,
+        provider_revision: this.config.service.providerRevision,
+        wallet_attempt: walletAttempt,
+        plan,
+      };
+      createWalletAttemptRequest(
+        'designated-execution-v1',
+        'designated-execution-v1',
+        'relay_transaction',
+        sponsor.accountId,
+        executionId,
+        plan.action.action_id,
+        { ...dispatch, plan: executionAttemptInput(plan) },
+      );
+      if (Buffer.byteLength(canonicalServiceJson(dispatch), 'utf8') > 32768)
+        throw new WalletProviderError('wallet_provider_input');
+    }
   }
   private request(record: TransferRecord): WalletAttemptRequest {
     const execution = record.execution;
@@ -171,6 +268,14 @@ export class ApprovedExecutionCoordinator {
           : claim.state === 'failed' && claim.failure.outcome !== 'unknown'
             ? 'failed'
             : 'unknown';
+    const { callsReceipt: _callsReceipt, ...publicObservation } =
+      execution.observation ?? {
+        chain_status: 'unobserved' as const,
+        verification: 'unverified' as const,
+        outcome: 'unknown' as const,
+        settlement: 'pending' as const,
+        observed_at: new Date(Date.now()).toISOString(),
+      };
     return {
       profile: this.profile,
       profile_revision: '1',
@@ -190,13 +295,7 @@ export class ApprovedExecutionCoordinator {
             : 'contract-execution'
         : 'token-transfer',
       next_poll_after_ms: this.config.pollIntervalSeconds * 1000,
-      ...(execution.observation ?? {
-        chain_status: 'unobserved',
-        verification: 'unverified',
-        outcome: 'unknown',
-        settlement: 'pending',
-        observed_at: new Date(Date.now()).toISOString(),
-      }),
+      ...publicObservation,
     };
   }
   async execute(
@@ -400,41 +499,14 @@ export class ApprovedExecutionCoordinator {
         ).toLowerCase() !== record.approval.account.address.toLowerCase()
       )
         unknown();
-      const message = record.approval.action.payload.message;
-      const plan: TransferExecutionPlan = {
-        profile: this.profile,
-        revision: '1',
-        action: record.approval.action,
-        sponsor: structuredClone(sponsor),
-        configurationHash: this.configurationHash,
-        genesisHash: this.config.rpc.genesisHash,
-        ...(!record.intent
-          ? { tokenCodeHash: this.config.rpc.tokenCodeHash! }
-          : {}),
+      const plan = this.buildPlan(
+        record.approval.action,
+        sponsor,
         scanFromBlock,
-        ...(this.config.replacement
-          ? { replacement: pinReplacementPolicy(this.config.replacement) }
-          : {}),
-        ...(record.intent ? { intent: structuredClone(record.intent) } : {}),
-        ...(record.runtimePolicy
-          ? { runtimePolicy: structuredClone(record.runtimePolicy) }
-          : {}),
-        data: record.intent
-          ? approvedCallData(record.approval.action, signature.serialized)
-          : transferInterface
-              .encodeFunctionData('transferWithAuthorization', [
-                message.from,
-                message.to,
-                message.value,
-                message.validAfter,
-                message.validBefore,
-                message.nonce,
-                signature.v,
-                signature.r,
-                signature.s,
-              ])
-              .toLowerCase(),
-      };
+        signature.serialized,
+        record.intent,
+        record.runtimePolicy,
+      );
       record = await this.actions.withAuthorizedTransfer(
         context.principal,
         id,

@@ -462,6 +462,38 @@ export function approvedCallPayload(
     },
   };
 }
+/** Construct the same exact Safe signing action for admission previews and durable preparation. */
+export function buildApprovedCallAction(
+  intent: ApprovedCallIntent,
+  owner: string,
+  expiresAt: string,
+  id: string,
+): TypedDataAction {
+  const payload = approvedCallPayload(intent);
+  const digest = TypedDataEncoder.hash(
+    payload.domain,
+    payload.types,
+    payload.message,
+  );
+  return {
+    action_id: id,
+    operation_id: id,
+    kind: 'sign_typed_data',
+    profile: 'evm_eoa_v1',
+    profile_revision: '1',
+    status: 'ready',
+    chain_id: 'eip155:84532',
+    chain_account_id: 'eip155:84532:' + owner,
+    binding_revision: '1',
+    capability_revision: '1',
+    plan_revision: '1',
+    plan_hash: digest,
+    payload_hash: digest,
+    expires_at: expiresAt,
+    dependencies: [],
+    payload,
+  };
+}
 export function approvedCallData(
   action: TypedDataAction,
   signature: string,

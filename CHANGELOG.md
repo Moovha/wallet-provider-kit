@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased standard wallet calls
+
+- Add the optional EIP-5792 2.0.0 account-scoped JSON-RPC interface for runtime-authorized Safe batch submission, capability discovery and status.
+- Reserve unpredictable or caller-supplied batch IDs atomically with queue admission; reject duplicates across concurrency and restart. Current consent, method/claim rules, sponsor and shared budgets still govern effects.
+- Retain quorum-verified receipt metadata, atomic Safe failure status and reorg/uncertainty handling. Polling never resubmits an unknown effect.
+- Export the dependency-free wallet-calls request adapter with an explicit host UI callback for wallet_showCallsStatus. Document method, capability, chain, authentication and size limits. Offline evidence does not establish live wallet/provider acceptance.
+
 ## Unreleased runtime contract authority
 
 - Bind published application policies to application-led owner consent, prepared
