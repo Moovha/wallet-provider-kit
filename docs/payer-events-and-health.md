@@ -111,7 +111,13 @@ The operational status is `healthy` or `degraded`. It exposes total payer count,
 affected, low-balance, unavailable and stale payer counts; pending, failed and
 unroutable webhook counts; oldest delivery age; and an optional last successful
 delivery timestamp. It exposes no payer addresses, destination IDs, URLs, keys or
-transaction identifiers. A health storage failure returns operational
+transaction identifiers. When replacement is configured, `replacement_pending`,
+`replacement_unknown`, `replacement_blocked` and `replacement_exhausted` count
+executions in each operational condition. Unknown, blocked or exhausted work
+degrades operational health. Payer events include corresponding aggregate
+`replacement` counts and total proposal attempts; final verified nonce consumption
+clears an execution from these active counts without asserting financial success.
+Replacement transitions and outbox intents commit together. A health storage failure returns operational
 `status: "unavailable"`. Restrict health ingress to the monitoring network.
 
 A condition is stale after three full configured sampling cycles, accounting for

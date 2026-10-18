@@ -52,11 +52,11 @@ export function createRelayerClient(
   const resolveAccount = options.resolveAccount;
 
   async function call(
-    method: 'GET' | 'POST',
+    method: 'GET' | 'POST' | 'PUT',
     path: string,
     body?: string,
   ): Promise<Record<string, unknown> | null> {
-    const outcome = method === 'POST' ? 'unknown' : 'not_dispatched';
+    const outcome = method === 'GET' ? 'not_dispatched' : 'unknown';
     try {
       const response = await request(`${origin}/api/v1${path}`, {
         method,
@@ -100,6 +100,11 @@ export function createRelayerClient(
         !record(envelope.data)
       )
         throw new WalletProviderError('wallet_provider_response', outcome);
+      if (method === 'GET' && /^\/relayers\/[^/]+$/.test(path)) {
+        delete envelope.data.wpk_replacement_contract;
+        const contract = response.headers.get('x-wpk-relayer-contract');
+        if (contract) envelope.data.wpk_replacement_contract = contract;
+      }
       return envelope.data;
     } catch (error) {
       if (error instanceof WalletProviderError) throw error;

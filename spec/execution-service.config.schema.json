@@ -757,6 +757,38 @@
                 "type": "boolean"
               }
             }
+          },
+          "replacement": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "initialFeeBasisPoints",
+              "bumpBasisPoints",
+              "maxAttempts",
+              "intervalSeconds"
+            ],
+            "properties": {
+              "initialFeeBasisPoints": {
+                "type": "integer",
+                "minimum": 1000,
+                "maximum": 9000
+              },
+              "bumpBasisPoints": {
+                "type": "integer",
+                "minimum": 1000,
+                "maximum": 10000
+              },
+              "maxAttempts": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 6
+              },
+              "intervalSeconds": {
+                "type": "integer",
+                "minimum": 30,
+                "maximum": 3600
+              }
+            }
           }
         },
         "allOf": [

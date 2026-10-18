@@ -112,6 +112,11 @@ export default defineConfig({
             link: '/docs/stuck-transactions-and-recovery',
           },
           {
+            text: 'Automatic replacements',
+            link: '/docs/automatic-replacements',
+          },
+          { text: 'Fee-only provider build', link: '/docs/fee-only-relayer' },
+          {
             text: 'Payer events and health',
             link: '/docs/payer-events-and-health',
           },
@@ -208,6 +213,11 @@ export default defineConfig({
             text: 'Stuck transaction recovery',
             link: '/docs/stuck-transactions-and-recovery',
           },
+          {
+            text: 'Automatic replacements',
+            link: '/docs/automatic-replacements',
+          },
+          { text: 'Fee-only provider build', link: '/docs/fee-only-relayer' },
           {
             text: 'Payer events and health',
             link: '/docs/payer-events-and-health',

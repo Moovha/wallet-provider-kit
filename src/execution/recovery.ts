@@ -1,3 +1,8 @@
+import {
+  replacementStatusSchema,
+  checkedReplacementStatus,
+  type ReplacementStatus,
+} from './replacement.js';
 import { WalletProviderError } from '../domain/signing.js';
 import type { ChainObservation, TransferExecutionPlan } from './types.js';
 
@@ -9,6 +14,7 @@ export interface ProviderInspection {
   status: string;
   nonce?: string;
   transactionHash?: string;
+  replacement?: ReplacementStatus;
 }
 export interface NonceSnapshot {
   confirmedNonce: string;
@@ -18,6 +24,10 @@ export interface NonceSnapshot {
   balanceWei: string;
   baseFeePerGas: string;
   transactionNonce?: string;
+  transactionHash?: string;
+  transactionMaxFeePerGas?: string;
+  transactionMaxPriorityFeePerGas?: string;
+  transactionPending?: boolean;
   safeNonce?: string;
 }
 export interface RecoveryDiagnosis {
@@ -171,6 +181,7 @@ export const providerInspectionSchema = {
   additionalProperties: false,
   required: ['status'],
   properties: {
+    replacement: replacementStatusSchema,
     status: { type: 'string', maxLength: 32 },
     nonce: decimal,
     transactionHash: { type: 'string', pattern: '^0x[0-9a-f]{64}$' },
@@ -248,7 +259,8 @@ export function checkedInspection(value: unknown): ProviderInspection {
   const entry = value as Record<string, unknown>;
   if (
     Object.keys(entry).some(
-      (key) => !['status', 'nonce', 'transactionHash'].includes(key),
+      (key) =>
+        !['status', 'nonce', 'transactionHash', 'replacement'].includes(key),
     ) ||
     typeof entry.status !== 'string' ||
     !/^[a-z_]{1,32}$/.test(entry.status) ||
@@ -261,5 +273,7 @@ export function checkedInspection(value: unknown): ProviderInspection {
         !/^0x[0-9a-f]{64}$/.test(entry.transactionHash)))
   )
     throw new WalletProviderError('wallet_provider_response');
+  if (entry.replacement !== undefined)
+    checkedReplacementStatus(entry.replacement);
   return structuredClone(entry) as unknown as ProviderInspection;
 }

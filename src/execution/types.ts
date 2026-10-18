@@ -48,6 +48,7 @@ export interface ExecutionConfiguration {
   sponsorPool?: { strategy: 'round-robin'; maxInFlightPerSponsor: number };
   safeQueue?: { maxDepthPerSafe: number; maxWaitSeconds: number };
   recovery?: import('./recovery.js').RecoveryConfiguration;
+  replacement?: import('./replacement.js').ReplacementPolicy;
   pollIntervalSeconds: number;
   maxLogRange: number;
 }
@@ -64,6 +65,7 @@ export interface ApprovedExecutionPlan {
   data: string;
   scanFromBlock: string;
   intent?: import('./approved-calls.js').ApprovedCallIntent;
+  replacement?: import('./replacement.js').PinnedReplacementPolicy;
 }
 
 export interface ChainObservation {
@@ -93,6 +95,8 @@ export interface TransferExecutionRecord {
   startedAt?: number;
   providerNonce?: string;
   recovery?: import('./recovery.js').RecoveryDiagnosis;
+  replacementStatus?: import('./replacement.js').ReplacementStatus;
+  replacements?: import('./replacement.js').WalletReplacementAttempt[];
   plan?: TransferExecutionPlan;
   planHash?: string;
   observation?: ChainObservation;
@@ -107,6 +111,7 @@ export interface TransferExecutionRecord {
 }
 
 export interface ExecutionReceipt extends ChainObservation {
+  replacement?: import('./replacement.js').ReplacementStatus;
   recovery?: import('./recovery.js').RecoveryDiagnosis;
   profile: ExecutionProfile;
   profile_revision: '1';
@@ -134,6 +139,14 @@ export interface ExecutionRecovery {
   transactionHash?: string;
 }
 export interface ExecutionProvider {
+  supportsReplacement?(): Promise<boolean>;
+  replace?(
+    plan: TransferExecutionPlan,
+    transactionId: string,
+    proposal: import('./replacement.js').ReplacementProposal,
+    authorizeEffect: () => Promise<void>,
+  ): Promise<string>;
+
   inspect?(
     plan: TransferExecutionPlan,
     transactionId: string,

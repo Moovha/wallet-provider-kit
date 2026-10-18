@@ -333,6 +333,11 @@ follow the [package installation guide](docs/package.md). npm publication remain
 disabled. For a new provider, continue with the [operator wizard](docs/setup-wizard.md); for an existing embedded host,
 start with the [API guide](docs/api.md) and [durable attempts](docs/durable-attempts.md).
 
+For designated execution, see [automatic bounded replacements](docs/automatic-replacements.md)
+and the [optional fee-only Relayer build](docs/fee-only-relayer.md). New wizard
+configurations supply editable evaluation gas defaults; every accepted execution
+retains fixed approved caps and current wallet authority checks.
+
 ## Build with us
 
 The [documentation site](https://moovha.github.io/wallet-provider-kit/) takes you

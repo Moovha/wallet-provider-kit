@@ -208,7 +208,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Read-only callback for the configured designated executor. Requires a pinned signed service request, exact stored plan/attempt and an unexpired handoff lease. Rechecks current owner, grant, KYC, consent, immutable approval and active revision. Application OAuth tokens do not authenticate this endpoint. */
+        /** @description Authority callback for the configured designated executor. Initial dispatch requires the exact stored plan/attempt and an unexpired handoff lease. Optional bounded replacements require a separate durable proposal, fresh RPC nonce/fee evidence and a short replacement lease. Every effect rechecks current owner, grant, KYC, consent, immutable approval and active revision. Application OAuth tokens do not authenticate this endpoint. */
         post: operations["checkExecutionAuthority"];
         delete?: never;
         options?: never;
@@ -2493,6 +2493,21 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
+                    replacement?: {
+                        proposal: {
+                            /** Format: uuid */
+                            id: string;
+                            sequence: number;
+                            nonce: string;
+                            previousTransactionHash: string;
+                            previousMaxFeePerGas: string;
+                            previousMaxPriorityFeePerGas: string;
+                            maxFeePerGas: string;
+                            maxPriorityFeePerGas: string;
+                        };
+                        /** @enum {string} */
+                        phase: "prepare" | "dispatch";
+                    };
                     provider_id: string;
                     provider_revision: string;
                     execution_id: string;
@@ -2510,6 +2525,21 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
+                        replacement?: {
+                            proposal: {
+                                /** Format: uuid */
+                                id: string;
+                                sequence: number;
+                                nonce: string;
+                                previousTransactionHash: string;
+                                previousMaxFeePerGas: string;
+                                previousMaxPriorityFeePerGas: string;
+                                maxFeePerGas: string;
+                                maxPriorityFeePerGas: string;
+                            };
+                            /** @enum {string} */
+                            phase: "prepare" | "dispatch";
+                        };
                         action_id: string;
                         /** @enum {boolean} */
                         allowed: true;
@@ -2606,6 +2636,15 @@ export interface operations {
                             safe_nonce?: string;
                             /** @enum {string} */
                             next_action: "wait" | "restore-evidence" | "fund-sponsor" | "review-provider-fees" | "review-provider-nonces" | "reconcile" | "operator-review";
+                        };
+                        replacement?: {
+                            /** @enum {string} */
+                            state: "prepared" | "dispatch" | "accepted" | "unknown" | "observed" | "abandoned" | "exhausted" | "blocked" | "settled";
+                            attempts: number;
+                            /** @enum {string} */
+                            reason?: "fee-cap" | "attempt-limit" | "authority-or-preparation-denied" | "evidence-unavailable";
+                            /** Format: date-time */
+                            last_attempt_at?: string;
                         };
                         /** @enum {string} */
                         profile: "erc3009-relayer-v1" | "erc3009-executor-v1" | "approved-evm-executor-v1";
@@ -2733,6 +2772,15 @@ export interface operations {
                             safe_nonce?: string;
                             /** @enum {string} */
                             next_action: "wait" | "restore-evidence" | "fund-sponsor" | "review-provider-fees" | "review-provider-nonces" | "reconcile" | "operator-review";
+                        };
+                        replacement?: {
+                            /** @enum {string} */
+                            state: "prepared" | "dispatch" | "accepted" | "unknown" | "observed" | "abandoned" | "exhausted" | "blocked" | "settled";
+                            attempts: number;
+                            /** @enum {string} */
+                            reason?: "fee-cap" | "attempt-limit" | "authority-or-preparation-denied" | "evidence-unavailable";
+                            /** Format: date-time */
+                            last_attempt_at?: string;
                         };
                         /** @enum {string} */
                         profile: "erc3009-relayer-v1" | "erc3009-executor-v1" | "approved-evm-executor-v1";
@@ -3025,6 +3073,15 @@ export interface operations {
                             safe_nonce?: string;
                             /** @enum {string} */
                             next_action: "wait" | "restore-evidence" | "fund-sponsor" | "review-provider-fees" | "review-provider-nonces" | "reconcile" | "operator-review";
+                        };
+                        replacement?: {
+                            /** @enum {string} */
+                            state: "prepared" | "dispatch" | "accepted" | "unknown" | "observed" | "abandoned" | "exhausted" | "blocked" | "settled";
+                            attempts: number;
+                            /** @enum {string} */
+                            reason?: "fee-cap" | "attempt-limit" | "authority-or-preparation-denied" | "evidence-unavailable";
+                            /** Format: date-time */
+                            last_attempt_at?: string;
                         };
                         /** @enum {string} */
                         profile: "erc3009-relayer-v1" | "erc3009-executor-v1" | "approved-evm-executor-v1";
@@ -3343,6 +3400,15 @@ export interface operations {
                                     safe_nonce?: string;
                                     /** @enum {string} */
                                     next_action: "wait" | "restore-evidence" | "fund-sponsor" | "review-provider-fees" | "review-provider-nonces" | "reconcile" | "operator-review";
+                                };
+                                replacement?: {
+                                    /** @enum {string} */
+                                    state: "prepared" | "dispatch" | "accepted" | "unknown" | "observed" | "abandoned" | "exhausted" | "blocked" | "settled";
+                                    attempts: number;
+                                    /** @enum {string} */
+                                    reason?: "fee-cap" | "attempt-limit" | "authority-or-preparation-denied" | "evidence-unavailable";
+                                    /** Format: date-time */
+                                    last_attempt_at?: string;
                                 };
                                 /** @enum {string} */
                                 profile: "erc3009-relayer-v1" | "erc3009-executor-v1" | "approved-evm-executor-v1";

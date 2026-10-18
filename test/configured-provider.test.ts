@@ -1,3 +1,5 @@
+import { replacementWire } from './helpers/replacements.js';
+import { defaultReplacementPolicy } from '../src/execution/replacement.js';
 import { buildApprovedCallIntent } from '../src/execution/approved-calls.js';
 import { SafeExecutionQueue } from '../src/execution/queue.js';
 import { OnboardingService } from '../src/onboarding/service.js';
@@ -388,7 +390,8 @@ async function fixture(
   };
 }
 
-async function designatedFixture() {
+async function designatedFixture(withReplacement = false) {
+  let replacement: ReturnType<typeof replacementWire> | undefined;
   for (const name of ['WALLET', 'EXECUTOR']) {
     const pair = await generateKeyPair('ES256', { extractable: true });
     vi.stubEnv(name + '_SERVICE_PRIVATE', await exportPKCS8(pair.privateKey));
@@ -403,6 +406,11 @@ async function designatedFixture() {
     loseAfterHandoff: false,
     authorityCalls: 0,
     beforeAuthority: undefined as (() => Promise<void>) | undefined,
+    beforeReplacementAuthority: undefined as
+      | ((
+          body: import('../src/executor/protocol.js').ExecutionAuthorityRequest,
+        ) => Promise<void>)
+      | undefined,
   };
   const f = await fixture(
     undefined,
@@ -480,6 +488,17 @@ async function designatedFixture() {
           authenticationAcceptance: 'offline-auth',
         },
       };
+      if (withReplacement) {
+        replacement = replacementWire(execution);
+        execution.request = replacement.request;
+        config.execution!.replacement = { ...defaultReplacementPolicy };
+        config.execution!.recovery = {
+          stuckAfterSeconds: 30,
+          quarantineOnStuck: true,
+        };
+        executorConfig.providers[0].replacement = config.execution!.replacement;
+        executorConfig.providers[0].recovery = config.execution!.recovery;
+      }
       bridge = (async (input, options) => {
         const url = new URL(String(input));
         if ([walletOrigin, serviceOrigin].includes(url.origin)) {
@@ -492,6 +511,11 @@ async function designatedFixture() {
           if (url.origin === walletOrigin) {
             state.authorityCalls++;
             await state.beforeAuthority?.();
+            const body = options?.body
+              ? JSON.parse(String(options.body))
+              : undefined;
+            if (body?.replacement)
+              await state.beforeReplacementAuthority?.(body);
           }
           const server = url.origin === walletOrigin ? walletApp : executor;
           const response = await server.inject({
@@ -526,6 +550,9 @@ async function designatedFixture() {
   return {
     f,
     state,
+    get replacement() {
+      return replacement;
+    },
     get executor() {
       return executor;
     },
@@ -2178,7 +2205,11 @@ it('runs application-led policy, provisioning and delegated signing without user
   );
 });
 
-async function generalFixture(contractOnly = false, queue = false) {
+async function generalFixture(
+  contractOnly = false,
+  queue = false,
+  replacements = false,
+) {
   const t = await designatedFixture(),
     f = t.f;
   const calls = approvedCallsFixture(
@@ -2203,6 +2234,22 @@ async function generalFixture(contractOnly = false, queue = false) {
     delete t.executorConfig.providers[0].token;
     delete f.config.execution!.rpc.tokenCodeHash;
     delete t.executorConfig.providers[0].rpc.tokenCodeHash;
+  }
+  const bounded = replacements
+    ? replacementWire(
+        { ...f.execution!, request: calls.request },
+        () => calls.state.included,
+      )
+    : undefined;
+  if (bounded) {
+    f.execution!.request = bounded.request;
+    f.config.execution!.replacement = { ...defaultReplacementPolicy };
+    f.config.execution!.recovery = {
+      stuckAfterSeconds: 30,
+      quarantineOnStuck: true,
+    };
+    t.executorConfig.providers[0].replacement = f.config.execution!.replacement;
+    t.executorConfig.providers[0].recovery = f.config.execution!.recovery;
   }
   await t.restart();
   const access = await f.api('/v1/access-requests', {
@@ -2294,7 +2341,7 @@ async function generalFixture(contractOnly = false, queue = false) {
     }
     return response;
   };
-  return { ...t, calls, grant, request };
+  return { ...t, calls, grant, request, bounded };
 }
 
 describe('approved EVM execution foundation', () => {
@@ -3498,3 +3545,230 @@ it('clears wallet and executor quarantines only after exact finalized recovery a
     executorDb.close();
   }
 });
+
+async function ageReplacement(
+  t: Awaited<ReturnType<typeof designatedFixture>>,
+  actionId: string,
+) {
+  const wallet = openProviderDatabase({
+    directory: t.f.config.storage.directory,
+  });
+  try {
+    await wallet.onboardingStore.transaction((state) => {
+      state.supportedActions![actionId].execution!.startedAt =
+        Date.now() - 31000;
+    });
+  } finally {
+    wallet.close();
+  }
+  const database = new DatabaseSync(
+    join(t.executorConfig.storage.directory, 'provider.sqlite'),
+  );
+  try {
+    const rows = database
+      .prepare(
+        "SELECT id,record FROM onboarding_records WHERE collection='executorDispatches'",
+      )
+      .all();
+    for (const row of rows) {
+      const record = JSON.parse(String(row.record));
+      record.startedAt = Date.now() - 31000;
+      database
+        .prepare(
+          "UPDATE onboarding_records SET record=? WHERE collection='executorDispatches' AND id=?",
+        )
+        .run(JSON.stringify(record), String(row.id));
+    }
+  } finally {
+    database.close();
+  }
+}
+it.each([false, true])(
+  'the default background worker preserves authority and fixed caps with original handoff response loss=%s',
+  async (lost) => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const t = await designatedFixture(true),
+        action = await t.f.request('1'),
+        id = action.json().action_id;
+      t.state.loseAfterHandoff = lost;
+      const executed = await t.f.api('/v1/actions/' + id + '/execute', {});
+      expect(executed.statusCode, executed.body).toBe(lost ? 503 : 200);
+      t.state.loseAfterHandoff = false;
+      await ageReplacement(t, id);
+      const phases: string[] = [];
+      t.state.beforeReplacementAuthority = async (body) => {
+        phases.push(body.replacement!.phase);
+      };
+      await vi.advanceTimersByTimeAsync(15000);
+      await vi.waitFor(() => expect(t.replacement!.state.puts).toBe(1), {
+        timeout: 3000,
+      });
+      expect(phases).toEqual(['prepare', 'dispatch']);
+      const status = await t.f.app.inject({
+        url: '/v1/actions/' + id + '/execution',
+        headers: {
+          authorization: await t.f.token(),
+          'execution-profile': 'erc3009-executor-v1',
+          'execution-profile-revision': '1',
+        },
+      });
+      expect(status.statusCode, status.body).toBe(200);
+      expect(status.json().replacement).toMatchObject({
+        state: 'accepted',
+        attempts: 1,
+      });
+      const database = openProviderDatabase({
+        directory: t.f.config.storage.directory,
+      });
+      try {
+        const stored = await database.onboardingStore.transaction(
+          (state) => state.supportedActions![id].execution!,
+        );
+        expect(stored.plan!.sponsor.maxFeePerGas).toBe('3000000000');
+        expect(stored.replacements).toHaveLength(1);
+      } finally {
+        database.close();
+      }
+      expect(injected.backend!.signTypedData).toHaveBeenCalledTimes(1);
+      t.f.execution!.state.included = true;
+      t.f.execution!.state.finality = 'finalized';
+      await vi.advanceTimersByTimeAsync(15000);
+      await vi.waitFor(
+        () => {
+          const database = new DatabaseSync(
+            join(t.executorConfig.storage.directory, 'provider.sqlite'),
+          );
+          try {
+            const row = database
+              .prepare(
+                "SELECT record FROM onboarding_records WHERE collection='executorDispatches'",
+              )
+              .get()!;
+            expect(
+              JSON.parse(String(row.record)).replacementStatus?.state,
+            ).toBe('settled');
+          } finally {
+            database.close();
+          }
+        },
+        { timeout: 3000 },
+      );
+      const finalized = await t.f.app.inject({
+        url: '/v1/actions/' + id + '/execution',
+        headers: {
+          authorization: await t.f.token(),
+          'execution-profile': 'erc3009-executor-v1',
+          'execution-profile-revision': '1',
+        },
+      });
+      expect(finalized.statusCode, finalized.body).toBe(200);
+      expect(finalized.json()).toMatchObject({
+        settlement: 'succeeded',
+        replacement: { state: 'settled', attempts: 1 },
+      });
+      expect(t.replacement!.state.puts).toBe(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  },
+);
+it.each(['grant', 'owner', 'identity', 'consent', 'approval'] as const)(
+  'denies automatic replacement when current %s changes at the final authority callback',
+  async (condition) => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const t = await designatedFixture(true),
+        action = await t.f.request('1'),
+        id = action.json().action_id;
+      expect(
+        (await t.f.api('/v1/actions/' + id + '/execute', {})).statusCode,
+      ).toBe(200);
+      await ageReplacement(t, id);
+      let mutated = false;
+      t.state.beforeReplacementAuthority = async (body) => {
+        if (body.replacement?.phase !== 'dispatch') return;
+        const database = openProviderDatabase({
+          directory: t.f.config.storage.directory,
+        });
+        try {
+          await database.onboardingStore.transaction((state) => {
+            const action = state.supportedActions![id],
+              grant = state.grants[t.f.grant.grant_id],
+              request = state.requests[grant.requestId],
+              account = state.accounts[grant.accountId];
+            if (condition === 'grant') grant.state = 'revoked';
+            if (condition === 'owner') account.owner = 'changed-owner';
+            if (condition === 'identity')
+              account.acceptedUntil = Date.now() - 1;
+            if (condition === 'consent') delete request.consent;
+            if (condition === 'approval') action.status = 'denied';
+          });
+        } finally {
+          database.close();
+        }
+        mutated = true;
+      };
+      await vi.advanceTimersByTimeAsync(15000);
+      await vi.waitFor(() => expect(mutated).toBe(true), { timeout: 3000 });
+      expect(t.replacement!.state.puts).toBe(0);
+      expect(t.f.execution!.state.posts).toBe(1);
+      expect(injected.backend!.signTypedData).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  },
+);
+
+it.each(['contract-call', 'swap', 'vault-deposit'] as const)(
+  'replaces the exact approved Safe %s without signing another owner action',
+  async (kind) => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const t = await generalFixture(false, false, true);
+      const action = await t.request(kind),
+        id = action.json().action_id;
+      expect(action.statusCode, action.body).toBe(200);
+      const execution = await t.f.api('/v1/actions/' + id + '/execute', {});
+      expect(execution.statusCode, execution.body).toBe(200);
+      const original = t.calls.state.data;
+      await ageReplacement(t, id);
+      await vi.advanceTimersByTimeAsync(15000);
+      await vi.waitFor(
+        () => {
+          const db = new DatabaseSync(
+            join(t.executorConfig.storage.directory, 'provider.sqlite'),
+            { readOnly: true },
+          );
+          try {
+            const row = db
+              .prepare(
+                "SELECT record FROM onboarding_records WHERE collection='executorDispatches'",
+              )
+              .get()!;
+            const record = JSON.parse(String(row.record));
+            expect(
+              t.bounded!.state.puts,
+              JSON.stringify({
+                recovery: record.recovery?.reason,
+                replacement: record.replacementStatus,
+                authorityCalls: t.state.authorityCalls,
+              }),
+            ).toBe(1);
+          } finally {
+            db.close();
+          }
+        },
+        { timeout: 3000 },
+      );
+      expect(t.bounded!.state.data).toBe(original);
+      expect(t.bounded!.state.target.toLowerCase()).toBe(
+        t.calls.state.target.toLowerCase(),
+      );
+      expect(t.calls.state.posts).toBe(1);
+      expect(injected.backend!.signTypedData).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  },
+);

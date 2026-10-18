@@ -82,7 +82,10 @@ execution CloudEvents feed include optional `recovery` diagnostics.
 2. Restore provider/RPC connectivity or agreed funding when that is the cause.
    Allow the accepted provider's own serialized nonce synchronization and recovery
    worker to reconcile its state. Do not edit Redis counters or delete journals.
-3. If a replacement or cancellation is required, obtain the operator's separate
+3. With the [automatic replacement policy](automatic-replacements.md), allow the
+   bounded worker to repair a visible pending transaction under fresh wallet
+   authority. It preserves fixed approved caps and never cancels or fills a gap.
+   When manual replacement or cancellation is required, obtain separate
    financial authorization and use the accepted provider procedure. A replacement
    intended to execute the original operation must preserve its outer nonce,
    exact recipient, value and calldata, durable reference and accepted fee limits.
@@ -92,13 +95,15 @@ execution CloudEvents feed include optional `recovery` diagnostics.
    switch payers to escape an unresolved effect. Only verified evidence establishes
    the financial result.
 
-The OpenZeppelin Relayer 1.8 API includes transaction-by-nonce lookup, relayer
+For an unmodified provider, the OpenZeppelin Relayer 1.8 API includes transaction-by-nonce lookup, relayer
 status, replacement and cancellation. Replacement can change transaction fields,
 so passing that API through without the immutable action checks would weaken the
 financial boundary. Provider-managed gap filling, replacements and cancellations
 can incur additional charges: deployment acceptance must account for their
 behavior and costs. The admission reservation does not cap every upstream
-recovery charge. The implementation research used Relayer v1.8.0; accept and test
+recovery charge. The optional [fee-only provider build](fee-only-relayer.md)
+disables those autonomous mutations and is required for the bounded worker.
+The implementation research used Relayer v1.8.0; accept and test
 the exact deployed version before enabling funded execution.
 
 ## Retain a signed Safe head

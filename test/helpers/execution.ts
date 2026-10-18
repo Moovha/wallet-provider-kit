@@ -382,6 +382,7 @@ export function executionFixture(
   }
   return {
     configuration,
+    domain,
     request,
     state,
     plan,

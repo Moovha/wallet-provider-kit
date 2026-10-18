@@ -969,6 +969,7 @@ export class QuorumExecutionObserver implements ExecutionObserver {
         )
           unavailable();
         let transactionNonce: string | undefined;
+        let transactionEvidence: Partial<NonceSnapshot> = {};
         if (transaction !== null) {
           const tx = checked(transaction);
           if (
@@ -989,6 +990,18 @@ export class QuorumExecutionObserver implements ExecutionObserver {
           )
             unavailable();
           transactionNonce = quantity(tx.nonce).toString();
+          transactionEvidence = {
+            transactionHash: hash(tx.hash),
+            transactionMaxFeePerGas: quantity(tx.maxFeePerGas).toString(),
+            transactionMaxPriorityFeePerGas: quantity(
+              tx.maxPriorityFeePerGas,
+            ).toString(),
+            transactionPending:
+              tx.blockNumber === null &&
+              tx.blockHash === null &&
+              Array.isArray(tx.accessList) &&
+              tx.accessList.length === 0,
+          };
         }
         let safeNonce: string | undefined;
         if (plan.intent) {
@@ -1007,6 +1020,7 @@ export class QuorumExecutionObserver implements ExecutionObserver {
           );
         }
         return {
+          ...transactionEvidence,
           headHash: hash(head.hash),
           finalHash: hash(final.hash),
           confirmedNonce: quantity(confirmed).toString(),

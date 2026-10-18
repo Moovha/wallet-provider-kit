@@ -1,3 +1,4 @@
+import { validateReplacementSponsors } from '../execution/replacement.js';
 import { validateOperations } from '../execution/operations.js';
 import { validateApprovedCallPolicy } from '../execution/approved-calls.js';
 import type { ExecutionConfiguration } from '../execution/types.js';
@@ -219,6 +220,10 @@ export function validateProviderConfiguration(
     }
     if (config.execution) {
       const execution = config.execution;
+      if (execution.replacement) {
+        if (!execution.service || !execution.recovery) throw new Error();
+        validateReplacementSponsors(execution.replacement, execution.sponsors);
+      }
       if (
         (!config.financial && !config.approvedCalls) ||
         config.policy.identity?.records ||

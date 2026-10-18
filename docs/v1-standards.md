@@ -128,3 +128,13 @@ through retries and recovery; unknown provider effects never dispatch again.
 Service proofs do not replace the application's current grants, KYC, consent,
 immutable approval or durable attempt authority. Enterprise v1 authentication,
 independent security review and live/failover acceptance gates remain applicable.
+
+## Bounded transaction replacement
+
+The designated executor supports an optional pinned EIP-1559 fee-only replacement
+policy with current wallet authority callbacks and durable proposal claims.
+See [automatic replacements](automatic-replacements.md) for the implemented
+contract, compatibility, fixed caps and uncertainty rules. It requires the
+[accepted provider build](fee-only-relayer.md); ordinary provider retry policies
+must not be treated as wallet-authorized recovery. Provider/source contract tests
+remain separate from funded deployment acceptance.

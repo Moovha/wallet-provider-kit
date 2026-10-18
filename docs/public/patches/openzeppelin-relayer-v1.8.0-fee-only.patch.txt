@@ -1,0 +1,490 @@
+diff --git a/src/domain/relayer/evm/nonce.rs b/src/domain/relayer/evm/nonce.rs
+index 15c2429..d3615e9 100644
+--- a/src/domain/relayer/evm/nonce.rs
++++ b/src/domain/relayer/evm/nonce.rs
+@@ -436,6 +436,11 @@ where
+         &self,
+         nonce: u64,
+     ) -> Result<TransactionRepoModel, RelayerError> {
++        if crate::wpk::enabled() {
++            return Err(RelayerError::NotSupported(
++                "gap filling disabled by fee-only contract".into(),
++            ));
++        }
+         let network_model = self
+             .network_repository
+             .get_by_name(NetworkType::Evm, &self.relayer.network)
+diff --git a/src/domain/transaction/evm/evm_transaction.rs b/src/domain/transaction/evm/evm_transaction.rs
+index a2414c8..b4b1ceb 100644
+--- a/src/domain/transaction/evm/evm_transaction.rs
++++ b/src/domain/transaction/evm/evm_transaction.rs
+@@ -708,6 +708,9 @@ where
+             .price_calculator
+             .get_transaction_price_params(&evm_data, relayer)
+             .await?;
++        if crate::wpk::enabled() {
++            crate::wpk::prices(&evm_data, &price_params)?;
++        }
+ 
+         debug!(
+             tx_id = %tx.id,
+@@ -1054,6 +1057,9 @@ where
+         &self,
+         tx: TransactionRepoModel,
+     ) -> Result<TransactionRepoModel, TransactionError> {
++        if crate::wpk::enabled() {
++            return Ok(tx);
++        }
+         debug!(
+             tx_id = %tx.id,
+             relayer_id = %tx.relayer_id,
+@@ -1235,6 +1241,11 @@ where
+         &self,
+         tx: TransactionRepoModel,
+     ) -> Result<TransactionRepoModel, TransactionError> {
++        if crate::wpk::enabled() {
++            return Err(TransactionError::ValidationError(
++                "automatic and manual cancellation disabled by fee-only contract".into(),
++            ));
++        }
+         info!(tx_id = %tx.id, status = ?tx.status, "cancelling transaction");
+ 
+         // Validate state: can only cancel transactions that are still pending
+@@ -1334,6 +1345,9 @@ where
+             }
+         };
+ 
++        if crate::wpk::enabled() {
++            crate::wpk::same_call(&old_evm_data, &new_evm_request)?;
++        }
+         let network_repo_model = self
+             .network_repository()
+             .get_by_chain_id(NetworkType::Evm, old_evm_data.chain_id)
+@@ -1370,6 +1384,9 @@ where
+ 
+         debug!(price_params = ?price_params, "replacement price params");
+ 
++        if crate::wpk::enabled() {
++            crate::wpk::prices(&updated_evm_data, &price_params)?;
++        }
+         // Apply the calculated price parameters to the updated EVM data
+         let evm_data_with_price_params = updated_evm_data.with_price_params(price_params.clone());
+ 
+@@ -1387,7 +1404,30 @@ where
+         let final_evm_data =
+             evm_data_with_price_params.with_signed_transaction_data(sig_result.into_evm()?);
+ 
+-        // Update the transaction in the repository
++        if crate::wpk::enabled() {
++            let mut hashes = old_tx.hashes.clone();
++            if let Some(hash) = final_evm_data.hash.clone() {
++                if !hashes.contains(&hash) {
++                    hashes.push(hash);
++                }
++            }
++            // Persist the signed artifact and recoverable Sent state in one repository update.
++            let updated_tx = self
++                .transaction_repository
++                .partial_update(
++                    old_tx.id.clone(),
++                    TransactionUpdateRequest {
++                        network_data: Some(NetworkTransactionData::Evm(final_evm_data)),
++                        hashes: Some(hashes),
++                        status: Some(TransactionStatus::Sent),
++                        sent_at: Some(Utc::now().to_rfc3339()),
++                        ..Default::default()
++                    },
++                )
++                .await?;
++            self.send_transaction_submit_job(&updated_tx).await?;
++            return Ok(updated_tx);
++        }
+         let updated_tx = self
+             .transaction_repository
+             .update_network_data(
+diff --git a/src/domain/transaction/evm/status.rs b/src/domain/transaction/evm/status.rs
+index aeb381f..7eb9a95 100644
+--- a/src/domain/transaction/evm/status.rs
++++ b/src/domain/transaction/evm/status.rs
+@@ -301,6 +301,9 @@ where
+         &self,
+         tx: &TransactionRepoModel,
+     ) -> Result<bool, TransactionError> {
++        if crate::wpk::enabled() {
++            return Ok(false);
++        }
+         // Validate transaction is in correct state for resubmission
+         ensure_status(tx, TransactionStatus::Submitted, Some("should_resubmit"))?;
+ 
+@@ -358,6 +361,9 @@ where
+         &self,
+         tx: &TransactionRepoModel,
+     ) -> Result<(bool, Option<String>), TransactionError> {
++        if crate::wpk::enabled() {
++            return Ok((false, None));
++        }
+         if too_many_noop_attempts(tx) {
+             debug!("Transaction has too many NOOP attempts already");
+             return Ok((false, None));
+@@ -473,6 +479,11 @@ where
+         is_cancellation: bool,
+         reason: Option<String>,
+     ) -> Result<TransactionUpdateRequest, TransactionError> {
++        if crate::wpk::enabled() {
++            return Err(TransactionError::ValidationError(
++                "automatic NOOP disabled by fee-only contract".into(),
++            ));
++        }
+         let mut evm_data = tx.network_data.get_evm_transaction_data()?;
+         let network_model = self
+             .network_repository()
+@@ -973,6 +984,9 @@ where
+         tx: TransactionRepoModel,
+         ctx: &StatusCheckContext,
+     ) -> Result<TransactionRepoModel, TransactionError> {
++        if crate::wpk::enabled() {
++            return Ok(tx);
++        }
+         let reason = format!(
+             "Transaction status monitoring failed after {} consecutive errors (total: {}). \
+              Last status: {:?}.",
+@@ -1399,6 +1413,11 @@ where
+         let age_since_sent = get_age_since_status_change(&tx)?;
+ 
+         if age_since_sent > get_evm_resend_timeout() {
++            if crate::wpk::enabled() {
++                // Recover a lost queue insertion by broadcasting the persisted artifact unchanged.
++                self.send_transaction_submit_job(&tx).await?;
++                return Ok(tx);
++            }
+             // A nonce gap below this tx makes any resubmit futile; the detector schedules
+             // the nonce-health job itself. Only worth the RPC once the tx is already stale.
+             if let Some(true) = self.detect_nonce_gap_ahead(&tx).await {
+@@ -2536,6 +2555,141 @@ mod tests {
+         }
+     }
+ 
++    #[tokio::test]
++    async fn test_wpk_replacement_persists_exact_artifact_and_submit_job() {
++        if !crate::wpk::enabled() {
++            return;
++        }
++        use crate::domain::transaction::Transaction;
++        use crate::models::{EvmTransactionRequest, NetworkTransactionRequest};
++        let mut mocks = default_test_mocks();
++        let mut tx = make_test_transaction(TransactionStatus::Submitted);
++        let mut data = tx.network_data.get_evm_transaction_data().unwrap();
++        data.gas_price = None;
++        data.nonce = Some(7);
++        data.max_fee_per_gas = Some(100);
++        data.max_priority_fee_per_gas = Some(10);
++        tx.network_data = NetworkTransactionData::Evm(data.clone());
++        mocks
++            .network_repo
++            .expect_get_by_chain_id()
++            .times(1)
++            .returning(|_, _| Ok(Some(create_test_network_model())));
++        mocks
++            .provider
++            .expect_get_balance()
++            .times(1)
++            .returning(|_| Box::pin(async { Ok(U256::MAX) }));
++        mocks
++            .signer
++            .expect_sign_transaction()
++            .times(1)
++            .withf(|value| {
++                let data = value.get_evm_transaction_data().unwrap();
++                data.nonce == Some(7)
++                    && data.max_fee_per_gas == Some(113)
++                    && data.max_priority_fee_per_gas == Some(12)
++            })
++            .returning(|_| {
++                Box::pin(async {
++                    Ok(crate::domain::relayer::SignTransactionResponse::Evm(
++                        crate::domain::relayer::SignTransactionResponseEvm {
++                            hash: "replacement-fixture".into(),
++                            signature: crate::models::EvmTransactionDataSignature {
++                                r: "r".into(),
++                                s: "s".into(),
++                                v: 1,
++                                sig: "sig".into(),
++                            },
++                            raw: vec![1, 2, 3],
++                        },
++                    ))
++                })
++            });
++        let original = tx.clone();
++        mocks
++            .tx_repo
++            .expect_partial_update()
++            .times(1)
++            .returning(move |id, update| {
++                assert_eq!(id, original.id);
++                assert!(matches!(update.status, Some(TransactionStatus::Sent)));
++                assert_eq!(update.hashes, Some(vec!["replacement-fixture".into()]));
++                let signed = update.network_data.unwrap();
++                assert_eq!(
++                    signed.get_evm_transaction_data().unwrap().raw,
++                    Some(vec![1, 2, 3])
++                );
++                let mut updated = original.clone();
++                updated.network_data = signed;
++                updated.status = TransactionStatus::Sent;
++                Ok(updated)
++            });
++        mocks
++            .job_producer
++            .expect_produce_submit_transaction_job()
++            .times(1)
++            .withf(|job, _| matches!(job.command, crate::jobs::TransactionCommand::Submit))
++            .returning(|_, _| Box::pin(async { Ok(()) }));
++        let service = make_test_evm_relayer_transaction(create_test_relayer(), mocks);
++        let request = NetworkTransactionRequest::Evm(EvmTransactionRequest {
++            to: data.to,
++            value: data.value,
++            data: data.data,
++            gas_limit: data.gas_limit,
++            max_fee_per_gas: Some(113),
++            max_priority_fee_per_gas: Some(12),
++            ..Default::default()
++        });
++        let result = service.replace_transaction(tx, request).await.unwrap();
++        assert_eq!(
++            result
++                .network_data
++                .get_evm_transaction_data()
++                .unwrap()
++                .nonce,
++            Some(7)
++        );
++    }
++
++    #[tokio::test]
++    async fn test_wpk_automatic_mutations_are_fenced() {
++        if !crate::wpk::enabled() {
++            return;
++        }
++        let service =
++            make_test_evm_relayer_transaction(create_test_relayer(), default_test_mocks());
++        let tx = make_test_transaction(TransactionStatus::Submitted);
++        assert!(!service.should_resubmit(&tx).await.unwrap());
++        assert!(!service.should_noop(&tx).await.unwrap().0);
++        assert!(service
++            .prepare_noop_update_request(&tx, false, None)
++            .await
++            .is_err());
++    }
++
++    #[tokio::test]
++    async fn test_wpk_sent_artifact_recovers_lost_job_without_repricing() {
++        if !crate::wpk::enabled() {
++            return;
++        }
++        let mut mocks = default_test_mocks();
++        let mut tx = make_test_transaction(TransactionStatus::Sent);
++        tx.sent_at = Some((Utc::now() - Duration::hours(1)).to_rfc3339());
++        mocks
++            .job_producer
++            .expect_produce_submit_transaction_job()
++            .times(1)
++            .withf(|job, _| job.transaction_id == "test-tx-id")
++            .returning(|_, _| Box::pin(async { Ok(()) }));
++        let service = make_test_evm_relayer_transaction(create_test_relayer(), mocks);
++        let result = service.handle_sent_state(tx.clone()).await.unwrap();
++        assert_eq!(
++            serde_json::to_value(result.network_data).unwrap(),
++            serde_json::to_value(tx.network_data).unwrap()
++        );
++    }
++
+     // Tests for `handle_sent_state`
+     mod handle_sent_state_tests {
+         use super::*;
+diff --git a/src/lib.rs b/src/lib.rs
+index c2152bf..74f7585 100644
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -38,3 +38,4 @@ pub mod queues;
+ pub mod repositories;
+ pub mod services;
+ pub mod utils;
++pub mod wpk;
+diff --git a/src/main.rs b/src/main.rs
+index 9548153..8d8d824 100644
+--- a/src/main.rs
++++ b/src/main.rs
+@@ -229,7 +229,7 @@ async fn main() -> Result<()> {
+             .wrap(TracingLogger::default())
+             .wrap(MetricsMiddleware)
+             .wrap(Governor::new(&rate_limit_config))
+-            .wrap(middleware::DefaultHeaders::new())
++            .wrap(middleware::DefaultHeaders::new().add(("x-wpk-relayer-contract", if openzeppelin_relayer::wpk::enabled() { "wpk-fee-only-replacement-v1" } else { "disabled" })))
+             .wrap(middleware::NormalizePath::trim())
+             .wrap(middleware::Compress::default())
+             .wrap(api::middleware::ConcurrencyLimiter::new(config.relayer_concurrency_limit))
+diff --git a/src/models/transaction/repository.rs b/src/models/transaction/repository.rs
+index 9e7ae0a..344a829 100644
+--- a/src/models/transaction/repository.rs
++++ b/src/models/transaction/repository.rs
+@@ -366,9 +366,21 @@ impl EvmTransactionData {
+                 .or(Some(DEFAULT_TRANSACTION_SPEED)),
+ 
+             // Clear pricing fields - these will be calculated later
+-            gas_price: None,
+-            max_fee_per_gas: None,
+-            max_priority_fee_per_gas: None,
++            gas_price: if crate::wpk::enabled() {
++                request.gas_price
++            } else {
++                None
++            },
++            max_fee_per_gas: if crate::wpk::enabled() {
++                request.max_fee_per_gas
++            } else {
++                None
++            },
++            max_priority_fee_per_gas: if crate::wpk::enabled() {
++                request.max_priority_fee_per_gas
++            } else {
++                None
++            },
+ 
+             // Reset signing fields
+             signature: None,
+diff --git a/src/wpk.rs b/src/wpk.rs
+new file mode 100644
+index 0000000..67a0026
+--- /dev/null
++++ b/src/wpk.rs
+@@ -0,0 +1,129 @@
++// SPDX-License-Identifier: AGPL-3.0-only
++//! Optional fee-only deployment contract. Existing signed artifacts can be
++//! submitted unchanged; fresh fee signatures require an authenticated caller.
++use crate::{
++    domain::transaction::evm::PriceParams,
++    models::{EvmTransactionData, EvmTransactionRequest, TransactionError},
++};
++pub fn enabled() -> bool {
++    std::env::var("WPK_FEE_ONLY_REPLACEMENTS").as_deref() == Ok("1")
++}
++pub fn prices(data: &EvmTransactionData, prices: &PriceParams) -> Result<(), TransactionError> {
++    if data.gas_limit.is_none()
++        || data.gas_price.is_some()
++        || data.max_fee_per_gas.is_none()
++        || data.max_priority_fee_per_gas.is_none()
++        || prices.gas_price.is_some()
++        || prices.max_fee_per_gas != data.max_fee_per_gas
++        || prices.max_priority_fee_per_gas != data.max_priority_fee_per_gas
++    {
++        return Err(TransactionError::ValidationError(
++            "fee-only contract requires exact EIP-1559 prices and gas limit".into(),
++        ));
++    }
++    Ok(())
++}
++pub fn same_call(
++    old: &EvmTransactionData,
++    request: &EvmTransactionRequest,
++) -> Result<(), TransactionError> {
++    if old.to != request.to
++        || old.value != request.value
++        || old.data != request.data
++        || old.gas_limit != request.gas_limit
++        || old.nonce.is_none()
++        || request.gas_price.is_some()
++        || request.max_fee_per_gas.is_none()
++        || request.max_priority_fee_per_gas.is_none()
++    {
++        return Err(TransactionError::ValidationError(
++            "replacement must retain the original call and nonce with explicit EIP-1559 prices"
++                .into(),
++        ));
++    }
++    Ok(())
++}
++#[cfg(test)]
++mod tests {
++    use super::*;
++    #[test]
++    fn test_wpk_fee_only_contract_prices() {
++        let data = EvmTransactionData {
++            gas_price: None,
++            gas_limit: Some(150000),
++            nonce: Some(0),
++            value: Default::default(),
++            data: Some("0x1234".into()),
++            from: "fixture".into(),
++            to: Some("target".into()),
++            chain_id: 84532,
++            hash: None,
++            signature: None,
++            speed: None,
++            max_fee_per_gas: Some(100),
++            max_priority_fee_per_gas: Some(10),
++            raw: None,
++        };
++        let mut computed = PriceParams {
++            gas_price: None,
++            max_fee_per_gas: Some(100),
++            max_priority_fee_per_gas: Some(10),
++            is_min_bumped: None,
++            extra_fee: None,
++            total_cost: Default::default(),
++        };
++        assert!(prices(&data, &computed).is_ok());
++        computed.max_fee_per_gas = Some(101);
++        assert!(prices(&data, &computed).is_err());
++        computed.max_fee_per_gas = Some(100);
++        computed.max_priority_fee_per_gas = Some(11);
++        assert!(prices(&data, &computed).is_err());
++        let mut request = EvmTransactionRequest {
++            to: data.to.clone(),
++            value: data.value,
++            data: data.data.clone(),
++            gas_limit: data.gas_limit,
++            max_fee_per_gas: Some(113),
++            max_priority_fee_per_gas: Some(12),
++            ..Default::default()
++        };
++        assert!(same_call(&data, &request).is_ok());
++        request.data = Some("0x5678".into());
++        assert!(same_call(&data, &request).is_err());
++    }
++    #[test]
++    fn test_wpk_preserves_explicit_fees_and_nonce() {
++        if !enabled() {
++            return;
++        }
++        let old = EvmTransactionData {
++            gas_price: None,
++            gas_limit: Some(150000),
++            nonce: Some(7),
++            value: Default::default(),
++            data: Some("0x1234".into()),
++            from: "fixture".into(),
++            to: Some("target".into()),
++            chain_id: 84532,
++            hash: None,
++            signature: None,
++            speed: None,
++            max_fee_per_gas: Some(100),
++            max_priority_fee_per_gas: Some(10),
++            raw: None,
++        };
++        let request = EvmTransactionRequest {
++            to: old.to.clone(),
++            value: old.value,
++            data: old.data.clone(),
++            gas_limit: old.gas_limit,
++            max_fee_per_gas: Some(113),
++            max_priority_fee_per_gas: Some(12),
++            ..Default::default()
++        };
++        let replacement = EvmTransactionData::for_replacement(&old, &request);
++        assert_eq!(replacement.nonce, Some(7));
++        assert_eq!(replacement.max_fee_per_gas, Some(113));
++        assert_eq!(replacement.max_priority_fee_per_gas, Some(12));
++    }
++}

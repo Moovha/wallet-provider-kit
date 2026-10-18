@@ -5,6 +5,12 @@ function setting(summary: string, why: string, source: string, guide: string) {
 }
 
 export const settings = {
+  replacementWorker: setting(
+    'A bounded background worker accelerates the same transaction using pre-approved fee headroom.',
+    'Only fee fields may change. Each mutation requires fresh wallet authority and a durable replacement record; responses lost after dispatch are reconciled without retrying the mutation. Gas units, fee ceilings, nonce, payer and action remain fixed.',
+    'Deploy and accept the pinned fee-only OpenZeppelin build on a dedicated provider. Match replacement policy in wallet and executor configurations. Initial 5000 basis points use half the fee ceilings; 1250 basis points increase fees by 12.5%. Defaults are editable for new plans and require deployment acceptance.',
+    'automatic-replacements.html',
+  ),
   executionRecovery: setting(
     'Read-only diagnosis of stuck transactions, sponsor nonces, fees and funding.',
     'Optional durable quarantine stops new signing and dispatch through an affected payer. Missing receipts and pending nonce counts do not authorize another submission. Only fresh verified finality clears an execution quarantine.',

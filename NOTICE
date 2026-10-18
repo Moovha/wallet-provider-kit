@@ -13,3 +13,8 @@ The bundled FormKit/Vue operator interface includes MIT-licensed components;
 see dist/setup-ui/THIRD_PARTY_NOTICES.txt in built packages. Provider marks
 identify integrations, remain their owners' property and imply no endorsement;
 see dist/setup-ui/PROVIDER_ASSETS.txt for official sources.
+
+The optional provider patch under docs/public/patches modifies OpenZeppelin
+Relayer v1.8.0 (OpenZeppelin and contributors) and is AGPL-3.0-only, with license
+text in that directory. Its modifications are Copyright 2026 Moovha and
+contributors. The external provider build is separate from the Apache-2.0 toolkit.

@@ -1,3 +1,4 @@
+import type { ReplacementStatus } from './replacement.js';
 import { createHmac, randomUUID } from 'node:crypto';
 import type { SecretReference } from '../deployment/config.js';
 import { fingerprint } from '../onboarding/policy.js';
@@ -18,6 +19,13 @@ export interface PayerCondition {
   reason: string;
   checkedAt?: number;
   balanceWei?: string;
+  replacement?: {
+    pending: number;
+    unknown: number;
+    blocked: number;
+    exhausted: number;
+    attempts: number;
+  };
 }
 export interface PayerEvent {
   specversion: '1.0';
@@ -33,6 +41,7 @@ export interface PayerEvent {
     reason: string;
     balance_wei?: string;
     threshold_wei: string;
+    replacement?: PayerCondition['replacement'];
   };
 }
 interface Delivery {
@@ -50,6 +59,10 @@ export interface OperationsState {
   lastDeliveredAt?: number;
   payers: Record<string, PayerCondition>;
   deliveries: Record<string, Delivery>;
+  replacementStatuses?: Record<
+    string,
+    { payer: string; status: ReplacementStatus }
+  >;
 }
 export interface OperationsStore {
   transaction<T>(operation: (state: OperationsState) => T): Promise<T>;
@@ -120,10 +133,17 @@ export function recordPayer(
   if (
     previous?.balance === condition.balance &&
     previous.affected === condition.affected &&
-    previous.reason === condition.reason
+    previous.reason === condition.reason &&
+    JSON.stringify(previous.replacement) ===
+      JSON.stringify(condition.replacement)
   )
     return;
-  if (!previous && condition.balance === 'sufficient' && !condition.affected)
+  if (
+    !previous &&
+    condition.balance === 'sufficient' &&
+    !condition.affected &&
+    !condition.replacement
+  )
     return;
   const event: PayerEvent = {
     specversion: '1.0',
@@ -141,6 +161,7 @@ export function recordPayer(
         ? { balance_wei: condition.balanceWei }
         : {}),
       threshold_wei: configuration.lowBalanceWei,
+      ...(condition.replacement ? { replacement: condition.replacement } : {}),
     },
   };
   for (const target of targets)
@@ -164,6 +185,10 @@ export interface OperationsHealth {
   webhook_unroutable: number;
   oldest_delivery_age_ms: number;
   last_webhook_delivery_at?: string;
+  replacement_pending: number;
+  replacement_unknown: number;
+  replacement_blocked: number;
+  replacement_exhausted: number;
 }
 /** Durable at-least-once delivery. Receiver deduplication uses the stable webhook-id. */
 export class PayerOperations {
@@ -220,6 +245,23 @@ export class PayerOperations {
       const unavailable = conditions.filter(
         (value) => !value || value.balance === 'unknown',
       ).length;
+      const replacements = conditions.map((value) => value?.replacement);
+      const replacement_pending = replacements.reduce(
+        (count, value) => count + (value?.pending ?? 0),
+        0,
+      );
+      const replacement_unknown = replacements.reduce(
+        (count, value) => count + (value?.unknown ?? 0),
+        0,
+      );
+      const replacement_blocked = replacements.reduce(
+        (count, value) => count + (value?.blocked ?? 0),
+        0,
+      );
+      const replacement_exhausted = replacements.reduce(
+        (count, value) => count + (value?.exhausted ?? 0),
+        0,
+      );
       const failed = deliveries.filter((value) => value.failed).length;
       const unroutable = deliveries.filter(
         (value) =>
@@ -230,11 +272,23 @@ export class PayerOperations {
       ).length;
       return {
         status:
-          stale || affected || low || unavailable || failed || unroutable
+          stale ||
+          affected ||
+          low ||
+          unavailable ||
+          failed ||
+          unroutable ||
+          replacement_unknown ||
+          replacement_blocked ||
+          replacement_exhausted
             ? 'degraded'
             : 'healthy',
         payers: keys.length,
         affected_payers: affected,
+        replacement_pending,
+        replacement_unknown,
+        replacement_blocked,
+        replacement_exhausted,
         low_balance_payers: low,
         unavailable_payers: unavailable,
         stale_payers: stale,
@@ -433,4 +487,41 @@ export function validateOperations(
       configuration.webhooks.length
   )
     throw new Error('Invalid operations configuration');
+}
+
+/** Replacement summaries share the same atomic operational outbox without exposing execution identifiers. */
+export function recordReplacement(
+  state: OperationsState,
+  payer: string,
+  executionId: string,
+  status: ReplacementStatus,
+  configuration: OperationsConfiguration,
+  targets: Pick<WebhookTarget, 'id' | 'target'>[],
+  source: string,
+): void {
+  (state.replacementStatuses ??= {})[executionId] = { payer, status };
+  const entries = Object.values(state.replacementStatuses).filter(
+    (entry) => entry.payer === payer,
+  );
+  const count = (states: string[]) =>
+    entries.filter((entry) => states.includes(entry.status.state)).length;
+  recordPayer(
+    state,
+    payer,
+    {
+      replacement: {
+        pending: count(['prepared', 'dispatch', 'accepted', 'observed']),
+        unknown: count(['unknown']),
+        blocked: count(['blocked']),
+        exhausted: count(['exhausted']),
+        attempts: entries.reduce(
+          (sum, entry) => sum + entry.status.attempts,
+          0,
+        ),
+      },
+    },
+    configuration,
+    targets,
+    source,
+  );
 }

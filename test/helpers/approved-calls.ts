@@ -183,9 +183,11 @@ export function approvedCallsFixture(
               number:
                 params[0] === 'latest'
                   ? '0x66'
-                  : params[0] === '0x65' || state.included
-                    ? '0x65'
-                    : '0x64',
+                  : /^0x/.test(params[0])
+                    ? params[0]
+                    : state.included
+                      ? '0x65'
+                      : '0x64',
               hash: original.blockHash,
             };
     else if (method === 'eth_getLogs') result = state.included ? logs() : [];

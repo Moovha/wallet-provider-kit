@@ -1,5 +1,9 @@
 <script setup lang="ts">
 import { computed } from 'vue';
+import {
+  defaultReplacementPolicy,
+  defaultSponsorGas,
+} from '../../src/execution/defaults';
 import SetupField from './SetupField.vue';
 import type { ProviderConfiguration } from '../model';
 const model = defineModel<ProviderConfiguration>({ required: true });
@@ -26,11 +30,7 @@ function sponsor() {
       bindingRevision: '1',
     },
     fundingAgreement: '',
-    gasLimit: '150000',
-    maxFeePerGas: '',
-    maxPriorityFeePerGas: '',
-    l1FeeReserveWei: '',
-    lifetimeBudgetWei: '',
+    ...defaultSponsorGas,
   };
 }
 function toggle(value: unknown) {
@@ -53,6 +53,8 @@ function toggle(value: unknown) {
     sponsors: [sponsor()],
     pollIntervalSeconds: 15,
     maxLogRange: 10000,
+    recovery: { stuckAfterSeconds: 30, quarantineOnStuck: true },
+    replacement: { ...defaultReplacementPolicy },
   };
   mode('erc3009-executor-v1');
 }
@@ -86,6 +88,7 @@ function mode(value: unknown) {
     }
   } else {
     execution.profile = 'erc3009-relayer-v1';
+    delete execution.replacement;
     delete execution.safeQueue;
     delete execution.service;
     execution.relayer = {
@@ -121,7 +124,10 @@ function toggleRecovery(value: unknown) {
       stuckAfterSeconds: 300,
       quarantineOnStuck: true,
     };
-  else delete model.value.execution.recovery;
+  else {
+    delete model.value.execution.recovery;
+    delete model.value.execution.replacement;
+  }
 }
 function toggleOperations(value: unknown) {
   if (value)
@@ -141,6 +147,16 @@ function addWebhook() {
     endpoint: { env: `PAYER_WEBHOOK_${suffix}_URL` },
     signingSecrets: [{ env: `PAYER_WEBHOOK_${suffix}_SECRET` }],
   });
+}
+function toggleReplacement(value: unknown) {
+  if (!model.value.execution) return;
+  if (value) {
+    model.value.execution.replacement = { ...defaultReplacementPolicy };
+    model.value.execution.recovery ??= {
+      stuckAfterSeconds: 30,
+      quarantineOnStuck: true,
+    };
+  } else delete model.value.execution.replacement;
 }
 </script>
 <template>
@@ -347,6 +363,54 @@ function addWebhook() {
             label="Quarantine affected payers"
             v-model="model.execution.recovery.quarantineOnStuck"
           />
+        </template>
+        <template v-if="model.execution.service">
+          <SetupField
+            guide="replacementWorker"
+            type="checkbox"
+            label="Automatically replace stuck transactions within approved fees"
+            :modelValue="!!model.execution.replacement"
+            @update:modelValue="toggleReplacement"
+          />
+          <template v-if="model.execution.replacement">
+            <SetupField
+              guide="replacementWorker"
+              type="number"
+              label="Initial fee percentage in basis points"
+              :number="true"
+              v-model="model.execution.replacement.initialFeeBasisPoints"
+              validation="required|between:1000,9000"
+            />
+            <SetupField
+              guide="replacementWorker"
+              type="number"
+              label="Replacement fee increase in basis points"
+              :number="true"
+              v-model="model.execution.replacement.bumpBasisPoints"
+              validation="required|between:1000,10000"
+            />
+            <SetupField
+              guide="replacementWorker"
+              type="number"
+              label="Maximum replacement attempts"
+              :number="true"
+              v-model="model.execution.replacement.maxAttempts"
+              validation="required|between:1,6"
+            />
+            <SetupField
+              guide="replacementWorker"
+              type="number"
+              label="Minimum replacement interval in seconds"
+              :number="true"
+              v-model="model.execution.replacement.intervalSeconds"
+              validation="required|between:30,3600"
+            />
+            <p class="help-text">
+              Requires the pinned fee-only provider build on the designated
+              executor. Existing approved gas caps remain fixed. An uncertain
+              replacement is reconciled without repeating its mutation.
+            </p>
+          </template>
         </template>
         <SetupField
           guide="payerOperations"
