@@ -43,6 +43,9 @@ import {
 } from './schemas.js';
 
 export interface ServerOptions {
+  authorizationServer?: {
+    register(app: import('fastify').FastifyInstance): void;
+  };
   walletCalls?: WalletCallsService;
   runtimeConfiguration?: RuntimeConfigurationService;
   authenticate?: Authenticate;
@@ -572,6 +575,7 @@ export async function createServer(options: ServerOptions = {}) {
   );
   if (options.documentation !== false && options.documentationTokens)
     await registerDocumentationTokens(app, options.documentationTokens);
+  options.authorizationServer?.register(app);
   await app.ready();
   return app;
 }

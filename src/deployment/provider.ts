@@ -1,3 +1,4 @@
+import { createBundledAuthorizationServer } from './authorization-server.js';
 import { WalletCallsService } from '../wallet-calls/service.js';
 import {
   PayerOperations,
@@ -44,7 +45,11 @@ export async function createConfiguredProvider(
   )
     throw new ConfigurationError(['/: unsafe environment']);
   const config = validateProviderConfiguration(input);
-  const authenticate = createAuthenticator(config.oauth);
+  const authorizationServer = config.authorizationServer
+    ? createBundledAuthorizationServer(config)
+    : undefined;
+  const authenticate =
+    authorizationServer?.authenticate ?? createAuthenticator(config.oauth);
   const issueExplorerToken = config.apiExplorer
     ? createExplorerTokenIssuer(config, authenticate)
     : undefined;
@@ -177,6 +182,9 @@ export async function createConfiguredProvider(
       ...(config.runtimeConfiguration ? [config.runtimeConfiguration] : []),
       ...(config.execution
         ? [executionConfigurationIdentity(config.execution)]
+        : []),
+      ...(config.authorizationServer
+        ? [config.authorizationServer, config.oauth]
         : []),
       ...(config.apiExplorer ? [config.apiExplorer, config.oauth] : []),
     ]);
@@ -370,6 +378,7 @@ export async function createConfiguredProvider(
           }
         : undefined,
       authenticate,
+      authorizationServer,
       operationsHealth: operations ? () => operations.health() : undefined,
       configurationProfile: config.profile,
       actionProfiles: [

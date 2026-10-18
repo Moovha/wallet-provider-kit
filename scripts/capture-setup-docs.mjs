@@ -7,7 +7,7 @@ import { createSetupServer } from '../dist/deployment/setup-server.js';
 
 const sample = JSON.parse(
   await readFile(
-    new URL('../docs/provider.config.example.json', import.meta.url),
+    new URL('../docs/provider.config.bundled.example.json', import.meta.url),
     'utf8',
   ),
 );
@@ -16,7 +16,14 @@ sample.policy.provider.origin = 'https://wallet.acme.example';
 sample.policy.provider.privacyUrl = 'https://acme.example/privacy';
 sample.policy.applications[0].name = 'Acme App';
 sample.policy.applications[0].clientId = 'acme-app';
-sample.backend.binding = 'acme-cdp-base-sepolia-01';
+sample.backend.binding = 'acme-ows-base-sepolia-01';
+sample.oauth = {
+  issuer: sample.policy.provider.origin + '/oauth',
+  audience: sample.policy.provider.origin + '/api',
+  jwksUrl: sample.policy.provider.origin + '/oauth/jwks',
+};
+sample.policy.applications[0].issuer = sample.oauth.issuer;
+sample.authorizationServer.clients[0].clientId = 'acme-app';
 const output = new URL('../artifacts/setup-docs/', import.meta.url);
 await mkdir(output, { recursive: true });
 const token = 'offline-documentation-session';
@@ -33,6 +40,7 @@ try {
     viewport: { width: 1440, height: 1000 },
   });
   await page.goto(`${url}/#${token}`);
+  await page.getByLabel('Provider name', { exact: true }).waitFor();
   await page
     .getByLabel('Import provider configuration', { exact: true })
     .setInputFiles({
@@ -124,6 +132,7 @@ try {
   });
   // Optional token configuration and issuance are demonstrated with offline fixtures only.
   await page.goto(`${url}/#${token}`);
+  await page.getByLabel('Provider name', { exact: true }).waitFor();
   await page
     .getByLabel('Import provider configuration', { exact: true })
     .setInputFiles({
@@ -219,6 +228,7 @@ try {
     ),
   );
   await page.goto(`${url}/#${token}`);
+  await page.getByLabel('Provider name', { exact: true }).waitFor();
   await page
     .getByLabel('Import provider configuration', { exact: true })
     .setInputFiles({

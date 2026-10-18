@@ -234,12 +234,16 @@ test('an operator configures CDP without JSON, exports valid files, and editing 
   await expect(
     page.getByRole('heading', { name: 'Choose your wallet backend' }),
   ).toBeVisible();
+  await page.getByRole('button', { name: 'Coinbase CDP', exact: true }).click();
   await page
     .getByLabel('Wallet environment name', { exact: true })
     .fill('acme-sepolia');
   await step(page, 'Policies');
   await page.getByLabel('Access flow', { exact: true }).selectOption('hosted');
   await step(page, 'Services');
+  await page
+    .getByLabel('Application authentication', { exact: true })
+    .selectOption('external');
   await page
     .getByLabel('Login service issuer URL', { exact: true })
     .fill('https://login.acme.example');
@@ -1425,4 +1429,90 @@ test('replacement defaults are editable for future designated execution plans an
   expect(saved.execution.sponsors).toEqual(config.execution.sponsors);
   await imported(page, saved);
   expect((await exported(page)).execution).toEqual(saved.execution);
+});
+
+test('a new provider exports the bundled issuer, OWS vault and Caddy profile without external service registrations', async ({
+  page,
+}) => {
+  await page
+    .getByLabel('Provider name', { exact: true })
+    .fill('Example Wallets');
+  await page
+    .getByLabel('Public wallet service address', { exact: true })
+    .fill('https://wallet.example.test');
+  await page
+    .getByLabel('Privacy notice URL', { exact: true })
+    .fill('https://wallet.example.test/privacy');
+  await page.getByRole('button', { name: 'Next', exact: true }).click();
+  await expect(
+    page.getByRole('button', { name: 'Open Wallet Standard', exact: true }),
+  ).toHaveAttribute('aria-pressed', 'true');
+  await page
+    .getByLabel('Wallet environment name', { exact: true })
+    .fill('bundled-example');
+  await page.getByRole('button', { name: 'Next', exact: true }).click();
+  await expect(
+    page.getByLabel('Application authentication', { exact: true }),
+  ).toHaveValue('bundled');
+  await expect(
+    page.getByLabel('Application token issuer', { exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByLabel('wallet:sign', { exact: true }),
+  ).not.toBeChecked();
+  await expect(
+    page.getByText('https://wallet.example.test/oauth', { exact: true }),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Next', exact: true }).click();
+  await page
+    .getByLabel('Application name', { exact: true })
+    .fill('Example Server');
+  await page
+    .getByLabel('Application client ID', { exact: true })
+    .fill('example-server');
+  await page
+    .getByLabel('Application identity and consent trust agreement', {
+      exact: true,
+    })
+    .fill('reviewed-example-agreement');
+  await page
+    .getByLabel('Enable runtime configuration', { exact: true })
+    .check();
+  await page
+    .getByLabel('Operator OAuth client ID', { exact: true })
+    .fill('provider-operator');
+  await expect(
+    page.getByLabel('Operator token subject', { exact: true }),
+  ).toHaveValue('provider-operator');
+  await page.getByRole('button', { name: 'Next', exact: true }).click();
+  await expect(page.getByLabel('HTTPS gateway', { exact: true })).toHaveValue(
+    'caddy',
+  );
+  const config = await exported(page);
+  expect(config.backend.kind).toBe('ows');
+  expect(config.authorizationServer.operatorClients).toEqual([
+    expect.objectContaining({ clientId: 'provider-operator' }),
+  ]);
+  expect(config.http.ingress).toBe('caddy');
+  expect(config.activation.enabled).toBe(false);
+  expect(config.authorizationServer.clients).toEqual([
+    expect.objectContaining({
+      clientId: 'example-server',
+      scopes: [
+        'wallet:access',
+        'wallet:access:read',
+        'wallet:account:read',
+        'wallet:provision',
+      ],
+    }),
+  ]);
+  expect(config.oauth).toEqual({
+    issuer: 'https://wallet.example.test/oauth',
+    audience: 'https://wallet.example.test/api',
+    jwksUrl: 'https://wallet.example.test/oauth/jwks',
+  });
+  await imported(page, config);
+  expect((await exported(page)).authorizationServer).toEqual(
+    config.authorizationServer,
+  );
 });

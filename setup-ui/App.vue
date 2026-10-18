@@ -16,6 +16,7 @@ import {
   deploymentChecklist,
   docs,
   emptyConfiguration,
+  synchronizeBundledServices,
   type ProviderConfiguration,
 } from './model';
 import { explainIssue } from './validation';
@@ -39,6 +40,20 @@ const referenceLoading = ref(false);
 const token = window.location.hash.slice(1);
 window.history.replaceState(null, '', window.location.pathname);
 const config = ref<ProviderConfiguration>();
+watch(
+  () => [
+    config.value?.policy.provider.origin,
+    config.value?.authorizationServer !== undefined,
+    config.value?.runtimeConfiguration?.operators.map(
+      (operator) => operator.clientId,
+    ),
+    config.value?.policy.applications.map((app) => [app.clientId, app.enabled]),
+  ],
+  () => {
+    if (config.value) synchronizeBundledServices(config.value);
+  },
+  { deep: true },
+);
 const generation = ref(0);
 const busy = ref(false);
 const setupLocked = ref(false);

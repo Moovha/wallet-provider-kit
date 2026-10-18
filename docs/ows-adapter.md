@@ -29,12 +29,11 @@ in [backend integration](backend-guide.md), then use that adapter's guide.
 For supported deployments, use [OWS configuration](setup.md#select-a-built-in-backend);
 the kit supplies authority and journals. The code below is the advanced embedded path.
 
-Install the optional engine explicitly in your host. The default service and CDP
-entry point do not import its native binding.
-
-```sh
-npm install --save-exact @open-wallet-standard/core@1.4.3
-```
+The package and standard image include the pinned engine and its native platform
+dependency. Keep optional platform dependencies installed. The default unconfigured
+service and CDP entry point do not import the native binding. New-deployment setup
+creates the private vault and generates a missing retained passphrase; see
+[bundled setup](bundled-setup.md).
 
 ```ts
 import { EmbeddedWalletService } from '@moovha/wallet-provider-kit';

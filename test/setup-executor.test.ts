@@ -252,14 +252,13 @@ describe('explicit local container executor with offline command fixtures', () =
       run.prepare({
         ...config,
         backend: {
-          kind: 'ows',
+          kind: 'custom',
           binding: 'local',
-          vaultDirectory: '.provider-vault',
-          passphrase: { env: 'OWS_OWNER_PASSPHRASE' },
+          module: './custom.js',
         },
       }),
     ).rejects.toMatchObject({
-      issues: [expect.stringContaining('supports CDP')],
+      issues: [expect.stringContaining('Custom adapters')],
     });
     const reservedConfig = structuredClone(config);
     if (reservedConfig.backend.kind === 'cdp')

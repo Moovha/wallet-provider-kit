@@ -591,6 +591,9 @@ See the [HTTP reference](http-reference.md).
 
 ```ts
 export interface ServerOptions {
+  authorizationServer?: {
+    register(app: import('fastify').FastifyInstance): void;
+  };
   walletCalls?: WalletCallsService;
   runtimeConfiguration?: RuntimeConfigurationService;
   authenticate?: Authenticate;
@@ -2529,6 +2532,7 @@ Import from `@moovha/wallet-provider-kit/deployment`. [Integration guide](setup.
 - [ApprovedExecutionCoordinator](#approvedexecutioncoordinator)
 - [ApprovedExecutionPlan](#approvedexecutionplan)
 - [buildApprovedCallIntent](#buildapprovedcallintent)
+- [BundledAuthorizationConfiguration](#bundledauthorizationconfiguration)
 - [ChainObservation](#chainobservation)
 - [ConfigurationError](#configurationerror)
 - [createConfiguredProvider](#createconfiguredprovider)
@@ -2817,6 +2821,25 @@ export declare function buildApprovedCallIntent(
   nonce: string,
   expiresAt: string,
 ): ApprovedCallIntent;
+```
+
+### BundledAuthorizationConfiguration
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/deployment/authorization-contract.ts).
+
+```ts
+export interface BundledAuthorizationConfiguration {
+  signingKey: SecretReference;
+  operatorClients?: {
+    clientId: string;
+    clientSecret: SecretReference;
+  }[];
+  clients: {
+    clientId: string;
+    clientSecret: SecretReference;
+    scopes: string[];
+  }[];
+}
 ```
 
 ### ChainObservation
@@ -3462,6 +3485,7 @@ export interface ProviderConfiguration {
   profile: 'provider-service-v1';
   policy: OnboardingPolicy;
   oauth: OAuthConfiguration;
+  authorizationServer?: BundledAuthorizationConfiguration;
   apiExplorer?: ExplorerTokensConfiguration;
   ownerLogin?: {
     issuer: string;
@@ -3532,6 +3556,7 @@ export interface ProviderConfiguration {
     host?: '127.0.0.1' | '0.0.0.0' | '::1' | '::';
     port?: number;
     documentation?: boolean;
+    ingress?: 'caddy' | 'existing';
   };
 }
 ```

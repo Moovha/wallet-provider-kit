@@ -707,6 +707,9 @@
         },
         "documentation": {
           "type": "boolean"
+        },
+        "ingress": {
+          "enum": ["caddy", "existing"]
         }
       }
     },
@@ -1698,6 +1701,91 @@
         },
         "authorizeContracts": {
           "type": "boolean"
+        }
+      }
+    },
+    "authorizationServer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["signingKey", "clients"],
+      "properties": {
+        "signingKey": {
+          "$ref": "#/$defs/secret"
+        },
+        "clients": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 100,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["clientId", "clientSecret", "scopes"],
+            "properties": {
+              "clientId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "clientSecret": {
+                "$ref": "#/$defs/secret"
+              },
+              "scopes": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 13,
+                "uniqueItems": true,
+                "items": {
+                  "enum": [
+                    "wallet:configuration:read",
+                    "wallet:configuration:propose",
+                    "wallet:access",
+                    "wallet:access:read",
+                    "wallet:account:read",
+                    "wallet:provision",
+                    "wallet:actions",
+                    "wallet:actions:read",
+                    "wallet:events",
+                    "wallet:events:read",
+                    "wallet:sign",
+                    "wallet:execute",
+                    "wallet:execute:read"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "operatorClients": {
+          "type": "array",
+          "maxItems": 16,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["clientId", "clientSecret"],
+            "properties": {
+              "clientId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "clientSecret": {
+                "$ref": "#/$defs/secret"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "secret": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["env"],
+      "properties": {
+        "env": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9_]{0,127}$"
         }
       }
     }

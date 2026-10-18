@@ -28,7 +28,13 @@ function enable(enabled: boolean) {
       Enable runtime configuration</label
     >
     <template v-if="model.runtimeConfiguration">
-      <p>
+      <p v-if="model.authorizationServer">
+        The bundled issuer registers separate provider service operators and
+        generates their credentials during setup. The token subject equals the
+        operator client ID. Keep these credentials with the provider; connected
+        applications cannot obtain operator tokens.
+      </p>
+      <p v-else>
         Use a separate provider operator OAuth client. The API explorer's
         application token controls cannot issue provider write authority.
         Operator identity and trust roots are deployment settings; runtime
@@ -41,6 +47,7 @@ function enable(enabled: boolean) {
         <legend>Runtime operator {{ index + 1 }}</legend>
         <FormKit
           type="url"
+          :readonly="!!model.authorizationServer"
           label="Operator issuer"
           v-model="operator.issuer"
           validation="required|https_url"
@@ -53,6 +60,7 @@ function enable(enabled: boolean) {
         />
         <FormKit
           type="text"
+          :readonly="!!model.authorizationServer"
           label="Operator token subject"
           v-model="operator.subject"
           validation="required"

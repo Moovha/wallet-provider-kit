@@ -54,7 +54,7 @@ export function setupWarnings(config: ProviderConfiguration): string[] {
     );
   if (config.backend.kind === 'ows')
     warnings.push(
-      'OWS requires the pinned native engine and a separate private vault on the deployment host; the reference Docker image omits that engine.',
+      'OWS uses the bundled native engine and a private persistent vault. Back up the vault, database and retained owner passphrase together.',
     );
   return warnings;
 }

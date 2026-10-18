@@ -45,6 +45,7 @@ try {
   assert.ok(paths.includes('docs/executor.config.example.json'));
   assert.ok(paths.includes('dist/executor/service.js'));
   assert.ok(paths.includes('docs/provider.config.example.json'));
+  assert.ok(paths.includes('docs/provider.config.bundled.example.json'));
   assert.ok(paths.includes('dist/setup-ui/index.html'));
   assert.ok(paths.includes('dist/setup-ui/providers/coinbase.png'));
   assert.ok(paths.includes('dist/setup-ui/THIRD_PARTY_NOTICES.txt'));
@@ -73,16 +74,13 @@ try {
     'install',
     join(temporary, candidate.filename),
     '--omit=dev',
-    '--omit=optional',
     '--ignore-scripts',
     '--no-audit',
     '--no-fund',
   ]);
   const installed = join(temporary, 'node_modules/@moovha/wallet-provider-kit');
-  await assert.rejects(
-    access(join(temporary, 'node_modules/@open-wallet-standard/core')),
-    { code: 'ENOENT' },
-  );
+  await access(join(temporary, 'node_modules/@open-wallet-standard/core'));
+  await access(join(temporary, 'node_modules/oidc-provider'));
   const manifest = JSON.parse(
     await readFile(join(installed, 'package.json'), 'utf8'),
   );
@@ -195,6 +193,47 @@ try {
       error.status === 1 &&
       String(error.stdout).includes('storage:catalog-and-integrity') &&
       String(error.stdout).includes('not_verified'),
+  );
+  assert.match(
+    run(process.execPath, [
+      executable,
+      'init-secrets',
+      '--config',
+      'provider.config.json',
+    ]),
+    /Private provider.env created/,
+  );
+  const retainedSecrets = await readFile(
+    join(temporary, 'provider.env'),
+    'utf8',
+  );
+  assert.throws(() =>
+    run(process.execPath, [
+      executable,
+      'init-secrets',
+      '--config',
+      'provider.config.json',
+    ]),
+  );
+  assert.equal(
+    await readFile(join(temporary, 'provider.env'), 'utf8'),
+    retainedSecrets,
+  );
+  const diagnosis = JSON.parse(
+    run(process.execPath, [
+      '--env-file=provider.env',
+      executable,
+      'doctor',
+      '--config',
+      'provider.config.json',
+    ]),
+  );
+  assert.ok(
+    diagnosis.checks.some(
+      (entry) =>
+        entry.check === 'authentication:bundled-issuer' &&
+        entry.status === 'pass',
+    ),
   );
   const walkthrough = run(process.execPath, [
     join(installed, 'examples/provider-flow/run.mjs'),
@@ -381,7 +420,7 @@ try {
     clearTimeout(timer);
   }
   console.log(
-    `Package consumer verified: ${candidate.files.length} files, ESM exports, TypeScript, inspection and provider-flow examples, OpenAPI and unconfigured CLI; optional OWS engine omitted`,
+    `Package consumer verified: ${candidate.files.length} files, ESM exports, TypeScript, inspection and provider-flow examples, OpenAPI and unconfigured CLI; bundled OWS engine installed`,
   );
 } finally {
   await rm(temporary, { recursive: true, force: true });

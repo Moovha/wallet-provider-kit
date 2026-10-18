@@ -84,14 +84,14 @@ and identity-vendor interfaces. Configuration is a fixed typed profile,
 not a general policy language. Access details use RAR's structure; the toolkit
 does not implement an OAuth authorization server or the full RAR protocol.
 
-| Surface                   | Specification                                                                                                             | Implementation scope                                                      |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| Provider API              | [OpenAPI 3.0.3](https://spec.openapis.org/oas/v3.0.3.html)                                                                | Generated from Fastify route schemas; checked for drift.                  |
-| Access tokens             | [RFC 9068](https://www.rfc-editor.org/rfc/rfc9068.html)                                                                   | OAuth JWT resource server using jose; the host supplies a trusted issuer. |
-| Errors                    | [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457.html)                                                                   | Problem Details with safe code, request ID and dispatch outcome.          |
-| Typed signing             | [EIP-712](https://eips.ethereum.org/EIPS/eip-712)                                                                         | CDP adapter checks the exact digest and recovered EOA; Base Sepolia only. |
-| Chain/account identifiers | [CAIP-2](https://standards.chainagnostic.org/CAIPs/caip-2) / [CAIP-10](https://standards.chainagnostic.org/CAIPs/caip-10) | Action identifiers are checked against the selected account and chain.    |
-| Telemetry                 | [OpenTelemetry JS](https://opentelemetry.io/docs/languages/js/exporters/)                                                 | OTLP/HTTP traces and metrics; no durable financial audit journal.         |
+| Surface                   | Specification                                                                                                             | Implementation scope                                                                             |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Provider API              | [OpenAPI 3.0.3](https://spec.openapis.org/oas/v3.0.3.html)                                                                | Generated from Fastify route schemas; checked for drift.                                         |
+| Access tokens             | [RFC 9068](https://www.rfc-editor.org/rfc/rfc9068.html)                                                                   | OAuth JWT verification using jose; bundled oidc-provider issuance or an existing trusted issuer. |
+| Errors                    | [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457.html)                                                                   | Problem Details with safe code, request ID and dispatch outcome.                                 |
+| Typed signing             | [EIP-712](https://eips.ethereum.org/EIPS/eip-712)                                                                         | CDP adapter checks the exact digest and recovered EOA; Base Sepolia only.                        |
+| Chain/account identifiers | [CAIP-2](https://standards.chainagnostic.org/CAIPs/caip-2) / [CAIP-10](https://standards.chainagnostic.org/CAIPs/caip-10) | Action identifiers are checked against the selected account and chain.                           |
+| Telemetry                 | [OpenTelemetry JS](https://opentelemetry.io/docs/languages/js/exporters/)                                                 | OTLP/HTTP traces and metrics; no durable financial audit journal.                                |
 
 Resource names, scopes and authorization rules are project-specific. These
 specifications establish neither certification, regulatory compliance nor an audit.

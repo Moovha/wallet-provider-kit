@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import { caddyConfiguration } from '../dist/deployment/https-ingress.js';
 import {
   localCompose,
   setupEnvironment,
@@ -30,13 +31,19 @@ const docker = (extra) =>
 try {
   const config = JSON.parse(
     await readFile(
-      new URL('../docs/provider.config.example.json', import.meta.url),
+      new URL('../docs/provider.config.bundled.example.json', import.meta.url),
       'utf8',
     ),
   );
   config.http = { ...config.http, host: '0.0.0.0', port: 8080 };
   config.storage.directory = '.provider-data';
-  await mkdir(join(directory, '.provider-data'), { mode: 0o700 });
+  for (const folder of ['.provider-data', '.provider-vault', '.provider-tls'])
+    await mkdir(join(directory, folder), { mode: 0o700 });
+  await writeFile(
+    join(directory, 'caddy.json'),
+    JSON.stringify(caddyConfiguration(config.policy.provider.origin)),
+    { mode: 0o600 },
+  );
   await writeFile(
     join(directory, 'provider.config.json'),
     JSON.stringify(config),
@@ -49,7 +56,7 @@ try {
     { mode: 0o600 },
   );
   const compose = localCompose(
-    { directory, project, port: 18080 },
+    { directory, project, port: 18080, config },
     fileURLToPath(new URL('../', import.meta.url)),
   );
   // CI builds this reviewed image immediately before this check.
@@ -79,8 +86,30 @@ try {
     '-e',
     `if(process.env.OFFLINE_COMPOSE_VALUE!==${JSON.stringify(fixture)}||process.getuid()===0)process.exit(1)`,
   ]);
+  await docker([
+    'run',
+    '--rm',
+    '--no-deps',
+    '--entrypoint',
+    'node',
+    'api',
+    '-e',
+    "import('@open-wallet-standard/core').then(engine=>{if(typeof engine.createWallet!=='function')process.exit(1)})",
+  ]);
+  // Validation provisions configuration only; it never starts listeners or certificate issuance.
+  await docker([
+    'run',
+    '--rm',
+    '--no-deps',
+    '--entrypoint',
+    'caddy',
+    'https',
+    'validate',
+    '--config',
+    '/etc/caddy/provider.json',
+  ]);
   console.log(
-    'Compose parsing, unprivileged config validation and literal multiline secret loading passed; no storage initialization or provider requests.',
+    'Compose parsing, unprivileged config validation, literal multiline secret loading, bundled OWS native import and Caddy configuration validation passed; no storage initialization, wallets, provider requests or certificate issuance.',
   );
 } finally {
   await docker(['down', '--remove-orphans']).catch(() => {});

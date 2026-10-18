@@ -45,6 +45,7 @@ export function explainIssue(issue: string) {
         ? 'Backend'
         : issue.startsWith('/ownerLogin') ||
             issue.startsWith('/oauth') ||
+            issue.startsWith('/authorizationServer') ||
             issue.startsWith('/identity')
           ? 'Services'
           : issue.startsWith('/policy') || issue.startsWith('/reviewers')
@@ -139,6 +140,9 @@ function fieldLabel(path: string): string {
     '/ownerLogin/clientId': 'Wallet login client ID',
     '/ownerLogin/clientSecret': 'Wallet login client secret variable name',
     '/ownerLogin/idTokenAlgorithm': 'Login token signing algorithm',
+    '/authorizationServer': 'Bundled application authentication',
+    '/authorizationServer/signingKey':
+      'Application token signing key variable name',
     '/oauth/issuer': 'Application token issuer',
     '/oauth/audience': 'Wallet API audience',
     '/oauth/jwksUrl': 'Token verification keys URL (JWKS)',

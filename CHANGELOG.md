@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased bundled setup
+
+- Default new wizard and CLI configurations to a bundled oidc-provider application
+  token service, pinned OWS engine, private vault and SQLite authority records.
+- Register configured server applications, generate missing deployment credentials
+  once and preserve issuer keys, client secrets and vault passphrases across restarts.
+- Register dedicated provider service operators separately for runtime workspace
+  administration; application clients cannot obtain operator write scopes.
+- Supply a digest-pinned Caddy automatic-HTTPS profile with private certificate
+  storage; local evaluation leaves public ingress off and wallet operations disabled.
+- Retain existing issuers, CDP, Relayer and custom adapters as optional paths;
+  imported configurations preserve their selected integrations.
+- Keep Base Sepolia, current wallet authority, durable attempts and deployment
+  acceptance boundaries unchanged. Bundling does not establish production custody
+  or live provider/TLS acceptance.
+
 ## Unreleased bundled wallet execution
 
 - Connect an explicitly selected ERC-4337 driver to EIP-5792 batch admission,

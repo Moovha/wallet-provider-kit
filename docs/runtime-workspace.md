@@ -10,11 +10,19 @@ access or spending authority.
 ## Set up access
 
 In the local setup wizard's **Policies** step, enable **Runtime configuration**,
-then enter a separate operator issuer, OAuth client ID and token subject. The
-operator issuer must match the configured OAuth issuer. Deploy the exported
+then choose a separate provider operator client ID. With bundled authentication,
+the issuer and token subject are filled automatically, and setup registers the
+operator and generates its missing secret privately. With an existing issuer,
+register the separate operator client there and enter its issuer and token subject;
+the issuer must match Services. Deploy the exported
 configuration using the normal deployment process. The runtime workspace becomes
 available on that provider host after installation; it is separate from the
 local setup session.
+
+For bundled authentication, the operator's service requests a five-minute
+client-credentials token from `/oauth/token` using its separate retained secret.
+Application credentials cannot obtain operator write scopes. See
+[bundled operator access](bundled-setup.md#connect-a-server-application).
 
 Give the operator a short-lived provider API access token with
 `wallet:configuration:write`, the configured audience and the exact configured

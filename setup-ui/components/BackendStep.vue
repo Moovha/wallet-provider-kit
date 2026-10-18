@@ -50,16 +50,17 @@ function removeSigner(index: number) {
   <div class="callout step-orientation">
     <strong>Choose one option to set up</strong>
     <p>
-      CDP connects to a managed Coinbase project. OWS keeps a private wallet
-      vault on your own server. Relayer connects to a separate signing service
-      you already operate. All three profiles are experimental and support Base
-      Sepolia test-network accounts only.
+      The recommended OWS option includes a local engine and private wallet
+      vault. CDP optionally connects to a managed Coinbase project. Relayer
+      connects to a separate signing service you already operate. All three
+      profiles are experimental and support Base Sepolia test-network accounts
+      only.
     </p>
     <p>
       Credential fields below contain variable names: labels that tell the
       server where to find each secret. Keep the supplied names for a first
-      setup. You will put the actual values in your private deployment
-      environment after exporting.
+      setup. Bundled setup generates missing local credentials privately. Supply
+      external-service credential values during deployment.
     </p>
   </div>
   <div class="provider-cards" role="group" aria-label="Wallet backend">
@@ -127,9 +128,9 @@ function removeSigner(index: number) {
     <div class="callout">
       <strong>Prepare your local vault</strong>
       <p>
-        Install the pinned OWS engine and create a private, persistent vault on
-        the deployment host. Preserve both vault and database backups. The
-        reference Docker image does not include the engine.
+        The pinned engine is included in the standard image. Setup creates a
+        private, persistent vault and generates a missing owner passphrase.
+        Retain the environment file and back up both vault and database.
       </p>
     </div>
     <SetupField

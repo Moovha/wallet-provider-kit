@@ -150,8 +150,9 @@ acceptance and keeps current local KYC and wallet authorization separate. The
 existing empty-body provisioning endpoint assumes a pre-enrolled owner unless
 you enable `EnrollmentService`, which adds a current-acceptance gate.
 
-Use an existing OAuth authorization server (for example the deployment's managed
-IdP or maintained `oidc-provider`). Configure exact HTTPS issuer and JWKS URL and
+The configured service bundles `oidc-provider` for static application
+client-credentials authentication; see [bundled setup](bundled-setup.md).
+Embedded/custom hosts can use an existing OAuth authorization server. Configure exact HTTPS issuer and JWKS URL and
 an audience dedicated to this service. The resource server validates RFC 9068
 JSON Web Tokens (JWTs) with type `at+jwt`, using RS256/ES256, trusted keys and
 mandatory issuer, subject, audience, expiry, issue time, token ID and client ID.
@@ -159,7 +160,8 @@ Tokens may live at most ten minutes. It rejects ID tokens, expired tokens and
 tokens with the wrong scope.
 Your OAuth issuer issues application tokens. Optional
 [operator token controls](operator-tokens.md) request them through that issuer;
-the kit is not a token issuer and does not accept shared Moovha admin API keys.
+the configured bundle can issue application tokens, while the low-level resource
+server only verifies them. Shared Moovha admin API keys are not accepted.
 
 `wallet:provision` and `wallet:sign` let a request reach your policy checks;
 they don't grant permission to spend. Your authority adapter must validate

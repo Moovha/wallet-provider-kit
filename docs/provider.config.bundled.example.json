@@ -1,0 +1,80 @@
+{
+  "configVersion": 1,
+  "profile": "provider-service-v1",
+  "policy": {
+    "version": "1",
+    "provider": {
+      "name": "Your Wallet Provider",
+      "origin": "https://wallet.example.com",
+      "privacyUrl": "https://wallet.example.com/privacy"
+    },
+    "applications": [
+      {
+        "issuer": "https://wallet.example.com/oauth",
+        "clientId": "application-1",
+        "name": "Your Connected Application",
+        "permissions": ["account:read"],
+        "assertionTrust": {
+          "agreement": "your-reviewed-application-trust-agreement"
+        }
+      }
+    ],
+    "identity": {
+      "maxAgeDays": 90,
+      "application": {
+        "requiredFields": ["country"],
+        "verificationLevel": "verified"
+      }
+    },
+    "access": {
+      "maxAgeDays": 7,
+      "mode": "application"
+    }
+  },
+  "oauth": {
+    "issuer": "https://wallet.example.com/oauth",
+    "audience": "https://wallet.example.com/api",
+    "jwksUrl": "https://wallet.example.com/oauth/jwks"
+  },
+  "identity": {},
+  "backend": {
+    "kind": "ows",
+    "binding": "your-stable-ows-environment",
+    "vaultDirectory": ".provider-vault",
+    "passphrase": {
+      "env": "OWS_OWNER_PASSPHRASE"
+    }
+  },
+  "storage": {
+    "kind": "sqlite",
+    "directory": ".provider-data"
+  },
+  "activation": {
+    "enabled": false
+  },
+  "http": {
+    "host": "127.0.0.1",
+    "port": 8080,
+    "documentation": false,
+    "ingress": "caddy"
+  },
+  "authorizationServer": {
+    "signingKey": {
+      "env": "WALLET_OAUTH_SIGNING_KEY"
+    },
+    "clients": [
+      {
+        "clientId": "application-1",
+        "clientSecret": {
+          "env": "WALLET_APPLICATION_1_SECRET"
+        },
+        "scopes": [
+          "wallet:access",
+          "wallet:access:read",
+          "wallet:account:read",
+          "wallet:provision"
+        ]
+      }
+    ]
+  }
+}

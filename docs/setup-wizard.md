@@ -46,13 +46,15 @@ Your backend creates wallet accounts and signs approved actions. Choosing it als
 chooses a control and recovery model: who holds credentials or a vault, how an
 account is found after a lost response, and what must survive a host failure.
 
-Choose **Coinbase CDP**, **Open Wallet Standard** or **OpenZeppelin Relayer**.
+Keep the recommended bundled **Open Wallet Standard** backend, or choose
+**Coinbase CDP** or an existing **OpenZeppelin Relayer** service.
 Prepare the selected backend using [backend services and credentials](operator-services.md#choose-one-wallet-backend):
 
 - **CDP:** enter variable names for its Secret API Key ID, matching key secret and
   project Wallet Secret. Accounts are created later through the provider API.
 - **OWS:** configure the private vault directory and owner-passphrase variable.
-  It requires the pinned native engine and coordinated vault/database backups;
+  Setup includes the pinned native engine, creates the private vault and generates
+  a missing owner passphrase. Keep coordinated vault/database/secret backups;
   use the [OWS guide](ows-adapter.md) for supported platforms and recovery.
 - **Relayer:** connect an existing service and enter verified, distinct signer-pool
   entries. Each accepted account reserves one signer. The
@@ -73,8 +75,14 @@ The provider must identify which application is calling before evaluating access
 to a user's wallet. An OAuth token issuer supplies that application identity;
 your service verifies its tokens with public keys.
 
-Configure **Application token issuer**, **Wallet API audience** and **Token
-verification keys URL (JWKS)**. Copy the exact values from your authorization
+Keep **Bundled token service** for automatic application registrations and
+five-minute tokens. The issuer, audience and JWKS URL derive from Provider.
+Choose each application's API scopes; setup generates its missing secret privately.
+Record the application's client ID, name and trust agreement in Policies.
+See [bundled setup](bundled-setup.md).
+
+For **Connect an existing authorization server**, configure **Application token
+issuer**, **Wallet API audience** and **Token verification keys URL (JWKS)**. Copy the exact values from your authorization
 server. Register a separate API client for each application you will admit in
 Policies. Tokens must follow RFC 9068, including `typ: at+jwt`, `client_id`, the
 required scopes and a lifetime of at most 600 seconds. The
@@ -242,14 +250,16 @@ Validation does not test external credentials, identity checks or recovery.
 
 ### Set up and run locally
 
-For CDP or Relayer, choose **Check local setup prerequisites**. If tools are
+For OWS, CDP or an existing Relayer, choose **Check local setup prerequisites**. If tools are
 missing or stopped, review the proposed machine changes and choose **Install
 local runtime and continue**. Follow its progress and complete any Homebrew or
 Docker prompts outside the browser. Once the deployment plan opens, review the
-private directory and local port, supply missing secrets privately and choose
+private directory and local port. Bundled credentials are generated privately;
+supply any missing external-service secrets and choose
 **Start local setup**.
 
-Setup saves private files, builds the image, validates, initializes new storage,
+Setup saves private files, the OWS vault mount and the selected Caddy HTTPS profile,
+builds the image, validates, initializes new storage,
 runs diagnostics and starts the container. **Local service running · wallet
 operations disabled** is the expected initial result. The
 [local setup guide](local-setup.md) explains runtime installation, progress,

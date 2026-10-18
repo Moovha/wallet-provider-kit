@@ -18,7 +18,10 @@ const http = computed({
     model.value.http = value;
   },
 });
-function updateHttp(key: 'host' | 'port' | 'documentation', value: unknown) {
+function updateHttp(
+  key: 'host' | 'port' | 'documentation' | 'ingress',
+  value: unknown,
+) {
   model.value.http = { ...http.value, [key]: value };
 }
 </script>
@@ -78,6 +81,22 @@ function updateHttp(key: 'host' | 'port' | 'documentation', value: unknown) {
     />
   </div>
   <SetupField
+    guide="httpsGateway"
+    type="select"
+    label="HTTPS gateway"
+    :modelValue="http.ingress ?? 'existing'"
+    :options="[
+      { label: 'Bundled Caddy automatic HTTPS (recommended)', value: 'caddy' },
+      { label: 'Connect an existing HTTPS gateway', value: 'existing' },
+    ]"
+    @update:modelValue="updateHttp('ingress', $event)"
+  />
+  <p class="help-text">
+    Local setup saves the gateway configuration. Public HTTPS starts separately
+    after your domain points to the deployment host and ports 80/443 are
+    reachable. Wallet operations stay disabled until acceptance.
+  </p>
+  <SetupField
     guide="explorer"
     type="checkbox"
     label="Enable deployed API explorer and Try it out"
@@ -93,10 +112,10 @@ function updateHttp(key: 'host' | 'port' | 'documentation', value: unknown) {
     <p>
       Local setup can save private files, prepare persistent storage and start a
       container for you. It uses 0.0.0.0:8080 inside the container and publishes
-      your selected port only on this machine. Connect your public address
-      through an HTTPS gateway. This gateway forwards encrypted web traffic to
-      the service’s internal port. The deployment guide walks through these
-      tasks and backups.
+      your selected port only on this machine. The bundled Caddy profile
+      supplies automatic HTTPS for your public address when you start it on the
+      final host; you can also connect an existing gateway. The deployment guide
+      walks through these tasks and backups.
     </p>
   </div>
   <ExecutionStep v-model="model" />

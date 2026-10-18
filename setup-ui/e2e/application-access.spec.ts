@@ -48,6 +48,9 @@ test('a new operator configures application-led access without user login, vendo
         .first(),
     ).toBeVisible();
     await page
+      .getByLabel('Application authentication', { exact: true })
+      .selectOption('external');
+    await page
       .getByLabel('Application token issuer', { exact: true })
       .fill('https://apps.example.test');
     await page
@@ -206,7 +209,7 @@ test('a new operator configures application-led access without user login, vendo
       (await (await variablesDownload).path())!,
       'utf8',
     );
-    expect(variables).toContain('WALLET_CDP_API_KEY_SECRET=\n');
+    expect(variables).toContain('OWS_OWNER_PASSPHRASE=\n');
     const external: string[] = [];
     page.on('request', (request) => {
       if (!request.url().startsWith(url)) external.push(request.url());

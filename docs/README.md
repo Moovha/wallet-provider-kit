@@ -59,20 +59,22 @@ Choose the service or engine that creates accounts and signs permitted actions.
 This choice determines who controls keys, how credentials are protected and what
 you must preserve to recover an account.
 
-Follow [Backend fields](setup-wizard.md#_2-backend), then prepare
-[CDP, OWS or Relayer](operator-services.md#choose-one-wallet-backend). Each profile
+Keep the recommended bundled OWS engine or select an existing service in
+[Backend fields](setup-wizard.md#_2-backend). See
+[backend choices](operator-services.md#choose-one-wallet-backend). Each profile
 has its own recovery and operating requirements. Keep its environment binding
 stable across restarts and credential rotations.
 
 ## 3. Services
 
-Your API needs to identify each calling application. Connect an OAuth token issuer
-using its exact issuer, wallet API audience and public verification keys URL.
-The application keeps its own credentials and obtains short-lived API tokens.
+Your API needs to identify each calling application. Keep the bundled OAuth token
+service: setup registers enabled applications and generates credentials privately.
+The provider origin determines the issuer, audience and public-key URL.
+Existing authorization servers are optional. See [bundled setup](bundled-setup.md).
 
 Follow [Services fields](setup-wizard.md#_3-services) and the
 [token registration requirements](operator-services.md#register-the-application-api-and-clients).
-The [Auth0 recipe](auth0-setup.md) demonstrates a compatible registration. Optional
+For an existing issuer, the [Auth0 recipe](auth0-setup.md) demonstrates a compatible registration. Optional
 staff login is needed only if you later enable staff token controls in Deployment.
 
 ## 4. Policies

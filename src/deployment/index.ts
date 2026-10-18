@@ -124,3 +124,4 @@ export type {
   ReplacementAuthority,
   ReplacementStatus,
 } from '../execution/replacement.js';
+export type { BundledAuthorizationConfiguration } from './authorization-contract.js';
