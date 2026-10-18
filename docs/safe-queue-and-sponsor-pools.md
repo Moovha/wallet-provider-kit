@@ -1,11 +1,12 @@
 # Queue Safe operations and distribute sponsored execution
 
-The optional Safe queue accepts concurrent policy-approved contract calls, swaps
-and vault deposits, then executes one head per Safe. It holds unsigned requests
-until they reach the head. Only then does the wallet verify the Safe's current
-nonce, create its immutable action and sign it. Different Safe heads can progress
-independently. The designated executor keeps its independent authenticated
-admission, fresh wallet-authority callbacks and durable provider journal.
+Applications can request several operations while a Safe is still executing its
+current transaction. Enable the optional queue in
+[Deployment](setup-wizard.md#_5-deployment) to retain unsigned requests and execute
+one head per Safe. The wallet checks the current nonce and creates the immutable
+action only when a request reaches the head. Sponsor pools can distribute
+execution across separately funded payers. This guide explains both settings,
+the application's queue requests and recovery behavior.
 
 Use one authoritative wallet-service queue for each Safe. Independent wallet
 services must not compete to sign that Safe at the same nonce; the executor

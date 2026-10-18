@@ -1,6 +1,9 @@
 # TypeScript API reference
 
-Use this reference for the public package exports and TypeScript declarations.
+Use these declarations when extending the backend selected in
+[Backend](setup-wizard.md#_2-backend), or embedding the service in your own server.
+The configured wizard service does not require library composition. For the API
+your connected applications call after deployment, use the [HTTP guide](http-api.md).
 For contributing or regeneration, see the [development guide](../CONTRIBUTING.md#development).
 
 Start with the [API guide](api.md) for composition, ownership and errors, or the

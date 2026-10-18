@@ -1,7 +1,10 @@
 # HTTP schema reference
 
-Use these request and response schemas with the
-[implemented provider contract](../spec/provider-api.json). For contributing or
+After [Export and deployment](setup-wizard.md#_6-export), use these schemas to
+implement application access and permitted wallet actions. They describe the
+[implemented provider contract](../spec/provider-api.json); the [HTTP guide](http-api.md)
+explains the request sequence and the [access guide](application-access.md) connects
+identity, consent and grants to the policy configured in the wizard. For contributing or
 regeneration, see the [development guide](../CONTRIBUTING.md#development).
 Read the [HTTP usage guide](http-api.md) for authentication, scopes, error handling
 and integration profiles. Optional-profile routes are present in the contract even

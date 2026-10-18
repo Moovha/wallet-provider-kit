@@ -54,90 +54,27 @@ export default defineConfig({
       {
         text: 'Get started',
         items: [
-          { text: 'Operator getting started', link: '/docs/' },
-          { text: 'Services and credentials', link: '/docs/operator-services' },
-          { text: 'Application-led access', link: '/docs/application-access' },
-          { text: 'Auth0 dashboard setup', link: '/docs/auth0-setup' },
-          { text: 'Operator setup wizard', link: '/docs/setup-wizard' },
-          { text: 'Automated local setup', link: '/docs/local-setup' },
-          { text: 'Deploy the export', link: '/docs/operator-deployment' },
-          { text: 'GUI application tokens', link: '/docs/operator-tokens' },
-          { text: 'Understand the roles', link: '/docs/concepts' },
-          {
-            text: 'Install the package',
-            link: '/docs/package#build-an-installable-tarball',
-          },
-          {
-            text: 'Run the offline tutorial',
-            link: '/docs/integration-example#_1-install-and-run',
-          },
-          {
-            text: 'Connect your backend',
-            link: '/docs/backend-guide#choose-an-integration',
-          },
+          { text: 'Open the setup wizard', link: '/docs/' },
+          { text: '1. Provider', link: '/docs/setup-wizard#_1-provider' },
+          { text: '2. Backend', link: '/docs/setup-wizard#_2-backend' },
+          { text: '3. Services', link: '/docs/setup-wizard#_3-services' },
+          { text: '4. Policies', link: '/docs/setup-wizard#_4-policies' },
+          { text: '5. Deployment', link: '/docs/setup-wizard#_5-deployment' },
+          { text: '6. Export', link: '/docs/setup-wizard#_6-export' },
         ],
       },
       {
         text: 'API',
         items: [
-          {
-            text: 'Choose an integration profile',
-            link: '/docs/api#choose-a-profile',
-          },
-          {
-            text: 'Core wallet service',
-            link: '/docs/api#core-wallet-service',
-          },
-          { text: 'TypeScript declarations', link: '/docs/api-reference' },
-          {
-            text: 'HTTP authentication',
-            link: '/docs/http-api#authentication-and-profiles',
-          },
-          { text: 'HTTP schemas', link: '/docs/http-reference' },
-          { text: 'Transfer execution', link: '/docs/execution' },
-          {
-            text: 'Designated execution service',
-            link: '/docs/execution-service',
-          },
-          {
-            text: 'Approved contract calls',
-            link: '/docs/approved-contract-calls',
-          },
-          {
-            text: 'Safe queues and sponsor pools',
-            link: '/docs/safe-queue-and-sponsor-pools',
-          },
-          {
-            text: 'Stuck transaction recovery',
-            link: '/docs/stuck-transactions-and-recovery',
-          },
-          {
-            text: 'Automatic replacements',
-            link: '/docs/automatic-replacements',
-          },
-          { text: 'Fee-only provider build', link: '/docs/fee-only-relayer' },
-          {
-            text: 'Payer events and health',
-            link: '/docs/payer-events-and-health',
-          },
+          { text: 'Application HTTP guide', link: '/docs/http-api' },
+          { text: 'Provider HTTP schemas', link: '/docs/http-reference' },
           {
             text: 'Executor HTTP schemas',
             link: '/docs/executor-http-reference',
           },
-          {
-            text: 'Runtime configuration',
-            link: '/docs/runtime-configuration',
-          },
-          {
-            text: 'Runtime operator workspace',
-            link: '/docs/runtime-workspace',
-          },
-          { text: 'Standard wallet calls', link: '/docs/wallet-calls' },
-          {
-            text: 'Account abstraction sponsorship',
-            link: '/docs/account-abstraction-sponsorship',
-          },
-          { text: 'Enterprise v1 standards', link: '/docs/v1-standards' },
+          { text: 'Configuration reference', link: '/docs/setup' },
+          { text: 'TypeScript integration guide', link: '/docs/api' },
+          { text: 'TypeScript declarations', link: '/docs/api-reference' },
         ],
       },
       { text: 'Moovha', link: 'https://moovha.com/' },
@@ -154,132 +91,197 @@ export default defineConfig({
     editLink: { pattern: `${repository}/edit/main/:path` },
     sidebar: [
       {
-        text: 'Overview',
+        text: 'Start here',
         items: [
           { text: 'What the kit does', link: '/' },
+          { text: 'Open the setup wizard', link: '/docs/' },
           { text: 'Roles and terms', link: '/docs/concepts' },
-          { text: 'Assets and gas sponsorship', link: '/docs/assets-and-gas' },
-          { text: 'Getting started', link: '/docs/' },
         ],
       },
       {
         text: 'Operator setup',
         items: [
-          { text: 'Run locally with progress', link: '/docs/local-setup' },
-          { text: '1. Get started', link: '/docs/' },
           {
-            text: '2. Services and credentials',
-            link: '/docs/operator-services',
+            text: '1. Provider',
+            link: '/docs/setup-wizard#_1-provider',
+            collapsed: true,
+            items: [
+              {
+                text: 'Domain and privacy notice',
+                link: '/docs/operator-services#provider-domain-and-privacy-notice',
+              },
+              {
+                text: 'Wallet control and responsibilities',
+                link: '/docs/architecture',
+              },
+              { text: 'Security boundaries', link: '/docs/security-model' },
+            ],
           },
-          { text: 'Application-led access', link: '/docs/application-access' },
-          { text: 'Auth0 dashboard setup', link: '/docs/auth0-setup' },
-          { text: '3. FormKit wizard', link: '/docs/setup-wizard' },
-          { text: '4. Deploy and activate', link: '/docs/operator-deployment' },
-          { text: '5. Staging walkthrough', link: '/docs/staging-walkthrough' },
           {
-            text: 'Application-record evaluation',
-            link: '/docs/application-records',
+            text: '2. Backend',
+            link: '/docs/setup-wizard#_2-backend',
+            collapsed: true,
+            items: [
+              {
+                text: 'Choose and prepare a backend',
+                link: '/docs/operator-services#choose-one-wallet-backend',
+              },
+              {
+                text: 'Coinbase CDP profile',
+                link: '/docs/provider-guide#current-adapter-profile',
+              },
+              { text: 'Open Wallet Standard', link: '/docs/ows-adapter' },
+              {
+                text: 'OpenZeppelin Relayer',
+                link: '/docs/openzeppelin-relayer',
+              },
+            ],
           },
-          { text: 'Get and renew API tokens', link: '/docs/operator-tokens' },
-          { text: 'Configuration reference', link: '/docs/setup' },
-          { text: 'Built-in SQLite storage', link: '/docs/storage' },
-          { text: 'Acceptance checklist', link: '/docs/conformance' },
-          { text: 'Operations reference', link: '/docs/operations' },
+          {
+            text: '3. Services',
+            link: '/docs/setup-wizard#_3-services',
+            collapsed: true,
+            items: [
+              {
+                text: 'Application API tokens',
+                link: '/docs/operator-services#register-the-application-api-and-clients',
+              },
+              { text: 'Auth0 registration recipe', link: '/docs/auth0-setup' },
+              {
+                text: 'Secret names and values',
+                link: '/docs/operator-services#put-references-in-the-wizard-values-in-the-deployment',
+              },
+            ],
+          },
+          {
+            text: '4. Policies',
+            link: '/docs/setup-wizard#_4-policies',
+            collapsed: true,
+            items: [
+              {
+                text: 'Application trust and access',
+                link: '/docs/application-access',
+              },
+              {
+                text: 'Transfer signing terms',
+                link: '/docs/setup#supported-financial-policy',
+              },
+              {
+                text: 'Runtime contract workspace',
+                link: '/docs/runtime-workspace',
+              },
+              {
+                text: 'Runtime policy API',
+                link: '/docs/runtime-configuration',
+              },
+            ],
+          },
+          {
+            text: '5. Deployment',
+            link: '/docs/setup-wizard#_5-deployment',
+            collapsed: true,
+            items: [
+              { text: 'Storage and recovery', link: '/docs/storage' },
+              {
+                text: 'Staff application token controls',
+                link: '/docs/operator-tokens',
+              },
+              { text: 'Assets and gas funding', link: '/docs/assets-and-gas' },
+              { text: 'Transfer execution', link: '/docs/execution' },
+              {
+                text: 'Designated execution service',
+                link: '/docs/execution-service',
+              },
+              {
+                text: 'Approved contract calls',
+                link: '/docs/approved-contract-calls',
+              },
+              {
+                text: 'Safe queues and sponsor pools',
+                link: '/docs/safe-queue-and-sponsor-pools',
+              },
+              {
+                text: 'Stuck transaction recovery',
+                link: '/docs/stuck-transactions-and-recovery',
+              },
+              {
+                text: 'Bounded fee replacements',
+                link: '/docs/automatic-replacements',
+              },
+              {
+                text: 'Fee-only Relayer build',
+                link: '/docs/fee-only-relayer',
+              },
+              {
+                text: 'Payer events and health',
+                link: '/docs/payer-events-and-health',
+              },
+              { text: 'Standard wallet calls', link: '/docs/wallet-calls' },
+              {
+                text: 'Account abstraction helpers',
+                link: '/docs/account-abstraction-sponsorship',
+              },
+            ],
+          },
+          {
+            text: '6. Export',
+            link: '/docs/setup-wizard#_6-export',
+            collapsed: true,
+            items: [
+              { text: 'Run locally with progress', link: '/docs/local-setup' },
+              {
+                text: 'Manual deployment and maintenance',
+                link: '/docs/operator-deployment',
+              },
+              {
+                text: 'Staging acceptance walkthrough',
+                link: '/docs/staging-walkthrough',
+              },
+              { text: 'Acceptance checklist', link: '/docs/conformance' },
+              { text: 'Monitoring and operations', link: '/docs/operations' },
+            ],
+          },
         ],
       },
       {
-        text: 'Advanced development',
+        text: 'API and configuration reference',
+        collapsed: true,
+        items: [
+          { text: 'HTTP integration guide', link: '/docs/http-api' },
+          { text: 'HTTP schemas', link: '/docs/http-reference' },
+          {
+            text: 'Executor HTTP schemas',
+            link: '/docs/executor-http-reference',
+          },
+          { text: 'Exported configuration', link: '/docs/setup' },
+          { text: 'TypeScript API guide', link: '/docs/api' },
+          { text: 'TypeScript declarations', link: '/docs/api-reference' },
+        ],
+      },
+      {
+        text: 'Custom integrations and compatibility',
         collapsed: true,
         items: [
           { text: 'Custom adapters', link: '/docs/custom-adapters' },
           { text: 'Package and imports', link: '/docs/package' },
           {
-            text: 'Offline integration example',
+            text: 'Offline integration tutorial',
             link: '/docs/integration-example',
           },
           { text: 'Backend integration', link: '/docs/backend-guide' },
           { text: 'Embedded host authority', link: '/docs/provider-guide' },
-        ],
-      },
-      {
-        text: 'API reference',
-        collapsed: true,
-        items: [
-          { text: 'API guide', link: '/docs/api' },
-          { text: 'TypeScript declarations', link: '/docs/api-reference' },
-          { text: 'HTTP guide', link: '/docs/http-api' },
-          { text: 'HTTP schemas', link: '/docs/http-reference' },
-          { text: 'Transfer execution', link: '/docs/execution' },
-          {
-            text: 'Designated execution service',
-            link: '/docs/execution-service',
-          },
-          {
-            text: 'Approved contract calls',
-            link: '/docs/approved-contract-calls',
-          },
-          {
-            text: 'Safe queues and sponsor pools',
-            link: '/docs/safe-queue-and-sponsor-pools',
-          },
-          {
-            text: 'Stuck transaction recovery',
-            link: '/docs/stuck-transactions-and-recovery',
-          },
-          {
-            text: 'Automatic replacements',
-            link: '/docs/automatic-replacements',
-          },
-          { text: 'Fee-only provider build', link: '/docs/fee-only-relayer' },
-          {
-            text: 'Payer events and health',
-            link: '/docs/payer-events-and-health',
-          },
-          {
-            text: 'Executor HTTP schemas',
-            link: '/docs/executor-http-reference',
-          },
-          {
-            text: 'Runtime configuration',
-            link: '/docs/runtime-configuration',
-          },
-          {
-            text: 'Runtime operator workspace',
-            link: '/docs/runtime-workspace',
-          },
-          { text: 'Standard wallet calls', link: '/docs/wallet-calls' },
-          {
-            text: 'Account abstraction sponsorship',
-            link: '/docs/account-abstraction-sponsorship',
-          },
-          { text: 'Enterprise v1 standards', link: '/docs/v1-standards' },
-        ],
-      },
-      {
-        text: 'Backend and access profiles',
-        collapsed: true,
-        items: [
           { text: 'Stored-action backend', link: '/docs/stored-backend' },
-          { text: 'Coinbase CDP', link: '/docs/backend-guide#coinbase-cdp' },
-          { text: 'Open Wallet Standard', link: '/docs/ows-adapter' },
-          { text: 'OpenZeppelin Relayer', link: '/docs/openzeppelin-relayer' },
-          { text: 'Hosted compatibility access', link: '/docs/onboarding' },
-          { text: 'OIDC enrollment', link: '/docs/enrollment' },
-        ],
-      },
-      {
-        text: 'Understand the boundaries',
-        collapsed: true,
-        items: [
           {
-            text: 'Architecture and wallet control',
-            link: '/docs/architecture',
-          },
-          { text: 'Security model', link: '/docs/security-model' },
-          {
-            text: 'Durable attempts and recovery',
+            text: 'Durable attempt interfaces',
             link: '/docs/durable-attempts',
           },
+          { text: 'Hosted compatibility access', link: '/docs/onboarding' },
+          {
+            text: 'Hosted record evaluation',
+            link: '/docs/application-records',
+          },
+          { text: 'OIDC enrollment', link: '/docs/enrollment' },
+          { text: 'Standards and support limits', link: '/docs/v1-standards' },
           { text: 'Examples and fixtures', link: '/examples/' },
           {
             text: 'Provider flow source guide',

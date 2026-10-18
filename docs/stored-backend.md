@@ -1,8 +1,11 @@
 # Supplied stored-action wallet backend
 
-Start with [package installation](package.md) and [backend selection](backend-guide.md).
-This guide covers the existing-host lifecycle profile; use the
-[provider guide](provider-guide.md) for the separate `EmbeddedWalletService` profile.
+If your existing server already owns user acceptance, grants and approved actions,
+use this library backend to coordinate account creation, recovery and signing
+without rebuilding that lifecycle. It is an advanced integration beyond the
+[configured wizard service](README.md). Install the [package](package.md), choose
+its [raw signing backend](backend-guide.md), then supply the authority ports
+explained below.
 
 The **host** is your wallet service's server application. Its **authority** supplies
 trusted records and permission checks. Here, authority **ports** mean typed interfaces
@@ -30,9 +33,10 @@ const backend = createStoredWalletBackend({
 
 `privateEnvironment`, `signingAuthority` and `accountAuthority` are trusted startup
 configuration, not HTTP inputs. Existing host integrations supply these adapters.
-For new users without existing identity or storage, start with the
-[onboarding profile](onboarding.md). That profile supplies reference persistence
-and consent but deliberately cannot sign financial actions. Neither profile
+For a new provider service, start with the [wizard](README.md). It supplies
+application access, persistent grants and optional configured financial signing.
+The separate programmatic [onboarding-only profile](onboarding.md) supplies
+consent and provisioning without financial signing. Neither profile
 turns vendor credentials or OAuth scopes into spending authority.
 
 ## Authority configuration

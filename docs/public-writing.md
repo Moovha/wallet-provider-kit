@@ -22,6 +22,25 @@ Contributor instructions belong in contributor workflows. Operator walkthroughs
 should explain how to use the service, rather than direct a coding agent or
 describe the maintainer's next development session.
 
+## Follow the provider's setup journey
+
+Organize operator setup around the FormKit steps in their actual order:
+**Provider → Backend → Services → Policies → Deployment → Export**. Keep the
+navigation, getting-started guide and wizard walkthrough consistent with those
+steps. Link a concept where the operator encounters its setting, with deeper
+reference material available from that point.
+
+Treat application-led identity and consent as the normal setup throughout this
+journey. Explain trust agreements, evidence, grants and revocation within Policies
+and application integration. Keep staff login, hosted compatibility and embedded
+library composition clearly optional, with their own prerequisites.
+
+Introduce a module through the problem it solves for the provider. Explain its
+role and the decision the operator makes, then show settings, commands or API
+specifications needed to implement that choice. Preserve exact limits and recovery
+rules. Development milestones and private delivery decisions do not replace a
+consumer-facing explanation of present support and remaining requirements.
+
 ## Make the text self-contained
 
 Address the operator or integrating developer as **you** when giving instructions.

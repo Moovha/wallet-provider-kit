@@ -1,11 +1,12 @@
 # Architecture
 
-The wallet service receives requests from connected applications and checks them
-against the account owner's current permissions before calling its wallet backend.
-The **host** is the server application running this service; **host authority** is
-its permission-checking code and trusted records. Authentication produces a
-**verified principal**, the checked caller identity. See [roles and terms](concepts.md)
-for how these responsibilities appear in configuration and API types.
+Your wallet service receives application requests, checks current user permission
+and calls a selected wallet backend. Understanding those responsibilities helps
+you choose the service identity in [Provider](setup-wizard.md#_1-provider), key
+control in Backend and application trust in Policies. This guide explains how the
+layers fit together and where the provider's responsibilities meet the connected
+application's. The **host** is the server application running the service;
+**host authority** is its permission-checking code and trusted records.
 
 `HTTP → verified principal → host authority → EmbeddedWalletService → signing provider`
 

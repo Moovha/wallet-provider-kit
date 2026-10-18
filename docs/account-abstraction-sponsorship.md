@@ -1,13 +1,14 @@
 # ERC-4337 and ERC-7677 sponsorship
 
-ERC-4337 paymasters are the planned sponsorship mechanism for compatible smart
-accounts. The existing relayer mechanisms remain supported for EOA transfers
-and the current SafeTx profile. Both use one application gas-budget identity and
-the same runtime contract/method policy. Execution mechanism selection must be
-explicit and immutable for each operation.
+Account abstraction can let a sponsor pay for compatible smart-account operations.
+The library provides unsigned preparation and paymaster-client helpers for teams
+building that integration. When choosing execution in
+[Deployment](setup-wizard.md#_5-deployment), use the supplied
+[relayer execution](execution.md) for the configured service: these helpers do not
+enable ERC-4337 signing or submission. A custom integration must keep one
+application gas-budget identity, runtime policy and immutable execution choice.
 
-The `@moovha/wallet-provider-kit/sponsorship` entry point supplies the first
-implementation milestone: unsigned UserOperation preparation, EntryPoint v0.7
+The `@moovha/wallet-provider-kit/sponsorship` entry point supplies unsigned UserOperation preparation, EntryPoint v0.7
 hashing and gas-cost bounds, shared budget helpers and a trusted-host ERC-7677
 client. **The configured service does not yet sign or submit ERC-4337 operations
 or advertise `paymasterService`.** The helpers do not enable a new HTTP route,
@@ -69,7 +70,7 @@ Hash vectors are checked independently against viem 2.57.7 and the
 `applicationGasBudgetId(providerOrigin, issuer, clientId)` preserves the existing
 relayer budget identity exactly. The mechanism, payer and paymaster do not create
 new application allowances. `applicationGasBudgetLimit` takes the lowest limit
-among that application's configured pool members. The relayer coordinator now
+among that application's configured pool members. The relayer coordinator
 uses these shared helpers.
 
 `maximumUserOperationCostV07` includes call gas, account verification gas,
@@ -97,7 +98,7 @@ with `isFinal: true`. Before either request, the callback must establish fresh
 owner/grant/consent/claim authority and a durable reservation for the supplied
 worst-case liability. A scope, policy snapshot or prepared operation alone is
 insufficient. This callback is an advanced trusted-host port; the configured
-service's durable ERC-4337 admission adapter is a separate release milestone.
+service does not supply durable ERC-4337 admission.
 
 The client sends only a bounded context with application ID, policy revision/hash,
 action ID and optional vendor policy ID. It does not send raw KYC data. Context
@@ -113,18 +114,24 @@ change must be revalidated and covered by the durable reservation before a new
 request. Unknown responses retain uncertainty; the caller must reconcile the
 original sponsorship attempt rather than switch mechanisms or release its budget.
 
-## Release milestones
+<span id="release-milestones"></span>
 
-| Milestone                          | Deliverable                                                                                                                                                                                                                                                        | Status                                                                |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------- |
-| AS1: shared sponsorship foundation | Versioned unsigned preparation, exact runtime call encoding, v0.7 hashes/cost bounds, shared application budget helpers and bounded ERC-7677 transport                                                                                                             | Implemented with offline fixtures; no configured financial activation |
-| AS2: durable authority and signing | Pin accepted Safe4337Module/account/fallback/EntryPoint/paymaster code; bind mechanism and sponsorship to immutable owner consent/action; reserve shared operation/gas budgets before either paymaster RPC; fresh authority/claims and SafeOp signature validation | Pending                                                               |
-| AS3: submission and reconciliation | Accepted bundler adapter, exact UserOperation hash/nonce handling, one durable mechanism per operation, uncertainty/restart recovery, independent per-UserOperation receipts/finality/cost reconciliation; EIP-5792 and ERC-7677 capability wiring                 | Pending                                                               |
-| AS4: operator/client rollout       | Structured configuration and funding/deposit monitoring, sponsor policy UI, schema verification if persistence changes, cost-tier assessment and staged interoperability/recovery acceptance                                                                       | Pending                                                               |
+## Support and integration limits
 
-Never advertise unsupported capabilities or switch an uncertain operation from
-ERC-4337 to the relayer. Paymaster refusal must not silently charge the user's
-native balance. Use maintained account/paymaster implementations and separately
-accept exact chain, contract and service revisions before activation. Module
-installation, contract deployment, provider procurement, funding and npm publication
-remain separate operational actions.
+Unsigned preparation, v0.7 hashing and cost bounds, shared gas-budget helpers and
+the ERC-7677 transport are available as library interfaces. Their offline fixtures
+exercise those contracts; they do not establish an accepted smart-account deployment.
+
+The configured service does not provide ERC-4337 durable admission, owner signing,
+bundler submission, receipt reconciliation or a `paymasterService` capability.
+A complete integration would need accepted account/module/EntryPoint/paymaster
+code bindings, current consent and claims, durable shared reservations before
+paymaster requests, exact operation hashes, independent finality and recovery.
+There is no wizard setting that activates those missing components.
+
+Keep any custom integration explicit about its mechanism, sponsor and supported
+contracts. Never switch an uncertain operation from ERC-4337 to the relayer or
+silently charge the user's balance after paymaster refusal. Installing account
+modules, deploying contracts and funding sponsors need their own reviewed
+operating procedures. Return to [Deployment](setup-wizard.md#_5-deployment) for the
+configured service's supported execution choices.

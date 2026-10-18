@@ -1,13 +1,14 @@
 # Coordinate transfers and verify their status
 
-The optional execution profiles coordinate one approved Base Sepolia EOA token
-transfer through a dedicated application sponsor. Use `erc3009-executor-v1` for
-the [separately deployed designated service](execution-service.md), or retain
-`erc3009-relayer-v1` for direct OpenZeppelin Relayer compatibility.
-It keeps the existing owner, application grant, identity, consent, immutable
-approval and durable attempt checks. Execution is disabled unless configured and
-explicitly accepted. Offline fixtures exercise the contract; live execution,
-operational recovery and production custody acceptance remain pending.
+Configure transfer execution in [Deployment](setup-wizard.md#_5-deployment) when
+your service should sign an approved transfer internally, submit it through an
+application-funded sponsor and verify its chain result. The application still
+needs the transfer delegation configured in Policies. This guide follows that
+request from the stored authorization to its verified status, then explains the
+settings and acceptance tests. Use `erc3009-executor-v1` for the
+[designated service](execution-service.md), or `erc3009-relayer-v1` for direct
+Relayer compatibility. Both are experimental Base Sepolia EOA profiles;
+configuration and offline tests do not establish live execution or custody acceptance.
 
 General contract calls, swaps and vault deposits use the same execution and recovery foundation through `approved-evm-executor-v1`. They require separate contract delegation and explicitly bound Safe accounts; see [approved contract calls](approved-contract-calls.md). The steps below describe the ERC-3009 transfer operation.
 

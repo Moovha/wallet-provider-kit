@@ -1,11 +1,13 @@
 # API guide
 
-Use this guide to choose the public API and understand the responsibilities you
-must supply. Then follow the [end-to-end provider tutorial](integration-example.md) and
-[connect your backend](backend-guide.md).
-For exact declarations, use the [generated TypeScript reference](api-reference.md);
-for requests and responses, use the [HTTP guide](http-api.md) and
-[generated HTTP schemas](http-reference.md).
+Use the HTTP API to connect applications to the service you configure in the
+[wizard](setup-wizard.md). If you need to embed wallet behavior in an existing
+server or implement an unsupported backend, this guide explains the TypeScript
+interfaces and responsibilities you supply. Start with the integration profiles
+below, then use the [offline tutorial](integration-example.md) and
+[backend guide](backend-guide.md). Exact declarations are in the
+[TypeScript reference](api-reference.md); application request/response contracts
+are in the [HTTP guide](http-api.md) and [HTTP schemas](http-reference.md).
 
 You can run the kit as a configured wallet service or embed it in your application.
 It supports controlled wallet access for applications including Moovha. Key

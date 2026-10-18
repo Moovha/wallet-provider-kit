@@ -1,9 +1,11 @@
 # Use OWS as the wallet engine
 
-The experimental `./ows` adapter reuses **Open Wallet Standard core 1.4.3** for
-encrypted wallet storage, key generation, derivation and EIP-712 signing. The kit
-adds host authorization and attempt coordination around that engine. The adapter
-supports only the profile below, rather than the full OWS interface.
+Choose OWS in [Backend](setup-wizard.md#_2-backend) when your team will operate a
+local encrypted wallet vault. You retain its passphrase and must recover the vault
+and provider database together. This guide explains that control model and the
+supported profile before showing optional library composition. The experimental
+`./ows` adapter uses Open Wallet Standard core **1.4.3** for key generation,
+derivation and EIP-712 signing, with toolkit authorization and attempt coordination.
 
 ## What fits today
 
@@ -88,9 +90,9 @@ remain unsupported even though OWS supports more operations.
 
 ## Before deployment
 
-Implement and verify the [durable journal](durable-attempts.md) against your real
-store. The adapter requires it; the test fixture is never packaged as a runtime
-store. Preserve the original account and attempt IDs on retries. A timeout,
+For the configured service, use its [SQLite journal](storage.md) and verify
+recovery on your host. Embedded integrations must supply and verify their
+[durable journal](durable-attempts.md); test fixtures are not runtime storage. Preserve the original account and attempt IDs on retries. A timeout,
 failed child or missing/corrupt vault record cannot authorize another mutation.
 OWS can skip malformed wallet metadata during listing, so a lookup miss is not
 proof that creation never occurred. Reconcile uncertain outcomes with the

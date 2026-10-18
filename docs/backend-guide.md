@@ -1,9 +1,13 @@
 # Connect your wallet backend
 
-A wallet backend creates or resolves accounts and signs permitted actions. Your
-host decides who may use each account, records the approved action and supplies
-durable attempt authority. The toolkit brings those parts together as a wallet
-service that connected applications can use without receiving keys.
+Use this developer guide when the backend choices in
+[Backend](setup-wizard.md#_2-backend) do not meet your needs, or when you are
+embedding the library in an existing server. A backend creates accounts and signs
+permitted actions; the host decides who may use an account and keeps durable
+attempt records. The configured service supplies those checks and journals.
+For its built-in CDP, OWS and Relayer choices, use
+[backend preparation](operator-services.md#choose-one-wallet-backend) without
+writing the composition code below.
 
 Here, **host** means your wallet service's server application, and **authority**
 means its current permission checks and trusted records. A **journal** is the
@@ -145,8 +149,9 @@ The [API guide](api.md#core-wallet-service) describes the authority port, and
 ## Complete the host integration
 
 Use [provider-guide.md](provider-guide.md) to connect the selected backend to your
-existing authority and HTTP application. Use [onboarding](onboarding.md) if you
-need application-led access and journaled provisioning. Select hosted compatibility explicitly if provider login and review are required. Keep
+existing authority and HTTP application. Use the [configured service](README.md) for application-led access and journaled
+provisioning. The [hosted compatibility profile](onboarding.md) separately supplies
+provider login and review. Keep
 public configuration in one typed startup module and credentials in your secret
 store or ignored local environment files.
 

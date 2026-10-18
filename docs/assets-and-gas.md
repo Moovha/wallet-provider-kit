@@ -1,10 +1,11 @@
 # Blockchain assets and gas sponsorship
 
-Wallet Provider Kit supports blockchain wallets for payments and decentralised
-finance (DeFi).
-It helps teams make blockchain wallets usable through familiar login, consent
-and approval experiences. The assets and transactions still live on a blockchain;
-the simpler experience should make them easier to understand.
+Users need to know which assets they can use and who pays the network fees for
+their transactions. When choosing transfer terms in
+[Policies](setup-wizard.md#_4-policies) and execution in
+[Deployment](setup-wizard.md#_5-deployment), agree the asset, network and funding
+responsibilities with each connected application. This guide explains those
+choices before describing the supported sponsorship and execution boundaries.
 
 ## Assets people recognise
 

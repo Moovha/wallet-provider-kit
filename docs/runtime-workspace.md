@@ -1,9 +1,11 @@
 # Operate contracts and policies through forms
 
-Open `/operator/` on a running provider service with runtime configuration enabled.
-The runtime workspace lets applications register contract methods, providers
-review and publish policies, and both inspect wallet batches. Forms call the
-same authenticated APIs as integrations; they require no JSON editing.
+After enabling runtime configuration in [Policies](setup-wizard.md#_4-policies)
+and deploying the export, open `/operator/` on your provider host. This workspace
+lets applications register contract methods and lets your operators review and
+publish policies through forms. It also shows enabled wallet batches. Use it when
+contracts change after initial setup; adding a proposal alone grants no wallet
+access or spending authority.
 
 ## Set up access
 

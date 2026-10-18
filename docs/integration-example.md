@@ -1,10 +1,11 @@
 # End-to-end provider integration
 
-Build and run a complete **offline provider flow**, then use the same public
-interfaces in your application. You will see a real access token pass the JWT
-verifier, HTTP middleware resolve host permission checks, and an approved stored action
-reach a signing backend with recorded attempt tracking. Retries, revocation, current KYC denial and
-an uncertain result are exercised in the same run.
+Use this offline tutorial if you are developing a custom or embedded integration
+beyond the [wizard setup](README.md). It makes authentication, permission checks,
+backend signing and durable retries visible in one runnable example. A fixture
+access token passes the JWT verifier and a stored approved action reaches a
+signing backend. The same run exercises replay, revocation, current-identity
+denial and an uncertain result. It requires no live credentials or funds.
 
 This tutorial covers the kit's implemented provider API. It doesn't call Moovha's
 planned operation API or implement prepare/commit, gas sponsorship or settlement.

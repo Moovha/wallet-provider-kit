@@ -1,10 +1,11 @@
 # Deploy the wizard export
 
-For a new local CDP or Relayer evaluation, the wizard or CLI can detect and install
-missing runtime tools, then perform file preparation,
-image build, storage initialization, diagnosis, startup and health checks with
-visible progress. Follow [automated local setup](local-setup.md). This guide covers
-manual deployment, final-host infrastructure and existing-service maintenance.
+Use this guide after [Export](setup-wizard.md#_6-export) to deploy the downloaded
+configuration manually, prepare a final host or maintain an existing service.
+Your deployment supplies the private records, secrets, HTTPS and supervision
+needed to keep the configured wallet service operating. For a new local CDP or
+Relayer evaluation, [local setup](local-setup.md) performs file preparation,
+build, initialization and startup with progress instead of the manual commands below.
 
 This walkthrough follows a completed [wizard](setup-wizard.md) export. It uses a
 reviewed source checkout and a single persistent macOS or glibc Linux host. The

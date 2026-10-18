@@ -1,11 +1,11 @@
 # Install and use the package
 
-The toolkit is a **Node.js ESM package** for backend applications. Use Node
-24.22.0 and npm 11.11.1. Importing the wallet library into a browser, CommonJS builds
-and other runtimes aren't supported. The package includes a separate bundled
-FormKit browser wizard served by its local Node.js setup command. TypeScript declarations accompany every JavaScript entry point.
-Version 0.1.0 is experimental and unpublished; `private: true` keeps npm
-publication disabled.
+Follow [Open the wizard](README.md#open-the-wizard) to configure the service from
+source. Use this guide if you want an installable tarball or need library imports
+for a custom server integration. The package contains Node.js ESM code, TypeScript
+declarations and a bundled FormKit wizard. Use Node **24.22.0** and npm **11.11.1**;
+browser library imports, CommonJS and other runtimes are unsupported. Version
+0.1.0 is experimental and unavailable from npm; publication is disabled.
 
 Before choosing an integration, read [roles and terms](concepts.md) for the account
 owner, connected application (OAuth client), host authority, wallet backend and journal.

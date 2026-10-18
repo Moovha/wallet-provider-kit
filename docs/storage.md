@@ -1,9 +1,11 @@
 # Use the built-in SQLite database
 
-The toolkit includes persistent SQLite storage for its supported
-onboarding, signing and Relayer execution profiles. It runs inside your Node.js
-process and requires no database server or additional npm dependency. Use it on
-one host with a private directory on persistent local POSIX storage.
+Choose private persistent storage in [Deployment](setup-wizard.md#_5-deployment)
+so ownership, grants, policy and attempts survive restarts. The supplied service
+uses local SQLite on one active POSIX host, without a separate database server.
+Operators should begin with [recovery and backups](#recovery-backup-and-operations)
+and the [deployment instructions](operator-deployment.md). The interfaces below
+also show developers how to use the database in an embedded integration.
 
 | Records                                                                                             | Built-in implementation                                    |
 | --------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |

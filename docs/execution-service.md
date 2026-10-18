@@ -1,10 +1,12 @@
 # Deploy a designated execution service
 
-The designated execution service is a separate process with its own local SQLite
-journal, sponsor credentials and configurable provider registry. The wallet
-service keeps owner signing, delegated financial authority and independent chain
-verification. Applications request execution by stored action ID; they cannot
-select a provider, sponsor, calldata or replacement transaction identity.
+A designated executor separates transaction submission and sponsor credentials
+from wallet signing. Choose it under [Deployment](setup-wizard.md#_5-deployment)
+when your service should dispatch approved actions through a separately operated
+submission service. This guide prepares that service and connects it back to the
+wallet. Each service has its own durable journal. The wallet retains user
+authority, signing and independent chain verification; applications request
+execution by stored action ID.
 
 Select `approved-evm-executor-v1` revision 1 for [approved general EVM operations](approved-contract-calls.md), or `erc3009-executor-v1` revision 1 to use this boundary. The direct
 `erc3009-relayer-v1` profile remains available for existing deployments. The transfer profiles support exact ERC-3009 token transfers with EOA signatures on Base Sepolia. The general profile also supports explicitly bound Safe 1.4.1 contract calls, swaps and vault deposits on that chain. The service is experimental: offline conformance

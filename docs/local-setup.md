@@ -1,9 +1,10 @@
 # Install the local runtime and run your service
 
-Use **Export → Set up and run locally** to turn a validated configuration into a
-running, isolated Docker Compose deployment. Downloads and manual preparation
-commands are optional for this path. The wizard shows progress and retains the
-files needed to operate the service.
+At [Export](setup-wizard.md#_6-export), choose **Set up and run locally** to turn
+your validated CDP or Relayer configuration into a running Docker Compose service.
+This guide explains the runtime preparation, private secret entry, progress and
+saved commands you will encounter. Setup starts with wallet operations disabled
+so you can complete deployment acceptance before activation.
 
 This is the recommended local evaluation path for CDP and Relayer. It builds the
 same repository Dockerfile used by the single-host container deployment: pinned

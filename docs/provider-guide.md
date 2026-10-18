@@ -1,8 +1,10 @@
 # Integrate your wallet service
 
-For supported deployments, use [configuration-first setup](setup.md); the kit
-supplies authority and journals. This guide covers advanced embedded hosts and
-custom financial integrations.
+Use this developer guide when your existing server must supply its own authority,
+storage or financial behavior. It explains how to connect those responsibilities
+to the toolkit's backend and HTTP interfaces. For the service configured through
+[the wizard](README.md), authority and journals are supplied; you select backend,
+policy and deployment settings without writing this host composition.
 
 After [installing the package](package.md) and running the
 [provider walkthrough](integration-example.md), [choose and connect your backend](backend-guide.md).

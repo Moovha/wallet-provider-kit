@@ -1,10 +1,11 @@
 # Application-led wallet access
 
-This is the standard deployment flow. The user signs in, completes identity checks
-and approves wallet access in the connected application. The application calls the
-provider on that user's behalf. The provider evaluates its configured policy and
-stores a limited, revocable grant. There is no provider user-login redirect or
-routine staff-review step.
+Your service needs to know which application may act for which user, and on what
+terms. Configure that trust in [Policies](setup-wizard.md#_4-policies): users sign
+in, complete identity checks and consent within the connected application. Your
+service evaluates its evidence and stores a limited, revocable grant. This guide
+connects those settings to the requests your application developer implements,
+from policy discovery through provisioning and withdrawal.
 
 The provider explicitly trusts each application's identity and consent attestations
 under a reviewed agreement. An OAuth token authenticates the calling application;
