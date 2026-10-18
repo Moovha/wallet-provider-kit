@@ -5937,3 +5937,1762 @@ Success response schema:
   }
 }
 ```
+
+## GET /v1/runtime-configuration
+
+Operation: `readRuntimeConfiguration`.
+
+Optional runtime configuration control plane. Application proposals and provider publications are configuration records, not wallet grants, signing authority or execution activation. Publications become readable immediately without restarting the service. Immutable historical revisions remain available. Requires the documented scope and configured application or operator identity.
+
+| Status | Content type             | Description      |
+| ------ | ------------------------ | ---------------- |
+| 200    | application/json         | Default Response |
+| 400    | application/problem+json | Problem response |
+| 401    | application/problem+json | Problem response |
+| 403    | application/problem+json | Problem response |
+| 409    | application/problem+json | Problem response |
+| 413    | application/problem+json | Problem response |
+| 415    | application/problem+json | Problem response |
+| 422    | application/problem+json | Problem response |
+| 429    | application/problem+json | Problem response |
+| 500    | application/problem+json | Problem response |
+| 503    | application/problem+json | Problem response |
+
+Success response schema:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "application_id",
+    "active_revision",
+    "revision",
+    "authorizes_spending"
+  ],
+  "properties": {
+    "application_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "active_revision": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,19})$"
+    },
+    "revision": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,19})$"
+    },
+    "publication": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "application_id",
+        "revision",
+        "previous_revision",
+        "policy_hash",
+        "policy",
+        "published_at",
+        "published_by"
+      ],
+      "properties": {
+        "application_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "revision": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,19})$"
+        },
+        "previous_revision": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,19})$"
+        },
+        "policy_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "policy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "version",
+            "enabled",
+            "chain_id",
+            "contracts",
+            "maximum_calls",
+            "maximum_native_value_wei",
+            "max_validity_seconds",
+            "claim_requirements"
+          ],
+          "properties": {
+            "version": {
+              "type": "string",
+              "enum": ["1"]
+            },
+            "enabled": {
+              "type": "boolean"
+            },
+            "chain_id": {
+              "type": "string",
+              "enum": ["eip155:84532"]
+            },
+            "contracts": {
+              "type": "array",
+              "maxItems": 32,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["address", "code_hash", "methods"],
+                "properties": {
+                  "address": {
+                    "type": "string",
+                    "pattern": "^0x[0-9a-fA-F]{40}$"
+                  },
+                  "code_hash": {
+                    "type": "string",
+                    "pattern": "^0x[0-9a-f]{64}$"
+                  },
+                  "implementation": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["address", "code_hash"],
+                    "properties": {
+                      "address": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                      },
+                      "code_hash": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-f]{64}$"
+                      }
+                    }
+                  },
+                  "methods": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 32,
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["signature", "maximum_value_wei"],
+                      "properties": {
+                        "signature": {
+                          "type": "string",
+                          "minLength": 3,
+                          "maxLength": 256
+                        },
+                        "maximum_value_wei": {
+                          "type": "string",
+                          "pattern": "^(0|[1-9][0-9]{0,77})$"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "maximum_calls": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 16
+            },
+            "maximum_native_value_wei": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]{0,77})$"
+            },
+            "max_validity_seconds": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 3600
+            },
+            "claim_requirements": {
+              "type": "array",
+              "maxItems": 16,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["name", "allowed_values", "max_age_seconds"],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9_]{0,63}$"
+                  },
+                  "allowed_values": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 32,
+                    "uniqueItems": true,
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128
+                    }
+                  },
+                  "max_age_seconds": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 31536000
+                  }
+                }
+              }
+            }
+          }
+        },
+        "published_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "proposal_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "published_by": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "authorizes_spending": {
+      "type": "boolean",
+      "enum": [false]
+    }
+  }
+}
+```
+
+## GET /v1/runtime-configuration/applications/{applicationId}
+
+Operation: `readRuntimeApplicationConfiguration`.
+
+Optional runtime configuration control plane. Application proposals and provider publications are configuration records, not wallet grants, signing authority or execution activation. Publications become readable immediately without restarting the service. Immutable historical revisions remain available. Requires the documented scope and configured application or operator identity.
+
+| Parameter       | Location | Required | Schema                                         |
+| --------------- | -------- | -------- | ---------------------------------------------- |
+| `applicationId` | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{64}$"}` |
+
+| Status | Content type             | Description      |
+| ------ | ------------------------ | ---------------- |
+| 200    | application/json         | Default Response |
+| 400    | application/problem+json | Problem response |
+| 401    | application/problem+json | Problem response |
+| 403    | application/problem+json | Problem response |
+| 409    | application/problem+json | Problem response |
+| 413    | application/problem+json | Problem response |
+| 415    | application/problem+json | Problem response |
+| 422    | application/problem+json | Problem response |
+| 429    | application/problem+json | Problem response |
+| 500    | application/problem+json | Problem response |
+| 503    | application/problem+json | Problem response |
+
+Success response schema:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "application_id",
+    "active_revision",
+    "revision",
+    "authorizes_spending"
+  ],
+  "properties": {
+    "application_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "active_revision": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,19})$"
+    },
+    "revision": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,19})$"
+    },
+    "publication": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "application_id",
+        "revision",
+        "previous_revision",
+        "policy_hash",
+        "policy",
+        "published_at",
+        "published_by"
+      ],
+      "properties": {
+        "application_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "revision": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,19})$"
+        },
+        "previous_revision": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,19})$"
+        },
+        "policy_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "policy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "version",
+            "enabled",
+            "chain_id",
+            "contracts",
+            "maximum_calls",
+            "maximum_native_value_wei",
+            "max_validity_seconds",
+            "claim_requirements"
+          ],
+          "properties": {
+            "version": {
+              "type": "string",
+              "enum": ["1"]
+            },
+            "enabled": {
+              "type": "boolean"
+            },
+            "chain_id": {
+              "type": "string",
+              "enum": ["eip155:84532"]
+            },
+            "contracts": {
+              "type": "array",
+              "maxItems": 32,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["address", "code_hash", "methods"],
+                "properties": {
+                  "address": {
+                    "type": "string",
+                    "pattern": "^0x[0-9a-fA-F]{40}$"
+                  },
+                  "code_hash": {
+                    "type": "string",
+                    "pattern": "^0x[0-9a-f]{64}$"
+                  },
+                  "implementation": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["address", "code_hash"],
+                    "properties": {
+                      "address": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                      },
+                      "code_hash": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-f]{64}$"
+                      }
+                    }
+                  },
+                  "methods": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 32,
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["signature", "maximum_value_wei"],
+                      "properties": {
+                        "signature": {
+                          "type": "string",
+                          "minLength": 3,
+                          "maxLength": 256
+                        },
+                        "maximum_value_wei": {
+                          "type": "string",
+                          "pattern": "^(0|[1-9][0-9]{0,77})$"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "maximum_calls": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 16
+            },
+            "maximum_native_value_wei": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]{0,77})$"
+            },
+            "max_validity_seconds": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 3600
+            },
+            "claim_requirements": {
+              "type": "array",
+              "maxItems": 16,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["name", "allowed_values", "max_age_seconds"],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9_]{0,63}$"
+                  },
+                  "allowed_values": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 32,
+                    "uniqueItems": true,
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128
+                    }
+                  },
+                  "max_age_seconds": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 31536000
+                  }
+                }
+              }
+            }
+          }
+        },
+        "published_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "proposal_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "published_by": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "authorizes_spending": {
+      "type": "boolean",
+      "enum": [false]
+    }
+  }
+}
+```
+
+## GET /v1/runtime-configuration/revisions/{revision}
+
+Operation: `readRuntimeConfigurationRevision`.
+
+Optional runtime configuration control plane. Application proposals and provider publications are configuration records, not wallet grants, signing authority or execution activation. Publications become readable immediately without restarting the service. Immutable historical revisions remain available. Requires the documented scope and configured application or operator identity.
+
+| Parameter  | Location | Required | Schema                                                  |
+| ---------- | -------- | -------- | ------------------------------------------------------- |
+| `revision` | path     | yes      | `{"type":"string","pattern":"^(0\|[1-9][0-9]{0,19})$"}` |
+
+| Status | Content type             | Description      |
+| ------ | ------------------------ | ---------------- |
+| 200    | application/json         | Default Response |
+| 400    | application/problem+json | Problem response |
+| 401    | application/problem+json | Problem response |
+| 403    | application/problem+json | Problem response |
+| 409    | application/problem+json | Problem response |
+| 413    | application/problem+json | Problem response |
+| 415    | application/problem+json | Problem response |
+| 422    | application/problem+json | Problem response |
+| 429    | application/problem+json | Problem response |
+| 500    | application/problem+json | Problem response |
+| 503    | application/problem+json | Problem response |
+
+Success response schema:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "application_id",
+    "active_revision",
+    "revision",
+    "authorizes_spending"
+  ],
+  "properties": {
+    "application_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "active_revision": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,19})$"
+    },
+    "revision": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,19})$"
+    },
+    "publication": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "application_id",
+        "revision",
+        "previous_revision",
+        "policy_hash",
+        "policy",
+        "published_at",
+        "published_by"
+      ],
+      "properties": {
+        "application_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "revision": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,19})$"
+        },
+        "previous_revision": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,19})$"
+        },
+        "policy_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "policy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "version",
+            "enabled",
+            "chain_id",
+            "contracts",
+            "maximum_calls",
+            "maximum_native_value_wei",
+            "max_validity_seconds",
+            "claim_requirements"
+          ],
+          "properties": {
+            "version": {
+              "type": "string",
+              "enum": ["1"]
+            },
+            "enabled": {
+              "type": "boolean"
+            },
+            "chain_id": {
+              "type": "string",
+              "enum": ["eip155:84532"]
+            },
+            "contracts": {
+              "type": "array",
+              "maxItems": 32,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["address", "code_hash", "methods"],
+                "properties": {
+                  "address": {
+                    "type": "string",
+                    "pattern": "^0x[0-9a-fA-F]{40}$"
+                  },
+                  "code_hash": {
+                    "type": "string",
+                    "pattern": "^0x[0-9a-f]{64}$"
+                  },
+                  "implementation": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["address", "code_hash"],
+                    "properties": {
+                      "address": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                      },
+                      "code_hash": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-f]{64}$"
+                      }
+                    }
+                  },
+                  "methods": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 32,
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["signature", "maximum_value_wei"],
+                      "properties": {
+                        "signature": {
+                          "type": "string",
+                          "minLength": 3,
+                          "maxLength": 256
+                        },
+                        "maximum_value_wei": {
+                          "type": "string",
+                          "pattern": "^(0|[1-9][0-9]{0,77})$"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "maximum_calls": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 16
+            },
+            "maximum_native_value_wei": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]{0,77})$"
+            },
+            "max_validity_seconds": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 3600
+            },
+            "claim_requirements": {
+              "type": "array",
+              "maxItems": 16,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["name", "allowed_values", "max_age_seconds"],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9_]{0,63}$"
+                  },
+                  "allowed_values": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 32,
+                    "uniqueItems": true,
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128
+                    }
+                  },
+                  "max_age_seconds": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 31536000
+                  }
+                }
+              }
+            }
+          }
+        },
+        "published_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "proposal_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "published_by": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "authorizes_spending": {
+      "type": "boolean",
+      "enum": [false]
+    }
+  }
+}
+```
+
+## POST /v1/runtime-configuration/proposals
+
+Operation: `proposeRuntimeConfiguration`.
+
+Optional runtime configuration control plane. Application proposals and provider publications are configuration records, not wallet grants, signing authority or execution activation. Publications become readable immediately without restarting the service. Immutable historical revisions remain available. Requires the documented scope and configured application or operator identity.
+
+| Parameter         | Location | Required | Schema                                                                                                |
+| ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
+| `idempotency-key` | header   | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+
+Request body (application/json):
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["expected_revision", "policy"],
+  "properties": {
+    "expected_revision": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,19})$"
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "enabled",
+        "chain_id",
+        "contracts",
+        "maximum_calls",
+        "maximum_native_value_wei",
+        "max_validity_seconds",
+        "claim_requirements"
+      ],
+      "properties": {
+        "version": {
+          "type": "string",
+          "enum": ["1"]
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "chain_id": {
+          "type": "string",
+          "enum": ["eip155:84532"]
+        },
+        "contracts": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["address", "code_hash", "methods"],
+            "properties": {
+              "address": {
+                "type": "string",
+                "pattern": "^0x[0-9a-fA-F]{40}$"
+              },
+              "code_hash": {
+                "type": "string",
+                "pattern": "^0x[0-9a-f]{64}$"
+              },
+              "implementation": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["address", "code_hash"],
+                "properties": {
+                  "address": {
+                    "type": "string",
+                    "pattern": "^0x[0-9a-fA-F]{40}$"
+                  },
+                  "code_hash": {
+                    "type": "string",
+                    "pattern": "^0x[0-9a-f]{64}$"
+                  }
+                }
+              },
+              "methods": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 32,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["signature", "maximum_value_wei"],
+                  "properties": {
+                    "signature": {
+                      "type": "string",
+                      "minLength": 3,
+                      "maxLength": 256
+                    },
+                    "maximum_value_wei": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]{0,77})$"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "maximum_calls": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16
+        },
+        "maximum_native_value_wei": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,77})$"
+        },
+        "max_validity_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3600
+        },
+        "claim_requirements": {
+          "type": "array",
+          "maxItems": 16,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "allowed_values", "max_age_seconds"],
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]{0,63}$"
+              },
+              "allowed_values": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 32,
+                "uniqueItems": true,
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              },
+              "max_age_seconds": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 31536000
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+| Status | Content type             | Description      |
+| ------ | ------------------------ | ---------------- |
+| 200    | application/json         | Default Response |
+| 400    | application/problem+json | Problem response |
+| 401    | application/problem+json | Problem response |
+| 403    | application/problem+json | Problem response |
+| 409    | application/problem+json | Problem response |
+| 413    | application/problem+json | Problem response |
+| 415    | application/problem+json | Problem response |
+| 422    | application/problem+json | Problem response |
+| 429    | application/problem+json | Problem response |
+| 500    | application/problem+json | Problem response |
+| 503    | application/problem+json | Problem response |
+
+Success response schema:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "proposal_id",
+    "application_id",
+    "based_on_revision",
+    "policy_hash",
+    "policy",
+    "created_at"
+  ],
+  "properties": {
+    "proposal_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "application_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "based_on_revision": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,19})$"
+    },
+    "policy_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "enabled",
+        "chain_id",
+        "contracts",
+        "maximum_calls",
+        "maximum_native_value_wei",
+        "max_validity_seconds",
+        "claim_requirements"
+      ],
+      "properties": {
+        "version": {
+          "type": "string",
+          "enum": ["1"]
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "chain_id": {
+          "type": "string",
+          "enum": ["eip155:84532"]
+        },
+        "contracts": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["address", "code_hash", "methods"],
+            "properties": {
+              "address": {
+                "type": "string",
+                "pattern": "^0x[0-9a-fA-F]{40}$"
+              },
+              "code_hash": {
+                "type": "string",
+                "pattern": "^0x[0-9a-f]{64}$"
+              },
+              "implementation": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["address", "code_hash"],
+                "properties": {
+                  "address": {
+                    "type": "string",
+                    "pattern": "^0x[0-9a-fA-F]{40}$"
+                  },
+                  "code_hash": {
+                    "type": "string",
+                    "pattern": "^0x[0-9a-f]{64}$"
+                  }
+                }
+              },
+              "methods": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 32,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["signature", "maximum_value_wei"],
+                  "properties": {
+                    "signature": {
+                      "type": "string",
+                      "minLength": 3,
+                      "maxLength": 256
+                    },
+                    "maximum_value_wei": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]{0,77})$"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "maximum_calls": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16
+        },
+        "maximum_native_value_wei": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,77})$"
+        },
+        "max_validity_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3600
+        },
+        "claim_requirements": {
+          "type": "array",
+          "maxItems": 16,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "allowed_values", "max_age_seconds"],
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]{0,63}$"
+              },
+              "allowed_values": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 32,
+                "uniqueItems": true,
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              },
+              "max_age_seconds": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 31536000
+              }
+            }
+          }
+        }
+      }
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}
+```
+
+## GET /v1/runtime-configuration/proposals/{proposalId}
+
+Operation: `readRuntimeConfigurationProposal`.
+
+Optional runtime configuration control plane. Application proposals and provider publications are configuration records, not wallet grants, signing authority or execution activation. Publications become readable immediately without restarting the service. Immutable historical revisions remain available. Requires the documented scope and configured application or operator identity.
+
+| Parameter    | Location | Required | Schema                                                                                                |
+| ------------ | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
+| `proposalId` | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+
+| Status | Content type             | Description      |
+| ------ | ------------------------ | ---------------- |
+| 200    | application/json         | Default Response |
+| 400    | application/problem+json | Problem response |
+| 401    | application/problem+json | Problem response |
+| 403    | application/problem+json | Problem response |
+| 409    | application/problem+json | Problem response |
+| 413    | application/problem+json | Problem response |
+| 415    | application/problem+json | Problem response |
+| 422    | application/problem+json | Problem response |
+| 429    | application/problem+json | Problem response |
+| 500    | application/problem+json | Problem response |
+| 503    | application/problem+json | Problem response |
+
+Success response schema:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "proposal_id",
+    "application_id",
+    "based_on_revision",
+    "policy_hash",
+    "policy",
+    "created_at"
+  ],
+  "properties": {
+    "proposal_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "application_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "based_on_revision": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,19})$"
+    },
+    "policy_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "enabled",
+        "chain_id",
+        "contracts",
+        "maximum_calls",
+        "maximum_native_value_wei",
+        "max_validity_seconds",
+        "claim_requirements"
+      ],
+      "properties": {
+        "version": {
+          "type": "string",
+          "enum": ["1"]
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "chain_id": {
+          "type": "string",
+          "enum": ["eip155:84532"]
+        },
+        "contracts": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["address", "code_hash", "methods"],
+            "properties": {
+              "address": {
+                "type": "string",
+                "pattern": "^0x[0-9a-fA-F]{40}$"
+              },
+              "code_hash": {
+                "type": "string",
+                "pattern": "^0x[0-9a-f]{64}$"
+              },
+              "implementation": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["address", "code_hash"],
+                "properties": {
+                  "address": {
+                    "type": "string",
+                    "pattern": "^0x[0-9a-fA-F]{40}$"
+                  },
+                  "code_hash": {
+                    "type": "string",
+                    "pattern": "^0x[0-9a-f]{64}$"
+                  }
+                }
+              },
+              "methods": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 32,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["signature", "maximum_value_wei"],
+                  "properties": {
+                    "signature": {
+                      "type": "string",
+                      "minLength": 3,
+                      "maxLength": 256
+                    },
+                    "maximum_value_wei": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]{0,77})$"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "maximum_calls": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16
+        },
+        "maximum_native_value_wei": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,77})$"
+        },
+        "max_validity_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3600
+        },
+        "claim_requirements": {
+          "type": "array",
+          "maxItems": 16,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "allowed_values", "max_age_seconds"],
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]{0,63}$"
+              },
+              "allowed_values": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 32,
+                "uniqueItems": true,
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              },
+              "max_age_seconds": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 31536000
+              }
+            }
+          }
+        }
+      }
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}
+```
+
+## POST /v1/runtime-configuration/proposals/{proposalId}/publish
+
+Operation: `publishRuntimeConfiguration`.
+
+Optional runtime configuration control plane. Application proposals and provider publications are configuration records, not wallet grants, signing authority or execution activation. Publications become readable immediately without restarting the service. Immutable historical revisions remain available. Requires the documented scope and configured application or operator identity.
+
+| Parameter         | Location | Required | Schema                                                                                                |
+| ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
+| `proposalId`      | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+| `idempotency-key` | header   | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+
+Request body (application/json):
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["expected_revision"],
+  "properties": {
+    "expected_revision": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,19})$"
+    }
+  }
+}
+```
+
+| Status | Content type             | Description      |
+| ------ | ------------------------ | ---------------- |
+| 200    | application/json         | Default Response |
+| 400    | application/problem+json | Problem response |
+| 401    | application/problem+json | Problem response |
+| 403    | application/problem+json | Problem response |
+| 409    | application/problem+json | Problem response |
+| 413    | application/problem+json | Problem response |
+| 415    | application/problem+json | Problem response |
+| 422    | application/problem+json | Problem response |
+| 429    | application/problem+json | Problem response |
+| 500    | application/problem+json | Problem response |
+| 503    | application/problem+json | Problem response |
+
+Success response schema:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "application_id",
+    "revision",
+    "previous_revision",
+    "policy_hash",
+    "policy",
+    "published_at",
+    "published_by"
+  ],
+  "properties": {
+    "application_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "revision": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,19})$"
+    },
+    "previous_revision": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,19})$"
+    },
+    "policy_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "enabled",
+        "chain_id",
+        "contracts",
+        "maximum_calls",
+        "maximum_native_value_wei",
+        "max_validity_seconds",
+        "claim_requirements"
+      ],
+      "properties": {
+        "version": {
+          "type": "string",
+          "enum": ["1"]
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "chain_id": {
+          "type": "string",
+          "enum": ["eip155:84532"]
+        },
+        "contracts": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["address", "code_hash", "methods"],
+            "properties": {
+              "address": {
+                "type": "string",
+                "pattern": "^0x[0-9a-fA-F]{40}$"
+              },
+              "code_hash": {
+                "type": "string",
+                "pattern": "^0x[0-9a-f]{64}$"
+              },
+              "implementation": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["address", "code_hash"],
+                "properties": {
+                  "address": {
+                    "type": "string",
+                    "pattern": "^0x[0-9a-fA-F]{40}$"
+                  },
+                  "code_hash": {
+                    "type": "string",
+                    "pattern": "^0x[0-9a-f]{64}$"
+                  }
+                }
+              },
+              "methods": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 32,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["signature", "maximum_value_wei"],
+                  "properties": {
+                    "signature": {
+                      "type": "string",
+                      "minLength": 3,
+                      "maxLength": 256
+                    },
+                    "maximum_value_wei": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]{0,77})$"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "maximum_calls": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16
+        },
+        "maximum_native_value_wei": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,77})$"
+        },
+        "max_validity_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3600
+        },
+        "claim_requirements": {
+          "type": "array",
+          "maxItems": 16,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "allowed_values", "max_age_seconds"],
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]{0,63}$"
+              },
+              "allowed_values": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 32,
+                "uniqueItems": true,
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              },
+              "max_age_seconds": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 31536000
+              }
+            }
+          }
+        }
+      }
+    },
+    "published_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "proposal_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "published_by": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}
+```
+
+## POST /v1/runtime-configuration/applications/{applicationId}/revisions
+
+Operation: `updateRuntimeConfiguration`.
+
+Optional runtime configuration control plane. Application proposals and provider publications are configuration records, not wallet grants, signing authority or execution activation. Publications become readable immediately without restarting the service. Immutable historical revisions remain available. Requires the documented scope and configured application or operator identity.
+
+| Parameter         | Location | Required | Schema                                                                                                |
+| ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
+| `applicationId`   | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{64}$"}`                                                        |
+| `idempotency-key` | header   | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+
+Request body (application/json):
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["expected_revision", "policy"],
+  "properties": {
+    "expected_revision": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,19})$"
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "enabled",
+        "chain_id",
+        "contracts",
+        "maximum_calls",
+        "maximum_native_value_wei",
+        "max_validity_seconds",
+        "claim_requirements"
+      ],
+      "properties": {
+        "version": {
+          "type": "string",
+          "enum": ["1"]
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "chain_id": {
+          "type": "string",
+          "enum": ["eip155:84532"]
+        },
+        "contracts": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["address", "code_hash", "methods"],
+            "properties": {
+              "address": {
+                "type": "string",
+                "pattern": "^0x[0-9a-fA-F]{40}$"
+              },
+              "code_hash": {
+                "type": "string",
+                "pattern": "^0x[0-9a-f]{64}$"
+              },
+              "implementation": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["address", "code_hash"],
+                "properties": {
+                  "address": {
+                    "type": "string",
+                    "pattern": "^0x[0-9a-fA-F]{40}$"
+                  },
+                  "code_hash": {
+                    "type": "string",
+                    "pattern": "^0x[0-9a-f]{64}$"
+                  }
+                }
+              },
+              "methods": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 32,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["signature", "maximum_value_wei"],
+                  "properties": {
+                    "signature": {
+                      "type": "string",
+                      "minLength": 3,
+                      "maxLength": 256
+                    },
+                    "maximum_value_wei": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]{0,77})$"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "maximum_calls": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16
+        },
+        "maximum_native_value_wei": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,77})$"
+        },
+        "max_validity_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3600
+        },
+        "claim_requirements": {
+          "type": "array",
+          "maxItems": 16,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "allowed_values", "max_age_seconds"],
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]{0,63}$"
+              },
+              "allowed_values": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 32,
+                "uniqueItems": true,
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              },
+              "max_age_seconds": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 31536000
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+| Status | Content type             | Description      |
+| ------ | ------------------------ | ---------------- |
+| 200    | application/json         | Default Response |
+| 400    | application/problem+json | Problem response |
+| 401    | application/problem+json | Problem response |
+| 403    | application/problem+json | Problem response |
+| 409    | application/problem+json | Problem response |
+| 413    | application/problem+json | Problem response |
+| 415    | application/problem+json | Problem response |
+| 422    | application/problem+json | Problem response |
+| 429    | application/problem+json | Problem response |
+| 500    | application/problem+json | Problem response |
+| 503    | application/problem+json | Problem response |
+
+Success response schema:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "application_id",
+    "revision",
+    "previous_revision",
+    "policy_hash",
+    "policy",
+    "published_at",
+    "published_by"
+  ],
+  "properties": {
+    "application_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "revision": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,19})$"
+    },
+    "previous_revision": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,19})$"
+    },
+    "policy_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "enabled",
+        "chain_id",
+        "contracts",
+        "maximum_calls",
+        "maximum_native_value_wei",
+        "max_validity_seconds",
+        "claim_requirements"
+      ],
+      "properties": {
+        "version": {
+          "type": "string",
+          "enum": ["1"]
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "chain_id": {
+          "type": "string",
+          "enum": ["eip155:84532"]
+        },
+        "contracts": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["address", "code_hash", "methods"],
+            "properties": {
+              "address": {
+                "type": "string",
+                "pattern": "^0x[0-9a-fA-F]{40}$"
+              },
+              "code_hash": {
+                "type": "string",
+                "pattern": "^0x[0-9a-f]{64}$"
+              },
+              "implementation": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["address", "code_hash"],
+                "properties": {
+                  "address": {
+                    "type": "string",
+                    "pattern": "^0x[0-9a-fA-F]{40}$"
+                  },
+                  "code_hash": {
+                    "type": "string",
+                    "pattern": "^0x[0-9a-f]{64}$"
+                  }
+                }
+              },
+              "methods": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 32,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["signature", "maximum_value_wei"],
+                  "properties": {
+                    "signature": {
+                      "type": "string",
+                      "minLength": 3,
+                      "maxLength": 256
+                    },
+                    "maximum_value_wei": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]{0,77})$"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "maximum_calls": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16
+        },
+        "maximum_native_value_wei": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,77})$"
+        },
+        "max_validity_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3600
+        },
+        "claim_requirements": {
+          "type": "array",
+          "maxItems": 16,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "allowed_values", "max_age_seconds"],
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]{0,63}$"
+              },
+              "allowed_values": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 32,
+                "uniqueItems": true,
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              },
+              "max_age_seconds": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 31536000
+              }
+            }
+          }
+        }
+      }
+    },
+    "published_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "proposal_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "published_by": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}
+```

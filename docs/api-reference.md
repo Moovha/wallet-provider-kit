@@ -586,6 +586,7 @@ See the [HTTP reference](http-reference.md).
 
 ```ts
 export interface ServerOptions {
+  runtimeConfiguration?: RuntimeConfigurationService;
   authenticate?: Authenticate;
   service?: EmbeddedWalletService;
   /** Enabling enrollment also gates the provisioning route on current provider acceptance. */
@@ -1370,6 +1371,7 @@ export interface ProviderState {
       activeRevision?: string;
       transportRevision?: string;
       accessMode?: 'application' | 'hosted';
+      runtimeConfiguration?: import('../runtime-configuration/service.js').RuntimeConfigurationState;
     }
   >;
   requests: Record<string, AccessRequest>;
@@ -2424,6 +2426,13 @@ Import from `@moovha/wallet-provider-kit/deployment`. [Integration guide](setup.
 - [ReplacementPolicy](#replacementpolicy)
 - [ReplacementProposal](#replacementproposal)
 - [ReplacementStatus](#replacementstatus)
+- [runtimeApplicationId](#runtimeapplicationid)
+- [RuntimeConfigurationOptions](#runtimeconfigurationoptions)
+- [RuntimeConfigurationService](#runtimeconfigurationservice)
+- [RuntimePolicy](#runtimepolicy)
+- [RuntimePolicyChange](#runtimepolicychange)
+- [RuntimePolicyProposal](#runtimepolicyproposal)
+- [RuntimePolicyRevision](#runtimepolicyrevision)
 - [SafeAccountBinding](#safeaccountbinding)
 - [SafeExecutionQueue](#safeexecutionqueue)
 - [SafeQueueRecord](#safequeuerecord)
@@ -3268,6 +3277,7 @@ export type PinnedReplacementPolicy = {
 
 ```ts
 export interface ProviderConfiguration {
+  runtimeConfiguration?: RuntimeConfigurationOptions;
   configVersion: 1;
   profile: 'provider-service-v1';
   policy: OnboardingPolicy;
@@ -3543,6 +3553,162 @@ export interface ReplacementStatus {
     | 'authority-or-preparation-denied'
     | 'evidence-unavailable';
   last_attempt_at?: string;
+}
+```
+
+### runtimeApplicationId
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/runtime-configuration/service.ts).
+
+```ts
+export declare const runtimeApplicationId: (
+  issuer: string,
+  clientId: string,
+) => string;
+```
+
+### RuntimeConfigurationOptions
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/runtime-configuration/service.ts).
+
+```ts
+export interface RuntimeConfigurationOptions {
+  operators: {
+    issuer: string;
+    clientId: string;
+    subject: string;
+  }[];
+}
+```
+
+### RuntimeConfigurationService
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/runtime-configuration/service.ts).
+
+```ts
+/** Durable configuration control plane. Published records do not authorize wallet effects. */
+export declare class RuntimeConfigurationService {
+  readonly onboardingPolicy: ResolvedPolicy;
+  constructor(
+    onboardingPolicy: ResolvedPolicy,
+    store: OnboardingStore,
+    options: RuntimeConfigurationOptions,
+    deploymentRevision: string,
+    transportRevision?: string | undefined,
+  );
+  propose(
+    context: AuthorityContext,
+    input: RuntimePolicyChange,
+  ): Promise<RuntimePolicyProposal>;
+  read(
+    principal: VerifiedPrincipal,
+    revision?: string,
+  ): Promise<{
+    authorizes_spending: false;
+    publication?: RuntimePolicyRevision | undefined;
+    application_id: string;
+    active_revision: string;
+    revision: string;
+  }>;
+  readApplication(
+    principal: VerifiedPrincipal,
+    applicationId: string,
+  ): Promise<{
+    authorizes_spending: false;
+    publication?: RuntimePolicyRevision | undefined;
+    application_id: string;
+    active_revision: string;
+    revision: string;
+  }>;
+  proposal(
+    principal: VerifiedPrincipal,
+    proposalId: string,
+  ): Promise<RuntimePolicyProposal>;
+  publish(
+    context: AuthorityContext,
+    proposalId: string,
+    expectedRevision: string,
+  ): Promise<RuntimePolicyRevision>;
+  update(
+    context: AuthorityContext,
+    applicationId: string,
+    input: RuntimePolicyChange,
+  ): Promise<RuntimePolicyRevision>;
+}
+```
+
+### RuntimePolicy
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/runtime-configuration/service.ts).
+
+```ts
+export interface RuntimePolicy {
+  version: '1';
+  enabled: boolean;
+  chain_id: 'eip155:84532';
+  contracts: {
+    address: string;
+    code_hash: string;
+    implementation?: {
+      address: string;
+      code_hash: string;
+    };
+    methods: {
+      signature: string;
+      maximum_value_wei: string;
+    }[];
+  }[];
+  maximum_calls: number;
+  maximum_native_value_wei: string;
+  max_validity_seconds: number;
+  claim_requirements: {
+    name: string;
+    allowed_values: string[];
+    max_age_seconds: number;
+  }[];
+}
+```
+
+### RuntimePolicyChange
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/runtime-configuration/service.ts).
+
+```ts
+export interface RuntimePolicyChange {
+  expected_revision: string;
+  policy: RuntimePolicy;
+}
+```
+
+### RuntimePolicyProposal
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/runtime-configuration/service.ts).
+
+```ts
+export interface RuntimePolicyProposal {
+  proposal_id: string;
+  application_id: string;
+  based_on_revision: string;
+  policy_hash: string;
+  policy: RuntimePolicy;
+  created_at: string;
+}
+```
+
+### RuntimePolicyRevision
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/runtime-configuration/service.ts).
+
+```ts
+export interface RuntimePolicyRevision {
+  published_by: string;
+  application_id: string;
+  revision: string;
+  previous_revision: string;
+  policy_hash: string;
+  policy: RuntimePolicy;
+  published_at: string;
+  proposal_id?: string;
 }
 ```
 

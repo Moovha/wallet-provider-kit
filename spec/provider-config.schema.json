@@ -759,6 +759,8 @@
                 "items": {
                   "type": "string",
                   "enum": [
+                    "wallet:configuration:read",
+                    "wallet:configuration:propose",
                     "wallet:access",
                     "wallet:access:read",
                     "wallet:account:read",
@@ -1656,6 +1658,40 @@
                     }
                   }
                 }
+              }
+            }
+          }
+        }
+      }
+    },
+    "runtimeConfiguration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operators"],
+      "properties": {
+        "operators": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 16,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["issuer", "clientId", "subject"],
+            "properties": {
+              "issuer": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "clientId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "subject": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
               }
             }
           }

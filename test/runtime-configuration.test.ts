@@ -1,0 +1,508 @@
+import { randomUUID } from 'node:crypto';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
+import { afterEach, describe, expect, it } from 'vitest';
+import { defineOnboardingPolicy } from '../src/onboarding/policy.js';
+import {
+  openProviderDatabase,
+  type ProviderDatabase,
+} from '../src/storage/index.js';
+import type {
+  AuthorityContext,
+  VerifiedPrincipal,
+} from '../src/domain/principal.js';
+import {
+  RuntimeConfigurationService,
+  runtimeApplicationId,
+  type RuntimePolicy,
+} from '../src/runtime-configuration/service.js';
+import { createServer } from '../src/service/server.js';
+import { AuthenticationError } from '../src/service/auth.js';
+import { validateProviderConfiguration } from '../src/deployment/config.js';
+import { runtimeConfigurationSchema } from '../src/runtime-configuration/schemas.js';
+import configurationSchema from '../spec/provider-config.schema.json' with { type: 'json' };
+
+const issuer = 'https://issuer.example.test';
+const policy = defineOnboardingPolicy({
+  version: '1',
+  provider: {
+    name: 'Offline provider',
+    origin: 'https://wallet.example.test',
+    privacyUrl: 'https://wallet.example.test/privacy',
+  },
+  access: { mode: 'application' },
+  identity: {
+    application: { verificationLevel: 'verified', requiredFields: ['country'] },
+  },
+  applications: ['first', 'second'].map((clientId) => ({
+    issuer,
+    clientId,
+    name: clientId,
+    assertionTrust: { agreement: 'offline-trust' },
+  })),
+});
+const application = (clientId = 'first'): VerifiedPrincipal => ({
+  issuer,
+  clientId,
+  subject: 'service',
+  scopes: ['wallet:configuration:read', 'wallet:configuration:propose'],
+});
+const operator: VerifiedPrincipal = {
+  issuer,
+  clientId: 'operator',
+  subject: 'provider-operator',
+  scopes: ['wallet:configuration:write'],
+};
+const options = {
+  operators: [
+    { issuer, clientId: operator.clientId, subject: operator.subject },
+  ],
+};
+const context = (principal = application()): AuthorityContext => ({
+  principal,
+  idempotencyKey: randomUUID(),
+});
+function document(): RuntimePolicy {
+  return {
+    version: '1',
+    enabled: true,
+    chain_id: 'eip155:84532',
+    maximum_calls: 4,
+    maximum_native_value_wei: '10',
+    max_validity_seconds: 120,
+    contracts: [
+      {
+        address: '0x1111111111111111111111111111111111111111',
+        code_hash: '0x' + '1'.repeat(64),
+        methods: [
+          {
+            signature: 'customMethod(uint256,address)',
+            maximum_value_wei: '0',
+          },
+        ],
+      },
+    ],
+    claim_requirements: [
+      { name: 'country', allowed_values: ['ZA', 'ZW'], max_age_seconds: 3600 },
+    ],
+  };
+}
+const directories: string[] = [];
+const databases: ProviderDatabase[] = [];
+const servers: Awaited<ReturnType<typeof createServer>>[] = [];
+afterEach(async () => {
+  for (const app of servers.splice(0)) await app.close();
+  for (const db of databases.splice(0)) db.close();
+  await Promise.all(
+    directories
+      .splice(0)
+      .map((directory) => rm(directory, { recursive: true, force: true })),
+  );
+});
+async function fixture() {
+  const directory = await mkdtemp(join(tmpdir(), 'wpk-runtime-'));
+  directories.push(directory);
+  const db = openProviderDatabase({ directory, initialize: true });
+  databases.push(db);
+  await db.onboardingStore.transaction((state) => {
+    state.deploymentBindings = {
+      'service-v1': {
+        origin: policy.provider.origin,
+        provider: 'offline',
+        binding: 'offline',
+        activeRevision: 'deployment-1',
+      },
+    };
+  });
+  const service = new RuntimeConfigurationService(
+    policy,
+    db.onboardingStore,
+    options,
+    'deployment-1',
+  );
+  return { directory, db, service };
+}
+const denied = { code: 'wallet_authorization_denied' };
+const conflicted = { code: 'wallet_attempt_conflict' };
+
+describe('runtime application contracts and provider policies', () => {
+  it('publishes and updates policies without replacing a running service, retaining exact history', async () => {
+    const { service, db } = await fixture();
+    const secondHost = new RuntimeConfigurationService(
+      policy,
+      db.onboardingStore,
+      options,
+      'deployment-1',
+    );
+    expect(await service.read(application())).toMatchObject({
+      active_revision: '0',
+      authorizes_spending: false,
+    });
+    const proposal = await service.propose(context(), {
+      expected_revision: '0',
+      policy: document(),
+    });
+    expect((await service.read(application())).active_revision).toBe('0');
+    const published = await service.publish(
+      context(operator),
+      proposal.proposal_id,
+      '0',
+    );
+    expect(published).toMatchObject({
+      revision: '1',
+      previous_revision: '0',
+      proposal_id: proposal.proposal_id,
+    });
+    expect((await secondHost.read(application())).publication).toEqual(
+      published,
+    );
+    const update = document();
+    update.enabled = false;
+    const next = await service.update(
+      context(operator),
+      proposal.application_id,
+      { expected_revision: '1', policy: update },
+    );
+    expect(next).toMatchObject({
+      revision: '2',
+      previous_revision: '1',
+      policy: { enabled: false },
+    });
+    expect((await secondHost.read(application(), '1')).publication).toEqual(
+      published,
+    );
+    expect((await secondHost.read(application())).publication).toEqual(next);
+    expect(
+      (await secondHost.readApplication(operator, proposal.application_id))
+        .publication,
+    ).toEqual(next);
+    await expect(
+      service.readApplication(application(), proposal.application_id),
+    ).rejects.toMatchObject(denied);
+    expect((await service.read(application('second'))).active_revision).toBe(
+      '0',
+    );
+  });
+  it('preserves registry state and normalized method signatures across a process restart', async () => {
+    const { service, db, directory } = await fixture();
+    const proposal = await service.propose(context(), {
+      expected_revision: '0',
+      policy: document(),
+    });
+    const publication = await service.publish(
+      context(operator),
+      proposal.proposal_id,
+      '0',
+    );
+    db.close();
+    const restored = openProviderDatabase({ directory });
+    databases.push(restored);
+    const registry = new RuntimeConfigurationService(
+      policy,
+      restored.onboardingStore,
+      options,
+      'deployment-1',
+    );
+    expect((await registry.read(application())).publication).toEqual(
+      publication,
+    );
+    expect(await registry.proposal(operator, proposal.proposal_id)).toEqual(
+      proposal,
+    );
+  });
+  it('scopes proposals to the registered application and never treats write scope as operator identity', async () => {
+    const { service } = await fixture();
+    const proposal = await service.propose(context(), {
+      expected_revision: '0',
+      policy: document(),
+    });
+    await expect(
+      service.proposal(application('second'), proposal.proposal_id),
+    ).rejects.toMatchObject(denied);
+    await expect(
+      service.read({ ...application(), issuer: 'https://other.example.test' }),
+    ).rejects.toMatchObject(denied);
+    await expect(
+      service.publish(
+        context({ ...application(), scopes: ['wallet:configuration:write'] }),
+        proposal.proposal_id,
+        '0',
+      ),
+    ).rejects.toMatchObject(denied);
+    await expect(
+      service.publish(
+        context({ ...operator, subject: 'wrong' }),
+        proposal.proposal_id,
+        '0',
+      ),
+    ).rejects.toMatchObject(denied);
+    await expect(
+      service.propose(context({ ...application(), scopes: [] }), {
+        expected_revision: '0',
+        policy: document(),
+      }),
+    ).rejects.toMatchObject(denied);
+    expect(
+      await service.proposal(
+        {
+          ...application(),
+          scopes: [...application().scopes, 'wallet:configuration:write'],
+        },
+        proposal.proposal_id,
+      ),
+    ).toEqual(proposal);
+  });
+  it('deduplicates canonical retries and never reactivates an old revision during publication replay', async () => {
+    const { service } = await fixture();
+    const request = context(),
+      change = { expected_revision: '0', policy: document() };
+    const proposed = await service.propose(request, change);
+    change.policy.claim_requirements[0].allowed_values.reverse();
+    expect(await service.propose(request, change)).toEqual(proposed);
+    change.policy.maximum_calls = 5;
+    await expect(service.propose(request, change)).rejects.toMatchObject(
+      conflicted,
+    );
+    const publish = context(operator),
+      first = await service.publish(publish, proposed.proposal_id, '0');
+    await service.update(context(operator), proposed.application_id, {
+      expected_revision: '1',
+      policy: document(),
+    });
+    expect(await service.publish(publish, proposed.proposal_id, '0')).toEqual(
+      first,
+    );
+    expect((await service.read(application())).active_revision).toBe('2');
+    await expect(
+      service.publish(context(operator), proposed.proposal_id, '0'),
+    ).rejects.toMatchObject(conflicted);
+  });
+  it('admits only one concurrent publication and rejects stale updates and proposals', async () => {
+    const { service } = await fixture();
+    const app = runtimeApplicationId(issuer, 'first');
+    const results = await Promise.allSettled([
+      service.update(context(operator), app, {
+        expected_revision: '0',
+        policy: document(),
+      }),
+      service.update(context(operator), app, {
+        expected_revision: '0',
+        policy: document(),
+      }),
+    ]);
+    expect(
+      results.filter((result) => result.status === 'fulfilled'),
+    ).toHaveLength(1);
+    expect(
+      results.filter((result) => result.status === 'rejected'),
+    ).toHaveLength(1);
+    await expect(
+      service.propose(context(), {
+        expected_revision: '0',
+        policy: document(),
+      }),
+    ).rejects.toMatchObject(conflicted);
+  });
+  it('fences readers and writers after deployment or transport authority changes', async () => {
+    const { service, db } = await fixture();
+    await db.onboardingStore.transaction((state) => {
+      state.deploymentBindings!['service-v1'].transportRevision = 'new-key';
+    });
+    await expect(service.read(application())).rejects.toMatchObject(denied);
+    await expect(
+      service.propose(context(), {
+        expected_revision: '0',
+        policy: document(),
+      }),
+    ).rejects.toMatchObject(denied);
+    const current = new RuntimeConfigurationService(
+      policy,
+      db.onboardingStore,
+      options,
+      'deployment-1',
+      'new-key',
+    );
+    expect((await current.read(application())).active_revision).toBe('0');
+    await db.onboardingStore.transaction((state) => {
+      state.deploymentBindings!['service-v1'].activeRevision = 'deployment-2';
+    });
+    await expect(
+      current.update(context(operator), runtimeApplicationId(issuer, 'first'), {
+        expected_revision: '0',
+        policy: document(),
+      }),
+    ).rejects.toMatchObject(denied);
+  });
+  it.each([
+    'signature',
+    'chain',
+    'duplicate',
+    'zero',
+    'value',
+    'unknown',
+    'claims',
+    'overflow',
+  ] as const)('rejects invalid %s before creating a proposal', async (kind) => {
+    const { service } = await fixture();
+    const value = document();
+    if (kind === 'signature')
+      value.contracts[0].methods[0].signature =
+        'function customMethod(uint256 x,address to)';
+    if (kind === 'chain') value.chain_id = 'eip155:1' as never;
+    if (kind === 'duplicate')
+      value.contracts.push(structuredClone(value.contracts[0]));
+    if (kind === 'zero') value.contracts[0].address = '0x' + '0'.repeat(40);
+    if (kind === 'value')
+      value.contracts[0].methods[0].maximum_value_wei = '11';
+    if (kind === 'unknown') Object.assign(value, { signer: 'caller' });
+    if (kind === 'claims')
+      value.claim_requirements.push(
+        structuredClone(value.claim_requirements[0]),
+      );
+    if (kind === 'overflow')
+      value.maximum_native_value_wei = String(2n ** 256n);
+    await expect(
+      service.propose(context(), { expected_revision: '0', policy: value }),
+    ).rejects.toMatchObject({ code: 'wallet_provider_input' });
+    expect((await service.read(application())).active_revision).toBe('0');
+  });
+  it('does not create financial approvals, admissions, attempts or budgets', async () => {
+    const { service, directory } = await fixture();
+    const proposal = await service.propose(context(), {
+      expected_revision: '0',
+      policy: document(),
+    });
+    await service.publish(context(operator), proposal.proposal_id, '0');
+    const database = new DatabaseSync(join(directory, 'provider.sqlite'), {
+      readOnly: true,
+    });
+    try {
+      for (const table of ['approvals', 'admissions', 'attempts', 'budgets'])
+        expect(
+          database.prepare(`SELECT count(*) AS count FROM ${table}`).get()
+            ?.count,
+        ).toBe(0);
+      expect(database.prepare('PRAGMA user_version').get()?.user_version).toBe(
+        1,
+      );
+    } finally {
+      database.close();
+    }
+  });
+  it('validates bootstrap operator separation and keeps its generated configuration schema current', async () => {
+    const input = JSON.parse(
+      await readFile(
+        new URL('../docs/provider.config.example.json', import.meta.url),
+        'utf8',
+      ),
+    );
+    input.runtimeConfiguration = structuredClone(options);
+    // The sample issuer is independent of this fixture's issuer.
+    input.runtimeConfiguration.operators[0].issuer = input.oauth.issuer;
+    expect(
+      validateProviderConfiguration(input).runtimeConfiguration,
+    ).toBeDefined();
+    input.runtimeConfiguration.operators[0].clientId =
+      input.policy.applications[0].clientId;
+    await expect(async () =>
+      validateProviderConfiguration(input),
+    ).rejects.toMatchObject({ name: 'Error' });
+    expect(configurationSchema.properties.runtimeConfiguration).toEqual(
+      runtimeConfigurationSchema,
+    );
+  });
+});
+
+describe('runtime configuration HTTP contract', () => {
+  it('supports application proposal, operator publication and live discovery with no wallet activation', async () => {
+    const { service } = await fixture();
+    const app = await createServer({
+      documentation: false,
+      runtimeConfiguration: service,
+      authenticate: async (token, scope) => {
+        if (!token) throw new AuthenticationError(401);
+        const principal =
+          token === 'Bearer operator' ? operator : application();
+        if (!principal.scopes.includes(scope))
+          throw new AuthenticationError(403);
+        return principal;
+      },
+    });
+    servers.push(app);
+    const proposal = await app.inject({
+      method: 'POST',
+      url: '/v1/runtime-configuration/proposals',
+      headers: { authorization: 'Bearer app', 'idempotency-key': randomUUID() },
+      payload: { expected_revision: '0', policy: document() },
+    });
+    expect(proposal.statusCode).toBe(200);
+    const publication = await app.inject({
+      method: 'POST',
+      url: `/v1/runtime-configuration/proposals/${proposal.json().proposal_id}/publish`,
+      headers: {
+        authorization: 'Bearer operator',
+        'idempotency-key': randomUUID(),
+      },
+      payload: { expected_revision: '0' },
+    });
+    expect(publication.statusCode).toBe(200);
+    const current = await app.inject({
+      url: '/v1/runtime-configuration',
+      headers: { authorization: 'Bearer app' },
+    });
+    expect(current.json()).toMatchObject({
+      active_revision: '1',
+      authorizes_spending: false,
+    });
+    expect((await app.inject('/health/ready')).statusCode).toBe(503);
+    expect((await app.inject('/v1/runtime-configuration')).statusCode).toBe(
+      401,
+    );
+    expect(
+      (
+        await app.inject({
+          method: 'POST',
+          url: `/v1/runtime-configuration/applications/${proposal.json().application_id}/revisions`,
+          headers: {
+            authorization: 'Bearer app',
+            'idempotency-key': randomUUID(),
+          },
+          payload: { expected_revision: '1', policy: document() },
+        })
+      ).statusCode,
+    ).toBe(403);
+    expect(
+      (
+        await app.inject({
+          method: 'POST',
+          url: '/v1/runtime-configuration/proposals',
+          headers: {
+            authorization: 'Bearer app',
+            'idempotency-key': randomUUID(),
+          },
+          payload: {
+            expected_revision: '1',
+            policy: document(),
+            application_id: 'caller-selected',
+          },
+        })
+      ).statusCode,
+    ).toBe(400);
+  });
+  it('keeps optional endpoints unavailable without configured runtime authority', async () => {
+    const app = await createServer({ documentation: false });
+    servers.push(app);
+    expect((await app.inject('/v1/runtime-configuration')).statusCode).toBe(
+      503,
+    );
+    const result = await app.inject({
+      method: 'POST',
+      url: '/v1/runtime-configuration/proposals',
+      headers: { 'idempotency-key': randomUUID() },
+      payload: { expected_revision: '0', policy: document() },
+    });
+    expect(result.statusCode).toBe(503);
+  });
+});

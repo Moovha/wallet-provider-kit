@@ -37,6 +37,14 @@ entrypoint and verify the resulting business effect separately.
 
 ## Freeze contracts before enterprise deployment
 
+The [runtime configuration control plane](runtime-configuration.md) supports
+application-scoped contract/method proposals and live provider policy publication.
+Its immutable revisions, compare-and-set updates and history do not yet feed
+financial signing/execution. Enterprise acceptance requires exact owner consent
+and action snapshots, current evidence/revocation checks, independent executor
+validation and recovery across policy changes. Configuration changes must not
+reinterpret a transfer-only grant as arbitrary-call authority.
+
 The implemented execution profile is selected with both `Execution-Profile` and
 `Execution-Profile-Revision` headers. Unsupported selections are rejected;
 requests cannot silently fall back to another execution or finality policy.
