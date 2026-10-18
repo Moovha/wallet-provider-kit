@@ -196,6 +196,10 @@ function validateDraft(policy: RuntimePolicy) {
   if (maximum >= 2n ** 256n)
     throw new Error('Total maximum wei must fit an unsigned 256-bit integer.');
   for (const [index, contract] of policy.contracts.entries()) {
+    if (contract.methods.length < 1 || contract.methods.length > 32)
+      throw new Error(
+        `Contract ${index + 1}: select between 1 and 32 methods.`,
+      );
     try {
       getAddress(contract.address);
       if (contract.implementation) getAddress(contract.implementation.address);

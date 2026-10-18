@@ -252,3 +252,161 @@ test('applications register methods and providers publish and allow subsequent a
   expect(browserErrors).toEqual([]);
   expect(external).toEqual([]);
 });
+
+test('address discovery fills verified pins and selected methods, while ABI import covers unverified contracts', async ({
+  page,
+}) => {
+  const address = '0x2222222222222222222222222222222222222222';
+  const discoveryRequests: { url: string; headers: Record<string, string> }[] =
+    [];
+  await page.route(
+    'https://sourcify.dev/server/v2/contract/84532/**',
+    async (route) => {
+      discoveryRequests.push({
+        url: route.request().url(),
+        headers: await route.request().allHeaders(),
+      });
+      if (!route.request().url().includes(address)) {
+        await route.fulfill({
+          status: 404,
+          headers: { 'access-control-allow-origin': '*' },
+          json: { error: 'not found' },
+        });
+        return;
+      }
+      await route.fulfill({
+        headers: { 'access-control-allow-origin': '*' },
+        json: {
+          address,
+          chainId: '84532',
+          runtimeMatch: 'exact_match',
+          runtimeBytecode: { onchainBytecode: '0x6001600055' },
+          proxyResolution: { isProxy: false },
+          abi: [
+            'function deposit(uint256,address) payable',
+            'function withdraw(uint256)',
+            'event Deposit(address owner)',
+          ],
+        },
+      });
+    },
+  );
+  await page.goto(`${url}/operator/`);
+  await page.getByLabel('Access token', { exact: true }).fill('offline-app');
+  await page.getByRole('button', { name: 'Connect', exact: true }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Register contracts', exact: true }),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Add contract', exact: true }).click();
+  const contract = page.getByRole('group', { name: /^Contract \d+$/ }).last();
+  await contract.getByLabel('Contract address', { exact: true }).fill(address);
+  await contract
+    .getByRole('button', { name: 'Load verified methods', exact: true })
+    .click();
+  await expect(
+    contract.getByText(/2 methods loaded and selected/),
+  ).toBeVisible();
+  await expect(
+    contract.getByLabel('Bytecode hash', { exact: true }),
+  ).toHaveValue(/^0x[0-9a-f]{64}$/);
+  await expect(
+    contract.getByLabel('Method signature', { exact: true }),
+  ).toHaveCount(2);
+  await expect(
+    contract.getByRole('checkbox', { name: /^deposit\(uint256,address\)/ }),
+  ).toBeChecked();
+  await contract
+    .getByRole('checkbox', { name: /^withdraw\(uint256\)/ })
+    .uncheck();
+  await expect(
+    contract.getByLabel('Method signature', { exact: true }),
+  ).toHaveCount(1);
+  await expect(
+    contract.getByLabel('Method signature', { exact: true }),
+  ).toHaveValue('deposit(uint256,address)');
+  await contract.screenshot({ path: '/tmp/wpk-contract-discovery.png' });
+  expect(discoveryRequests).toHaveLength(1);
+  expect(discoveryRequests[0].headers.authorization).toBeUndefined();
+  expect(discoveryRequests[0].headers.cookie).toBeUndefined();
+  expect(discoveryRequests[0].headers.referer).toBeUndefined();
+  expect(discoveryRequests[0].url).not.toContain('offline-app');
+  await contract
+    .getByLabel('Contract address', { exact: true })
+    .fill('0x3333333333333333333333333333333333333333');
+  await expect(
+    contract.getByLabel('Bytecode hash', { exact: true }),
+  ).toHaveValue('');
+  await contract
+    .getByRole('button', { name: 'Load verified methods', exact: true })
+    .click();
+  await expect(contract.getByRole('alert')).toContainText(
+    'No Sourcify verification',
+  );
+  await contract.getByText('Upload or paste an ABI', { exact: true }).click();
+  await contract.getByLabel('ABI JSON', { exact: true }).fill(
+    JSON.stringify({
+      abi: ['function firstMethod(uint)', 'function secondMethod(bytes32)'],
+    }),
+  );
+  await contract
+    .getByRole('button', { name: 'Import ABI', exact: true })
+    .click();
+  await expect(
+    contract.getByLabel('Method signature', { exact: true }).first(),
+  ).toHaveValue('firstMethod(uint256)');
+  await expect(
+    contract.getByLabel('Method signature', { exact: true }),
+  ).toHaveCount(2);
+  await contract.getByLabel('ABI file', { exact: true }).setInputFiles({
+    name: 'contract-artifact.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(
+      JSON.stringify({ abi: ['function uploadedMethod(address)'] }),
+    ),
+  });
+  await expect(
+    contract.getByLabel('Method signature', { exact: true }),
+  ).toHaveCount(1);
+  await expect(
+    contract.getByLabel('Method signature', { exact: true }),
+  ).toHaveValue('uploadedMethod(address)');
+  await contract.getByLabel('ABI JSON', { exact: true }).fill('not an ABI');
+  await contract
+    .getByRole('button', { name: 'Import ABI', exact: true })
+    .click();
+  await expect(contract.getByRole('alert')).toContainText('valid ABI JSON');
+  await expect(
+    contract.getByLabel('Method signature', { exact: true }),
+  ).toHaveCount(1);
+  await expect(
+    contract.getByLabel('Method signature', { exact: true }),
+  ).toHaveValue('uploadedMethod(address)');
+  await contract
+    .getByLabel('ABI JSON', { exact: true })
+    .fill(
+      JSON.stringify(
+        Array.from(
+          { length: 33 },
+          (_, index) => `function method${index}(uint256)`,
+        ),
+      ),
+    );
+  await contract
+    .getByRole('button', { name: 'Import ABI', exact: true })
+    .click();
+  await expect(contract.getByText(/33 methods found/)).toBeVisible();
+  await expect(
+    contract.getByLabel('Method signature', { exact: true }),
+  ).toHaveCount(0);
+  await contract.getByRole('checkbox', { name: /^method0\(uint256\)/ }).check();
+  await expect(
+    contract.getByLabel('Method signature', { exact: true }),
+  ).toHaveValue('method0(uint256)');
+  await page.setViewportSize({ width: 390, height: 844 });
+
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+});

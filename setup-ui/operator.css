@@ -227,3 +227,21 @@ details {
   padding: 0;
   margin: 0;
 }
+
+.contract-discovery {
+  margin: 18px 0;
+  padding: 16px;
+  border-radius: 8px;
+  background: #f3f8f5;
+}
+.discovered-method {
+  overflow-wrap: anywhere;
+  font-weight: 500;
+}
+.discovered-method input {
+  margin-right: 8px;
+}
+
+.editor {
+  overflow-wrap: anywhere;
+}

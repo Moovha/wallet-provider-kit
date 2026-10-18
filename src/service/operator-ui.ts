@@ -8,6 +8,10 @@ export async function registerOperatorUi(app: FastifyInstance) {
     const html = await readFile(new URL('operator.html', root), 'utf8');
     return reply
       .header('cache-control', 'no-store')
+      .header(
+        'content-security-policy',
+        "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self' https://sourcify.dev; img-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'",
+      )
       .type('text/html')
       .send(html.replaceAll('/assets/', '/operator/assets/'));
   });

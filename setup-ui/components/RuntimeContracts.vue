@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ContractDiscovery from './ContractDiscovery.vue';
 import type { RuntimePolicy } from '../../src/runtime-configuration/service';
 const model = defineModel<RuntimePolicy['contracts']>({ required: true });
 function add() {
@@ -18,8 +19,9 @@ function add() {
       </button>
     </div>
     <p>
-      Use the deployed bytecode hash and canonical ABI signatures, such as
-      deposit(uint256,address). Values are decimal wei.
+      Enter a deployed address and load its verified methods, or import an ABI.
+      You can also enter bytecode pins and canonical method signatures manually.
+      Values are decimal wei.
     </p>
     <p v-if="!model.length">No contracts registered.</p>
     <fieldset v-for="(contract, index) in model" :key="index">
@@ -31,6 +33,7 @@ function add() {
           pattern="0x[0-9a-fA-F]{40}"
           autocomplete="off"
       /></label>
+      <ContractDiscovery v-model="model[index]" />
       <label
         >Bytecode hash<input
           v-model="contract.code_hash"

@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased contract method discovery
+
+- Load verified Base Sepolia contract methods and bytecode pins from Sourcify in
+  the runtime workspace, including a single EIP-1967 proxy implementation.
+- Select discovered methods through checkboxes, with all methods selected by
+  default within the existing 32-method limit; support ABI upload/paste and
+  manual pin entry when verification is unavailable.
+- Keep public metadata lookup separate from provider credentials, publication,
+  current owner consent and independent execution-time code checks.
+
 ## Unreleased runtime operator workspace
 
 - Add a deployed `/operator/` workspace with structured contract/method forms,

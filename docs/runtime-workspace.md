@@ -35,9 +35,12 @@ and current owner consent.
 
 ## Register and review methods
 
-1. Connect as an application. Select **Add contract**, then enter the deployed
-   address, bytecode hash and canonical ABI method signatures. Add an
-   implementation pin for a proxy. Native-value fields use decimal wei.
+1. Connect as an application. Select **Add contract**, paste the deployed Base
+   Sepolia address and choose **Load verified methods**. The form loads verified
+   methods and bytecode pins from Sourcify. All discovered methods are selected
+   by default when there are at most 32; uncheck any methods you do not need.
+   For more than 32, explicitly select up to the policy limit. Native-value
+   fields use decimal wei and new methods default to zero.
 2. Check **Policy changes** and submit the registration. Until the provider has
    published a baseline policy and allowed automatic registration, proposals wait
    for provider review. Registration alone grants no spending authority.
@@ -48,6 +51,34 @@ and current owner consent.
 4. Select **Publish policy**. Publishing is immediate and preserves immutable
    revision history. Applications must obtain renewed financial consent to the
    published revision before new signing or execution effects.
+
+### Verified lookup and ABI fallback
+
+Verified lookup sends the public Base Sepolia address directly from your browser
+to [Sourcify's contract lookup API](https://docs.sourcify.dev/blog/apiv2-lookup-endpoints/).
+It sends no provider token, cookies or referrer and follows no redirects. The
+provider's browser policy permits that fixed verification origin for this feature.
+Lookup is an explicit action; entering an address alone makes no external request.
+
+For a single EIP-1967 proxy implementation, lookup fills both bytecode pins and
+combines the verified proxy and implementation methods. Nested proxies, diamonds
+and other implementation layouts are not automatically imported. Overloaded
+functions retain their full canonical signatures; events, constructors and
+fallback/receive handlers are excluded. Read-only methods are labelled by ABI
+mutability and may be selected too. Selector collisions are rejected.
+
+If verification is unavailable, expand **Upload or paste an ABI**. Upload a JSON
+ABI/compiler artifact, or paste its ABI JSON and choose **Import ABI**. Supply
+reviewed bytecode and implementation pins manually when lookup could not provide
+them. Imports accept at most 512 KiB; lookup has the same response limit and a
+12-second timeout. Changing an address clears pins supplied by its prior lookup.
+Manual signature and pin entry remains available.
+
+Sourcify's verified bytecode is registration metadata, not a fresh independent
+chain observation. An uploaded ABI is also a declaration; it does not prove that
+its functions match deployed code. Actual execution retains current code/proxy
+checks, policy publication and owner consent. Loading or selecting methods never
+publishes a policy, signs or submits a transaction.
 
 The initial registration form suggests four calls, zero native value and a
 300-second validity window. These are proposed terms until provider publication;
