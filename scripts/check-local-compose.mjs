@@ -154,6 +154,15 @@ try {
     if(!r.ok || !data.success || !Array.isArray(data.data) || data.data.length) process.exit(1);
   `,
   ]);
+  await docker([
+    'exec',
+    '-T',
+    'execution-store',
+    'valkey-cli',
+    'SET',
+    'wpk-offline-retention',
+    'retained',
+  ]);
   await docker(['restart', 'execution-store']);
   await docker([
     'up',
@@ -163,8 +172,19 @@ try {
     '120',
     'local-execution',
   ]);
+  const retained = await docker([
+    'exec',
+    '-T',
+    'execution-store',
+    'valkey-cli',
+    '--raw',
+    'GET',
+    'wpk-offline-retention',
+  ]);
+  if (retained.stdout.trim() !== 'retained')
+    throw new Error('Execution store did not retain the offline fixture');
   console.log(
-    'Compose parsing, unprivileged config validation, literal multiline secret loading, bundled OWS native import Caddy configuration validation and empty bundled Relayer/Valkey readiness across a store restart passed; no wallets, provider requests or certificate issuance.',
+    'Compose parsing, unprivileged config validation, literal multiline secret loading, bundled OWS native import, Caddy configuration validation, and empty bundled Relayer/Valkey readiness with fixture retention across a store restart passed; no wallets, provider requests or certificate issuance.',
   );
 } finally {
   await docker(['down', '--remove-orphans']).catch(() => {});

@@ -197,7 +197,7 @@ export function localCompose(plan: SetupPlan, buildSource: string) {
                   'CMD',
                   'node',
                   '-e',
-                  "fetch('http://127.0.0.1:8080/ready',{signal:AbortSignal.timeout(3000)}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+                  "fetch('http://127.0.0.1:8080/api/v1/ready',{signal:AbortSignal.timeout(3000)}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
                 ],
                 interval: '5s',
                 timeout: '4s',
