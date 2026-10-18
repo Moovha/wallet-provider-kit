@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased generic calls and optional adapters
+
+- Authorize native transfers through the common stored-call and wallet-calls
+  pipeline using explicit recipient/code pins, provider opt-in and value limits.
+- Extract protocol construction and receipt checks into optional policy adapters;
+  share their verification across relayer and ERC-4337 execution.
+- Keep generic calls independent of compatibility route settings. Explicitly
+  selected adapters recognize exact supported calldata without caller labels.
+- Preserve static swap/vault requests, their signing payloads and ERC-3009 transfer
+  compatibility. Keep cumulative asset-budget migration and dedicated form controls
+  as separate acceptance gates.
+
 ## Unreleased bundled setup
 
 - Start a private OpenZeppelin Relayer and persistent Valkey by default in bundled setup; generate encrypted local gas-sponsor keys and bindings for configured approved actions. Existing execution services remain optional.

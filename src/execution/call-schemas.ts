@@ -22,7 +22,7 @@ const pin = {
 const call = object({
   to: address,
   value: uint,
-  data: { type: 'string', pattern: '^0x(?:[0-9a-f]{2}){4,4096}$' },
+  data: { type: 'string', pattern: '^0x(?:[0-9a-f]{2}){0,4096}$' },
 });
 export const approvedCallInputSchema = {
   oneOf: [
@@ -83,6 +83,28 @@ export const approvedCallIntentSchema = object({
   nonce: uint,
 });
 
+approvedCallIntentSchema.properties = {
+  ...approvedCallIntentSchema.properties,
+  nativeRecipients: {
+    type: 'array',
+    minItems: 1,
+    maxItems: 16,
+    items: address,
+  },
+  adapterInput: {
+    oneOf: [
+      approvedCallInputSchema.oneOf[1],
+      approvedCallInputSchema.oneOf[2],
+      object({
+        kind: { type: 'string', enum: ['token-transfer'] },
+        token: address,
+        recipient: address,
+        amount: uint,
+      }),
+    ],
+  },
+};
+
 /** SafeTx is constructed by the wallet; applications never submit this payload for signing. */
 export const safePayloadSchema = object({
   primaryType: { type: 'string', enum: ['SafeTx'] },
@@ -137,3 +159,47 @@ export const safePayloadSchema = object({
     nonce: uint,
   }),
 });
+export const operationAdaptersSchema = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    tokenTransfers: {
+      type: 'array',
+      maxItems: 128,
+      items: object({
+        token: pin,
+        recipients: {
+          type: 'array',
+          minItems: 1,
+          maxItems: 128,
+          uniqueItems: true,
+          items: address,
+        },
+        maximumAmount: uint,
+      }),
+    },
+    swaps: {
+      type: 'array',
+      maxItems: 128,
+      items: object({
+        id: route,
+        router: pin,
+        tokenIn: pin,
+        tokenOut: pin,
+        fee: { type: 'integer', minimum: 1, maximum: 999999 },
+        maximumInput: uint,
+      }),
+    },
+    vaults: {
+      type: 'array',
+      maxItems: 128,
+      items: object({
+        id: route,
+        router: pin,
+        vault: pin,
+        asset: pin,
+        maximumAssets: uint,
+      }),
+    },
+  },
+};

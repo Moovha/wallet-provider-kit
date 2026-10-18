@@ -217,7 +217,7 @@ export class WalletCallsService {
     const from = input.from === undefined ? undefined : address(input.from);
     const calls = input.calls.map((call) => {
       if (!object(call, ['to', 'data', 'value', 'capabilities'])) invalid();
-      // Contract creation and empty native transfers are outside this registered-method profile.
+      // Contract creation is outside this account-bound profile.
       const to = address(call.to);
       const data = call.data ?? '0x',
         value = call.value ?? '0x0';

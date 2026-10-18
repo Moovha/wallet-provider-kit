@@ -195,7 +195,7 @@ export default defineConfig({
                 link: '/docs/execution-service',
               },
               {
-                text: 'Approved contract calls',
+                text: 'Call policies and adapters',
                 link: '/docs/approved-contract-calls',
               },
               {

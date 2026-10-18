@@ -20,11 +20,12 @@ const bundler: BundlerConfigurationV07 = {
 };
 const txHash = '0x' + 'c'.repeat(64),
   blockHash = '0x' + 'b'.repeat(64);
-async function setup(lifetimeBudgetWei = '10000000') {
+async function setup(lifetimeBudgetWei = '10000000', native = false) {
+  const nativeRecipient = native ? Wallet.createRandom().address : undefined;
   const f = await fixture((c) => {
     c.submissionBinding = userOperationExecutionBinding(bundler);
     c.sponsors[0].lifetimeBudgetWei = lifetimeBudgetWei;
-  });
+  }, nativeRecipient);
   (f.context.principal.scopes as string[]).push(
     'wallet:execute',
     'wallet:execute:read',
@@ -229,7 +230,10 @@ async function setup(lifetimeBudgetWei = '10000000') {
           version: '2.0.0',
           atomicRequired: true,
           chainId: '0x14a34',
-          calls: f.input.calls.map((c) => ({
+          calls: (nativeRecipient
+            ? [{ to: nativeRecipient, value: '4', data: '0x' }]
+            : f.input.calls
+          ).map((c) => ({
             ...c,
             value: toQuantity(c.value),
           })),
@@ -478,6 +482,33 @@ describe('ERC-4337 wallet calls durable submission and independent receipt recov
     await t.ports.driver.runOnce();
     await t.ports.driver.runOnce();
     expect(await t.status()).toMatchObject({ status: 100 });
+    expect(t.s.sends + t.f.state.posts + t.f.state.signs).toBe(0);
+  });
+  it('submits a native transfer through wallet calls with shared runtime authority and durable SafeOp signing', async () => {
+    const t = await setup('10000000', true);
+    await t.submit();
+    await t.ports.driver.runOnce();
+    expect(t.s.sends).toBe(1);
+    expect(t.f.state.posts).toBe(2);
+    expect(t.f.state.signs).toBe(1);
+    const plans = await t.f.onboarding.store.transaction((s) =>
+      Object.values(s.userOperationExecutions!),
+    );
+    expect(plans[0].intent.calls[0]).toMatchObject({ value: '4', data: '0x' });
+    expect(plans[0].intent.nativeRecipients).toHaveLength(1);
+    t.s.included = true;
+    expect(await t.status()).toMatchObject({ status: 200 });
+  });
+  it('denies a native recipient whose accepted empty-code pin changed before sponsorship', async () => {
+    const t = await setup('10000000', true),
+      recipient = t.f.config.basePolicy.nativeTransfers!.recipients[0].address;
+    t.f.state.mutate = (method, result, params) =>
+      method === 'eth_getCode' &&
+      String(params[0]).toLowerCase() === recipient.toLowerCase()
+        ? '0x6001'
+        : result;
+    await t.submit();
+    await t.ports.driver.runOnce();
     expect(t.s.sends + t.f.state.posts + t.f.state.signs).toBe(0);
   });
 });

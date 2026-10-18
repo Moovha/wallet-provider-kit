@@ -108,7 +108,7 @@ vendor services or certify readiness. Initial activation remains disabled._
    submit current identity and consent evidence, receive a grant, create the wallet
    and revoke access when the user withdraws. Select the optional
    [execution coordinator](docs/execution.md) for transfers or
-   [approved contract calls, swaps and vault deposits](docs/approved-contract-calls.md),
+   [generic calls and optional operation adapters](docs/approved-contract-calls.md),
    or use an accepted application submission rail. Optional
    [Safe queues and sponsor pools](docs/safe-queue-and-sponsor-pools.md),
    [stuck-transaction recovery](docs/stuck-transactions-and-recovery.md) and

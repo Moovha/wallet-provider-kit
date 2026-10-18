@@ -44,6 +44,7 @@ const entryInterface = new Interface([
 const pin = () => ({ address: Wallet.createRandom().address, codeHash });
 export async function fixture(
   configure?: (config: Safe4337SigningConfiguration) => void,
+  nativeRecipient?: string,
 ) {
   const directory = await mkdtemp(join(tmpdir(), 'wpk-as2-'));
   dirs.push(directory);
@@ -167,6 +168,17 @@ export async function fixture(
       version: '1',
       enabled: true,
       chain_id: 'eip155:84532',
+      ...(nativeRecipient
+        ? {
+            native_transfers: [
+              {
+                address: nativeRecipient,
+                code_hash: keccak256('0x'),
+                maximum_value_wei: '5',
+              },
+            ],
+          }
+        : {}),
       maximum_calls: 2,
       maximum_native_value_wei: '10',
       max_validity_seconds: 120,
@@ -227,6 +239,19 @@ export async function fixture(
         maximumValueWei: '10',
       },
     ],
+    ...(nativeRecipient
+      ? {
+          nativeTransfers: {
+            recipients: [
+              {
+                address: nativeRecipient,
+                codeHash: keccak256('0x'),
+                maximumValueWei: '5',
+              },
+            ],
+          },
+        }
+      : {}),
     maximumNativeValueWei: '10',
     lifetimeOperations: '3',
     swaps: [],
@@ -318,7 +343,12 @@ export async function fixture(
             ? config.acceptance.genesisHash
             : '0x' + 'b'.repeat(64),
       };
-    else if (method === 'eth_getCode') result = code;
+    else if (method === 'eth_getCode')
+      result =
+        nativeRecipient &&
+        params[0].toLowerCase() === nativeRecipient.toLowerCase()
+          ? '0x'
+          : code;
     else if (method === 'eth_getStorageAt')
       result =
         params[1] ===

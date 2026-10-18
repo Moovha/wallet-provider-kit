@@ -95,8 +95,10 @@ export function runtimeCallPolicy(
   snapshot: RuntimePolicySnapshot,
 ): ApprovedCallPolicy {
   validateRuntimeSnapshot(snapshot);
+  const { adapters: _staticAdapters, ...infrastructure } =
+    structuredClone(base);
   const policy: ApprovedCallPolicy = {
-    ...structuredClone(base),
+    ...infrastructure,
     maximumNativeValueWei: String(
       BigInt(base.maximumNativeValueWei) <
         BigInt(snapshot.policy.maximum_native_value_wei)
@@ -129,6 +131,24 @@ export function runtimeCallPolicy(
     })),
     swaps: [],
     vaults: [],
+    ...(snapshot.policy.call_adapters
+      ? { adapters: structuredClone(snapshot.policy.call_adapters) }
+      : {}),
+    ...(base.nativeTransfers
+      ? {
+          nativeTransfers: {
+            recipients: (snapshot.policy.native_transfers ?? []).map((r) => ({
+              address: r.address,
+              codeHash: r.code_hash,
+              maximumValueWei: String(
+                BigInt(r.maximum_value_wei) < BigInt(base.maximumNativeValueWei)
+                  ? BigInt(r.maximum_value_wei)
+                  : BigInt(base.maximumNativeValueWei),
+              ),
+            })),
+          },
+        }
+      : {}),
   };
   validateApprovedCallPolicy(policy);
   return policy;
@@ -145,6 +165,18 @@ export function validateRuntimeCalls(
   )
     deny();
   for (const call of input.calls) {
+    if (call.data === '0x') {
+      const recipient = snapshot.policy.native_transfers?.find(
+        (r) => r.address.toLowerCase() === call.to.toLowerCase(),
+      );
+      if (
+        !recipient ||
+        !/^[1-9][0-9]{0,77}$/.test(call.value) ||
+        BigInt(call.value) > BigInt(recipient.maximum_value_wei)
+      )
+        deny();
+      continue;
+    }
     const contract = snapshot.policy.contracts.find(
       (contract) => contract.address.toLowerCase() === call.to.toLowerCase(),
     );

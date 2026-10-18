@@ -10,7 +10,7 @@ settings and acceptance tests. New setups use the [bundled local Relayer and Val
 Relayer compatibility. Both are experimental Base Sepolia EOA profiles;
 configuration and offline tests do not establish live execution or custody acceptance.
 
-General contract calls, swaps and vault deposits use the same execution and recovery foundation through `approved-evm-executor-v1`. They require separate contract delegation and explicitly bound Safe accounts; see [approved contract calls](approved-contract-calls.md). The steps below describe the ERC-3009 transfer operation.
+Generic wallet calls, including explicitly allowed native transfers and optional operation adapters, use the same execution and recovery foundation through `approved-evm-executor-v1`. They require separate contract delegation and explicitly bound Safe accounts; see [approved contract calls](approved-contract-calls.md). The steps below describe the ERC-3009 transfer operation.
 
 ## Standard application flow
 

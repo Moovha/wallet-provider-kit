@@ -211,7 +211,9 @@ the wallet side; it does not deploy that dispatcher.
 
 For contract calls, choose **Approved EVM actions through designated service**
 and enable **Approved contract-call policy**. Configure pre-existing Safe 1.4.1
-account bindings, code pins, allowed functions and any swap/vault routes. The
+account bindings, code pins and allowed functions. The existing swap/vault
+fields configure optional compatibility request builders. Generic native-recipient
+and operation-adapter terms currently use reviewed configuration/API fields. The
 [approved-call guide](approved-contract-calls.md) explains those requirements and
 how they connect to `contracts:request` consent in Policies. The wizard does not
 create or fund Safe accounts.

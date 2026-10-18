@@ -2523,6 +2523,7 @@ export interface ProviderDatabaseOptions {
 
 Import from `@moovha/wallet-provider-kit/deployment`. [Integration guide](setup.md).
 
+- [AdapterInput](#adapterinput)
 - [ApprovedCallInput](#approvedcallinput)
 - [ApprovedCallIntent](#approvedcallintent)
 - [approvedCallPayload](#approvedcallpayload)
@@ -2534,6 +2535,7 @@ Import from `@moovha/wallet-provider-kit/deployment`. [Integration guide](setup.
 - [buildApprovedCallIntent](#buildapprovedcallintent)
 - [BundledAuthorizationConfiguration](#bundledauthorizationconfiguration)
 - [ChainObservation](#chainobservation)
+- [compileOperationAdapter](#compileoperationadapter)
 - [ConfigurationError](#configurationerror)
 - [createConfiguredProvider](#createconfiguredprovider)
 - [createExecutionService](#createexecutionservice)
@@ -2560,6 +2562,7 @@ Import from `@moovha/wallet-provider-kit/deployment`. [Integration guide](setup.
 - [loadExecutionServiceConfiguration](#loadexecutionserviceconfiguration)
 - [loadProviderConfiguration](#loadproviderconfiguration)
 - [NonceSnapshot](#noncesnapshot)
+- [OperationAdapters](#operationadapters)
 - [OperationsConfiguration](#operationsconfiguration)
 - [OperationsHealth](#operationshealth)
 - [PayerEvent](#payerevent)
@@ -2595,6 +2598,7 @@ Import from `@moovha/wallet-provider-kit/deployment`. [Integration guide](setup.
 - [ServiceSigningKey](#servicesigningkey)
 - [ServiceVerificationKey](#serviceverificationkey)
 - [signedServiceClient](#signedserviceclient)
+- [TokenTransferAdapter](#tokentransferadapter)
 - [TransactionEventInput](#transactioneventinput)
 - [TransactionEventReport](#transactioneventreport)
 - [TransferExecutionCoordinator](#transferexecutioncoordinator)
@@ -2610,6 +2614,26 @@ Import from `@moovha/wallet-provider-kit/deployment`. [Integration guide](setup.
 - [WalletCallsRpcError](#walletcallsrpcerror)
 - [WalletCallsService](#walletcallsservice)
 - [WalletCallsStatus](#walletcallsstatus)
+
+### AdapterInput
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/operation-adapters.ts).
+
+```ts
+export type AdapterInput =
+  | Exclude<
+      ApprovedCallInput,
+      {
+        kind: 'contract-call';
+      }
+    >
+  | {
+      kind: 'token-transfer';
+      token: string;
+      recipient: string;
+      amount: string;
+    };
+```
 
 ### ApprovedCallInput
 
@@ -2645,6 +2669,8 @@ export type ApprovedCallInput =
 
 ```ts
 export interface ApprovedCallIntent {
+  adapterInput?: AdapterInput;
+  nativeRecipients?: string[];
   version: '1';
   mechanism: 'safe-1.4.1';
   input: ApprovedCallInput;
@@ -2680,6 +2706,12 @@ export declare function approvedCallPayload(
 ```ts
 export interface ApprovedCallPolicy {
   mechanism: 'safe-1.4.1';
+  adapters?: OperationAdapters;
+  nativeTransfers?: {
+    recipients: (PinnedContract & {
+      maximumValueWei: string;
+    })[];
+  };
   accounts: SafeAccountBinding[];
   multiSend: PinnedContract;
   maximumNativeValueWei: string;
@@ -2688,7 +2720,7 @@ export interface ApprovedCallPolicy {
     selectors: string[];
     maximumValueWei: string;
   })[];
-  swaps: {
+  swaps?: {
     id: string;
     router: PinnedContract;
     tokenIn: PinnedContract;
@@ -2696,7 +2728,7 @@ export interface ApprovedCallPolicy {
     fee: number;
     maximumInput: string;
   }[];
-  vaults: {
+  vaults?: {
     id: string;
     router: PinnedContract;
     vault: PinnedContract;
@@ -2860,6 +2892,30 @@ export interface ChainObservation {
   block_number?: string;
   execution_origin?: 'sponsor' | 'external';
 }
+```
+
+### compileOperationAdapter
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/operation-adapters.ts).
+
+```ts
+/** Compatibility requests compile to the same ordered calls as generic batches. */
+export declare function compileOperationAdapter(
+  policy: ApprovedCallPolicy,
+  input: ApprovedCallInput,
+  account: SafeAccountBinding,
+  expiresAt: string,
+): {
+  calls: ApprovedContractCall[];
+  contracts: PinnedContract[];
+  effects: {
+    token: string;
+    from: string;
+    to: string;
+    minimum: string;
+    maximum?: string;
+  }[];
+};
 ```
 
 ### ConfigurationError
@@ -3378,6 +3434,18 @@ export interface NonceSnapshot {
 }
 ```
 
+### OperationAdapters
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/operation-adapters.ts).
+
+```ts
+export interface OperationAdapters {
+  tokenTransfers?: TokenTransferAdapter[];
+  swaps?: NonNullable<ApprovedCallPolicy['swaps']>;
+  vaults?: NonNullable<ApprovedCallPolicy['vaults']>;
+}
+```
+
 ### OperationsConfiguration
 
 [Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/operations.ts).
@@ -3887,6 +3955,12 @@ export declare class RuntimeConfigurationService {
 ```ts
 export interface RuntimePolicy {
   version: '1';
+  native_transfers?: {
+    address: string;
+    code_hash: string;
+    maximum_value_wei: string;
+  }[];
+  call_adapters?: import('../execution/operation-adapters.js').OperationAdapters;
   enabled: boolean;
   chain_id: 'eip155:84532';
   contracts: {
@@ -4232,6 +4306,18 @@ export declare function signedServiceClient(
   path: string,
   body?: unknown,
 ) => Promise<unknown>;
+```
+
+### TokenTransferAdapter
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/operation-adapters.ts).
+
+```ts
+export interface TokenTransferAdapter {
+  token: PinnedContract;
+  recipients: string[];
+  maximumAmount: string;
+}
 ```
 
 ### TransactionEventInput
@@ -5047,8 +5133,9 @@ export declare class Safe4337Verifier {
   verify(
     intent: Pick<
       ApprovedCallIntent,
-      'account' | 'multiSend' | 'calls' | 'contracts'
-    >,
+      'account' | 'multiSend' | 'calls' | 'contracts' | 'nativeRecipients'
+    > &
+      Partial<Pick<ApprovedCallIntent, 'adapterInput' | 'effects'>>,
     owner: string,
     nonce?: string,
   ): Promise<string>;

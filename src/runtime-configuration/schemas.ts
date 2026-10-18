@@ -1,3 +1,4 @@
+import { operationAdaptersSchema } from '../execution/call-schemas.js';
 const string = { type: 'string', minLength: 1, maxLength: 256 };
 const uint = { type: 'string', pattern: '^(0|[1-9][0-9]{0,77})$' };
 export const revisionSchema = {
@@ -78,6 +79,17 @@ export const runtimePolicySchema = {
             },
           },
         },
+      },
+    },
+    call_adapters: operationAdaptersSchema,
+    native_transfers: {
+      type: 'array',
+      maxItems: 32,
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['address', 'code_hash', 'maximum_value_wei'],
+        properties: { ...pin.properties, maximum_value_wei: uint },
       },
     },
     maximum_calls: { type: 'integer', minimum: 1, maximum: 16 },

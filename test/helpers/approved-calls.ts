@@ -18,7 +18,10 @@ export function approvedCallsFixture(
     address: Wallet.createRandom().address,
     codeHash: keccak256(offlineCode),
   });
-  const policy: ApprovedCallPolicy = {
+  const policy: ApprovedCallPolicy & {
+    swaps: NonNullable<ApprovedCallPolicy['swaps']>;
+    vaults: NonNullable<ApprovedCallPolicy['vaults']>;
+  } = {
     mechanism: 'safe-1.4.1',
     accounts: [{ ...pin(), accountId, singleton: pin() }],
     multiSend: pin(),
