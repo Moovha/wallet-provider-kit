@@ -1,3 +1,7 @@
+import {
+  bindExecutionMechanism,
+  approvalMechanism,
+} from './execution-binding.js';
 import { randomUUID } from 'node:crypto';
 import type {
   EmbeddedWalletAuthority,
@@ -269,6 +273,12 @@ export function sqliteFinancialAuthority(
     return connection.transaction(() => {
       const latest = loadApproval(connection, id, purpose !== 'status');
       if (!latest || fingerprint(latest) !== fingerprint(approval)) return null;
+      if (purpose !== 'status')
+        bindExecutionMechanism(
+          connection,
+          approval,
+          approvalMechanism(approval),
+        );
       const proposed = attemptFor(options, approval, randomUUID());
       const previous = connection.get(
         'SELECT attempt_id,request,approval_id FROM admissions WHERE namespace=? AND provider=? AND resource_key=?',

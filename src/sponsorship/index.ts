@@ -21,3 +21,17 @@ export type {
   PaymasterStubV07,
 } from './paymaster.js';
 export type { ApplicationGasAllowance } from './budget.js';
+export {
+  safeOpPayloadV07,
+  safeOpActionV07,
+  safeOpSignatureV07,
+  safeOpTypes,
+} from './safe-op.js';
+export { Safe4337Verifier } from './verifier.js';
+export type { Safe4337Acceptance } from './verifier.js';
+export { Safe4337SigningService } from './signing.js';
+export type {
+  Safe4337SigningConfiguration,
+  Safe4337SigningOptions,
+  SponsorshipConsentTerms,
+} from './signing.js';

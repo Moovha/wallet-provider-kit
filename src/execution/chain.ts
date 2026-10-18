@@ -114,7 +114,7 @@ function callsReceipt(
 }
 
 /** Read-only JSON-RPC transport with fixed methods, bounded responses and no automatic retries. */
-class RpcReader {
+export class RpcReader {
   constructor(
     private readonly endpoint: string,
     private readonly request: typeof fetch,
