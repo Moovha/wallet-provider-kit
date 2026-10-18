@@ -197,7 +197,7 @@ test('a new operator configures application-led access without user login, vendo
       .getByRole('button', { name: 'API reference', exact: true })
       .click();
     await page.locator('.swagger-ui .opblock').first().waitFor();
-    await expect(page.locator('.swagger-ui .opblock')).toHaveCount(27);
+    await expect(page.locator('.swagger-ui .opblock')).toHaveCount(34);
     await page
       .getByLabel('Example endpoint', { exact: true })
       .selectOption('requestAccountAccess');
