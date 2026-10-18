@@ -134,6 +134,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/contract-call-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["enqueueContractCall"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/contract-call-requests/{requestId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readContractCallRequest"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/contract-call-requests/{requestId}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["cancelContractCallRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/actions/contract-calls": {
         parameters: {
             query?: never;
@@ -179,6 +227,22 @@ export interface paths {
         get: operations["getExecutionCapabilities"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/actions/{actionId}/reconcile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["reconcileExecution"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2123,6 +2187,133 @@ export interface operations {
             };
         };
     };
+    enqueueContractCall: {
+        parameters: {
+            query?: never;
+            header: {
+                "idempotency-key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    account_id: string;
+                    /** @enum {string} */
+                    kind: "contract-call";
+                    calls: {
+                        to: string;
+                        value: string;
+                        data: string;
+                    }[];
+                } | {
+                    account_id: string;
+                    /** @enum {string} */
+                    kind: "swap";
+                    route: string;
+                    amount_in: string;
+                    minimum_out: string;
+                    deadline: string;
+                } | {
+                    account_id: string;
+                    /** @enum {string} */
+                    kind: "vault-deposit";
+                    route: string;
+                    assets: string;
+                    minimum_shares: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Default Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        request_id: string;
+                        account_id: string;
+                        action_id?: string;
+                        /** @enum {string} */
+                        status: "queued" | "executing" | "succeeded" | "cancelled" | "expired" | "blocked";
+                        /** Format: date-time */
+                        expires_at: string;
+                        next_poll_after_ms: number;
+                    };
+                };
+            };
+        };
+    };
+    readContractCallRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                requestId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        request_id: string;
+                        account_id: string;
+                        action_id?: string;
+                        /** @enum {string} */
+                        status: "queued" | "executing" | "succeeded" | "cancelled" | "expired" | "blocked";
+                        /** Format: date-time */
+                        expires_at: string;
+                        next_poll_after_ms: number;
+                    };
+                };
+            };
+        };
+    };
+    cancelContractCallRequest: {
+        parameters: {
+            query?: never;
+            header: {
+                "idempotency-key": string;
+            };
+            path: {
+                requestId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        request_id: string;
+                        account_id: string;
+                        action_id?: string;
+                        /** @enum {string} */
+                        status: "queued" | "executing" | "succeeded" | "cancelled" | "expired" | "blocked";
+                        /** Format: date-time */
+                        expires_at: string;
+                        next_poll_after_ms: number;
+                    };
+                };
+            };
+        };
+    };
     requestContractCall: {
         parameters: {
             query?: never;
@@ -2372,6 +2563,133 @@ export interface operations {
             };
         };
     };
+    reconcileExecution: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Select the exact execution contract from GET /v1/execution-capabilities. */
+                "execution-profile": "erc3009-relayer-v1" | "erc3009-executor-v1" | "approved-evm-executor-v1";
+                /** @description Unknown revisions are rejected; the server never substitutes a different execution contract. */
+                "execution-profile-revision": "1";
+                "idempotency-key": string;
+            };
+            path: {
+                actionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        recovery?: {
+                            /** @enum {string} */
+                            state: "observing" | "suspected-stuck" | "awaiting-finality" | "finalized" | "unavailable" | "blocked";
+                            /** @enum {string} */
+                            reason: "within-threshold" | "pending-too-long" | "nonce-gap-suspected" | "nonce-consumed-without-result" | "safe-nonce-advanced" | "insufficient-sponsor-funds" | "fee-cap-below-base-fee" | "transaction-not-visible" | "provider-nonce-conflict" | "evidence-unavailable" | "awaiting-finality" | "verified-finality";
+                            /** Format: date-time */
+                            observed_at: string;
+                            pending_age_ms: number;
+                            quarantined: boolean;
+                            sponsor_nonce?: string;
+                            confirmed_nonce?: string;
+                            finalized_nonce?: string;
+                            safe_nonce?: string;
+                            /** @enum {string} */
+                            next_action: "wait" | "restore-evidence" | "fund-sponsor" | "review-provider-fees" | "review-provider-nonces" | "reconcile" | "operator-review";
+                        };
+                        /** @enum {string} */
+                        profile: "erc3009-relayer-v1" | "erc3009-executor-v1" | "approved-evm-executor-v1";
+                        /**
+                         * @description What verified success establishes: exact token transfer, successful approved calls, or the required swap/vault asset effects. Contract execution alone does not prove an arbitrary business outcome.
+                         * @enum {string}
+                         */
+                        outcome_scope?: "token-transfer" | "contract-execution" | "swap-effects" | "vault-deposit-effects";
+                        /** @enum {string} */
+                        profile_revision: "1";
+                        action_id: string;
+                        execution_id: string;
+                        /**
+                         * @description Durable submission state. Accepted identifies a durable executor/provider acceptance; it is not chain inclusion or settlement.
+                         * @enum {string}
+                         */
+                        dispatch_status: "not_started" | "pending" | "accepted" | "unknown" | "failed";
+                        observation_revision: number;
+                        next_poll_after_ms: number;
+                        /** @enum {string} */
+                        chain_status: "unobserved" | "pending" | "included" | "safe" | "finalized" | "reorged";
+                        /**
+                         * @description RPC quorum means agreement of all configured trusted RPC sources on exact receipt effects and canonical block evidence, not a cryptographic light-client proof.
+                         * @enum {string}
+                         */
+                        verification: "unverified" | "rpc-quorum";
+                        /** @enum {string} */
+                        outcome: "unknown" | "succeeded" | "reverted";
+                        /**
+                         * @description The supported token transfer reaches succeeded/reverted settlement only after matching finalized chain evidence. This is not a claim of general business-operation completion.
+                         * @enum {string}
+                         */
+                        settlement: "pending" | "succeeded" | "reverted";
+                        /** Format: date-time */
+                        observed_at: string;
+                        transaction_hash?: string;
+                        block_hash?: string;
+                        block_number?: string;
+                        /**
+                         * @description An external party can relay the same ERC-3009 authorization. Only its exact verified token effect can establish success.
+                         * @enum {string}
+                         */
+                        execution_origin?: "sponsor" | "external";
+                    } & ({
+                        /** @enum {unknown} */
+                        verification?: "unverified";
+                        /** @enum {unknown} */
+                        chain_status?: "unobserved" | "pending" | "reorged";
+                        /** @enum {unknown} */
+                        outcome?: "unknown";
+                        /** @enum {unknown} */
+                        settlement?: "pending";
+                    } | {
+                        /** @enum {unknown} */
+                        verification?: "rpc-quorum";
+                        /** @enum {unknown} */
+                        chain_status?: "included" | "safe";
+                        /** @enum {unknown} */
+                        outcome?: "succeeded" | "reverted";
+                        /** @enum {unknown} */
+                        settlement?: "pending";
+                    } | {
+                        /** @enum {unknown} */
+                        verification?: "rpc-quorum";
+                        /** @enum {unknown} */
+                        chain_status?: "finalized";
+                        /** @enum {unknown} */
+                        outcome?: "succeeded";
+                        /** @enum {unknown} */
+                        settlement?: "succeeded";
+                    } | {
+                        /** @enum {unknown} */
+                        verification?: "rpc-quorum";
+                        /** @enum {unknown} */
+                        chain_status?: "finalized";
+                        /** @enum {unknown} */
+                        outcome?: "reverted";
+                        /** @enum {unknown} */
+                        settlement?: "reverted";
+                    });
+                };
+            };
+        };
+    };
     executeTransfer: {
         parameters: {
             query?: never;
@@ -2400,6 +2718,22 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
+                        recovery?: {
+                            /** @enum {string} */
+                            state: "observing" | "suspected-stuck" | "awaiting-finality" | "finalized" | "unavailable" | "blocked";
+                            /** @enum {string} */
+                            reason: "within-threshold" | "pending-too-long" | "nonce-gap-suspected" | "nonce-consumed-without-result" | "safe-nonce-advanced" | "insufficient-sponsor-funds" | "fee-cap-below-base-fee" | "transaction-not-visible" | "provider-nonce-conflict" | "evidence-unavailable" | "awaiting-finality" | "verified-finality";
+                            /** Format: date-time */
+                            observed_at: string;
+                            pending_age_ms: number;
+                            quarantined: boolean;
+                            sponsor_nonce?: string;
+                            confirmed_nonce?: string;
+                            finalized_nonce?: string;
+                            safe_nonce?: string;
+                            /** @enum {string} */
+                            next_action: "wait" | "restore-evidence" | "fund-sponsor" | "review-provider-fees" | "review-provider-nonces" | "reconcile" | "operator-review";
+                        };
                         /** @enum {string} */
                         profile: "erc3009-relayer-v1" | "erc3009-executor-v1" | "approved-evm-executor-v1";
                         /**
@@ -2676,6 +3010,22 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
+                        recovery?: {
+                            /** @enum {string} */
+                            state: "observing" | "suspected-stuck" | "awaiting-finality" | "finalized" | "unavailable" | "blocked";
+                            /** @enum {string} */
+                            reason: "within-threshold" | "pending-too-long" | "nonce-gap-suspected" | "nonce-consumed-without-result" | "safe-nonce-advanced" | "insufficient-sponsor-funds" | "fee-cap-below-base-fee" | "transaction-not-visible" | "provider-nonce-conflict" | "evidence-unavailable" | "awaiting-finality" | "verified-finality";
+                            /** Format: date-time */
+                            observed_at: string;
+                            pending_age_ms: number;
+                            quarantined: boolean;
+                            sponsor_nonce?: string;
+                            confirmed_nonce?: string;
+                            finalized_nonce?: string;
+                            safe_nonce?: string;
+                            /** @enum {string} */
+                            next_action: "wait" | "restore-evidence" | "fund-sponsor" | "review-provider-fees" | "review-provider-nonces" | "reconcile" | "operator-review";
+                        };
                         /** @enum {string} */
                         profile: "erc3009-relayer-v1" | "erc3009-executor-v1" | "approved-evm-executor-v1";
                         /**
@@ -2978,6 +3328,22 @@ export interface operations {
                             datacontenttype: "application/json";
                             sequence: number;
                             data: {
+                                recovery?: {
+                                    /** @enum {string} */
+                                    state: "observing" | "suspected-stuck" | "awaiting-finality" | "finalized" | "unavailable" | "blocked";
+                                    /** @enum {string} */
+                                    reason: "within-threshold" | "pending-too-long" | "nonce-gap-suspected" | "nonce-consumed-without-result" | "safe-nonce-advanced" | "insufficient-sponsor-funds" | "fee-cap-below-base-fee" | "transaction-not-visible" | "provider-nonce-conflict" | "evidence-unavailable" | "awaiting-finality" | "verified-finality";
+                                    /** Format: date-time */
+                                    observed_at: string;
+                                    pending_age_ms: number;
+                                    quarantined: boolean;
+                                    sponsor_nonce?: string;
+                                    confirmed_nonce?: string;
+                                    finalized_nonce?: string;
+                                    safe_nonce?: string;
+                                    /** @enum {string} */
+                                    next_action: "wait" | "restore-evidence" | "fund-sponsor" | "review-provider-fees" | "review-provider-nonces" | "reconcile" | "operator-review";
+                                };
                                 /** @enum {string} */
                                 profile: "erc3009-relayer-v1" | "erc3009-executor-v1" | "approved-evm-executor-v1";
                                 /**

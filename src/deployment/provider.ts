@@ -1,3 +1,8 @@
+import {
+  PayerOperations,
+  emptyOperationsState,
+} from '../execution/operations.js';
+import { SafeExecutionQueue } from '../execution/queue.js';
 import { executionConfigurationIdentity } from '../executor/protocol.js';
 import { createServiceIdentity } from '../executor/auth.js';
 import { createRemoteExecutionProvider } from '../execution/remote.js';
@@ -248,6 +253,45 @@ export async function createConfiguredProvider(
           config.execution.maxLogRange,
         )
       : undefined;
+    let operationsBinding: string | undefined;
+    const operations =
+      config.operations && config.execution && observer
+        ? new PayerOperations(
+            config.operations,
+            {
+              transaction: (operation) =>
+                database.onboardingStore.transaction((state) => {
+                  if (
+                    state.deploymentBindings?.['service-v1']?.activeRevision !==
+                    activeRevision
+                  )
+                    throw new Error('Inactive configuration');
+                  const data = ((state.operations ??= {})['service-v1'] ??=
+                    emptyOperationsState());
+                  if (data.binding !== operationsBinding)
+                    throw new Error('Inactive operations configuration');
+                  return operation(data);
+                }),
+            },
+            config.execution.sponsors.map((sponsor) => ({
+              address: sponsor.binding.address,
+              balance: () => observer.payerBalance(sponsor.binding.address),
+            })),
+            config.policy.provider.origin,
+            resolveSecret,
+          )
+        : undefined;
+    if (operations) {
+      operationsBinding = operations.binding;
+      await database.onboardingStore.transaction((state) => {
+        ((state.operations ??= {})['service-v1'] ??=
+          emptyOperationsState()).binding = operationsBinding;
+      });
+    } else
+      await database.onboardingStore.transaction((state) => {
+        if (state.operations?.['service-v1'])
+          state.operations['service-v1'].binding = 'disabled';
+      });
     const execution =
       config.execution && actions
         ? new TransferExecutionCoordinator(
@@ -265,6 +309,18 @@ export async function createConfiguredProvider(
                   resolveSecret(config.execution.relayer!.apiKey),
                 ),
             observer!,
+            operations,
+          )
+        : undefined;
+    const safeQueue =
+      config.execution?.safeQueue && execution && actions && observer
+        ? new SafeExecutionQueue(
+            actions,
+            database,
+            execution,
+            (binding, owner) => observer.contractNonce(binding, owner),
+            config.execution.safeQueue,
+            config.execution.pollIntervalSeconds,
           )
         : undefined;
     const currentConfiguration = () =>
@@ -294,6 +350,7 @@ export async function createConfiguredProvider(
           }
         : undefined,
       authenticate,
+      operationsHealth: operations ? () => operations.health() : undefined,
       configurationProfile: config.profile,
       actionProfiles: [
         ...(config.financial ? [config.financial.profile] : []),
@@ -317,6 +374,7 @@ export async function createConfiguredProvider(
           ),
         actions,
         execution,
+        safeQueue,
         executionIdentity,
         contractNonce:
           config.approvedCalls && observer
@@ -324,6 +382,8 @@ export async function createConfiguredProvider(
             : undefined,
       },
       onClose: async () => {
+        await operations?.close();
+        await safeQueue?.close();
         await execution?.close();
         database.close();
       },
@@ -339,7 +399,11 @@ export async function createConfiguredProvider(
         )),
       documentation: config.http?.documentation ?? false,
     });
-    if (config.activation.enabled) execution?.start();
+    if (config.activation.enabled) {
+      operations?.start();
+      execution?.start();
+      safeQueue?.start();
+    }
     return app;
   } catch (error) {
     database.close();

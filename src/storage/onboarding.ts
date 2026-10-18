@@ -3,6 +3,10 @@ import type { StorageConnection } from './connection.js';
 
 const collections = [
   'supportedActions',
+  'operations',
+  'executionPools',
+  'sponsorQuarantines',
+  'safeRequests',
   'deploymentBindings',
   'backendAccounts',
   'requests',

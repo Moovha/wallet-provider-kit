@@ -416,6 +416,41 @@ export class SupportedActions {
     }
     return this.read(context.principal, record.approval.action.action_id);
   }
+  /** Current delegation for an unsigned queued request; queue admission never authorizes signing by itself. */
+  async queueAuthority(
+    principal: VerifiedPrincipal,
+    input: ApprovedCallInput,
+    expiresAt: string,
+  ) {
+    if (!this.callConfiguration || !Number.isFinite(Date.parse(expiresAt)))
+      deny();
+    const { grant, account } = await this.binding(
+      principal,
+      input.account_id,
+      'contracts:request',
+    );
+    const intent = buildApprovedCallIntent(
+      this.callConfiguration.policy,
+      input,
+      '0',
+      expiresAt,
+    );
+    return {
+      grantId: grant.id,
+      owner: grant.owner,
+      consentReference: grant.requestId,
+      safeAddress: intent.account.address.toLowerCase(),
+      address: account.address!,
+    };
+  }
+  queueExpiry(maximumSeconds: number) {
+    if (!this.callConfiguration) deny();
+    return new Date(
+      (Math.floor(Date.now() / 1000) +
+        Math.min(maximumSeconds, this.callConfiguration.maxValiditySeconds)) *
+        1000,
+    ).toISOString();
+  }
   /** Admit exact contract calls only under the separately consented contract policy. */
   async requestCalls(
     inputContext: AuthorityContext,
@@ -424,6 +459,7 @@ export class SupportedActions {
       binding: import('../execution/approved-calls.js').SafeAccountBinding,
       owner: string,
     ) => Promise<string>,
+    queued?: { id: string; expiresAt: string },
   ) {
     const context = structuredClone(inputContext);
     input = structuredClone(input);
@@ -454,11 +490,15 @@ export class SupportedActions {
         throw new WalletProviderError('wallet_attempt_conflict');
       return state.supportedActions[entry.id];
     });
-    const expiresAt = new Date(
-      (Math.floor(Date.now() / 1000) +
-        this.callConfiguration!.maxValiditySeconds) *
-        1000,
-    ).toISOString();
+    const expiresAt =
+      queued?.expiresAt ??
+      this.queueExpiry(this.callConfiguration!.maxValiditySeconds);
+    if (
+      Date.parse(expiresAt) <= Date.now() ||
+      Date.parse(expiresAt) >
+        Date.now() + this.callConfiguration.maxValiditySeconds * 1000
+    )
+      deny();
     const intent =
       previous?.intent ??
       buildApprovedCallIntent(
@@ -484,6 +524,29 @@ export class SupportedActions {
         return state.supportedActions[entry.id];
       }
       const records = (state.supportedActions ??= {});
+      const pending = Object.values(state.safeRequests ?? {})
+        .filter(
+          (entry) =>
+            entry.safeAddress === intent.account.address.toLowerCase() &&
+            ['queued', 'executing', 'blocked'].includes(entry.status),
+        )
+        .sort((a, b) => a.sequence - b.sequence);
+      if (pending.length && (!queued || pending[0].id !== queued.id))
+        throw new WalletProviderError('wallet_attempt_conflict');
+      if (
+        queued &&
+        (!pending.length ||
+          pending[0].id !== queued.id ||
+          pending[0].revision !== this.revision ||
+          pending[0].grantId !== grant.id ||
+          pending[0].owner !== grant.owner ||
+          pending[0].consentReference !== grant.requestId ||
+          !sameCaller(pending[0].principal, context.principal) ||
+          pending[0].address !== account.address ||
+          fingerprint(pending[0].input) !== fingerprint(input) ||
+          pending[0].expiresAt !== expiresAt)
+      )
+        deny();
       // Expired actions release a nonce only when the same transaction proves no signing admission ever existed.
       for (const record of Object.values(records)) {
         if (

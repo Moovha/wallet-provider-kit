@@ -1,3 +1,4 @@
+import { recoveryDiagnosisSchema } from './recovery.js';
 import { uuidSchema } from '../service/schemas.js';
 
 export const executionHeaders = {
@@ -48,6 +49,7 @@ export const executionReceiptSchema = {
     'observed_at',
   ],
   properties: {
+    recovery: recoveryDiagnosisSchema,
     profile: {
       type: 'string',
       enum: [

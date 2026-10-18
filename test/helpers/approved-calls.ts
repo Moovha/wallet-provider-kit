@@ -48,6 +48,7 @@ export function approvedCallsFixture(
   const originalRequest = original.request;
   const state = {
     included: false,
+    target: policy.accounts[0].address,
     lostResponse: false,
     digest: '',
     data: '',
@@ -72,7 +73,7 @@ export function approvedCallsFixture(
     const output = [
       {
         ...common,
-        address: policy.accounts[0].address,
+        address: state.target,
         ...safeInterface.encodeEventLog(
           safeInterface.getEvent(
             state.safeSuccess ? 'ExecutionSuccess' : 'ExecutionFailure',
@@ -113,9 +114,10 @@ export function approvedCallsFixture(
   }
   const accepted = () => ({
     id: original.transactionId,
+    nonce: 0,
     relayer_id: 'sponsor-relayer',
     from: original.configuration.sponsors[0].binding.address,
-    to: policy.accounts[0].address,
+    to: state.target,
     value: '0x0',
     data: state.data,
     gas_limit: 150000,
@@ -132,11 +134,15 @@ export function approvedCallsFixture(
       if (options?.method === 'POST') {
         const body = JSON.parse(String(options.body));
         if (
-          body.to.toLowerCase() !== policy.accounts[0].address.toLowerCase() ||
+          !policy.accounts.some(
+            (account) =>
+              account.address.toLowerCase() === body.to.toLowerCase(),
+          ) ||
           body.value !== '0x0'
         )
           throw new Error('Invalid fixture dispatch');
         state.posts++;
+        state.target = body.to;
         state.data = body.data;
         if (state.lostResponse) throw new Error('Offline response loss');
       }
@@ -154,11 +160,26 @@ export function approvedCallsFixture(
     if (method === 'eth_chainId') result = '0x14a34';
     else if (method === 'eth_getCode') result = offlineCode;
     else if (method === 'eth_getBalance') result = '0x10000000000000000';
+    else if (method === 'eth_getTransactionCount')
+      result = toQuantity(
+        params[1] === 'pending'
+          ? state.posts
+            ? 1
+            : 0
+          : state.included && BigInt(params[1]) >= 101n
+            ? 1
+            : 0,
+      );
     else if (method === 'eth_getBlockByNumber')
       result =
         params[0] === '0x0'
-          ? { number: '0x0', hash: original.configuration.rpc.genesisHash }
+          ? {
+              number: '0x0',
+              baseFeePerGas: '0x3b9aca00',
+              hash: original.configuration.rpc.genesisHash,
+            }
           : {
+              baseFeePerGas: '0x3b9aca00',
               number:
                 params[0] === 'latest'
                   ? '0x66'
@@ -172,10 +193,15 @@ export function approvedCallsFixture(
       result = state.included
         ? {
             hash: original.transactionHash,
+            type: '0x2',
+            nonce: '0x0',
+            gas: '0x249f0',
+            maxFeePerGas: '0xb2d05e00',
+            maxPriorityFeePerGas: '0x3b9aca00',
             blockHash: original.blockHash,
             blockNumber: '0x65',
             from: original.configuration.sponsors[0].binding.address,
-            to: policy.accounts[0].address,
+            to: state.target,
             value: '0x0',
             chainId: '0x14a34',
             input: state.data,
@@ -188,7 +214,7 @@ export function approvedCallsFixture(
             blockHash: original.blockHash,
             blockNumber: '0x65',
             from: original.configuration.sponsors[0].binding.address,
-            to: policy.accounts[0].address,
+            to: state.target,
             status: '0x1',
             logs: logs(),
           }

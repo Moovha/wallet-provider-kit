@@ -783,3 +783,72 @@ describe('execution wire authentication', () => {
     expect(t.f.state.posts).toBe(0);
   });
 });
+
+it('enforces sponsor capacity atomically across wallet origins and releases capacity only on verified finality', async () => {
+  const t = await fixture(),
+    provider = t.config.providers[0];
+  provider.revision = '2';
+  provider.sponsorPool = { strategy: 'round-robin', maxInFlightPerSponsor: 2 };
+  const db = openExecutorDatabase(t.config, process.cwd());
+  const make = () => {
+    const dispatch = structuredClone(t.dispatch);
+    dispatch.execution_id = randomUUID();
+    dispatch.provider_revision = '2';
+    dispatch.plan.action.action_id = randomUUID();
+    dispatch.plan.action.operation_id = dispatch.plan.action.action_id;
+    dispatch.wallet_attempt = createWalletAttemptRequest(
+      'configured-execution-v1',
+      'erc3009-executor-v1',
+      'relay_transaction',
+      dispatch.wallet_attempt.accountId,
+      dispatch.execution_id,
+      dispatch.plan.action.action_id,
+      dispatch.plan,
+    );
+    return dispatch;
+  };
+  try {
+    const first = make(),
+      second = make(),
+      third = make();
+    const a = db.admit(t.wallet.origin, first, provider),
+      b = db.admit('https://other-wallet.example.test', second, provider);
+    expect(() => db.admit(t.wallet.origin, third, provider)).toThrow();
+    expect(
+      db.admit(t.wallet.origin, first, provider).dispatch.execution_id,
+    ).toBe(first.execution_id);
+    db.observe(a, {
+      chain_status: 'included',
+      verification: 'rpc-quorum',
+      outcome: 'succeeded',
+      settlement: 'pending',
+      observed_at: new Date().toISOString(),
+      transaction_hash: t.f.transactionHash,
+      block_hash: t.f.blockHash,
+      block_number: '101',
+      execution_origin: 'sponsor',
+    });
+    expect(() => db.admit(t.wallet.origin, third, provider)).toThrow();
+    const latest = db.load(first.execution_id, t.wallet.origin)!;
+    db.observe(latest, {
+      chain_status: 'finalized',
+      verification: 'rpc-quorum',
+      outcome: 'succeeded',
+      settlement: 'succeeded',
+      observed_at: new Date().toISOString(),
+      transaction_hash: t.f.transactionHash,
+      block_hash: t.f.blockHash,
+      block_number: '101',
+      execution_origin: 'sponsor',
+    });
+    expect(
+      db.admit(t.wallet.origin, third, provider).dispatch.execution_id,
+    ).toBe(third.execution_id);
+    expect(
+      db.load(b.dispatch.execution_id, 'https://other-wallet.example.test')!
+        .observation,
+    ).toBeUndefined();
+  } finally {
+    db.close();
+  }
+});

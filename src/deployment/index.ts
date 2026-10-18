@@ -72,3 +72,20 @@ export {
   type PinnedContract,
 } from '../execution/approved-calls.js';
 export type { ApprovedExecutionPlan } from '../execution/types.js';
+
+export { SafeExecutionQueue } from '../execution/queue.js';
+export type { SafeQueueRecord } from '../execution/queue.js';
+
+export type {
+  RecoveryConfiguration,
+  RecoveryDiagnosis,
+  NonceSnapshot,
+  ProviderInspection,
+} from '../execution/recovery.js';
+
+export type {
+  OperationsConfiguration,
+  OperationsHealth,
+  PayerEvent,
+} from '../execution/operations.js';
+export { payerKey } from '../execution/operations.js';

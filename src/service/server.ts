@@ -46,6 +46,9 @@ export interface ServerOptions {
   onboarding?: OnboardingHttpOptions;
   /** Must check durable authority/recovery dependencies; never infer readiness from env keys. */
   ready?: () => Promise<boolean>;
+  operationsHealth?: () => Promise<
+    import('../execution/operations.js').OperationsHealth
+  >;
   documentation?: boolean;
   /** Optional operator-authenticated client-credentials broker for the deployed explorer. */
   documentationTokens?: DocumentationTokenOptions;
@@ -87,7 +90,7 @@ export async function createServer(options: ServerOptions = {}) {
         title: 'Moovha Wallet Provider Service',
         version: '0.1.0',
         description:
-          'Experimental wallet-provider API with application-led access and optional hosted compatibility. Signing returns an approved EIP-712 signature; it does not submit a transaction or pay gas. Optional approved-transfer execution coordinates signing, simulation and sponsored submission through a durable attempt; independent RPC checks verify transfer effects and finality. Application transaction-event reports remain unverified and do not establish settlement. General contract calls require a stored policy-approved action and the explicit Safe execution profile; no blind signing or direct arbitrary-submission endpoint is exposed. Not the Moovha operation orchestration API.',
+          'Experimental wallet-provider API with application-led access and optional hosted compatibility. Signing returns an approved EIP-712 signature; it does not submit a transaction or pay gas. Optional approved-transfer execution coordinates signing, simulation and sponsored submission through a durable attempt; independent RPC checks verify transfer effects and finality. Application transaction-event reports remain unverified and do not establish settlement. General contract calls require a stored policy-approved action and the explicit Safe execution profile; no blind signing or direct arbitrary-submission endpoint is exposed. Optional bounded Safe request queues authorize delayed execution under fresh current authority; configurable sponsor pools retain one selected payer per execution. Not the Moovha operation orchestration API.',
       },
       components: {
         securitySchemes: {
@@ -139,6 +142,7 @@ export async function createServer(options: ServerOptions = {}) {
           enrollment: !!options.enrollment,
           financial: !!options.onboarding?.actions?.consentTerms(),
           execution: !!options.onboarding?.execution,
+          safeQueue: !!options.onboarding?.safeQueue,
           executionService: !!options.onboarding?.executionIdentity,
           contractCalls: !!options.onboarding?.contractNonce,
           signing:
@@ -253,9 +257,16 @@ export async function createServer(options: ServerOptions = {}) {
     { schema: { hide: true } },
     async (_request, reply) => {
       const ready = await isReady();
-      return reply
-        .code(ready ? 200 : 503)
-        .send({ status: ready ? 'ready' : 'unconfigured' });
+      return reply.code(ready ? 200 : 503).send({
+        status: ready ? 'ready' : 'unconfigured',
+        ...(options.operationsHealth
+          ? {
+              operations: await options
+                .operationsHealth()
+                .catch(() => ({ status: 'unavailable' })),
+            }
+          : {}),
+      });
     },
   );
   app.get('/openapi.json', { schema: { hide: true } }, async () =>

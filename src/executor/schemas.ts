@@ -1,4 +1,8 @@
 import {
+  providerInspectionSchema,
+  recoveryDiagnosisSchema,
+} from '../execution/recovery.js';
+import {
   approvedCallIntentSchema,
   safePayloadSchema,
 } from '../execution/call-schemas.js';
@@ -51,6 +55,8 @@ export const executorReceiptSchema = {
   additionalProperties: false,
   required: ['contract', 'execution_id', 'plan_hash', 'dispatch_status'],
   properties: {
+    provider_inspection: providerInspectionSchema,
+    recovery: recoveryDiagnosisSchema,
     contract: { type: 'string', enum: ['execution-dispatch-v1'] },
     execution_id: uuidSchema,
     plan_hash: hash,

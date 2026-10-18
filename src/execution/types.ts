@@ -45,6 +45,9 @@ export interface ExecutionConfiguration {
     tokenCodeHash?: string;
   };
   sponsors: ExecutionSponsor[];
+  sponsorPool?: { strategy: 'round-robin'; maxInFlightPerSponsor: number };
+  safeQueue?: { maxDepthPerSafe: number; maxWaitSeconds: number };
+  recovery?: import('./recovery.js').RecoveryConfiguration;
   pollIntervalSeconds: number;
   maxLogRange: number;
 }
@@ -85,6 +88,11 @@ export interface TransferExecutionRecord {
   dispatchLeaseUntil?: number;
   configurationHash: string;
   sponsorClientId: string;
+  sponsorAccountId?: string;
+  sponsorAddress?: string;
+  startedAt?: number;
+  providerNonce?: string;
+  recovery?: import('./recovery.js').RecoveryDiagnosis;
   plan?: TransferExecutionPlan;
   planHash?: string;
   observation?: ChainObservation;
@@ -99,6 +107,7 @@ export interface TransferExecutionRecord {
 }
 
 export interface ExecutionReceipt extends ChainObservation {
+  recovery?: import('./recovery.js').RecoveryDiagnosis;
   profile: ExecutionProfile;
   profile_revision: '1';
   action_id: string;
@@ -125,6 +134,10 @@ export interface ExecutionRecovery {
   transactionHash?: string;
 }
 export interface ExecutionProvider {
+  inspect?(
+    plan: TransferExecutionPlan,
+    transactionId: string,
+  ): Promise<import('./recovery.js').ProviderInspection>;
   prepare(plan: TransferExecutionPlan): Promise<void>;
   submit(
     plan: TransferExecutionPlan,
@@ -141,6 +154,10 @@ export interface ExecutionProvider {
 }
 
 export interface ExecutionObserver {
+  nonceSnapshot?(
+    plan: TransferExecutionPlan,
+    ownHash?: string,
+  ): Promise<import('./recovery.js').NonceSnapshot>;
   anchor(): Promise<string>;
   preflight(plan: TransferExecutionPlan): Promise<void>;
   observe(

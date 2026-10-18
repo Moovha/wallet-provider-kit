@@ -104,6 +104,18 @@ export default defineConfig({
             link: '/docs/approved-contract-calls',
           },
           {
+            text: 'Safe queues and sponsor pools',
+            link: '/docs/safe-queue-and-sponsor-pools',
+          },
+          {
+            text: 'Stuck transaction recovery',
+            link: '/docs/stuck-transactions-and-recovery',
+          },
+          {
+            text: 'Payer events and health',
+            link: '/docs/payer-events-and-health',
+          },
+          {
             text: 'Executor HTTP schemas',
             link: '/docs/executor-http-reference',
           },
@@ -187,6 +199,18 @@ export default defineConfig({
           {
             text: 'Approved contract calls',
             link: '/docs/approved-contract-calls',
+          },
+          {
+            text: 'Safe queues and sponsor pools',
+            link: '/docs/safe-queue-and-sponsor-pools',
+          },
+          {
+            text: 'Stuck transaction recovery',
+            link: '/docs/stuck-transactions-and-recovery',
+          },
+          {
+            text: 'Payer events and health',
+            link: '/docs/payer-events-and-health',
           },
           {
             text: 'Executor HTTP schemas',

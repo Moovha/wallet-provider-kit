@@ -610,7 +610,7 @@ test('API reference follows the configuration, preserves edits, shows Swagger sc
   await expect(
     page.getByRole('heading', { name: 'Provider API reference', exact: true }),
   ).toBeVisible();
-  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(23);
+  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(27);
   await expect(
     page
       .getByText('Not enabled: Wallet operations are disabled in Deployment', {
@@ -652,7 +652,7 @@ test('API reference follows the configuration, preserves edits, shows Swagger sc
     page.getByLabel('cURL request example', { exact: true }),
   ).toContainText('wallet.example.com/v1/accounts/');
   await page.getByLabel('Find an endpoint', { exact: true }).fill('');
-  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(23);
+  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(27);
   await page
     .getByLabel('Example endpoint', { exact: true })
     .selectOption('signAction');
@@ -711,7 +711,7 @@ test('API reference follows the configuration, preserves edits, shows Swagger sc
     permissions: ['account:read', 'transfers:request'],
   });
   await imported(page, financial);
-  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(23);
+  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(27);
   await page
     .getByLabel('Example endpoint', { exact: true })
     .selectOption('signAction');
@@ -794,7 +794,7 @@ test('API renderer can retry a failed bundled asset without losing setup', async
   await page
     .getByRole('button', { name: 'Reload API reference', exact: true })
     .click();
-  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(23);
+  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(27);
   await page
     .getByRole('button', { name: 'Setup configuration', exact: true })
     .click();
@@ -1267,4 +1267,102 @@ test('operators can configure and export contract-only execution policies withou
     path: 'artifacts/setup-approved-calls.png',
     fullPage: true,
   });
+});
+
+test('operators can export per-Safe queue limits and multiple sponsors for one application', async ({
+  page,
+}) => {
+  const config = JSON.parse(
+    await readFile(
+      new URL(
+        '../../docs/provider.config.contracts.example.json',
+        import.meta.url,
+      ),
+      'utf8',
+    ),
+  );
+  const second = structuredClone(config.execution.sponsors[0]);
+  second.accountId = '30000000-0000-4000-8000-000000000003';
+  second.binding.address = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+  config.execution.sponsors.push(second);
+  config.execution.sponsorPool = {
+    strategy: 'round-robin',
+    maxInFlightPerSponsor: 4,
+  };
+  await imported(page, config);
+  await step(page, 'Deployment');
+  await expect(
+    page.getByLabel('Enable round-robin sponsor pools', { exact: true }),
+  ).toBeChecked();
+  await page
+    .getByText('Enable durable per-Safe request queues', { exact: true })
+    .click();
+  await page
+    .getByLabel('Maximum pending requests per Safe', { exact: true })
+    .fill('12');
+  await page
+    .getByLabel('Maximum queue validity in seconds', { exact: true })
+    .fill('180');
+  await page
+    .getByLabel('Maximum unfinished executions per sponsor', { exact: true })
+    .fill('3');
+  await page
+    .getByText('Detect stuck execution and nonce problems', { exact: true })
+    .click();
+  await page
+    .getByLabel('Stuck suspicion threshold in seconds', { exact: true })
+    .fill('120');
+  await page
+    .getByText('Monitor payer balances, health and webhooks', { exact: true })
+    .click();
+  await page
+    .getByLabel('Low gas balance threshold in wei', { exact: true })
+    .fill('2000000000000000');
+  await page
+    .getByRole('button', { name: 'Add payer webhook', exact: true })
+    .click();
+  await page
+    .getByLabel('Webhook destination ID', { exact: true })
+    .fill('alerts');
+  const saved = await exported(page);
+  expect(saved.execution.recovery).toEqual({
+    stuckAfterSeconds: 120,
+    quarantineOnStuck: true,
+  });
+  expect(saved.operations).toEqual({
+    pollIntervalSeconds: 15,
+    lowBalanceWei: '2000000000000000',
+    webhooks: [
+      {
+        id: 'alerts',
+        endpoint: { env: 'PAYER_WEBHOOK_1_URL' },
+        signingSecrets: [{ env: 'PAYER_WEBHOOK_1_SECRET' }],
+      },
+    ],
+  });
+  expect(saved.execution.safeQueue).toEqual({
+    maxDepthPerSafe: 12,
+    maxWaitSeconds: 180,
+  });
+  expect(saved.execution.sponsorPool).toEqual({
+    strategy: 'round-robin',
+    maxInFlightPerSponsor: 3,
+  });
+  expect(saved.execution.sponsors).toHaveLength(2);
+  expect(saved.execution.sponsors[0].clientId).toBe(
+    saved.execution.sponsors[1].clientId,
+  );
+  await page
+    .getByRole('button', { name: 'API reference', exact: true })
+    .click();
+  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(27);
+  await page
+    .getByLabel('Example endpoint', { exact: true })
+    .selectOption('enqueueContractCall');
+  await expect(page.getByLabel('cURL request example')).toContainText(
+    '/v1/contract-call-requests',
+  );
+  await expect(page.getByLabel('cURL request example')).toContainText(
+    'Idempotency-Key',
+  );
 });

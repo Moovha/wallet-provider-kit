@@ -1155,6 +1155,102 @@
                     "dispatch_status"
                   ],
                   "properties": {
+                    "provider_inspection": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["status"],
+                      "properties": {
+                        "status": { "type": "string", "maxLength": 32 },
+                        "nonce": {
+                          "type": "string",
+                          "pattern": "^(0|[1-9][0-9]{0,77})$"
+                        },
+                        "transactionHash": {
+                          "type": "string",
+                          "pattern": "^0x[0-9a-f]{64}$"
+                        }
+                      }
+                    },
+                    "recovery": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "state",
+                        "reason",
+                        "observed_at",
+                        "pending_age_ms",
+                        "quarantined",
+                        "next_action"
+                      ],
+                      "properties": {
+                        "state": {
+                          "type": "string",
+                          "enum": [
+                            "observing",
+                            "suspected-stuck",
+                            "awaiting-finality",
+                            "finalized",
+                            "unavailable",
+                            "blocked"
+                          ]
+                        },
+                        "reason": {
+                          "type": "string",
+                          "enum": [
+                            "within-threshold",
+                            "pending-too-long",
+                            "nonce-gap-suspected",
+                            "nonce-consumed-without-result",
+                            "safe-nonce-advanced",
+                            "insufficient-sponsor-funds",
+                            "fee-cap-below-base-fee",
+                            "transaction-not-visible",
+                            "provider-nonce-conflict",
+                            "evidence-unavailable",
+                            "awaiting-finality",
+                            "verified-finality"
+                          ]
+                        },
+                        "observed_at": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "pending_age_ms": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "quarantined": { "type": "boolean" },
+                        "sponsor_nonce": {
+                          "type": "string",
+                          "pattern": "^(0|[1-9][0-9]{0,77})$"
+                        },
+                        "confirmed_nonce": {
+                          "type": "string",
+                          "pattern": "^(0|[1-9][0-9]{0,77})$"
+                        },
+                        "finalized_nonce": {
+                          "type": "string",
+                          "pattern": "^(0|[1-9][0-9]{0,77})$"
+                        },
+                        "safe_nonce": {
+                          "type": "string",
+                          "pattern": "^(0|[1-9][0-9]{0,77})$"
+                        },
+                        "next_action": {
+                          "type": "string",
+                          "enum": [
+                            "wait",
+                            "restore-evidence",
+                            "fund-sponsor",
+                            "review-provider-fees",
+                            "review-provider-nonces",
+                            "reconcile",
+                            "operator-review"
+                          ]
+                        }
+                      }
+                    },
                     "contract": {
                       "type": "string",
                       "enum": ["execution-dispatch-v1"]
@@ -1220,6 +1316,102 @@
                     "dispatch_status"
                   ],
                   "properties": {
+                    "provider_inspection": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["status"],
+                      "properties": {
+                        "status": { "type": "string", "maxLength": 32 },
+                        "nonce": {
+                          "type": "string",
+                          "pattern": "^(0|[1-9][0-9]{0,77})$"
+                        },
+                        "transactionHash": {
+                          "type": "string",
+                          "pattern": "^0x[0-9a-f]{64}$"
+                        }
+                      }
+                    },
+                    "recovery": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "state",
+                        "reason",
+                        "observed_at",
+                        "pending_age_ms",
+                        "quarantined",
+                        "next_action"
+                      ],
+                      "properties": {
+                        "state": {
+                          "type": "string",
+                          "enum": [
+                            "observing",
+                            "suspected-stuck",
+                            "awaiting-finality",
+                            "finalized",
+                            "unavailable",
+                            "blocked"
+                          ]
+                        },
+                        "reason": {
+                          "type": "string",
+                          "enum": [
+                            "within-threshold",
+                            "pending-too-long",
+                            "nonce-gap-suspected",
+                            "nonce-consumed-without-result",
+                            "safe-nonce-advanced",
+                            "insufficient-sponsor-funds",
+                            "fee-cap-below-base-fee",
+                            "transaction-not-visible",
+                            "provider-nonce-conflict",
+                            "evidence-unavailable",
+                            "awaiting-finality",
+                            "verified-finality"
+                          ]
+                        },
+                        "observed_at": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "pending_age_ms": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "quarantined": { "type": "boolean" },
+                        "sponsor_nonce": {
+                          "type": "string",
+                          "pattern": "^(0|[1-9][0-9]{0,77})$"
+                        },
+                        "confirmed_nonce": {
+                          "type": "string",
+                          "pattern": "^(0|[1-9][0-9]{0,77})$"
+                        },
+                        "finalized_nonce": {
+                          "type": "string",
+                          "pattern": "^(0|[1-9][0-9]{0,77})$"
+                        },
+                        "safe_nonce": {
+                          "type": "string",
+                          "pattern": "^(0|[1-9][0-9]{0,77})$"
+                        },
+                        "next_action": {
+                          "type": "string",
+                          "enum": [
+                            "wait",
+                            "restore-evidence",
+                            "fund-sponsor",
+                            "review-provider-fees",
+                            "review-provider-nonces",
+                            "reconcile",
+                            "operator-review"
+                          ]
+                        }
+                      }
+                    },
                     "contract": {
                       "type": "string",
                       "enum": ["execution-dispatch-v1"]

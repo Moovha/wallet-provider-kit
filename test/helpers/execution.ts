@@ -117,6 +117,7 @@ export function executionFixture(
   function transactionRecord() {
     return {
       id: transactionId,
+      nonce: 0,
       relayer_id: 'sponsor-relayer',
       from: sponsor.address,
       to: token,
@@ -212,6 +213,7 @@ export function executionFixture(
                 : Number(BigInt(tag));
         result = {
           number: toQuantity(height),
+          baseFeePerGas: toQuantity(1000000000),
           hash: height === 0 ? configuration.rpc.genesisHash : blockHash,
         };
         break;
@@ -245,6 +247,17 @@ export function executionFixture(
             ? events().slice(0, 1)
             : [];
         break;
+      case 'eth_getTransactionCount':
+        result = toQuantity(
+          body.params[1] === 'pending'
+            ? state.posts
+              ? 1
+              : 0
+            : state.included && BigInt(body.params[1]) >= 101n
+              ? 1
+              : 0,
+        );
+        break;
       case 'eth_getTransactionByHash':
         result =
           state.included && body.params[0] === transactionHash
@@ -252,6 +265,7 @@ export function executionFixture(
                 hash: transactionHash,
                 chainId: toQuantity(84532),
                 type: '0x2',
+                nonce: '0x0',
                 from: sponsor.address,
                 to: token,
                 value: '0x0',

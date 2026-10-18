@@ -1,3 +1,4 @@
+import { validateOperations } from '../execution/operations.js';
 import { validateApprovedCallPolicy } from '../execution/approved-calls.js';
 import type { ExecutionConfiguration } from '../execution/types.js';
 import type { ExplorerTokensConfiguration } from './explorer-tokens.js';
@@ -87,6 +88,7 @@ export interface ProviderConfiguration {
   financial?: TransferPolicy;
   approvedCalls?: import('../execution/approved-calls.js').ApprovedCallsConfiguration;
   execution?: ExecutionConfiguration;
+  operations?: import('../execution/operations.js').OperationsConfiguration;
   http?: {
     host?: '127.0.0.1' | '0.0.0.0' | '::1' | '::';
     port?: number;
@@ -115,6 +117,8 @@ export function validateProviderConfiguration(
     );
   const config = structuredClone(input) as unknown as ProviderConfiguration;
   try {
+    if (config.operations) validateOperations(config.operations);
+    if (config.operations && !config.execution) throw new Error();
     defineOnboardingPolicy(config.policy);
     const applicationLed = config.policy.access?.mode === 'application';
     if ((!applicationLed || config.apiExplorer) && !config.ownerLogin)
@@ -237,7 +241,15 @@ export function validateProviderConfiguration(
             /^0x0{64}$/.test(execution.rpc.tokenCodeHash)))
       )
         throw new Error();
-      for (const field of ['clientId', 'accountId'] as const)
+      if (
+        execution.safeQueue &&
+        (execution.profile !== 'approved-evm-executor-v1' ||
+          !config.approvedCalls)
+      )
+        throw new Error();
+      for (const field of execution.sponsorPool
+        ? (['accountId'] as const)
+        : (['clientId', 'accountId'] as const))
         if (
           new Set(execution.sponsors.map((entry) => entry[field])).size !==
           execution.sponsors.length
@@ -365,6 +377,10 @@ export function secretReferences(
   config: ProviderConfiguration,
 ): SecretReference[] {
   return [
+    ...(config.operations?.webhooks.flatMap((entry) => [
+      entry.endpoint,
+      ...entry.signingSecrets,
+    ]) ?? []),
     ...(config.execution
       ? [
           ...(config.execution.relayer
