@@ -5,6 +5,12 @@ import type {
 import type { EmbeddedAccount, TypedDataAction } from '../domain/signing.js';
 import type { RelayerExecutionAction } from '../domain/relayer-execution.js';
 
+export interface AssetBudgetCharge {
+  budgetId: string;
+  units: string;
+  maximum: string;
+}
+
 /** Insert only from the host's trusted exact-action authorization flow, never an HTTP body. */
 export interface FinancialApproval {
   ownerSubject: string;
@@ -16,6 +22,7 @@ export interface FinancialApproval {
   action: TypedDataAction | RelayerExecutionAction;
   budgetId: string;
   units: string;
+  additionalBudgets?: AssetBudgetCharge[];
 }
 
 /** Fresh host evidence; matching a stored approval is necessary but is not a policy check. */

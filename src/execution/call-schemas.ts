@@ -3,11 +3,11 @@ const address = { type: 'string', pattern: '^0x[0-9a-fA-F]{40}$' };
 const uint = { type: 'string', pattern: '^(0|[1-9][0-9]{0,77})$' };
 const hash = { type: 'string', pattern: '^0x[0-9a-f]{64}$' };
 const route = { type: 'string', pattern: '^[A-Za-z0-9._-]{1,64}$' };
-function object(properties: Record<string, unknown>) {
+function object(properties: Record<string, unknown>, optional: string[] = []) {
   return {
     type: 'object',
     additionalProperties: false,
-    required: Object.keys(properties),
+    required: Object.keys(properties).filter((key) => !optional.includes(key)),
     properties,
   };
 }
@@ -85,6 +85,12 @@ export const approvedCallIntentSchema = object({
 
 approvedCallIntentSchema.properties = {
   ...approvedCallIntentSchema.properties,
+  assetBudgets: {
+    type: 'array',
+    minItems: 1,
+    maxItems: 16,
+    items: object({ token: address, units: uint, maximum: uint }),
+  },
   nativeRecipients: {
     type: 'array',
     minItems: 1,
@@ -166,17 +172,21 @@ export const operationAdaptersSchema = {
     tokenTransfers: {
       type: 'array',
       maxItems: 128,
-      items: object({
-        token: pin,
-        recipients: {
-          type: 'array',
-          minItems: 1,
-          maxItems: 128,
-          uniqueItems: true,
-          items: address,
+      items: object(
+        {
+          token: pin,
+          recipients: {
+            type: 'array',
+            minItems: 1,
+            maxItems: 128,
+            uniqueItems: true,
+            items: address,
+          },
+          maximumAmount: uint,
+          lifetimeAmount: uint,
         },
-        maximumAmount: uint,
-      }),
+        ['lifetimeAmount'],
+      ),
     },
     swaps: {
       type: 'array',

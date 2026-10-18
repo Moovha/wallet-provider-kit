@@ -96,11 +96,11 @@ Set `policy.adapters` in a static policy, or `call_adapters` in a reviewed runti
 publication. Runtime calls must also match their published contracts and methods.
 Adapters do not add a submission mechanism or another budget namespace.
 
-| Optional adapter | Selected policy and guarantees                                                                                                                                                                                             |
-| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `tokenTransfers` | Pin the token, allowed recipients and maximum amount per transfer. Decode canonical ERC-20 transfer calldata and require matching transfer-event evidence. This is not a cumulative asset-spending allowance.              |
-| `swaps`          | Pin a supported original Uniswap V3 route and input ceiling. Require the exact approval/swap/cleanup sequence, Safe recipient, supplied minimum output and deadline; verify net input/output and cleared allowance.        |
-| `vaults`         | Pin a Yearn4626-compatible router, vault, asset and deposit ceiling. Require the exact approval/deposit/cleanup sequence with supplied minimum shares; verify asset binding, shares, Deposit event and cleared allowances. |
+| Optional adapter | Selected policy and guarantees                                                                                                                                                                                                                                    |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tokenTransfers` | Pin the token, allowed recipients and maximum amount per transfer. Decode canonical ERC-20 transfer calldata and require matching transfer-event evidence. Optional `lifetimeAmount` shares the cumulative ERC-3009 allowance for that token and logical account. |
+| `swaps`          | Pin a supported original Uniswap V3 route and input ceiling. Require the exact approval/swap/cleanup sequence, Safe recipient, supplied minimum output and deadline; verify net input/output and cleared allowance.                                               |
+| `vaults`         | Pin a Yearn4626-compatible router, vault, asset and deposit ceiling. Require the exact approval/deposit/cleanup sequence with supplied minimum shares; verify asset binding, shares, Deposit event and cleared allowances.                                        |
 
 These adapters support one complete recognized operation per batch. A selected
 adapter cannot be bypassed by leaving out a label: its configured target/method
@@ -114,6 +114,69 @@ must be enforced by the target contract for on-chain rollback; receipt checks
 only verify observed results. Other routers, token models and vault methods can
 use generic calls under their own reviewed policy without implementing a toolkit
 adapter. Do not describe them as having an unselected adapter's guarantees.
+
+## Cumulative token allowances
+
+Set `lifetimeAmount` on a selected `tokenTransfers` adapter when the delegation
+must limit total direct token transfers. For example, the adapter entry contains
+`token`, `recipients`, `maximumAmount: "1000000"` and
+`lifetimeAmount: "5000000"`. Amounts are decimal token base units. Static
+configuration uses `policy.adapters`; runtime publications use `call_adapters`.
+The adapter supports one canonical direct transfer per batch. Its cumulative term
+is part of financial consent; provider review and fresh owner consent are required
+when a runtime publication changes it. Automatic contract acceptance cannot
+publish these terms.
+
+The allowance identity is the existing ERC-3009 identity: provider origin,
+logical account ID and token address on the supported Base Sepolia profile.
+Applications, signer namespaces and relayer/ERC-4337 mechanisms share that
+allowance. Existing reserved usage is retained. Generic activation never raises
+an existing ceiling. When a matching ERC-3009 policy is configured, its lifetime
+ceiling also caps generic approval, including when the generic path initializes
+the allowance first. Changing a policy does not refund usage or grant a new
+allowance.
+
+Generic approvals retain their operation-count charge and add the exact token
+amount. Relayer signing reserves both atomically. ERC-4337 admission reserves
+operations, assets and gas atomically before requesting usable sponsorship;
+SafeOp signing and recovery reuse the asset reservation. Denial rolls back the
+new reservations. Failure, expiry, revocation and uncertain outcomes retain
+possible exposure. Receipt recovery does not automatically refund it.
+
+### Activate with existing authorizations
+
+1. Stop incompatible workers, fence the active deployment revision and take a
+   consistent SQLite-aware backup. Preserve the provider origin, logical account
+   ID and token identity. Reconcile any restore-loss window before admitting work.
+2. Publish the reviewed adapter terms and obtain current owner consent. Use a
+   compatible toolkit version across all workers before resuming dispatch.
+3. The first generic action with the cumulative term initializes the allowance
+   without resetting its existing usage or maximum. It inventories earlier generic
+   signing admissions and sponsorship reservations for that account, including
+   revoked, expired and uncertain authorizations. Attributable canonical direct
+   transfers are added once. Later activations also inventory newly admitted
+   unbudgeted authorizations. Unsigned actions without admission are not exposure.
+4. Opaque earlier calls stop activation with a conflict: review their possible
+   asset exposure before migrating that account. There is no automatic override
+   or assumption that an unknown call spent nothing. If identified historical
+   transfers exceed the ceiling, their full usage is retained and new spending
+   remains denied. Do not delete migration records or create a new account ID to
+   clear an allowance.
+
+The migration records and reservations use the existing version-1 SQLite JSON
+catalog; no SQL schema upgrade is required. Back up the allowance counters,
+`assetReservations` and `assetBudgetMigrations` with the other authority records.
+The trusted library method `ensureAssetBudget(origin, accountId, token, maximum,
+revision)` performs the same activation inventory; it is not an application API
+or an allowance-reset method.
+
+This profile covers selected direct `transfer(address,uint256)` calls. It does
+not measure approvals, `transferFrom`, swaps, arbitrary internal token movement,
+native cumulative spending or all indirect asset exposure. Configure other
+permissions to match the delegation you intend. Converting an ERC-3009 EOA flow
+to a Safe account still requires explicit account, execution and consumer
+acceptance; sharing an allowance does not move assets or make those accounts
+interchangeable.
 
 ## Request and execute a stored action
 
@@ -154,8 +217,9 @@ categories. They do not automatically enable adapters for generic batches.
 Existing ERC-3009 transfer requests retain their endpoint, delegation, asset
 allowance, signature format, execution and recovery behavior. No automatic account
 migration, mechanism switch or reset of those allowances occurs. Move a consumer
-only after its required policy and asset-accounting guarantees are implemented
-and accepted on the chosen generic mechanism.
+only after its required policy, account binding and execution guarantees are
+accepted on the chosen generic mechanism. Direct token-transfer cumulative
+accounting is available through the optional adapter described above.
 
 ## Verification, expiry and recovery
 
@@ -166,7 +230,8 @@ reported. Neither outer bundle success nor generic execution establishes a
 business guarantee by itself.
 
 The shared operation and sponsor-gas ledgers retain their current identities and
-limits. Optional per-call asset caps do not replace cumulative asset budgets.
+limits. Per-call asset caps and optional cumulative token allowances are separate
+terms.
 Unknown or failed exposure retains the existing conservative reservations;
 automatic refunds and an automatic relayer fallback are unavailable.
 

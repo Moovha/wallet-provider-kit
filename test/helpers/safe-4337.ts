@@ -15,6 +15,7 @@ import { fingerprint } from '../../src/onboarding/policy.js';
 import {
   safeInterface,
   buildApprovedCallIntent,
+  tokenInterface,
   type ApprovedCallPolicy,
 } from '../../src/execution/approved-calls.js';
 import {
@@ -45,6 +46,7 @@ const pin = () => ({ address: Wallet.createRandom().address, codeHash });
 export async function fixture(
   configure?: (config: Safe4337SigningConfiguration) => void,
   nativeRecipient?: string,
+  assetBudget?: { maximumAmount: string; lifetimeAmount?: string },
 ) {
   const directory = await mkdtemp(join(tmpdir(), 'wpk-as2-'));
   dirs.push(directory);
@@ -162,6 +164,14 @@ export async function fixture(
     'active-1',
   );
   const target = pin();
+  const recipient = Wallet.createRandom().address;
+  const adapters = assetBudget
+    ? {
+        tokenTransfers: [
+          { token: target, recipients: [recipient], ...assetBudget },
+        ],
+      }
+    : undefined;
   const proposal = await runtime.propose(context, {
     expected_revision: '0',
     policy: {
@@ -179,6 +189,7 @@ export async function fixture(
             ],
           }
         : {}),
+      ...(adapters ? { call_adapters: adapters } : {}),
       maximum_calls: 2,
       maximum_native_value_wei: '10',
       max_validity_seconds: 120,
@@ -186,7 +197,14 @@ export async function fixture(
         {
           address: target.address,
           code_hash: codeHash,
-          methods: [{ signature: 'work(uint256)', maximum_value_wei: '10' }],
+          methods: [
+            {
+              signature: assetBudget
+                ? 'transfer(address,uint256)'
+                : 'work(uint256)',
+              maximum_value_wei: '10',
+            },
+          ],
         },
       ],
       claim_requirements: [
@@ -230,6 +248,7 @@ export async function fixture(
   });
   const basePolicy: ApprovedCallPolicy = {
     mechanism: 'safe-1.4.1',
+    ...(adapters ? { adapters } : {}),
     accounts: [{ ...pin(), accountId, singleton: pin() }],
     multiSend: pin(),
     contracts: [
@@ -294,8 +313,12 @@ export async function fixture(
     calls: [
       {
         to: target.address,
-        value: '2',
-        data: iface.encodeFunctionData('work', [42]),
+        value: assetBudget ? '0' : '2',
+        data: assetBudget
+          ? tokenInterface
+              .encodeFunctionData('transfer', [recipient, 4])
+              .toLowerCase()
+          : iface.encodeFunctionData('work', [42]),
       },
     ],
   };

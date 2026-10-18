@@ -34,6 +34,7 @@ export interface TokenTransferAdapter {
   token: PinnedContract;
   recipients: string[];
   maximumAmount: string;
+  lifetimeAmount?: string;
 }
 export interface OperationAdapters {
   tokenTransfers?: TokenTransferAdapter[];

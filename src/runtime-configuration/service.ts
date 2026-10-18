@@ -193,6 +193,10 @@ export function normalizeRuntimePolicy(
       invalid();
     }
     uint(transfer.maximumAmount);
+    if (transfer.lifetimeAmount !== undefined) {
+      uint(transfer.lifetimeAmount);
+      if (BigInt(transfer.lifetimeAmount) === 0n) invalid();
+    }
   }
   for (const swap of policy.call_adapters?.swaps ?? []) {
     [swap.router, swap.tokenIn, swap.tokenOut].forEach(normalizePin);

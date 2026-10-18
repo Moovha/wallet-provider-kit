@@ -1436,6 +1436,20 @@ export type Permission = (typeof permissions)[number];
 ```ts
 export interface ProviderState {
   format: 'moovha-onboarding-1';
+  assetReservations?: Record<
+    string,
+    {
+      budgetId: string;
+      units: string;
+    }
+  >;
+  assetBudgetMigrations?: Record<
+    string,
+    {
+      revision: string;
+      profile: 'direct-token-transfers-v1';
+    }
+  >;
   userOperationExecutions?: Record<
     string,
     import('../sponsorship/execution-types.js').UserOperationExecution
@@ -2295,6 +2309,8 @@ export interface StoredWalletBackendConfiguration<
 
 Import from `@moovha/wallet-provider-kit/storage`. [Integration guide](storage.md).
 
+- [AssetBudgetCharge](#assetbudgetcharge)
+- [assetBudgetId](#assetbudgetid)
 - [AttemptAdmission](#attemptadmission)
 - [DatabaseEnrollmentOptions](#databaseenrollmentoptions)
 - [FinancialApproval](#financialapproval)
@@ -2303,6 +2319,31 @@ Import from `@moovha/wallet-provider-kit/storage`. [Integration guide](storage.m
 - [openProviderDatabase](#openproviderdatabase)
 - [ProviderDatabase](#providerdatabase)
 - [ProviderDatabaseOptions](#providerdatabaseoptions)
+
+### AssetBudgetCharge
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/storage/types.ts).
+
+```ts
+export interface AssetBudgetCharge {
+  budgetId: string;
+  units: string;
+  maximum: string;
+}
+```
+
+### assetBudgetId
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/storage/asset-budgets.ts).
+
+```ts
+/** Preserve the deployed ERC-3009 allowance identity on the supported Base Sepolia profile. */
+export declare function assetBudgetId(
+  origin: string,
+  accountId: string,
+  token: string,
+): string;
+```
 
 ### AttemptAdmission
 
@@ -2357,6 +2398,7 @@ export interface FinancialApproval {
   action: TypedDataAction | RelayerExecutionAction;
   budgetId: string;
   units: string;
+  additionalBudgets?: AssetBudgetCharge[];
 }
 ```
 
@@ -2459,6 +2501,13 @@ export declare function openProviderDatabase(
     maximum: string,
     configuredRevision?: string,
   ): Promise<void>;
+  ensureAssetBudget(
+    origin: string,
+    accountId: string,
+    token: string,
+    maximum: string,
+    revision: string,
+  ): Promise<string>;
   budget(id: string): Promise<{
     maximum: string;
     reserved: string;
@@ -2670,6 +2719,11 @@ export type ApprovedCallInput =
 ```ts
 export interface ApprovedCallIntent {
   adapterInput?: AdapterInput;
+  assetBudgets?: {
+    token: string;
+    units: string;
+    maximum: string;
+  }[];
   nativeRecipients?: string[];
   version: '1';
   mechanism: 'safe-1.4.1';
@@ -4317,6 +4371,7 @@ export interface TokenTransferAdapter {
   token: PinnedContract;
   recipients: string[];
   maximumAmount: string;
+  lifetimeAmount?: string;
 }
 ```
 

@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased cumulative direct-token allowances
+
+- Add optional `lifetimeAmount` to selected token-transfer adapters and runtime
+  policy terms. Generic calls reuse ERC-3009 allowance identities, recorded usage
+  and compatible ceilings while preserving legacy signatures and endpoints.
+- Reserve assets with operation and gas budgets before effects; deduplicate asset
+  charges across signing namespaces, SafeOp phases and restart recovery.
+- Inventory earlier admitted direct transfers once during activation, retaining
+  uncertain exposure and overdrawn usage. Opaque historical calls stop activation
+  for review. Indirect asset flows and automatic account migration remain outside
+  this profile.
+
 ## Unreleased generic calls and optional adapters
 
 - Authorize native transfers through the common stored-call and wallet-calls
@@ -9,7 +21,7 @@
 - Keep generic calls independent of compatibility route settings. Explicitly
   selected adapters recognize exact supported calldata without caller labels.
 - Preserve static swap/vault requests, their signing payloads and ERC-3009 transfer
-  compatibility. Keep cumulative asset-budget migration and dedicated form controls
+  compatibility. Keep dedicated form controls and consumer account/execution migration
   as separate acceptance gates.
 
 ## Unreleased bundled setup

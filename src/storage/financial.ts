@@ -1,3 +1,4 @@
+import { validateAssetBudgetCharges } from './asset-budgets.js';
 import {
   bindExecutionMechanism,
   approvalMechanism,
@@ -71,6 +72,13 @@ export function validateApproval(
   )
     throw new WalletProviderError('wallet_provider_input');
   units(approval.units);
+  validateAssetBudgetCharges(approval.additionalBudgets);
+  if (
+    approval.additionalBudgets?.some(
+      (charge) => charge.budgetId === approval.budgetId,
+    )
+  )
+    throw new WalletProviderError('wallet_provider_input');
   const revision = revisions(approval);
   if (
     ![
@@ -131,6 +139,9 @@ export function storeApproval(
     }
     if (!connection.get('SELECT id FROM budgets WHERE id=?', approval.budgetId))
       throw new WalletProviderError('wallet_authorization_denied');
+    for (const charge of approval.additionalBudgets ?? [])
+      if (!connection.get('SELECT id FROM budgets WHERE id=?', charge.budgetId))
+        throw new WalletProviderError('wallet_authorization_denied');
     connection.run(
       'INSERT INTO approvals(id,account_id,kind,fingerprint,record) VALUES(?,?,?,?,?)',
       id,

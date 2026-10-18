@@ -368,6 +368,11 @@ export interface operations {
                                 maximum?: string;
                             }[];
                             nonce: string;
+                            assetBudgets?: {
+                                token: string;
+                                units: string;
+                                maximum: string;
+                            }[];
                             nativeRecipients?: string[];
                             adapterInput?: {
                                 account_id: string;
@@ -426,6 +431,7 @@ export interface operations {
                                         };
                                         recipients: string[];
                                         maximumAmount: string;
+                                        lifetimeAmount?: string;
                                     }[];
                                     swaps?: {
                                         id: string;

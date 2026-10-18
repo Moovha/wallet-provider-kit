@@ -188,6 +188,11 @@ export interface StoredAttempt {
 }
 export interface ProviderState {
   format: 'moovha-onboarding-1';
+  assetReservations?: Record<string, { budgetId: string; units: string }>;
+  assetBudgetMigrations?: Record<
+    string,
+    { revision: string; profile: 'direct-token-transfers-v1' }
+  >;
   userOperationExecutions?: Record<
     string,
     import('../sponsorship/execution-types.js').UserOperationExecution

@@ -199,6 +199,57 @@ describe('unified approved calls and optional operation adapters', () => {
         ),
       ).toThrow();
   });
+  it('binds optional cumulative token terms to the exact intent and requires a new policy for changes', () => {
+    const f = setup(),
+      token = f.policy.swaps[0].tokenIn;
+    f.policy.adapters = {
+      tokenTransfers: [
+        {
+          token,
+          recipients: [f.recipient],
+          maximumAmount: '10',
+          lifetimeAmount: '20',
+        },
+      ],
+    };
+    const input = {
+      account_id: f.id,
+      kind: 'contract-call' as const,
+      calls: [
+        {
+          to: token.address,
+          value: '0',
+          data: tokenInterface
+            .encodeFunctionData('transfer', [f.recipient, 4])
+            .toLowerCase(),
+        },
+      ],
+    };
+    const intent = buildApprovedCallIntent(f.policy, input, '0', f.expiresAt),
+      action = buildApprovedCallAction(
+        intent,
+        f.owner,
+        f.expiresAt,
+        randomUUID(),
+      );
+    expect(intent.assetBudgets).toEqual([
+      { token: token.address, units: '4', maximum: '20' },
+    ]);
+    f.policy.adapters.tokenTransfers![0].lifetimeAmount = '30';
+    expect(() =>
+      validateApprovedCallAction(f.policy, intent, action),
+    ).toThrow();
+    delete f.policy.adapters.tokenTransfers![0].lifetimeAmount;
+    expect(
+      buildApprovedCallIntent(f.policy, input, '0', f.expiresAt).assetBudgets,
+    ).toBeUndefined();
+    for (const invalid of ['0', (2n ** 256n).toString()]) {
+      f.policy.adapters.tokenTransfers![0].lifetimeAmount = invalid;
+      expect(() =>
+        buildApprovedCallIntent(f.policy, input, '0', f.expiresAt),
+      ).toThrow();
+    }
+  });
   it('supports adapter configuration independently of compatibility route fields', () => {
     const f = setup(),
       swap = f.policy.swaps[0];

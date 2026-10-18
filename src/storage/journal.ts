@@ -1,3 +1,4 @@
+import { reserveAssetBudgets } from './asset-budgets.js';
 import { randomUUID } from 'node:crypto';
 import { getAddress, recoverAddress } from 'ethers';
 import type {
@@ -247,6 +248,14 @@ export function sqliteJournal(
           reserved.toString(),
           String(admitted.budget_id),
         );
+        if (admitted.approval_id) {
+          const row = connection.get(
+            'SELECT record FROM approvals WHERE id=?',
+            String(admitted.approval_id),
+          );
+          if (!row) unavailable();
+          reserveAssetBudgets(connection, JSON.parse(String(row.record)));
+        }
         const leaseToken = randomUUID();
         const expires = Date.now() + 30000;
         connection.run(
