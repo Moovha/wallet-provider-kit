@@ -12,6 +12,10 @@ It does not add another signing or execution path. Current owner identity,
 contract delegation, runtime revision, claim freshness, registered methods,
 shared budgets, code pins and independent executor checks still apply.
 
+Use the [runtime workspace](runtime-workspace.md#track-wallet-batches) to inspect
+batches through forms. Its bounded list distinguishes queue stage from verified
+execution and keeps provider ledger access separate from application owner access.
+
 ## Configure and connect an account
 
 Complete the [runtime policy and consent flow](runtime-configuration.md#use-registered-contracts-for-consent-and-execution).

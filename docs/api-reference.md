@@ -1094,7 +1094,7 @@ export declare class OnboardingService {
       | 'transfers:request'
       | 'contracts:request'
     )[];
-    mode: 'create' | 'connect';
+    mode: 'connect' | 'create';
     durationDays: number;
     status: string;
   }>;
@@ -2473,6 +2473,7 @@ Import from `@moovha/wallet-provider-kit/deployment`. [Integration guide](setup.
 - [RuntimePolicyProposal](#runtimepolicyproposal)
 - [RuntimePolicyRevision](#runtimepolicyrevision)
 - [RuntimePolicySnapshot](#runtimepolicysnapshot)
+- [RuntimeReview](#runtimereview)
 - [SafeAccountBinding](#safeaccountbinding)
 - [SafeExecutionQueue](#safeexecutionqueue)
 - [SafeQueueRecord](#safequeuerecord)
@@ -3669,10 +3670,45 @@ export declare class RuntimeConfigurationService {
     deploymentRevision: string,
     transportRevision?: string | undefined,
   );
+  assertOperator(principal: VerifiedPrincipal): void;
+  assertOperatorState(principal: VerifiedPrincipal, state: ProviderState): void;
   propose(
     context: AuthorityContext,
     input: RuntimePolicyChange,
   ): Promise<RuntimePolicyProposal>;
+  workspace(
+    principal: VerifiedPrincipal,
+    applicationId?: string,
+  ): Promise<{
+    role: 'provider' | 'application';
+    applications: {
+      active_revision: string;
+      review: RuntimeReview | undefined;
+      publications: RuntimePolicyRevision[];
+      publication: RuntimePolicyRevision | undefined;
+      proposals_truncated: boolean;
+      proposals: {
+        published_revision: string | undefined;
+        proposal_id: string;
+        application_id: string;
+        based_on_revision: string;
+        policy_hash: string;
+        policy: RuntimePolicy;
+        created_at: string;
+      }[];
+      application_id: string;
+      name: string;
+    }[];
+  }>;
+  setReview(
+    context: AuthorityContext,
+    applicationId: string,
+    input: {
+      expected_revision: string;
+      expected_review_revision: string;
+      mode: 'automatic' | 'manual';
+    },
+  ): Promise<RuntimeReview>;
   read(
     principal: VerifiedPrincipal,
     revision?: string,
@@ -3799,6 +3835,18 @@ export interface RuntimePolicySnapshot {
 }
 ```
 
+### RuntimeReview
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/runtime-configuration/service.ts).
+
+```ts
+export interface RuntimeReview {
+  mode: 'automatic' | 'manual';
+  revision: string;
+  approved_by: string;
+}
+```
+
 ### SafeAccountBinding
 
 [Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/approved-calls.ts).
@@ -3849,7 +3897,7 @@ export declare class SafeExecutionQueue {
     accountId: string,
     id: string,
   ): Promise<{
-    execution?: import('./types.js').TransferExecutionRecord | undefined;
+    execution: import('./types.js').TransferExecutionRecord | undefined;
     walletCalls?: WalletCallsMetadata;
     id: string;
     input: ApprovedCallInput;
@@ -3873,6 +3921,38 @@ export declare class SafeExecutionQueue {
       | 'cancelled'
       | 'expired'
       | 'blocked';
+  }>;
+  walletCallsList(
+    principal: VerifiedPrincipal,
+    authorizeOperator?: (state: ProviderState) => void,
+  ): Promise<{
+    records: {
+      execution: import('./types.js').TransferExecutionRecord | undefined;
+      walletCalls?: WalletCallsMetadata;
+      id: string;
+      input: ApprovedCallInput;
+      principal: VerifiedPrincipal;
+      grantId: string;
+      owner: string;
+      consentReference: string;
+      safeAddress: string;
+      address: string;
+      revision: string;
+      expiresAt: string;
+      sequence: number;
+      actionKey: string;
+      executeKey: string;
+      identityHash: string;
+      actionId?: string;
+      status:
+        | 'queued'
+        | 'executing'
+        | 'succeeded'
+        | 'cancelled'
+        | 'expired'
+        | 'blocked';
+    }[];
+    truncated: boolean;
   }>;
   read(
     principal: VerifiedPrincipal,
@@ -4251,6 +4331,32 @@ export declare class WalletCallsService {
     queue: SafeExecutionQueue,
     execution: ApprovedExecutionCoordinator,
   );
+  list(
+    principal: VerifiedPrincipal,
+    authorizeOperator?: (state: ProviderState) => void,
+  ): Promise<{
+    truncated: boolean;
+    batches: {
+      version: '2.0.0';
+      id: string;
+      chainId: '0x14a34';
+      status: 100 | 200 | 400 | 500;
+      atomic: true;
+      receipts?: import('./types.js').WalletCallsReceipt[];
+      account_id: string;
+      sender: string;
+      queue_stage:
+        | 'cancelled'
+        | 'expired'
+        | 'blocked'
+        | 'succeeded'
+        | 'queued'
+        | 'executing';
+      policy_revision: string;
+      expires_at: string;
+      application_id: string;
+    }[];
+  }>;
   request(
     principal: VerifiedPrincipal,
     accountId: string,

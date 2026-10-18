@@ -67,13 +67,20 @@ export interface RuntimePolicyRevision {
   published_at: string;
   proposal_id?: string;
 }
+export interface RuntimeReview {
+  mode: 'automatic' | 'manual';
+  revision: string;
+  approved_by: string;
+}
 export interface RuntimeConfigurationState {
+  reviews?: Record<string, RuntimeReview>;
+  reviewReceipts?: Record<string, RuntimeReview>;
   heads: Record<string, string>;
   proposals: Record<string, RuntimePolicyProposal>;
   revisions: Record<string, RuntimePolicyRevision>;
   idempotency: Record<
     string,
-    { hash: string; kind: 'proposal' | 'revision'; id: string }
+    { hash: string; kind: 'proposal' | 'revision' | 'review'; id: string }
   >;
 }
 const validator = new Ajv({ strict: true, allErrors: false });
@@ -217,7 +224,8 @@ export class RuntimeConfigurationService {
     const app = application(this.onboardingPolicy, principal);
     return runtimeApplicationId(app.issuer, app.clientId);
   }
-  private operator(principal: VerifiedPrincipal) {
+  assertOperator(principal: VerifiedPrincipal) {
+    if (!principal.scopes.includes('wallet:configuration:write')) deny();
     if (
       !this.options.operators.some(
         (operator) =>
@@ -225,6 +233,15 @@ export class RuntimeConfigurationService {
           operator.clientId === principal.clientId &&
           operator.subject === principal.subject,
       )
+    )
+      deny();
+  }
+  assertOperatorState(principal: VerifiedPrincipal, state: ProviderState) {
+    this.assertOperator(principal);
+    const binding = state.deploymentBindings?.['service-v1'];
+    if (
+      binding?.activeRevision !== this.deploymentRevision ||
+      binding.transportRevision !== this.transportRevision
     )
       deny();
   }
@@ -297,14 +314,17 @@ export class RuntimeConfigurationService {
     change: RuntimePolicyChange,
     key: string,
     hash: string,
-    actor: VerifiedPrincipal,
+    actor: VerifiedPrincipal | string,
     proposalId?: string,
   ) {
     this.current(registry, applicationId, change.expected_revision);
     const revision = String(BigInt(change.expected_revision) + 1n);
     if (BigInt(revision) > 1024n) conflict();
     const record: RuntimePolicyRevision = {
-      published_by: serviceHash([actor.issuer, actor.clientId, actor.subject]),
+      published_by:
+        typeof actor === 'string'
+          ? actor
+          : serviceHash([actor.issuer, actor.clientId, actor.subject]),
       application_id: applicationId,
       revision,
       previous_revision: change.expected_revision,
@@ -366,7 +386,182 @@ export class RuntimeConfigurationService {
         resource: record.proposal_id,
         revision: change.expected_revision,
       });
+      const review = registry.reviews?.[applicationId];
+      const current =
+        registry.revisions[
+          revisionKey(applicationId, change.expected_revision)
+        ];
+      // Automatic acceptance delegates contract registration, never provider terms.
+      if (review?.mode === 'automatic' && current) {
+        const { contracts: _old, ...terms } = current.policy;
+        const { contracts: _new, ...requestedTerms } = change.policy;
+        if (
+          current.policy.enabled &&
+          serviceHash(terms) === serviceHash(requestedTerms)
+        ) {
+          this.publishRevision(
+            registry,
+            state,
+            applicationId,
+            change,
+            serviceHash(['automatic-publication', record.proposal_id]),
+            hash,
+            review.approved_by,
+            record.proposal_id,
+          );
+          state.audit.push({
+            at: Date.now(),
+            event: 'runtime_contracts_auto_accepted',
+            resource: record.proposal_id,
+            revision: review.revision,
+          });
+        }
+      }
       return record;
+    });
+  }
+  async workspace(principal: VerifiedPrincipal, applicationId?: string) {
+    let provider = false;
+    if (principal.scopes.includes('wallet:configuration:write')) {
+      this.assertOperator(principal);
+      provider = true;
+    }
+    const own = provider ? undefined : this.application(principal);
+    if (!provider && !principal.scopes.includes('wallet:configuration:read'))
+      deny();
+    if (applicationId) {
+      this.target(applicationId);
+      if (own && applicationId !== own) deny();
+    }
+    return this.transaction((registry) => ({
+      role: provider ? ('provider' as const) : ('application' as const),
+      applications: this.onboardingPolicy.applications
+        .filter((app) => app.enabled !== false)
+        .map((app) => ({
+          application_id: runtimeApplicationId(app.issuer, app.clientId),
+          name: app.name,
+        }))
+        .filter((app) => !own || app.application_id === own)
+        .map((app) => ({
+          ...app,
+          active_revision: registry.heads[app.application_id] ?? '0',
+          review: registry.reviews?.[app.application_id],
+          publications:
+            applicationId === app.application_id
+              ? Object.values(registry.revisions)
+                  .filter(
+                    (record) => record.application_id === app.application_id,
+                  )
+                  .slice(-20)
+              : [],
+          publication:
+            applicationId === app.application_id
+              ? registry.revisions[
+                  revisionKey(
+                    app.application_id,
+                    registry.heads[app.application_id] ?? '0',
+                  )
+                ]
+              : undefined,
+          proposals_truncated:
+            applicationId === app.application_id &&
+            Object.values(registry.proposals).filter(
+              (p) => p.application_id === app.application_id,
+            ).length > 20,
+          proposals: Object.values(registry.proposals)
+            .filter(
+              (p) =>
+                p.application_id === applicationId &&
+                p.application_id === app.application_id,
+            )
+            .slice(-20)
+            .map((proposal) => ({
+              ...proposal,
+              published_revision: Object.values(registry.revisions).find(
+                (r) => r.proposal_id === proposal.proposal_id,
+              )?.revision,
+            })),
+        })),
+    }));
+  }
+  async setReview(
+    context: AuthorityContext,
+    applicationId: string,
+    input: {
+      expected_revision: string;
+      expected_review_revision: string;
+      mode: 'automatic' | 'manual';
+    },
+  ) {
+    context = structuredClone(context);
+    input = structuredClone(input);
+    this.assertOperator(context.principal);
+    this.target(applicationId);
+    if (
+      !input ||
+      Object.keys(input).some(
+        (k) =>
+          !['expected_revision', 'expected_review_revision', 'mode'].includes(
+            k,
+          ),
+      ) ||
+      !/^(0|[1-9][0-9]{0,19})$/.test(input.expected_revision) ||
+      !/^(0|[1-9][0-9]{0,19})$/.test(input.expected_review_revision) ||
+      !['automatic', 'manual'].includes(input.mode)
+    )
+      invalid();
+    const key = this.key(
+      context,
+      'wallet:configuration:write',
+      'review',
+      applicationId,
+    );
+    return this.transaction((registry, state) => {
+      // Review decisions share the policy revision fence so publication and mode changes cannot race.
+      const previous = registry.idempotency[key];
+      const hash = serviceHash(input);
+      if (previous) {
+        if (previous.hash !== hash) conflict();
+        return registry.reviewReceipts?.[key] ?? conflict();
+      }
+      this.current(registry, applicationId, input.expected_revision);
+      if (
+        !registry.revisions[revisionKey(applicationId, input.expected_revision)]
+      )
+        conflict();
+      if (
+        Object.values(registry.idempotency).filter(
+          (item) => item.kind === 'review' && item.id === applicationId,
+        ).length >= 1024
+      )
+        conflict();
+      const reviews = (registry.reviews ??= {});
+      if (
+        (reviews[applicationId]?.revision ?? '0') !==
+        input.expected_review_revision
+      )
+        conflict();
+      const revision = String(BigInt(input.expected_review_revision) + 1n);
+      reviews[applicationId] = {
+        mode: input.mode,
+        revision,
+        approved_by: serviceHash([
+          context.principal.issuer,
+          context.principal.clientId,
+          context.principal.subject,
+        ]),
+      };
+      // A separate receipt preserves the exact decision on retries, including after later changes.
+      const review = reviews[applicationId];
+      (registry.reviewReceipts ??= {})[key] = structuredClone(review);
+      registry.idempotency[key] = { hash, kind: 'review', id: applicationId };
+      state.audit.push({
+        at: Date.now(),
+        event: 'runtime_review_mode_changed',
+        resource: applicationId,
+        revision,
+      });
+      return review;
     });
   }
   async read(principal: VerifiedPrincipal, revision?: string) {
@@ -377,7 +572,7 @@ export class RuntimeConfigurationService {
     return this.readApplicationRevision(applicationId, revision);
   }
   async readApplication(principal: VerifiedPrincipal, applicationId: string) {
-    this.operator(principal);
+    this.assertOperator(principal);
     if (!principal.scopes.includes('wallet:configuration:write')) deny();
     this.target(applicationId);
     return this.readApplicationRevision(applicationId);
@@ -423,7 +618,7 @@ export class RuntimeConfigurationService {
     expectedRevision: string,
   ) {
     context = structuredClone(context);
-    this.operator(context.principal);
+    this.assertOperator(context.principal);
     if (
       !uuid.test(proposalId) ||
       !/^(0|[1-9][0-9]{0,19})$/.test(expectedRevision)
@@ -461,7 +656,7 @@ export class RuntimeConfigurationService {
     input: RuntimePolicyChange,
   ) {
     context = structuredClone(context);
-    this.operator(context.principal);
+    this.assertOperator(context.principal);
     this.target(applicationId);
     const key = this.key(
       context,

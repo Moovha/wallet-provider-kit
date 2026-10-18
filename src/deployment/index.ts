@@ -20,6 +20,7 @@ export type {
   RuntimePolicyChange,
   RuntimePolicyProposal,
   RuntimePolicyRevision,
+  RuntimeReview,
 } from '../runtime-configuration/service.js';
 export type { WalletBackendAdapterV1 } from './backends.js';
 export {

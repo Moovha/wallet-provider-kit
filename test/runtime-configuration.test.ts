@@ -506,3 +506,204 @@ describe('runtime configuration HTTP contract', () => {
     expect(result.statusCode).toBe(503);
   });
 });
+
+describe('operator workspace and delegated contract registration', () => {
+  it('automatically publishes contract changes only after provider approval and preserves exact replay across restart', async () => {
+    const { service, db } = await fixture();
+    const appId = runtimeApplicationId(issuer, 'first');
+    const first = await service.propose(context(), {
+      expected_revision: '0',
+      policy: document(),
+    });
+    expect((await service.read(application())).active_revision).toBe('0');
+    await expect(
+      service.setReview(context(operator), appId, {
+        expected_revision: '0',
+        expected_review_revision: '0',
+        mode: 'automatic',
+      }),
+    ).rejects.toMatchObject(conflicted);
+    await service.publish(context(operator), first.proposal_id, '0');
+    const decisionContext = context(operator);
+    const decision = await service.setReview(decisionContext, appId, {
+      expected_revision: '1',
+      expected_review_revision: '0',
+      mode: 'automatic',
+    });
+    const change = document();
+    change.contracts[0].methods.push({
+      signature: 'anotherMethod(bytes32)',
+      maximum_value_wei: '1',
+    });
+    const submission = context();
+    const proposal = await service.propose(submission, {
+      expected_revision: '1',
+      policy: change,
+    });
+    const publication = (await service.read(application())).publication!;
+    expect(publication).toMatchObject({
+      revision: '2',
+      proposal_id: proposal.proposal_id,
+      published_by: decision.approved_by,
+    });
+    expect(publication.policy.contracts[0].methods).toHaveLength(2);
+    expect(
+      (await service.workspace(operator, appId)).applications[0].proposals.find(
+        (p) => p.proposal_id === proposal.proposal_id,
+      )?.published_revision,
+    ).toBe('2');
+    await service.setReview(context(operator), appId, {
+      expected_revision: '2',
+      expected_review_revision: '1',
+      mode: 'manual',
+    });
+    const restarted = new RuntimeConfigurationService(
+      policy,
+      db.onboardingStore,
+      options,
+      'deployment-1',
+    );
+    expect(
+      await restarted.propose(submission, {
+        expected_revision: '1',
+        policy: change,
+      }),
+    ).toEqual(proposal);
+    expect(
+      await restarted.setReview(decisionContext, appId, {
+        expected_revision: '1',
+        expected_review_revision: '0',
+        mode: 'automatic',
+      }),
+    ).toEqual(decision);
+    expect(
+      (await restarted.workspace(operator, appId)).applications[0].review?.mode,
+    ).toBe('manual');
+    expect((await restarted.read(application())).active_revision).toBe('2');
+    expect(
+      await db.onboardingStore.transaction((state) =>
+        state.audit.some(
+          (event) => event.event === 'runtime_contracts_auto_accepted',
+        ),
+      ),
+    ).toBe(true);
+  });
+  it.each([
+    'claim_requirements',
+    'maximum_calls',
+    'maximum_native_value_wei',
+    'max_validity_seconds',
+    'enabled',
+  ] as const)(
+    'keeps proposals changing %s pending even in automatic mode',
+    async (field) => {
+      const { service } = await fixture();
+      const appId = runtimeApplicationId(issuer, 'first');
+      await service.update(context(operator), appId, {
+        expected_revision: '0',
+        policy: document(),
+      });
+      await service.setReview(context(operator), appId, {
+        expected_revision: '1',
+        expected_review_revision: '0',
+        mode: 'automatic',
+      });
+      const value = document();
+      if (field === 'claim_requirements') value.claim_requirements = [];
+      else if (field === 'enabled') value.enabled = false;
+      else if (field === 'maximum_native_value_wei')
+        value.maximum_native_value_wei = '11';
+      else value[field] += 1;
+      const proposed = await service.propose(context(), {
+        expected_revision: '1',
+        policy: value,
+      });
+      expect((await service.read(application())).active_revision).toBe('1');
+      expect(
+        (await service.proposal(operator, proposed.proposal_id)).policy,
+      ).toEqual(value);
+    },
+  );
+  it('keeps disabled policies disabled and does not retroactively accept pending proposals', async () => {
+    const { service } = await fixture();
+    const appId = runtimeApplicationId(issuer, 'first');
+    const disabled = document();
+    disabled.enabled = false;
+    await service.update(context(operator), appId, {
+      expected_revision: '0',
+      policy: disabled,
+    });
+    const pending = await service.propose(context(), {
+      expected_revision: '1',
+      policy: disabled,
+    });
+    await service.setReview(context(operator), appId, {
+      expected_revision: '1',
+      expected_review_revision: '0',
+      mode: 'automatic',
+    });
+    await service.propose(context(), {
+      expected_revision: '1',
+      policy: disabled,
+    });
+    expect((await service.read(application())).active_revision).toBe('1');
+    expect(
+      (
+        await service.workspace(application(), appId)
+      ).applications[0].proposals.every((p) => !p.published_revision),
+    ).toBe(true);
+    expect(await service.proposal(operator, pending.proposal_id)).toBeDefined();
+  });
+  it('isolates application workspaces, rejects scope-only operators and fences simultaneous review decisions', async () => {
+    const { service } = await fixture();
+    const appId = runtimeApplicationId(issuer, 'first');
+    expect(
+      (await service.workspace(application())).applications.map(
+        (app) => app.application_id,
+      ),
+    ).toEqual([appId]);
+    expect((await service.workspace(operator)).applications).toHaveLength(2);
+    await expect(
+      service.workspace(application(), runtimeApplicationId(issuer, 'second')),
+    ).rejects.toMatchObject(denied);
+    await expect(
+      service.workspace({
+        ...application(),
+        scopes: ['wallet:configuration:write'],
+      }),
+    ).rejects.toMatchObject(denied);
+    await expect(
+      service.setReview(context(), appId, {
+        expected_revision: '0',
+        expected_review_revision: '0',
+        mode: 'automatic',
+      }),
+    ).rejects.toMatchObject(denied);
+    await service.update(context(operator), appId, {
+      expected_revision: '0',
+      policy: document(),
+    });
+    const results = await Promise.allSettled(
+      ['automatic', 'manual'].map((mode) =>
+        service.setReview(context(operator), appId, {
+          expected_revision: '1',
+          expected_review_revision: '0',
+          mode: mode as 'automatic' | 'manual',
+        }),
+      ),
+    );
+    expect(
+      results.filter((result) => result.status === 'fulfilled'),
+    ).toHaveLength(1);
+    expect(
+      results.find((result) => result.status === 'rejected'),
+    ).toMatchObject({ reason: conflicted });
+    await expect(
+      service.setReview(context(operator), appId, {
+        expected_revision: '0',
+        expected_review_revision: '1',
+        mode: 'automatic',
+      }),
+    ).rejects.toMatchObject(conflicted);
+  });
+});

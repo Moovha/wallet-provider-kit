@@ -1,3 +1,4 @@
+import { runtimeApplicationId } from '../src/runtime-configuration/service.js';
 import { replacementWire } from './helpers/replacements.js';
 import { defaultReplacementPolicy } from '../src/execution/replacement.js';
 import { buildApprovedCallIntent } from '../src/execution/approved-calls.js';
@@ -4081,6 +4082,7 @@ async function runtimeFinancialFixture(queue = false) {
   return {
     t,
     config,
+    operatorToken,
     calls,
     user,
     document,
@@ -4668,5 +4670,98 @@ it('rejects aggregate calldata beyond the Safe profile limit before queue admiss
   ).toBe(0);
   db.close();
   expect(injected.backend!.signTypedData).not.toHaveBeenCalled();
+  expect(f.calls.state.posts).toBe(0);
+});
+
+it('lists wallet batches with owner-bound application access and a separately authorized provider ledger', async () => {
+  const f = await walletCallsFixture();
+  const sent = await f.rpc('wallet_sendCalls', [
+    { ...f.batch(), id: 'operator-ui-batch' },
+  ]);
+  expect(sent.result.id).toBe('operator-ui-batch');
+  const list = (authorization: string) =>
+    f.app.inject({
+      method: 'GET',
+      url: '/v1/runtime-configuration/batches',
+      headers: { authorization },
+    });
+  const appToken = await f.t.f.token('wallet:execute:read');
+  const applicationList = await list(appToken);
+  expect(applicationList.statusCode, applicationList.body).toBe(200);
+  expect(applicationList.json().batches).toEqual([
+    expect.objectContaining({
+      id: 'operator-ui-batch',
+      status: 100,
+      queue_stage: 'queued',
+    }),
+  ]);
+  expect(applicationList.body).not.toContain('consentReference');
+  expect(applicationList.body).not.toContain('principal');
+  const providerList = await list(f.operatorToken);
+  expect(providerList.statusCode, providerList.body).toBe(200);
+  expect(providerList.json()).toEqual(applicationList.json());
+  const otherSubject = await list(
+    await f.t.f.token('wallet:execute:read', undefined, 'different-subject'),
+  );
+  expect(otherSubject.statusCode).toBe(200);
+  expect(otherSubject.json().batches).toEqual([]);
+  expect(
+    (await list(await f.t.f.token('wallet:configuration:write'))).statusCode,
+  ).toBe(403);
+  await f.publish();
+  expect((await list(appToken)).json().batches).toHaveLength(1);
+  expect(f.calls.state.posts).toBe(0);
+  const db = openProviderDatabase({ directory: f.config.storage.directory });
+  try {
+    await db.onboardingStore.transaction((state) => {
+      for (const grant of Object.values(state.grants)) grant.state = 'revoked';
+    });
+  } finally {
+    await db.close();
+  }
+  expect((await list(appToken)).json().batches).toEqual([]);
+  expect((await list(f.operatorToken)).json().batches).toHaveLength(1);
+  expect(f.calls.state.posts).toBe(0);
+});
+
+it('requires renewed financial consent after a provider-allowed application automatically registers a method', async () => {
+  const f = await runtimeFinancialFixture();
+  const appId = runtimeApplicationId(
+    f.config.oauth.issuer,
+    f.config.policy.applications[0].clientId,
+  );
+  const review = await f.app.inject({
+    method: 'POST',
+    url: `/v1/runtime-configuration/applications/${appId}/review`,
+    headers: {
+      authorization: f.operatorToken,
+      'idempotency-key': randomUUID(),
+    },
+    payload: {
+      expected_revision: '1',
+      expected_review_revision: '0',
+      mode: 'automatic',
+    },
+  });
+  expect(review.statusCode, review.body).toBe(200);
+  f.document.contracts[0].methods.unshift({
+    signature: 'anotherMethod(bytes32)',
+    maximum_value_wei: '2',
+  });
+  const proposed = await f.app.inject({
+    method: 'POST',
+    url: '/v1/runtime-configuration/proposals',
+    headers: {
+      authorization: await f.t.f.token('wallet:configuration:propose'),
+      'idempotency-key': randomUUID(),
+    },
+    payload: { expected_revision: '1', policy: f.document },
+  });
+  expect(proposed.statusCode, proposed.body).toBe(200);
+  expect((await f.request()).statusCode).toBe(403);
+  expect(f.calls.state.posts).toBe(0);
+  expect((await f.consent()).json().status).toBe('granted');
+  const admitted = await f.request();
+  expect(admitted.statusCode, admitted.body).toBe(200);
   expect(f.calls.state.posts).toBe(0);
 });

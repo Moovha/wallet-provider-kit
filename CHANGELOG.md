@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased runtime operator workspace
+
+- Add a deployed `/operator/` workspace with structured contract/method forms,
+  policy previews, provider publication and bounded proposal/publication history.
+  The setup wizard configures separate runtime operator identities.
+- Default the provider's application approval form to automatic contract/method
+  acceptance. Publish valid registrations only within unchanged enabled provider
+  terms; retain provider-controlled claims, limits, consent and execution gates.
+- Add scoped batch lists with provider ledger access, current owner-bound
+  application access, retained finalized receipts and individual standard status
+  refreshes. List/status reads never sign, submit or retry batches.
+- Retain immutable publications, auditable review decisions, idempotent retries
+  and separate policy/review concurrency checks in the existing SQLite JSON
+  records. No SQL migration or application deployment is performed.
+
 ## Unreleased standard wallet calls
 
 - Add the optional EIP-5792 2.0.0 account-scoped JSON-RPC interface for runtime-authorized Safe batch submission, capability discovery and status.

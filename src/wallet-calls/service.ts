@@ -1,3 +1,5 @@
+import type { ProviderState } from '../onboarding/types.js';
+import { runtimeApplicationId } from '../runtime-configuration/service.js';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { getAddress } from 'ethers';
 import type { VerifiedPrincipal } from '../domain/principal.js';
@@ -64,6 +66,33 @@ export class WalletCallsService {
   ) {
     if (!actions.onboarding.runtimeContracts)
       throw new WalletProviderError('wallet_provider_configuration');
+  }
+  async list(
+    principal: VerifiedPrincipal,
+    authorizeOperator?: (state: ProviderState) => void,
+  ) {
+    const { records, truncated } = await this.queue.walletCallsList(
+      principal,
+      authorizeOperator,
+    );
+    return {
+      truncated,
+      batches: records.map((record) => ({
+        account_id: record.input.account_id,
+        sender: record.walletCalls!.sender,
+        queue_stage: record.status,
+        policy_revision: record.walletCalls!.policyRevision,
+        expires_at: record.expiresAt,
+        application_id: runtimeApplicationId(
+          record.principal.issuer,
+          record.principal.clientId,
+        ),
+        ...this.status(
+          record,
+          record.execution?.observation?.chain_status === 'finalized',
+        ),
+      })),
+    };
   }
   async request(
     principal: VerifiedPrincipal,
@@ -219,6 +248,13 @@ export class WalletCallsService {
       }
       stored = await this.queue.walletCallsRecord(principal, accountId, id);
     }
+    return this.status(stored, fresh);
+  }
+  private status(
+    stored: Awaited<ReturnType<SafeExecutionQueue['walletCallsRecord']>>,
+    fresh: boolean,
+  ): WalletCallsStatus {
+    const id = stored.walletCalls!.id;
     const observation = stored.execution?.observation;
     const confirmed =
       (fresh || observation?.chain_status === 'finalized') &&

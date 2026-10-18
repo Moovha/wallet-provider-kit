@@ -23,6 +23,37 @@ export interface OperationGuide {
 }
 // Shared operator guidance. Runtime authentication and authority remain authoritative.
 export const operationGuides: Record<string, OperationGuide> = {
+  readRuntimeWorkspace: {
+    title: 'Read the runtime application workspace',
+    group: 'Runtime configuration',
+    scope: 'wallet:configuration:read',
+    runtimeConfiguration: true,
+    prerequisite:
+      'Use application configuration read scope or an exact configured provider operator with configuration write scope. Supply application_id to load one application’s policy and latest 20 proposals. Application callers cannot select another namespace.',
+    success:
+      '200: enabled application summaries and selected policy/proposal details. The provider sees its configured applications; applications see only their own registration. No spending authority is granted.',
+  },
+  listRuntimeBatches: {
+    title: 'List readable wallet batches',
+    group: 'Wallet calls',
+    scope: 'wallet:execute:read',
+    walletCalls: true,
+    runtimeConfiguration: true,
+    prerequisite:
+      'Applications need current owner account-read access and execute read scope. Exact configured provider operators can inspect the provider ledger using configuration write scope. No application token can become an operator through scopes alone.',
+    success:
+      '200: up to 100 readable batch summaries, queue stages and retained finalized RPC-quorum receipts. Unfinalized observations remain pending in this list; applications can refresh individual wallet_getCallsStatus results. Listing never signs, submits or retries.',
+  },
+  setRuntimeReviewMode: {
+    title: 'Allow automatic application contract registration',
+    group: 'Runtime configuration',
+    scope: 'wallet:configuration:write',
+    runtimeConfiguration: true,
+    prerequisite:
+      'Publish a baseline policy first. An exact configured provider operator chooses automatic or manual review using both expected_revision and expected_review_revision with a UUID idempotency key. The workspace defaults the approval form to automatic acceptance.',
+    success:
+      '200: a durable review decision. Automatic mode publishes subsequent contract/method changes only when provider terms exactly match the enabled current policy. Claims, value/call limits, validity, enablement and chain remain provider controlled. Existing pending proposals are not retroactively accepted.',
+  },
   walletCallsRpc: {
     title: 'Submit or inspect a standard wallet call batch',
     group: 'Wallet calls',

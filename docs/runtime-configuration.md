@@ -13,6 +13,12 @@ preparation, signing and designated execution. Registration alone grants no wall
 access or spending authority. Without the explicit financial opt-in, the registry
 remains a configuration-only service and existing startup policies keep their behavior.
 
+Use the [runtime workspace](runtime-workspace.md) for contract registration,
+policy review/publication and batch tracking through forms. Providers explicitly
+allow automatic contract/method acceptance per application; provider requirements
+remain controlled by the published policy. The setup wizard can configure the
+operator boundary without editing JSON.
+
 ## Configure the operator boundary
 
 Add this optional section to your provider configuration before starting the

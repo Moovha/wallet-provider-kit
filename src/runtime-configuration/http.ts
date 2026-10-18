@@ -1,3 +1,5 @@
+import { walletCallsReceiptSchema } from '../wallet-calls/schemas.js';
+import type { WalletCallsService } from '../wallet-calls/service.js';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { AuthorityContext } from '../domain/principal.js';
 import { AuthenticationError, type Authenticate } from '../service/auth.js';
@@ -56,6 +58,117 @@ const proposalSchema = {
     created_at: { type: 'string', format: 'date-time' },
   },
 };
+const reviewSchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['mode', 'revision', 'approved_by'],
+  properties: {
+    mode: { type: 'string', enum: ['automatic', 'manual'] },
+    revision: revisionSchema,
+    approved_by: applicationIdSchema,
+  },
+};
+const workspaceSchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['role', 'applications'],
+  properties: {
+    role: { type: 'string', enum: ['provider', 'application'] },
+    applications: {
+      type: 'array',
+      maxItems: 100,
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: [
+          'application_id',
+          'name',
+          'active_revision',
+          'proposals',
+          'proposals_truncated',
+          'publications',
+        ],
+        properties: {
+          application_id: applicationIdSchema,
+          name: { type: 'string' },
+          active_revision: revisionSchema,
+          publication: publicationSchema,
+          publications: {
+            type: 'array',
+            maxItems: 20,
+            items: publicationSchema,
+          },
+          review: reviewSchema,
+          proposals_truncated: { type: 'boolean' },
+          proposals: {
+            type: 'array',
+            maxItems: 20,
+            items: {
+              ...proposalSchema,
+              properties: {
+                ...proposalSchema.properties,
+                published_revision: revisionSchema,
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+};
+const batchesSchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['truncated', 'batches'],
+  properties: {
+    truncated: { type: 'boolean' },
+    batches: {
+      type: 'array',
+      maxItems: 100,
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: [
+          'id',
+          'account_id',
+          'sender',
+          'queue_stage',
+          'policy_revision',
+          'expires_at',
+          'application_id',
+          'version',
+          'chainId',
+          'status',
+          'atomic',
+        ],
+        properties: {
+          id: { type: 'string', maxLength: 8194 },
+          account_id: uuidSchema,
+          sender: { type: 'string' },
+          queue_stage: {
+            type: 'string',
+            enum: [
+              'queued',
+              'executing',
+              'succeeded',
+              'cancelled',
+              'expired',
+              'blocked',
+            ],
+          },
+          policy_revision: revisionSchema,
+          expires_at: { type: 'string', format: 'date-time' },
+          application_id: applicationIdSchema,
+          version: { type: 'string', enum: ['2.0.0'] },
+          chainId: { type: 'string', enum: ['0x14a34'] },
+          status: { type: 'integer', enum: [100, 200, 400, 500] },
+          atomic: { type: 'boolean', enum: [true] },
+          receipts: { type: 'array', items: walletCallsReceiptSchema },
+        },
+      },
+    },
+  },
+};
 const currentSchema = {
   type: 'object',
   additionalProperties: false,
@@ -102,6 +215,7 @@ export async function registerRuntimeConfigurationRoutes(
   app: FastifyInstance,
   service?: RuntimeConfigurationService,
   authenticate?: Authenticate,
+  walletCalls?: WalletCallsService,
 ) {
   function configured() {
     if (!service)
@@ -130,6 +244,100 @@ export async function registerRuntimeConfigurationRoutes(
     ...extra,
     response: { 200: response, ...errors },
   });
+  app.get<{ Querystring: { application_id?: string } }>(
+    '/v1/runtime-configuration/workspace',
+    {
+      schema: schema('readRuntimeWorkspace', workspaceSchema, {
+        querystring: {
+          type: 'object',
+          additionalProperties: false,
+          properties: { application_id: applicationIdSchema },
+        },
+      }),
+    },
+    async (request) => {
+      let caller;
+      try {
+        caller = await principal(request, 'wallet:configuration:read');
+      } catch (error) {
+        if (!(error instanceof AuthenticationError) || error.status !== 403)
+          throw error;
+        caller = await principal(request, 'wallet:configuration:write');
+      }
+      return configured().workspace(caller, request.query.application_id);
+    },
+  );
+  app.get(
+    '/v1/runtime-configuration/batches',
+    {
+      schema: schema('listRuntimeBatches', batchesSchema),
+    },
+    async (request) => {
+      let caller;
+      try {
+        caller = await principal(request, 'wallet:execute:read');
+      } catch (error) {
+        if (!(error instanceof AuthenticationError) || error.status !== 403)
+          throw error;
+        caller = await principal(request, 'wallet:configuration:write');
+      }
+      if (!walletCalls)
+        throw Object.assign(new Error('Unavailable'), { statusCode: 503 });
+      const provider = caller.scopes.includes('wallet:configuration:write');
+      if (provider) configured().assertOperator(caller);
+      return walletCalls.list(
+        caller,
+        provider
+          ? (state) => configured().assertOperatorState(caller, state)
+          : undefined,
+      );
+    },
+  );
+  app.post<{
+    Params: { applicationId: string };
+    Body: {
+      expected_revision: string;
+      expected_review_revision: string;
+      mode: 'automatic' | 'manual';
+    };
+  }>(
+    '/v1/runtime-configuration/applications/:applicationId/review',
+    {
+      schema: schema(
+        'setRuntimeReviewMode',
+        {
+          type: 'object',
+          additionalProperties: false,
+          required: ['mode', 'revision', 'approved_by'],
+          properties: {
+            mode: { type: 'string', enum: ['automatic', 'manual'] },
+            revision: revisionSchema,
+            approved_by: applicationIdSchema,
+          },
+        },
+        {
+          headers,
+          params: params('applicationId', applicationIdSchema),
+          body: {
+            type: 'object',
+            additionalProperties: false,
+            required: ['expected_revision', 'expected_review_revision', 'mode'],
+            properties: {
+              expected_revision: revisionSchema,
+              expected_review_revision: revisionSchema,
+              mode: { type: 'string', enum: ['automatic', 'manual'] },
+            },
+          },
+        },
+      ),
+    },
+    async (request) =>
+      configured().setReview(
+        await context(request, 'wallet:configuration:write'),
+        request.params.applicationId,
+        request.body,
+      ),
+  );
   app.get(
     '/v1/runtime-configuration',
     {
