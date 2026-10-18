@@ -1,4 +1,15 @@
 export { createConfiguredProvider } from './provider.js';
+export {
+  RuntimeConfigurationService,
+  runtimeApplicationId,
+} from '../runtime-configuration/service.js';
+export type {
+  RuntimeConfigurationOptions,
+  RuntimePolicy,
+  RuntimePolicyChange,
+  RuntimePolicyProposal,
+  RuntimePolicyRevision,
+} from '../runtime-configuration/service.js';
 export type { WalletBackendAdapterV1 } from './backends.js';
 export {
   validateProviderConfiguration,

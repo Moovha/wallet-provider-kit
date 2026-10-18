@@ -8,6 +8,7 @@ export interface OperationGuide {
   enrollment?: boolean;
   execution?: boolean;
   safeQueue?: boolean;
+  runtimeConfiguration?: boolean;
   applicationLed?: boolean;
   records?: boolean;
   vendor?: boolean;
@@ -21,6 +22,76 @@ export interface OperationGuide {
 }
 // Shared operator guidance. Runtime authentication and authority remain authoritative.
 export const operationGuides: Record<string, OperationGuide> = {
+  readRuntimeApplicationConfiguration: {
+    title: 'Read an application policy as provider operator',
+    group: 'Runtime configuration',
+    scope: 'wallet:configuration:write',
+    runtimeConfiguration: true,
+    prerequisite:
+      'Use a separately configured provider operator token. Application tokens cannot read another application’s registry or publish changes.',
+    success:
+      '200: the current durable publication and predecessor information. Read it before preparing a compare-and-set policy update. Configuration does not authorize spending.',
+  },
+  readRuntimeConfiguration: {
+    title: 'Read the active application configuration',
+    group: 'Runtime configuration',
+    scope: 'wallet:configuration:read',
+    runtimeConfiguration: true,
+    prerequisite:
+      'Configure runtimeConfiguration and use an explicitly registered application or provider operator. Write scope alone never confers operator authority. Configuration changes do not authorize signing or activate execution.',
+    success:
+      '200: a durable proposal, publication or current configuration. Publications are visible without restart. Mutations require an original UUIDv4 idempotency key and expected_revision; stale updates conflict. Historical revisions remain immutable. Applications can read only their own records.',
+  },
+  readRuntimeConfigurationRevision: {
+    title: 'Read an immutable configuration revision',
+    group: 'Runtime configuration',
+    scope: 'wallet:configuration:read',
+    runtimeConfiguration: true,
+    prerequisite:
+      'Configure runtimeConfiguration and use an explicitly registered application or provider operator. Write scope alone never confers operator authority. Configuration changes do not authorize signing or activate execution.',
+    success:
+      '200: a durable proposal, publication or current configuration. Publications are visible without restart. Mutations require an original UUIDv4 idempotency key and expected_revision; stale updates conflict. Historical revisions remain immutable. Applications can read only their own records.',
+  },
+  proposeRuntimeConfiguration: {
+    title: 'Propose application contracts and policy',
+    group: 'Runtime configuration',
+    scope: 'wallet:configuration:propose',
+    runtimeConfiguration: true,
+    prerequisite:
+      'Configure runtimeConfiguration and use an explicitly registered application or provider operator. Write scope alone never confers operator authority. Configuration changes do not authorize signing or activate execution.',
+    success:
+      '200: a durable proposal, publication or current configuration. Publications are visible without restart. Mutations require an original UUIDv4 idempotency key and expected_revision; stale updates conflict. Historical revisions remain immutable. Applications can read only their own records.',
+  },
+  readRuntimeConfigurationProposal: {
+    title: 'Read a configuration proposal',
+    group: 'Runtime configuration',
+    scope: 'wallet:configuration:read',
+    runtimeConfiguration: true,
+    prerequisite:
+      'Configure runtimeConfiguration and use an explicitly registered application or provider operator. Write scope alone never confers operator authority. Configuration changes do not authorize signing or activate execution.',
+    success:
+      '200: a durable proposal, publication or current configuration. Publications are visible without restart. Mutations require an original UUIDv4 idempotency key and expected_revision; stale updates conflict. Historical revisions remain immutable. Applications can read only their own records.',
+  },
+  publishRuntimeConfiguration: {
+    title: 'Publish an application proposal as provider operator',
+    group: 'Runtime configuration',
+    scope: 'wallet:configuration:write',
+    runtimeConfiguration: true,
+    prerequisite:
+      'Configure runtimeConfiguration and use an explicitly registered application or provider operator. Write scope alone never confers operator authority. Configuration changes do not authorize signing or activate execution.',
+    success:
+      '200: a durable proposal, publication or current configuration. Publications are visible without restart. Mutations require an original UUIDv4 idempotency key and expected_revision; stale updates conflict. Historical revisions remain immutable. Applications can read only their own records.',
+  },
+  updateRuntimeConfiguration: {
+    title: 'Publish a provider policy revision',
+    group: 'Runtime configuration',
+    scope: 'wallet:configuration:write',
+    runtimeConfiguration: true,
+    prerequisite:
+      'Configure runtimeConfiguration and use an explicitly registered application or provider operator. Write scope alone never confers operator authority. Configuration changes do not authorize signing or activate execution.',
+    success:
+      '200: a durable proposal, publication or current configuration. Publications are visible without restart. Mutations require an original UUIDv4 idempotency key and expected_revision; stale updates conflict. Historical revisions remain immutable. Applications can read only their own records.',
+  },
   enqueueContractCall: {
     title: 'Queue an approved Safe operation for automatic execution',
     group: 'Safe execution queue',
@@ -301,6 +372,7 @@ export interface ApiFeatures {
   financial: boolean;
   execution?: boolean;
   safeQueue?: boolean;
+  runtimeConfiguration?: boolean;
   executionService?: boolean;
   contractCalls?: boolean;
   signing?: boolean;
@@ -318,6 +390,10 @@ export function operationUnavailableReason(
   const guide = operationGuides[id];
   if (!guide || id === 'getCapabilities' || id === 'getExecutionCapabilities')
     return undefined;
+  if (guide.runtimeConfiguration)
+    return features.runtimeConfiguration
+      ? undefined
+      : 'Runtime configuration control plane is not configured';
   if (guide.safeQueue && !features.safeQueue)
     return 'Durable Safe execution queue is not configured';
   if (id === 'requestContractCall' && !features.contractCalls)

@@ -124,6 +124,10 @@ export default defineConfig({
             text: 'Executor HTTP schemas',
             link: '/docs/executor-http-reference',
           },
+          {
+            text: 'Runtime configuration',
+            link: '/docs/runtime-configuration',
+          },
           { text: 'Enterprise v1 standards', link: '/docs/v1-standards' },
         ],
       },
@@ -225,6 +229,10 @@ export default defineConfig({
           {
             text: 'Executor HTTP schemas',
             link: '/docs/executor-http-reference',
+          },
+          {
+            text: 'Runtime configuration',
+            link: '/docs/runtime-configuration',
           },
           { text: 'Enterprise v1 standards', link: '/docs/v1-standards' },
         ],

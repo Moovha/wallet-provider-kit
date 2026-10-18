@@ -631,6 +631,87 @@ describe('configuration convention and CLI', () => {
 });
 
 describe('configured API and provider transfer authorization', () => {
+  it('composes the runtime registry with real JWT application/operator separation and live publication', async () => {
+    const t = await fixture();
+    t.config.runtimeConfiguration = {
+      operators: [
+        {
+          issuer: t.config.oauth.issuer,
+          clientId: 'runtime-operator',
+          subject: 'configuration-operator',
+        },
+      ],
+    };
+    await t.restart();
+    const running = t.app;
+    const applicationToken = await t.token(
+      'wallet:configuration:read wallet:configuration:propose',
+    );
+    const operatorToken = await t.token(
+      'wallet:configuration:write',
+      'runtime-operator',
+      'configuration-operator',
+    );
+    const policy = {
+      version: '1',
+      enabled: false,
+      chain_id: 'eip155:84532',
+      contracts: [],
+      maximum_calls: 1,
+      maximum_native_value_wei: '0',
+      max_validity_seconds: 120,
+      claim_requirements: [],
+    };
+    const proposal = await t.app.inject({
+      method: 'POST',
+      url: '/v1/runtime-configuration/proposals',
+      headers: {
+        authorization: applicationToken,
+        'idempotency-key': randomUUID(),
+      },
+      payload: { expected_revision: '0', policy },
+    });
+    expect(proposal.statusCode).toBe(200);
+    const publication = await t.app.inject({
+      method: 'POST',
+      url: `/v1/runtime-configuration/proposals/${proposal.json().proposal_id}/publish`,
+      headers: {
+        authorization: operatorToken,
+        'idempotency-key': randomUUID(),
+      },
+      payload: { expected_revision: '0' },
+    });
+    expect(publication.statusCode).toBe(200);
+    const read = await t.app.inject({
+      url: '/v1/runtime-configuration',
+      headers: { authorization: applicationToken },
+    });
+    expect(read.json()).toMatchObject({
+      active_revision: '1',
+      authorizes_spending: false,
+      publication: { policy: { enabled: false } },
+    });
+    expect(t.app).toBe(running);
+    expect(injected.backend!.signTypedData).not.toHaveBeenCalled();
+    const forgedOperator = await t.token(
+      'wallet:configuration:write',
+      t.config.policy.applications[0].clientId,
+      'configuration-operator',
+    );
+    expect(
+      (
+        await t.app.inject({
+          method: 'POST',
+          url: `/v1/runtime-configuration/proposals/${proposal.json().proposal_id}/publish`,
+          headers: {
+            authorization: forgedOperator,
+            'idempotency-key': randomUUID(),
+          },
+          payload: { expected_revision: '0' },
+        })
+      ).statusCode,
+    ).toBe(403);
+  });
   it('loads only versioned local custom adapters at run time', async () => {
     const config = await template();
     const dir = await folder();

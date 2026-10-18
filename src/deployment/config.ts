@@ -1,4 +1,8 @@
 import { validateReplacementSponsors } from '../execution/replacement.js';
+import {
+  validateRuntimeConfiguration,
+  type RuntimeConfigurationOptions,
+} from '../runtime-configuration/service.js';
 import { validateOperations } from '../execution/operations.js';
 import { validateApprovedCallPolicy } from '../execution/approved-calls.js';
 import type { ExecutionConfiguration } from '../execution/types.js';
@@ -23,6 +27,7 @@ export interface SecretReference {
   env: string;
 }
 export interface ProviderConfiguration {
+  runtimeConfiguration?: RuntimeConfigurationOptions;
   configVersion: 1;
   profile: 'provider-service-v1';
   policy: OnboardingPolicy;
@@ -120,7 +125,16 @@ export function validateProviderConfiguration(
   try {
     if (config.operations) validateOperations(config.operations);
     if (config.operations && !config.execution) throw new Error();
-    defineOnboardingPolicy(config.policy);
+    const resolvedPolicy = defineOnboardingPolicy(config.policy);
+    if (config.runtimeConfiguration) {
+      validateRuntimeConfiguration(config.runtimeConfiguration, resolvedPolicy);
+      if (
+        config.runtimeConfiguration.operators.some(
+          (operator) => operator.issuer !== config.oauth.issuer,
+        )
+      )
+        throw new Error();
+    }
     const applicationLed = config.policy.access?.mode === 'application';
     if ((!applicationLed || config.apiExplorer) && !config.ownerLogin)
       throw new ConfigurationError([

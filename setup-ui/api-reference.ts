@@ -73,6 +73,7 @@ export function operationStatus(
     financial: !!config.financial,
     execution: !!config.execution,
     safeQueue: !!config.execution?.safeQueue,
+    runtimeConfiguration: !!config.runtimeConfiguration,
     executionService: !!config.execution?.service,
     contractCalls: !!config.approvedCalls?.policy,
     flow: config.policy.access?.mode ?? 'hosted',
@@ -80,6 +81,10 @@ export function operationStatus(
     vendor: !!config.identity.didit || !!config.identity.sumsub,
   });
   if (unavailable) return `Not enabled: ${unavailable}`;
+  if (guide.scope === 'wallet:configuration:write')
+    return 'Use a dedicated configured provider operator token; application tokens cannot publish policy';
+  if (guide.runtimeConfiguration)
+    return 'Runtime registry settings are present; current application access still requires verification';
   const app = config.policy.applications[applicationIndex];
   if (!app?.clientId || !app.issuer || app.issuer !== config.oauth.issuer)
     return "Complete this application's registration in Policies and Services";
@@ -105,6 +110,12 @@ export function requestExample(
   config: ProviderConfiguration,
   applicationIndex: number,
 ): object | undefined {
+  if (
+    id === 'proposeRuntimeConfiguration' ||
+    id === 'updateRuntimeConfiguration'
+  )
+    return { expected_revision: '0', policy: runtimePolicyExample };
+  if (id === 'publishRuntimeConfiguration') return { expected_revision: '0' };
   if (id === 'checkExecutionAuthority')
     return {
       provider_id: 'application-sponsor',
@@ -251,12 +262,68 @@ export function referenceOperations(
   );
 }
 export type ReferenceOperation = ReturnType<typeof referenceOperations>[number];
+const runtimePolicyExample = {
+  version: '1',
+  enabled: false,
+  chain_id: 'eip155:84532',
+  contracts: [
+    {
+      address: '0x1111111111111111111111111111111111111111',
+      code_hash: '0x' + '1'.repeat(64),
+      methods: [
+        { signature: 'customMethod(uint256,address)', maximum_value_wei: '0' },
+      ],
+    },
+  ],
+  maximum_calls: 1,
+  maximum_native_value_wei: '0',
+  max_validity_seconds: 120,
+  claim_requirements: [],
+};
 /** Fictional, schema-checked bodies; never approvals, signatures or live results. */
 export function responseExample(
   id: string,
   config?: ProviderConfiguration,
   requestedPermissions?: string[],
 ): object {
+  if (
+    [
+      'readRuntimeConfiguration',
+      'readRuntimeConfigurationRevision',
+      'readRuntimeApplicationConfiguration',
+    ].includes(id)
+  )
+    return {
+      application_id: 'a'.repeat(64),
+      active_revision: '0',
+      revision: '0',
+      authorizes_spending: false,
+    };
+  if (
+    id === 'proposeRuntimeConfiguration' ||
+    id === 'readRuntimeConfigurationProposal'
+  )
+    return {
+      proposal_id: exampleId,
+      application_id: 'a'.repeat(64),
+      based_on_revision: '0',
+      policy_hash: 'b'.repeat(64),
+      policy: runtimePolicyExample,
+      created_at: '2030-01-01T00:00:00.000Z',
+    };
+  if (
+    id === 'publishRuntimeConfiguration' ||
+    id === 'updateRuntimeConfiguration'
+  )
+    return {
+      application_id: 'a'.repeat(64),
+      revision: '1',
+      previous_revision: '0',
+      policy_hash: 'b'.repeat(64),
+      policy: runtimePolicyExample,
+      published_at: '2030-01-01T00:00:00.000Z',
+      published_by: 'c'.repeat(64),
+    };
   if (
     [
       'enqueueContractCall',
@@ -620,7 +687,14 @@ function shellQuote(value: string) {
 }
 export function curlExample(item: ReferenceOperation, origin: string) {
   const lines = [
-    `curl --request ${item.method.toUpperCase()} ${shellQuote(referenceOrigin(origin) + item.path.replace(/\{[^}]+\}/g, exampleId))}`,
+    `curl --request ${item.method.toUpperCase()} ${shellQuote(
+      referenceOrigin(origin) +
+        item.path.replace(/\{([^}]+)\}/g, (_match, name: string) => {
+          if (name === 'revision') return '1';
+          if (name === 'applicationId') return 'a'.repeat(64);
+          return exampleId;
+        }),
+    )}`,
   ];
   if (item.guide.execution)
     lines.push(
@@ -632,7 +706,11 @@ export function curlExample(item: ReferenceOperation, origin: string) {
       "  --header 'Authorization: Bearer <SIGNED_SERVICE_REQUEST_PROOF>'",
     );
   if (item.guide.scope)
-    lines.push("  --header 'Authorization: Bearer <APPLICATION_ACCESS_TOKEN>'");
+    lines.push(
+      item.guide.scope === 'wallet:configuration:write'
+        ? "  --header 'Authorization: Bearer <PROVIDER_OPERATOR_ACCESS_TOKEN>'"
+        : "  --header 'Authorization: Bearer <APPLICATION_ACCESS_TOKEN>'",
+    );
   if (item.body !== undefined)
     lines.push(
       "  --header 'Content-Type: application/json'",

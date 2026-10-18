@@ -3,6 +3,7 @@ import {
   emptyOperationsState,
 } from '../execution/operations.js';
 import { SafeExecutionQueue } from '../execution/queue.js';
+import { RuntimeConfigurationService } from '../runtime-configuration/service.js';
 import { executionConfigurationIdentity } from '../executor/protocol.js';
 import { createServiceIdentity } from '../executor/auth.js';
 import { createRemoteExecutionProvider } from '../execution/remote.js';
@@ -171,6 +172,7 @@ export async function createConfiguredProvider(
       config.ownerLogin?.issuer,
       config.ownerLogin?.clientId,
       config.activation.enabled,
+      ...(config.runtimeConfiguration ? [config.runtimeConfiguration] : []),
       ...(config.execution
         ? [executionConfigurationIdentity(config.execution)]
         : []),
@@ -332,6 +334,15 @@ export async function createConfiguredProvider(
             transportRevision,
       );
     const app = await createServer({
+      runtimeConfiguration: config.runtimeConfiguration
+        ? new RuntimeConfigurationService(
+            onboarding.policy,
+            database.onboardingStore,
+            config.runtimeConfiguration,
+            activeRevision,
+            transportRevision,
+          )
+        : undefined,
       documentationTokens: config.apiExplorer
         ? {
             origin: config.policy.provider.origin,

@@ -16,6 +16,10 @@ Users remain in the connected application, which authenticates them, performs id
 
 ## Choose who does each part
 
+For application contract/method registration and provider policy publication,
+see the optional [runtime configuration API](runtime-configuration.md). It stores
+versioned configuration without restart; financial integration remains a release gate.
+
 | Role                               | Work                                                                                                                                 |
 | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
 | Provider operator                  | Register external services, configure policies, store secrets, deploy, back up and operate the service                               |

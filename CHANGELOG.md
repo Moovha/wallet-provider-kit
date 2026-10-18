@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased runtime configuration control plane
+
+- Add application-scoped contract/method proposals and separate provider operator
+  publication through the optional runtime configuration API. Durable current
+  revisions become readable immediately without restarting the service.
+- Retain immutable policy history, canonical method/hash validation, idempotent
+  receipts, compare-and-set concurrency and deployment/transport fencing in the
+  existing SQLite v1 JSON deployment record, with no SQL migration.
+- Publish generated API contracts and operator/developer guidance. Runtime policy
+  documents do not yet authorize signing or execution; current configured
+  financial policies and production acceptance gates remain unchanged.
+
 ## Unreleased bounded replacements
 
 - Add the default designated-executor replacement worker for explicitly pinned

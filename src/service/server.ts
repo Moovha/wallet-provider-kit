@@ -1,4 +1,6 @@
 import { readFile } from 'node:fs/promises';
+import { registerRuntimeConfigurationRoutes } from '../runtime-configuration/http.js';
+import type { RuntimeConfigurationService } from '../runtime-configuration/service.js';
 import {
   registerDocumentationTokens,
   type DocumentationTokenOptions,
@@ -38,6 +40,7 @@ import {
 } from './schemas.js';
 
 export interface ServerOptions {
+  runtimeConfiguration?: RuntimeConfigurationService;
   authenticate?: Authenticate;
   service?: EmbeddedWalletService;
   /** Enabling enrollment also gates the provisioning route on current provider acceptance. */
@@ -143,6 +146,7 @@ export async function createServer(options: ServerOptions = {}) {
           financial: !!options.onboarding?.actions?.consentTerms(),
           execution: !!options.onboarding?.execution,
           safeQueue: !!options.onboarding?.safeQueue,
+          runtimeConfiguration: !!options.runtimeConfiguration,
           executionService: !!options.onboarding?.executionIdentity,
           contractCalls: !!options.onboarding?.contractNonce,
           signing:
@@ -547,6 +551,11 @@ export async function createServer(options: ServerOptions = {}) {
     options.onboarding,
     options.authenticate,
     isReady,
+  );
+  await registerRuntimeConfigurationRoutes(
+    app,
+    options.runtimeConfiguration,
+    options.authenticate,
   );
   if (options.documentation !== false && options.documentationTokens)
     await registerDocumentationTokens(app, options.documentationTokens);

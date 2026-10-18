@@ -28,7 +28,7 @@ describe('operator API reference', () => {
   it('uses canonical request/response contracts, includes unavailable advanced profiles and does not mutate them', () => {
     const config = fixture();
     const operations = referenceOperations(contract, config, 0);
-    expect(operations).toHaveLength(27);
+    expect(operations).toHaveLength(34);
     expect(
       Object.values(contract.paths)
         .flatMap((methods) =>
@@ -166,7 +166,9 @@ describe('operator API reference', () => {
       );
       if (item.guide.scope)
         expect(curlExample(item, config.policy.provider.origin)).toContain(
-          '<APPLICATION_ACCESS_TOKEN>',
+          item.guide.scope === 'wallet:configuration:write'
+            ? '<PROVIDER_OPERATOR_ACCESS_TOKEN>'
+            : '<APPLICATION_ACCESS_TOKEN>',
         );
     }
     expect(referenceOrigin('http://127.0.0.1:4319')).toBe(

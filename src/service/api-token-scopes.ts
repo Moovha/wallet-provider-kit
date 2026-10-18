@@ -1,5 +1,7 @@
 /** Explicit operator token limits; all API authority checks still apply. */
 export const apiTokenScopes = [
+  'wallet:configuration:read',
+  'wallet:configuration:propose',
   'wallet:access',
   'wallet:access:read',
   'wallet:account:read',
@@ -18,6 +20,8 @@ export const apiTokenScopeLabels: Record<
   (typeof apiTokenScopes)[number],
   string
 > = {
+  'wallet:configuration:read': 'Read application configuration',
+  'wallet:configuration:propose': 'Propose application contracts and policies',
   'wallet:access': 'Request or revoke wallet access',
   'wallet:access:read': 'Read access request status',
   'wallet:account:read': 'Read wallet account details',

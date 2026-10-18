@@ -208,6 +208,7 @@ export interface ProviderState {
       activeRevision?: string;
       transportRevision?: string;
       accessMode?: 'application' | 'hosted';
+      runtimeConfiguration?: import('../runtime-configuration/service.js').RuntimeConfigurationState;
     }
   >;
   requests: Record<string, AccessRequest>;
