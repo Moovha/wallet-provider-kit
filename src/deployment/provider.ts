@@ -1,3 +1,7 @@
+import {
+  SafeProvisioningService,
+  createSafeDeploymentDriver,
+} from '../provisioning/safe.js';
 import { providerNetwork } from '../networks.js';
 import { localExecutionFetch } from './local-execution.js';
 import { createBundledAuthorizationServer } from './authorization-server.js';
@@ -194,6 +198,7 @@ export async function createConfiguredProvider(
       onboarding!.policy.revision,
       ...(network.testnet ? [] : [network.name]),
       config.financial ?? null,
+      ...(config.safeProvisioning ? [config.safeProvisioning] : []),
       ...(config.approvedCalls ? [config.approvedCalls] : []),
       config.backend,
       config.reviewers,
@@ -244,6 +249,7 @@ export async function createConfiguredProvider(
             activeRevision,
             config.approvedCalls,
             config.network,
+            config.safeProvisioning ?? false,
           )
         : undefined;
     financial = actions
@@ -368,7 +374,25 @@ export async function createConfiguredProvider(
           state.deploymentBindings?.['service-v1']?.transportRevision ===
             transportRevision,
       );
+    const safeProvisioning =
+      config.safeProvisioning && config.execution
+        ? new SafeProvisioningService(
+            onboarding,
+            database,
+            config.safeProvisioning,
+            config.execution,
+            activeRevision,
+            createSafeDeploymentDriver(
+              config.execution,
+              resolveSecret(config.execution.relayer!.apiKey),
+              localExecutionFetch(),
+            ),
+            config.execution.rpc.endpoints.map((entry) => resolveSecret(entry)),
+            config.network,
+          )
+        : undefined;
     const app = await createServer({
+      safeProvisioning,
       walletCalls:
         config.runtimeConfiguration?.authorizeContracts &&
         actions &&

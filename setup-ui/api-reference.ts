@@ -74,6 +74,7 @@ export function operationStatus(
     financial: !!config.financial,
     execution: !!config.execution,
     safeQueue: !!config.execution?.safeQueue,
+    safeProvisioning: !!config.safeProvisioning,
     walletCalls:
       !!config.runtimeConfiguration?.authorizeContracts &&
       !!config.execution?.safeQueue,
@@ -312,6 +313,13 @@ export function responseExample(
   config?: ProviderConfiguration,
   requestedPermissions?: string[],
 ): object {
+  if (id === 'readProvisionedSafe')
+    return {
+      profile: 'safe-1.4.1',
+      chain_id: config?.network === 'base' ? 'eip155:8453' : 'eip155:84532',
+      address: '0x1111111111111111111111111111111111111111',
+      status: 'pending',
+    };
   if (id === 'readRuntimeWorkspace')
     return {
       role: 'application',

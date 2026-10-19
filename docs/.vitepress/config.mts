@@ -199,6 +199,10 @@ export default defineConfig({
                 link: '/docs/approved-contract-calls',
               },
               {
+                text: 'Automatic Safe provisioning',
+                link: '/docs/safe-provisioning',
+              },
+              {
                 text: 'Safe queues and sponsor pools',
                 link: '/docs/safe-queue-and-sponsor-pools',
               },

@@ -171,7 +171,7 @@ describe('provider HTTP boundary', () => {
     });
     servers.push(app);
     const live = (await app.inject('/docs/json')).json();
-    expect(Object.keys(live.paths)).toHaveLength(37);
+    expect(Object.keys(live.paths)).toHaveLength(38);
     expect(live.paths['/v1/enrollments'].post.summary).toContain(
       '[Not enabled]',
     );

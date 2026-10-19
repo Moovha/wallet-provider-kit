@@ -83,6 +83,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/accounts/{accountId}/safe": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readProvisionedSafe"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/actions/{actionId}/sign": {
         parameters: {
             query?: never;
@@ -1294,6 +1310,15 @@ export interface operations {
                 content: {
                     "application/json": {
                         account_id: string;
+                        smart_account?: {
+                            /** @enum {string} */
+                            profile: "safe-1.4.1";
+                            /** @enum {string} */
+                            chain_id: "eip155:8453" | "eip155:84532";
+                            address: string;
+                            /** @enum {string} */
+                            status: "prepared" | "pending" | "ready" | "unknown";
+                        };
                         address: string;
                     };
                 };
@@ -1458,6 +1483,70 @@ export interface operations {
                 };
                 content: {
                     "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+        };
+    };
+    readProvisionedSafe: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                accountId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        profile: "safe-1.4.1";
+                        /** @enum {string} */
+                        chain_id: "eip155:8453" | "eip155:84532";
+                        address: string;
+                        /** @enum {string} */
+                        status: "prepared" | "pending" | "ready" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
                         type: string;
                         title: string;
                         status: number;

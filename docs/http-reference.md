@@ -326,9 +326,74 @@ Success response schema:
       "type": "string",
       "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
     },
+    "smart_account": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profile", "chain_id", "address", "status"],
+      "properties": {
+        "profile": {
+          "type": "string",
+          "enum": ["safe-1.4.1"]
+        },
+        "chain_id": {
+          "type": "string",
+          "enum": ["eip155:8453", "eip155:84532"]
+        },
+        "address": {
+          "type": "string",
+          "pattern": "^0x[0-9a-fA-F]{40}$"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["prepared", "pending", "ready", "unknown"]
+        }
+      }
+    },
     "address": {
       "type": "string",
       "pattern": "^0x[0-9a-fA-F]{40}$"
+    }
+  }
+}
+```
+
+## GET /v1/accounts/{accountId}/safe
+
+Operation: `readProvisionedSafe`.
+
+| Parameter   | Location | Required | Schema                                                                                                |
+| ----------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
+| `accountId` | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+
+| Status | Content type     | Description      |
+| ------ | ---------------- | ---------------- |
+| 200    | application/json | Default Response |
+| 403    | application/json | Default Response |
+| 503    | application/json | Default Response |
+
+Success response schema:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["profile", "chain_id", "address", "status"],
+  "properties": {
+    "profile": {
+      "type": "string",
+      "enum": ["safe-1.4.1"]
+    },
+    "chain_id": {
+      "type": "string",
+      "enum": ["eip155:8453", "eip155:84532"]
+    },
+    "address": {
+      "type": "string",
+      "pattern": "^0x[0-9a-fA-F]{40}$"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["prepared", "pending", "ready", "unknown"]
     }
   }
 }

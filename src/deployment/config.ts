@@ -38,6 +38,7 @@ export interface SecretReference {
 }
 export interface ProviderConfiguration {
   network?: ProviderNetwork;
+  safeProvisioning?: import('../provisioning/safe.js').SafeProvisioningConfiguration;
   runtimeConfiguration?: RuntimeConfigurationOptions;
   localExecution?: LocalExecutionConfiguration;
   configVersion: 1;
@@ -103,6 +104,7 @@ export interface ProviderConfiguration {
     recoveryAcceptance?: string;
     tokenAcceptance?: string;
     executionAcceptance?: string;
+    safeProvisioningAcceptance?: string;
   };
   financial?: TransferPolicy;
   approvedCalls?: import('../execution/approved-calls.js').ApprovedCallsConfiguration;
@@ -496,8 +498,40 @@ export function validateProviderConfiguration(
           throw new Error();
       }
     }
+    if (config.safeProvisioning) {
+      const p = config.safeProvisioning;
+      if (
+        !config.approvedCalls ||
+        config.execution?.profile !== 'approved-evm-executor-v1' ||
+        !config.execution.local ||
+        !config.localExecution ||
+        config.execution.service ||
+        (config.activation.enabled &&
+          !config.activation.safeProvisioningAcceptance)
+      )
+        throw new ConfigurationError([
+          '/safeProvisioning: requires approved EVM calls, the bundled local execution engine and explicit deployment acceptance',
+        ]);
+      for (const pin of [p.factory, p.singleton]) {
+        if (
+          pin.implementation ||
+          getAddress(pin.address) ===
+            '0x0000000000000000000000000000000000000000' ||
+          /^0x0{64}$/.test(pin.codeHash)
+        )
+          throw new Error();
+      }
+      if (
+        p.factory.address.toLowerCase() === p.singleton.address.toLowerCase() ||
+        /^0x0{64}$/.test(p.proxyCodeHash)
+      )
+        throw new Error();
+    }
     if (config.approvedCalls) {
-      validateApprovedCallPolicy(config.approvedCalls.policy);
+      validateApprovedCallPolicy(
+        config.approvedCalls.policy,
+        !!config.safeProvisioning,
+      );
       if (
         config.execution?.profile !== 'approved-evm-executor-v1' ||
         (!config.execution.service && !config.execution.local)
