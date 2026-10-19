@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased RPC throttling recovery
+
+- Serialize fixed read-only RPC methods and allow at most three read attempts for HTTP 429 responses with bounded server backoff. Reject financial RPC methods before transport and preserve all quorum checks and financial no-redispatch rules.
+
 ## Unreleased Safe batch gas limits
 
 - Allow explicitly configured Safe contract-call sponsors to use up to 5,000,000 gas per execution. Keep transfer-only configurations capped at 1,000,000, defaults unchanged, and exact sponsor fee/lifetime-budget admission in both wallet and designated executor validation.

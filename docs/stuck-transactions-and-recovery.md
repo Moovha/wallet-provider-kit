@@ -123,6 +123,13 @@ authorizes another submission. During explicit nonce cancellation, background
 observation follows the cancellation; the fenced original remains available for
 explicit reconciliation.
 
+RPC reads are serialized per reader to limit bursts. HTTP 429 responses allow at
+most three read attempts, honoring a server backoff of up to two seconds or using
+a 500 ms fallback. Longer server backoffs return unavailable immediately and
+prevent that reader from issuing requests until the backoff expires. This retry
+policy applies only to the fixed read-method allowlist. Signing, provider
+submission and uncertain financial attempts are never retried by this transport.
+
 ## Retain a signed Safe head
 
 The outer payer nonce and Safe authorization nonce are separate. Service expiry
