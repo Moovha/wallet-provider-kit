@@ -1,3 +1,4 @@
+import { setAuthenticatedResponseTimeout } from '../service/response-timeout.js';
 import { uuid } from '../onboarding/policy.js';
 import type { FastifyInstance } from 'fastify';
 import type { Authenticate } from '../service/auth.js';
@@ -54,6 +55,7 @@ export async function registerWalletCallsRoutes(
         request.headers.authorization,
         'wallet:access:read',
       );
+      setAuthenticatedResponseTimeout(request);
       const body = request.body;
       let id: string | number | null = null;
       try {

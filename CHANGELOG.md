@@ -8,7 +8,8 @@
   sponsor budgets before infrastructure creation. Safe reads expose the network
   and exact configured admission reserve alongside the sponsor funding address.
 - Keep retained Safe reconciliation available after sponsor funds are spent, and
-  allow protected provisioning responses up to sixty seconds for RPC reconciliation.
+  allow authenticated wallet and application responses up to sixty seconds for
+  provider and RPC reconciliation.
 - Create service-owned storage and vault subdirectories in new local deployments
   so bind-mount root ownership does not prevent first startup. Existing stores
   keep their configured paths.

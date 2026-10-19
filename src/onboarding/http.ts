@@ -1,3 +1,4 @@
+import { setAuthenticatedResponseTimeout } from '../service/response-timeout.js';
 import type { VerifiedPrincipal } from '../domain/principal.js';
 import { runtimeSnapshotSchema } from '../runtime-configuration/schemas.js';
 import type { SafeExecutionQueue } from '../execution/queue.js';
@@ -238,6 +239,7 @@ export async function registerOnboardingRoutes(
   async function context(request: FastifyRequest, scope: string) {
     if (!authenticate || !options || !(await ready())) return unavailable();
     const principal = await authenticate(request.headers.authorization, scope);
+    setAuthenticatedResponseTimeout(request);
     if (!(await ready())) return unavailable();
     return {
       principal,

@@ -1,3 +1,4 @@
+import { setAuthenticatedResponseTimeout } from './response-timeout.js';
 import { registerWalletCallsRoutes } from '../wallet-calls/http.js';
 import type { WalletCallsService } from '../wallet-calls/service.js';
 import { readFile } from 'node:fs/promises';
@@ -342,6 +343,7 @@ export async function createServer(options: ServerOptions = {}) {
       request,
       await options.authenticate(request.headers.authorization, scope),
     );
+    setAuthenticatedResponseTimeout(request);
   }
   function mutationSchema(
     id: string | undefined,

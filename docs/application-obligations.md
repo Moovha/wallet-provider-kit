@@ -206,8 +206,8 @@ Complete these steps after the application connects:
    UUIDv4 key. Independent application RPCs must agree that the sponsor has enough
    gas before the backend creates the retained Safe owner key. Deployment uses the
    accepted application sponsor. Repeat the request to reconcile retained
-   provisioning until the status is `ready`. These protected provisioning routes
-   allow up to sixty seconds for retained reconciliation; a transport timeout still
+   provisioning until the status is `ready`. Authenticated provider and wallet APIs
+   allow up to sixty seconds for response work and retained reconciliation; a transport timeout still
    requires reading retained state and retrying the original request. Uncertain
    attempts keep their original identities and transaction plans.
 6. Users obtain individual wallet grants and consent to the current application

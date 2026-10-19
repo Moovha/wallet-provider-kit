@@ -1,3 +1,4 @@
+import { setAuthenticatedResponseTimeout } from '../service/response-timeout.js';
 import {
   obligationSchemas,
   type ObligationKind,
@@ -233,7 +234,9 @@ export async function registerRuntimeConfigurationRoutes(
   async function principal(request: FastifyRequest, scope: string) {
     if (!service || !authenticate)
       throw Object.assign(new Error('Unavailable'), { statusCode: 503 });
-    return authenticate(request.headers.authorization, scope);
+    const caller = await authenticate(request.headers.authorization, scope);
+    setAuthenticatedResponseTimeout(request);
+    return caller;
   }
   async function context(
     request: FastifyRequest,
@@ -278,7 +281,6 @@ export async function registerRuntimeConfigurationRoutes(
       if (!applicationSponsors)
         throw Object.assign(new Error('Unavailable'), { statusCode: 503 });
       const authority = await context(request, 'wallet:configuration:write');
-      request.raw.socket?.setTimeout?.(60000);
       return applicationSponsors.provision(
         authority,
         request.params.applicationId,
@@ -373,7 +375,6 @@ export async function registerRuntimeConfigurationRoutes(
     },
     async (request) => {
       const authority = await context(request, 'wallet:configuration:write');
-      request.raw.socket?.setTimeout?.(60000);
       return safes().provision(authority, request.params.applicationId);
     },
   );
