@@ -109,9 +109,11 @@ from application API clients and applies only to those staff tools.
 
 ![Application token service connections](public/screenshots/services.webp)
 
-Continue to **Policies** to decide what authenticated applications may request.
+Continue to **Applications** to decide what authenticated applications may request.
 
-## 4. Policies
+<span id="_4-policies"></span>
+
+## 4. Applications
 
 An authenticated application needs your explicit trust before it can attest a
 user's identity or request wallet access. Policy defines that relationship and
@@ -145,46 +147,26 @@ It cannot request transfers merely because account reading is permitted. The
 [access contract](application-access.md) shows the resulting requests, grants,
 renewal and withdrawal process for your application developer.
 
-### Delegated transfer signing
+### Application configuration after connection
 
-Enable **Configure delegated transfer signing** when applications should request
-token transfers within user-approved limits. Enter the verified token contract,
-signing-domain name/version, symbol and decimals. Choose allowed recipients,
-per-transfer and lifetime amounts in integer base units, and authorization validity.
-The [financial profile reference](setup.md#supported-financial-policy) explains
-the exact ERC-3009 contract and budget behavior.
+The default profile prebundles a shared application Safe engine. Application action
+policies, off-chain fields and enums, gas sponsorship and RPC credentials are
+registered through protected APIs after deployment. The provider reviews and
+manages each application's resources with its separate operator credential.
+The bundled issuer generates that operator identity; an existing issuer needs an
+exact operator issuer, client ID and subject binding.
 
-Allow `transfers:request` only for intended applications. They must present the
-current transfer terms to the user and attest consent to that policy revision.
-Signing creates a usable authorization; it does not broadcast, fund gas or confirm
-a transfer. You choose optional coordinated execution in Deployment.
+Follow [application obligations](application-obligations.md) to accept resources,
+prepare the sponsor, expose its funding address and provision the Safe after gas
+is available. User assets remain in individual wallets. No Safe or sponsor is
+created by the wizard. Identity baseline controls are under **Provider identity
+baseline and access duration**; these establish provider trust requirements,
+while runtime policies constrain each application's requested actions.
 
-### Runtime contract policies
-
-Enable **Runtime configuration** when applications should register contracts and
-methods after deployment. The bundled issuer generates a separate operator client
-ID, derives its issuer and subject, and registers it automatically. Inspect or
-override the identity under **Advanced operator identity**. With an existing
-issuer, enter the externally registered operator issuer, client ID and subject. The [application management guide](runtime-workspace.md) explains operator
-access, contract proposals, publication and automatic registration review through
-protected APIs. The [runtime API](runtime-configuration.md) supplies the developer
-contract and the additional opt-ins needed for financial use.
-
-For approved contract calls, allow `contracts:request` for intended applications;
-configure their Safe bindings and execution mechanism in Deployment. Every
-financial policy revision requires current user consent before new effects.
-
-### Existing hosted deployments
-
-**Provider-hosted access (compatibility)** retains provider login, consent pages
-and staff review for deployments that need them. Use the [hosted guide](onboarding.md)
-for that configuration and its optional [application-record evaluation](application-records.md).
-Its login/vendor connections are configured in Services. Do not switch an occupied
-store's access mode to bypass its [ownership migration requirements](application-access.md#hosted-compatibility-and-migration).
-
-![Application registrations and access policy](public/screenshots/policies.webp)
-
-Continue to **Deployment** to choose storage, API tools and execution.
+Imported deployments without shared application Safes retain their optional
+transfer, per-user Safe and separate-executor configuration controls. See the
+[financial profile reference](setup.md#supported-financial-policy) for those
+compatibility profiles.
 
 ## 5. Deployment
 
@@ -214,43 +196,24 @@ wallet-user identity and consent still come from the connected application.
 
 ### Execution and sponsorship
 
-Choose coordinated execution if the service should sign internally, dispatch
-through an application sponsor and verify chain results. The connected application
-arranges sponsor funding; [assets and gas](assets-and-gas.md) explains that role.
+The default deployment includes the private local execution engine, reviewed Safe
+1.4.1 infrastructure pins and an empty application execution configuration. There
+are no sponsor addresses, RPC subscriptions or contract allowlists to enter here.
+Applications supply these resources after connecting; follow the
+[post-deployment sequence](application-obligations.md#prepare-gas-sponsorship-and-the-shared-safe).
 
-Keep the bundled local engine selected in Services. For transfers, its local profile is selected automatically; setup creates encrypted sponsor keys and bindings. Configure independent RPC sources, gas budgets and funding before activation. Existing designated services and direct Relayer connections remain optional. The [transfer execution guide](execution.md) covers sponsors, independent
-RPC sources, fixed gas limits, budgets and outcome meanings. The
-[designated service guide](execution-service.md) explains its separate deployment,
-provider ID/revision and service-key environment references. The wizard configures
-the wallet side; it does not deploy that dispatcher.
-
-For contract calls, select the approved EVM execution profile and enable
-**Approved contract-call policy**. With the bundled local engine, enable
-[automatic Safe provisioning](safe-provisioning.md) or configure existing Safe
-1.4.1 bindings. Fund the application sponsor before provisioning. Configure code
-pins and permitted functions, then obtain separate `contracts:request` consent.
-The swap/vault fields configure optional compatibility request builders; generic
-native-recipient terms use reviewed configuration/API fields. Optional adapters
-are available in the policy forms. The [approved-call guide](approved-contract-calls.md)
-explains operation limits and outcome verification. The application separately
-funds the Safe with assets for its approved calls.
-
-Optional execution settings support [Safe queues and sponsor pools](safe-queue-and-sponsor-pools.md),
-[stuck-transaction detection and recovery](stuck-transactions-and-recovery.md),
-[bounded fee replacements](automatic-replacements.md) and
-[payer events and health](payer-events-and-health.md). Configure only the features
-your execution service supports. Automatic replacement is not selected for the bundled local engine. Replacement requires the
-[fee-only Relayer build](fee-only-relayer.md); ordinary Relayer is insufficient.
-[Standard wallet calls](wallet-calls.md) uses the runtime-authorized Safe queue.
-[Account-abstraction helpers](account-abstraction-sponsorship.md) do not enable
-ERC-4337 signing or submission in the configured service.
+The provider controls the application Safe signer and enforces user authority.
+Application-specific RPCs verify chain state and submit transactions. The shared
+Safe queues calls by nonce, with separate user grants and consent. Imported
+compatibility configurations continue to expose their existing execution controls.
 
 ### Activation
 
 Keep **Enable wallet operations in this configuration** off for the first
 deployment. Complete backend and recovery acceptance before enabling it. Transfer
-signing also needs token acceptance; coordinated execution needs execution/RPC/
-submission recovery acceptance. Enter references to your actual test reports.
+signing in compatibility profiles also needs token acceptance. Shared application
+execution additionally requires reviewed resource declarations, accepted application
+policy, working application RPCs and a funded sponsor after connection. Enter references to your actual test reports.
 The wizard does not run those tests or verify report contents. Use the
 [staging walkthrough](staging-walkthrough.md) and [acceptance checklist](conformance.md)
 to plan isolated tests before admitting users.

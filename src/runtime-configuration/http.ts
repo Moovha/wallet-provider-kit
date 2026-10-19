@@ -222,6 +222,8 @@ export async function registerRuntimeConfigurationRoutes(
   service?: RuntimeConfigurationService,
   authenticate?: Authenticate,
   walletCalls?: WalletCallsService,
+  applicationSafes?: import('../provisioning/application.js').ApplicationSafeService,
+  applicationSponsors?: import('../provisioning/application-sponsor.js').ApplicationSponsorService,
 ) {
   function configured() {
     if (!service)
@@ -250,6 +252,109 @@ export async function registerRuntimeConfigurationRoutes(
     ...extra,
     response: { 200: response, ...errors },
   });
+  app.post<{ Params: { applicationId: string } }>(
+    '/v1/provider/applications/:applicationId/sponsorship/provision',
+    {
+      schema: schema(
+        'provisionApplicationSponsor',
+        {
+          type: 'object',
+          additionalProperties: false,
+          required: ['application_id', 'funding_address', 'status'],
+          properties: {
+            application_id: applicationIdSchema,
+            funding_address: { type: 'string' },
+            status: { type: 'string', enum: ['ready'] },
+          },
+        },
+        {
+          headers,
+          params: params('applicationId', applicationIdSchema),
+          body: { type: 'object', additionalProperties: false, properties: {} },
+        },
+      ),
+    },
+    async (request) => {
+      if (!applicationSponsors)
+        throw Object.assign(new Error('Unavailable'), { statusCode: 503 });
+      return applicationSponsors.provision(
+        await context(request, 'wallet:configuration:write'),
+        request.params.applicationId,
+      );
+    },
+  );
+  const applicationSafeSchema = {
+    type: 'object',
+    additionalProperties: false,
+    required: [
+      'application_id',
+      'funding_addresses',
+      'status',
+      'asset_model',
+      'account_model',
+    ],
+    properties: {
+      application_id: applicationIdSchema,
+      funding_addresses: { type: 'array', items: { type: 'string' } },
+      status: {
+        type: 'string',
+        enum: [
+          'unprovisioned',
+          'signer_ready',
+          'signer_pending',
+          'prepared',
+          'pending',
+          'ready',
+          'unknown',
+        ],
+      },
+      address: { type: 'string' },
+      asset_model: { type: 'string', enum: ['individual-user-wallets'] },
+      account_model: {
+        type: 'string',
+        enum: ['provider-controlled-application-safe'],
+      },
+    },
+  };
+  function safes() {
+    if (!applicationSafes)
+      throw Object.assign(new Error('Unavailable'), { statusCode: 503 });
+    return applicationSafes;
+  }
+  app.get(
+    '/v1/application/safe',
+    { schema: schema('readApplicationSafe', applicationSafeSchema) },
+    async (request) =>
+      safes().read(await principal(request, 'wallet:configuration:read')),
+  );
+  app.get<{ Params: { applicationId: string } }>(
+    '/v1/provider/applications/:applicationId/safe',
+    {
+      schema: schema('readProviderApplicationSafe', applicationSafeSchema, {
+        params: params('applicationId', applicationIdSchema),
+      }),
+    },
+    async (request) =>
+      safes().read(
+        await principal(request, 'wallet:configuration:write'),
+        request.params.applicationId,
+      ),
+  );
+  app.post<{ Params: { applicationId: string } }>(
+    '/v1/provider/applications/:applicationId/safe',
+    {
+      schema: schema('provisionApplicationSafe', applicationSafeSchema, {
+        headers,
+        params: params('applicationId', applicationIdSchema),
+        body: { type: 'object', additionalProperties: false, properties: {} },
+      }),
+    },
+    async (request) =>
+      safes().provision(
+        await context(request, 'wallet:configuration:write'),
+        request.params.applicationId,
+      ),
+  );
   const credentialSchema = {
     type: 'object',
     additionalProperties: false,

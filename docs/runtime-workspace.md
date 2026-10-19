@@ -25,8 +25,9 @@ provider terms; it does not delegate provider policy or spending authority.
 
 The [application obligations API](application-obligations.md) manages
 expected off-chain action fields, application-paid service declarations and gas
-sponsorship agreements. Those records do not currently activate execution or
-provision the shared application Safe.
+sponsorship agreements. After provider review, prepare the application sponsor,
+fund its exposed address and provision the shared Safe through the protected
+provider endpoints described in that guide. Acceptance alone never authorizes spending.
 
 ## Configure optional policy adapters
 

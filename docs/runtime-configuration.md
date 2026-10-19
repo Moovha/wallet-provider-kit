@@ -1,7 +1,7 @@
 # Register application contracts and publish policies
 
 Applications may need to register additional contracts without a service restart.
-Enable runtime configuration in [Policies](setup-wizard.md#_4-policies) to let
+The [Applications step](setup-wizard.md#_4-applications) enables runtime configuration for new deployments, letting
 registered applications propose methods and separately authorized provider
 operators publish versioned policies. Use the [application management APIs](runtime-workspace.md) and deployed Swagger explorer.
 This guide describes policy contracts, revision rules and optional financial authority.
@@ -79,7 +79,8 @@ Submit `POST /v1/application/policy/proposals` with
         "methods": [
           {
             "signature": "customMethod(uint256,address)",
-            "maximum_value_wei": "0"
+            "maximum_value_wei": "0",
+            "user_address_parameters": [1]
           }
         ]
       }
@@ -99,7 +100,7 @@ Submit `POST /v1/application/policy/proposals` with
 ```
 
 The address/hash are fictional. Register independently reviewed actual contracts.
-Only Base Sepolia is accepted. The registry checks format; it does not call RPC
+The policy chain must match the configured Base or Base Sepolia network. The registry checks format; it does not call RPC
 to certify code or business semantics. Optional `implementation` contains an
 address and `code_hash` for a reviewed implementation pin; recording that pin is
 not an upgrade-race guarantee.
@@ -178,7 +179,15 @@ retention before enterprise adoption.
 
 ## Use registered contracts for consent and execution
 
-Configure both services once before enabling runtime financial use:
+New wizard deployments use the [shared application Safe flow](application-obligations.md#prepare-gas-sponsorship-and-the-shared-safe).
+They prebundle contract pins and an idle local engine; sponsors, credentials and
+policies are application resources registered after deployment. Shared calls bind
+policy-designated ABI address parameters to the individual user and carry no
+native value. Published action requirements and accepted declarations are enforced
+at admission and again before signing or dispatch.
+
+For existing separately deployed executor integrations, configure both services
+before enabling runtime financial use:
 
 - On the wallet, use application-led access, a reviewed `assertionTrust` agreement,
   `approvedCalls`, `execution.profile: "approved-evm-executor-v1"` and

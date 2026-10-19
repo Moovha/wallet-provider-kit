@@ -172,6 +172,22 @@ export function validateProviderConfiguration(
         config.execution?.profile !== 'approved-evm-executor-v1')
     )
       throw new Error();
+    if (
+      config.runtimeConfiguration?.sharedApplicationSafes &&
+      (!config.runtimeConfiguration.authorizeContracts ||
+        !config.runtimeConfiguration.credentialKey ||
+        !config.execution?.local ||
+        !config.safeProvisioning ||
+        !config.approvedCalls ||
+        config.approvedCalls.policy.accounts.length !== 0 ||
+        config.execution.sponsors.length !== 0 ||
+        config.execution.rpc.endpoints.length !== 0 ||
+        config.operations ||
+        config.financial)
+    )
+      throw new Error(
+        'Shared application Safes require application credentials, runtime authority, local execution and automatic Safe provisioning without user Safe bindings',
+      );
     if (config.runtimeConfiguration) {
       validateRuntimeConfiguration(config.runtimeConfiguration, resolvedPolicy);
       if (
@@ -351,6 +367,11 @@ export function validateProviderConfiguration(
     if (config.execution) {
       const execution = config.execution;
       if (
+        !config.runtimeConfiguration?.sharedApplicationSafes &&
+        (execution.sponsors.length < 1 || execution.rpc.endpoints.length < 2)
+      )
+        throw new Error();
+      if (
         execution.local &&
         (!config.localExecution ||
           execution.service ||
@@ -370,7 +391,9 @@ export function validateProviderConfiguration(
       if (
         (!config.financial && !config.approvedCalls) ||
         config.policy.identity?.records ||
-        (config.activation.enabled && !config.activation.executionAcceptance)
+        (config.activation.enabled &&
+          !config.runtimeConfiguration?.sharedApplicationSafes &&
+          !config.activation.executionAcceptance)
       )
         throw new ConfigurationError([
           '/execution: an approved-action policy and separate execution acceptance are required',
@@ -511,6 +534,7 @@ export function validateProviderConfiguration(
         !config.localExecution ||
         config.execution.service ||
         (config.activation.enabled &&
+          !config.runtimeConfiguration?.sharedApplicationSafes &&
           !config.activation.safeProvisioningAcceptance)
       )
         throw new ConfigurationError([

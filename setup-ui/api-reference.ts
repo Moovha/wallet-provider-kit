@@ -74,10 +74,13 @@ export function operationStatus(
     financial: !!config.financial,
     execution: !!config.execution,
     nonceCancellation:
+      !config.runtimeConfiguration?.sharedApplicationSafes &&
       !!config.execution?.local &&
       config.execution.profile === 'approved-evm-executor-v1',
     safeQueue: !!config.execution?.safeQueue,
-    safeProvisioning: !!config.safeProvisioning,
+    safeProvisioning:
+      !!config.safeProvisioning &&
+      !config.runtimeConfiguration?.sharedApplicationSafes,
     walletCalls:
       !!config.runtimeConfiguration?.authorizeContracts &&
       !!config.execution?.safeQueue,
@@ -95,20 +98,21 @@ export function operationStatus(
     return 'Runtime registry settings are present; current application access still requires verification';
   const app = config.policy.applications[applicationIndex];
   if (!app?.clientId || !app.issuer || app.issuer !== config.oauth.issuer)
-    return "Complete this application's registration in Policies and Services";
-  if (app.enabled === false) return 'This application is disabled in Policies';
+    return "Complete this application's registration in Applications and Services";
+  if (app.enabled === false)
+    return 'This application is disabled in Applications';
   if (
     config.policy.access?.mode === 'application' &&
     !app.assertionTrust?.agreement
   )
-    return 'Record this application’s identity and consent trust agreement in Policies';
+    return 'Record this application’s identity and consent trust agreement in Applications';
   if (
     guide.permission &&
     !(app.permissions ?? ['account:read', 'operations:request']).includes(
       guide.permission,
     )
   )
-    return 'Select the required permission for this application in Policies';
+    return 'Select the required permission for this application in Applications';
   if (!config.activation.enabled)
     return 'Not enabled: Wallet operations are disabled in Deployment';
   return 'Settings are present; deployed access has not been checked';
@@ -154,6 +158,8 @@ export function requestExample(
   config: ProviderConfiguration,
   applicationIndex: number,
 ): object | undefined {
+  if (['provisionApplicationSafe', 'provisionApplicationSponsor'].includes(id))
+    return {};
   if (id === 'writeApplicationCredential')
     return {
       expected_revision: '0',
@@ -389,6 +395,27 @@ export function responseExample(
   config?: ProviderConfiguration,
   requestedPermissions?: string[],
 ): object {
+  if (id === 'provisionApplicationSponsor')
+    return {
+      application_id: 'a'.repeat(64),
+      funding_address: '0x' + '1'.repeat(40),
+      status: 'ready',
+    };
+  if (
+    [
+      'readApplicationSafe',
+      'readProviderApplicationSafe',
+      'provisionApplicationSafe',
+    ].includes(id)
+  )
+    return {
+      application_id: 'a'.repeat(64),
+      funding_addresses: ['0x' + '1'.repeat(40)],
+      status: 'pending',
+      address: '0x' + '2'.repeat(40),
+      asset_model: 'individual-user-wallets',
+      account_model: 'provider-controlled-application-safe',
+    };
   if (
     [
       'readApplicationCredentials',

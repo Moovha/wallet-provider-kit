@@ -43,6 +43,8 @@ import {
 
 export interface ServerOptions {
   safeProvisioning?: import('../provisioning/safe.js').SafeProvisioningService;
+  applicationSafes?: import('../provisioning/application.js').ApplicationSafeService;
+  applicationSponsors?: import('../provisioning/application-sponsor.js').ApplicationSponsorService;
   authorizationServer?: {
     register(app: import('fastify').FastifyInstance): void;
   };
@@ -534,6 +536,7 @@ export async function createServer(options: ServerOptions = {}) {
     {
       schema: {
         operationId: 'readProvisionedSafe',
+        hide: !!options.applicationSafes,
         security: [{ accessToken: [] }],
         params: {
           type: 'object',
@@ -611,6 +614,8 @@ export async function createServer(options: ServerOptions = {}) {
     options.runtimeConfiguration,
     options.authenticate,
     options.walletCalls,
+    options.applicationSafes,
+    options.applicationSponsors,
   );
   if (options.documentation !== false && options.documentationTokens)
     await registerDocumentationTokens(app, options.documentationTokens);

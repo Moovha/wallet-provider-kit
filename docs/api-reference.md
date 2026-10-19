@@ -594,6 +594,8 @@ See the [HTTP reference](http-reference.md).
 ```ts
 export interface ServerOptions {
   safeProvisioning?: import('../provisioning/safe.js').SafeProvisioningService;
+  applicationSafes?: import('../provisioning/application.js').ApplicationSafeService;
+  applicationSponsors?: import('../provisioning/application-sponsor.js').ApplicationSponsorService;
   authorizationServer?: {
     register(app: import('fastify').FastifyInstance): void;
   };
@@ -649,7 +651,7 @@ export declare class WalletCallsService {
   constructor(
     actions: SupportedActions,
     queue: SafeExecutionQueue,
-    execution: ApprovedExecutionCoordinator,
+    execution: ExecutionCoordinatorPort,
     driver?: WalletCallsDriver,
   );
   list(
@@ -2406,6 +2408,8 @@ export interface FinancialApproval {
   consentReference: string;
   policyRevision: string;
   account: EmbeddedAccount;
+  /** Original user authority for provider-owned application Safe signing. */
+  userAccount?: EmbeddedAccount;
   action: TypedDataAction | RelayerExecutionAction;
   budgetId: string;
   units: string;
@@ -3995,6 +3999,7 @@ export interface RuntimeConfigurationOptions {
   credentialKey?: {
     env: string;
   };
+  sharedApplicationSafes?: boolean;
   operators: {
     issuer: string;
     clientId: string;
@@ -4035,7 +4040,10 @@ export declare class RuntimeConfigurationService {
     },
   ): Promise<CredentialMetadata>;
   /** Resolve only accepted resources belonging to the authenticated application's identity. */
-  rpcEndpoints(applicationId: string): Promise<string[]>;
+  rpcEndpoints(
+    applicationId: string,
+    kind?: 'rpc-verification' | 'rpc-submission',
+  ): Promise<string[]>;
   readObligations(
     principal: VerifiedPrincipal,
     applicationId?: string,
@@ -4165,6 +4173,7 @@ export interface RuntimePolicy {
     methods: {
       signature: string;
       maximum_value_wei: string;
+      user_address_parameters?: number[];
     }[];
   }[];
   maximum_calls: number;
@@ -4468,6 +4477,12 @@ export declare class SafeProvisioningService {
     resolveEndpoints?:
       ((context: AuthorityContext) => Promise<string[]>) | undefined,
     assertResources?: (() => Promise<void>) | undefined,
+    applicationAuthority?:
+      | (() => Promise<{
+          owner: string;
+          caller: Pick<VerifiedPrincipal, 'issuer' | 'subject' | 'clientId'>;
+        }>)
+      | undefined,
   );
   read(
     context: AuthorityContext,
@@ -4841,7 +4856,7 @@ export declare class WalletCallsService {
   constructor(
     actions: SupportedActions,
     queue: SafeExecutionQueue,
-    execution: ApprovedExecutionCoordinator,
+    execution: ExecutionCoordinatorPort,
     driver?: WalletCallsDriver,
   );
   list(

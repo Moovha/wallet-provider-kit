@@ -55,7 +55,7 @@ export function createRelayerClient(
   const resolveAccount = options.resolveAccount;
 
   async function call(
-    method: 'GET' | 'POST' | 'PUT',
+    method: 'GET' | 'POST' | 'PUT' | 'PATCH',
     path: string,
     body?: string,
   ): Promise<Record<string, unknown> | null> {

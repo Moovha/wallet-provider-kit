@@ -7,7 +7,7 @@ import type { VerifiedPrincipal } from '../domain/principal.js';
 import { WalletProviderError } from '../domain/signing.js';
 import type { SupportedActions } from '../deployment/actions.js';
 import type { SafeExecutionQueue } from '../execution/queue.js';
-import type { ApprovedExecutionCoordinator } from '../execution/coordinator.js';
+import type { ExecutionCoordinatorPort } from '../execution/application-coordinator.js';
 import { WalletCallsError } from './errors.js';
 import type { WalletCallsStatus } from './types.js';
 
@@ -67,19 +67,19 @@ function capabilities(
 /** Account-scoped EIP-5792 adapter. The server selects the durable execution driver for each account. */
 export class WalletCallsService {
   private readonly queue?: SafeExecutionQueue;
-  private readonly execution?: ApprovedExecutionCoordinator;
+  private readonly execution?: ExecutionCoordinatorPort;
   private readonly driver?: WalletCallsDriver;
   constructor(actions: SupportedActions, driver: WalletCallsDriver);
   constructor(
     actions: SupportedActions,
     queue: SafeExecutionQueue,
-    execution: ApprovedExecutionCoordinator,
+    execution: ExecutionCoordinatorPort,
     driver?: WalletCallsDriver,
   );
   constructor(
     private readonly actions: SupportedActions,
     queueOrDriver: SafeExecutionQueue | WalletCallsDriver,
-    execution?: ApprovedExecutionCoordinator,
+    execution?: ExecutionCoordinatorPort,
     driver?: WalletCallsDriver,
   ) {
     if (!actions.onboarding.runtimeContracts)

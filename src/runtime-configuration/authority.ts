@@ -279,3 +279,32 @@ export function validateRuntimeCalls(
     }
   }
 }
+
+/** Shared-Safe contracts must bind every policy-designated user address to the currently authorized individual wallet. */
+export function validateRuntimeUserCalls(
+  snapshot: RuntimePolicySnapshot,
+  input: ApprovedCallInput,
+  userAddress: string,
+): void {
+  validateRuntimeCalls(snapshot, input);
+  if (input.kind !== 'contract-call') deny();
+  for (const call of input.calls) {
+    const method = snapshot.policy.contracts
+      .find((c) => c.address.toLowerCase() === call.to.toLowerCase())
+      ?.methods.find(
+        (m) => id(m.signature).slice(0, 10) === call.data.slice(0, 10),
+      );
+    if (!method?.user_address_parameters?.length || call.value !== '0') deny();
+    const abi = new Interface(['function ' + method.signature]);
+    const fragment = abi.getFunction(method.signature);
+    const decoded = abi.decodeFunctionData(method.signature, call.data);
+    for (const index of method.user_address_parameters) {
+      if (
+        fragment?.inputs[index]?.type !== 'address' ||
+        typeof decoded[index] !== 'string' ||
+        decoded[index].toLowerCase() !== userAddress.toLowerCase()
+      )
+        deny();
+    }
+  }
+}

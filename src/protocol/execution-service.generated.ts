@@ -437,6 +437,7 @@ export interface operations {
                                     methods: {
                                         signature: string;
                                         maximum_value_wei: string;
+                                        user_address_parameters?: number[];
                                     }[];
                                 }[];
                                 call_adapters?: {

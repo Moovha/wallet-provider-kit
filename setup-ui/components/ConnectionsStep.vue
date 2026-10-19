@@ -72,7 +72,7 @@ const flow = computed(() => model.value.policy.access?.mode ?? 'hosted');
     <strong>Connect the services your provider will use</strong>
     <p>
       Configure application tokens here. Set the access flow, identity evidence,
-      application trust and limits together in Policies.
+      application trust and limits together in Applications.
     </p>
     <p v-if="flow === 'application'">
       Users stay in the application. It authenticates them, completes identity
@@ -81,12 +81,13 @@ const flow = computed(() => model.value.policy.access?.mode ?? 'hosted');
     </p>
     <p v-else>
       Hosted compatibility requires login and either an identity-vendor
-      connection or application-record evaluation selected in Policies.
+      connection or application-record evaluation selected in Applications.
     </p>
   </div>
   <SetupField
     type="select"
     guide="executionEnabled"
+    v-if="!model.runtimeConfiguration?.sharedApplicationSafes"
     label="Local execution engine"
     :modelValue="model.localExecution ? 'bundled' : 'external'"
     :options="[
@@ -187,7 +188,7 @@ const flow = computed(() => model.value.policy.access?.mode ?? 'hosted');
       <strong>Application authentication is included</strong>
       <p>
         The bundled OAuth service uses oidc-provider. Setup registers the
-        enabled applications from Policies and generates missing credentials
+        enabled applications from Applications and generates missing credentials
         privately. No separate token-service installation is required. Server
         applications obtain five-minute tokens using client_credentials; users
         stay in the connected application.
@@ -324,15 +325,15 @@ const flow = computed(() => model.value.policy.access?.mode ?? 'hosted');
   <template v-if="flow === 'hosted'">
     <h3>Hosted identity-vendor connections</h3>
     <p v-if="model.policy.identity?.records" class="help-text">
-      Application-record evaluation is selected in Policies. It uses no
+      Application-record evaluation is selected in Applications. It uses no
       identity-vendor connection. To use a vendor, turn off record evaluation in
-      Policies, then configure its connection here.
+      Applications, then configure its connection here.
     </p>
     <template v-else>
       <p class="help-text">
         Connect Didit or Sumsub for external verification. “Verification” starts
         new checks; “import” reuses evidence shared from another service. Set
-        each route's agreed price limit and application funding in Policies,
+        each route's agreed price limit and application funding in Applications,
         including free routes.
       </p>
       <fieldset class="vendor-panel">
@@ -432,7 +433,7 @@ const flow = computed(() => model.value.policy.access?.mode ?? 'hosted');
         class="error-text"
       >
         Configure an identity vendor here or select application-record
-        evaluation in Policies before exporting.
+        evaluation in Applications before exporting.
       </p>
     </template>
   </template>

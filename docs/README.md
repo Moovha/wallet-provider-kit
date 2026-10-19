@@ -2,21 +2,22 @@
 
 Your wallet service connects applications to accounts while retaining control over
 which requests reach the signing backend. The setup wizard brings those choices
-into six steps: **Provider → Backend → Services → Policies → Deployment → Export**.
+into six steps: **Provider → Backend → Services → Applications → Deployment → Export**.
 Follow them in order. Each section below introduces the decision and links to its
 fields and supporting information.
 
 Users sign in, complete identity checks and approve wallet access within the
 connected application. Your service checks its attestations against your policy
-and stores limited, revocable access. You configure that relationship in Policies
+and stores limited, revocable access. You configure that relationship in Applications
 as part of the same setup.
 
 The current service is experimental and supports one active POSIX host with selectable Base
 mainnet or Base Sepolia. Production custody and funded mainnet acceptance remain pending. You
 can explore the wizard without external credentials. The recommended setup supplies
 the wallet engine, application token service, private execution engine, durable
-storage and HTTPS gateway. Record your provider domain, policies and application
-gas funding agreements through the wizard.
+storage and HTTPS gateway. Record your provider domain and trusted application
+identities in the wizard. Applications supply policies, gas sponsorship and service
+credentials after connection.
 
 <span id="install-and-open-the-local-wizard"></span>
 
@@ -85,24 +86,27 @@ Follow [Services fields](setup-wizard.md#_3-services) and the
 For an existing issuer, the [Auth0 recipe](auth0-setup.md) demonstrates a compatible registration. Optional
 staff login is needed only if you later enable staff token controls in Deployment.
 
-## 4. Policies
+<span id="_4-policies"></span>
+
+## 4. Applications
 
 Authentication identifies an application; your policy determines what it may do
 for a user. Register each application's client ID and reviewed identity/consent
 trust agreement. Choose required evidence, freshness, access duration and allowed
-permissions. Add delegated transfer signing only when you need it.
+permissions. The default shared Safe profile keeps action policy and gas setup
+out of the wizard.
 
-Follow [Policies fields](setup-wizard.md#_4-policies). The
+Follow [Application fields](setup-wizard.md#_4-applications). The
 [access contract](application-access.md) connects those settings to the application's
 requests, user binding, consent and revocation. For contract registrations and
-policy publication after deployment, configure the optional
-[application configuration APIs](runtime-workspace.md) here.
+policy publication after deployment, use the
+[application configuration APIs](runtime-workspace.md) enabled by the default profile.
 
 ## 5. Deployment
 
 Your service must retain ownership, grants and attempts across restarts. Choose
 private persistent storage and HTTP listen settings. Decide whether to enable API
-testing tools and whether transactions use a supplied execution coordinator.
+testing tools. The default profile includes an idle private execution engine.
 
 Follow [Deployment fields](setup-wizard.md#_5-deployment). Its supporting guides
 cover [storage and backups](storage.md), [staff token controls](operator-tokens.md),

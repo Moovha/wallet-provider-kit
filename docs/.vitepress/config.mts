@@ -59,7 +59,7 @@ export default defineConfig({
           { text: '1. Provider', link: '/docs/setup-wizard#_1-provider' },
           { text: '2. Backend', link: '/docs/setup-wizard#_2-backend' },
           { text: '3. Services', link: '/docs/setup-wizard#_3-services' },
-          { text: '4. Policies', link: '/docs/setup-wizard#_4-policies' },
+          { text: '4. Applications', link: '/docs/setup-wizard#_4-applications' },
           { text: '5. Deployment', link: '/docs/setup-wizard#_5-deployment' },
           { text: '6. Export', link: '/docs/setup-wizard#_6-export' },
         ],
@@ -156,8 +156,8 @@ export default defineConfig({
             ],
           },
           {
-            text: '4. Policies',
-            link: '/docs/setup-wizard#_4-policies',
+            text: '4. Applications',
+            link: '/docs/setup-wizard#_4-applications',
             collapsed: true,
             items: [
               {

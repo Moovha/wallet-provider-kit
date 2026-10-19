@@ -71,11 +71,16 @@ export function prepareLocalExecution(
       contents: JSON.stringify(keystore),
     });
   }
-  const rpc = execution
-    ? execution.rpc.endpoints.map((entry) => values[entry.env])
-    : network.testnet
-      ? ['https://sepolia.base.org', 'https://base-sepolia-rpc.publicnode.com']
-      : ['https://mainnet.base.org', 'https://base.drpc.org'];
+  const rpc = config.runtimeConfiguration?.sharedApplicationSafes
+    ? ['https://unconfigured.invalid']
+    : execution
+      ? execution.rpc.endpoints.map((entry) => values[entry.env])
+      : network.testnet
+        ? [
+            'https://sepolia.base.org',
+            'https://base-sepolia-rpc.publicnode.com',
+          ]
+        : ['https://mainnet.base.org', 'https://base.drpc.org'];
   if (rpc.some((url) => !url))
     throw new ConfigurationError([
       '/execution/rpc: supply the configured RPC values privately',

@@ -1216,3 +1216,38 @@ describe('application credentials', () => {
     expect((await snapshot()).policy_hash).not.toBe(first.policy_hash);
   });
 });
+
+it('requires provider publication for shared-Safe methods and validates user-address ABI indices', async () => {
+  const { db } = await fixture();
+  const service = new RuntimeConfigurationService(
+    policy,
+    db.onboardingStore,
+    { ...options, sharedApplicationSafes: true },
+    'deployment-1',
+  );
+  const appId = runtimeApplicationId(issuer, 'first');
+  await expect(
+    service.setReview(context(operator), appId, {
+      expected_revision: '0',
+      expected_review_revision: '0',
+      mode: 'automatic',
+    }),
+  ).rejects.toThrow();
+  const value = document();
+  value.contracts[0].methods[0].user_address_parameters = [0];
+  await expect(
+    service.update(context(operator), appId, {
+      expected_revision: '0',
+      policy: value,
+    }),
+  ).rejects.toThrow();
+  value.contracts[0].methods[0].user_address_parameters = [1];
+  expect(
+    (
+      await service.update(context(operator), appId, {
+        expected_revision: '0',
+        policy: value,
+      })
+    ).revision,
+  ).toBe('1');
+});

@@ -6651,6 +6651,17 @@ Success response schema:
                         "maximum_value_wei": {
                           "type": "string",
                           "pattern": "^(0|[1-9][0-9]{0,77})$"
+                        },
+                        "user_address_parameters": {
+                          "type": "array",
+                          "minItems": 1,
+                          "maxItems": 16,
+                          "uniqueItems": true,
+                          "items": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 31
+                          }
                         }
                       }
                     }
@@ -7982,6 +7993,296 @@ Success response schema:
           "type": "string"
         }
       }
+    }
+  }
+}
+```
+
+## POST /v1/provider/applications/{applicationId}/sponsorship/provision
+
+Operation: `provisionApplicationSponsor`.
+
+Optional runtime configuration control plane. Application proposals and provider publications are configuration records, not wallet grants, signing authority or execution activation. Publications become readable immediately without restarting the service. Immutable historical revisions remain available. Requires the documented scope and configured application or operator identity.
+
+| Parameter         | Location | Required | Schema                                                                                                |
+| ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
+| `applicationId`   | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{64}$"}`                                                        |
+| `idempotency-key` | header   | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+
+Request body (application/json):
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {}
+}
+```
+
+| Status | Content type             | Description      |
+| ------ | ------------------------ | ---------------- |
+| 200    | application/json         | Default Response |
+| 400    | application/problem+json | Problem response |
+| 401    | application/problem+json | Problem response |
+| 403    | application/problem+json | Problem response |
+| 409    | application/problem+json | Problem response |
+| 413    | application/problem+json | Problem response |
+| 415    | application/problem+json | Problem response |
+| 422    | application/problem+json | Problem response |
+| 429    | application/problem+json | Problem response |
+| 500    | application/problem+json | Problem response |
+| 503    | application/problem+json | Problem response |
+
+Success response schema:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["application_id", "funding_address", "status"],
+  "properties": {
+    "application_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "funding_address": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["ready"]
+    }
+  }
+}
+```
+
+## GET /v1/application/safe
+
+Operation: `readApplicationSafe`.
+
+Optional runtime configuration control plane. Application proposals and provider publications are configuration records, not wallet grants, signing authority or execution activation. Publications become readable immediately without restarting the service. Immutable historical revisions remain available. Requires the documented scope and configured application or operator identity.
+
+| Status | Content type             | Description      |
+| ------ | ------------------------ | ---------------- |
+| 200    | application/json         | Default Response |
+| 400    | application/problem+json | Problem response |
+| 401    | application/problem+json | Problem response |
+| 403    | application/problem+json | Problem response |
+| 409    | application/problem+json | Problem response |
+| 413    | application/problem+json | Problem response |
+| 415    | application/problem+json | Problem response |
+| 422    | application/problem+json | Problem response |
+| 429    | application/problem+json | Problem response |
+| 500    | application/problem+json | Problem response |
+| 503    | application/problem+json | Problem response |
+
+Success response schema:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "application_id",
+    "funding_addresses",
+    "status",
+    "asset_model",
+    "account_model"
+  ],
+  "properties": {
+    "application_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "funding_addresses": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "unprovisioned",
+        "signer_ready",
+        "signer_pending",
+        "prepared",
+        "pending",
+        "ready",
+        "unknown"
+      ]
+    },
+    "address": {
+      "type": "string"
+    },
+    "asset_model": {
+      "type": "string",
+      "enum": ["individual-user-wallets"]
+    },
+    "account_model": {
+      "type": "string",
+      "enum": ["provider-controlled-application-safe"]
+    }
+  }
+}
+```
+
+## GET /v1/provider/applications/{applicationId}/safe
+
+Operation: `readProviderApplicationSafe`.
+
+Optional runtime configuration control plane. Application proposals and provider publications are configuration records, not wallet grants, signing authority or execution activation. Publications become readable immediately without restarting the service. Immutable historical revisions remain available. Requires the documented scope and configured application or operator identity.
+
+| Parameter       | Location | Required | Schema                                         |
+| --------------- | -------- | -------- | ---------------------------------------------- |
+| `applicationId` | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{64}$"}` |
+
+| Status | Content type             | Description      |
+| ------ | ------------------------ | ---------------- |
+| 200    | application/json         | Default Response |
+| 400    | application/problem+json | Problem response |
+| 401    | application/problem+json | Problem response |
+| 403    | application/problem+json | Problem response |
+| 409    | application/problem+json | Problem response |
+| 413    | application/problem+json | Problem response |
+| 415    | application/problem+json | Problem response |
+| 422    | application/problem+json | Problem response |
+| 429    | application/problem+json | Problem response |
+| 500    | application/problem+json | Problem response |
+| 503    | application/problem+json | Problem response |
+
+Success response schema:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "application_id",
+    "funding_addresses",
+    "status",
+    "asset_model",
+    "account_model"
+  ],
+  "properties": {
+    "application_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "funding_addresses": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "unprovisioned",
+        "signer_ready",
+        "signer_pending",
+        "prepared",
+        "pending",
+        "ready",
+        "unknown"
+      ]
+    },
+    "address": {
+      "type": "string"
+    },
+    "asset_model": {
+      "type": "string",
+      "enum": ["individual-user-wallets"]
+    },
+    "account_model": {
+      "type": "string",
+      "enum": ["provider-controlled-application-safe"]
+    }
+  }
+}
+```
+
+## POST /v1/provider/applications/{applicationId}/safe
+
+Operation: `provisionApplicationSafe`.
+
+Optional runtime configuration control plane. Application proposals and provider publications are configuration records, not wallet grants, signing authority or execution activation. Publications become readable immediately without restarting the service. Immutable historical revisions remain available. Requires the documented scope and configured application or operator identity.
+
+| Parameter         | Location | Required | Schema                                                                                                |
+| ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
+| `applicationId`   | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{64}$"}`                                                        |
+| `idempotency-key` | header   | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+
+Request body (application/json):
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {}
+}
+```
+
+| Status | Content type             | Description      |
+| ------ | ------------------------ | ---------------- |
+| 200    | application/json         | Default Response |
+| 400    | application/problem+json | Problem response |
+| 401    | application/problem+json | Problem response |
+| 403    | application/problem+json | Problem response |
+| 409    | application/problem+json | Problem response |
+| 413    | application/problem+json | Problem response |
+| 415    | application/problem+json | Problem response |
+| 422    | application/problem+json | Problem response |
+| 429    | application/problem+json | Problem response |
+| 500    | application/problem+json | Problem response |
+| 503    | application/problem+json | Problem response |
+
+Success response schema:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "application_id",
+    "funding_addresses",
+    "status",
+    "asset_model",
+    "account_model"
+  ],
+  "properties": {
+    "application_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "funding_addresses": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "unprovisioned",
+        "signer_ready",
+        "signer_pending",
+        "prepared",
+        "pending",
+        "ready",
+        "unknown"
+      ]
+    },
+    "address": {
+      "type": "string"
+    },
+    "asset_model": {
+      "type": "string",
+      "enum": ["individual-user-wallets"]
+    },
+    "account_model": {
+      "type": "string",
+      "enum": ["provider-controlled-application-safe"]
     }
   }
 }
@@ -10272,6 +10573,17 @@ Success response schema:
                               "maximum_value_wei": {
                                 "type": "string",
                                 "pattern": "^(0|[1-9][0-9]{0,77})$"
+                              },
+                              "user_address_parameters": {
+                                "type": "array",
+                                "minItems": 1,
+                                "maxItems": 16,
+                                "uniqueItems": true,
+                                "items": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 31
+                                }
                               }
                             }
                           }
@@ -10826,6 +11138,17 @@ Success response schema:
                                 "maximum_value_wei": {
                                   "type": "string",
                                   "pattern": "^(0|[1-9][0-9]{0,77})$"
+                                },
+                                "user_address_parameters": {
+                                  "type": "array",
+                                  "minItems": 1,
+                                  "maxItems": 16,
+                                  "uniqueItems": true,
+                                  "items": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 31
+                                  }
                                 }
                               }
                             }
@@ -11414,6 +11737,17 @@ Success response schema:
                                 "maximum_value_wei": {
                                   "type": "string",
                                   "pattern": "^(0|[1-9][0-9]{0,77})$"
+                                },
+                                "user_address_parameters": {
+                                  "type": "array",
+                                  "minItems": 1,
+                                  "maxItems": 16,
+                                  "uniqueItems": true,
+                                  "items": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 31
+                                  }
                                 }
                               }
                             }
@@ -12261,6 +12595,17 @@ Success response schema:
                         "maximum_value_wei": {
                           "type": "string",
                           "pattern": "^(0|[1-9][0-9]{0,77})$"
+                        },
+                        "user_address_parameters": {
+                          "type": "array",
+                          "minItems": 1,
+                          "maxItems": 16,
+                          "uniqueItems": true,
+                          "items": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 31
+                          }
                         }
                       }
                     }
@@ -12865,6 +13210,17 @@ Success response schema:
                         "maximum_value_wei": {
                           "type": "string",
                           "pattern": "^(0|[1-9][0-9]{0,77})$"
+                        },
+                        "user_address_parameters": {
+                          "type": "array",
+                          "minItems": 1,
+                          "maxItems": 16,
+                          "uniqueItems": true,
+                          "items": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 31
+                          }
                         }
                       }
                     }
@@ -13469,6 +13825,17 @@ Success response schema:
                         "maximum_value_wei": {
                           "type": "string",
                           "pattern": "^(0|[1-9][0-9]{0,77})$"
+                        },
+                        "user_address_parameters": {
+                          "type": "array",
+                          "minItems": 1,
+                          "maxItems": 16,
+                          "uniqueItems": true,
+                          "items": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 31
+                          }
                         }
                       }
                     }
@@ -14017,6 +14384,17 @@ Request body (application/json):
                     "maximum_value_wei": {
                       "type": "string",
                       "pattern": "^(0|[1-9][0-9]{0,77})$"
+                    },
+                    "user_address_parameters": {
+                      "type": "array",
+                      "minItems": 1,
+                      "maxItems": 16,
+                      "uniqueItems": true,
+                      "items": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 31
+                      }
                     }
                   }
                 }
@@ -14564,6 +14942,17 @@ Success response schema:
                     "maximum_value_wei": {
                       "type": "string",
                       "pattern": "^(0|[1-9][0-9]{0,77})$"
+                    },
+                    "user_address_parameters": {
+                      "type": "array",
+                      "minItems": 1,
+                      "maxItems": 16,
+                      "uniqueItems": true,
+                      "items": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 31
+                      }
                     }
                   }
                 }
@@ -15125,6 +15514,17 @@ Success response schema:
                     "maximum_value_wei": {
                       "type": "string",
                       "pattern": "^(0|[1-9][0-9]{0,77})$"
+                    },
+                    "user_address_parameters": {
+                      "type": "array",
+                      "minItems": 1,
+                      "maxItems": 16,
+                      "uniqueItems": true,
+                      "items": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 31
+                      }
                     }
                   }
                 }
@@ -15704,6 +16104,17 @@ Success response schema:
                     "maximum_value_wei": {
                       "type": "string",
                       "pattern": "^(0|[1-9][0-9]{0,77})$"
+                    },
+                    "user_address_parameters": {
+                      "type": "array",
+                      "minItems": 1,
+                      "maxItems": 16,
+                      "uniqueItems": true,
+                      "items": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 31
+                      }
                     }
                   }
                 }
@@ -16241,6 +16652,17 @@ Request body (application/json):
                     "maximum_value_wei": {
                       "type": "string",
                       "pattern": "^(0|[1-9][0-9]{0,77})$"
+                    },
+                    "user_address_parameters": {
+                      "type": "array",
+                      "minItems": 1,
+                      "maxItems": 16,
+                      "uniqueItems": true,
+                      "items": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 31
+                      }
                     }
                   }
                 }
@@ -16789,6 +17211,17 @@ Success response schema:
                     "maximum_value_wei": {
                       "type": "string",
                       "pattern": "^(0|[1-9][0-9]{0,77})$"
+                    },
+                    "user_address_parameters": {
+                      "type": "array",
+                      "minItems": 1,
+                      "maxItems": 16,
+                      "uniqueItems": true,
+                      "items": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 31
+                      }
                     }
                   }
                 }

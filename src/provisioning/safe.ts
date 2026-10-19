@@ -199,6 +199,10 @@ export class SafeProvisioningService {
       context: AuthorityContext,
     ) => Promise<string[]>,
     private readonly assertResources?: () => Promise<void>,
+    private readonly applicationAuthority?: () => Promise<{
+      owner: string;
+      caller: Pick<VerifiedPrincipal, 'issuer' | 'subject' | 'clientId'>;
+    }>,
   ) {
     this.config = structuredClone(config);
     this.execution = structuredClone(execution);
@@ -221,6 +225,7 @@ export class SafeProvisioningService {
     provision = true,
   ) {
     await this.assertResources?.();
+    if (this.applicationAuthority) return this.applicationAuthority();
     if (
       !uuid.test(id) ||
       !uuid.test(context.idempotencyKey) ||

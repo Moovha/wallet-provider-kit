@@ -23,6 +23,8 @@ export interface FinancialApproval {
   consentReference: string;
   policyRevision: string;
   account: EmbeddedAccount;
+  /** Original user authority for provider-owned application Safe signing. */
+  userAccount?: EmbeddedAccount;
   action: TypedDataAction | RelayerExecutionAction;
   budgetId: string;
   units: string;

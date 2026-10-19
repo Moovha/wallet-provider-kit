@@ -46,10 +46,11 @@ function financial(enabled: unknown) {
 <template>
   <div class="step-heading">
     <span class="eyebrow">Access and limits</span>
-    <h2>Set your policies</h2>
+    <h2>Connect trusted applications</h2>
     <p>
-      Decide which applications can request access, which identity evidence to
-      accept, and which actions are supported.
+      Register application identities and their trust agreements. Applications
+      submit action policies, service credentials and gas sponsorship after
+      connecting to the deployed API.
     </p>
   </div>
   <div class="callout step-orientation">
@@ -75,75 +76,79 @@ function financial(enabled: unknown) {
       requires agreed route prices and an application funding agreement.
       Configure those rules below and connect the vendors in Services.
     </p>
-    <p>
+    <p v-if="!model.runtimeConfiguration?.sharedApplicationSafes">
       Transfer signing is optional. Leave it off if you only need wallet
       creation and account access. Keep the starting policy version for a first
       setup; review the access periods against your own requirements.
     </p>
   </div>
-  <AccessPolicyFields
-    v-model="model"
-    @configure-services="emit('configure-services')"
-  />
-  <AdvancedSettings label="Advanced policy metadata">
-    <SetupField
-      guide="policyVersion"
-      v-model="model.policy.version"
-      type="text"
-      label="Policy version"
-      validation="required|length:1,256"
+  <details :open="!model.runtimeConfiguration?.sharedApplicationSafes">
+    <summary>Provider identity baseline and access duration</summary>
+    <AccessPolicyFields
+      v-model="model"
+      @configure-services="emit('configure-services')"
     />
-  </AdvancedSettings>
-  <div class="field-grid">
-    <SetupField
-      guide="identityAge"
-      v-model="identityDays"
-      type="number"
-      :number="true"
-      :label="
-        model.policy.identity?.records
-          ? 'Maximum age of accepted records (days)'
-          : 'Maximum age of identity checks (days)'
-      "
-      min="1"
-      max="365"
-      validation="required|between:1,365"
-    /><SetupField
-      guide="accessAge"
-      v-model="accessDays"
-      type="number"
-      :number="true"
-      label="Maximum access duration (days)"
-      min="1"
-      max="365"
-      validation="required|between:1,365"
-    />
-  </div>
-  <div v-if="model.policy.access?.mode === 'application'" class="callout">
-    <strong>How the provider uses these rules</strong>
-    <p>
-      A trusted application must submit identity evidence at the required level,
-      with every required field, checked within {{ identityDays }} days. It can
-      request only its allowed permissions with the user’s current consent.
-      Access lasts at most {{ accessDays }} days and ends sooner if identity
-      evidence or consent expires, or access is revoked.
-    </p>
-    <details>
-      <summary>Need different policy rules?</summary>
+    <AdvancedSettings label="Advanced policy metadata">
+      <SetupField
+        guide="policyVersion"
+        v-model="model.policy.version"
+        type="text"
+        label="Policy version"
+        validation="required|length:1,256"
+      />
+    </AdvancedSettings>
+    <div class="field-grid">
+      <SetupField
+        guide="identityAge"
+        v-model="identityDays"
+        type="number"
+        :number="true"
+        :label="
+          model.policy.identity?.records
+            ? 'Maximum age of accepted records (days)'
+            : 'Maximum age of identity checks (days)'
+        "
+        min="1"
+        max="365"
+        validation="required|between:1,365"
+      /><SetupField
+        guide="accessAge"
+        v-model="accessDays"
+        type="number"
+        :number="true"
+        label="Maximum access duration (days)"
+        min="1"
+        max="365"
+        validation="required|between:1,365"
+      />
+    </div>
+    <div v-if="model.policy.access?.mode === 'application'" class="callout">
+      <strong>How the provider uses these rules</strong>
       <p>
-        The wizard configures the built-in rules shown on this page, including
-        optional transfer limits below. Required fields check that values are
-        present; they do not restrict countries or evaluate risk scores. Custom
-        decision rules require an advanced host integration.
-        <a
-          :href="docs + 'application-access.html#configure-the-trust-policy'"
-          target="_blank"
-          rel="noopener noreferrer"
-          >Policy controls and limits ↗</a
-        >
+        A trusted application must submit identity evidence at the required
+        level, with every required field, checked within
+        {{ identityDays }} days. It can request only its allowed permissions
+        with the user’s current consent. Access lasts at most
+        {{ accessDays }} days and ends sooner if identity evidence or consent
+        expires, or access is revoked.
       </p>
-    </details>
-  </div>
+      <details v-if="!model.runtimeConfiguration?.sharedApplicationSafes">
+        <summary>Need different policy rules?</summary>
+        <p>
+          The wizard configures the built-in rules shown on this page, including
+          optional transfer limits below. Required fields check that values are
+          present; they do not restrict countries or evaluate risk scores.
+          Custom decision rules require an advanced host integration.
+          <a
+            :href="docs + 'application-access.html#configure-the-trust-policy'"
+            target="_blank"
+            rel="noopener noreferrer"
+            >Policy controls and limits ↗</a
+          >
+        </p>
+      </details>
+    </div>
+  </details>
   <div class="section-heading">
     <h3>Connected applications</h3>
     <button
@@ -158,7 +163,9 @@ function financial(enabled: unknown) {
           ...(model.policy.access?.mode === 'application'
             ? { assertionTrust: { agreement: '' } }
             : {}),
-          permissions: ['account:read'],
+          permissions: model.runtimeConfiguration?.sharedApplicationSafes
+            ? ['account:read', 'contracts:request']
+            : ['account:read'],
         })
       "
     >
@@ -221,24 +228,32 @@ function financial(enabled: unknown) {
       type="checkbox"
       label="Allowed permissions"
       :options="
-        model.policy.identity?.records
-          ? [{ value: 'account:read', label: 'Read wallet accounts' }]
-          : [
+        model.runtimeConfiguration?.sharedApplicationSafes
+          ? [
               { value: 'account:read', label: 'Read wallet accounts' },
               {
-                value: 'operations:request',
-                label: 'Request wallet operations (advanced hosts)',
-              },
-              {
                 value: 'contracts:request',
-                label:
-                  'Request approved contract calls, swaps and vault deposits',
-              },
-              {
-                value: 'transfers:request',
-                label: 'Request transfers on behalf of users',
+                label: 'Request user-authorized application calls',
               },
             ]
+          : model.policy.identity?.records
+            ? [{ value: 'account:read', label: 'Read wallet accounts' }]
+            : [
+                { value: 'account:read', label: 'Read wallet accounts' },
+                {
+                  value: 'operations:request',
+                  label: 'Request wallet operations (advanced hosts)',
+                },
+                {
+                  value: 'contracts:request',
+                  label:
+                    'Request approved contract calls, swaps and vault deposits',
+                },
+                {
+                  value: 'transfers:request',
+                  label: 'Request transfers on behalf of users',
+                },
+              ]
       "
       validation="required"
     />
@@ -369,7 +384,10 @@ function financial(enabled: unknown) {
       />
     </template>
   </section>
-  <div class="feature-panel">
+  <div
+    v-if="!model.runtimeConfiguration?.sharedApplicationSafes"
+    class="feature-panel"
+  >
     <h3>Optional delegated transfer signing</h3>
     <p v-if="model.policy.identity?.records" class="help-text">
       Application-record evaluation keeps wallets unfunded and permits reads
@@ -391,7 +409,11 @@ function financial(enabled: unknown) {
       @update:modelValue="financial($event)"
     />
   </div>
-  <template v-if="model.financial">
+  <template
+    v-if="
+      model.financial && !model.runtimeConfiguration?.sharedApplicationSafes
+    "
+  >
     <p class="help-text">
       <a
         :href="docs + 'setup.html#supported-financial-policy'"

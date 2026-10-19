@@ -82,7 +82,7 @@ const stepNames: Record<string, string> = {
   provider: 'Provider details',
   backend: 'Wallet backend',
   connections: 'Connected services',
-  policies: 'Policies',
+  policies: 'Applications',
   deployment: 'Deployment',
   review: 'Review & export',
 };
@@ -440,7 +440,7 @@ function enableDocumentation() {
                   "
                 /></fieldset
             ></FormKit>
-            <FormKit type="step" name="policies" label="Policies"
+            <FormKit type="step" name="policies" label="Applications"
               ><fieldset class="configuration-fields" :disabled="setupLocked">
                 <PolicyStep
                   v-model="config"

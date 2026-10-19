@@ -128,8 +128,22 @@ function updateHttp(
       walks through these tasks and backups.
     </p>
   </div>
-  <ExecutionStep v-model="model" />
-  <ContractCallsStep v-model="model" />
+  <div
+    v-if="model.runtimeConfiguration?.sharedApplicationSafes"
+    class="callout"
+  >
+    <strong>Application execution is prepared after connection</strong>
+    <p>
+      The bundled engine starts without sponsor keys, RPC credentials or
+      application policies. Each connected application supplies its services and
+      action schema. The provider reviews them, exposes a funding address and
+      provisions the application Safe after funding.
+    </p>
+  </div>
+  <template v-else>
+    <ExecutionStep v-model="model" />
+    <ContractCallsStep v-model="model" />
+  </template>
   <h3>Enable wallet operations</h3>
   <p class="help-text">
     Leave this off for your first deployment. Complete wallet backend and
@@ -164,7 +178,9 @@ function updateHttp(
       validation="required|length:1,256"
     />
     <SetupField
-      v-if="model.execution"
+      v-if="
+        model.execution && !model.runtimeConfiguration?.sharedApplicationSafes
+      "
       guide="executionEvidence"
       v-model="model.activation.executionAcceptance"
       type="text"
@@ -172,7 +188,10 @@ function updateHttp(
       validation="required|length:1,256"
     />
     <SetupField
-      v-if="model.safeProvisioning"
+      v-if="
+        model.safeProvisioning &&
+        !model.runtimeConfiguration?.sharedApplicationSafes
+      "
       guide="executionEvidence"
       v-model="model.activation.safeProvisioningAcceptance"
       type="text"

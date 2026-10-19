@@ -16,6 +16,7 @@ export const runtimeConfigurationSchema = {
   required: ['operators'],
   properties: {
     authorizeContracts: { type: 'boolean' },
+    sharedApplicationSafes: { type: 'boolean' },
     credentialKey: {
       type: 'object',
       additionalProperties: false,
@@ -86,6 +87,13 @@ export const runtimePolicySchema = {
               properties: {
                 signature: { type: 'string', minLength: 3, maxLength: 256 },
                 maximum_value_wei: uint,
+                user_address_parameters: {
+                  type: 'array',
+                  minItems: 1,
+                  maxItems: 16,
+                  uniqueItems: true,
+                  items: { type: 'integer', minimum: 0, maximum: 31 },
+                },
               },
             },
           },

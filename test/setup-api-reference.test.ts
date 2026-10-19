@@ -89,7 +89,7 @@ describe('operator API reference', () => {
     expect(
       operations.find((item) => item.operation.operationId === 'signAction')
         ?.status,
-    ).toBe('Not enabled: Transfer signing is off in Policies');
+    ).toBe('Not enabled: Transfer signing is off in Applications');
     config.financial = {
       profile: 'provider-authorized-erc3009-v1',
       token: {
@@ -110,7 +110,9 @@ describe('operator API reference', () => {
     expect(
       operations.find((item) => item.operation.operationId === 'signAction')
         ?.status,
-    ).toBe('Select the required permission for this application in Policies');
+    ).toBe(
+      'Select the required permission for this application in Applications',
+    );
     expect(
       operations.find(
         (item) => item.operation.operationId === 'provisionAccount',
@@ -125,13 +127,15 @@ describe('operator API reference', () => {
       referenceOperations(contract, config, 1).find(
         (item) => item.operation.operationId === 'requestAccountAccess',
       )?.status,
-    ).toBe('This application is disabled in Policies');
+    ).toBe('This application is disabled in Applications');
     delete config.policy.applications[0].permissions;
     expect(
       referenceOperations(contract, config, 0).find(
         (item) => item.operation.operationId === 'signAction',
       )?.status,
-    ).toBe('Select the required permission for this application in Policies');
+    ).toBe(
+      'Select the required permission for this application in Applications',
+    );
   });
   it('provides schema-valid request examples and placeholder-only scoped cURL with an explicit retry key', () => {
     const config = fixture();

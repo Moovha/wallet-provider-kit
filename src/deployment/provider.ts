@@ -1,3 +1,9 @@
+import { ApplicationExecutionCoordinator } from '../execution/application-coordinator.js';
+import { ApplicationSponsorService } from '../provisioning/application-sponsor.js';
+import {
+  ApplicationSafeService,
+  applicationAccountNamespace,
+} from '../provisioning/application.js';
 import { ApplicationExecutionObserver } from '../runtime-configuration/observer.js';
 import { ApplicationCredentialCipher } from '../runtime-configuration/credentials.js';
 import {
@@ -255,6 +261,7 @@ export async function createConfiguredProvider(
             config.approvedCalls,
             config.network,
             config.safeProvisioning ?? false,
+            !!config.runtimeConfiguration?.sharedApplicationSafes,
           )
         : undefined;
     financial = actions
@@ -306,6 +313,67 @@ export async function createConfiguredProvider(
             : undefined,
         )
       : undefined;
+    const applicationSponsors = config.runtimeConfiguration
+      ?.sharedApplicationSafes
+      ? new ApplicationSponsorService(
+          runtimeConfiguration!,
+          database,
+          new ApplicationCredentialCipher(
+            resolveSecret(config.runtimeConfiguration.credentialKey!),
+          ),
+          config.execution!,
+          activeRevision,
+          resolveSecret(config.execution!.relayer!.apiKey),
+          localExecutionFetch(),
+          config.network,
+        )
+      : undefined;
+    let applicationSafes: ApplicationSafeService | undefined;
+    if (config.runtimeConfiguration?.sharedApplicationSafes) {
+      const applicationBackend = await createConfiguredBackend(
+        config.backend,
+        directory,
+        database,
+        {
+          namespace: applicationAccountNamespace,
+          journal: database.journal,
+          authorizeAttempt: (request) =>
+            applicationSafes?.authorizeProvision(request) ??
+            Promise.resolve(false),
+        },
+        {
+          namespace: 'configured-transfers-v1',
+          journal: database.journal,
+          authorizeAttempt: (request) =>
+            financial?.authorizeAttempt(request) ?? Promise.resolve(false),
+        },
+        config.network,
+      );
+      applicationSafes = new ApplicationSafeService(
+        runtimeConfiguration!,
+        onboarding,
+        database,
+        applicationBackend,
+        config.safeProvisioning!,
+        config.execution!,
+        createSafeDeploymentDriver(
+          config.execution!,
+          resolveSecret(config.execution!.relayer!.apiKey),
+          localExecutionFetch(),
+        ),
+        activeRevision,
+        config.activation.enabled,
+        config.network,
+        fetch,
+        applicationSponsors,
+        (execution) =>
+          createSafeDeploymentDriver(
+            execution,
+            resolveSecret(config.execution!.relayer!.apiKey),
+            applicationSponsors!.request(),
+          ),
+      );
+    }
     const observer = config.execution
       ? runtimeConfiguration && config.runtimeConfiguration?.credentialKey
         ? new ApplicationExecutionObserver(
@@ -363,24 +431,46 @@ export async function createConfiguredProvider(
       });
     const execution =
       config.execution && actions
-        ? new TransferExecutionCoordinator(
-            actions,
-            database,
-            service,
-            config.execution,
-            config.execution.service
-              ? createRemoteExecutionProvider(
-                  config.execution,
-                  executionIdentity!,
-                )
-              : createTransferExecutionProvider(
-                  config.execution,
-                  resolveSecret(config.execution.relayer!.apiKey),
-                  config.execution.local ? localExecutionFetch() : undefined,
-                ),
-            observer!,
-            operations,
-          )
+        ? applicationSponsors
+          ? new ApplicationExecutionCoordinator(
+              database,
+              activeRevision,
+              config.execution.pollIntervalSeconds,
+              async (applicationId) => {
+                const execution =
+                  await applicationSponsors.configuration(applicationId);
+                return new TransferExecutionCoordinator(
+                  actions,
+                  database,
+                  service,
+                  execution,
+                  createTransferExecutionProvider(
+                    execution,
+                    resolveSecret(execution.relayer!.apiKey),
+                    applicationSponsors.request(),
+                  ),
+                  observer!,
+                );
+              },
+            )
+          : new TransferExecutionCoordinator(
+              actions,
+              database,
+              service,
+              config.execution,
+              config.execution.service
+                ? createRemoteExecutionProvider(
+                    config.execution,
+                    executionIdentity!,
+                  )
+                : createTransferExecutionProvider(
+                    config.execution,
+                    resolveSecret(config.execution.relayer!.apiKey),
+                    config.execution.local ? localExecutionFetch() : undefined,
+                  ),
+              observer!,
+              operations,
+            )
         : undefined;
     const safeQueue =
       config.execution?.safeQueue && execution && actions && observer
@@ -434,7 +524,9 @@ export async function createConfiguredProvider(
           )
         : undefined;
     const app = await createServer({
-      safeProvisioning,
+      safeProvisioning: applicationSafes ? undefined : safeProvisioning,
+      applicationSafes,
+      applicationSponsors,
       walletCalls:
         config.runtimeConfiguration?.authorizeContracts &&
         actions &&

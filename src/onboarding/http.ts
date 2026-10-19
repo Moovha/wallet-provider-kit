@@ -21,7 +21,6 @@ import {
 } from '../executor/schemas.js';
 import type { ExecutionAuthorityRequest } from '../executor/protocol.js';
 import providerConfigurationSchema from '../../spec/provider-config.schema.json' with { type: 'json' };
-import type { TransferExecutionCoordinator } from '../execution/coordinator.js';
 import {
   executionHeaders,
   executionReceiptSchema,
@@ -80,7 +79,7 @@ export interface OnboardingHttpOptions {
   apiExplorerLogin?: boolean;
   /** Configuration-first provider-authorized transfers; absent in the onboarding-only profile. */
   actions?: SupportedActions;
-  execution?: TransferExecutionCoordinator;
+  execution?: import('../execution/application-coordinator.js').ExecutionCoordinatorPort;
   safeQueue?: SafeExecutionQueue;
   executionIdentity?: ServiceIdentity;
   contractNonce?: (

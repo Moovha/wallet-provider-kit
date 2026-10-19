@@ -10,9 +10,14 @@ credentials can supply the RPC quorum used for chain verification and Safe
 provisioning. Neither configuration acceptance nor an OAuth scope authorizes
 spending: current user authority and durable attempt admission remain required.
 
-Shared application Safe signing, application-managed submission services and
-post-deployment sponsor provisioning are not implemented. Existing execution
-infrastructure still requires deployment configuration.
+New wizard deployments prebundle an idle local execution engine and enable
+`runtimeConfiguration.sharedApplicationSafes`. Each application has one
+provider-controlled Safe. The provider retains its signing authority; users keep
+assets in their individual wallets. No sponsor keys, funded accounts or application
+RPC credentials are needed to export the initial deployment.
+
+A complete [application profile example](provider.config.application.example.json)
+shows the prebundled infrastructure and empty application resources.
 
 ## Authenticate each role
 
@@ -91,7 +96,10 @@ metadata. Rotation or revocation resets the associated declaration to pending
 review. With credential storage configured, verification and Safe provisioning
 use these application endpoints and fail closed when they are missing, revoked
 or unaccepted. They do not fall back to deployment RPC credentials. Submission
-RPCs and other service types remain declarations only.
+RPCs use one to three accepted `rpc-submission` services. The private local
+Relayer receives that application's endpoints before submission or simulation;
+missing or revoked credentials deny the request. Other service kinds can be
+registered for review, but require a supported adapter before use.
 
 ## Supply action payloads
 
@@ -147,3 +155,55 @@ The bounded experimental registry permits 256 revisions per resource and 16
 provider decisions per resource revision. Bodies are limited to 32 KiB, with
 normalized declaration values limited to 24 KiB. Review the generated
 [HTTP reference](http-reference.md) for field and collection limits.
+
+## Prepare gas sponsorship and the shared Safe
+
+Complete these steps after the application connects:
+
+1. The application stores its verification and submission RPC credentials and
+   declares its services, expected actions and sponsorship agreement.
+2. The provider reviews each resource and publishes the application policy. Shared
+   Safe policies require manual publication; automatic contract acceptance is disabled. For
+   every shared-Safe method, set `user_address_parameters` to the zero-based ABI
+   indices of the individual wallet addresses that control whose assets or
+   authority the method uses. Each designated parameter must be a direct `address`
+   and match the currently authorized user's wallet. Review the actual contract
+   semantics and code pins; the toolkit cannot infer business meaning from a name.
+3. The provider calls
+   `POST /v1/provider/applications/{applicationId}/sponsorship/provision` with an
+   empty object and UUIDv4 `Idempotency-Key`. This prepares an application-specific
+   gas signer and relayer, returning `funding_address`. It does not transfer funds.
+4. The application reads `GET /v1/application/safe` and arranges funding of the
+   returned `funding_addresses` on the configured chain. The provider can inspect
+   the same state with `GET /v1/provider/applications/{applicationId}/safe`.
+5. With wallet operations activated, the provider calls
+   `POST /v1/provider/applications/{applicationId}/safe` with an empty object and
+   UUIDv4 key. Independent application RPCs must agree that the sponsor has enough
+   gas before the backend creates the retained Safe owner key. Deployment uses the
+   accepted application sponsor. Repeat the request to reconcile retained
+   provisioning until the status is `ready`; uncertain attempts keep their original
+   identities and transaction plans.
+6. Users obtain individual wallet grants and consent to the current application
+   terms. Submit user-bound contract calls with the required `application_action`.
+   The provider rechecks user authority, current policy and immutable attempts
+   before signing and dispatch. All users of this application share the Safe's
+   nonce queue, while grants, accounts and consent remain individual.
+
+Shared calls require zero native value and explicit user-address mappings. The
+Safe does not acquire authority over an individual wallet merely by being deployed.
+A reviewed target contract must enforce the intended user authorization or existing
+asset approval. Safe-funded token, swap and vault request builders are not enabled
+by this shared profile. Do not pool user assets in the application Safe.
+
+Sponsor identities, gas limits and funding agreement are retained across restarts.
+Provisioning does not overwrite a signer or replace an uncertain resource. Changing
+an established funding agreement or budget requires an explicit infrastructure
+migration; rejecting the declaration immediately stops new authorized effects.
+Previously signed or broadcast transactions cannot be recalled by policy changes.
+
+The local engine uses the pinned OpenZeppelin Relayer 1.8.0
+[signer and relayer API](https://github.com/OpenZeppelin/openzeppelin-relayer/blob/v1.8.0/openapi.json).
+Per-relayer [custom RPC configuration](https://docs.openzeppelin.com/relayer/1.8.x/configuration)
+keeps submission billing with the application. The deployment's default RPC is an
+unconfigured placeholder, not a provider-paid fallback. Keep encrypted sponsor
+keys, application credentials and the retained database together in protected backups.

@@ -256,3 +256,25 @@ key control, recovery/export rights and failure modes to your users. A login
 integration does not establish end-user self-custody. Measure live usage and costs
 before activation. WalletConnect supplies connectivity and is not a signing
 backend included in this kit.
+
+## Application-owned configuration and shared execution
+
+New wizard deployments enable `runtimeConfiguration.sharedApplicationSafes` with
+an empty execution template. The provider configures infrastructure and trust
+roots at deployment. Connected applications supply actions, off-chain field enums,
+service credentials and sponsorship terms; the provider reviews these per
+application through the [application management API](runtime-workspace.md).
+
+Follow [application obligations](application-obligations.md) for the complete
+credential, policy, sponsor funding and Safe provisioning sequence. A separate
+provider-controlled Safe signer is retained for each application outside the user
+account registry. Users retain individual wallets, grants and consent. Shared
+calls require zero native value and provider-reviewed `user_address_parameters`
+that bind calldata to the authorized user's wallet. This does not invent an asset
+approval: the target contract must implement the intended user authorization.
+
+Existing per-user Safe deployments are not converted automatically. Their durable
+attempts, keys and account ownership retain their original meaning. Complete or
+reconcile existing work before planning a reviewed migration; switching profiles
+does not move assets. Offline fixtures verify authority and retry behavior, not
+live provider or network acceptance.

@@ -226,9 +226,7 @@ it('defaults to the bundled issuer and OWS, synchronizes registrations without r
   synchronizeBundledServices(draft);
   expect(draft.oauth).toEqual(bundledOAuth('https://wallet.example.test'));
   expect(draft.authorizationServer!.clients[0].clientSecret).toEqual(secret);
-  expect(draft.authorizationServer!.clients[0].scopes).not.toContain(
-    'wallet:sign',
-  );
+  expect(draft.authorizationServer!.clients[0].scopes).toContain('wallet:sign');
 });
 
 it('creates a private retained vault and generated secrets without returning secrets in plans, progress or command arguments', async () => {
@@ -447,6 +445,32 @@ it('supplies unique stable internal identities without granting financial author
     ),
   ).toBe(true);
   expect(first.financial).toBeUndefined();
-  expect(first.execution).toBeUndefined();
+  expect(first.execution?.sponsors).toEqual([]);
+  expect(first.execution?.rpc.endpoints).toEqual([]);
+  expect(first.approvedCalls?.policy.accounts).toEqual([]);
   expect(first.activation.enabled).toBe(false);
+});
+
+it('exports an idle shared-Safe deployment without sponsor keys, funded accounts or provider RPC subscriptions', async () => {
+  const draft = emptyConfiguration(config);
+  draft.policy.provider = { ...config.policy.provider };
+  draft.policy.applications[0].name = 'Offline application';
+  draft.policy.applications[0].assertionTrust!.agreement = 'offline-agreement';
+  synchronizeBundledServices(draft);
+  expect(validateProviderConfiguration(draft)).toEqual(draft);
+  const { prepareLocalExecution } =
+    await import('../src/deployment/local-execution.js');
+  const prepared = prepareLocalExecution(
+    draft,
+    generateDeploymentSecrets(draft, {}),
+  );
+  expect(prepared.keys).toEqual([]);
+  expect(prepared.relayer.signers).toEqual([]);
+  expect(prepared.relayer.relayers).toEqual([]);
+  expect(prepared.relayer.networks[0].rpc_urls).toEqual([
+    'https://unconfigured.invalid',
+  ]);
+  const mixed = structuredClone(draft);
+  mixed.execution!.rpc.endpoints = [{ env: 'PROVIDER_PAID_RPC' }];
+  expect(() => validateProviderConfiguration(mixed)).toThrow();
 });

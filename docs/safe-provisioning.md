@@ -1,5 +1,11 @@
 # Automatic Safe provisioning
 
+New wizard deployments use one provider-controlled Safe per application. Follow
+[application Safe provisioning](application-obligations.md#prepare-gas-sponsorship-and-the-shared-safe)
+for sponsor preparation, funding and protected provider commands. The per-user
+provisioning profile below remains available to existing configurations; it is not
+the default shared application flow.
+
 Use automatic Safe provisioning when your application needs contract calls from a smart account. The wallet backend creates the signing wallet; the provider then deploys a Safe 1.4.1 account owned only by that wallet, with threshold one. The signing wallet address and Safe address are separate. Fund the Safe with the assets its approved calls will use.
 
 ## Configure deployment

@@ -44,6 +44,7 @@ import { policyChangeSchema, runtimeConfigurationSchema } from './schemas.js';
 export interface RuntimeConfigurationOptions {
   authorizeContracts?: boolean;
   credentialKey?: { env: string };
+  sharedApplicationSafes?: boolean;
   operators: { issuer: string; clientId: string; subject: string }[];
 }
 export interface RuntimePolicy {
@@ -62,7 +63,11 @@ export interface RuntimePolicy {
     address: string;
     code_hash: string;
     implementation?: { address: string; code_hash: string };
-    methods: { signature: string; maximum_value_wei: string }[];
+    methods: {
+      signature: string;
+      maximum_value_wei: string;
+      user_address_parameters?: number[];
+    }[];
   }[];
   maximum_calls: number;
   maximum_native_value_wei: string;
@@ -101,6 +106,14 @@ export interface RuntimeReview {
   approved_by: string;
 }
 export interface RuntimeConfigurationState {
+  applicationSponsors?: Record<
+    string,
+    import('../provisioning/application-sponsor.js').ApplicationSponsorRecord
+  >;
+  applicationSafes?: Record<
+    string,
+    import('../provisioning/application.js').ApplicationSafeAccount
+  >;
   obligations?: ObligationRegistry;
   credentials?: Record<string, ApplicationCredential>;
   credentialReceipts?: Record<
@@ -265,6 +278,15 @@ export function normalizeRuntimePolicy(
         const fragment = FunctionFragment.from(method.signature);
         const canonical = fragment.format('sighash');
         if (canonical !== method.signature) invalid();
+        if (method.user_address_parameters) {
+          if (
+            method.user_address_parameters.some(
+              (index) => fragment.inputs[index]?.type !== 'address',
+            )
+          )
+            invalid();
+          method.user_address_parameters.sort((a, b) => a - b);
+        }
         const selector = id(canonical).slice(0, 10);
         if (selectors.has(selector)) invalid();
         selectors.add(selector);
@@ -524,7 +546,10 @@ export class RuntimeConfigurationService {
     });
   }
   /** Resolve only accepted resources belonging to the authenticated application's identity. */
-  async rpcEndpoints(applicationId: string): Promise<string[]> {
+  async rpcEndpoints(
+    applicationId: string,
+    kind: 'rpc-verification' | 'rpc-submission' = 'rpc-verification',
+  ): Promise<string[]> {
     this.target(applicationId);
     return this.transaction((registry) => {
       if (!this.credentialCipher) deny();
@@ -532,7 +557,7 @@ export class RuntimeConfigurationService {
         registry.obligations?.records[applicationId + ':services'];
       if (services?.decision !== 'accepted') deny();
       const endpoints = (services.value as ApplicationObligations['services'])
-        .filter((s) => s.kind === 'rpc-verification')
+        .filter((s) => s.kind === kind)
         .map((s) => {
           const record =
             registry.credentials?.[
@@ -547,7 +572,7 @@ export class RuntimeConfigurationService {
           return this.credentialCipher!.open(record);
         });
       if (
-        endpoints.length < 2 ||
+        endpoints.length < (kind === 'rpc-verification' ? 2 : 1) ||
         endpoints.length > 3 ||
         new Set(endpoints.map((e) => new URL(e).origin)).size !==
           endpoints.length
@@ -735,7 +760,11 @@ export class RuntimeConfigurationService {
           revisionKey(applicationId, change.expected_revision)
         ];
       // Automatic acceptance delegates contract registration, never provider terms.
-      if (review?.mode === 'automatic' && current) {
+      if (
+        review?.mode === 'automatic' &&
+        current &&
+        !this.options.sharedApplicationSafes
+      ) {
         const { contracts: _old, ...terms } = current.policy;
         const { contracts: _new, ...requestedTerms } = change.policy;
         if (
@@ -851,7 +880,8 @@ export class RuntimeConfigurationService {
       ) ||
       !/^(0|[1-9][0-9]{0,19})$/.test(input.expected_revision) ||
       !/^(0|[1-9][0-9]{0,19})$/.test(input.expected_review_revision) ||
-      !['automatic', 'manual'].includes(input.mode)
+      !['automatic', 'manual'].includes(input.mode) ||
+      (this.options.sharedApplicationSafes && input.mode === 'automatic')
     )
       invalid();
     const key = this.key(

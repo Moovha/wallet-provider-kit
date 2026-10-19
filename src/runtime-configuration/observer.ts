@@ -76,10 +76,12 @@ export class ApplicationExecutionObserver implements ExecutionObserver {
   ) {
     if (!principal) deny();
     const applicationId = await this.store.transaction((state) => {
-      const record =
-        state.deploymentBindings?.['service-v1']?.safeAccounts?.[
-          binding.accountId
-        ];
+      const record = Object.values(
+        state.deploymentBindings?.['service-v1']?.safeAccounts ?? {},
+      ).find(
+        (record) =>
+          record.plan.address.toLowerCase() === binding.address.toLowerCase(),
+      );
       if (
         !record ||
         record.plan.address.toLowerCase() !== binding.address.toLowerCase() ||

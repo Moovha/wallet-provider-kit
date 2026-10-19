@@ -1472,6 +1472,17 @@ Request body:
                                 "maximum_value_wei": {
                                   "type": "string",
                                   "pattern": "^(0|[1-9][0-9]{0,77})$"
+                                },
+                                "user_address_parameters": {
+                                  "type": "array",
+                                  "minItems": 1,
+                                  "maxItems": 16,
+                                  "uniqueItems": true,
+                                  "items": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 31
+                                  }
                                 }
                               }
                             }
