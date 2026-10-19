@@ -158,7 +158,7 @@ export const settings = {
   ),
   authorizationMode: setting(
     'Choose the included application token service or connect an existing issuer.',
-    'The bundled service creates static server-application registrations from Policies and issues short-lived access tokens.',
+    'The bundled service creates static server-application registrations from Applications and issues short-lived access tokens.',
     'Keep the bundled option for a new deployment. Use an existing authorization server only when it supplies the required RFC 9068 profile. Optional staff or hosted login has its own connection.',
     'bundled-setup.html',
   ),
@@ -171,7 +171,7 @@ export const settings = {
   bundledOperatorSecret: setting(
     'The retained secret variable for this dedicated provider service operator.',
     'This separate registration can request runtime administration scopes. Ordinary applications cannot obtain those scopes.',
-    'Configure the operator client ID in Policies. Setup generates the missing secret privately. Keep it in the provider’s secret store and obtain five-minute client-credentials tokens from the bundled token endpoint for operator work.',
+    'Configure the operator client ID in Applications. Setup generates the missing secret privately. Keep it in the provider’s secret store and obtain five-minute client-credentials tokens from the bundled token endpoint for operator work.',
     'bundled-setup.html#connect-a-server-application',
   ),
   bundledClientSecret: setting(
@@ -315,7 +315,7 @@ export const settings = {
   priceEnabled: setting(
     'Record a confirmed cost ceiling for this identity route. Import reuses shared evidence; verification starts new checks.',
     'The kit reserves the agreed budget before requesting vendor work. An unconfigured route is blocked, even if you expect it to be free.',
-    'Confirm the price for this workflow or level with the vendor or your contract. Configure each route you offer, including an explicit zero for a confirmed free route. Also configure each application’s funding agreement in Policies.',
+    'Confirm the price for this workflow or level with the vendor or your contract. Configure each route you offer, including an explicit zero for a confirmed free route. Also configure each application’s funding agreement in Applications.',
     'operator-services.html#prices-terms-and-application-funding',
   ),
   priceMaximum: setting(

@@ -24,9 +24,159 @@ export interface OperationGuide {
 }
 // Shared operator guidance. Runtime authentication and authority remain authoritative.
 export const operationGuides: Record<string, OperationGuide> = {
-  readRuntimeWorkspace: {
-    title: 'Read the runtime application workspace',
-    group: 'Runtime configuration',
+  readApplicationSafe: {
+    title: 'Read application funding addresses and Safe status',
+    group: 'Application infrastructure',
+    scope: 'wallet:configuration:read',
+    runtimeConfiguration: true,
+    prerequisite:
+      'Connect an enabled application to a provider configured for shared application Safes.',
+    success:
+      '200: funding addresses and retained provisioning status. Individual user wallets retain their assets.',
+  },
+  readProviderApplicationSafe: {
+    title: 'Inspect an application Safe',
+    group: 'Application infrastructure',
+    scope: 'wallet:configuration:write',
+    runtimeConfiguration: true,
+    prerequisite:
+      'Use an exact configured provider identity and an application ID.',
+    success:
+      '200: public addresses and provisioning status, without signer identifiers or credentials.',
+  },
+  provisionApplicationSponsor: {
+    title: 'Prepare application gas sponsorship',
+    group: 'Application infrastructure',
+    scope: 'wallet:configuration:write',
+    runtimeConfiguration: true,
+    prerequisite:
+      'Accept the application sponsorship and submission service declarations. The bundled engine and encrypted credential storage must be configured.',
+    success:
+      '200: a retained application-specific sponsor address. Fund this address before provisioning the Safe. Retries reconcile the same signer and relayer identities.',
+  },
+  provisionApplicationSafe: {
+    title: 'Provision a funded application Safe',
+    group: 'Application infrastructure',
+    scope: 'wallet:configuration:write',
+    runtimeConfiguration: true,
+    prerequisite:
+      'Use a provider token after accepting sponsorship and verifier services, preparing the sponsor and funding its gas ceiling. Wallet activation must be enabled.',
+    success:
+      '200: pending, unknown or finalized-ready deployment status. The provider-owned application signer is separate from every user wallet. Unknown submissions are never blindly repeated.',
+  },
+  readApplicationCredentials: {
+    title: 'Read application credential metadata',
+    group: 'Application configuration',
+    scope: 'wallet:configuration:read',
+    runtimeConfiguration: true,
+    prerequisite:
+      'Use the registered application identity. Credential values are never returned.',
+    success:
+      '200: application-local references, revisions, origins and active or revoked status.',
+  },
+  readProviderApplicationCredentials: {
+    title: 'Review application credential origins',
+    group: 'Application configuration',
+    scope: 'wallet:configuration:write',
+    runtimeConfiguration: true,
+    prerequisite:
+      'Use an exact configured provider identity and the application ID. Review each origin before accepting the service declaration.',
+    success:
+      '200: credential metadata without secret paths. Reject service declarations to prevent their use.',
+  },
+  writeApplicationCredential: {
+    title: 'Store or revoke an application credential',
+    group: 'Application configuration',
+    scope: 'wallet:configuration:propose',
+    runtimeConfiguration: true,
+    prerequisite:
+      'Configure a retained runtimeConfiguration.credentialKey. Use the application identity, an original idempotency key and the current credential revision. Supply a vendor HTTPS endpoint or null to revoke it.',
+    success:
+      '200: encrypted credential retained and metadata returned. Referencing service declarations return to pending review. No provider secrets can be selected.',
+  },
+  readApplicationObligations: {
+    title: 'Read your application obligations',
+    group: 'Application obligations',
+    scope: 'wallet:configuration:read',
+    runtimeConfiguration: true,
+    prerequisite:
+      'Use an enabled registered application for its own declarations, or an exact configured provider operator for decisions and cross-application inspection. Writes require a UUIDv4 idempotency key and the current resource revision. Decisions also require the current decision revision.',
+    success:
+      '200: durable application-scoped declarations or provider decisions. Changes return to pending review. Accepted actions constrain off-chain payloads; accepted services enable application-owned verifier credentials when credential storage is configured. Acceptance does not activate execution or authorize spending. Shared Safe provisioning requires its separate provider endpoint and funded sponsorship. Submit schema declarations and opaque application-local secret references, never actual user payloads or credentials.',
+  },
+  readProviderApplicationObligations: {
+    title: 'Inspect application obligations as provider',
+    group: 'Application obligations',
+    scope: 'wallet:configuration:write',
+    runtimeConfiguration: true,
+    prerequisite:
+      'Use an enabled registered application for its own declarations, or an exact configured provider operator for decisions and cross-application inspection. Writes require a UUIDv4 idempotency key and the current resource revision. Decisions also require the current decision revision.',
+    success:
+      '200: durable application-scoped declarations or provider decisions. Changes return to pending review. Accepted actions constrain off-chain payloads; accepted services enable application-owned verifier credentials when credential storage is configured. Acceptance does not activate execution or authorize spending. Shared Safe provisioning requires its separate provider endpoint and funded sponsorship. Submit schema declarations and opaque application-local secret references, never actual user payloads or credentials.',
+  },
+  submitApplicationActions: {
+    title: 'Declare expected actions and off-chain fields',
+    group: 'Application obligations',
+    scope: 'wallet:configuration:propose',
+    runtimeConfiguration: true,
+    prerequisite:
+      'Use an enabled registered application for its own declarations, or an exact configured provider operator for decisions and cross-application inspection. Writes require a UUIDv4 idempotency key and the current resource revision. Decisions also require the current decision revision.',
+    success:
+      '200: durable application-scoped declarations or provider decisions. Changes return to pending review. Accepted actions constrain off-chain payloads; accepted services enable application-owned verifier credentials when credential storage is configured. Acceptance does not activate execution or authorize spending. Shared Safe provisioning requires its separate provider endpoint and funded sponsorship. Submit schema declarations and opaque application-local secret references, never actual user payloads or credentials.',
+  },
+  submitApplicationServices: {
+    title: 'Declare application-paid service accounts',
+    group: 'Application obligations',
+    scope: 'wallet:configuration:propose',
+    runtimeConfiguration: true,
+    prerequisite:
+      'Use an enabled registered application for its own declarations, or an exact configured provider operator for decisions and cross-application inspection. Writes require a UUIDv4 idempotency key and the current resource revision. Decisions also require the current decision revision.',
+    success:
+      '200: durable application-scoped declarations or provider decisions. Changes return to pending review. Accepted actions constrain off-chain payloads; accepted services enable application-owned verifier credentials when credential storage is configured. Acceptance does not activate execution or authorize spending. Shared Safe provisioning requires its separate provider endpoint and funded sponsorship. Submit schema declarations and opaque application-local secret references, never actual user payloads or credentials.',
+  },
+  submitApplicationSponsorship: {
+    title: 'Declare application gas sponsorship',
+    group: 'Application obligations',
+    scope: 'wallet:configuration:propose',
+    runtimeConfiguration: true,
+    prerequisite:
+      'Use an enabled registered application for its own declarations, or an exact configured provider operator for decisions and cross-application inspection. Writes require a UUIDv4 idempotency key and the current resource revision. Decisions also require the current decision revision.',
+    success:
+      '200: durable application-scoped declarations or provider decisions. Changes return to pending review. Accepted actions constrain off-chain payloads; accepted services enable application-owned verifier credentials when credential storage is configured. Acceptance does not activate execution or authorize spending. Shared Safe provisioning requires its separate provider endpoint and funded sponsorship. Submit schema declarations and opaque application-local secret references, never actual user payloads or credentials.',
+  },
+  decideApplicationActions: {
+    title: 'Accept or reject declared actions',
+    group: 'Application obligations',
+    scope: 'wallet:configuration:write',
+    runtimeConfiguration: true,
+    prerequisite:
+      'Use an enabled registered application for its own declarations, or an exact configured provider operator for decisions and cross-application inspection. Writes require a UUIDv4 idempotency key and the current resource revision. Decisions also require the current decision revision.',
+    success:
+      '200: durable application-scoped declarations or provider decisions. Changes return to pending review. Accepted actions constrain off-chain payloads; accepted services enable application-owned verifier credentials when credential storage is configured. Acceptance does not activate execution or authorize spending. Shared Safe provisioning requires its separate provider endpoint and funded sponsorship. Submit schema declarations and opaque application-local secret references, never actual user payloads or credentials.',
+  },
+  decideApplicationServices: {
+    title: 'Accept or reject declared service accounts',
+    group: 'Application obligations',
+    scope: 'wallet:configuration:write',
+    runtimeConfiguration: true,
+    prerequisite:
+      'Use an enabled registered application for its own declarations, or an exact configured provider operator for decisions and cross-application inspection. Writes require a UUIDv4 idempotency key and the current resource revision. Decisions also require the current decision revision.',
+    success:
+      '200: durable application-scoped declarations or provider decisions. Changes return to pending review. Accepted actions constrain off-chain payloads; accepted services enable application-owned verifier credentials when credential storage is configured. Acceptance does not activate execution or authorize spending. Shared Safe provisioning requires its separate provider endpoint and funded sponsorship. Submit schema declarations and opaque application-local secret references, never actual user payloads or credentials.',
+  },
+  decideApplicationSponsorship: {
+    title: 'Accept or reject declared gas sponsorship',
+    group: 'Application obligations',
+    scope: 'wallet:configuration:write',
+    runtimeConfiguration: true,
+    prerequisite:
+      'Use an enabled registered application for its own declarations, or an exact configured provider operator for decisions and cross-application inspection. Writes require a UUIDv4 idempotency key and the current resource revision. Decisions also require the current decision revision.',
+    success:
+      '200: durable application-scoped declarations or provider decisions. Changes return to pending review. Accepted actions constrain off-chain payloads; accepted services enable application-owned verifier credentials when credential storage is configured. Acceptance does not activate execution or authorize spending. Shared Safe provisioning requires its separate provider endpoint and funded sponsorship. Submit schema declarations and opaque application-local secret references, never actual user payloads or credentials.',
+  },
+  listApplicationConfigurations: {
+    title: 'List application configurations',
+    group: 'Application configuration',
     scope: 'wallet:configuration:read',
     runtimeConfiguration: true,
     prerequisite:
@@ -34,7 +184,7 @@ export const operationGuides: Record<string, OperationGuide> = {
     success:
       '200: enabled application summaries and selected policy/proposal details. The provider sees its configured applications; applications see only their own registration. No spending authority is granted.',
   },
-  listRuntimeBatches: {
+  listWalletBatches: {
     title: 'List readable wallet batches',
     group: 'Wallet calls',
     scope: 'wallet:execute:read',
@@ -47,11 +197,11 @@ export const operationGuides: Record<string, OperationGuide> = {
   },
   setRuntimeReviewMode: {
     title: 'Allow automatic application contract registration',
-    group: 'Runtime configuration',
+    group: 'Application configuration',
     scope: 'wallet:configuration:write',
     runtimeConfiguration: true,
     prerequisite:
-      'Publish a baseline policy first. An exact configured provider operator chooses automatic or manual review using both expected_revision and expected_review_revision with a UUID idempotency key. The workspace defaults the approval form to automatic acceptance.',
+      'Publish a baseline policy first. An exact configured provider operator chooses automatic or manual review using both expected_revision and expected_review_revision with a UUID idempotency key. Choose the review mode explicitly.',
     success:
       '200: a durable review decision. Automatic mode publishes subsequent contract/method changes only when provider terms exactly match the enabled current policy. Claims, value/call limits, validity, enablement and chain remain provider controlled. Existing pending proposals are not retroactively accepted.',
   },
@@ -67,7 +217,7 @@ export const operationGuides: Record<string, OperationGuide> = {
   },
   readRuntimeApplicationConfiguration: {
     title: 'Read an application policy as provider operator',
-    group: 'Runtime configuration',
+    group: 'Application configuration',
     scope: 'wallet:configuration:write',
     runtimeConfiguration: true,
     prerequisite:
@@ -77,7 +227,7 @@ export const operationGuides: Record<string, OperationGuide> = {
   },
   readRuntimeConfiguration: {
     title: 'Read the active application configuration',
-    group: 'Runtime configuration',
+    group: 'Application configuration',
     scope: 'wallet:configuration:read',
     runtimeConfiguration: true,
     prerequisite:
@@ -87,7 +237,7 @@ export const operationGuides: Record<string, OperationGuide> = {
   },
   readRuntimeConfigurationRevision: {
     title: 'Read an immutable configuration revision',
-    group: 'Runtime configuration',
+    group: 'Application configuration',
     scope: 'wallet:configuration:read',
     runtimeConfiguration: true,
     prerequisite:
@@ -97,7 +247,7 @@ export const operationGuides: Record<string, OperationGuide> = {
   },
   proposeRuntimeConfiguration: {
     title: 'Propose application contracts and policy',
-    group: 'Runtime configuration',
+    group: 'Application configuration',
     scope: 'wallet:configuration:propose',
     runtimeConfiguration: true,
     prerequisite:
@@ -107,7 +257,7 @@ export const operationGuides: Record<string, OperationGuide> = {
   },
   readRuntimeConfigurationProposal: {
     title: 'Read a configuration proposal',
-    group: 'Runtime configuration',
+    group: 'Application configuration',
     scope: 'wallet:configuration:read',
     runtimeConfiguration: true,
     prerequisite:
@@ -117,7 +267,7 @@ export const operationGuides: Record<string, OperationGuide> = {
   },
   publishRuntimeConfiguration: {
     title: 'Publish an application proposal as provider operator',
-    group: 'Runtime configuration',
+    group: 'Application configuration',
     scope: 'wallet:configuration:write',
     runtimeConfiguration: true,
     prerequisite:
@@ -127,7 +277,7 @@ export const operationGuides: Record<string, OperationGuide> = {
   },
   updateRuntimeConfiguration: {
     title: 'Publish a provider policy revision',
-    group: 'Runtime configuration',
+    group: 'Application configuration',
     scope: 'wallet:configuration:write',
     runtimeConfiguration: true,
     prerequisite:
@@ -485,7 +635,7 @@ export function operationUnavailableReason(
   if (guide.approvedAction && !features.financial && !features.contractCalls)
     return 'Approved-action policy is not configured';
   if (guide.financial && !features.financial)
-    return 'Transfer signing is off in Policies';
+    return 'Transfer signing is off in Applications';
   if (['provisionAccount', 'signAction'].includes(id))
     return features.wallet ? undefined : 'Wallet authority is not configured';
   if (!features.onboarding)
@@ -495,7 +645,7 @@ export function operationUnavailableReason(
   if ((guide.records || guide.vendor) && features.flow === 'application')
     return 'Requires hosted compatibility access';
   if (guide.records && !features.records)
-    return 'Select application records in Policies to use batch submission';
+    return 'Select application records in Applications to use batch submission';
   if (guide.vendor && !features.vendor)
     return 'Select an identity vendor in Services to import verification';
   return undefined;

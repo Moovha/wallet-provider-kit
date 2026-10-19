@@ -12,7 +12,6 @@ export default defineConfig({
     rolldownOptions: {
       input: {
         setup: fileURLToPath(new URL('index.html', import.meta.url)),
-        operator: fileURLToPath(new URL('operator.html', import.meta.url)),
       },
     },
   },

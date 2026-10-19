@@ -1,3 +1,4 @@
+import { runtimeApplicationId } from '../runtime-configuration/service.js';
 import {
   safeProvisioningIdentity,
   type SafeProvisioningConfiguration,
@@ -16,6 +17,7 @@ import {
   currentRuntimePolicy,
   runtimeCallPolicy,
   validateRuntimeCalls,
+  validateRuntimeUserCalls,
   type RuntimePolicySnapshot,
 } from '../runtime-configuration/authority.js';
 import { serviceHash } from '../executor/auth.js';
@@ -135,6 +137,7 @@ export class SupportedActions {
     network?: ProviderNetwork,
     private readonly automaticSafes:
       SafeProvisioningConfiguration | false = false,
+    private readonly sharedApplicationSafes = false,
   ) {
     this.network = providerNetwork(network);
     this.transferPolicy = policy ? structuredClone(policy) : undefined;
@@ -184,7 +187,12 @@ export class SupportedActions {
     });
   }
   private async refreshAccounts() {
-    if (!this.automaticSafes || !this.callConfiguration) return;
+    if (
+      this.sharedApplicationSafes ||
+      !this.automaticSafes ||
+      !this.callConfiguration
+    )
+      return;
     const accounts = await this.onboarding.store.transaction((state) => {
       const deployment = state.deploymentBindings?.['service-v1'];
       if (deployment?.activeRevision !== this.revision) deny();
@@ -222,7 +230,71 @@ export class SupportedActions {
       ),
     ];
   }
-  private async callAuthority(principal: VerifiedPrincipal) {
+  private shared(
+    state: ProviderState,
+    principal: Pick<VerifiedPrincipal, 'issuer' | 'clientId'>,
+    accountId?: string,
+  ) {
+    const applicationId = runtimeApplicationId(
+      principal.issuer,
+      principal.clientId,
+    );
+    const deployment = state.deploymentBindings?.['service-v1'];
+    const registry = deployment?.runtimeConfiguration;
+    const signer = registry?.applicationSafes?.[applicationId];
+    const safe = signer && deployment?.safeAccounts?.[signer.accountId];
+    if (
+      deployment?.activeRevision !== this.revision ||
+      !signer?.account ||
+      !safe ||
+      safe.state !== 'ready' ||
+      signer.provider !== deployment.provider ||
+      safe.plan.accountId !== signer.account.accountId ||
+      safe.plan.owner.toLowerCase() !== signer.account.address.toLowerCase() ||
+      safe.plan.chainId !== this.network.chainId ||
+      safe.configurationHash !==
+        safeProvisioningIdentity(
+          this.automaticSafes as SafeProvisioningConfiguration,
+          this.network.name,
+        ) ||
+      ['actions', 'services', 'sponsorship'].some(
+        (kind) =>
+          registry?.obligations?.records[applicationId + ':' + kind]
+            ?.decision !== 'accepted',
+      )
+    )
+      deny();
+    const sponsorship = registry!.obligations!.records[
+      applicationId + ':sponsorship'
+    ]
+      .value as import('../runtime-configuration/obligations.js').ApplicationObligations['sponsorship'];
+    if (
+      safe.plan.sponsor.fundingAgreement !== sponsorship.funding_agreement ||
+      BigInt(safe.plan.sponsor.lifetimeBudgetWei) >
+        BigInt(sponsorship.maximum_gas_budget_wei)
+    )
+      deny();
+    const sponsor = registry?.applicationSponsors?.[applicationId];
+    if (
+      sponsor &&
+      (sponsor.status !== 'ready' ||
+        fingerprint(sponsor.sponsor) !== fingerprint(safe.plan.sponsor))
+    )
+      deny();
+    return {
+      signer: signer.account,
+      binding: {
+        accountId: accountId ?? signer.accountId,
+        address: safe.plan.address,
+        codeHash: safe.plan.proxyCodeHash,
+        singleton: safe.plan.singleton,
+      },
+    };
+  }
+  private async callAuthority(
+    principal: VerifiedPrincipal,
+    accountId?: string,
+  ) {
     await this.refreshAccounts();
     if (!this.callConfiguration) deny();
     const snapshot = this.onboarding.runtimeContracts
@@ -231,11 +303,18 @@ export class SupportedActions {
         )
       : undefined;
     if (snapshot && snapshot.policy.chain_id !== this.network.caip) deny();
+    const shared = this.sharedApplicationSafes
+      ? await this.onboarding.store.transaction((state) =>
+          this.shared(state, principal, accountId),
+        )
+      : undefined;
+    const base = shared
+      ? { ...this.callConfiguration.policy, accounts: [shared.binding] }
+      : this.callConfiguration.policy;
     return {
       snapshot,
-      policy: snapshot
-        ? runtimeCallPolicy(this.callConfiguration.policy, snapshot)
-        : this.callConfiguration.policy,
+      signer: shared?.signer,
+      policy: snapshot ? runtimeCallPolicy(base, snapshot) : base,
       validity: Math.min(
         this.callConfiguration.maxValiditySeconds,
         snapshot?.policy.max_validity_seconds ??
@@ -244,6 +323,25 @@ export class SupportedActions {
     };
   }
   private currentRuntime(state: ProviderState, record: TransferRecord) {
+    if (this.sharedApplicationSafes && record.intent) {
+      const shared = this.shared(
+        state,
+        record.approval.caller,
+        record.intent.input.account_id,
+      );
+      if (
+        !record.approval.userAccount ||
+        fingerprint(shared.signer) !== fingerprint(record.approval.account) ||
+        fingerprint(shared.binding) !== fingerprint(record.intent.account)
+      )
+        deny();
+      if (!record.intent.cancellation)
+        validateRuntimeUserCalls(
+          record.runtimePolicy ?? deny(),
+          record.intent.input,
+          record.approval.userAccount.address,
+        );
+    } else if (record.approval.userAccount) deny();
     if (record.intent?.cancellation) {
       const reference = record.intent.cancellation;
       const original = state.supportedActions?.[reference.actionId];
@@ -289,19 +387,24 @@ export class SupportedActions {
     try {
       const { action, account, units } = record.approval;
       if (record.intent) {
-        const policy = record.runtimePolicy
-          ? runtimeCallPolicy(
-              this.callConfiguration?.policy ?? deny(),
-              record.runtimePolicy,
-            )
+        const base = this.sharedApplicationSafes
+          ? {
+              ...(this.callConfiguration?.policy ?? deny()),
+              accounts: [record.intent.account],
+            }
           : this.callConfiguration?.policy;
+        const policy = record.runtimePolicy
+          ? runtimeCallPolicy(base ?? deny(), record.runtimePolicy)
+          : base;
         if (this.onboarding.runtimeContracts !== !!record.runtimePolicy) deny();
         if (record.runtimePolicy && !record.intent.cancellation)
           validateRuntimeCalls(record.runtimePolicy, record.intent.input);
         if (
           !this.callConfiguration?.policy ||
-          record.intent.account.accountId !== account.accountId ||
-          record.intent.input.account_id !== account.accountId ||
+          record.intent.account.accountId !==
+            (record.approval.userAccount ?? account).accountId ||
+          record.intent.input.account_id !==
+            (record.approval.userAccount ?? account).accountId ||
           record.revision !== this.revision ||
           (record.status === 'denied' && !includeDenied) ||
           (!allowExpired && Date.parse(action.expires_at) <= Date.now()) ||
@@ -419,7 +522,7 @@ export class SupportedActions {
     if (!sameCaller(principal, approval.caller)) deny();
     const { grant, account } = await this.binding(
       principal,
-      approval.account.accountId,
+      (approval.userAccount ?? approval.account).accountId,
       record.intent ? 'contracts:request' : 'transfers:request',
     );
     if (
@@ -427,7 +530,8 @@ export class SupportedActions {
       grant.owner !== approval.ownerSubject ||
       grant.requestId !== approval.consentReference ||
       approval.policyRevision !== this.revision ||
-      account.address?.toLowerCase() !== approval.account.address.toLowerCase()
+      account.address?.toLowerCase() !==
+        (approval.userAccount ?? approval.account).address.toLowerCase()
     )
       deny();
     return grant;
@@ -604,8 +708,14 @@ export class SupportedActions {
       input.account_id,
       'contracts:request',
     );
-    const authority = await this.callAuthority(principal);
+    const authority = await this.callAuthority(principal, input.account_id);
     if (authority.snapshot) validateRuntimeCalls(authority.snapshot, input);
+    if (this.sharedApplicationSafes)
+      validateRuntimeUserCalls(
+        authority.snapshot ?? deny(),
+        input,
+        account.address!,
+      );
     const intent = buildApprovedCallIntent(
       authority.policy,
       input,
@@ -624,7 +734,7 @@ export class SupportedActions {
   async walletCallsAccount(principal: VerifiedPrincipal, accountId: string) {
     if (!this.onboarding.runtimeContracts) deny();
     await this.binding(principal, accountId, 'contracts:request');
-    const authority = await this.callAuthority(principal);
+    const authority = await this.callAuthority(principal, accountId);
     const binding =
       authority.policy.accounts.find(
         (account) => account.accountId === accountId,
@@ -641,9 +751,11 @@ export class SupportedActions {
       input.account_id,
       'contracts:request',
     );
-    const authority = await this.callAuthority(principal);
+    const authority = await this.callAuthority(principal, input.account_id);
     const snapshot = authority.snapshot ?? deny();
     validateRuntimeCalls(snapshot, input);
+    if (this.sharedApplicationSafes)
+      validateRuntimeUserCalls(snapshot, input, account.address!);
     const expiresAt = this.queueExpiry(authority.validity);
     const intent = buildApprovedCallIntent(
       authority.policy,
@@ -656,7 +768,7 @@ export class SupportedActions {
       runtimePolicy: snapshot,
       action: buildApprovedCallAction(
         intent,
-        account.address!,
+        authority.signer?.address ?? account.address!,
         expiresAt,
         randomUUID(),
         this.network.name,
@@ -686,6 +798,7 @@ export class SupportedActions {
     nonce: (
       binding: import('../execution/approved-calls.js').SafeAccountBinding,
       owner: string,
+      principal?: VerifiedPrincipal,
     ) => Promise<string>,
     queued?: { id: string; expiresAt: string },
     requestedExpiresAt?: string,
@@ -704,8 +817,17 @@ export class SupportedActions {
       input.account_id,
       'contracts:request',
     );
-    const authority = await this.callAuthority(context.principal);
+    const authority = await this.callAuthority(
+      context.principal,
+      input.account_id,
+    );
     if (authority.snapshot) validateRuntimeCalls(authority.snapshot, input);
+    if (this.sharedApplicationSafes)
+      validateRuntimeUserCalls(
+        authority.snapshot ?? deny(),
+        input,
+        account.address!,
+      );
     const key = fingerprint([
       'supported-call',
       context.principal.issuer,
@@ -743,7 +865,8 @@ export class SupportedActions {
           authority.policy.accounts.find(
             (binding) => binding.accountId === input.account_id,
           ) ?? deny(),
-          account.address!,
+          authority.signer?.address ?? account.address!,
+          context.principal,
         ),
         expiresAt,
       );
@@ -809,7 +932,7 @@ export class SupportedActions {
       const id = randomUUID();
       const action = buildApprovedCallAction(
         intent,
-        account.address!,
+        authority.signer?.address ?? account.address!,
         expiresAt,
         id,
         this.network.name,
@@ -829,7 +952,18 @@ export class SupportedActions {
           grantId: grant.id,
           consentReference: grant.requestId,
           policyRevision: this.revision,
-          account: { accountId: input.account_id, address: account.address! },
+          account: authority.signer ?? {
+            accountId: input.account_id,
+            address: account.address!,
+          },
+          ...(authority.signer
+            ? {
+                userAccount: {
+                  accountId: input.account_id,
+                  address: account.address!,
+                },
+              }
+            : {}),
           action,
           budgetId: fingerprint([
             'contract-operations',
@@ -893,6 +1027,7 @@ export class SupportedActions {
     nonce: (
       binding: import('../execution/approved-calls.js').SafeAccountBinding,
       owner: string,
+      principal?: VerifiedPrincipal,
     ) => Promise<string>,
   ) {
     if (
@@ -915,11 +1050,15 @@ export class SupportedActions {
       !(await this.database.isApprovedAction(original.approval, true))
     )
       deny();
-    const authority = await this.callAuthority(context.principal);
+    const authority = await this.callAuthority(
+      context.principal,
+      (original.approval.userAccount ?? original.approval.account).accountId,
+    );
     if (
       (await nonce(
         original.intent.account,
         original.approval.account.address,
+        context.principal,
       )) !== original.intent.nonce
     )
       deny();
@@ -933,7 +1072,7 @@ export class SupportedActions {
     const hash = fingerprint([id, input, this.revision]);
     const record = await this.onboarding.withAccountAccess(
       context.principal,
-      original.approval.account.accountId,
+      (original.approval.userAccount ?? original.approval.account).accountId,
       'contracts:request',
       (state, grant) => {
         const latest = state.supportedActions?.[id] ?? deny();
@@ -964,7 +1103,8 @@ export class SupportedActions {
         const cancellationId = randomUUID();
         const intent = buildNonceCancellationIntent(
           authority.policy,
-          original.approval.account.accountId,
+          (original.approval.userAccount ?? original.approval.account)
+            .accountId,
           original.intent!.nonce,
           { actionId: id, payloadHash: original.approval.action.payload_hash },
         );
@@ -1026,7 +1166,8 @@ export class SupportedActions {
     const action = record.approval.action;
     return {
       action_id: action.action_id,
-      account_id: record.approval.account.accountId,
+      account_id: (record.approval.userAccount ?? record.approval.account)
+        .accountId,
       status: record.status,
       expires_at: action.expires_at,
       payload_hash: action.payload_hash,
@@ -1060,7 +1201,7 @@ export class SupportedActions {
     if (!sameCaller(principal, record.approval.caller)) deny();
     return this.onboarding.withAccountAccess(
       principal,
-      record.approval.account.accountId,
+      (record.approval.userAccount ?? record.approval.account).accountId,
       'account:read',
       (state, grant) => {
         const latest = state.supportedActions?.[id];
@@ -1070,7 +1211,7 @@ export class SupportedActions {
           grant.owner !== latest.approval.ownerSubject ||
           fingerprint(latest.approval) !== fingerprint(record.approval) ||
           state.accounts[grant.accountId]?.address !==
-            latest.approval.account.address ||
+            (latest.approval.userAccount ?? latest.approval.account).address ||
           state.deploymentBindings?.['service-v1']?.activeRevision !==
             this.revision
         )
@@ -1097,7 +1238,7 @@ export class SupportedActions {
       deny();
     return this.onboarding.withAccountAccess(
       principal,
-      before.approval.account.accountId,
+      (before.approval.userAccount ?? before.approval.account).accountId,
       before.intent ? 'contracts:request' : 'transfers:request',
       (state, currentGrant) => {
         const latest = state.supportedActions?.[id];
@@ -1108,7 +1249,9 @@ export class SupportedActions {
           fingerprint(latest.approval) !== fingerprint(before.approval) ||
           fingerprint(grant) !== fingerprint(currentGrant) ||
           state.accounts[grant.accountId]?.address?.toLowerCase() !==
-            before.approval.account.address.toLowerCase() ||
+            (
+              before.approval.userAccount ?? before.approval.account
+            ).address.toLowerCase() ||
           state.deploymentBindings?.['service-v1']?.activeRevision !==
             this.revision
         )
@@ -1160,7 +1303,7 @@ export class SupportedActions {
     const hash = fingerprint([id, input]);
     return this.onboarding.withAccountAccess(
       context.principal,
-      record.approval.account.accountId,
+      (record.approval.userAccount ?? record.approval.account).accountId,
       record.intent ? 'contracts:request' : 'transfers:request',
       (state, currentGrant) => {
         const latest = state.supportedActions?.[id];
@@ -1171,7 +1314,9 @@ export class SupportedActions {
           fingerprint(currentGrant) !== fingerprint(grant) ||
           state.accounts[grant.accountId]?.owner !== grant.owner ||
           state.accounts[grant.accountId]?.address?.toLowerCase() !==
-            record.approval.account.address.toLowerCase() ||
+            (
+              record.approval.userAccount ?? record.approval.account
+            ).address.toLowerCase() ||
           state.deploymentBindings?.['service-v1']?.activeRevision !==
             this.revision
         )
@@ -1215,7 +1360,7 @@ export class SupportedActions {
     if (record.status !== 'authorized') deny();
     return this.onboarding.withAccountAccess(
       principal,
-      record.approval.account.accountId,
+      (record.approval.userAccount ?? record.approval.account).accountId,
       record.intent ? 'contracts:request' : 'transfers:request',
       (state, grant) => {
         const latest = state.supportedActions?.[id];
@@ -1225,7 +1370,9 @@ export class SupportedActions {
           fingerprint(latest.approval) !== fingerprint(record.approval) ||
           fingerprint(grant) !== fingerprint(originalGrant) ||
           state.accounts[grant.accountId]?.address?.toLowerCase() !==
-            record.approval.account.address.toLowerCase() ||
+            (
+              record.approval.userAccount ?? record.approval.account
+            ).address.toLowerCase() ||
           state.deploymentBindings?.['service-v1']?.activeRevision !==
             this.revision
         )

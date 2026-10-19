@@ -249,7 +249,7 @@ function toggleReplacement(value: unknown) {
       @update:modelValue="toggle"
     />
     <p v-if="!model.financial && !model.approvedCalls" class="help-text">
-      Configure delegated transfer signing in Policies or an approved
+      Configure delegated transfer signing in Applications or an approved
       contract-call policy below.
     </p>
     <template v-if="model.execution">

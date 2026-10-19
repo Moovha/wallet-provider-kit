@@ -1,4 +1,3 @@
-import { registerOperatorUi } from './operator-ui.js';
 import { registerWalletCallsRoutes } from '../wallet-calls/http.js';
 import type { WalletCallsService } from '../wallet-calls/service.js';
 import { readFile } from 'node:fs/promises';
@@ -44,6 +43,8 @@ import {
 
 export interface ServerOptions {
   safeProvisioning?: import('../provisioning/safe.js').SafeProvisioningService;
+  applicationSafes?: import('../provisioning/application.js').ApplicationSafeService;
+  applicationSponsors?: import('../provisioning/application-sponsor.js').ApplicationSponsorService;
   authorizationServer?: {
     register(app: import('fastify').FastifyInstance): void;
   };
@@ -535,6 +536,7 @@ export async function createServer(options: ServerOptions = {}) {
     {
       schema: {
         operationId: 'readProvisionedSafe',
+        hide: !!options.applicationSafes,
         security: [{ accessToken: [] }],
         params: {
           type: 'object',
@@ -607,12 +609,13 @@ export async function createServer(options: ServerOptions = {}) {
     options.authenticate,
     isReady,
   );
-  if (options.runtimeConfiguration) await registerOperatorUi(app);
   await registerRuntimeConfigurationRoutes(
     app,
     options.runtimeConfiguration,
     options.authenticate,
     options.walletCalls,
+    options.applicationSafes,
+    options.applicationSponsors,
   );
   if (options.documentation !== false && options.documentationTokens)
     await registerDocumentationTokens(app, options.documentationTokens);

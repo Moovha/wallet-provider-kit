@@ -1,11 +1,10 @@
 # Register application contracts and publish policies
 
 Applications may need to register additional contracts without a service restart.
-Enable runtime configuration in [Policies](setup-wizard.md#_4-policies) to let
+The [Applications step](setup-wizard.md#_4-applications) enables runtime configuration for new deployments, letting
 registered applications propose methods and separately authorized provider
-operators publish versioned policies. The [runtime workspace](runtime-workspace.md)
-offers forms for this task. This guide describes its API, revision rules and
-optional financial authority so your application developer can implement the same flow.
+operators publish versioned policies. Use the [application management APIs](runtime-workspace.md) and deployed Swagger explorer.
+This guide describes policy contracts, revision rules and optional financial authority.
 
 Application-led providers can opt into runtime contract authority for the existing
 Base Sepolia Safe 1.4.1 execution mechanism. Published targets, methods, native-value
@@ -14,8 +13,8 @@ preparation, signing and designated execution. Registration alone grants no wall
 access or spending authority. Without the explicit financial opt-in, the registry
 remains a configuration-only service and existing startup policies keep their behavior.
 
-Use the [runtime workspace](runtime-workspace.md) for contract registration,
-policy review/publication and batch tracking through forms. Providers explicitly
+Use the [application management APIs](runtime-workspace.md) for contract registration,
+policy publication and batch tracking. Providers explicitly
 allow automatic contract/method acceptance per application; provider requirements
 remain controlled by the published policy. The setup wizard can configure the
 operator boundary without editing JSON.
@@ -58,12 +57,12 @@ the registry. Unconfigured optional endpoints return 503.
 
 ## Propose contracts and policy
 
-Read `GET /v1/runtime-configuration` with `wallet:configuration:read`. It returns
+Read `GET /v1/application/policy` with `wallet:configuration:read`. It returns
 your opaque `application_id`, `active_revision` and `authorizes_spending: false`.
 Revision `"0"` means nothing has been published. The namespace is derived from
 the authenticated issuer/client; applications cannot select another namespace.
 
-Submit `POST /v1/runtime-configuration/proposals` with
+Submit `POST /v1/application/policy/proposals` with
 `wallet:configuration:propose`, a new UUIDv4 `Idempotency-Key` and:
 
 ```json
@@ -80,7 +79,8 @@ Submit `POST /v1/runtime-configuration/proposals` with
         "methods": [
           {
             "signature": "customMethod(uint256,address)",
-            "maximum_value_wei": "0"
+            "maximum_value_wei": "0",
+            "user_address_parameters": [1]
           }
         ]
       }
@@ -100,7 +100,7 @@ Submit `POST /v1/runtime-configuration/proposals` with
 ```
 
 The address/hash are fictional. Register independently reviewed actual contracts.
-Only Base Sepolia is accepted. The registry checks format; it does not call RPC
+The policy chain must match the configured Base or Base Sepolia network. The registry checks format; it does not call RPC
 to certify code or business semantics. Optional `implementation` contains an
 address and `code_hash` for a reviewed implementation pin; recording that pin is
 not an upgrade-race guarantee.
@@ -115,7 +115,7 @@ exceed the document limit; neither field bounds token allowances or unknown effe
 The response contains stable `proposal_id`, `application_id`, predecessor revision
 and normalized policy/hash. Creation does not publish the proposal. An application
 can read only its own proposal through
-`GET /v1/runtime-configuration/proposals/{proposalId}`. A configured operator can
+`GET /v1/application/policy/proposals/{proposalId}`. A configured operator can
 read it with write scope. Do not put personal evidence or beneficiary details in
 registration documents.
 
@@ -124,7 +124,7 @@ registration documents.
 After reviewing the exact proposal, the operator calls:
 
 ```http
-POST /v1/runtime-configuration/proposals/{proposalId}/publish
+POST /v1/provider/policy/proposals/{proposalId}/publish
 Authorization: Bearer <operator-access-token>
 Idempotency-Key: <new-uuid-v4>
 Content-Type: application/json
@@ -138,11 +138,11 @@ Current-policy reads immediately return it. For provider-authored changes, send
 the complete policy-change shape above to:
 
 ```http
-POST /v1/runtime-configuration/applications/{applicationId}/revisions
+POST /v1/provider/applications/{applicationId}/policy/revisions
 ```
 
 Read the current application document as an operator through
-`GET /v1/runtime-configuration/applications/{applicationId}` before updating it.
+`GET /v1/provider/applications/{applicationId}/policy` before updating it.
 Use the current `expected_revision`. `policy.enabled: false` publishes a disabled
 document. In runtime financial mode, publication immediately invalidates financial
 consent for earlier revisions; a disabled document stops new financial effects.
@@ -155,7 +155,7 @@ automatically without reviewing its terms.
 
 ## History, retries and storage
 
-Read `GET /v1/runtime-configuration/revisions/{revision}` for your application's
+Read `GET /v1/application/policy/revisions/{revision}` for your application's
 immutable snapshot and the current active revision. Rollback publishes a new
 revision containing reviewed earlier terms. There is no history deletion, head
 rewind or automatic modification of stored financial actions.
@@ -179,7 +179,15 @@ retention before enterprise adoption.
 
 ## Use registered contracts for consent and execution
 
-Configure both services once before enabling runtime financial use:
+New wizard deployments use the [shared application Safe flow](application-obligations.md#prepare-gas-sponsorship-and-the-shared-safe).
+They prebundle contract pins and an idle local engine; sponsors, credentials and
+policies are application resources registered after deployment. Shared calls bind
+policy-designated ABI address parameters to the individual user and carry no
+native value. Published action requirements and accepted declarations are enforced
+at admission and again before signing or dispatch.
+
+For existing separately deployed executor integrations, configure both services
+before enabling runtime financial use:
 
 - On the wallet, use application-led access, a reviewed `assertionTrust` agreement,
   `approvedCalls`, `execution.profile: "approved-evm-executor-v1"` and
@@ -271,7 +279,7 @@ or vault effects. They do not certify beneficiary settlement. Native-value limit
 review permitted methods and their argument semantics accordingly. New execution
 mechanisms, business-effect verifiers and policy rule types require implementation.
 The [EIP-5792 adapter](wallet-calls.md) supplies standard batch submission and
-status for this Safe profile. Use the [runtime workspace](runtime-workspace.md) for operator forms. Real
+status for this Safe profile. Use the [application management APIs](runtime-workspace.md) for provider operations. Real
 test-network, provider and recovery acceptance remain required for your deployment;
 see the [support and acceptance reference](v1-standards.md).
 
@@ -289,7 +297,6 @@ uses the same provider/account/token allowance as ERC-3009. Publication requires
 fresh financial consent and retains existing usage; automatic contract acceptance
 does not approve changes to these terms. See [cumulative token allowances](approved-contract-calls.md#cumulative-token-allowances)
 for activation inventory, uncertainty, account compatibility and unsupported
-indirect asset exposure. Provider operators can edit these terms in the
-[runtime workspace](runtime-workspace.md#configure-optional-policy-adapters),
-review the change summary and publish through the existing configuration API.
+indirect asset exposure. Provider operators can review and publish these terms through the
+[configuration API](runtime-workspace.md#configure-optional-policy-adapters).
 Applications can view the published terms but cannot edit provider adapter rules.

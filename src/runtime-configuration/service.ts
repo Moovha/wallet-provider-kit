@@ -1,4 +1,18 @@
 import {
+  ApplicationCredentialCipher,
+  credentialMetadata,
+  credentialOrigin,
+  type ApplicationCredential,
+  type CredentialMetadata,
+} from './credentials.js';
+import {
+  normalizeObligation,
+  type ApplicationObligations,
+  type ObligationKind,
+  type ObligationRegistry,
+  type ObligationRecord,
+} from './obligations.js';
+import {
   providerNetwork,
   type ProviderNetwork,
   type ProviderChainId,
@@ -29,9 +43,13 @@ import { policyChangeSchema, runtimeConfigurationSchema } from './schemas.js';
 
 export interface RuntimeConfigurationOptions {
   authorizeContracts?: boolean;
+  credentialKey?: { env: string };
+  sharedApplicationSafes?: boolean;
   operators: { issuer: string; clientId: string; subject: string }[];
 }
 export interface RuntimePolicy {
+  action_requirements?: ApplicationObligations['actions'];
+  application_resources_hash?: string;
   version: '1';
   native_transfers?: {
     address: string;
@@ -45,7 +63,11 @@ export interface RuntimePolicy {
     address: string;
     code_hash: string;
     implementation?: { address: string; code_hash: string };
-    methods: { signature: string; maximum_value_wei: string }[];
+    methods: {
+      signature: string;
+      maximum_value_wei: string;
+      user_address_parameters?: number[];
+    }[];
   }[];
   maximum_calls: number;
   maximum_native_value_wei: string;
@@ -84,6 +106,20 @@ export interface RuntimeReview {
   approved_by: string;
 }
 export interface RuntimeConfigurationState {
+  applicationSponsors?: Record<
+    string,
+    import('../provisioning/application-sponsor.js').ApplicationSponsorRecord
+  >;
+  applicationSafes?: Record<
+    string,
+    import('../provisioning/application.js').ApplicationSafeAccount
+  >;
+  obligations?: ObligationRegistry;
+  credentials?: Record<string, ApplicationCredential>;
+  credentialReceipts?: Record<
+    string,
+    { hash: string; metadata: CredentialMetadata }
+  >;
   reviews?: Record<string, RuntimeReview>;
   reviewReceipts?: Record<string, RuntimeReview>;
   heads: Record<string, string>;
@@ -155,6 +191,11 @@ export function normalizeRuntimePolicy(
     invalid();
   const result = structuredClone(change);
   const policy = result.policy;
+  if (policy.action_requirements)
+    policy.action_requirements = normalizeObligation(
+      'actions',
+      policy.action_requirements,
+    );
   const uint = (value: string) => {
     if (BigInt(value) >= 2n ** 256n) invalid();
   };
@@ -237,6 +278,15 @@ export function normalizeRuntimePolicy(
         const fragment = FunctionFragment.from(method.signature);
         const canonical = fragment.format('sighash');
         if (canonical !== method.signature) invalid();
+        if (method.user_address_parameters) {
+          if (
+            method.user_address_parameters.some(
+              (index) => fragment.inputs[index]?.type !== 'address',
+            )
+          )
+            invalid();
+          method.user_address_parameters.sort((a, b) => a - b);
+        }
         const selector = id(canonical).slice(0, 10);
         if (selectors.has(selector)) invalid();
         selectors.add(selector);
@@ -278,6 +328,7 @@ export class RuntimeConfigurationService {
     private readonly deploymentRevision: string,
     private readonly transportRevision?: string,
     private readonly network?: ProviderNetwork,
+    private readonly credentialCipher?: ApplicationCredentialCipher,
   ) {
     if (!text(deploymentRevision))
       throw new WalletProviderError('wallet_provider_configuration');
@@ -409,6 +460,257 @@ export class RuntimeConfigurationService {
     });
     return record;
   }
+  async readCredentials(principal: VerifiedPrincipal, applicationId?: string) {
+    const selected = applicationId ?? this.application(principal);
+    if (applicationId) {
+      this.assertOperator(principal);
+      this.target(selected);
+    } else if (!principal.scopes.includes('wallet:configuration:read')) deny();
+    return this.transaction((registry) =>
+      Object.values(registry.credentials ?? {})
+        .filter((entry) => entry.application_id === selected)
+        .map(credentialMetadata),
+    );
+  }
+  async writeCredential(
+    context: AuthorityContext,
+    reference: string,
+    input: { expected_revision: string; endpoint: string | null },
+  ) {
+    context = structuredClone(context);
+    input = structuredClone(input);
+    const applicationId = this.application(context.principal);
+    const key = this.key(
+      context,
+      'wallet:configuration:propose',
+      'credential-' + reference,
+      applicationId,
+    );
+    if (!this.credentialCipher) deny();
+    if (
+      !/^[A-Za-z0-9_-]{1,128}$/.test(reference) ||
+      !input ||
+      Object.keys(input).sort().join(',') !== 'endpoint,expected_revision' ||
+      !/^(0|[1-9][0-9]{0,3})$/.test(input.expected_revision)
+    )
+      invalid();
+    const origin =
+      input.endpoint === null ? '' : credentialOrigin(input.endpoint);
+    const hash = this.credentialCipher.digest([
+      applicationId,
+      reference,
+      input,
+    ]);
+    return this.transaction((registry) => {
+      const receipts = (registry.credentialReceipts ??= {});
+      if (receipts[key]) {
+        if (receipts[key].hash !== hash) conflict();
+        return structuredClone(receipts[key].metadata);
+      }
+      const records = (registry.credentials ??= {}),
+        id = applicationId + ':' + reference;
+      const previous = records[id];
+      if ((previous?.revision ?? '0') !== input.expected_revision) conflict();
+      if (
+        Number(input.expected_revision) >= 256 ||
+        (!previous &&
+          Object.values(records).filter(
+            (r) => r.application_id === applicationId,
+          ).length >= 32)
+      )
+        deny();
+      const metadata: CredentialMetadata = {
+        application_id: applicationId,
+        reference,
+        revision: String(Number(input.expected_revision) + 1),
+        origin,
+        status: input.endpoint === null ? 'revoked' : 'active',
+      };
+      records[id] = this.credentialCipher!.seal(metadata, input.endpoint ?? '');
+      const services =
+        registry.obligations?.records[applicationId + ':services'];
+      if (
+        services &&
+        (services.value as ApplicationObligations['services']).some(
+          (s) => s.credential_reference === reference,
+        )
+      ) {
+        services.decision = 'pending';
+        services.decision_revision = String(
+          Number(services.decision_revision) + 1,
+        );
+        delete services.decided_at;
+      }
+      receipts[key] = { hash, metadata };
+      return structuredClone(metadata);
+    });
+  }
+  /** Resolve only accepted resources belonging to the authenticated application's identity. */
+  async rpcEndpoints(
+    applicationId: string,
+    kind: 'rpc-verification' | 'rpc-submission' = 'rpc-verification',
+  ): Promise<string[]> {
+    this.target(applicationId);
+    return this.transaction((registry) => {
+      if (!this.credentialCipher) deny();
+      const services =
+        registry.obligations?.records[applicationId + ':services'];
+      if (services?.decision !== 'accepted') deny();
+      const endpoints = (services.value as ApplicationObligations['services'])
+        .filter((s) => s.kind === kind)
+        .map((s) => {
+          const record =
+            registry.credentials?.[
+              applicationId + ':' + s.credential_reference
+            ];
+          if (
+            !record ||
+            record.application_id !== applicationId ||
+            record.status !== 'active'
+          )
+            deny();
+          return this.credentialCipher!.open(record);
+        });
+      if (
+        endpoints.length < (kind === 'rpc-verification' ? 2 : 1) ||
+        endpoints.length > 3 ||
+        new Set(endpoints.map((e) => new URL(e).origin)).size !==
+          endpoints.length
+      )
+        deny();
+      return endpoints;
+    });
+  }
+  async readObligations(principal: VerifiedPrincipal, applicationId?: string) {
+    principal = structuredClone(principal);
+    if (applicationId !== undefined) {
+      this.assertOperator(principal);
+      this.target(applicationId);
+    } else {
+      if (!principal.scopes.includes('wallet:configuration:read')) deny();
+      applicationId = this.application(principal);
+    }
+    const selected = applicationId;
+    return this.transaction((registry) => ({
+      application_id: selected,
+      resources: Object.values(registry.obligations?.records ?? {})
+        .filter((record) => record.application_id === selected)
+        .map((record) => structuredClone(record)),
+      authorizes_spending: false as const,
+      activates_execution: false as const,
+    }));
+  }
+  async submitObligation<K extends ObligationKind>(
+    context: AuthorityContext,
+    kind: K,
+    input: { expected_revision: string; value: ApplicationObligations[K] },
+  ): Promise<ObligationRecord> {
+    context = structuredClone(context);
+    const applicationId = this.application(context.principal);
+    const key = this.key(
+      context,
+      'wallet:configuration:propose',
+      'obligation-' + kind,
+      applicationId,
+    );
+    if (
+      !input ||
+      Object.keys(input).sort().join(',') !== 'expected_revision,value' ||
+      !/^(0|[1-9][0-9]{0,3})$/.test(input.expected_revision)
+    )
+      invalid();
+    const expected = input.expected_revision;
+    const value = normalizeObligation(kind, input.value);
+    if (
+      kind === 'sponsorship' &&
+      (value as ApplicationObligations['sponsorship']).chain_id !==
+        providerNetwork(this.network).caip
+    )
+      invalid();
+    const hash = serviceHash([expected, value]);
+    return this.transaction((registry) => {
+      const obligations = (registry.obligations ??= {
+        records: {},
+        receipts: {},
+      });
+      const previous = obligations.receipts[key];
+      if (previous) {
+        if (previous.hash !== hash) conflict();
+        return structuredClone(previous.record);
+      }
+      const id = applicationId + ':' + kind;
+      const current = obligations.records[id];
+      if ((current?.revision ?? '0') !== expected || BigInt(expected) >= 256n)
+        conflict();
+      const record: ObligationRecord = {
+        application_id: applicationId,
+        kind,
+        revision: String(BigInt(expected) + 1n),
+        value,
+        submitted_at: new Date().toISOString(),
+        decision: 'pending',
+        decision_revision: '0',
+      };
+      obligations.records[id] = record;
+      obligations.receipts[key] = { hash, record: structuredClone(record) };
+      return structuredClone(record);
+    });
+  }
+  async decideObligation(
+    context: AuthorityContext,
+    applicationId: string,
+    kind: ObligationKind,
+    input: {
+      expected_revision: string;
+      expected_decision_revision: string;
+      decision: 'accepted' | 'rejected';
+    },
+  ): Promise<ObligationRecord> {
+    context = structuredClone(context);
+    input = structuredClone(input);
+    this.assertOperator(context.principal);
+    this.target(applicationId);
+    if (
+      !['actions', 'services', 'sponsorship'].includes(kind) ||
+      !input ||
+      Object.keys(input).sort().join(',') !==
+        'decision,expected_decision_revision,expected_revision' ||
+      !['accepted', 'rejected'].includes(input.decision) ||
+      !/^[1-9][0-9]{0,3}$/.test(input.expected_revision) ||
+      !/^(0|[1-9][0-9]{0,3})$/.test(input.expected_decision_revision)
+    )
+      invalid();
+    const key = this.key(
+      context,
+      'wallet:configuration:write',
+      'decide-obligation-' + kind,
+      applicationId,
+    );
+    const hash = serviceHash(input);
+    return this.transaction((registry) => {
+      const obligations = registry.obligations ?? conflict();
+      const previous = obligations?.receipts[key];
+      if (previous) {
+        if (previous.hash !== hash) conflict();
+        return structuredClone(previous.record);
+      }
+      const record =
+        obligations.records[applicationId + ':' + kind] ?? conflict();
+      if (
+        !obligations ||
+        !record ||
+        record.revision !== input.expected_revision ||
+        record.decision_revision !== input.expected_decision_revision ||
+        BigInt(record.decision_revision) >= 16n
+      )
+        conflict();
+      record.decision = input.decision;
+      record.decision_revision = String(BigInt(record.decision_revision) + 1n);
+      record.decided_at = new Date().toISOString();
+      obligations.receipts[key] = { hash, record: structuredClone(record) };
+      return structuredClone(record);
+    });
+  }
   async propose(context: AuthorityContext, input: RuntimePolicyChange) {
     context = structuredClone(context);
     const applicationId = this.application(context.principal);
@@ -458,7 +760,11 @@ export class RuntimeConfigurationService {
           revisionKey(applicationId, change.expected_revision)
         ];
       // Automatic acceptance delegates contract registration, never provider terms.
-      if (review?.mode === 'automatic' && current) {
+      if (
+        review?.mode === 'automatic' &&
+        current &&
+        !this.options.sharedApplicationSafes
+      ) {
         const { contracts: _old, ...terms } = current.policy;
         const { contracts: _new, ...requestedTerms } = change.policy;
         if (
@@ -486,7 +792,7 @@ export class RuntimeConfigurationService {
       return record;
     });
   }
-  async workspace(principal: VerifiedPrincipal, applicationId?: string) {
+  async listApplications(principal: VerifiedPrincipal, applicationId?: string) {
     let provider = false;
     if (principal.scopes.includes('wallet:configuration:write')) {
       this.assertOperator(principal);
@@ -574,7 +880,8 @@ export class RuntimeConfigurationService {
       ) ||
       !/^(0|[1-9][0-9]{0,19})$/.test(input.expected_revision) ||
       !/^(0|[1-9][0-9]{0,19})$/.test(input.expected_review_revision) ||
-      !['automatic', 'manual'].includes(input.mode)
+      !['automatic', 'manual'].includes(input.mode) ||
+      (this.options.sharedApplicationSafes && input.mode === 'automatic')
     )
       invalid();
     const key = this.key(

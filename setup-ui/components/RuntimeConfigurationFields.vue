@@ -18,13 +18,13 @@ function enable(enabled: boolean) {
 </script>
 <template>
   <section class="form-section">
-    <h3>Runtime contract workspace</h3>
+    <h3>Application policy APIs</h3>
     <p>
       Let applications register contracts and methods after deployment.
       Providers publish policies and choose automatic or manual registration
-      review at /operator/ on the running service.
+      review through the protected application configuration APIs.
     </p>
-    <label
+    <label v-if="!model.runtimeConfiguration?.sharedApplicationSafes"
       ><input
         type="checkbox"
         :checked="!!model.runtimeConfiguration"
@@ -117,15 +117,16 @@ function enable(enabled: boolean) {
         Add runtime operator
       </button>
       <FormKit
+        v-if="!model.runtimeConfiguration.sharedApplicationSafes"
         type="checkbox"
         label="Use runtime policies for contract authorization"
         v-model="model.runtimeConfiguration.authorizeContracts"
       />
       <p>
-        Financial authorization requires application-led access, approved
-        contract calls and the Safe execution profile. Registration does not
-        grant wallet access. The designated executor must also explicitly enable
-        runtime contracts.
+        Application action policies, services and sponsorship are reviewed
+        through the protected APIs after deployment. Registration does not grant
+        wallet access. Each user still needs current identity evidence and
+        consent.
       </p>
     </template>
   </section>

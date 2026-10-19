@@ -187,3 +187,48 @@ describe('runtime executor snapshots', () => {
     expect(() => validateRuntimeCalls(f.snapshot, f.input)).toThrow();
   });
 });
+
+describe('off-chain application actions', () => {
+  it('requires a declared action and exact provider-accepted enum payload', async () => {
+    const f = await fixture();
+    f.snapshot.policy.action_requirements = [
+      {
+        name: 'purchase',
+        description: 'Purchase under application authorization',
+        fields: [
+          { name: 'tier', required: true, allowed_values: ['retail'] },
+          { name: 'region', required: false, allowed_values: ['ZA'] },
+        ],
+      },
+    ];
+    f.snapshot.policy = normalizeRuntimePolicy({
+      expected_revision: '0',
+      policy: f.snapshot.policy,
+    }).policy;
+    f.snapshot.policy_hash = serviceHash(f.snapshot.policy);
+    expect(() => validateRuntimeCalls(f.snapshot, f.input)).toThrow();
+    const valid = {
+      ...f.input,
+      application_action: { name: 'purchase', payload: { tier: 'retail' } },
+    };
+    expect(() => validateRuntimeCalls(f.snapshot, valid)).not.toThrow();
+    const rejected: { name: string; payload: Record<string, string> }[] = [
+      { name: 'unregistered', payload: { tier: 'retail' } },
+      { name: 'purchase', payload: {} },
+      { name: 'purchase', payload: { tier: 'wholesale' } },
+      { name: 'purchase', payload: { tier: 'retail', extra: 'ZA' } },
+      { name: 'purchase', payload: { tier: 'retail', region: 'US' } },
+    ];
+    for (const application_action of rejected)
+      expect(() =>
+        validateRuntimeCalls(f.snapshot, { ...f.input, application_action }),
+      ).toThrow();
+    f.snapshot.policy.action_requirements = [];
+    f.snapshot.policy = normalizeRuntimePolicy({
+      expected_revision: '0',
+      policy: f.snapshot.policy,
+    }).policy;
+    f.snapshot.policy_hash = serviceHash(f.snapshot.policy);
+    expect(() => validateRuntimeCalls(f.snapshot, valid)).toThrow();
+  });
+});

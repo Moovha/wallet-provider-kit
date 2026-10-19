@@ -72,6 +72,7 @@ const requiredFields = computed({
 <template>
   <h3>Access flow and identity requirements</h3>
   <FormKit
+    v-if="!model.runtimeConfiguration?.sharedApplicationSafes"
     type="select"
     label="Access flow"
     :modelValue="flow"

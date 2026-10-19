@@ -163,13 +163,13 @@ describe.each(['base', 'base-sepolia'] as const)(
         max_validity_seconds: 60,
         claim_requirements: [],
       };
-      const proposal = await f.request('/v1/runtime-configuration/proposals', {
+      const proposal = await f.request('/v1/application/policy/proposals', {
         expected_revision: '0',
         policy,
       });
       expect(proposal.status).toBe(200);
       const path =
-        '/v1/runtime-configuration/proposals/' +
+        '/v1/provider/policy/proposals/' +
         proposal.body.proposal_id +
         '/publish';
       expect((await f.request(path, { expected_revision: '0' })).status).toBe(
@@ -179,11 +179,11 @@ describe.each(['base', 'base-sepolia'] as const)(
         (await f.request(path, { expected_revision: '0' }, f.operator)).status,
       ).toBe(200);
       expect(
-        (await f.request('/v1/runtime-configuration')).body.publication.policy
+        (await f.request('/v1/application/policy')).body.publication.policy
           .chain_id,
       ).toBe(chain.caip);
       expect(
-        (await f.request('/v1/runtime-configuration/workspace')).body.network,
+        (await f.request('/v1/applications/configurations')).body.network,
       ).toBe(network);
       const wrong = structuredClone(policy);
       wrong.chain_id = providerNetwork(
@@ -191,7 +191,7 @@ describe.each(['base', 'base-sepolia'] as const)(
       ).caip;
       expect(
         (
-          await f.request('/v1/runtime-configuration/proposals', {
+          await f.request('/v1/application/policy/proposals', {
             expected_revision: '1',
             policy: wrong,
           })

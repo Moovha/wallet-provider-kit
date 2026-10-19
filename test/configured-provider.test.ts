@@ -687,7 +687,7 @@ describe('configured API and provider transfer authorization', () => {
     };
     const proposal = await t.app.inject({
       method: 'POST',
-      url: '/v1/runtime-configuration/proposals',
+      url: '/v1/application/policy/proposals',
       headers: {
         authorization: applicationToken,
         'idempotency-key': randomUUID(),
@@ -697,7 +697,7 @@ describe('configured API and provider transfer authorization', () => {
     expect(proposal.statusCode).toBe(200);
     const publication = await t.app.inject({
       method: 'POST',
-      url: `/v1/runtime-configuration/proposals/${proposal.json().proposal_id}/publish`,
+      url: `/v1/provider/policy/proposals/${proposal.json().proposal_id}/publish`,
       headers: {
         authorization: operatorToken,
         'idempotency-key': randomUUID(),
@@ -706,7 +706,7 @@ describe('configured API and provider transfer authorization', () => {
     });
     expect(publication.statusCode).toBe(200);
     const read = await t.app.inject({
-      url: '/v1/runtime-configuration',
+      url: '/v1/application/policy',
       headers: { authorization: applicationToken },
     });
     expect(read.json()).toMatchObject({
@@ -725,7 +725,7 @@ describe('configured API and provider transfer authorization', () => {
       (
         await t.app.inject({
           method: 'POST',
-          url: `/v1/runtime-configuration/proposals/${proposal.json().proposal_id}/publish`,
+          url: `/v1/provider/policy/proposals/${proposal.json().proposal_id}/publish`,
           headers: {
             authorization: forgedOperator,
             'idempotency-key': randomUUID(),
@@ -4073,10 +4073,7 @@ async function runtimeFinancialFixture(queue = false, local = false) {
   const publish = async () => {
     const result = await app.inject({
       method: 'POST',
-      url:
-        '/v1/runtime-configuration/applications/' +
-        applicationId +
-        '/revisions',
+      url: '/v1/provider/applications/' + applicationId + '/policy/revisions',
       headers: {
         authorization: operatorToken,
         'idempotency-key': randomUUID(),
@@ -4369,6 +4366,42 @@ async function walletCallsFixture(local = false) {
 }
 
 describe('EIP-5792 runtime wallet calls', () => {
+  it('enforces off-chain action payloads before queue admission and fences policy changes before signing', async () => {
+    const f = await walletCallsFixture();
+    const action_requirements = [
+      {
+        name: 'purchase',
+        description: 'Purchase',
+        fields: [{ name: 'tier', required: true, allowed_values: ['retail'] }],
+      },
+    ];
+    Object.assign(f.document, { action_requirements });
+    await f.publish();
+    expect((await f.consent()).json().status).toBe('granted');
+    const capability = await f.rpc('wallet_getCapabilities', [
+      f.calls.policy.accounts[0].address,
+    ]);
+    expect(capability.result['0x14a34'].applicationAction).toEqual({
+      supported: true,
+    });
+    expect((await f.rpc('wallet_sendCalls', [f.batch()])).error).toBeDefined();
+    const batch = {
+      ...f.batch(),
+      capabilities: {
+        applicationAction: { name: 'purchase', payload: { tier: 'wholesale' } },
+      },
+    };
+    expect((await f.rpc('wallet_sendCalls', [batch])).error).toBeDefined();
+    expect(f.calls.state.posts).toBe(0);
+    batch.capabilities.applicationAction.payload.tier = 'retail';
+    expect((await f.rpc('wallet_sendCalls', [batch])).error).toBeUndefined();
+    action_requirements[0].fields[0].allowed_values = ['wholesale'];
+    await f.publish();
+    await f.process();
+    expect(f.calls.state.posts).toBe(0);
+    expect(vi.mocked(injected.backend!.signTypedData)).not.toHaveBeenCalled();
+  });
+
   it('discovers the Safe sender, submits an atomic batch once and returns verified standard receipts across restart and policy changes', async () => {
     const f = await walletCallsFixture();
     expect(
@@ -4742,7 +4775,7 @@ it('lists wallet batches with owner-bound application access and a separately au
   const list = (authorization: string) =>
     f.app.inject({
       method: 'GET',
-      url: '/v1/runtime-configuration/batches',
+      url: '/v1/wallet/batches',
       headers: { authorization },
     });
   const appToken = await f.t.f.token('wallet:execute:read');
@@ -4792,7 +4825,7 @@ it('requires renewed financial consent after a provider-allowed application auto
   );
   const review = await f.app.inject({
     method: 'POST',
-    url: `/v1/runtime-configuration/applications/${appId}/review`,
+    url: `/v1/provider/applications/${appId}/policy/review`,
     headers: {
       authorization: f.operatorToken,
       'idempotency-key': randomUUID(),
@@ -4810,7 +4843,7 @@ it('requires renewed financial consent after a provider-allowed application auto
   });
   const proposed = await f.app.inject({
     method: 'POST',
-    url: '/v1/runtime-configuration/proposals',
+    url: '/v1/application/policy/proposals',
     headers: {
       authorization: await f.t.f.token('wallet:configuration:propose'),
       'idempotency-key': randomUUID(),

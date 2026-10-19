@@ -594,6 +594,8 @@ See the [HTTP reference](http-reference.md).
 ```ts
 export interface ServerOptions {
   safeProvisioning?: import('../provisioning/safe.js').SafeProvisioningService;
+  applicationSafes?: import('../provisioning/application.js').ApplicationSafeService;
+  applicationSponsors?: import('../provisioning/application-sponsor.js').ApplicationSponsorService;
   authorizationServer?: {
     register(app: import('fastify').FastifyInstance): void;
   };
@@ -649,7 +651,7 @@ export declare class WalletCallsService {
   constructor(
     actions: SupportedActions,
     queue: SafeExecutionQueue,
-    execution: ApprovedExecutionCoordinator,
+    execution: ExecutionCoordinatorPort,
     driver?: WalletCallsDriver,
   );
   list(
@@ -1151,7 +1153,7 @@ export declare class OnboardingService {
       | 'transfers:request'
       | 'contracts:request'
     )[];
-    mode: 'connect' | 'create';
+    mode: 'create' | 'connect';
     durationDays: number;
     status: string;
   }>;
@@ -2406,6 +2408,8 @@ export interface FinancialApproval {
   consentReference: string;
   policyRevision: string;
   account: EmbeddedAccount;
+  /** Original user authority for provider-owned application Safe signing. */
+  userAccount?: EmbeddedAccount;
   action: TypedDataAction | RelayerExecutionAction;
   budgetId: string;
   units: string;
@@ -2732,6 +2736,10 @@ export type ApprovedCallInput =
       account_id: string;
       kind: 'contract-call';
       calls: ApprovedContractCall[];
+      application_action?: {
+        name: string;
+        payload: Record<string, string>;
+      };
     }
   | {
       account_id: string;
@@ -3288,7 +3296,7 @@ export interface ExecutionObserver {
     plan: TransferExecutionPlan,
     ownHash?: string,
   ): Promise<import('./recovery.js').NonceSnapshot>;
-  anchor(): Promise<string>;
+  anchor(principal?: VerifiedPrincipal): Promise<string>;
   preflightUnsigned?(plan: TransferExecutionPlan): Promise<void>;
   preflight(plan: TransferExecutionPlan): Promise<void>;
   observe(
@@ -3788,7 +3796,11 @@ export declare class QuorumExecutionObserver implements ExecutionObserver {
   preflightUnsigned(plan: TransferExecutionPlan): Promise<void>;
   preflight(plan: TransferExecutionPlan): Promise<void>;
   /** Read-only verified account binding and common nonce before constructing an approved action. */
-  contractNonce(binding: SafeAccountBinding, owner: string): Promise<string>;
+  contractNonce(
+    binding: SafeAccountBinding,
+    owner: string,
+    _principal?: import('../domain/principal.js').VerifiedPrincipal,
+  ): Promise<string>;
   /** Native balance at a common canonical block, with chain identity and block-hash agreement. */
   payerBalance(sponsor: string): Promise<string>;
   /** Read-only nonce diagnostics at common canonical block heights; pending counts are explicitly local hints. */
@@ -3828,7 +3840,11 @@ export declare class QuorumExecutionObserver implements ExecutionObserver {
   preflightUnsigned(plan: TransferExecutionPlan): Promise<void>;
   preflight(plan: TransferExecutionPlan): Promise<void>;
   /** Read-only verified account binding and common nonce before constructing an approved action. */
-  contractNonce(binding: SafeAccountBinding, owner: string): Promise<string>;
+  contractNonce(
+    binding: SafeAccountBinding,
+    owner: string,
+    _principal?: import('../domain/principal.js').VerifiedPrincipal,
+  ): Promise<string>;
   /** Native balance at a common canonical block, with chain identity and block-hash agreement. */
   payerBalance(sponsor: string): Promise<string>;
   /** Read-only nonce diagnostics at common canonical block heights; pending counts are explicitly local hints. */
@@ -3980,6 +3996,10 @@ export declare const runtimeApplicationId: (
 ```ts
 export interface RuntimeConfigurationOptions {
   authorizeContracts?: boolean;
+  credentialKey?: {
+    env: string;
+  };
+  sharedApplicationSafes?: boolean;
   operators: {
     issuer: string;
     clientId: string;
@@ -4003,14 +4023,59 @@ export declare class RuntimeConfigurationService {
     deploymentRevision: string,
     transportRevision?: string | undefined,
     network?: ProviderNetwork | undefined,
+    credentialCipher?: ApplicationCredentialCipher | undefined,
   );
   assertOperator(principal: VerifiedPrincipal): void;
   assertOperatorState(principal: VerifiedPrincipal, state: ProviderState): void;
+  readCredentials(
+    principal: VerifiedPrincipal,
+    applicationId?: string,
+  ): Promise<CredentialMetadata[]>;
+  writeCredential(
+    context: AuthorityContext,
+    reference: string,
+    input: {
+      expected_revision: string;
+      endpoint: string | null;
+    },
+  ): Promise<CredentialMetadata>;
+  /** Resolve only accepted resources belonging to the authenticated application's identity. */
+  rpcEndpoints(
+    applicationId: string,
+    kind?: 'rpc-verification' | 'rpc-submission',
+  ): Promise<string[]>;
+  readObligations(
+    principal: VerifiedPrincipal,
+    applicationId?: string,
+  ): Promise<{
+    application_id: string;
+    resources: ObligationRecord[];
+    authorizes_spending: false;
+    activates_execution: false;
+  }>;
+  submitObligation<K extends ObligationKind>(
+    context: AuthorityContext,
+    kind: K,
+    input: {
+      expected_revision: string;
+      value: ApplicationObligations[K];
+    },
+  ): Promise<ObligationRecord>;
+  decideObligation(
+    context: AuthorityContext,
+    applicationId: string,
+    kind: ObligationKind,
+    input: {
+      expected_revision: string;
+      expected_decision_revision: string;
+      decision: 'accepted' | 'rejected';
+    },
+  ): Promise<ObligationRecord>;
   propose(
     context: AuthorityContext,
     input: RuntimePolicyChange,
   ): Promise<RuntimePolicyProposal>;
-  workspace(
+  listApplications(
     principal: VerifiedPrincipal,
     applicationId?: string,
   ): Promise<{
@@ -4087,6 +4152,8 @@ export declare class RuntimeConfigurationService {
 
 ```ts
 export interface RuntimePolicy {
+  action_requirements?: ApplicationObligations['actions'];
+  application_resources_hash?: string;
   version: '1';
   native_transfers?: {
     address: string;
@@ -4106,6 +4173,7 @@ export interface RuntimePolicy {
     methods: {
       signature: string;
       maximum_value_wei: string;
+      user_address_parameters?: number[];
     }[];
   }[];
   maximum_calls: number;
@@ -4245,7 +4313,11 @@ export declare class SafeExecutionQueue {
     actions: SupportedActions,
     database: ProviderDatabase,
     execution: Pick<ApprovedExecutionCoordinator, 'refresh' | 'execute'>,
-    nonce: (binding: SafeAccountBinding, owner: string) => Promise<string>,
+    nonce: (
+      binding: SafeAccountBinding,
+      owner: string,
+      principal?: VerifiedPrincipal,
+    ) => Promise<string>,
     configuration: NonNullable<ExecutionConfiguration['safeQueue']>,
     pollIntervalSeconds: number,
   );
@@ -4402,24 +4474,33 @@ export declare class SafeProvisioningService {
     endpoints: string[],
     network?: ProviderNetwork,
     request?: typeof fetch,
+    resolveEndpoints?:
+      ((context: AuthorityContext) => Promise<string[]>) | undefined,
+    assertResources?: (() => Promise<void>) | undefined,
+    applicationAuthority?:
+      | (() => Promise<{
+          owner: string;
+          caller: Pick<VerifiedPrincipal, 'issuer' | 'subject' | 'clientId'>;
+        }>)
+      | undefined,
   );
   read(
     context: AuthorityContext,
     id: string,
   ): Promise<{
     profile: 'safe-1.4.1';
-    chain_id: import('../networks.js').ProviderChainId;
+    chain_id: string;
     address: string;
-    status: 'pending' | 'unknown' | 'ready' | 'prepared';
+    status: SafeDeploymentRecord['state'];
   }>;
   provision(
     input: AuthorityContext,
     id: string,
   ): Promise<{
     profile: 'safe-1.4.1';
-    chain_id: import('../networks.js').ProviderChainId;
+    chain_id: string;
     address: string;
-    status: 'pending' | 'unknown' | 'ready' | 'prepared';
+    status: SafeDeploymentRecord['state'];
   }>;
 }
 ```
@@ -4775,7 +4856,7 @@ export declare class WalletCallsService {
   constructor(
     actions: SupportedActions,
     queue: SafeExecutionQueue,
-    execution: ApprovedExecutionCoordinator,
+    execution: ExecutionCoordinatorPort,
     driver?: WalletCallsDriver,
   );
   list(

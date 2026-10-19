@@ -6,6 +6,13 @@ This walkthrough uses an isolated, unfunded Base Sepolia deployment and the same
 six-step wizard. Users authenticate and consent inside the application.
 Keep a reviewed toolkit revision and its matching configuration throughout the run.
 
+For a new shared application Safe deployment, complete the wizard without gas,
+RPC subscriptions or contract policies. After deployment, follow the
+[application resource and Safe sequence](application-obligations.md#prepare-gas-sponsorship-and-the-shared-safe).
+Use isolated application service accounts and test-network funds for acceptance.
+The manually configured execution examples below describe compatibility profiles;
+they are not additional wizard requirements for the shared profile.
+
 ## 1. Check prerequisites and record gaps
 
 Prepare HTTPS, a supported wallet backend and recovery process, private persistent
@@ -19,7 +26,7 @@ cannot certify your real application assertions, backend or recovery.
 
 ## 2. Configure and export in the GUI
 
-Configure token issuer/audience/JWKS in Services. In Policies, choose
+Configure token issuer/audience/JWKS in Services. In Applications, choose
 **Application-led access (standard)** and set identity level, required fields,
 application registrations, trust-agreement references, allowed permissions,
 identity age and access duration. Choose a backend

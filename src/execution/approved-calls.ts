@@ -72,7 +72,12 @@ export interface ApprovedContractCall {
   data: string;
 }
 export type ApprovedCallInput =
-  | { account_id: string; kind: 'contract-call'; calls: ApprovedContractCall[] }
+  | {
+      account_id: string;
+      kind: 'contract-call';
+      calls: ApprovedContractCall[];
+      application_action?: { name: string; payload: Record<string, string> };
+    }
   | {
       account_id: string;
       kind: 'swap';
@@ -290,7 +295,12 @@ export function buildApprovedCallIntent(
   let compiled: ReturnType<typeof compileOperationAdapter> | undefined;
   let adapter: AdapterInput | undefined;
   if (input.kind === 'contract-call') {
-    exact(input, ['account_id', 'kind', 'calls']);
+    exact(input, [
+      'account_id',
+      'kind',
+      'calls',
+      ...(input.application_action ? ['application_action'] : []),
+    ]);
     if (
       !Array.isArray(input.calls) ||
       !input.calls.length ||

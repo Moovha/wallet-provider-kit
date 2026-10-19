@@ -29,7 +29,7 @@ profile, not a claim of superior production custody or certification. See the
 ## Supplied settings and explicit decisions
 
 A new wizard draft generates unique wallet environment and bundled application
-IDs. Enabling the runtime workspace generates a separate operator ID. These are
+IDs. Enabling the application configuration APIs generates a separate operator ID. These are
 non-secret identifiers, retained in the configuration through export and import;
 setup never replaces them on restart. Import the saved configuration when editing
 an existing deployment. Starting a fresh draft or running `init` creates new IDs
@@ -146,7 +146,7 @@ A token identifies the application; it does not prove user ownership or authoriz
 spending. The existing owner, grant, current identity, consent, exact action and
 durable attempt checks remain mandatory before wallet effects.
 
-When you enable the runtime workspace in Policies, the wizard generates a
+When you enable the application configuration APIs in Policies, the wizard generates a
 separate provider operator client ID. Its override is under **Advanced operator
 identity**. The bundle registers this service client separately, generates
 its secret and sets its token subject to its client ID. It can request

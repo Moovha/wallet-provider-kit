@@ -138,7 +138,7 @@ test('field guidance follows backend choices and explains service registrations,
   const relayerHelp = page.locator('[data-setting="relayerOrigin"]');
   await relayerHelp.locator('summary').click();
   await expect(relayerHelp).toContainText('does not install a Relayer');
-  await step(page, 'Policies');
+  await step(page, 'Applications');
   await page.getByLabel('Access flow', { exact: true }).selectOption('hosted');
   await page
     .getByRole('button', {
@@ -162,7 +162,7 @@ test('field guidance follows backend choices and explains service registrations,
   );
   await page.getByText('Use Didit', { exact: true }).click();
   await page
-    .getByRole('button', { name: 'Continue in Policies', exact: true })
+    .getByRole('button', { name: 'Continue in Applications', exact: true })
     .click();
   await page
     .getByText('Didit verification: set an agreed price limit', {
@@ -173,7 +173,7 @@ test('field guidance follows backend choices and explains service registrations,
   await priceHelp.locator('summary').click();
   await expect(priceHelp).toContainText('250 means USD 2.50');
   await expect(priceHelp).toContainText('explicitly agreed free route');
-  await step(page, 'Policies');
+  await step(page, 'Applications');
   const reviewerHelp = page.locator('[data-setting="reviewer"]');
   await reviewerHelp.locator('summary').click();
   await expect(reviewerHelp).toContainText('Do not enter an email');
@@ -216,9 +216,10 @@ test('field guidance follows backend choices and explains service registrations,
   ).toBeVisible();
 });
 
-test('an operator configures CDP without JSON, exports valid files, and editing invalidates export', async ({
+test('an operator edits a compatibility CDP profile, exports valid files, and editing invalidates export', async ({
   page,
 }) => {
+  await imported(page);
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   const external: string[] = [];
@@ -244,7 +245,7 @@ test('an operator configures CDP without JSON, exports valid files, and editing 
   await page
     .getByLabel('Wallet environment name', { exact: true })
     .fill('acme-sepolia');
-  await step(page, 'Policies');
+  await step(page, 'Applications');
   await page.getByLabel('Access flow', { exact: true }).selectOption('hosted');
   await step(page, 'Services');
   await page
@@ -265,7 +266,7 @@ test('an operator configures CDP without JSON, exports valid files, and editing 
   await page
     .getByLabel('Token verification keys URL (JWKS)', { exact: true })
     .fill('https://applications.acme.example/jwks');
-  await step(page, 'Policies');
+  await step(page, 'Applications');
   await page
     .getByText('Use application-supplied records for an unfunded evaluation', {
       exact: true,
@@ -274,7 +275,7 @@ test('an operator configures CDP without JSON, exports valid files, and editing 
   await expect(
     page.getByLabel('Required record fields', { exact: true }),
   ).toHaveValue('display_name\ncountry');
-  await step(page, 'Policies');
+  await step(page, 'Applications');
   await page.getByLabel('Application name', { exact: true }).fill('Acme App');
   await page
     .getByLabel('Application client ID', { exact: true })
@@ -358,7 +359,7 @@ test('OWS and Sumsub can be selected with their references and exported without 
   await page
     .getByLabel('Sumsub recipient level name', { exact: true })
     .fill('recipient-level');
-  await step(page, 'Policies');
+  await step(page, 'Applications');
   await page
     .getByText('Sumsub import: set an agreed price limit', {
       exact: true,
@@ -425,7 +426,7 @@ test('Relayer signer pool, applications, financial policies and activation are c
   await expect(page.getByLabel('Relayer ID', { exact: true })).toHaveValue(
     'relayer-two',
   );
-  await step(page, 'Policies');
+  await step(page, 'Applications');
   await page
     .getByText('Record an identity funding agreement for this application', {
       exact: true,
@@ -515,7 +516,7 @@ test('invalid policies block exports, imports round-trip, and custom adapters st
 }) => {
   await imported(page);
   expect(await exported(page)).toEqual(sample);
-  await step(page, 'Policies');
+  await step(page, 'Applications');
   await page.getByRole('button', { name: 'Add reviewer', exact: true }).click();
   await page
     .getByLabel('Reviewer 2 account ID (sub)', { exact: true })
@@ -629,7 +630,7 @@ test('API reference follows the configuration, preserves edits, shows Swagger sc
   await expect(
     page.getByRole('heading', { name: 'Provider API reference', exact: true }),
   ).toBeVisible();
-  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(40);
+  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(55);
   await expect(
     page
       .getByText('Not enabled: Wallet operations are disabled in Deployment', {
@@ -665,19 +666,21 @@ test('API reference follows the configuration, preserves edits, shows Swagger sc
     '[Not enabled]',
   );
   expect(spec.servers).toEqual([{ url: sample.policy.provider.origin }]);
-  await page.getByLabel('Find an endpoint', { exact: true }).fill('/provision');
+  await page
+    .getByLabel('Find an endpoint', { exact: true })
+    .fill('/v1/accounts/{accountId}/provision');
   await expect(page.locator('.swagger-ui .opblock')).toHaveCount(1);
   await expect(
     page.getByLabel('cURL request example', { exact: true }),
   ).toContainText('wallet.example.com/v1/accounts/');
   await page.getByLabel('Find an endpoint', { exact: true }).fill('');
-  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(40);
+  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(55);
   await page
     .getByLabel('Example endpoint', { exact: true })
     .selectOption('signAction');
   await expect(
     page
-      .getByText('Not enabled: Transfer signing is off in Policies', {
+      .getByText('Not enabled: Transfer signing is off in Applications', {
         exact: true,
       })
       .first(),
@@ -688,7 +691,7 @@ test('API reference follows the configuration, preserves edits, shows Swagger sc
   await expect(page.getByLabel('Provider name', { exact: true })).toHaveValue(
     'Draft provider name',
   );
-  await step(page, 'Policies');
+  await step(page, 'Applications');
   await page.getByText('Application access enabled', { exact: true }).click();
   await page
     .getByRole('button', { name: 'API reference', exact: true })
@@ -698,7 +701,9 @@ test('API reference follows the configuration, preserves edits, shows Swagger sc
     .selectOption('requestAccountAccess');
   await expect(
     page
-      .getByText('This application is disabled in Policies', { exact: true })
+      .getByText('This application is disabled in Applications', {
+        exact: true,
+      })
       .first(),
   ).toBeVisible();
   const financial = structuredClone(sample);
@@ -730,14 +735,14 @@ test('API reference follows the configuration, preserves edits, shows Swagger sc
     permissions: ['account:read', 'transfers:request'],
   });
   await imported(page, financial);
-  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(40);
+  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(55);
   await page
     .getByLabel('Example endpoint', { exact: true })
     .selectOption('signAction');
   await expect(
     page
       .getByText(
-        'Select the required permission for this application in Policies',
+        'Select the required permission for this application in Applications',
         { exact: true },
       )
       .first(),
@@ -813,7 +818,7 @@ test('API renderer can retry a failed bundled asset without losing setup', async
   await page
     .getByRole('button', { name: 'Reload API reference', exact: true })
     .click();
-  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(40);
+  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(55);
   await page
     .getByRole('button', { name: 'Setup configuration', exact: true })
     .click();
@@ -937,7 +942,7 @@ test('hosted compatibility supports unfunded record evaluation without vendor cr
   await imported(page);
   await step(page, 'Services');
   await expect(page.getByLabel('Use Didit', { exact: true })).toBeChecked();
-  await step(page, 'Policies');
+  await step(page, 'Applications');
   const records = page.getByLabel(
     'Use application-supplied records for an unfunded evaluation',
     { exact: true },
@@ -951,7 +956,7 @@ test('hosted compatibility supports unfunded record evaluation without vendor cr
   await page
     .getByLabel('Required record fields', { exact: true })
     .fill('display_name\ncountry\ncustomer_type');
-  await step(page, 'Policies');
+  await step(page, 'Applications');
   await expect(
     page.getByLabel('Configure delegated transfer signing', { exact: true }),
   ).toBeDisabled();
@@ -972,7 +977,7 @@ test('hosted compatibility supports unfunded record evaluation without vendor cr
     await readFile((await (await variables).path())!, 'utf8'),
   ).not.toContain('DIDIT');
   await imported(page, config);
-  await step(page, 'Policies');
+  await step(page, 'Applications');
   await expect(
     page.getByLabel('Required record fields', { exact: true }),
   ).toHaveValue('display_name\ncountry\ncustomer_type');
@@ -986,7 +991,7 @@ test('hosted compatibility supports unfunded record evaluation without vendor cr
   await expect(
     page.getByLabel('Didit workflow ID', { exact: true }),
   ).toBeVisible();
-  await step(page, 'Policies');
+  await step(page, 'Applications');
   await expect(
     page.getByLabel('Didit verification: set an agreed price limit', {
       exact: true,
@@ -1389,7 +1394,7 @@ test('operators can export per-Safe queue limits and multiple sponsors for one a
   await page
     .getByRole('button', { name: 'API reference', exact: true })
     .click();
-  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(40);
+  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(55);
   await page
     .getByLabel('Example endpoint', { exact: true })
     .selectOption('enqueueContractCall');
@@ -1481,9 +1486,7 @@ test('a new provider exports the bundled issuer, OWS vault and Caddy profile wit
   await expect(
     page.getByLabel('Application token issuer', { exact: true }),
   ).toHaveCount(0);
-  await expect(
-    page.getByLabel('wallet:sign', { exact: true }),
-  ).not.toBeChecked();
+  await expect(page.getByLabel('wallet:sign', { exact: true })).toBeChecked();
   await expect(
     page.getByLabel('wallet:sign', { exact: true }),
   ).not.toBeVisible();
@@ -1509,9 +1512,9 @@ test('a new provider exports the bundled issuer, OWS vault and Caddy profile wit
       exact: true,
     })
     .fill('reviewed-example-agreement');
-  await page
-    .getByLabel('Enable runtime configuration', { exact: true })
-    .check();
+  await expect(
+    page.getByLabel('Enable runtime configuration', { exact: true }),
+  ).toHaveCount(0);
   await expect(
     page.getByLabel('Operator OAuth client ID', { exact: true }),
   ).not.toBeVisible();
@@ -1540,12 +1543,14 @@ test('a new provider exports the bundled issuer, OWS vault and Caddy profile wit
   expect(config.authorizationServer.clients).toEqual([
     expect.objectContaining({
       clientId,
-      scopes: [
+      scopes: expect.arrayContaining([
         'wallet:access',
         'wallet:access:read',
         'wallet:account:read',
         'wallet:provision',
-      ],
+        'wallet:configuration:propose',
+        'wallet:sign',
+      ]),
     }),
   ]);
   expect(config.oauth).toEqual({
@@ -1558,47 +1563,33 @@ test('a new provider exports the bundled issuer, OWS vault and Caddy profile wit
   expect(restored).toEqual(config);
 });
 
-test('bundled execution starts selected and supplies managed sponsor bindings', async ({
+test('shared execution is prebundled without wizard sponsors, RPCs or contract policies', async ({
   page,
 }) => {
   await step(page, 'Services');
   await expect(
     page.getByLabel('Local execution engine', { exact: true }),
-  ).toHaveValue('bundled');
+  ).toHaveCount(0);
   await expect(
     page.getByText('Local setup starts the execution engine'),
   ).toBeVisible();
-  await step(page, 'Deployment');
-  await page
-    .getByText('Configure transfer execution and RPC verification', {
-      exact: true,
-    })
-    .click();
+  await step(page, 'Applications');
+  await expect(page.getByLabel('Access flow', { exact: true })).toHaveCount(0);
   await expect(
-    page.getByLabel('Execution submission service', { exact: true }),
-  ).toHaveValue('local-transfer');
+    page.getByLabel('Required identity level', { exact: true }),
+  ).not.toBeVisible();
+  await step(page, 'Deployment');
+  await expect(
+    page.getByText('Configure transfer execution and RPC verification', {
+      exact: true,
+    }),
+  ).toHaveCount(0);
   await expect(
     page.getByLabel('Sponsor signer ID 1', { exact: true }),
   ).toHaveCount(0);
   await expect(
-    page.getByText("Setup creates this sponsor's encrypted keystore"),
-  ).toBeVisible();
-  await page
-    .getByLabel('Execution submission service', { exact: true })
-    .selectOption('local-approved');
-  await expect(
-    page.getByLabel('Enable durable per-Safe request queues', { exact: true }),
-  ).toBeVisible();
-  await step(page, 'Services');
-  await page
-    .getByLabel('Local execution engine', { exact: true })
-    .selectOption('external');
-  await step(page, 'Deployment');
-  await expect(
-    page.getByLabel('Configure transfer execution and RPC verification', {
-      exact: true,
-    }),
-  ).not.toBeChecked();
+    page.getByLabel('Execution submission service', { exact: true }),
+  ).toHaveCount(0);
 });
 
 test('advanced overrides and additional bundled registrations retain their identities across export and import', async ({
@@ -1630,7 +1621,7 @@ test('advanced overrides and additional bundled registrations retain their ident
   await page
     .getByLabel('OWS owner passphrase variable name', { exact: true })
     .fill('RETAINED_VAULT_PASSPHRASE');
-  await step(page, 'Policies');
+  await step(page, 'Applications');
   await page
     .getByRole('button', { name: 'Add application', exact: true })
     .click();

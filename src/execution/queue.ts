@@ -68,6 +68,7 @@ export class SafeExecutionQueue {
     private readonly nonce: (
       binding: SafeAccountBinding,
       owner: string,
+      principal?: VerifiedPrincipal,
     ) => Promise<string>,
     configuration: NonNullable<ExecutionConfiguration['safeQueue']>,
     private readonly pollIntervalSeconds: number,
@@ -114,8 +115,10 @@ export class SafeExecutionQueue {
       action.approval.grantId !== entry.grantId ||
       action.approval.ownerSubject !== entry.owner ||
       action.approval.consentReference !== entry.consentReference ||
-      action.approval.account.accountId !== entry.input.account_id ||
-      action.approval.account.address !== entry.address ||
+      (action.approval.userAccount ?? action.approval.account).accountId !==
+        entry.input.account_id ||
+      (action.approval.userAccount ?? action.approval.account).address !==
+        entry.address ||
       fingerprint(action.approval.caller) !==
         fingerprint({
           issuer: entry.principal.issuer,

@@ -43,7 +43,7 @@ rail, the application's obligations and the current implementation boundary.
 [Documentation](https://moovha.github.io/wallet-provider-kit/) ·
 [Get started](docs/README.md) ·
 [Operator wizard](docs/setup-wizard.md) ·
-[Runtime workspace](docs/runtime-workspace.md) ·
+[Application management](docs/runtime-workspace.md) ·
 [Services and credentials](docs/operator-services.md) ·
 [Local preview](docs/local-preview.md) · [Run locally](docs/local-setup.md) · [Deploy the export](docs/operator-deployment.md)
 
@@ -98,7 +98,7 @@ vendor services or certify readiness. Initial activation remains disabled._
    wallet engine and application registrations. Review which applications may attest user identity
    and consent, and the evidence your policy requires.
 2. **[Configure the six screens](docs/setup-wizard.md):** Provider, Backend, Services,
-   Policies, Deployment and Export. Application-led access is selected by default.
+   Applications, Deployment and Export. Application-led access is selected by default.
    Record application trust agreements and enter secret variable names, not values.
 3. **[Run locally and accept](docs/local-setup.md):** let setup save private files,
    initialize new storage once and start a disabled container. Start the supplied HTTPS profile on the final host, test
@@ -317,12 +317,18 @@ requests must satisfy.
    credentials and recovery arrangements.
 3. **[Services](docs/setup-wizard.md#_3-services)** — connect the token issuer that
    authenticates applications to your API.
-4. **[Policies](docs/setup-wizard.md#_4-policies)** — register trusted applications,
-   define identity and consent requirements, and choose permitted actions and limits.
+4. **[Applications](docs/setup-wizard.md#_4-applications)** — register trusted applications,
+   record identity and consent trust agreements and separate provider operators.
 5. **[Deployment](docs/setup-wizard.md#_5-deployment)** — choose persistent storage,
-   API tools and any sponsored execution features. Keep initial activation off.
+   API tools and the prebundled execution engine. Keep initial activation off.
 6. **[Export](docs/setup-wizard.md#_6-export)** — validate your settings, run a local
    deployment or download its files, then test and activate the service.
+
+After connection, applications register their action payloads, billable service
+credentials and gas sponsorship terms through protected APIs. The provider reviews
+each application's resources, exposes its sponsor address and provisions its shared
+Safe once gas is available. User assets remain in individual wallets. Follow the
+[application setup sequence](docs/application-obligations.md#prepare-gas-sponsorship-and-the-shared-safe).
 
 The [setup guide](docs/README.md) explains how to open the wizard. Each step links
 to the relevant preparation, API and operating details. You can configure the

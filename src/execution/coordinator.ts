@@ -210,7 +210,7 @@ export class ApprovedExecutionCoordinator {
       'configured-execution-v1',
       this.profile,
       'relay_transaction',
-      record.approval.account.accountId,
+      (record.approval.userAccount ?? record.approval.account).accountId,
       execution.executionId,
       record.approval.action.action_id,
       executionAttemptInput(execution.plan),
@@ -433,7 +433,9 @@ export class ApprovedExecutionCoordinator {
           throw new WalletProviderError('wallet_attempt_pending');
         if (
           sponsor.binding.address.toLowerCase() ===
-          latest.approval.account.address.toLowerCase()
+            latest.approval.account.address.toLowerCase() ||
+          sponsor.binding.address.toLowerCase() ===
+            latest.approval.userAccount?.address.toLowerCase()
         )
           deny();
         if (
@@ -513,7 +515,7 @@ export class ApprovedExecutionCoordinator {
         deny();
       let scanFromBlock: string;
       try {
-        scanFromBlock = await this.observer.anchor();
+        scanFromBlock = await this.observer.anchor(context.principal);
         if (this.config.local && record.intent) {
           if (!this.observer.preflightUnsigned) deny();
           await this.observer.preflightUnsigned(

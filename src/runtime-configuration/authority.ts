@@ -59,14 +59,67 @@ export function currentRuntimePolicy(
   if (
     !publication ||
     publication.application_id !== application_id ||
-    publication.revision !== revision
+    publication.revision !== revision ||
+    publication.policy_hash !== serviceHash(publication.policy)
   )
     deny();
+  const policy = structuredClone(publication.policy);
+  const declared = registry?.obligations?.records[application_id + ':actions'];
+  if (declared) {
+    if (declared.decision !== 'accepted') deny();
+    const manifest =
+      declared.value as import('./obligations.js').ApplicationObligations['actions'];
+    if (policy.action_requirements) {
+      for (const rule of policy.action_requirements) {
+        const declaration = manifest.find(
+          (action) => action.name === rule.name,
+        );
+        if (
+          !declaration ||
+          rule.fields.some(
+            (field) => !declaration.fields.some((d) => d.name === field.name),
+          )
+        )
+          deny();
+        rule.fields = declaration.fields.map((field) => {
+          const restriction = rule.fields.find((r) => r.name === field.name);
+          if (!restriction) return structuredClone(field);
+          const allowed_values = restriction.allowed_values.filter((value) =>
+            field.allowed_values.includes(value),
+          );
+          if (!allowed_values.length) deny();
+          return {
+            name: field.name,
+            required: field.required || restriction.required,
+            allowed_values,
+          };
+        });
+      }
+    } else policy.action_requirements = structuredClone(manifest);
+    policy.action_requirements = normalizeRuntimePolicy({
+      expected_revision: '0',
+      policy,
+    }).policy.action_requirements;
+  }
+  const resources = Object.values(registry?.obligations?.records ?? {}).filter(
+    (r) => r.application_id === application_id,
+  );
+  const credentials = Object.values(registry?.credentials ?? {}).filter(
+    (c) => c.application_id === application_id,
+  );
+  if (resources.length || credentials.length) {
+    policy.application_resources_hash = serviceHash([
+      resources.sort((a, b) => a.kind.localeCompare(b.kind)),
+      credentials
+        .map(({ sealed: _sealed, ...metadata }) => metadata)
+        .sort((a, b) => a.reference.localeCompare(b.reference)),
+    ]);
+  }
   const snapshot = {
     application_id,
     revision,
-    policy_hash: publication.policy_hash,
-    policy: structuredClone(publication.policy),
+    policy_hash: serviceHash(policy),
+    policy,
   };
   validateRuntimeSnapshot(snapshot);
   return snapshot;
@@ -165,6 +218,32 @@ export function validateRuntimeCalls(
     input.calls.length > snapshot.policy.maximum_calls
   )
     deny();
+  const requirements = snapshot.policy.action_requirements;
+  if (requirements) {
+    const context = input.application_action;
+    const action = requirements.find((entry) => entry.name === context?.name);
+    if (
+      !context ||
+      !action ||
+      Object.keys(context).sort().join(',') !== 'name,payload' ||
+      !context.payload ||
+      typeof context.payload !== 'object' ||
+      Array.isArray(context.payload) ||
+      Object.keys(context.payload).length > 32 ||
+      Object.keys(context.payload).some(
+        (name) => !action.fields.some((field) => field.name === name),
+      )
+    )
+      deny();
+    for (const field of action.fields) {
+      const present = Object.hasOwn(context.payload, field.name);
+      if (
+        (!present && field.required) ||
+        (present && !field.allowed_values.includes(context.payload[field.name]))
+      )
+        deny();
+    }
+  } else if (input.application_action) deny();
   for (const call of input.calls) {
     if (call.data === '0x') {
       const recipient = snapshot.policy.native_transfers?.find(
@@ -197,6 +276,35 @@ export function validateRuntimeCalls(
         deny();
     } catch {
       deny();
+    }
+  }
+}
+
+/** Shared-Safe contracts must bind every policy-designated user address to the currently authorized individual wallet. */
+export function validateRuntimeUserCalls(
+  snapshot: RuntimePolicySnapshot,
+  input: ApprovedCallInput,
+  userAddress: string,
+): void {
+  validateRuntimeCalls(snapshot, input);
+  if (input.kind !== 'contract-call') deny();
+  for (const call of input.calls) {
+    const method = snapshot.policy.contracts
+      .find((c) => c.address.toLowerCase() === call.to.toLowerCase())
+      ?.methods.find(
+        (m) => id(m.signature).slice(0, 10) === call.data.slice(0, 10),
+      );
+    if (!method?.user_address_parameters?.length || call.value !== '0') deny();
+    const abi = new Interface(['function ' + method.signature]);
+    const fragment = abi.getFunction(method.signature);
+    const decoded = abi.decodeFunctionData(method.signature, call.data);
+    for (const index of method.user_address_parameters) {
+      if (
+        fragment?.inputs[index]?.type !== 'address' ||
+        typeof decoded[index] !== 'string' ||
+        decoded[index].toLowerCase() !== userAddress.toLowerCase()
+      )
+        deny();
     }
   }
 }

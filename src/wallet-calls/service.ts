@@ -7,7 +7,7 @@ import type { VerifiedPrincipal } from '../domain/principal.js';
 import { WalletProviderError } from '../domain/signing.js';
 import type { SupportedActions } from '../deployment/actions.js';
 import type { SafeExecutionQueue } from '../execution/queue.js';
-import type { ApprovedExecutionCoordinator } from '../execution/coordinator.js';
+import type { ExecutionCoordinatorPort } from '../execution/application-coordinator.js';
 import { WalletCallsError } from './errors.js';
 import type { WalletCallsStatus } from './types.js';
 
@@ -45,7 +45,11 @@ function address(value: unknown): string {
     return invalid();
   }
 }
-function capabilities(value: unknown, paymasterSupported = false) {
+function capabilities(
+  value: unknown,
+  paymasterSupported = false,
+  allowAction = false,
+) {
   if (value === undefined) return;
   if (!object(value) || Object.keys(value).length > 16) invalid();
   for (const [name, capability] of Object.entries(value)) {
@@ -55,6 +59,7 @@ function capabilities(value: unknown, paymasterSupported = false) {
         typeof capability.optional !== 'boolean')
     )
       invalid();
+    if (name === 'applicationAction' && allowAction) continue;
     if (name === 'paymasterService' && paymasterSupported) continue;
     if (capability.optional !== true) throw new WalletCallsError(5700);
   }
@@ -62,19 +67,19 @@ function capabilities(value: unknown, paymasterSupported = false) {
 /** Account-scoped EIP-5792 adapter. The server selects the durable execution driver for each account. */
 export class WalletCallsService {
   private readonly queue?: SafeExecutionQueue;
-  private readonly execution?: ApprovedExecutionCoordinator;
+  private readonly execution?: ExecutionCoordinatorPort;
   private readonly driver?: WalletCallsDriver;
   constructor(actions: SupportedActions, driver: WalletCallsDriver);
   constructor(
     actions: SupportedActions,
     queue: SafeExecutionQueue,
-    execution: ApprovedExecutionCoordinator,
+    execution: ExecutionCoordinatorPort,
     driver?: WalletCallsDriver,
   );
   constructor(
     private readonly actions: SupportedActions,
     queueOrDriver: SafeExecutionQueue | WalletCallsDriver,
-    execution?: ApprovedExecutionCoordinator,
+    execution?: ExecutionCoordinatorPort,
     driver?: WalletCallsDriver,
   ) {
     if (!actions.onboarding.runtimeContracts)
@@ -172,6 +177,9 @@ export class WalletCallsService {
       ? {
           [this.actions.network.hex]: {
             atomic: { status: 'supported' },
+            ...(binding.snapshot.policy.action_requirements
+              ? { applicationAction: { supported: true } }
+              : {}),
             ...(driver ? { paymasterService: { supported: true } } : {}),
           },
         }
@@ -210,13 +218,37 @@ export class WalletCallsService {
       throw new WalletCallsError(5710);
     if (input.calls.length > 16) throw new WalletCallsError(5740);
     const driver = this.selected(accountId);
-    capabilities(input.capabilities, !!driver);
+    capabilities(input.capabilities, !!driver, true);
     if (driver)
       driver.acceptPaymaster(
         object(input.capabilities)
           ? input.capabilities.paymasterService
           : undefined,
       );
+    const applicationAction = object(input.capabilities)
+      ? input.capabilities.applicationAction
+      : undefined;
+    if (
+      applicationAction !== undefined &&
+      (!object(applicationAction, ['name', 'payload', 'optional']) ||
+        typeof applicationAction.name !== 'string' ||
+        !object(applicationAction.payload) ||
+        Object.values(applicationAction.payload).some(
+          (v) => typeof v !== 'string',
+        ))
+    )
+      invalid();
+    const actionContext =
+      applicationAction === undefined
+        ? {}
+        : {
+            application_action: {
+              name: (applicationAction as { name: string }).name,
+              payload: (
+                applicationAction as { payload: Record<string, string> }
+              ).payload,
+            },
+          };
     const from = input.from === undefined ? undefined : address(input.from);
     const calls = input.calls.map((call) => {
       if (!object(call, ['to', 'data', 'value', 'capabilities'])) invalid();
@@ -257,6 +289,7 @@ export class WalletCallsService {
       )(principal, {
         account_id: accountId,
         kind: 'contract-call',
+        ...actionContext,
         calls,
       });
     } catch (error) {
@@ -276,7 +309,7 @@ export class WalletCallsService {
         : this.queue!.enqueue.bind(this.queue!)
     )(
       { principal, idempotencyKey: randomUUID() },
-      { account_id: accountId, kind: 'contract-call', calls },
+      { account_id: accountId, kind: 'contract-call', ...actionContext, calls },
       {
         version: '2.0.0',
         id,

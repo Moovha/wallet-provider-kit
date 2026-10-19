@@ -836,7 +836,7 @@
           "properties": {
             "endpoints": {
               "type": "array",
-              "minItems": 2,
+              "minItems": 0,
               "maxItems": 3,
               "uniqueItems": true,
               "items": {
@@ -863,7 +863,7 @@
         },
         "sponsors": {
           "type": "array",
-          "minItems": 1,
+          "minItems": 0,
           "maxItems": 100,
           "items": {
             "type": "object",
@@ -2050,6 +2050,20 @@
           }
         },
         "authorizeContracts": {
+          "type": "boolean"
+        },
+        "credentialKey": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["env"],
+          "properties": {
+            "env": {
+              "type": "string",
+              "pattern": "^[A-Z][A-Z0-9_]{0,127}$"
+            }
+          }
+        },
+        "sharedApplicationSafes": {
           "type": "boolean"
         }
       }

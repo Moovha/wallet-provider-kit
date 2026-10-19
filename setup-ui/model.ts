@@ -1,4 +1,8 @@
 import {
+  configureApplicationRuntime,
+  applicationGenesis,
+} from '../src/deployment/application-defaults.js';
+import {
   newClientId,
   newWalletBinding,
 } from '../src/deployment/setup-identifiers.js';
@@ -88,7 +92,7 @@ export function emptyConfiguration(
       issuer: '',
       clientId: '',
       name: '',
-      permissions: ['account:read'],
+      permissions: ['account:read', 'contracts:request'],
       assertionTrust: { agreement: '' },
     },
   ];
@@ -111,6 +115,14 @@ export function emptyConfiguration(
   delete config.activation.executionAcceptance;
   config.backend = newBackend('ows');
   config.localExecution = defaultLocalExecution();
+  const operatorId = newClientId('operator');
+  config.runtimeConfiguration = {
+    authorizeContracts: true,
+    sharedApplicationSafes: true,
+    credentialKey: { env: 'APPLICATION_CREDENTIAL_STORAGE_KEY' },
+    operators: [{ issuer: '', clientId: operatorId, subject: operatorId }],
+  };
+  configureApplicationRuntime(config);
   config.http = { ...config.http, ingress: 'caddy' };
   synchronizeBundledServices(config);
   return config;
@@ -118,6 +130,8 @@ export function emptyConfiguration(
 
 /** Keep generated service registrations aligned with the operator's admitted applications. */
 export function synchronizeBundledServices(config: ProviderConfiguration) {
+  if (config.runtimeConfiguration?.sharedApplicationSafes && config.execution)
+    config.execution.rpc.genesisHash = applicationGenesis(config.network);
   if (!config.authorizationServer) return;
   config.oauth = bundledOAuth(config.policy.provider.origin);
   for (const app of config.policy.applications)
@@ -152,7 +166,19 @@ export function synchronizeBundledServices(config: ProviderConfiguration) {
           clientSecret: {
             env: `WALLET_APPLICATION_${crypto.randomUUID().replaceAll('-', '').toUpperCase()}_SECRET`,
           },
-          scopes: [...initialApplicationScopes],
+          scopes: [
+            ...initialApplicationScopes,
+            ...(config.runtimeConfiguration?.sharedApplicationSafes
+              ? [
+                  'wallet:configuration:read',
+                  'wallet:configuration:propose',
+                  'wallet:actions',
+                  'wallet:sign',
+                  'wallet:execute',
+                  'wallet:execute:read',
+                ]
+              : []),
+          ],
         },
     );
   if (JSON.stringify(previous) !== JSON.stringify(clients))

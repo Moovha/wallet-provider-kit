@@ -1,5 +1,24 @@
 # Changelog
 
+## Application-scoped setup and shared Safes
+
+- New wizard deployments prebundle execution and defer application RPC credentials,
+  action policy, gas sponsorship and Safe provisioning until after connection.
+- Protected provider APIs prepare one sponsor and one provider-controlled Safe per
+  application. User wallets and consent remain separate; shared calls require
+  explicit user-address bindings and zero native value.
+- Accepted application RPC credentials drive verification and submission without
+  a provider-paid fallback. Revocation blocks new effects; uncertain creation
+  retries retain the original identities.
+- Application off-chain action fields and enums are enforced alongside published
+  provider restrictions. The standalone operator workspace and legacy runtime
+  configuration routes are replaced by application and provider APIs.
+
+## Unreleased application configuration APIs
+
+- Remove the standalone operator workspace. Move application configuration listing to `/v1/applications/configurations` and batch listing to `/v1/wallet/batches`; existing clients must update the two former runtime-configuration URLs.
+- Add application-scoped action, service-account and gas sponsorship declarations with separate provider decisions, revision checks and durable idempotent retries. Accepted action declarations constrain off-chain payloads. Application-owned verifier credentials support encrypted storage, rotation, revocation and scoped RPC selection. Shared Safe provisioning and execution activation remain outside declaration authority.
+
 ## Unreleased RPC throttling recovery
 
 - Serialize fixed read-only RPC methods and allow at most three read attempts for HTTP 429 responses with bounded server backoff. Reject financial RPC methods before transport and preserve all quorum checks and financial no-redispatch rules.

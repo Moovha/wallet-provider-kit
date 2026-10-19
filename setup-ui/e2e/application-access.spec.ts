@@ -63,9 +63,14 @@ test('a new operator configures application-led access without user login, vendo
       .getByLabel('Token verification keys URL (JWKS)', { exact: true })
       .fill('https://apps.example.test/jwks');
     await page.getByRole('button', { name: 'Next', exact: true }).click();
-    await expect(page.getByLabel('Access flow', { exact: true })).toHaveValue(
-      'application',
+    await expect(page.getByLabel('Access flow', { exact: true })).toHaveCount(
+      0,
     );
+    await page
+      .getByText('Provider identity baseline and access duration', {
+        exact: true,
+      })
+      .click();
     await page
       .getByLabel('Required identity level', { exact: true })
       .fill('enhanced');
@@ -109,8 +114,8 @@ test('a new operator configures application-led access without user login, vendo
       page.getByRole('button', { name: 'Add reviewer', exact: true }),
     ).toHaveCount(0);
     await page
-      .getByLabel('Enable runtime configuration', { exact: true })
-      .check();
+      .getByLabel('Operator issuer', { exact: true })
+      .fill('https://apps.example.test');
     await page
       .getByLabel('Operator OAuth client ID', { exact: true })
       .fill('runtime-provider-operator');
@@ -153,7 +158,9 @@ test('a new operator configures application-led access without user login, vendo
       verificationLevel: 'enhanced',
       requiredFields: ['country', 'customer_type'],
     });
-    expect(config.runtimeConfiguration).toEqual({
+    expect(config.runtimeConfiguration).toMatchObject({
+      sharedApplicationSafes: true,
+      authorizeContracts: true,
       operators: [
         {
           issuer: 'https://apps.example.test',
@@ -221,7 +228,7 @@ test('a new operator configures application-led access without user login, vendo
       .getByRole('button', { name: 'API reference', exact: true })
       .click();
     await page.locator('.swagger-ui .opblock').first().waitFor();
-    await expect(page.locator('.swagger-ui .opblock')).toHaveCount(40);
+    await expect(page.locator('.swagger-ui .opblock')).toHaveCount(55);
     await page
       .getByLabel('Example endpoint', { exact: true })
       .selectOption('requestAccountAccess');

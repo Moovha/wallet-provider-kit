@@ -40,7 +40,7 @@ export function explainIssue(issue: string) {
     : /^\/identity\/(didit|sumsub)\/(importPrice|verificationPrice)(?:\/|$)/.test(
           path,
         )
-      ? 'Policies'
+      ? 'Applications'
       : issue.startsWith('/backend')
         ? 'Backend'
         : issue.startsWith('/ownerLogin') ||
@@ -49,9 +49,9 @@ export function explainIssue(issue: string) {
             issue.startsWith('/identity')
           ? 'Services'
           : issue.startsWith('/policy') || issue.startsWith('/reviewers')
-            ? 'Policies'
+            ? 'Applications'
             : issue.startsWith('/financial')
-              ? 'Policies'
+              ? 'Applications'
               : issue.startsWith('/execution') ||
                   issue.startsWith('/activation') ||
                   issue.startsWith('/apiExplorer') ||
@@ -77,13 +77,13 @@ export function explainIssue(issue: string) {
     'login configuration is required for hosted access or staff token controls':
       'Configure login in Services for enabled staff token controls or hosted compatibility. Standard wallet users stay in the application.',
     'hosted access requires reviewers':
-      'In Policies, add the staff account IDs allowed to review hosted requests.',
+      'In Applications, add the staff account IDs allowed to review hosted requests.',
     'application-led access uses trusted application attestations, not hosted verification':
-      'Keep application-led access selected in Policies and remove hosted identity-vendor settings. Configure application identity requirements and trust agreements instead.',
+      'Keep application-led access selected in Applications and remove hosted identity-vendor settings. Configure application identity requirements and trust agreements instead.',
     'issuers must match /oauth/issuer':
       'Use the same token issuer for each application as in Services.',
     'documentation and enabled registered clients are required; duplicate clients are not allowed':
-      'Enable the deployed API explorer, select enabled applications registered in Policies, and remove duplicate application entries.',
+      'Enable the deployed API explorer, select enabled applications registered in Applications, and remove duplicate application entries.',
     'backendAcceptance and recoveryAcceptance are required when enabled; financial setup also requires tokenAcceptance':
       'Add the wallet backend and recovery test report references. Transfer signing also needs a token signing test report reference.',
     'transfer signing and separate execution acceptance are required':

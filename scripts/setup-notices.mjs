@@ -27,8 +27,7 @@ const packages = [
   '@adraffy/ens-normalize',
   'aes-js',
 ];
-let notices =
-  'Bundled setup and runtime workspace interfaces: third-party license notices\n\n';
+let notices = 'Bundled setup interface: third-party license notices\n\n';
 const runtimeDependency = createRequire(import.meta.resolve('ethers'));
 const runtimeEntries = {
   ethers: 'ethers',

@@ -306,6 +306,12 @@ export interface operations {
                                     value: string;
                                     data: string;
                                 }[];
+                                application_action?: {
+                                    name: string;
+                                    payload: {
+                                        [key: string]: string;
+                                    };
+                                };
                             } | {
                                 account_id: string;
                                 /** @enum {string} */
@@ -406,6 +412,16 @@ export interface operations {
                             revision: string;
                             policy_hash: string;
                             policy: {
+                                action_requirements?: {
+                                    name: string;
+                                    description: string;
+                                    fields: {
+                                        name: string;
+                                        required: boolean;
+                                        allowed_values: string[];
+                                    }[];
+                                }[];
+                                application_resources_hash?: string;
                                 /** @enum {string} */
                                 version: "1";
                                 enabled: boolean;
@@ -421,6 +437,7 @@ export interface operations {
                                     methods: {
                                         signature: string;
                                         maximum_value_wei: string;
+                                        user_address_parameters?: number[];
                                     }[];
                                 }[];
                                 call_adapters?: {

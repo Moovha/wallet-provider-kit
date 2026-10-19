@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest';
 import { explainIssue, identityFields } from '../setup-ui/validation.js';
 
-it('routes policy requirements and vendor price errors to Policies while connection errors stay in Services', () => {
+it('routes policy requirements and vendor price errors to Applications while connection errors stay in Services', () => {
   for (const path of [
     '/policy/access/mode',
     '/policy/identity/application/verificationLevel',
@@ -9,7 +9,7 @@ it('routes policy requirements and vendor price errors to Policies while connect
     '/identity/didit/importPrice/maximumMinor',
     '/identity/sumsub/verificationPrice/termsReference',
   ]) {
-    expect(explainIssue(`${path}: required`)).toMatch(/^Policies — /);
+    expect(explainIssue(`${path}: required`)).toMatch(/^Applications — /);
   }
   for (const path of [
     '/oauth/issuer',
@@ -24,7 +24,7 @@ it('points operators to the visible step and repeated field instead of a JSON pa
   const message = explainIssue(
     '/policy/applications/1/funding/monthlyLimitMinor: maximum',
   );
-  expect(message).toContain('Policies');
+  expect(message).toContain('Applications');
   expect(message).toContain(
     'Application 2 monthly identity budget (USD cents)',
   );

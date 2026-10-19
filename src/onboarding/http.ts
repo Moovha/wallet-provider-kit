@@ -1,3 +1,4 @@
+import type { VerifiedPrincipal } from '../domain/principal.js';
 import { runtimeSnapshotSchema } from '../runtime-configuration/schemas.js';
 import type { SafeExecutionQueue } from '../execution/queue.js';
 import {
@@ -20,7 +21,6 @@ import {
 } from '../executor/schemas.js';
 import type { ExecutionAuthorityRequest } from '../executor/protocol.js';
 import providerConfigurationSchema from '../../spec/provider-config.schema.json' with { type: 'json' };
-import type { TransferExecutionCoordinator } from '../execution/coordinator.js';
 import {
   executionHeaders,
   executionReceiptSchema,
@@ -79,12 +79,13 @@ export interface OnboardingHttpOptions {
   apiExplorerLogin?: boolean;
   /** Configuration-first provider-authorized transfers; absent in the onboarding-only profile. */
   actions?: SupportedActions;
-  execution?: TransferExecutionCoordinator;
+  execution?: import('../execution/application-coordinator.js').ExecutionCoordinatorPort;
   safeQueue?: SafeExecutionQueue;
   executionIdentity?: ServiceIdentity;
   contractNonce?: (
     binding: SafeAccountBinding,
     owner: string,
+    principal?: VerifiedPrincipal,
   ) => Promise<string>;
   /** Fence superseded configured-service instances, including browser authority writers. */
   currentConfiguration?: () => Promise<boolean>;
