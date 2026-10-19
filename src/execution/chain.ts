@@ -38,17 +38,20 @@ export const transferInterface = new Interface([
 ]);
 const hashPattern = /^0x[0-9a-fA-F]{64}$/;
 const bytesPattern = /^0x(?:[0-9a-fA-F]{2})*$/;
-type RpcMethod =
-  | 'eth_getTransactionCount'
-  | 'eth_chainId'
-  | 'eth_getBlockByNumber'
-  | 'eth_getCode'
-  | 'eth_getStorageAt'
-  | 'eth_call'
-  | 'eth_getBalance'
-  | 'eth_getLogs'
-  | 'eth_getTransactionReceipt'
-  | 'eth_getTransactionByHash';
+const rpcReadMethods = [
+  'eth_getTransactionCount',
+  'eth_chainId',
+  'eth_getBlockByNumber',
+  'eth_getCode',
+  'eth_getStorageAt',
+  'eth_call',
+  'eth_getBalance',
+  'eth_getLogs',
+  'eth_getTransactionReceipt',
+  'eth_getTransactionByHash',
+] as const;
+type RpcMethod = (typeof rpcReadMethods)[number];
+class RpcThrottled extends Error {}
 
 function unavailable(): never {
   throw new WalletProviderError('wallet_provider_unavailable', 'unknown');
@@ -118,8 +121,10 @@ function callsReceipt(
   };
 }
 
-/** Read-only JSON-RPC transport with fixed methods, bounded responses and no automatic retries. */
+/** Read-only JSON-RPC transport with fixed methods, serialized requests and bounded throttling recovery. */
 export class RpcReader {
+  private pending: Promise<unknown> = Promise.resolve();
+  private retryAfter = 0;
   constructor(
     private readonly endpoint: string,
     private readonly request: typeof fetch,
@@ -140,6 +145,41 @@ export class RpcReader {
     }
   }
   async call(method: RpcMethod, params: unknown[]): Promise<unknown> {
+    if (!rpcReadMethods.includes(method))
+      throw new WalletProviderError('wallet_provider_input');
+    let captured: unknown[];
+    try {
+      captured = structuredClone(params);
+    } catch {
+      throw new WalletProviderError('wallet_provider_input');
+    }
+    const result = this.pending.then(() =>
+      this.readWithRetry(method, captured),
+    );
+    this.pending = result.then(
+      () => undefined,
+      () => undefined,
+    );
+    return result;
+  }
+  private async readWithRetry(
+    method: RpcMethod,
+    params: unknown[],
+  ): Promise<unknown> {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const delay = this.retryAfter - Date.now();
+      // Long server backoffs fail closed without keeping a financial request open.
+      if (delay > 2000) unavailable();
+      if (delay > 0) await new Promise((resolve) => setTimeout(resolve, delay));
+      try {
+        return await this.read(method, params);
+      } catch (error) {
+        if (!(error instanceof RpcThrottled) || attempt === 2) unavailable();
+      }
+    }
+    return unavailable();
+  }
+  private async read(method: RpcMethod, params: unknown[]): Promise<unknown> {
     try {
       const response = await this.request(this.endpoint, {
         method: 'POST',
@@ -152,6 +192,18 @@ export class RpcReader {
         credentials: 'omit',
         signal: AbortSignal.timeout(3000),
       });
+      if (response.status === 429) {
+        const header = response.headers.get('retry-after');
+        const seconds =
+          header && /^[0-9]+$/.test(header) ? Number(header) * 1000 : undefined;
+        const date = header && seconds === undefined ? Date.parse(header) : NaN;
+        const delay =
+          seconds ??
+          (Number.isFinite(date) ? Math.max(0, date - Date.now()) : 500);
+        this.retryAfter = Math.max(this.retryAfter, Date.now() + delay);
+        await response.body?.cancel();
+        throw new RpcThrottled();
+      }
       if (!response.ok) {
         await response.body?.cancel();
         unavailable();
@@ -182,7 +234,8 @@ export class RpcReader {
       )
         unavailable();
       return envelope.result;
-    } catch {
+    } catch (error) {
+      if (error instanceof RpcThrottled) throw error;
       return unavailable();
     }
   }
