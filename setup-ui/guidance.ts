@@ -223,9 +223,9 @@ export const settings = {
     'operator-services.html#openzeppelin-relayer',
   ),
   signerAddress: setting(
-    'The existing 0x wallet address controlled by this signer on the Base Sepolia test network.',
+    'The existing 0x wallet address controlled by this signer on the selected Base network.',
     'The kit checks that signing uses the address allocated to the account. This profile requires an externally owned account, meaning an account controlled by a signing key.',
-    'Copy the verified address from your Relayer inventory. Ask its administrator to confirm the signer ID, active status and Base Sepolia chain 84532 together. Use binding revision 1 for this profile.',
+    'Copy the verified address from your Relayer inventory. Ask its administrator to confirm the signer ID, active status and the selected network and chain ID together. Use binding revision 1 for this profile.',
     'operator-services.html#openzeppelin-relayer',
   ),
   loginIssuer: setting(
@@ -405,12 +405,12 @@ export const settings = {
   financialEnabled: setting(
     'Optional. Leave off if you only need wallet creation and account access.',
     'Enabling this allows signing of specific token transfer authorizations under owner delegation and provider limits. It does not send transactions, pay network fees or settle transfers.',
-    'Enable only with a verified ERC-3009 token on Base Sepolia and reviewed recipients and limits. Have a token integration specialist verify the contract and signing details below.',
+    'Enable only with a verified ERC-3009 token on the selected Base network and reviewed recipients and limits. Have a token integration specialist verify the contract and signing details below.',
     'operator-services.html#optional-token-signing-policy',
   ),
   tokenAddress: setting(
-    'The 0x address of the token contract on the Base Sepolia test network.',
-    'Signatures must bind to the exact supported ERC-3009 contract on chain 84532.',
+    'The 0x address of the token contract on the selected Base network.',
+    'Signatures must bind to the exact supported ERC-3009 contract on the selected chain.',
     'Have your token specialist verify the deployed contract against issuer documentation. A mainnet address, ticker or example address is insufficient.',
     'operator-services.html#optional-token-signing-policy',
   ),

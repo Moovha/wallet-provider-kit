@@ -230,6 +230,7 @@ export default defineConfig({
             link: '/docs/setup-wizard#_6-export',
             collapsed: true,
             items: [
+              { text: 'Local Base preview', link: '/docs/local-preview' },
               { text: 'Run locally with progress', link: '/docs/local-setup' },
               {
                 text: 'Manual deployment and maintenance',

@@ -1,3 +1,4 @@
+import { providerNetwork, type ProviderNetwork } from '../src/networks.js';
 import {
   Fragment,
   FunctionFragment,
@@ -84,7 +85,9 @@ export function parseAbi(text: string): DiscoveredMethod[] {
 }
 function address(value: unknown): string {
   if (typeof value !== 'string' || !/^0x[0-9a-fA-F]{40}$/.test(value))
-    throw new Error('Enter a deployed contract address on Base Sepolia.');
+    throw new Error(
+      'Enter a deployed contract address on the selected network.',
+    );
   let result: string;
   try {
     result = getAddress(value);
@@ -138,9 +141,10 @@ async function metadata(
   target: string,
   fetcher: typeof fetch,
   signal: AbortSignal,
+  network?: ProviderNetwork,
 ) {
   const response = await fetcher(
-    `https://sourcify.dev/server/v2/contract/84532/${target}?fields=abi,runtimeBytecode.onchainBytecode,proxyResolution`,
+    `https://sourcify.dev/server/v2/contract/${providerNetwork(network).chainId}/${target}?fields=abi,runtimeBytecode.onchainBytecode,proxyResolution`,
     {
       method: 'GET',
       credentials: 'omit',
@@ -152,7 +156,7 @@ async function metadata(
   );
   if (response.status === 404)
     throw new Error(
-      'No Sourcify verification was found on Base Sepolia. Upload or paste the ABI and supply the bytecode pins manually.',
+      'No Sourcify verification was found on the selected network. Upload or paste the ABI and supply the bytecode pins manually.',
     );
   if (!response.ok)
     throw new Error(
@@ -161,7 +165,7 @@ async function metadata(
   const value = await responseJson(response);
   if (
     !record(value) ||
-    value.chainId !== '84532' ||
+    value.chainId !== providerNetwork(network).chainId ||
     address(value.address) !== target ||
     !['exact_match', 'match'].includes(String(value.runtimeMatch)) ||
     !record(value.runtimeBytecode) ||
@@ -185,6 +189,7 @@ export async function discoverContract(
   input: string,
   fetcher: typeof fetch = fetch,
   signal?: AbortSignal,
+  network?: ProviderNetwork,
 ): Promise<DiscoveredContract> {
   const target = address(input);
   const controller = new AbortController();
@@ -193,7 +198,12 @@ export async function discoverContract(
   signal?.addEventListener('abort', cancel, { once: true });
   const timer = setTimeout(cancel, 12000);
   try {
-    const contract = await metadata(target, fetcher, controller.signal);
+    const contract = await metadata(
+      target,
+      fetcher,
+      controller.signal,
+      network,
+    );
     if (!contract.proxy.isProxy)
       return {
         code_hash: contract.code_hash,
@@ -216,6 +226,7 @@ export async function discoverContract(
       implementationAddress,
       fetcher,
       controller.signal,
+      network,
     );
     if (implementation.proxy.isProxy)
       throw new Error(

@@ -37,6 +37,7 @@ export async function createExecutorProvider(
       const provider = createTransferExecutionProvider(
         {
           profile: 'erc3009-relayer-v1',
+          network: config.network,
           relayer: config.relayer!,
           rpc: config.rpc,
           sponsors: config.sponsors,

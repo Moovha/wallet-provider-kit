@@ -7,3 +7,9 @@ export * from './telemetry.js';
 export * from './storage/index.js';
 export * from './deployment/index.js';
 export * from './sponsorship/index.js';
+
+export {
+  providerNetwork,
+  type ProviderNetwork,
+  type ProviderChainId,
+} from './networks.js';

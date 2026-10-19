@@ -227,6 +227,7 @@ export interface ProviderState {
       origin: string;
       provider: string;
       binding: string;
+      network?: import('../networks.js').ProviderNetwork;
       activeRevision?: string;
       transportRevision?: string;
       accessMode?: 'application' | 'hosted';

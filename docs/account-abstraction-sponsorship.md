@@ -65,7 +65,7 @@ EntryPoint, paymaster, proxy and bytecode checks remain activation gates. The
 current SafeTx verifier still rejects enabled modules; this foundation does not
 relax it or automatically upgrade accounts. See [Safe's ERC-4337 model](https://docs.safe.global/advanced/erc-4337/4337-safe).
 
-The initial wire profile supports predeployed accounts on Base Sepolia only.
+The initial wire profile supports predeployed accounts on Base mainnet or Base Sepolia, with the exact network domain selected by the host. Funded mainnet bundler/paymaster acceptance remains pending.
 Factory deployment, EIP-7702, other chains and other EntryPoint versions are
 rejected. Gas/fee fields use canonical hex quantities bounded by v0.7 validation
 limits; the nonce is uint256. Calldata is bounded to 16 KiB and paymaster data to

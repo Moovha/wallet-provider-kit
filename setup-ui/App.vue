@@ -341,7 +341,10 @@ function enableDocumentation() {
     </aside>
     <main>
       <header class="topbar">
-        <span class="badge">Base Sepolia · experimental</span>
+        <span class="badge"
+          >{{ config?.network === 'base' ? 'Base mainnet' : 'Base Sepolia' }} ·
+          experimental</span
+        >
         <div class="topbar-actions">
           <div class="view-switch" role="group" aria-label="Workspace view">
             <button

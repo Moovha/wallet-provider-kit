@@ -94,6 +94,11 @@ export class Safe4337SigningService {
   ) {
     this.config = structuredClone(configuration);
     if (
+      BigInt(this.config.acceptance.domain.chainId) !==
+      BigInt(this.actions.network.chainId)
+    )
+      throw new WalletProviderError('wallet_provider_configuration');
+    if (
       typeof options?.authorizeSponsorship !== 'function' ||
       typeof options.authorization !== 'function'
     )

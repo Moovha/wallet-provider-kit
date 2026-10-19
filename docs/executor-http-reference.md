@@ -231,11 +231,11 @@ Request body:
                 },
                 "chain_id": {
                   "type": "string",
-                  "enum": ["eip155:84532"]
+                  "enum": ["eip155:84532", "eip155:8453"]
                 },
                 "chain_account_id": {
                   "type": "string",
-                  "pattern": "^eip155:84532:0x[0-9a-fA-F]{40}$"
+                  "pattern": "^eip155:(84532|8453):0x[0-9a-fA-F]{40}$"
                 },
                 "binding_revision": {
                   "type": "string",
@@ -299,7 +299,7 @@ Request body:
                         },
                         "chainId": {
                           "type": "string",
-                          "enum": ["84532"]
+                          "enum": ["84532", "8453"]
                         },
                         "verifyingContract": {
                           "type": "string",
@@ -572,11 +572,11 @@ Request body:
                 },
                 "chain_id": {
                   "type": "string",
-                  "enum": ["eip155:84532"]
+                  "enum": ["eip155:84532", "eip155:8453"]
                 },
                 "chain_account_id": {
                   "type": "string",
-                  "pattern": "^eip155:84532:0x[0-9a-fA-F]{40}$"
+                  "pattern": "^eip155:(84532|8453):0x[0-9a-fA-F]{40}$"
                 },
                 "binding_revision": {
                   "type": "string",
@@ -625,7 +625,7 @@ Request body:
                       "properties": {
                         "chainId": {
                           "type": "string",
-                          "enum": ["84532"]
+                          "enum": ["84532", "8453"]
                         },
                         "verifyingContract": {
                           "type": "string",
@@ -1328,7 +1328,7 @@ Request body:
                     },
                     "chain_id": {
                       "type": "string",
-                      "enum": ["eip155:84532"]
+                      "enum": ["eip155:84532", "eip155:8453"]
                     },
                     "contracts": {
                       "type": "array",

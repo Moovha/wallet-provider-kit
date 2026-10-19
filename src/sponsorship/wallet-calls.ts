@@ -267,7 +267,7 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
     return {
       version: '2.0.0',
       id: entry.metadata.id,
-      chainId: '0x14a34',
+      chainId: this.actions.network.hex,
       atomic: true,
       status: receipt
         ? receipt.status === '0x1'

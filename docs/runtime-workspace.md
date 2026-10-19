@@ -66,7 +66,7 @@ and current owner consent.
 
 ### Verified lookup and ABI fallback
 
-Verified lookup sends the public Base Sepolia address directly from your browser
+Verified lookup sends the public address and selected Base network directly from your browser
 to [Sourcify's contract lookup API](https://docs.sourcify.dev/blog/apiv2-lookup-endpoints/).
 It sends no provider token, cookies or referrer and follows no redirects. The
 provider's browser policy permits that fixed verification origin for this feature.
@@ -173,3 +173,44 @@ recorded outcomes; reloading the page clears credentials and in-memory retry
 state. For 503 or a lost connection, inspect the original outcome before making
 a different submission. Unconfigured batch execution does not prevent contract
 registration and policy review.
+
+## Configure optional policy adapters
+
+Connect with a provider operator token and select the application. Under **Review
+and publish policy**, use **Optional policy adapters** to add token-transfer,
+original Uniswap V3 swap or ERC-4626 deposit rules. Adapters start unselected;
+generic calls do not need one.
+
+For a token adapter, select an existing registered contract pin or enter its
+address and runtime code hash. Enter allowed recipients and the maximum transfer
+in token base units. **Use a cumulative token allowance** is a separate opt-in;
+its initial value uses the per-transfer amount and remains editable. That
+allowance shares recorded ERC-3009 usage when applicable. Do not infer token
+decimals or prices from a contract address.
+
+Swap rules include router/input/output pins, fee and maximum input. Vault rules
+include router/vault/asset pins and maximum deposit. New swaps start at 3000
+millionths (0.3%); verify the fee for the actual pool. Addresses, hashes and asset
+limits require explicit values. Runtime calls must also match registered methods;
+an adapter does not register or authorize additional contract methods.
+
+Review **Policy changes**, then publish. These are provider terms: changing them
+requires fresh financial consent. Automatic contract registration cannot approve
+adapter changes. Current requirements, publication history and registration
+history display selected adapter terms, including cumulative limits. Application
+operators can read those terms; only provider operators receive the editor.
+
+## Configure gas sponsorship separately
+
+Use **Deployment → Configure transfer execution and RPC verification** in the
+[setup wizard](setup-wizard.md) for sponsor identities, funding agreements, gas
+limits and application lifetime budgets. ETH and gwei fields convert exactly to
+stored wei; **Advanced gas values in wei** exposes the underlying values. A cost
+summary shows the maximum admission amount and budget size at that ceiling.
+Recorded usage reduces remaining capacity; the summary is not a live balance.
+
+Gas settings are deployment configuration, not runtime policy publications.
+Validate/export and apply them through the normal deployment/revision process.
+Publishing an adapter does not change gas capacity or fund a sponsor. Gas,
+operation and any selected adapter charges still reserve atomically before
+sponsored effects. No new budget-reset or funding action is introduced.

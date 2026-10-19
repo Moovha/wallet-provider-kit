@@ -109,7 +109,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Fixed Base Sepolia ERC-3009 transfer authorization. Explicit transfer delegation, current owner-bound access, identity and provider policy authorization are required. No per-transfer owner prompt. No broadcast or settlement. */
+        /** @description ERC-3009 transfer authorization on the configured network. Explicit transfer delegation, current owner-bound access, identity and provider policy authorization are required. No per-transfer owner prompt. No broadcast or settlement. */
         post: operations["requestTransferAuthorization"];
         delete?: never;
         options?: never;
@@ -124,7 +124,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Fixed Base Sepolia ERC-3009 transfer authorization. Explicit transfer delegation, current owner-bound access, identity and provider policy authorization are required. No per-transfer owner prompt. No broadcast or settlement. */
+        /** @description ERC-3009 transfer authorization on the configured network. Explicit transfer delegation, current owner-bound access, identity and provider policy authorization are required. No per-transfer owner prompt. No broadcast or settlement. */
         get: operations["getTransferAuthorization"];
         put?: never;
         post?: never;
@@ -1710,7 +1710,7 @@ export interface operations {
                                 name: string;
                                 version: string;
                                 /** @enum {string} */
-                                chainId: "84532";
+                                chainId: "84532" | "8453";
                                 verifyingContract: string;
                             };
                             types: {
@@ -1744,7 +1744,7 @@ export interface operations {
                             primaryType: "SafeTx";
                             domain: {
                                 /** @enum {string} */
-                                chainId: "84532";
+                                chainId: "84532" | "8453";
                                 verifyingContract: string;
                             };
                             types: {
@@ -2086,7 +2086,7 @@ export interface operations {
                                 name: string;
                                 version: string;
                                 /** @enum {string} */
-                                chainId: "84532";
+                                chainId: "84532" | "8453";
                                 verifyingContract: string;
                             };
                             types: {
@@ -2120,7 +2120,7 @@ export interface operations {
                             primaryType: "SafeTx";
                             domain: {
                                 /** @enum {string} */
-                                chainId: "84532";
+                                chainId: "84532" | "8453";
                                 verifyingContract: string;
                             };
                             types: {
@@ -2614,7 +2614,7 @@ export interface operations {
                             primaryType: "SafeTx";
                             domain: {
                                 /** @enum {string} */
-                                chainId: "84532";
+                                chainId: "84532" | "8453";
                                 verifyingContract: string;
                             };
                             types: {
@@ -3962,7 +3962,7 @@ export interface operations {
                              */
                             event: "submitted" | "confirmed" | "failed";
                             /** @enum {string} */
-                            chain_id: "eip155:84532";
+                            chain_id: "eip155:84532" | "eip155:8453";
                             transaction_hash: string;
                             /** Format: date-time */
                             observed_at: string;
@@ -4170,7 +4170,7 @@ export interface operations {
                      */
                     event: "submitted" | "confirmed" | "failed";
                     /** @enum {string} */
-                    chain_id: "eip155:84532";
+                    chain_id: "eip155:84532" | "eip155:8453";
                     transaction_hash: string;
                     /** Format: date-time */
                     observed_at: string;
@@ -4191,7 +4191,7 @@ export interface operations {
                          */
                         event: "submitted" | "confirmed" | "failed";
                         /** @enum {string} */
-                        chain_id: "eip155:84532";
+                        chain_id: "eip155:84532" | "eip155:8453";
                         transaction_hash: string;
                         /** Format: date-time */
                         observed_at: string;
@@ -4644,6 +4644,8 @@ export interface operations {
                 content: {
                     "application/json": {
                         /** @enum {string} */
+                        chain_id?: "eip155:8453" | "eip155:84532";
+                        /** @enum {string} */
                         source: "application_record" | "vendor_verification" | "application_attestation";
                         evaluation_only: boolean;
                         required_fields: string[];
@@ -4844,7 +4846,7 @@ export interface operations {
                                 version: "1";
                                 enabled: boolean;
                                 /** @enum {string} */
-                                chain_id: "eip155:84532";
+                                chain_id: "eip155:84532" | "eip155:8453";
                                 contracts: {
                                     address: string;
                                     code_hash: string;
@@ -6184,6 +6186,16 @@ export interface operations {
                                     status: "supported";
                                 };
                             };
+                            "0x2105"?: {
+                                paymasterService?: {
+                                    /** @enum {boolean} */
+                                    supported: true;
+                                };
+                                atomic: {
+                                    /** @enum {string} */
+                                    status: "supported";
+                                };
+                            };
                         };
                         error?: {
                             code: number;
@@ -6264,6 +6276,8 @@ export interface operations {
                 content: {
                     "application/json": {
                         /** @enum {string} */
+                        network?: "base" | "base-sepolia";
+                        /** @enum {string} */
                         role: "provider" | "application";
                         applications: {
                             application_id: string;
@@ -6279,7 +6293,7 @@ export interface operations {
                                     version: "1";
                                     enabled: boolean;
                                     /** @enum {string} */
-                                    chain_id: "eip155:84532";
+                                    chain_id: "eip155:84532" | "eip155:8453";
                                     contracts: {
                                         address: string;
                                         code_hash: string;
@@ -6393,7 +6407,7 @@ export interface operations {
                                     version: "1";
                                     enabled: boolean;
                                     /** @enum {string} */
-                                    chain_id: "eip155:84532";
+                                    chain_id: "eip155:84532" | "eip155:8453";
                                     contracts: {
                                         address: string;
                                         code_hash: string;
@@ -6514,7 +6528,7 @@ export interface operations {
                                     version: "1";
                                     enabled: boolean;
                                     /** @enum {string} */
-                                    chain_id: "eip155:84532";
+                                    chain_id: "eip155:84532" | "eip155:8453";
                                     contracts: {
                                         address: string;
                                         code_hash: string;
@@ -6823,7 +6837,7 @@ export interface operations {
                             /** @enum {string} */
                             version: "2.0.0";
                             /** @enum {string} */
-                            chainId: "0x14a34";
+                            chainId: "0x14a34" | "0x2105";
                             /** @enum {integer} */
                             status: 100 | 200 | 400 | 500;
                             /** @enum {boolean} */
@@ -7254,7 +7268,7 @@ export interface operations {
                                 version: "1";
                                 enabled: boolean;
                                 /** @enum {string} */
-                                chain_id: "eip155:84532";
+                                chain_id: "eip155:84532" | "eip155:8453";
                                 contracts: {
                                     address: string;
                                     code_hash: string;
@@ -7566,7 +7580,7 @@ export interface operations {
                                 version: "1";
                                 enabled: boolean;
                                 /** @enum {string} */
-                                chain_id: "eip155:84532";
+                                chain_id: "eip155:84532" | "eip155:8453";
                                 contracts: {
                                     address: string;
                                     code_hash: string;
@@ -7878,7 +7892,7 @@ export interface operations {
                                 version: "1";
                                 enabled: boolean;
                                 /** @enum {string} */
-                                chain_id: "eip155:84532";
+                                chain_id: "eip155:84532" | "eip155:8453";
                                 contracts: {
                                     address: string;
                                     code_hash: string;
@@ -8177,7 +8191,7 @@ export interface operations {
                         version: "1";
                         enabled: boolean;
                         /** @enum {string} */
-                        chain_id: "eip155:84532";
+                        chain_id: "eip155:84532" | "eip155:8453";
                         contracts: {
                             address: string;
                             code_hash: string;
@@ -8296,7 +8310,7 @@ export interface operations {
                             version: "1";
                             enabled: boolean;
                             /** @enum {string} */
-                            chain_id: "eip155:84532";
+                            chain_id: "eip155:84532" | "eip155:8453";
                             contracts: {
                                 address: string;
                                 code_hash: string;
@@ -8599,7 +8613,7 @@ export interface operations {
                             version: "1";
                             enabled: boolean;
                             /** @enum {string} */
-                            chain_id: "eip155:84532";
+                            chain_id: "eip155:84532" | "eip155:8453";
                             contracts: {
                                 address: string;
                                 code_hash: string;
@@ -8910,7 +8924,7 @@ export interface operations {
                             version: "1";
                             enabled: boolean;
                             /** @enum {string} */
-                            chain_id: "eip155:84532";
+                            chain_id: "eip155:84532" | "eip155:8453";
                             contracts: {
                                 address: string;
                                 code_hash: string;
@@ -9208,7 +9222,7 @@ export interface operations {
                         version: "1";
                         enabled: boolean;
                         /** @enum {string} */
-                        chain_id: "eip155:84532";
+                        chain_id: "eip155:84532" | "eip155:8453";
                         contracts: {
                             address: string;
                             code_hash: string;
@@ -9327,7 +9341,7 @@ export interface operations {
                             version: "1";
                             enabled: boolean;
                             /** @enum {string} */
-                            chain_id: "eip155:84532";
+                            chain_id: "eip155:84532" | "eip155:8453";
                             contracts: {
                                 address: string;
                                 code_hash: string;

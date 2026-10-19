@@ -1,3 +1,8 @@
+import {
+  providerNetwork,
+  type ProviderNetwork,
+  type ProviderChainId,
+} from '../networks.js';
 import { AbiCoder, getAddress, keccak256 } from 'ethers';
 import type { AuthorityContext } from './principal.js';
 import { WalletProviderError, type EmbeddedAccount } from './signing.js';
@@ -19,7 +24,7 @@ export interface RelayerExecutionAction {
   profile: 'oz_relayer_evm_v1';
   profileRevision: '1';
   status: 'ready';
-  chainId: 'eip155:84532';
+  chainId: ProviderChainId;
   chainAccountId: string;
   bindingRevision: string;
   capabilityRevision: string;
@@ -139,6 +144,7 @@ export function validateRelayerAction(
   account: EmbeddedAccount,
   action: RelayerExecutionAction,
   requireUnexpired = true,
+  network?: ProviderNetwork,
 ): void {
   try {
     if (
@@ -150,9 +156,9 @@ export function validateRelayerAction(
       action.profile !== 'oz_relayer_evm_v1' ||
       action.profileRevision !== '1' ||
       action.status !== 'ready' ||
-      action.chainId !== 'eip155:84532' ||
+      action.chainId !== providerNetwork(network).caip ||
       action.chainAccountId.toLowerCase() !==
-        `eip155:84532:${getAddress(account.address).toLowerCase()}` ||
+        `${providerNetwork(network).caip}:${getAddress(account.address).toLowerCase()}` ||
       ![
         action.bindingRevision,
         action.capabilityRevision,

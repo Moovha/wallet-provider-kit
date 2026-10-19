@@ -1,3 +1,4 @@
+import type { ProviderNetwork } from '../networks.js';
 import { validateReplacementSponsors } from '../execution/replacement.js';
 import { validateOperations } from '../execution/operations.js';
 import {
@@ -26,6 +27,7 @@ import {
 } from './auth.js';
 
 export interface ExecutorProviderConfiguration {
+  network?: ProviderNetwork;
   id: string;
   revision: string;
   kind: 'openzeppelin-relayer' | 'custom';

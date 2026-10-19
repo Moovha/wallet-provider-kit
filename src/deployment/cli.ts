@@ -130,6 +130,7 @@ export async function inspectSetup(
           origin: string;
           provider: string;
           binding: string;
+          network?: import('../networks.js').ProviderNetwork;
         })
       : undefined;
     const names = {
@@ -140,6 +141,8 @@ export async function inspectSetup(
     const matches = saved
       ? saved.origin === config.policy.provider.origin &&
         saved.binding === config.backend.binding &&
+        (saved.network ?? 'base-sepolia') ===
+          (config.network ?? 'base-sepolia') &&
         (config.backend.kind === 'custom' ||
           saved.provider === names[config.backend.kind])
       : !database
@@ -229,6 +232,7 @@ export async function setupCommand(args: string[]): Promise<boolean> {
         'utf8',
       ),
     );
+    example.network = 'base';
     example.backend.binding = newWalletBinding();
     for (const application of example.policy.applications) {
       const registration = example.authorizationServer!.clients.find(

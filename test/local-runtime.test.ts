@@ -401,3 +401,39 @@ it('retains the host lock after an interrupted package command whose effects may
     ).isDirectory(),
   ).toBe(true);
 });
+
+it('accepts the bundled OWS terminal setup with generated credentials', async () => {
+  const fixture = runtimeFixture(home, {
+    docker: true,
+    compose: true,
+    buildx: true,
+    engine: true,
+  });
+  const config: ProviderConfiguration = JSON.parse(
+    await readFile(
+      new URL('../docs/provider.config.bundled.example.json', import.meta.url),
+      'utf8',
+    ),
+  );
+  const commands: string[][] = [];
+  await runLocalSetup({
+    config,
+    installRuntime: false,
+    runtime: fixture.options,
+    executor: {
+      root: join(home, 'ows-deployments'),
+      environment: {},
+      command: async (args) => {
+        commands.push(args);
+        if (args[0] === 'context') return 'unix:///offline/docker.sock';
+        if (args.includes('version')) return '2.40.0';
+        if (args.includes('info')) return 'linux';
+        return '';
+      },
+    },
+    report: () => {},
+  });
+  expect(commands.filter((args) => args.includes('init-storage'))).toHaveLength(
+    1,
+  );
+});

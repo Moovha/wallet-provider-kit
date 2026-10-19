@@ -53,7 +53,7 @@ export const runtimePolicySchema = {
   properties: {
     version: { type: 'string', enum: ['1'] },
     enabled: { type: 'boolean' },
-    chain_id: { type: 'string', enum: ['eip155:84532'] },
+    chain_id: { type: 'string', enum: ['eip155:84532', 'eip155:8453'] },
     contracts: {
       type: 'array',
       maxItems: 32,

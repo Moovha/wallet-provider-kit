@@ -1,3 +1,4 @@
+import { providerNetwork } from '../networks.js';
 import { localExecutionFetch } from './local-execution.js';
 import { createBundledAuthorizationServer } from './authorization-server.js';
 import { WalletCallsService } from '../wallet-calls/service.js';
@@ -46,6 +47,9 @@ export async function createConfiguredProvider(
   )
     throw new ConfigurationError(['/: unsafe environment']);
   const config = validateProviderConfiguration(input);
+  const network = providerNetwork(config.network);
+  if (config.execution && !network.testnet)
+    config.execution.network = network.name;
   if (
     config.execution?.local &&
     config.execution.sponsors.some(
@@ -101,6 +105,7 @@ export async function createConfiguredProvider(
         authorizeAttempt: (request) =>
           financial?.authorizeAttempt(request) ?? Promise.resolve(false),
       },
+      config.network,
     );
     const occupied = await database.hasStoredRecords();
     const bound = await database.onboardingStore.transaction((state) => {
@@ -109,6 +114,7 @@ export async function createConfiguredProvider(
         provider: backend.provider,
         binding: config.backend.binding,
         accessMode: config.policy.access?.mode ?? 'hosted',
+        network: network.name,
       };
       const previous = state.deploymentBindings?.['service-v1'];
       if (
@@ -118,6 +124,7 @@ export async function createConfiguredProvider(
               provider: previous.provider,
               binding: previous.binding,
               accessMode: previous.accessMode ?? 'hosted',
+              network: previous.network ?? 'base-sepolia',
             }) !== fingerprint(expected)
           : occupied
       )
@@ -151,11 +158,14 @@ export async function createConfiguredProvider(
           ]
         : []),
     ];
-    const actionPolicyRevision = config.approvedCalls
+    const actionPolicyRevisionBase = config.approvedCalls
       ? fingerprint([config.financial ?? null, config.approvedCalls])
       : config.financial
         ? fingerprint(config.financial)
         : undefined;
+    const actionPolicyRevision = network.testnet
+      ? actionPolicyRevisionBase
+      : fingerprint([network.name, actionPolicyRevisionBase]);
     onboarding = new OnboardingService(
       config.policy,
       database.onboardingStore,
@@ -182,6 +192,7 @@ export async function createConfiguredProvider(
       : undefined;
     activeRevision = fingerprint([
       onboarding!.policy.revision,
+      ...(network.testnet ? [] : [network.name]),
       config.financial ?? null,
       ...(config.approvedCalls ? [config.approvedCalls] : []),
       config.backend,
@@ -232,6 +243,7 @@ export async function createConfiguredProvider(
             config.financial,
             activeRevision,
             config.approvedCalls,
+            config.network,
           )
         : undefined;
     financial = actions
@@ -273,6 +285,8 @@ export async function createConfiguredProvider(
           config.execution.rpc.endpoints.map((entry) => resolveSecret(entry)),
           config.execution.rpc.genesisHash,
           config.execution.maxLogRange,
+          fetch,
+          config.network,
         )
       : undefined;
     let operationsBinding: string | undefined;
@@ -369,6 +383,7 @@ export async function createConfiguredProvider(
             config.runtimeConfiguration,
             activeRevision,
             transportRevision,
+            config.network,
           )
         : undefined,
       documentationTokens: config.apiExplorer
@@ -401,6 +416,7 @@ export async function createConfiguredProvider(
       service,
       onboarding: {
         service: onboarding,
+        network: config.network,
         login,
         apiExplorerLogin: !!config.apiExplorer,
         reviewers: config.reviewers ?? [],

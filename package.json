@@ -108,7 +108,8 @@
     "docs:build": "vitepress build docs",
     "docs:preview": "vitepress preview docs --host 127.0.0.1",
     "build:setup": "vite build --config setup-ui/vite.config.ts && node scripts/setup-notices.mjs",
-    "test:setup": "npm run build && playwright test --config setup-ui/playwright.config.ts"
+    "test:setup": "npm run build && playwright test --config setup-ui/playwright.config.ts",
+    "preview:local": "node examples/local-preview/run.mjs"
   },
   "dependencies": {
     "@coinbase/cdp-sdk": "1.58.0",

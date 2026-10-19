@@ -1,3 +1,4 @@
+import type { ProviderNetwork } from '../networks.js';
 import { getAuthHeaders } from '@coinbase/cdp-sdk/auth';
 import { getAddress, recoverAddress } from 'ethers';
 import {
@@ -7,7 +8,7 @@ import {
   type WalletSigningProvider,
 } from '../domain/signing.js';
 
-import { baseSepoliaPayload } from './evm-typed-data.js';
+import { evmTypedDataPayload } from './evm-typed-data.js';
 
 const host = 'api.cdp.coinbase.com';
 const accountsPath = '/platform/v2/evm/accounts';
@@ -102,6 +103,7 @@ async function boundedJson(response: Response): Promise<unknown> {
 export function createCdpWalletProvider(
   environment: NodeJS.ProcessEnv,
   request: typeof fetch = fetch,
+  network?: ProviderNetwork,
 ): WalletSigningProvider {
   const config = configuration(environment);
 
@@ -182,7 +184,7 @@ export function createCdpWalletProvider(
       const boundAccount = structuredClone(account);
       const boundAction = structuredClone(action);
       requireAttempt(attemptId);
-      const body = baseSepoliaPayload(boundAccount, boundAction);
+      const body = evmTypedDataPayload(boundAccount, boundAction, network);
       const stored = await findAccount(boundAccount.accountId);
       if (
         !stored ||
@@ -190,7 +192,7 @@ export function createCdpWalletProvider(
       ) {
         throw new WalletProviderError('wallet_provider_input');
       }
-      baseSepoliaPayload(boundAccount, boundAction); // Recheck expiry after the provider lookup.
+      evmTypedDataPayload(boundAccount, boundAction, network); // Recheck expiry after the provider lookup.
       const response = await call(
         'POST',
         `${accountsPath}/${stored.address}/sign/typed-data`,

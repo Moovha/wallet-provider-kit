@@ -1,3 +1,4 @@
+import { generatedSecretNames } from './deployment-secrets.js';
 import { access } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
@@ -63,10 +64,10 @@ export async function runLocalSetup(options: {
     const config = options.config;
     if (
       config.activation.enabled ||
-      !['cdp', 'openzeppelin-relayer'].includes(config.backend.kind)
+      !['ows', 'cdp', 'openzeppelin-relayer'].includes(config.backend.kind)
     )
       fail(
-        'Local setup requires CDP or Relayer with wallet operations disabled.',
+        'Local setup requires OWS, CDP or Relayer with wallet operations disabled.',
       );
     const source =
       options.executor?.source ??
@@ -80,7 +81,9 @@ export async function runLocalSetup(options: {
       );
     }
     const missing = secretReferences(config).filter(
-      (reference) => !environment[reference.env],
+      (reference) =>
+        !environment[reference.env] &&
+        !generatedSecretNames(config).includes(reference.env),
     );
     if (missing.length)
       fail(

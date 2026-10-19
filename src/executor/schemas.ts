@@ -142,7 +142,7 @@ const payload = object({
   domain: object({
     name: text,
     version: text,
-    chainId: { type: 'string', enum: ['84532'] },
+    chainId: { type: 'string', enum: ['84532', '8453'] },
     verifyingContract: address,
   }),
   types: object({
@@ -175,10 +175,10 @@ const action = object({
   profile: { type: 'string', enum: ['evm_eoa_v1'] },
   profile_revision: { type: 'string', enum: ['1'] },
   status: { type: 'string', enum: ['ready'] },
-  chain_id: { type: 'string', enum: ['eip155:84532'] },
+  chain_id: { type: 'string', enum: ['eip155:84532', 'eip155:8453'] },
   chain_account_id: {
     type: 'string',
-    pattern: '^eip155:84532:0x[0-9a-fA-F]{40}$',
+    pattern: '^eip155:(84532|8453):0x[0-9a-fA-F]{40}$',
   },
   binding_revision: revision,
   capability_revision: { type: 'string', enum: ['1'] },

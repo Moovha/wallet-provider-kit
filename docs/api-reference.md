@@ -68,6 +68,7 @@ export interface AuthorityContext {
 export declare function createDurableSigningService<Context>(
   authority: StoredSigningAuthority<Context>,
   signer: StoredTypedDataSigner,
+  network?: ProviderNetwork,
 ): {
   sign(context: Context, actionId: string): Promise<StoredSigningResult>;
 };
@@ -312,6 +313,7 @@ export interface StoredWalletBackendConfiguration<
 > {
   /** Explicit host opt-in; credentials never activate this backend. */
   enabled: boolean;
+  network?: ProviderNetwork;
   provider: WalletSigningProvider;
   signingAuthority: StoredSigningAuthority<SigningContext>;
   accountAuthority: StoredAccountAuthority<AccountContext>;
@@ -1492,6 +1494,7 @@ export interface ProviderState {
       origin: string;
       provider: string;
       binding: string;
+      network?: import('../networks.js').ProviderNetwork;
       activeRevision?: string;
       transportRevision?: string;
       accessMode?: 'application' | 'hosted';
@@ -1846,6 +1849,7 @@ Import from `@moovha/wallet-provider-kit/cdp`. [Integration guide](provider-guid
 export declare function createCdpWalletProvider(
   environment: NodeJS.ProcessEnv,
   request?: typeof fetch,
+  network?: ProviderNetwork,
 ): WalletSigningProvider;
 ```
 
@@ -1874,6 +1878,7 @@ export declare function createOwsWalletProvider(
 
 ```ts
 export interface OwsProviderOptions {
+  network?: ProviderNetwork;
   /** Dedicated, existing, operator-owned vault; never the ambient ~/.ows vault. */
   vaultPath: string;
   /** Owner credential from the host secret store. Never from an HTTP caller. */
@@ -1991,6 +1996,7 @@ export interface RelayerBinding {
 
 ```ts
 export interface RelayerConnection {
+  network?: ProviderNetwork;
   /** Operator-configured HTTPS origin, without path, query, credentials or fragment. */
   url: string;
   apiKey: string;
@@ -2011,7 +2017,7 @@ export interface RelayerExecutionAction {
   profile: 'oz_relayer_evm_v1';
   profileRevision: '1';
   status: 'ready';
-  chainId: 'eip155:84532';
+  chainId: ProviderChainId;
   chainAccountId: string;
   bindingRevision: string;
   capabilityRevision: string;
@@ -2159,6 +2165,7 @@ Import from `@moovha/wallet-provider-kit/backend`. [Integration guide](stored-ba
 export declare function createDurableSigningService<Context>(
   authority: StoredSigningAuthority<Context>,
   signer: StoredTypedDataSigner,
+  network?: ProviderNetwork,
 ): {
   sign(context: Context, actionId: string): Promise<StoredSigningResult>;
 };
@@ -2299,6 +2306,7 @@ export interface StoredWalletBackendConfiguration<
 > {
   /** Explicit host opt-in; credentials never activate this backend. */
   enabled: boolean;
+  network?: ProviderNetwork;
   provider: WalletSigningProvider;
   signingAuthority: StoredSigningAuthority<SigningContext>;
   accountAuthority: StoredAccountAuthority<AccountContext>;
@@ -2758,6 +2766,7 @@ export interface ApprovedCallIntent extends OperationAdapterTerms {
 ```ts
 export declare function approvedCallPayload(
   intent: ApprovedCallIntent,
+  network?: ProviderNetwork,
 ): TypedDataAction['payload'];
 ```
 
@@ -3124,7 +3133,7 @@ export declare const defaultReplacementPolicy: Readonly<ReplacementPolicy>;
 [Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/defaults.ts).
 
 ```ts
-/** Editable starting configuration for Base Sepolia; deployment simulation and funding acceptance remain required. */
+/** Editable starting configuration for Base evaluation; deployment simulation and funding acceptance remain required. */
 export declare const defaultSponsorGas: Readonly<{
   gasLimit: '500000';
   maxFeePerGas: '3000000000';
@@ -3176,6 +3185,7 @@ export interface ExecutionCloudEvent {
 ```ts
 /** Optional versioned approved-action execution. Secrets and RPC addresses remain server configuration. */
 export interface ExecutionConfiguration {
+  network?: ProviderNetwork;
   profile: ExecutionProfile;
   local?: true;
   relayer?: {
@@ -3415,6 +3425,7 @@ export interface ExecutionSponsor {
 
 ```ts
 export interface ExecutorProviderConfiguration {
+  network?: ProviderNetwork;
   id: string;
   revision: string;
   kind: 'openzeppelin-relayer' | 'custom';
@@ -3628,6 +3639,7 @@ export type PinnedReplacementPolicy = {
 
 ```ts
 export interface ProviderConfiguration {
+  network?: ProviderNetwork;
   runtimeConfiguration?: RuntimeConfigurationOptions;
   localExecution?: LocalExecutionConfiguration;
   configVersion: 1;
@@ -3735,6 +3747,7 @@ export declare class QuorumExecutionObserver implements ExecutionObserver {
     genesisHash: string,
     maxLogRange: number,
     request?: typeof fetch,
+    network?: ProviderNetwork | undefined,
   );
   anchor(): Promise<string>;
   preflight(plan: TransferExecutionPlan): Promise<void>;
@@ -3772,6 +3785,7 @@ export declare class QuorumExecutionObserver implements ExecutionObserver {
     genesisHash: string,
     maxLogRange: number,
     request?: typeof fetch,
+    network?: ProviderNetwork | undefined,
   );
   anchor(): Promise<string>;
   preflight(plan: TransferExecutionPlan): Promise<void>;
@@ -3950,6 +3964,7 @@ export declare class RuntimeConfigurationService {
     options: RuntimeConfigurationOptions,
     deploymentRevision: string,
     transportRevision?: string | undefined,
+    network?: ProviderNetwork | undefined,
   );
   assertOperator(principal: VerifiedPrincipal): void;
   assertOperatorState(principal: VerifiedPrincipal, state: ProviderState): void;
@@ -3961,6 +3976,7 @@ export declare class RuntimeConfigurationService {
     principal: VerifiedPrincipal,
     applicationId?: string,
   ): Promise<{
+    network: 'base' | 'base-sepolia';
     role: 'provider' | 'application';
     applications: {
       active_revision: string;
@@ -4041,7 +4057,7 @@ export interface RuntimePolicy {
   }[];
   call_adapters?: import('../execution/operation-adapters.js').OperationAdapters;
   enabled: boolean;
-  chain_id: 'eip155:84532';
+  chain_id: ProviderChainId;
   contracts: {
     address: string;
     code_hash: string;
@@ -4407,7 +4423,7 @@ export interface TokenTransferAdapter {
 ```ts
 export interface TransactionEventInput {
   event: 'submitted' | 'confirmed' | 'failed';
-  chain_id: 'eip155:84532';
+  chain_id: ProviderChainId;
   transaction_hash: string;
   observed_at: string;
 }
@@ -4580,6 +4596,7 @@ export interface WalletBackendAdapterV1 {
 ```ts
 /** Host-authorized transport. Never place an OAuth client secret in a browser. */
 export interface WalletCallsClientOptions {
+  network?: ProviderNetwork;
   url: string;
   authorization: () => Promise<string>;
   fetch?: typeof fetch;
@@ -4657,7 +4674,7 @@ export declare class WalletCallsService {
 export interface WalletCallsStatus {
   version: '2.0.0';
   id: string;
-  chainId: '0x14a34';
+  chainId: '0x14a34' | '0x2105';
   status: 100 | 200 | 400 | 500;
   atomic: true;
   receipts?: WalletCallsReceipt[];
@@ -4697,6 +4714,7 @@ export declare function createWalletCallsProvider(
 ```ts
 /** Host-authorized transport. Never place an OAuth client secret in a browser. */
 export interface WalletCallsClientOptions {
+  network?: ProviderNetwork;
   url: string;
   authorization: () => Promise<string>;
   fetch?: typeof fetch;
@@ -4744,7 +4762,7 @@ export declare class WalletCallsRpcError extends Error {
 export interface WalletCallsStatus {
   version: '2.0.0';
   id: string;
-  chainId: '0x14a34';
+  chainId: '0x14a34' | '0x2105';
   status: 100 | 200 | 400 | 500;
   atomic: true;
   receipts?: WalletCallsReceipt[];
@@ -5332,7 +5350,7 @@ export interface SponsorshipConsentTerms {
 export interface UserOperationDomainV07 {
   entryPointVersion: '0.7';
   entryPoint: string;
-  chainId: '0x14a34';
+  chainId: '0x14a34' | '0x2105';
 }
 ```
 

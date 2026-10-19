@@ -166,9 +166,11 @@ export class WalletCallsService {
     const driver = this.selected(accountId);
     if (driver) await driver.capabilities(principal, accountId);
     return chains === undefined ||
-      (chains as string[]).some((chain) => BigInt(chain) === 84532n)
+      (chains as string[]).some(
+        (chain) => BigInt(chain) === BigInt(this.actions.network.chainId),
+      )
       ? {
-          '0x14a34': {
+          [this.actions.network.hex]: {
             atomic: { status: 'supported' },
             ...(driver ? { paymasterService: { supported: true } } : {}),
           },
@@ -204,7 +206,8 @@ export class WalletCallsService {
       !input.calls.length
     )
       invalid();
-    if (BigInt(input.chainId) !== 84532n) throw new WalletCallsError(5710);
+    if (BigInt(input.chainId) !== BigInt(this.actions.network.chainId))
+      throw new WalletCallsError(5710);
     if (input.calls.length > 16) throw new WalletCallsError(5740);
     const driver = this.selected(accountId);
     capabilities(input.capabilities, !!driver);
@@ -333,7 +336,7 @@ export class WalletCallsService {
     return {
       version: '2.0.0',
       id,
-      chainId: '0x14a34',
+      chainId: this.actions.network.hex,
       status,
       atomic: true,
       ...(receipts ? { receipts } : {}),

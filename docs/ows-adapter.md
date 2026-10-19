@@ -12,7 +12,7 @@ derivation and EIP-712 signing, with toolkit authorization and attempt coordinat
 | Capability   | Supported profile                                                                                        |
 | ------------ | -------------------------------------------------------------------------------------------------------- |
 | Engine       | Pinned `@open-wallet-standard/core` 1.4.3, MIT licensed.                                                 |
-| Network      | Base Sepolia, `eip155:84532`, EOA revision 1.                                                            |
+| Network      | Base mainnet (`eip155:8453`) or Base Sepolia (`eip155:84532`), EOA revision 1.                           |
 | Provisioning | One OWS wallet per opaque host account UUID; 24-word generation stays inside OWS.                        |
 | Signing      | Approved stored EIP-712 action; exact digest and recovered signer checked.                               |
 | Credentials  | Host-controlled owner passphrase, supplied by a secret-store callback.                                   |

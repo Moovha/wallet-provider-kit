@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { providerNetwork } from '../../src/networks';
 import SetupField from './SetupField.vue';
 import { docs } from '../model';
 import type { ProviderConfiguration } from '../model';
@@ -43,6 +44,23 @@ const model = defineModel<ProviderConfiguration>({ required: true });
       restart your deployment with the reviewed files.
     </p>
   </div>
+  <label for="provider-network">Blockchain network</label>
+  <select
+    id="provider-network"
+    :value="model.network ?? 'base-sepolia'"
+    @change="
+      model.network = ($event.target as HTMLSelectElement).value as
+        'base' | 'base-sepolia'
+    "
+  >
+    <option value="base">Base mainnet (8453)</option>
+    <option value="base-sepolia">Base Sepolia testnet (84532)</option>
+  </select>
+  <p class="help-text">
+    Use separate storage and wallet bindings for each network. Mainnet
+    transactions use real assets and network fees. Configuration validation does
+    not certify execution.
+  </p>
   <div class="section-heading"><h3>Name your wallet service</h3></div>
   <p class="help-text">
     Connected applications use this name and public address to identify your
@@ -89,9 +107,9 @@ const model = defineModel<ProviderConfiguration>({ required: true });
     </p>
     <p>
       Local setup runs containers on this machine. It does not buy a domain or
-      configure public hosting. The supported service uses Base Sepolia, a
-      blockchain test network. It is experimental and is not approved for
-      production custody.
+      configure public hosting. The selected network is
+      {{ providerNetwork(model.network).label }}. It is experimental and is not
+      approved for production custody.
     </p>
   </div>
   <div class="callout">

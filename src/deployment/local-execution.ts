@@ -1,3 +1,4 @@
+import { providerNetwork } from '../networks.js';
 import { Wallet } from 'ethers';
 import { ConfigurationError, type ProviderConfiguration } from './config.js';
 import { trustedHttpsUrl } from '../service/auth.js';
@@ -42,6 +43,7 @@ export function prepareLocalExecution(
   values: Record<string, string>,
 ) {
   const engine = config.localExecution!;
+  const network = providerNetwork(config.network);
   const keys: { name: string; contents: string }[] = [];
   const execution = config.execution?.local ? config.execution : undefined;
   for (const sponsor of execution?.sponsors ?? []) {
@@ -65,7 +67,9 @@ export function prepareLocalExecution(
   }
   const rpc = execution
     ? execution.rpc.endpoints.map((entry) => values[entry.env])
-    : ['https://sepolia.base.org', 'https://base-sepolia-rpc.publicnode.com'];
+    : network.testnet
+      ? ['https://sepolia.base.org', 'https://base-sepolia-rpc.publicnode.com']
+      : ['https://mainnet.base.org', 'https://base.drpc.org'];
   if (rpc.some((url) => !url))
     throw new ConfigurationError([
       '/execution/rpc: supply the configured RPC values privately',
@@ -75,7 +79,7 @@ export function prepareLocalExecution(
     relayers: (execution?.sponsors ?? []).map((sponsor) => ({
       id: sponsor.binding.relayerId,
       name: 'Application gas sponsor',
-      network: 'base-sepolia',
+      network: network.name,
       network_type: 'evm',
       paused: false,
       signer_id: sponsor.binding.signerId,
@@ -99,16 +103,16 @@ export function prepareLocalExecution(
     networks: [
       {
         type: 'evm',
-        network: 'base-sepolia',
-        chain_id: 84532,
+        network: network.name,
+        chain_id: Number(network.chainId),
         required_confirmations: 6,
         symbol: 'ETH',
         features: ['eip1559'],
         rpc_urls: rpc,
         explorer_urls: [],
         average_blocktime_ms: 2000,
-        is_testnet: true,
-        tags: ['testnet'],
+        is_testnet: network.testnet,
+        tags: [network.testnet ? 'testnet' : 'mainnet'],
       },
     ],
   };

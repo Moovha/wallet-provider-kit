@@ -1,3 +1,4 @@
+import { type ProviderNetwork } from '../networks.js';
 import {
   budgetReservationId,
   reserveAdditionalBudget,
@@ -138,8 +139,13 @@ export function ensureAssetBudget(
         throw new WalletProviderError('wallet_attempt_conflict');
       if (
         record.approval.action.kind !== 'sign_typed_data' ||
-        fingerprint(approvedCallPayload(record.intent)) !==
-          fingerprint(record.approval.action.payload)
+        fingerprint(
+          approvedCallPayload(
+            record.intent,
+            JSON.parse(String(binding.record)).network as
+              ProviderNetwork | undefined,
+          ),
+        ) !== fingerprint(record.approval.action.payload)
       )
         throw new WalletProviderError('wallet_attempt_conflict');
       let amount = 0n;

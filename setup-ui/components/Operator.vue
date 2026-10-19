@@ -1,6 +1,10 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
+import { providerNetwork, type ProviderNetwork } from '../../src/networks';
 import { FunctionFragment, getAddress } from 'ethers';
+import PolicyAdapterSummary from './PolicyAdapterSummary.vue';
+import PolicyAdapters from './PolicyAdapters.vue';
+import { validateAdapterAmounts } from '../policy-forms';
 import RuntimeContracts from './RuntimeContracts.vue';
 import type {
   RuntimePolicy,
@@ -22,6 +26,7 @@ type Application = {
   publications: RuntimePolicyRevision[];
 };
 type Workspace = {
+  network?: ProviderNetwork;
   role: 'provider' | 'application';
   applications: Application[];
 };
@@ -77,7 +82,7 @@ function baseline(): RuntimePolicy {
   return {
     version: '1',
     enabled: true,
-    chain_id: 'eip155:84532',
+    chain_id: providerNetwork(workspace.value?.network).caip,
     contracts: [],
     maximum_calls: 4,
     maximum_native_value_wei: '0',
@@ -192,6 +197,7 @@ function editProposal(item: Proposal) {
   draft.value = clone(item.policy);
 }
 function validateDraft(policy: RuntimePolicy) {
+  validateAdapterAmounts(policy.call_adapters);
   const maximum = BigInt(policy.maximum_native_value_wei);
   if (maximum >= 2n ** 256n)
     throw new Error('Total maximum wei must fit an unsigned 256-bit integer.');
@@ -491,6 +497,9 @@ async function refreshBatch(batch: Batch) {
           </div>
           <details v-if="application.publication">
             <summary>Current published requirements and pins</summary>
+            <PolicyAdapterSummary
+              :adapters="application.publication.policy.call_adapters"
+            />
             <p v-if="!application.publication.policy.claim_requirements.length">
               No additional runtime claim requirements.
             </p>
@@ -652,10 +661,38 @@ async function refreshBatch(batch: Batch) {
                 Provider terms: {{ terms(draft) }}. Registered methods still
                 require current owner consent and execution authority.
               </p>
-              <RuntimeContracts v-model="draft.contracts" />
+              <RuntimeContracts
+                v-model="draft.contracts"
+                :network="workspace?.network"
+              />
+              <PolicyAdapters
+                v-if="provider"
+                v-model="draft.call_adapters"
+                :contracts="
+                  draft.contracts.map((c) => ({
+                    address: c.address,
+                    codeHash: c.code_hash,
+                    ...(c.implementation
+                      ? {
+                          implementation: {
+                            address: c.implementation.address,
+                            codeHash: c.implementation.code_hash,
+                          },
+                        }
+                      : {}),
+                  }))
+                "
+              />
+              <p v-if="provider">
+                Runtime calls must also match registered contracts and methods.
+                Gas sponsor budgets are deployment settings in the setup wizard.
+                Publishing this policy does not change sponsor capacity. Adapter
+                changes require renewed owner consent.
+              </p>
               <p>
-                Network: Base Sepolia. Publishing changes financial consent
-                terms; registration alone cannot sign or execute a transaction.
+                Network: {{ providerNetwork(workspace?.network).label }}.
+                Publishing changes financial consent terms; registration alone
+                cannot sign or execute a transaction.
               </p>
               <button :disabled="busy" class="primary">
                 {{ provider ? 'Publish policy' : 'Submit registration' }}
@@ -681,6 +718,9 @@ async function refreshBatch(batch: Batch) {
                 {{ publication.published_at }}</strong
               >
               <p>{{ terms(publication.policy) }}</p>
+              <PolicyAdapterSummary
+                :adapters="publication.policy.call_adapters"
+              />
               <p class="identifier">
                 Published by {{ publication.published_by }}
               </p>
@@ -738,6 +778,7 @@ async function refreshBatch(batch: Batch) {
               {{ item.policy.contracts.length }} contracts
             </p>
             <p>{{ terms(item.policy) }}</p>
+            <PolicyAdapterSummary :adapters="item.policy.call_adapters" />
             <ul>
               <li
                 v-for="contract in item.policy.contracts"

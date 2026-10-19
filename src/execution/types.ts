@@ -1,3 +1,4 @@
+import type { ProviderNetwork } from '../networks.js';
 import type { SecretReference } from '../deployment/config.js';
 import type { RelayerBinding } from '../providers/relayer-client.js';
 import type { WalletAttemptRequest } from '../domain/attempt-journal.js';
@@ -30,6 +31,7 @@ export interface ExecutionSponsor {
 
 /** Optional versioned approved-action execution. Secrets and RPC addresses remain server configuration. */
 export interface ExecutionConfiguration {
+  network?: ProviderNetwork;
   profile: ExecutionProfile;
   local?: true;
   relayer?: { url: string; apiKey: SecretReference };

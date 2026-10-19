@@ -1043,7 +1043,7 @@ test('optional execution sponsor settings survive wizard import, edits and expor
     .getByLabel('Execution Relayer HTTPS origin', { exact: true })
     .fill('https://sponsor.example.test');
   await page
-    .getByLabel('Accepted Base Sepolia genesis hash', { exact: true })
+    .getByLabel('Accepted network genesis hash', { exact: true })
     .fill('0x' + '1'.repeat(64));
   await page
     .getByLabel('Accepted token runtime code hash', { exact: true })
@@ -1060,6 +1060,7 @@ test('optional execution sponsor settings survive wizard import, edits and expor
   await page
     .getByLabel('Gas funding agreement reference 1', { exact: true })
     .fill('reviewed-offline-funding-agreement');
+  await page.getByText('Advanced gas values in wei 1', { exact: true }).click();
   await page
     .getByLabel('Maximum fee per gas in wei 1', { exact: true })
     .fill('3000000000');
@@ -1185,6 +1186,7 @@ test('designated execution configuration preserves provider selection, service-k
   await page
     .getByLabel('Gas funding agreement reference 2', { exact: true })
     .fill('offline-second-agreement');
+  await page.getByText('Advanced gas values in wei 2', { exact: true }).click();
   await page
     .getByLabel('Maximum fee per gas in wei 2', { exact: true })
     .fill('3000000000');
@@ -1690,4 +1692,206 @@ test('advanced overrides and additional bundled registrations retain their ident
   );
   await imported(page, saved);
   expect(await exported(page)).toEqual(saved);
+});
+
+test('optional adapter forms preserve generic defaults and export exact gas display amounts', async ({
+  page,
+}) => {
+  const config = JSON.parse(
+    await readFile(
+      new URL(
+        '../../docs/provider.config.contracts.example.json',
+        import.meta.url,
+      ),
+      'utf8',
+    ),
+  );
+  await imported(page, config);
+  await step(page, 'Deployment');
+  await expect(
+    page.getByText('No optional adapters selected.', { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByLabel('Lifetime sponsorship budget (ETH) 1', { exact: true }),
+  ).toHaveValue('0.01');
+  await page
+    .getByLabel('Lifetime sponsorship budget (ETH) 1', { exact: true })
+    .fill('0.025000000000000001');
+  await page
+    .getByLabel('Maximum fee per gas (gwei) 1', { exact: true })
+    .fill('4.25');
+  await page
+    .locator('section.feature-panel')
+    .filter({
+      has: page.getByRole('heading', {
+        name: 'Application gas sponsor 1',
+        exact: true,
+      }),
+    })
+    .last()
+    .screenshot({ path: '/tmp/wpk-gas-budget-forms.png' });
+  await page
+    .getByRole('button', { name: 'Add token transfer adapter', exact: true })
+    .click();
+  await page
+    .getByLabel('Transfer token registered contract', { exact: true })
+    .selectOption(config.approvedCalls.policy.contracts[0].address);
+  await expect(
+    page.getByLabel('Transfer token code hash', { exact: true }),
+  ).toHaveValue(config.approvedCalls.policy.contracts[0].codeHash);
+  await page
+    .getByLabel('Allowed transfer recipients (one per line)', { exact: true })
+    .fill('0x3333333333333333333333333333333333333333');
+  await page
+    .getByLabel('Maximum transfer amount (base units)', { exact: true })
+    .fill('1000000');
+  await expect(
+    page.getByLabel('Use a cumulative token allowance', { exact: true }),
+  ).not.toBeChecked();
+  await page
+    .getByLabel('Use a cumulative token allowance', { exact: true })
+    .check();
+  await expect(
+    page.getByLabel('Lifetime token allowance (base units)', { exact: true }),
+  ).toHaveValue('1000000');
+  await page
+    .getByLabel('Lifetime token allowance (base units)', { exact: true })
+    .fill('5000000');
+  await page
+    .getByRole('region', { name: 'Optional policy adapters', exact: true })
+    .screenshot({ path: '/tmp/wpk-wizard-policy-adapters.png' });
+  await page
+    .getByRole('button', {
+      name: 'Use compatibility routes as optional adapters',
+      exact: true,
+    })
+    .click();
+  const saved = await exported(page);
+  expect(saved.approvedCalls.policy.adapters.tokenTransfers[0]).toMatchObject({
+    maximumAmount: '1000000',
+    lifetimeAmount: '5000000',
+    token: {
+      address: config.approvedCalls.policy.contracts[0].address,
+      codeHash: config.approvedCalls.policy.contracts[0].codeHash,
+    },
+  });
+  expect(saved.approvedCalls.policy.adapters.swaps[0]).toMatchObject({
+    ...config.approvedCalls.policy.swaps[0],
+    id: config.approvedCalls.policy.swaps[0].id + '-adapter',
+  });
+  expect(saved.approvedCalls.policy.swaps).toEqual(
+    config.approvedCalls.policy.swaps,
+  );
+  expect(saved.approvedCalls.policy.adapters.vaults[0]).toMatchObject({
+    ...config.approvedCalls.policy.vaults[0],
+    id: config.approvedCalls.policy.vaults[0].id + '-adapter',
+  });
+  expect(saved.execution.sponsors[0].lifetimeBudgetWei).toBe(
+    '25000000000000001',
+  );
+  expect(saved.execution.sponsors[0].maxFeePerGas).toBe('4250000000');
+  await imported(page, saved);
+  await step(page, 'Deployment');
+  await expect(
+    page.getByLabel('Lifetime token allowance (base units)', { exact: true }),
+  ).toHaveValue('5000000');
+  await page
+    .getByRole('button', { name: 'Remove token adapter 1', exact: true })
+    .click();
+  await page
+    .getByRole('button', { name: 'Remove swap adapter 1', exact: true })
+    .click();
+  await page
+    .getByRole('button', { name: 'Remove vault adapter 1', exact: true })
+    .click();
+  const generic = await exported(page);
+  expect(generic.approvedCalls.policy).not.toHaveProperty('adapters');
+  expect(generic.execution.sponsors).toEqual(saved.execution.sponsors);
+});
+
+test('ERC-3009 prefill requires an explicit cumulative opt-in and invalid gas decimals stay invalid', async ({
+  page,
+}) => {
+  const config = JSON.parse(
+    await readFile(
+      new URL(
+        '../../docs/provider.config.contracts.example.json',
+        import.meta.url,
+      ),
+      'utf8',
+    ),
+  );
+  const token = config.approvedCalls.policy.swaps[0].tokenIn;
+  config.financial = {
+    profile: 'provider-authorized-erc3009-v1',
+    token: {
+      address: token.address,
+      name: 'Offline Token',
+      version: '1',
+      symbol: 'TEST',
+      decimals: 6,
+    },
+    recipients: ['0x3333333333333333333333333333333333333333'],
+    maximumAmount: '1000000',
+    lifetimeAmount: '7000000',
+    maxValiditySeconds: 300,
+  };
+  config.execution.rpc.tokenCodeHash = token.codeHash;
+  await imported(page, config);
+  await step(page, 'Deployment');
+  await page
+    .getByRole('button', { name: 'Add token transfer adapter', exact: true })
+    .click();
+  await page
+    .getByRole('button', { name: 'Prefill from ERC-3009 policy', exact: true })
+    .click();
+  await expect(
+    page.getByLabel('Transfer token address', { exact: true }),
+  ).toHaveValue(token.address);
+  await expect(
+    page.getByLabel('Transfer token code hash', { exact: true }),
+  ).toHaveValue(token.codeHash);
+  await expect(
+    page.getByLabel('Maximum transfer amount (base units)', { exact: true }),
+  ).toHaveValue('1000000');
+  await expect(
+    page.getByLabel('Use a cumulative token allowance', { exact: true }),
+  ).not.toBeChecked();
+  await page
+    .getByLabel('Use a cumulative token allowance', { exact: true })
+    .check();
+  await expect(
+    page.getByLabel('Lifetime token allowance (base units)', { exact: true }),
+  ).toHaveValue('7000000');
+  await page
+    .getByLabel('Maximum fee per gas (gwei) 1', { exact: true })
+    .fill('0.0000000001');
+  await expect(page.getByRole('alert')).toContainText(
+    'at most 9 decimal places',
+  );
+  await page
+    .getByLabel('Maximum fee per gas (gwei) 1', { exact: true })
+    .fill('3');
+  await page
+    .getByLabel('Use a cumulative token allowance', { exact: true })
+    .uncheck();
+  const saved = await exported(page);
+  expect(
+    saved.approvedCalls.policy.adapters.tokenTransfers[0],
+  ).not.toHaveProperty('lifetimeAmount');
+  expect(saved.financial).toEqual(config.financial);
+});
+
+test('network selection defaults new drafts to Base and preserves omitted Sepolia imports', async ({
+  page,
+}) => {
+  const selector = page.getByLabel('Blockchain network', { exact: true });
+  await expect(selector).toHaveValue('base');
+  await imported(page);
+  await step(page, 'Provider');
+  await expect(selector).toHaveValue('base-sepolia');
+  expect(await exported(page)).not.toHaveProperty('network');
+  await step(page, 'Provider');
+  await selector.selectOption('base');
+  expect((await exported(page)).network).toBe('base');
 });

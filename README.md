@@ -45,7 +45,7 @@ rail, the application's obligations and the current implementation boundary.
 [Operator wizard](docs/setup-wizard.md) ·
 [Runtime workspace](docs/runtime-workspace.md) ·
 [Services and credentials](docs/operator-services.md) ·
-[Run locally](docs/local-setup.md) · [Deploy the export](docs/operator-deployment.md)
+[Local preview](docs/local-preview.md) · [Run locally](docs/local-setup.md) · [Deploy the export](docs/operator-deployment.md)
 
 ## Start with the graphical setup
 
@@ -124,10 +124,10 @@ your provider's HTTPS domain. [Test live API responses](docs/http-api.md#try-dep
 with public discovery or a short-lived application token after deployment.
 Optional [operator token controls](docs/operator-tokens.md) obtain and renew tokens
 in that GUI using server-held secrets and an explicit operator allowlist.
-The local preview sends no API calls; deployed requests have real effects and permission checks.
+The wizard’s API reference preview sends no API calls; deployed requests have real effects and permission checks.
 
 The [getting-started guide](docs/README.md) links every stage. Supported profiles
-remain single-host and Base Sepolia only (EOA transfers and explicitly bound Safe 1.4.1 contract calls); production custody acceptance is pending.
+remain single-host, with selectable Base mainnet or Base Sepolia (EOA transfers and explicitly bound Safe 1.4.1 contract calls); production custody acceptance is pending.
 
 ## Who takes part
 
@@ -293,14 +293,14 @@ library-only execution profile.
 The current version, **0.1.0**, is experimental and available from source rather
 than npm. You can configure account access and provisioning, add delegated
 ERC-3009 transfer signing, and optionally execute approved Safe contract calls,
-swaps and vault deposits on **Base Sepolia**. Start with the
+swaps and vault deposits on the configured **Base mainnet or Base Sepolia** network. Start with the
 [setup guide](docs/README.md); it follows the same six steps as the wizard.
 
 Your first deployment stays disabled while you test your backend, application
 permissions and recovery. The supported runtime uses one active POSIX host with
 persistent [SQLite storage](docs/storage.md). Production custody acceptance and
-mainnet support remain pending. USDC and ZARP illustrate the wider project's
-asset use cases; verify the exact test-token contract and signing domain before
+funded mainnet acceptance remain pending. USDC and ZARP illustrate the wider project's
+asset use cases; verify the exact network-specific token contract and signing domain before
 configuring transfers.
 
 ## Configure your wallet service

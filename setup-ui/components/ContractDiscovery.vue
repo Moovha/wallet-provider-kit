@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { providerNetwork, type ProviderNetwork } from '../../src/networks';
+const props = defineProps<{ network?: ProviderNetwork }>();
 import { onBeforeUnmount, ref, watch } from 'vue';
 import type { RuntimePolicy } from '../../src/runtime-configuration/service';
 import {
@@ -19,7 +21,7 @@ let generation = 0;
 let lookup: AbortController | undefined;
 let discoveredAddress: string | undefined;
 watch(
-  () => model.value.address,
+  () => [model.value.address, props.network],
   () => {
     generation++;
     lookup?.abort();
@@ -73,6 +75,7 @@ async function load() {
       model.value.address,
       fetch,
       lookup.signal,
+      props.network,
     );
     if (current !== generation) return;
     if (JSON.stringify(model.value) !== original)
@@ -153,8 +156,9 @@ function toggle(method: DiscoveredMethod, selected: boolean) {
       {{ busy ? 'Loading contract…' : 'Load verified methods' }}
     </button>
     <p>
-      Look up this Base Sepolia address on Sourcify. Only the public address is
-      sent; your access token stays with this provider.
+      Look up this {{ providerNetwork(props.network).label }} address on
+      Sourcify. Only the public address is sent; your access token stays with
+      this provider.
     </p>
     <p v-if="error" role="alert" class="error">{{ error }}</p>
     <p v-if="notice" role="status">{{ notice }}</p>

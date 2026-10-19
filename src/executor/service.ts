@@ -121,6 +121,7 @@ export async function createExecutionService(
             provider.rpc.genesisHash,
             10000,
             options.request,
+            provider.network,
           ),
         });
     }

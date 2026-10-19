@@ -115,7 +115,7 @@ approvedCallIntentSchema.properties = {
 export const safePayloadSchema = object({
   primaryType: { type: 'string', enum: ['SafeTx'] },
   domain: object({
-    chainId: { type: 'string', enum: ['84532'] },
+    chainId: { type: 'string', enum: ['84532', '8453'] },
     verifyingContract: address,
   }),
   types: object({

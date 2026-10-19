@@ -141,7 +141,7 @@ export interface operations {
                             /** @enum {string} */
                             status: "ready";
                             /** @enum {string} */
-                            chain_id: "eip155:84532";
+                            chain_id: "eip155:84532" | "eip155:8453";
                             chain_account_id: string;
                             binding_revision: string;
                             /** @enum {string} */
@@ -160,7 +160,7 @@ export interface operations {
                                     name: string;
                                     version: string;
                                     /** @enum {string} */
-                                    chainId: "84532";
+                                    chainId: "84532" | "8453";
                                     verifyingContract: string;
                                 };
                                 types: {
@@ -224,7 +224,7 @@ export interface operations {
                             /** @enum {string} */
                             status: "ready";
                             /** @enum {string} */
-                            chain_id: "eip155:84532";
+                            chain_id: "eip155:84532" | "eip155:8453";
                             chain_account_id: string;
                             binding_revision: string;
                             /** @enum {string} */
@@ -241,7 +241,7 @@ export interface operations {
                                 primaryType: "SafeTx";
                                 domain: {
                                     /** @enum {string} */
-                                    chainId: "84532";
+                                    chainId: "84532" | "8453";
                                     verifyingContract: string;
                                 };
                                 types: {
@@ -406,7 +406,7 @@ export interface operations {
                                 version: "1";
                                 enabled: boolean;
                                 /** @enum {string} */
-                                chain_id: "eip155:84532";
+                                chain_id: "eip155:84532" | "eip155:8453";
                                 contracts: {
                                     address: string;
                                     code_hash: string;

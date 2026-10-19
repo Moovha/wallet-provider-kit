@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import type { EmbeddedWalletService } from '../../dist/domain/embedded-wallet.js';
 import type { WalletCallsService } from '../../dist/wallet-calls/service.js';
 import { test, expect } from '@playwright/test';
@@ -404,6 +405,121 @@ test('address discovery fills verified pins and selected methods, while ABI impo
   ).toHaveValue('method0(uint256)');
   await page.setViewportSize({ width: 390, height: 844 });
 
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+});
+
+test('providers publish optional adapter terms through forms and applications retain read-only terms', async ({
+  page,
+}) => {
+  const headers = {
+    authorization: 'Bearer offline-provider',
+    'idempotency-key': randomUUID(),
+  };
+  const workspace = (
+    await app.inject({
+      method: 'GET',
+      url: '/v1/runtime-configuration/workspace',
+      headers,
+    })
+  ).json();
+  const target = workspace.applications[0];
+  const seed = await app.inject({
+    method: 'POST',
+    url: `/v1/runtime-configuration/applications/${target.application_id}/revisions`,
+    headers,
+    payload: {
+      expected_revision: target.active_revision,
+      policy: {
+        version: '1',
+        enabled: true,
+        chain_id: 'eip155:84532',
+        contracts: [
+          {
+            address: '0x1111111111111111111111111111111111111111',
+            code_hash: '0x' + '1'.repeat(64),
+            methods: [
+              {
+                signature: 'transfer(address,uint256)',
+                maximum_value_wei: '0',
+              },
+            ],
+          },
+        ],
+        maximum_calls: 4,
+        maximum_native_value_wei: '0',
+        max_validity_seconds: 300,
+        claim_requirements: [],
+      },
+    },
+  });
+  expect(seed.statusCode).toBe(200);
+
+  await page.goto(`${url}/operator/`);
+  await page
+    .getByLabel('Access token', { exact: true })
+    .fill('offline-provider');
+  await page.getByRole('button', { name: 'Connect', exact: true }).click();
+  await expect(
+    page.getByRole('button', {
+      name: 'Add token transfer adapter',
+      exact: true,
+    }),
+  ).toBeVisible();
+  await page
+    .getByRole('button', { name: 'Add token transfer adapter', exact: true })
+    .click();
+  await page
+    .getByLabel('Transfer token registered contract', { exact: true })
+    .selectOption('0x1111111111111111111111111111111111111111');
+  await page
+    .getByLabel('Allowed transfer recipients (one per line)', { exact: true })
+    .fill('0x3333333333333333333333333333333333333333');
+  await page
+    .getByLabel('Maximum transfer amount (base units)', { exact: true })
+    .fill('10');
+  await page
+    .getByLabel('Use a cumulative token allowance', { exact: true })
+    .check();
+  await page
+    .getByLabel('Lifetime token allowance (base units)', { exact: true })
+    .fill('50');
+  await page
+    .getByRole('region', { name: 'Optional policy adapters', exact: true })
+    .screenshot({ path: '/tmp/wpk-runtime-policy-adapters.png' });
+  const published = page.waitForRequest(
+    (r) => r.method() === 'POST' && r.url().endsWith('/revisions'),
+  );
+  await page
+    .getByRole('button', { name: 'Publish policy', exact: true })
+    .click();
+  const request = await published;
+  expect(
+    request.postDataJSON().policy.call_adapters.tokenTransfers[0]
+      .lifetimeAmount,
+  ).toBe('50');
+  await expect(
+    page.getByRole('status').filter({ hasText: 'Policy published' }),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Disconnect', exact: true }).click();
+  await page.getByLabel('Access token', { exact: true }).fill('offline-app');
+  await page.getByRole('button', { name: 'Connect', exact: true }).click();
+  await expect(
+    page.getByRole('button', {
+      name: 'Add token transfer adapter',
+      exact: true,
+    }),
+  ).toHaveCount(0);
+  await page
+    .getByText('Current published requirements and pins', { exact: true })
+    .click();
+  await expect(
+    page.getByText(/Cumulative allowance: 50 base units\./).first(),
+  ).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,

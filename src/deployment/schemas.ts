@@ -38,7 +38,7 @@ const legacyTransferReceiptSchema = {
           properties: {
             name: { type: 'string' },
             version: { type: 'string' },
-            chainId: { type: 'string', enum: ['84532'] },
+            chainId: { type: 'string', enum: ['84532', '8453'] },
             verifyingContract: address,
           },
         },
@@ -127,7 +127,7 @@ export const transactionEventInputSchema = {
       description:
         'Application observation only; confirmed is not provider-verified settlement.',
     },
-    chain_id: { type: 'string', enum: ['eip155:84532'] },
+    chain_id: { type: 'string', enum: ['eip155:84532', 'eip155:8453'] },
     transaction_hash: { type: 'string', pattern: '^0x[0-9a-f]{64}$' },
     observed_at: {
       type: 'string',

@@ -1,3 +1,4 @@
+import type { ProviderNetwork } from '../networks.js';
 import { getAddress } from 'ethers';
 import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
@@ -50,6 +51,7 @@ export async function createConfiguredBackend(
   database: ProviderDatabase,
   provision: JournaledProviderOptions,
   financial: JournaledProviderOptions,
+  network?: ProviderNetwork,
 ): Promise<ConfiguredBackend> {
   if (config.kind === 'ows') {
     try {
@@ -71,6 +73,7 @@ export async function createConfiguredBackend(
     const options = {
       vaultPath: resolve(directory, config.vaultDirectory),
       passphrase: async () => passphrase,
+      network,
     };
     // Built-in OWS and Relayer factories already own the journal wrapper; never wrap them twice.
     return combine(
@@ -87,6 +90,7 @@ export async function createConfiguredBackend(
     }));
     const connection = {
       url: config.url,
+      network,
       apiKey: resolveSecret(config.apiKey),
       resolveAccount: async (id: string): Promise<RelayerBinding | null> =>
         database.onboardingStore.transaction((state) => {
@@ -143,13 +147,17 @@ export async function createConfiguredBackend(
   }
   let raw: WalletSigningProvider;
   if (config.kind === 'cdp') {
-    raw = createCdpWalletProvider({
-      WALLET_SERVICE_MODE: 'provider',
-      WALLET_BACKEND: 'cdp',
-      WALLET_CDP_API_KEY_ID: resolveSecret(config.apiKeyId),
-      WALLET_CDP_API_KEY_SECRET: resolveSecret(config.apiKeySecret),
-      WALLET_CDP_WALLET_SECRET: resolveSecret(config.walletSecret),
-    });
+    raw = createCdpWalletProvider(
+      {
+        WALLET_SERVICE_MODE: 'provider',
+        WALLET_BACKEND: 'cdp',
+        WALLET_CDP_API_KEY_ID: resolveSecret(config.apiKeyId),
+        WALLET_CDP_API_KEY_SECRET: resolveSecret(config.apiKeySecret),
+        WALLET_CDP_WALLET_SECRET: resolveSecret(config.walletSecret),
+      },
+      fetch,
+      network,
+    );
   } else {
     const module: WalletBackendAdapterV1 = await import(
       pathToFileURL(resolve(directory, config.module)).href

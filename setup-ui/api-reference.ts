@@ -1,3 +1,4 @@
+import { providerNetwork } from '../src/networks.js';
 import {
   operationGuides,
   operationUnavailableReason,
@@ -117,7 +118,13 @@ export function requestExample(
     id === 'proposeRuntimeConfiguration' ||
     id === 'updateRuntimeConfiguration'
   )
-    return { expected_revision: '0', policy: runtimePolicyExample };
+    return {
+      expected_revision: '0',
+      policy: {
+        ...runtimePolicyExample,
+        chain_id: providerNetwork(config.network).caip,
+      },
+    };
   if (id === 'publishRuntimeConfiguration') return { expected_revision: '0' };
   if (id === 'checkExecutionAuthority')
     return {
@@ -135,7 +142,7 @@ export function requestExample(
   if (id === 'reportTransactionEvent')
     return {
       event: 'submitted',
-      chain_id: 'eip155:84532',
+      chain_id: providerNetwork(config.network).caip,
       transaction_hash: '0x' + '1'.repeat(64),
       observed_at: '2030-01-01T00:00:00.000Z',
     };
@@ -212,7 +219,10 @@ export function requestExample(
       jsonrpc: '2.0',
       id: 1,
       method: 'wallet_getCapabilities',
-      params: ['0x1111111111111111111111111111111111111111', ['0x14a34']],
+      params: [
+        '0x1111111111111111111111111111111111111111',
+        [providerNetwork(config.network).hex],
+      ],
     };
   if (id === 'requestContractCall' || id === 'enqueueContractCall')
     return {
@@ -348,7 +358,11 @@ export function responseExample(
     return {
       jsonrpc: '2.0',
       id: 1,
-      result: { '0x14a34': { atomic: { status: 'supported' } } },
+      result: {
+        [providerNetwork(config?.network).hex]: {
+          atomic: { status: 'supported' },
+        },
+      },
     };
   if (
     id === 'publishRuntimeConfiguration' ||
@@ -427,7 +441,10 @@ export function responseExample(
       payload_hash: '0x' + '0'.repeat(64),
       payload: {
         primaryType: 'SafeTx',
-        domain: { chainId: '84532', verifyingContract: target },
+        domain: {
+          chainId: providerNetwork(config?.network).chainId,
+          verifyingContract: target,
+        },
         types: {
           SafeTx: [
             ['to', 'address'],
@@ -496,7 +513,7 @@ export function responseExample(
         implemented: true,
         configured: config?.execution?.profile === profile,
         ready: false,
-        chain_id: 'eip155:84532',
+        chain_id: providerNetwork(config?.network).caip,
         account_type: 'eoa',
         signing: 'eip-712',
         token_authorization: 'erc-3009',
@@ -543,7 +560,7 @@ export function responseExample(
   if (['reportTransactionEvent', 'getTransactionEvents'].includes(id)) {
     const report = {
       event: 'submitted',
-      chain_id: 'eip155:84532',
+      chain_id: providerNetwork(config?.network).caip,
       transaction_hash: '0x' + '1'.repeat(64),
       observed_at: '2030-01-01T00:00:00.000Z',
       report_id: exampleId,
@@ -640,7 +657,7 @@ export function responseExample(
       domain: {
         name: 'Example Token',
         version: '1',
-        chainId: '84532',
+        chainId: providerNetwork(config?.network).chainId,
         verifyingContract: address,
       },
       types: {

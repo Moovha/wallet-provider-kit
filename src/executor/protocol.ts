@@ -1,3 +1,4 @@
+import { providerNetwork } from '../networks.js';
 import {
   runtimeCallPolicy,
   validateRuntimeCalls,
@@ -69,6 +70,7 @@ export function executorProviderIdentity(
     id: provider.id,
     revision: provider.revision,
     kind: provider.kind,
+    ...(provider.network ? { network: provider.network } : {}),
     ...(provider.relayer ? { relayerOrigin: provider.relayer.url } : {}),
     ...(provider.module
       ? { module: provider.module, options: provider.options ?? {} }
@@ -118,6 +120,7 @@ export function validateExecutionDispatch(
       'plan',
     ]);
     const plan = input.plan;
+    const network = providerNetwork(provider.network);
     exact(plan, [
       'profile',
       'revision',
@@ -206,6 +209,8 @@ export function validateExecutionDispatch(
         ? runtimeCallPolicy(provider.contractCalls, plan.runtimePolicy)
         : provider.contractCalls;
       if (plan.runtimePolicy) {
+        if (plan.runtimePolicy.policy.chain_id !== network.caip)
+          throw new Error();
         validateRuntimeCalls(plan.runtimePolicy, plan.intent.input);
         if (
           Date.parse(action.expires_at) >
@@ -213,22 +218,25 @@ export function validateExecutionDispatch(
         )
           throw new Error();
       }
-      validateApprovedCallAction(policy, plan.intent, action);
+      validateApprovedCallAction(policy, plan.intent, action, network.name);
       const parsed = safeInterface.parseTransaction({ data: plan.data });
       const signature = String(parsed?.args.signatures);
       if (
         approvedCallData(action, signature) !== plan.data ||
         recoverAddress(action.payload_hash, signature).toLowerCase() !==
           action.chain_account_id.split(':')[2].toLowerCase() ||
-        action.chain_account_id === 'eip155:84532:' + sponsor.binding.address ||
+        action.chain_account_id ===
+          network.caip + ':' + sponsor.binding.address ||
         !uuid.test(action.action_id) ||
         action.operation_id !== action.action_id ||
         action.kind !== 'sign_typed_data' ||
         action.profile !== 'evm_eoa_v1' ||
         action.profile_revision !== '1' ||
         action.status !== 'ready' ||
-        action.chain_id !== 'eip155:84532' ||
-        !/^eip155:84532:0x[0-9a-fA-F]{40}$/.test(action.chain_account_id) ||
+        action.chain_id !== network.caip ||
+        !new RegExp('^' + network.caip + ':0x[0-9a-fA-F]{40}$').test(
+          action.chain_account_id,
+        ) ||
         !/^[1-9][0-9]{0,19}$/.test(action.binding_revision) ||
         action.capability_revision !== '1' ||
         action.plan_revision !== '1' ||
@@ -274,8 +282,8 @@ export function validateExecutionDispatch(
       action.profile !== 'evm_eoa_v1' ||
       action.profile_revision !== '1' ||
       action.status !== 'ready' ||
-      action.chain_id !== 'eip155:84532' ||
-      action.chain_account_id !== 'eip155:84532:' + message.from ||
+      action.chain_id !== network.caip ||
+      action.chain_account_id !== network.caip + ':' + message.from ||
       !/^[1-9][0-9]{0,19}$/.test(action.binding_revision) ||
       action.capability_revision !== '1' ||
       action.plan_revision !== '1' ||
@@ -285,7 +293,7 @@ export function validateExecutionDispatch(
       action.payload_hash !== digest ||
       primaryType !== 'TransferWithAuthorization' ||
       serviceHash(types) !== serviceHash(transferTypes) ||
-      domain.chainId !== '84532' ||
+      domain.chainId !== network.chainId ||
       domain.name !== provider.token?.name ||
       domain.version !== provider.token?.version ||
       String(domain.verifyingContract).toLowerCase() !==

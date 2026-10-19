@@ -217,7 +217,7 @@ and durable attempt identity. The default CLI does not activate any adapter.
 
 | Capability   | CDP adapter                                                                                                                                                                                       |
 | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Network      | Base Sepolia, chain 84532 only.                                                                                                                                                                   |
+| Network      | Base mainnet (8453) or Base Sepolia (84532), selected by the host.                                                                                                                                |
 | Account type | Externally owned account (EOA), revision 1. Contract accounts are unsupported.                                                                                                                    |
 | Signing      | Exact approved EIP-712 typed data; digest, domain and recovered signer checked.                                                                                                                   |
 | Key control  | App-controlled CDP API-key wallets; no keys or seed phrases exposed by the kit interface.                                                                                                         |
@@ -245,7 +245,7 @@ deterministic read-only recovery. Never rename an existing account or reset a du
 attempt to adopt this format. Previously rejected attempts remain rejected;
 uncertain attempts require reconciliation before any further provider effects.
 Phone numbers and customer identifiers never go to the vendor as names. It checks
-Base Sepolia chain 84532, EOA revision 1, a 32 KiB
+the configured Base chain (8453 or 84532), EOA revision 1, a 32 KiB
 payload, expiry, matching domain, primary type, CAIP-10 address and digest, then
 verifies the returned signature.
 It snapshots the input before awaits and rechecks expiry after the account read.

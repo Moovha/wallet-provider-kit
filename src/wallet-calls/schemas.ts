@@ -174,6 +174,27 @@ export const rpcResponseSchema = {
                 },
               },
             },
+            '0x2105': {
+              type: 'object',
+              additionalProperties: false,
+              required: ['atomic'],
+              properties: {
+                paymasterService: {
+                  type: 'object',
+                  additionalProperties: false,
+                  required: ['supported'],
+                  properties: { supported: { type: 'boolean', enum: [true] } },
+                },
+                atomic: {
+                  type: 'object',
+                  additionalProperties: false,
+                  required: ['status'],
+                  properties: {
+                    status: { type: 'string', enum: ['supported'] },
+                  },
+                },
+              },
+            },
           },
         },
       ],

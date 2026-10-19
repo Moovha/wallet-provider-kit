@@ -289,5 +289,7 @@ uses the same provider/account/token allowance as ERC-3009. Publication requires
 fresh financial consent and retains existing usage; automatic contract acceptance
 does not approve changes to these terms. See [cumulative token allowances](approved-contract-calls.md#cumulative-token-allowances)
 for activation inventory, uncertainty, account compatibility and unsupported
-indirect asset exposure. Dedicated adapter editing forms remain unavailable;
-provider operators can publish these terms through the configuration API.
+indirect asset exposure. Provider operators can edit these terms in the
+[runtime workspace](runtime-workspace.md#configure-optional-policy-adapters),
+review the change summary and publish through the existing configuration API.
+Applications can view the published terms but cannot edit provider adapter rules.

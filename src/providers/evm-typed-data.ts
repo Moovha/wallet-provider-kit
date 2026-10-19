@@ -1,3 +1,4 @@
+import { providerNetwork, type ProviderNetwork } from '../networks.js';
 import { TypedDataEncoder } from 'ethers';
 import {
   WalletProviderError,
@@ -25,28 +26,30 @@ function wireValue(value: unknown, depth = 0): boolean {
   );
 }
 
-/** Only the unfunded Base Sepolia typed-data slice is admitted at this checkpoint. */
-export function baseSepoliaPayload(
+/** Validate the exact action against the backend network before signing. */
+export function evmTypedDataPayload(
   account: EmbeddedAccount,
   action: TypedDataAction,
+  network?: ProviderNetwork,
 ): Record<string, unknown> {
   try {
+    const selected = providerNetwork(network);
     requireAccountId(account.accountId);
     if (
       action.kind !== 'sign_typed_data' ||
       action.profile !== 'evm_eoa_v1' ||
       action.profile_revision !== '1' ||
       action.status !== 'ready' ||
-      action.chain_id !== 'eip155:84532' ||
+      action.chain_id !== selected.caip ||
       action.chain_account_id.toLowerCase() !==
-        `eip155:84532:${account.address.toLowerCase()}` ||
+        `${selected.caip}:${account.address.toLowerCase()}` ||
       !addressPattern.test(account.address) ||
       !Number.isFinite(Date.parse(action.expires_at)) ||
       Date.parse(action.expires_at) <= Date.now() ||
       !/^0x[0-9a-f]{64}$/.test(action.payload_hash) ||
       Buffer.byteLength(JSON.stringify(action.payload), 'utf8') > 32768 ||
       !wireValue(action.payload) ||
-      action.payload.domain.chainId !== '84532'
+      action.payload.domain.chainId !== selected.chainId
     ) {
       throw new Error('invalid');
     }
@@ -67,8 +70,11 @@ export function baseSepoliaPayload(
     ) {
       throw new Error('invalid');
     }
-    // CDP's domain uses a JSON number; only this fixed, safe chain ID is converted.
-    return { ...canonical, domain: { ...canonical.domain, chainId: 84532 } };
+    // CDP's domain uses a JSON number; only the selected, safe chain ID is converted.
+    return {
+      ...canonical,
+      domain: { ...canonical.domain, chainId: Number(selected.chainId) },
+    };
   } catch {
     throw new WalletProviderError('wallet_provider_input');
   }
