@@ -249,10 +249,7 @@ assert.equal(
   receipt.accountId,
   'Retained owner access is unavailable; renew the synthetic consent through the API',
 );
-assert.equal(
-  (await api('/v1/runtime-configuration/workspace')).network,
-  'base',
-);
+assert.equal((await api('/v1/applications/configurations')).network, 'base');
 await writeFile(
   join(directory, 'preview-evidence.json'),
   JSON.stringify(
@@ -273,7 +270,7 @@ await writeFile(
   ) + '\n',
   { mode: 0o600 },
 );
-console.log('Local Base preview: ' + origin + '/operator/');
+console.log('Local Base preview: ' + origin + '/docs/');
 console.log('API explorer: ' + origin + '/docs/');
 console.log(
   'Private application/operator tokens are saved in the preview directory and expire after five minutes. Restart this command to renew them.',

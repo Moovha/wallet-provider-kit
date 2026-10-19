@@ -1151,7 +1151,7 @@ export declare class OnboardingService {
       | 'transfers:request'
       | 'contracts:request'
     )[];
-    mode: 'connect' | 'create';
+    mode: 'create' | 'connect';
     durationDays: number;
     status: string;
   }>;
@@ -4006,11 +4006,38 @@ export declare class RuntimeConfigurationService {
   );
   assertOperator(principal: VerifiedPrincipal): void;
   assertOperatorState(principal: VerifiedPrincipal, state: ProviderState): void;
+  readObligations(
+    principal: VerifiedPrincipal,
+    applicationId?: string,
+  ): Promise<{
+    application_id: string;
+    resources: ObligationRecord[];
+    authorizes_spending: false;
+    activates_execution: false;
+  }>;
+  submitObligation<K extends ObligationKind>(
+    context: AuthorityContext,
+    kind: K,
+    input: {
+      expected_revision: string;
+      value: ApplicationObligations[K];
+    },
+  ): Promise<ObligationRecord>;
+  decideObligation(
+    context: AuthorityContext,
+    applicationId: string,
+    kind: ObligationKind,
+    input: {
+      expected_revision: string;
+      expected_decision_revision: string;
+      decision: 'accepted' | 'rejected';
+    },
+  ): Promise<ObligationRecord>;
   propose(
     context: AuthorityContext,
     input: RuntimePolicyChange,
   ): Promise<RuntimePolicyProposal>;
-  workspace(
+  listApplications(
     principal: VerifiedPrincipal,
     applicationId?: string,
   ): Promise<{

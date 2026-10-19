@@ -169,8 +169,12 @@ export default defineConfig({
                 link: '/docs/setup#supported-financial-policy',
               },
               {
-                text: 'Runtime contract workspace',
+                text: 'Application management APIs',
                 link: '/docs/runtime-workspace',
+              },
+              {
+                text: 'Application obligations API',
+                link: '/docs/application-obligations',
               },
               {
                 text: 'Runtime policy API',

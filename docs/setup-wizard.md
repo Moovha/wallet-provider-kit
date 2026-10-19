@@ -165,9 +165,9 @@ Enable **Runtime configuration** when applications should register contracts and
 methods after deployment. The bundled issuer generates a separate operator client
 ID, derives its issuer and subject, and registers it automatically. Inspect or
 override the identity under **Advanced operator identity**. With an existing
-issuer, enter the externally registered operator issuer, client ID and subject. The [runtime workspace](runtime-workspace.md) explains operator
+issuer, enter the externally registered operator issuer, client ID and subject. The [application management guide](runtime-workspace.md) explains operator
 access, contract proposals, publication and automatic registration review through
-`/operator/`. The [runtime API](runtime-configuration.md) supplies the developer
+protected APIs. The [runtime API](runtime-configuration.md) supplies the developer
 contract and the additional opt-ins needed for financial use.
 
 For approved contract calls, allow `contracts:request` for intended applications;

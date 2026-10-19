@@ -507,7 +507,7 @@ describe('runtime configuration HTTP contract', () => {
   });
 });
 
-describe('operator workspace and delegated contract registration', () => {
+describe('application configuration listing and delegated contract registration', () => {
   it('automatically publishes contract changes only after provider approval and preserves exact replay across restart', async () => {
     const { service, db } = await fixture();
     const appId = runtimeApplicationId(issuer, 'first');
@@ -548,7 +548,9 @@ describe('operator workspace and delegated contract registration', () => {
     });
     expect(publication.policy.contracts[0].methods).toHaveLength(2);
     expect(
-      (await service.workspace(operator, appId)).applications[0].proposals.find(
+      (
+        await service.listApplications(operator, appId)
+      ).applications[0].proposals.find(
         (p) => p.proposal_id === proposal.proposal_id,
       )?.published_revision,
     ).toBe('2');
@@ -577,7 +579,8 @@ describe('operator workspace and delegated contract registration', () => {
       }),
     ).toEqual(decision);
     expect(
-      (await restarted.workspace(operator, appId)).applications[0].review?.mode,
+      (await restarted.listApplications(operator, appId)).applications[0].review
+        ?.mode,
     ).toBe('manual');
     expect((await restarted.read(application())).active_revision).toBe('2');
     expect(
@@ -661,25 +664,30 @@ describe('operator workspace and delegated contract registration', () => {
     expect((await service.read(application())).active_revision).toBe('1');
     expect(
       (
-        await service.workspace(application(), appId)
+        await service.listApplications(application(), appId)
       ).applications[0].proposals.every((p) => !p.published_revision),
     ).toBe(true);
     expect(await service.proposal(operator, pending.proposal_id)).toBeDefined();
   });
-  it('isolates application workspaces, rejects scope-only operators and fences simultaneous review decisions', async () => {
+  it('isolates application configuration lists, rejects scope-only operators and fences simultaneous review decisions', async () => {
     const { service } = await fixture();
     const appId = runtimeApplicationId(issuer, 'first');
     expect(
-      (await service.workspace(application())).applications.map(
+      (await service.listApplications(application())).applications.map(
         (app) => app.application_id,
       ),
     ).toEqual([appId]);
-    expect((await service.workspace(operator)).applications).toHaveLength(2);
+    expect(
+      (await service.listApplications(operator)).applications,
+    ).toHaveLength(2);
     await expect(
-      service.workspace(application(), runtimeApplicationId(issuer, 'second')),
+      service.listApplications(
+        application(),
+        runtimeApplicationId(issuer, 'second'),
+      ),
     ).rejects.toMatchObject(denied);
     await expect(
-      service.workspace({
+      service.listApplications({
         ...application(),
         scopes: ['wallet:configuration:write'],
       }),
@@ -717,5 +725,248 @@ describe('operator workspace and delegated contract registration', () => {
         mode: 'automatic',
       }),
     ).rejects.toMatchObject(conflicted);
+  });
+});
+
+describe('application obligations', () => {
+  const actions = [
+    {
+      name: 'pay_invoice',
+      description: 'Pay an invoice under the accepted application policy.',
+      fields: [
+        {
+          name: 'invoice_status',
+          required: true,
+          allowed_values: ['approved', 'issued'],
+        },
+      ],
+    },
+  ];
+  it('isolates declarations, retains retry results and requires provider decisions on exact revisions', async () => {
+    const { service, db } = await fixture();
+    const caller = context();
+    const first = await service.submitObligation(caller, 'actions', {
+      expected_revision: '0',
+      value: actions,
+    });
+    const appId = runtimeApplicationId(issuer, 'first');
+    expect(first).toMatchObject({
+      application_id: appId,
+      revision: '1',
+      decision: 'pending',
+    });
+    expect(
+      (await service.readObligations(application('second'))).resources,
+    ).toEqual([]);
+    await expect(
+      service.readObligations(application(), appId),
+    ).rejects.toMatchObject(denied);
+    await expect(
+      service.decideObligation(
+        context({ ...application(), scopes: ['wallet:configuration:write'] }),
+        appId,
+        'actions',
+        {
+          expected_revision: '1',
+          expected_decision_revision: '0',
+          decision: 'accepted',
+        },
+      ),
+    ).rejects.toMatchObject(denied);
+    const decisionCaller = context(operator);
+    const decision = {
+      expected_revision: '1',
+      expected_decision_revision: '0',
+      decision: 'accepted' as const,
+    };
+    const accepted = await service.decideObligation(
+      decisionCaller,
+      appId,
+      'actions',
+      decision,
+    );
+    expect(accepted).toMatchObject({
+      decision: 'accepted',
+      decision_revision: '1',
+    });
+    expect(
+      await service.submitObligation(caller, 'actions', {
+        expected_revision: '0',
+        value: actions,
+      }),
+    ).toEqual(first);
+    await expect(
+      service.submitObligation(context(), 'actions', {
+        expected_revision: '0',
+        value: actions,
+      }),
+    ).rejects.toMatchObject(conflicted);
+    const next = await service.submitObligation(context(), 'actions', {
+      expected_revision: '1',
+      value: [],
+    });
+    expect(next).toMatchObject({
+      revision: '2',
+      decision: 'pending',
+      decision_revision: '0',
+    });
+    expect(
+      await service.decideObligation(
+        decisionCaller,
+        appId,
+        'actions',
+        decision,
+      ),
+    ).toEqual(accepted);
+    await expect(
+      service.decideObligation(context(operator), appId, 'actions', decision),
+    ).rejects.toMatchObject(conflicted);
+    const restarted = new RuntimeConfigurationService(
+      policy,
+      db.onboardingStore,
+      options,
+      'deployment-1',
+    );
+    expect(await restarted.readObligations(operator, appId)).toMatchObject({
+      resources: [next],
+      authorizes_spending: false,
+      activates_execution: false,
+    });
+    await db.onboardingStore.transaction((state) => {
+      state.deploymentBindings!['service-v1'].activeRevision = 'deployment-2';
+    });
+    await expect(service.readObligations(application())).rejects.toMatchObject(
+      denied,
+    );
+  });
+  it('rejects duplicate actions, ambiguous fields, credentials, wrong-chain sponsorship and oversized budgets', async () => {
+    const { service } = await fixture();
+    const invalidInput = { code: 'wallet_provider_input' };
+    for (const value of [
+      [actions[0], actions[0]],
+      [{ ...actions[0], fields: [actions[0].fields[0], actions[0].fields[0]] }],
+      [
+        {
+          ...actions[0],
+          fields: [{ ...actions[0].fields[0], name: 'constructor' }],
+        },
+      ],
+    ])
+      await expect(
+        service.submitObligation(context(), 'actions', {
+          expected_revision: '0',
+          value,
+        }),
+      ).rejects.toMatchObject(invalidInput);
+    await expect(
+      service.submitObligation(context(), 'services', {
+        expected_revision: '0',
+        value: [
+          {
+            id: 'verifier',
+            kind: 'rpc-verification',
+            vendor: 'example',
+            credential_reference: 'https://example.test/private-token',
+            billing_owner: 'application',
+          },
+        ],
+      }),
+    ).rejects.toMatchObject(invalidInput);
+    const sponsorship = {
+      chain_id: 'eip155:8453' as const,
+      funding_agreement: 'Application pays gas',
+      maximum_gas_budget_wei: '100',
+      account_model: 'provider-controlled-application-safe' as const,
+      asset_model: 'individual-user-wallets' as const,
+    };
+    await expect(
+      service.submitObligation(context(), 'sponsorship', {
+        expected_revision: '0',
+        value: sponsorship,
+      }),
+    ).rejects.toMatchObject(invalidInput);
+    await expect(
+      service.submitObligation(context(), 'sponsorship', {
+        expected_revision: '0',
+        value: {
+          ...sponsorship,
+          chain_id: 'eip155:84532',
+          maximum_gas_budget_wei: String(2n ** 256n),
+        },
+      }),
+    ).rejects.toMatchObject(invalidInput);
+  });
+  it('serves protected application and provider resources without enabling financial effects', async () => {
+    const { service } = await fixture();
+    const server = await createServer({
+      runtimeConfiguration: service,
+      authenticate: async (authorization, scope) => {
+        const caller =
+          authorization === 'Bearer application'
+            ? application()
+            : authorization === 'Bearer operator'
+              ? operator
+              : undefined;
+        if (!caller) throw new AuthenticationError(401);
+        if (!caller.scopes.includes(scope)) throw new AuthenticationError(403);
+        return caller;
+      },
+    });
+    servers.push(server);
+    for (const url of [
+      '/operator/',
+      '/v1/runtime-configuration/workspace',
+      '/v1/runtime-configuration/batches',
+    ]) {
+      expect(
+        (
+          await server.inject({
+            method: 'GET',
+            url,
+            headers: { authorization: 'Bearer operator' },
+          })
+        ).statusCode,
+      ).toBe(404);
+    }
+    const listing = await server.inject({
+      method: 'GET',
+      url: '/v1/applications/configurations',
+      headers: { authorization: 'Bearer application' },
+    });
+    expect(listing.statusCode).toBe(200);
+    expect(listing.json().applications).toHaveLength(1);
+    expect(
+      (
+        await server.inject({
+          method: 'GET',
+          url: '/v1/application/obligations',
+        })
+      ).statusCode,
+    ).toBe(401);
+    const response = await server.inject({
+      method: 'PUT',
+      url: '/v1/application/obligations/actions',
+      headers: {
+        authorization: 'Bearer application',
+        'idempotency-key': randomUUID(),
+      },
+      payload: { expected_revision: '0', value: actions },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json().value).toEqual(actions);
+    const providerRead = await server.inject({
+      method: 'GET',
+      url:
+        '/v1/provider/applications/' +
+        runtimeApplicationId(issuer, 'first') +
+        '/obligations',
+      headers: { authorization: 'Bearer operator' },
+    });
+    expect(providerRead.statusCode).toBe(200);
+    expect(providerRead.json()).toMatchObject({
+      authorizes_spending: false,
+      activates_execution: false,
+      resources: [{ kind: 'actions', decision: 'pending' }],
+    });
   });
 });

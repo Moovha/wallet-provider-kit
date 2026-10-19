@@ -14,8 +14,7 @@ npm run build
 npm run preview:local
 ```
 
-Open [the operator workspace](http://127.0.0.1:8088/operator/) or
-[the API explorer](http://127.0.0.1:8088/docs/). The command saves a private
+Open [the API explorer](http://127.0.0.1:8088/docs/). The command saves a private
 configuration, credentials, encrypted vault, SQLite database and exercise receipt
 in `artifacts/local-preview`, with network `base` (chain 8453). Keep this directory
 private and excluded from Git. An alternative empty private directory can be
@@ -24,8 +23,8 @@ passed after `--`. Do not copy its evaluation acceptance values into production.
 The initial exercise requests a disabled application policy, publishes it using
 a separate operator token, grants the synthetic owner access and provisions the
 wallet twice with the same idempotency key. Both replies must identify the same
-wallet. No contract is automatically registered or accepted. The operator workspace
-lets you propose contracts/methods and approve policy revisions. Register only
+wallet. No contract is automatically registered or accepted. The application configuration APIs
+let you propose contracts and methods and approve policy revisions. Register only
 reviewed network-specific addresses, ABI methods and bytecode pins.
 
 Load `operator.token` from that private directory into the workspace's token

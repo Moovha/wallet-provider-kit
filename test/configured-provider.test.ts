@@ -4742,7 +4742,7 @@ it('lists wallet batches with owner-bound application access and a separately au
   const list = (authorization: string) =>
     f.app.inject({
       method: 'GET',
-      url: '/v1/runtime-configuration/batches',
+      url: '/v1/wallet/batches',
       headers: { authorization },
     });
   const appToken = await f.t.f.token('wallet:execute:read');

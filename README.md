@@ -43,7 +43,7 @@ rail, the application's obligations and the current implementation boundary.
 [Documentation](https://moovha.github.io/wallet-provider-kit/) ·
 [Get started](docs/README.md) ·
 [Operator wizard](docs/setup-wizard.md) ·
-[Runtime workspace](docs/runtime-workspace.md) ·
+[Application management](docs/runtime-workspace.md) ·
 [Services and credentials](docs/operator-services.md) ·
 [Local preview](docs/local-preview.md) · [Run locally](docs/local-setup.md) · [Deploy the export](docs/operator-deployment.md)
 

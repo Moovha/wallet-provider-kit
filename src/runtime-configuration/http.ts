@@ -1,3 +1,8 @@
+import {
+  obligationSchemas,
+  type ObligationKind,
+  type ApplicationObligations,
+} from './obligations.js';
 import { walletCallsReceiptSchema } from '../wallet-calls/schemas.js';
 import type { WalletCallsService } from '../wallet-calls/service.js';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
@@ -68,7 +73,7 @@ const reviewSchema = {
     approved_by: applicationIdSchema,
   },
 };
-const workspaceSchema = {
+const applicationsSchema = {
   type: 'object',
   additionalProperties: false,
   required: ['role', 'applications'],
@@ -245,10 +250,168 @@ export async function registerRuntimeConfigurationRoutes(
     ...extra,
     response: { 200: response, ...errors },
   });
-  app.get<{ Querystring: { application_id?: string } }>(
-    '/v1/runtime-configuration/workspace',
+  const obligationRecordSchema = {
+    type: 'object',
+    additionalProperties: false,
+    required: [
+      'application_id',
+      'kind',
+      'revision',
+      'value',
+      'submitted_at',
+      'decision',
+      'decision_revision',
+    ],
+    properties: {
+      application_id: applicationIdSchema,
+      kind: { type: 'string', enum: ['actions', 'services', 'sponsorship'] },
+      revision: revisionSchema,
+      value: { anyOf: Object.values(obligationSchemas) },
+      submitted_at: { type: 'string', format: 'date-time' },
+      decision: { type: 'string', enum: ['pending', 'accepted', 'rejected'] },
+      decision_revision: revisionSchema,
+      decided_at: { type: 'string', format: 'date-time' },
+    },
+  };
+  const obligationReadSchema = {
+    type: 'object',
+    additionalProperties: false,
+    required: [
+      'application_id',
+      'resources',
+      'authorizes_spending',
+      'activates_execution',
+    ],
+    properties: {
+      application_id: applicationIdSchema,
+      resources: { type: 'array', maxItems: 3, items: obligationRecordSchema },
+      authorizes_spending: { type: 'boolean', enum: [false] },
+      activates_execution: { type: 'boolean', enum: [false] },
+    },
+  };
+  const obligationSchema = (
+    operationId: string,
+    response: object,
+    extra = {},
+  ) => ({
+    ...schema(operationId, response, extra),
+    tags: ['Application obligations'],
+    description:
+      'Protected, application-scoped declarations and provider decisions. Acceptance records an agreement only: it does not resolve credentials, fund gas, provision a Safe, activate execution or authorize spending. User assets remain in individual user wallets. Secrets and actual user payloads must not be submitted here.',
+  });
+  app.get(
+    '/v1/application/obligations',
     {
-      schema: schema('readRuntimeWorkspace', workspaceSchema, {
+      schema: obligationSchema(
+        'readApplicationObligations',
+        obligationReadSchema,
+      ),
+    },
+    async (request) =>
+      configured().readObligations(
+        await principal(request, 'wallet:configuration:read'),
+      ),
+  );
+  app.get<{ Params: { applicationId: string } }>(
+    '/v1/provider/applications/:applicationId/obligations',
+    {
+      schema: obligationSchema(
+        'readProviderApplicationObligations',
+        obligationReadSchema,
+        {
+          params: params('applicationId', applicationIdSchema),
+        },
+      ),
+    },
+    async (request) =>
+      configured().readObligations(
+        await principal(request, 'wallet:configuration:write'),
+        request.params.applicationId,
+      ),
+  );
+  for (const kind of Object.keys(obligationSchemas) as ObligationKind[]) {
+    const name = kind[0].toUpperCase() + kind.slice(1);
+    app.put<{
+      Body: {
+        expected_revision: string;
+        value: ApplicationObligations[ObligationKind];
+      };
+    }>(
+      '/v1/application/obligations/' + kind,
+      {
+        bodyLimit: 32768,
+        schema: obligationSchema(
+          'submitApplication' + name,
+          obligationRecordSchema,
+          {
+            headers,
+            body: {
+              type: 'object',
+              additionalProperties: false,
+              required: ['expected_revision', 'value'],
+              properties: {
+                expected_revision: revisionSchema,
+                value: obligationSchemas[kind],
+              },
+            },
+          },
+        ),
+      },
+      async (request) =>
+        configured().submitObligation(
+          await context(request, 'wallet:configuration:propose'),
+          kind,
+          request.body,
+        ),
+    );
+    app.post<{
+      Params: { applicationId: string };
+      Body: {
+        expected_revision: string;
+        expected_decision_revision: string;
+        decision: 'accepted' | 'rejected';
+      };
+    }>(
+      '/v1/provider/applications/:applicationId/obligations/' +
+        kind +
+        '/decision',
+      {
+        schema: obligationSchema(
+          'decideApplication' + name,
+          obligationRecordSchema,
+          {
+            headers,
+            params: params('applicationId', applicationIdSchema),
+            body: {
+              type: 'object',
+              additionalProperties: false,
+              required: [
+                'expected_revision',
+                'expected_decision_revision',
+                'decision',
+              ],
+              properties: {
+                expected_revision: revisionSchema,
+                expected_decision_revision: revisionSchema,
+                decision: { type: 'string', enum: ['accepted', 'rejected'] },
+              },
+            },
+          },
+        ),
+      },
+      async (request) =>
+        configured().decideObligation(
+          await context(request, 'wallet:configuration:write'),
+          request.params.applicationId,
+          kind,
+          request.body,
+        ),
+    );
+  }
+  app.get<{ Querystring: { application_id?: string } }>(
+    '/v1/applications/configurations',
+    {
+      schema: schema('listApplicationConfigurations', applicationsSchema, {
         querystring: {
           type: 'object',
           additionalProperties: false,
@@ -265,13 +428,16 @@ export async function registerRuntimeConfigurationRoutes(
           throw error;
         caller = await principal(request, 'wallet:configuration:write');
       }
-      return configured().workspace(caller, request.query.application_id);
+      return configured().listApplications(
+        caller,
+        request.query.application_id,
+      );
     },
   );
   app.get(
-    '/v1/runtime-configuration/batches',
+    '/v1/wallet/batches',
     {
-      schema: schema('listRuntimeBatches', batchesSchema),
+      schema: schema('listWalletBatches', batchesSchema),
     },
     async (request) => {
       let caller;

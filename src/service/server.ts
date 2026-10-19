@@ -1,4 +1,3 @@
-import { registerOperatorUi } from './operator-ui.js';
 import { registerWalletCallsRoutes } from '../wallet-calls/http.js';
 import type { WalletCallsService } from '../wallet-calls/service.js';
 import { readFile } from 'node:fs/promises';
@@ -607,7 +606,6 @@ export async function createServer(options: ServerOptions = {}) {
     options.authenticate,
     isReady,
   );
-  if (options.runtimeConfiguration) await registerOperatorUi(app);
   await registerRuntimeConfigurationRoutes(
     app,
     options.runtimeConfiguration,

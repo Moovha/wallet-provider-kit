@@ -96,7 +96,7 @@ Follow [Policies fields](setup-wizard.md#_4-policies). The
 [access contract](application-access.md) connects those settings to the application's
 requests, user binding, consent and revocation. For contract registrations and
 policy publication after deployment, configure the optional
-[runtime workspace](runtime-workspace.md) here.
+[application configuration APIs](runtime-workspace.md) here.
 
 ## 5. Deployment
 
@@ -125,7 +125,7 @@ recovery evidence and saved operating commands.
 
 After deployment, your application developer follows the
 [access contract](application-access.md) and [HTTP guide](http-api.md).
-Use the [runtime workspace](runtime-workspace.md) for enabled contract/policy
+Use the [application configuration APIs](runtime-workspace.md) for enabled contract/policy
 management, and [operations](operations.md) for monitoring. When changing a
 running service, import its saved configuration and follow the
 [deployment maintenance process](operator-deployment.md); preserve its database,

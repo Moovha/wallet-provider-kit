@@ -18,11 +18,11 @@ function enable(enabled: boolean) {
 </script>
 <template>
   <section class="form-section">
-    <h3>Runtime contract workspace</h3>
+    <h3>Application policy APIs</h3>
     <p>
       Let applications register contracts and methods after deployment.
       Providers publish policies and choose automatic or manual registration
-      review at /operator/ on the running service.
+      review through the protected application configuration APIs.
     </p>
     <label
       ><input

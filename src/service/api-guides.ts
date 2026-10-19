@@ -24,8 +24,88 @@ export interface OperationGuide {
 }
 // Shared operator guidance. Runtime authentication and authority remain authoritative.
 export const operationGuides: Record<string, OperationGuide> = {
-  readRuntimeWorkspace: {
-    title: 'Read the runtime application workspace',
+  readApplicationObligations: {
+    title: 'Read your application obligations',
+    group: 'Application obligations',
+    scope: 'wallet:configuration:read',
+    runtimeConfiguration: true,
+    prerequisite:
+      'Use an enabled registered application for its own declarations, or an exact configured provider operator for decisions and cross-application inspection. Writes require a UUIDv4 idempotency key and the current resource revision. Decisions also require the current decision revision.',
+    success:
+      '200: durable application-scoped declarations or provider decisions. Changes return to pending review. Acceptance does not activate execution, resolve credentials, provision accounts or authorize spending. Submit schema declarations and opaque application-local secret references, never actual user payloads or credentials.',
+  },
+  readProviderApplicationObligations: {
+    title: 'Inspect application obligations as provider',
+    group: 'Application obligations',
+    scope: 'wallet:configuration:write',
+    runtimeConfiguration: true,
+    prerequisite:
+      'Use an enabled registered application for its own declarations, or an exact configured provider operator for decisions and cross-application inspection. Writes require a UUIDv4 idempotency key and the current resource revision. Decisions also require the current decision revision.',
+    success:
+      '200: durable application-scoped declarations or provider decisions. Changes return to pending review. Acceptance does not activate execution, resolve credentials, provision accounts or authorize spending. Submit schema declarations and opaque application-local secret references, never actual user payloads or credentials.',
+  },
+  submitApplicationActions: {
+    title: 'Declare expected actions and off-chain fields',
+    group: 'Application obligations',
+    scope: 'wallet:configuration:propose',
+    runtimeConfiguration: true,
+    prerequisite:
+      'Use an enabled registered application for its own declarations, or an exact configured provider operator for decisions and cross-application inspection. Writes require a UUIDv4 idempotency key and the current resource revision. Decisions also require the current decision revision.',
+    success:
+      '200: durable application-scoped declarations or provider decisions. Changes return to pending review. Acceptance does not activate execution, resolve credentials, provision accounts or authorize spending. Submit schema declarations and opaque application-local secret references, never actual user payloads or credentials.',
+  },
+  submitApplicationServices: {
+    title: 'Declare application-paid service accounts',
+    group: 'Application obligations',
+    scope: 'wallet:configuration:propose',
+    runtimeConfiguration: true,
+    prerequisite:
+      'Use an enabled registered application for its own declarations, or an exact configured provider operator for decisions and cross-application inspection. Writes require a UUIDv4 idempotency key and the current resource revision. Decisions also require the current decision revision.',
+    success:
+      '200: durable application-scoped declarations or provider decisions. Changes return to pending review. Acceptance does not activate execution, resolve credentials, provision accounts or authorize spending. Submit schema declarations and opaque application-local secret references, never actual user payloads or credentials.',
+  },
+  submitApplicationSponsorship: {
+    title: 'Declare application gas sponsorship',
+    group: 'Application obligations',
+    scope: 'wallet:configuration:propose',
+    runtimeConfiguration: true,
+    prerequisite:
+      'Use an enabled registered application for its own declarations, or an exact configured provider operator for decisions and cross-application inspection. Writes require a UUIDv4 idempotency key and the current resource revision. Decisions also require the current decision revision.',
+    success:
+      '200: durable application-scoped declarations or provider decisions. Changes return to pending review. Acceptance does not activate execution, resolve credentials, provision accounts or authorize spending. Submit schema declarations and opaque application-local secret references, never actual user payloads or credentials.',
+  },
+  decideApplicationActions: {
+    title: 'Accept or reject declared actions',
+    group: 'Application obligations',
+    scope: 'wallet:configuration:write',
+    runtimeConfiguration: true,
+    prerequisite:
+      'Use an enabled registered application for its own declarations, or an exact configured provider operator for decisions and cross-application inspection. Writes require a UUIDv4 idempotency key and the current resource revision. Decisions also require the current decision revision.',
+    success:
+      '200: durable application-scoped declarations or provider decisions. Changes return to pending review. Acceptance does not activate execution, resolve credentials, provision accounts or authorize spending. Submit schema declarations and opaque application-local secret references, never actual user payloads or credentials.',
+  },
+  decideApplicationServices: {
+    title: 'Accept or reject declared service accounts',
+    group: 'Application obligations',
+    scope: 'wallet:configuration:write',
+    runtimeConfiguration: true,
+    prerequisite:
+      'Use an enabled registered application for its own declarations, or an exact configured provider operator for decisions and cross-application inspection. Writes require a UUIDv4 idempotency key and the current resource revision. Decisions also require the current decision revision.',
+    success:
+      '200: durable application-scoped declarations or provider decisions. Changes return to pending review. Acceptance does not activate execution, resolve credentials, provision accounts or authorize spending. Submit schema declarations and opaque application-local secret references, never actual user payloads or credentials.',
+  },
+  decideApplicationSponsorship: {
+    title: 'Accept or reject declared gas sponsorship',
+    group: 'Application obligations',
+    scope: 'wallet:configuration:write',
+    runtimeConfiguration: true,
+    prerequisite:
+      'Use an enabled registered application for its own declarations, or an exact configured provider operator for decisions and cross-application inspection. Writes require a UUIDv4 idempotency key and the current resource revision. Decisions also require the current decision revision.',
+    success:
+      '200: durable application-scoped declarations or provider decisions. Changes return to pending review. Acceptance does not activate execution, resolve credentials, provision accounts or authorize spending. Submit schema declarations and opaque application-local secret references, never actual user payloads or credentials.',
+  },
+  listApplicationConfigurations: {
+    title: 'List application configurations',
     group: 'Runtime configuration',
     scope: 'wallet:configuration:read',
     runtimeConfiguration: true,
@@ -34,7 +114,7 @@ export const operationGuides: Record<string, OperationGuide> = {
     success:
       '200: enabled application summaries and selected policy/proposal details. The provider sees its configured applications; applications see only their own registration. No spending authority is granted.',
   },
-  listRuntimeBatches: {
+  listWalletBatches: {
     title: 'List readable wallet batches',
     group: 'Wallet calls',
     scope: 'wallet:execute:read',
@@ -51,7 +131,7 @@ export const operationGuides: Record<string, OperationGuide> = {
     scope: 'wallet:configuration:write',
     runtimeConfiguration: true,
     prerequisite:
-      'Publish a baseline policy first. An exact configured provider operator chooses automatic or manual review using both expected_revision and expected_review_revision with a UUID idempotency key. The workspace defaults the approval form to automatic acceptance.',
+      'Publish a baseline policy first. An exact configured provider operator chooses automatic or manual review using both expected_revision and expected_review_revision with a UUID idempotency key. Choose the review mode explicitly.',
     success:
       '200: a durable review decision. Automatic mode publishes subsequent contract/method changes only when provider terms exactly match the enabled current policy. Claims, value/call limits, validity, enablement and chain remain provider controlled. Existing pending proposals are not retroactively accepted.',
   },

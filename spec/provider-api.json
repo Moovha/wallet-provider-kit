@@ -12065,9 +12065,3760 @@
         }
       }
     },
-    "/v1/runtime-configuration/workspace": {
+    "/v1/application/obligations": {
       "get": {
-        "operationId": "readRuntimeWorkspace",
+        "operationId": "readApplicationObligations",
+        "tags": ["Application obligations"],
+        "description": "Protected, application-scoped declarations and provider decisions. Acceptance records an agreement only: it does not resolve credentials, fund gas, provision a Safe, activate execution or authorize spending. User assets remain in individual user wallets. Secrets and actual user payloads must not be submitted here.",
+        "security": [{ "accessToken": [] }],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "application_id",
+                    "resources",
+                    "authorizes_spending",
+                    "activates_execution"
+                  ],
+                  "properties": {
+                    "application_id": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    },
+                    "resources": {
+                      "type": "array",
+                      "maxItems": 3,
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "application_id",
+                          "kind",
+                          "revision",
+                          "value",
+                          "submitted_at",
+                          "decision",
+                          "decision_revision"
+                        ],
+                        "properties": {
+                          "application_id": {
+                            "type": "string",
+                            "pattern": "^[0-9a-f]{64}$"
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": ["actions", "services", "sponsorship"]
+                          },
+                          "revision": {
+                            "type": "string",
+                            "pattern": "^(0|[1-9][0-9]{0,19})$"
+                          },
+                          "value": {
+                            "anyOf": [
+                              {
+                                "type": "array",
+                                "maxItems": 64,
+                                "items": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "required": ["name", "description", "fields"],
+                                  "properties": {
+                                    "name": {
+                                      "type": "string",
+                                      "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+                                    },
+                                    "description": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 256
+                                    },
+                                    "fields": {
+                                      "type": "array",
+                                      "maxItems": 32,
+                                      "items": {
+                                        "type": "object",
+                                        "additionalProperties": false,
+                                        "required": [
+                                          "name",
+                                          "required",
+                                          "allowed_values"
+                                        ],
+                                        "properties": {
+                                          "name": {
+                                            "type": "string",
+                                            "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+                                          },
+                                          "required": { "type": "boolean" },
+                                          "allowed_values": {
+                                            "type": "array",
+                                            "minItems": 1,
+                                            "maxItems": 64,
+                                            "uniqueItems": true,
+                                            "items": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 128
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              },
+                              {
+                                "type": "array",
+                                "maxItems": 32,
+                                "items": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "required": [
+                                    "id",
+                                    "kind",
+                                    "vendor",
+                                    "credential_reference",
+                                    "billing_owner"
+                                  ],
+                                  "properties": {
+                                    "id": {
+                                      "type": "string",
+                                      "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+                                    },
+                                    "kind": {
+                                      "type": "string",
+                                      "enum": [
+                                        "rpc-verification",
+                                        "rpc-submission",
+                                        "other"
+                                      ]
+                                    },
+                                    "vendor": {
+                                      "type": "string",
+                                      "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+                                    },
+                                    "credential_reference": {
+                                      "type": "string",
+                                      "pattern": "^[a-zA-Z0-9_-]{1,128}$",
+                                      "description": "Opaque application-local secret-store reference. Never a credential, URL, environment-variable lookup or authority to read another application’s secret. Runtime resolution is not enabled by registration."
+                                    },
+                                    "billing_owner": {
+                                      "type": "string",
+                                      "enum": ["application"]
+                                    }
+                                  }
+                                }
+                              },
+                              {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                  "chain_id",
+                                  "funding_agreement",
+                                  "maximum_gas_budget_wei",
+                                  "account_model",
+                                  "asset_model"
+                                ],
+                                "properties": {
+                                  "chain_id": {
+                                    "type": "string",
+                                    "enum": ["eip155:8453", "eip155:84532"]
+                                  },
+                                  "funding_agreement": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 256
+                                  },
+                                  "maximum_gas_budget_wei": {
+                                    "type": "string",
+                                    "pattern": "^[1-9][0-9]{0,77}$"
+                                  },
+                                  "account_model": {
+                                    "type": "string",
+                                    "enum": [
+                                      "provider-controlled-application-safe"
+                                    ]
+                                  },
+                                  "asset_model": {
+                                    "type": "string",
+                                    "enum": ["individual-user-wallets"]
+                                  }
+                                }
+                              }
+                            ]
+                          },
+                          "submitted_at": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "decision": {
+                            "type": "string",
+                            "enum": ["pending", "accepted", "rejected"]
+                          },
+                          "decision_revision": {
+                            "type": "string",
+                            "pattern": "^(0|[1-9][0-9]{0,19})$"
+                          },
+                          "decided_at": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        }
+                      }
+                    },
+                    "authorizes_spending": {
+                      "type": "boolean",
+                      "enum": [false]
+                    },
+                    "activates_execution": {
+                      "type": "boolean",
+                      "enum": [false]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/provider/applications/{applicationId}/obligations": {
+      "get": {
+        "operationId": "readProviderApplicationObligations",
+        "tags": ["Application obligations"],
+        "description": "Protected, application-scoped declarations and provider decisions. Acceptance records an agreement only: it does not resolve credentials, fund gas, provision a Safe, activate execution or authorize spending. User assets remain in individual user wallets. Secrets and actual user payloads must not be submitted here.",
+        "parameters": [
+          {
+            "schema": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+            "in": "path",
+            "name": "applicationId",
+            "required": true
+          }
+        ],
+        "security": [{ "accessToken": [] }],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "application_id",
+                    "resources",
+                    "authorizes_spending",
+                    "activates_execution"
+                  ],
+                  "properties": {
+                    "application_id": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    },
+                    "resources": {
+                      "type": "array",
+                      "maxItems": 3,
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "application_id",
+                          "kind",
+                          "revision",
+                          "value",
+                          "submitted_at",
+                          "decision",
+                          "decision_revision"
+                        ],
+                        "properties": {
+                          "application_id": {
+                            "type": "string",
+                            "pattern": "^[0-9a-f]{64}$"
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": ["actions", "services", "sponsorship"]
+                          },
+                          "revision": {
+                            "type": "string",
+                            "pattern": "^(0|[1-9][0-9]{0,19})$"
+                          },
+                          "value": {
+                            "anyOf": [
+                              {
+                                "type": "array",
+                                "maxItems": 64,
+                                "items": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "required": ["name", "description", "fields"],
+                                  "properties": {
+                                    "name": {
+                                      "type": "string",
+                                      "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+                                    },
+                                    "description": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 256
+                                    },
+                                    "fields": {
+                                      "type": "array",
+                                      "maxItems": 32,
+                                      "items": {
+                                        "type": "object",
+                                        "additionalProperties": false,
+                                        "required": [
+                                          "name",
+                                          "required",
+                                          "allowed_values"
+                                        ],
+                                        "properties": {
+                                          "name": {
+                                            "type": "string",
+                                            "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+                                          },
+                                          "required": { "type": "boolean" },
+                                          "allowed_values": {
+                                            "type": "array",
+                                            "minItems": 1,
+                                            "maxItems": 64,
+                                            "uniqueItems": true,
+                                            "items": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 128
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              },
+                              {
+                                "type": "array",
+                                "maxItems": 32,
+                                "items": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "required": [
+                                    "id",
+                                    "kind",
+                                    "vendor",
+                                    "credential_reference",
+                                    "billing_owner"
+                                  ],
+                                  "properties": {
+                                    "id": {
+                                      "type": "string",
+                                      "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+                                    },
+                                    "kind": {
+                                      "type": "string",
+                                      "enum": [
+                                        "rpc-verification",
+                                        "rpc-submission",
+                                        "other"
+                                      ]
+                                    },
+                                    "vendor": {
+                                      "type": "string",
+                                      "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+                                    },
+                                    "credential_reference": {
+                                      "type": "string",
+                                      "pattern": "^[a-zA-Z0-9_-]{1,128}$",
+                                      "description": "Opaque application-local secret-store reference. Never a credential, URL, environment-variable lookup or authority to read another application’s secret. Runtime resolution is not enabled by registration."
+                                    },
+                                    "billing_owner": {
+                                      "type": "string",
+                                      "enum": ["application"]
+                                    }
+                                  }
+                                }
+                              },
+                              {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                  "chain_id",
+                                  "funding_agreement",
+                                  "maximum_gas_budget_wei",
+                                  "account_model",
+                                  "asset_model"
+                                ],
+                                "properties": {
+                                  "chain_id": {
+                                    "type": "string",
+                                    "enum": ["eip155:8453", "eip155:84532"]
+                                  },
+                                  "funding_agreement": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 256
+                                  },
+                                  "maximum_gas_budget_wei": {
+                                    "type": "string",
+                                    "pattern": "^[1-9][0-9]{0,77}$"
+                                  },
+                                  "account_model": {
+                                    "type": "string",
+                                    "enum": [
+                                      "provider-controlled-application-safe"
+                                    ]
+                                  },
+                                  "asset_model": {
+                                    "type": "string",
+                                    "enum": ["individual-user-wallets"]
+                                  }
+                                }
+                              }
+                            ]
+                          },
+                          "submitted_at": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "decision": {
+                            "type": "string",
+                            "enum": ["pending", "accepted", "rejected"]
+                          },
+                          "decision_revision": {
+                            "type": "string",
+                            "pattern": "^(0|[1-9][0-9]{0,19})$"
+                          },
+                          "decided_at": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        }
+                      }
+                    },
+                    "authorizes_spending": {
+                      "type": "boolean",
+                      "enum": [false]
+                    },
+                    "activates_execution": {
+                      "type": "boolean",
+                      "enum": [false]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/application/obligations/actions": {
+      "put": {
+        "operationId": "submitApplicationActions",
+        "tags": ["Application obligations"],
+        "description": "Protected, application-scoped declarations and provider decisions. Acceptance records an agreement only: it does not resolve credentials, fund gas, provision a Safe, activate execution or authorize spending. User assets remain in individual user wallets. Secrets and actual user payloads must not be submitted here.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["expected_revision", "value"],
+                "properties": {
+                  "expected_revision": {
+                    "type": "string",
+                    "pattern": "^(0|[1-9][0-9]{0,19})$"
+                  },
+                  "value": {
+                    "type": "array",
+                    "maxItems": 64,
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["name", "description", "fields"],
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+                        },
+                        "description": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 256
+                        },
+                        "fields": {
+                          "type": "array",
+                          "maxItems": 32,
+                          "items": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": ["name", "required", "allowed_values"],
+                            "properties": {
+                              "name": {
+                                "type": "string",
+                                "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+                              },
+                              "required": { "type": "boolean" },
+                              "allowed_values": {
+                                "type": "array",
+                                "minItems": 1,
+                                "maxItems": 64,
+                                "uniqueItems": true,
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 128
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            },
+            "in": "header",
+            "name": "idempotency-key",
+            "required": true
+          }
+        ],
+        "security": [{ "accessToken": [] }],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "application_id",
+                    "kind",
+                    "revision",
+                    "value",
+                    "submitted_at",
+                    "decision",
+                    "decision_revision"
+                  ],
+                  "properties": {
+                    "application_id": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": ["actions", "services", "sponsorship"]
+                    },
+                    "revision": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]{0,19})$"
+                    },
+                    "value": {
+                      "anyOf": [
+                        {
+                          "type": "array",
+                          "maxItems": 64,
+                          "items": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": ["name", "description", "fields"],
+                            "properties": {
+                              "name": {
+                                "type": "string",
+                                "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+                              },
+                              "description": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 256
+                              },
+                              "fields": {
+                                "type": "array",
+                                "maxItems": 32,
+                                "items": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "required": [
+                                    "name",
+                                    "required",
+                                    "allowed_values"
+                                  ],
+                                  "properties": {
+                                    "name": {
+                                      "type": "string",
+                                      "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+                                    },
+                                    "required": { "type": "boolean" },
+                                    "allowed_values": {
+                                      "type": "array",
+                                      "minItems": 1,
+                                      "maxItems": 64,
+                                      "uniqueItems": true,
+                                      "items": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 128
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        },
+                        {
+                          "type": "array",
+                          "maxItems": 32,
+                          "items": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "id",
+                              "kind",
+                              "vendor",
+                              "credential_reference",
+                              "billing_owner"
+                            ],
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+                              },
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "rpc-verification",
+                                  "rpc-submission",
+                                  "other"
+                                ]
+                              },
+                              "vendor": {
+                                "type": "string",
+                                "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+                              },
+                              "credential_reference": {
+                                "type": "string",
+                                "pattern": "^[a-zA-Z0-9_-]{1,128}$",
+                                "description": "Opaque application-local secret-store reference. Never a credential, URL, environment-variable lookup or authority to read another application’s secret. Runtime resolution is not enabled by registration."
+                              },
+                              "billing_owner": {
+                                "type": "string",
+                                "enum": ["application"]
+                              }
+                            }
+                          }
+                        },
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "chain_id",
+                            "funding_agreement",
+                            "maximum_gas_budget_wei",
+                            "account_model",
+                            "asset_model"
+                          ],
+                          "properties": {
+                            "chain_id": {
+                              "type": "string",
+                              "enum": ["eip155:8453", "eip155:84532"]
+                            },
+                            "funding_agreement": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 256
+                            },
+                            "maximum_gas_budget_wei": {
+                              "type": "string",
+                              "pattern": "^[1-9][0-9]{0,77}$"
+                            },
+                            "account_model": {
+                              "type": "string",
+                              "enum": ["provider-controlled-application-safe"]
+                            },
+                            "asset_model": {
+                              "type": "string",
+                              "enum": ["individual-user-wallets"]
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    "submitted_at": { "type": "string", "format": "date-time" },
+                    "decision": {
+                      "type": "string",
+                      "enum": ["pending", "accepted", "rejected"]
+                    },
+                    "decision_revision": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]{0,19})$"
+                    },
+                    "decided_at": { "type": "string", "format": "date-time" }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/provider/applications/{applicationId}/obligations/actions/decision": {
+      "post": {
+        "operationId": "decideApplicationActions",
+        "tags": ["Application obligations"],
+        "description": "Protected, application-scoped declarations and provider decisions. Acceptance records an agreement only: it does not resolve credentials, fund gas, provision a Safe, activate execution or authorize spending. User assets remain in individual user wallets. Secrets and actual user payloads must not be submitted here.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "expected_revision",
+                  "expected_decision_revision",
+                  "decision"
+                ],
+                "properties": {
+                  "expected_revision": {
+                    "type": "string",
+                    "pattern": "^(0|[1-9][0-9]{0,19})$"
+                  },
+                  "expected_decision_revision": {
+                    "type": "string",
+                    "pattern": "^(0|[1-9][0-9]{0,19})$"
+                  },
+                  "decision": {
+                    "type": "string",
+                    "enum": ["accepted", "rejected"]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+            "in": "path",
+            "name": "applicationId",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            },
+            "in": "header",
+            "name": "idempotency-key",
+            "required": true
+          }
+        ],
+        "security": [{ "accessToken": [] }],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "application_id",
+                    "kind",
+                    "revision",
+                    "value",
+                    "submitted_at",
+                    "decision",
+                    "decision_revision"
+                  ],
+                  "properties": {
+                    "application_id": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": ["actions", "services", "sponsorship"]
+                    },
+                    "revision": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]{0,19})$"
+                    },
+                    "value": {
+                      "anyOf": [
+                        {
+                          "type": "array",
+                          "maxItems": 64,
+                          "items": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": ["name", "description", "fields"],
+                            "properties": {
+                              "name": {
+                                "type": "string",
+                                "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+                              },
+                              "description": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 256
+                              },
+                              "fields": {
+                                "type": "array",
+                                "maxItems": 32,
+                                "items": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "required": [
+                                    "name",
+                                    "required",
+                                    "allowed_values"
+                                  ],
+                                  "properties": {
+                                    "name": {
+                                      "type": "string",
+                                      "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+                                    },
+                                    "required": { "type": "boolean" },
+                                    "allowed_values": {
+                                      "type": "array",
+                                      "minItems": 1,
+                                      "maxItems": 64,
+                                      "uniqueItems": true,
+                                      "items": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 128
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        },
+                        {
+                          "type": "array",
+                          "maxItems": 32,
+                          "items": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "id",
+                              "kind",
+                              "vendor",
+                              "credential_reference",
+                              "billing_owner"
+                            ],
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+                              },
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "rpc-verification",
+                                  "rpc-submission",
+                                  "other"
+                                ]
+                              },
+                              "vendor": {
+                                "type": "string",
+                                "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+                              },
+                              "credential_reference": {
+                                "type": "string",
+                                "pattern": "^[a-zA-Z0-9_-]{1,128}$",
+                                "description": "Opaque application-local secret-store reference. Never a credential, URL, environment-variable lookup or authority to read another application’s secret. Runtime resolution is not enabled by registration."
+                              },
+                              "billing_owner": {
+                                "type": "string",
+                                "enum": ["application"]
+                              }
+                            }
+                          }
+                        },
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "chain_id",
+                            "funding_agreement",
+                            "maximum_gas_budget_wei",
+                            "account_model",
+                            "asset_model"
+                          ],
+                          "properties": {
+                            "chain_id": {
+                              "type": "string",
+                              "enum": ["eip155:8453", "eip155:84532"]
+                            },
+                            "funding_agreement": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 256
+                            },
+                            "maximum_gas_budget_wei": {
+                              "type": "string",
+                              "pattern": "^[1-9][0-9]{0,77}$"
+                            },
+                            "account_model": {
+                              "type": "string",
+                              "enum": ["provider-controlled-application-safe"]
+                            },
+                            "asset_model": {
+                              "type": "string",
+                              "enum": ["individual-user-wallets"]
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    "submitted_at": { "type": "string", "format": "date-time" },
+                    "decision": {
+                      "type": "string",
+                      "enum": ["pending", "accepted", "rejected"]
+                    },
+                    "decision_revision": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]{0,19})$"
+                    },
+                    "decided_at": { "type": "string", "format": "date-time" }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/application/obligations/services": {
+      "put": {
+        "operationId": "submitApplicationServices",
+        "tags": ["Application obligations"],
+        "description": "Protected, application-scoped declarations and provider decisions. Acceptance records an agreement only: it does not resolve credentials, fund gas, provision a Safe, activate execution or authorize spending. User assets remain in individual user wallets. Secrets and actual user payloads must not be submitted here.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["expected_revision", "value"],
+                "properties": {
+                  "expected_revision": {
+                    "type": "string",
+                    "pattern": "^(0|[1-9][0-9]{0,19})$"
+                  },
+                  "value": {
+                    "type": "array",
+                    "maxItems": 32,
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "id",
+                        "kind",
+                        "vendor",
+                        "credential_reference",
+                        "billing_owner"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "rpc-verification",
+                            "rpc-submission",
+                            "other"
+                          ]
+                        },
+                        "vendor": {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+                        },
+                        "credential_reference": {
+                          "type": "string",
+                          "pattern": "^[a-zA-Z0-9_-]{1,128}$",
+                          "description": "Opaque application-local secret-store reference. Never a credential, URL, environment-variable lookup or authority to read another application’s secret. Runtime resolution is not enabled by registration."
+                        },
+                        "billing_owner": {
+                          "type": "string",
+                          "enum": ["application"]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            },
+            "in": "header",
+            "name": "idempotency-key",
+            "required": true
+          }
+        ],
+        "security": [{ "accessToken": [] }],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "application_id",
+                    "kind",
+                    "revision",
+                    "value",
+                    "submitted_at",
+                    "decision",
+                    "decision_revision"
+                  ],
+                  "properties": {
+                    "application_id": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": ["actions", "services", "sponsorship"]
+                    },
+                    "revision": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]{0,19})$"
+                    },
+                    "value": {
+                      "anyOf": [
+                        {
+                          "type": "array",
+                          "maxItems": 64,
+                          "items": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": ["name", "description", "fields"],
+                            "properties": {
+                              "name": {
+                                "type": "string",
+                                "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+                              },
+                              "description": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 256
+                              },
+                              "fields": {
+                                "type": "array",
+                                "maxItems": 32,
+                                "items": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "required": [
+                                    "name",
+                                    "required",
+                                    "allowed_values"
+                                  ],
+                                  "properties": {
+                                    "name": {
+                                      "type": "string",
+                                      "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+                                    },
+                                    "required": { "type": "boolean" },
+                                    "allowed_values": {
+                                      "type": "array",
+                                      "minItems": 1,
+                                      "maxItems": 64,
+                                      "uniqueItems": true,
+                                      "items": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 128
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        },
+                        {
+                          "type": "array",
+                          "maxItems": 32,
+                          "items": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "id",
+                              "kind",
+                              "vendor",
+                              "credential_reference",
+                              "billing_owner"
+                            ],
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+                              },
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "rpc-verification",
+                                  "rpc-submission",
+                                  "other"
+                                ]
+                              },
+                              "vendor": {
+                                "type": "string",
+                                "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+                              },
+                              "credential_reference": {
+                                "type": "string",
+                                "pattern": "^[a-zA-Z0-9_-]{1,128}$",
+                                "description": "Opaque application-local secret-store reference. Never a credential, URL, environment-variable lookup or authority to read another application’s secret. Runtime resolution is not enabled by registration."
+                              },
+                              "billing_owner": {
+                                "type": "string",
+                                "enum": ["application"]
+                              }
+                            }
+                          }
+                        },
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "chain_id",
+                            "funding_agreement",
+                            "maximum_gas_budget_wei",
+                            "account_model",
+                            "asset_model"
+                          ],
+                          "properties": {
+                            "chain_id": {
+                              "type": "string",
+                              "enum": ["eip155:8453", "eip155:84532"]
+                            },
+                            "funding_agreement": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 256
+                            },
+                            "maximum_gas_budget_wei": {
+                              "type": "string",
+                              "pattern": "^[1-9][0-9]{0,77}$"
+                            },
+                            "account_model": {
+                              "type": "string",
+                              "enum": ["provider-controlled-application-safe"]
+                            },
+                            "asset_model": {
+                              "type": "string",
+                              "enum": ["individual-user-wallets"]
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    "submitted_at": { "type": "string", "format": "date-time" },
+                    "decision": {
+                      "type": "string",
+                      "enum": ["pending", "accepted", "rejected"]
+                    },
+                    "decision_revision": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]{0,19})$"
+                    },
+                    "decided_at": { "type": "string", "format": "date-time" }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/provider/applications/{applicationId}/obligations/services/decision": {
+      "post": {
+        "operationId": "decideApplicationServices",
+        "tags": ["Application obligations"],
+        "description": "Protected, application-scoped declarations and provider decisions. Acceptance records an agreement only: it does not resolve credentials, fund gas, provision a Safe, activate execution or authorize spending. User assets remain in individual user wallets. Secrets and actual user payloads must not be submitted here.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "expected_revision",
+                  "expected_decision_revision",
+                  "decision"
+                ],
+                "properties": {
+                  "expected_revision": {
+                    "type": "string",
+                    "pattern": "^(0|[1-9][0-9]{0,19})$"
+                  },
+                  "expected_decision_revision": {
+                    "type": "string",
+                    "pattern": "^(0|[1-9][0-9]{0,19})$"
+                  },
+                  "decision": {
+                    "type": "string",
+                    "enum": ["accepted", "rejected"]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+            "in": "path",
+            "name": "applicationId",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            },
+            "in": "header",
+            "name": "idempotency-key",
+            "required": true
+          }
+        ],
+        "security": [{ "accessToken": [] }],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "application_id",
+                    "kind",
+                    "revision",
+                    "value",
+                    "submitted_at",
+                    "decision",
+                    "decision_revision"
+                  ],
+                  "properties": {
+                    "application_id": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": ["actions", "services", "sponsorship"]
+                    },
+                    "revision": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]{0,19})$"
+                    },
+                    "value": {
+                      "anyOf": [
+                        {
+                          "type": "array",
+                          "maxItems": 64,
+                          "items": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": ["name", "description", "fields"],
+                            "properties": {
+                              "name": {
+                                "type": "string",
+                                "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+                              },
+                              "description": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 256
+                              },
+                              "fields": {
+                                "type": "array",
+                                "maxItems": 32,
+                                "items": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "required": [
+                                    "name",
+                                    "required",
+                                    "allowed_values"
+                                  ],
+                                  "properties": {
+                                    "name": {
+                                      "type": "string",
+                                      "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+                                    },
+                                    "required": { "type": "boolean" },
+                                    "allowed_values": {
+                                      "type": "array",
+                                      "minItems": 1,
+                                      "maxItems": 64,
+                                      "uniqueItems": true,
+                                      "items": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 128
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        },
+                        {
+                          "type": "array",
+                          "maxItems": 32,
+                          "items": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "id",
+                              "kind",
+                              "vendor",
+                              "credential_reference",
+                              "billing_owner"
+                            ],
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+                              },
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "rpc-verification",
+                                  "rpc-submission",
+                                  "other"
+                                ]
+                              },
+                              "vendor": {
+                                "type": "string",
+                                "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+                              },
+                              "credential_reference": {
+                                "type": "string",
+                                "pattern": "^[a-zA-Z0-9_-]{1,128}$",
+                                "description": "Opaque application-local secret-store reference. Never a credential, URL, environment-variable lookup or authority to read another application’s secret. Runtime resolution is not enabled by registration."
+                              },
+                              "billing_owner": {
+                                "type": "string",
+                                "enum": ["application"]
+                              }
+                            }
+                          }
+                        },
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "chain_id",
+                            "funding_agreement",
+                            "maximum_gas_budget_wei",
+                            "account_model",
+                            "asset_model"
+                          ],
+                          "properties": {
+                            "chain_id": {
+                              "type": "string",
+                              "enum": ["eip155:8453", "eip155:84532"]
+                            },
+                            "funding_agreement": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 256
+                            },
+                            "maximum_gas_budget_wei": {
+                              "type": "string",
+                              "pattern": "^[1-9][0-9]{0,77}$"
+                            },
+                            "account_model": {
+                              "type": "string",
+                              "enum": ["provider-controlled-application-safe"]
+                            },
+                            "asset_model": {
+                              "type": "string",
+                              "enum": ["individual-user-wallets"]
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    "submitted_at": { "type": "string", "format": "date-time" },
+                    "decision": {
+                      "type": "string",
+                      "enum": ["pending", "accepted", "rejected"]
+                    },
+                    "decision_revision": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]{0,19})$"
+                    },
+                    "decided_at": { "type": "string", "format": "date-time" }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/application/obligations/sponsorship": {
+      "put": {
+        "operationId": "submitApplicationSponsorship",
+        "tags": ["Application obligations"],
+        "description": "Protected, application-scoped declarations and provider decisions. Acceptance records an agreement only: it does not resolve credentials, fund gas, provision a Safe, activate execution or authorize spending. User assets remain in individual user wallets. Secrets and actual user payloads must not be submitted here.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["expected_revision", "value"],
+                "properties": {
+                  "expected_revision": {
+                    "type": "string",
+                    "pattern": "^(0|[1-9][0-9]{0,19})$"
+                  },
+                  "value": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "chain_id",
+                      "funding_agreement",
+                      "maximum_gas_budget_wei",
+                      "account_model",
+                      "asset_model"
+                    ],
+                    "properties": {
+                      "chain_id": {
+                        "type": "string",
+                        "enum": ["eip155:8453", "eip155:84532"]
+                      },
+                      "funding_agreement": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 256
+                      },
+                      "maximum_gas_budget_wei": {
+                        "type": "string",
+                        "pattern": "^[1-9][0-9]{0,77}$"
+                      },
+                      "account_model": {
+                        "type": "string",
+                        "enum": ["provider-controlled-application-safe"]
+                      },
+                      "asset_model": {
+                        "type": "string",
+                        "enum": ["individual-user-wallets"]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            },
+            "in": "header",
+            "name": "idempotency-key",
+            "required": true
+          }
+        ],
+        "security": [{ "accessToken": [] }],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "application_id",
+                    "kind",
+                    "revision",
+                    "value",
+                    "submitted_at",
+                    "decision",
+                    "decision_revision"
+                  ],
+                  "properties": {
+                    "application_id": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": ["actions", "services", "sponsorship"]
+                    },
+                    "revision": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]{0,19})$"
+                    },
+                    "value": {
+                      "anyOf": [
+                        {
+                          "type": "array",
+                          "maxItems": 64,
+                          "items": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": ["name", "description", "fields"],
+                            "properties": {
+                              "name": {
+                                "type": "string",
+                                "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+                              },
+                              "description": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 256
+                              },
+                              "fields": {
+                                "type": "array",
+                                "maxItems": 32,
+                                "items": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "required": [
+                                    "name",
+                                    "required",
+                                    "allowed_values"
+                                  ],
+                                  "properties": {
+                                    "name": {
+                                      "type": "string",
+                                      "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+                                    },
+                                    "required": { "type": "boolean" },
+                                    "allowed_values": {
+                                      "type": "array",
+                                      "minItems": 1,
+                                      "maxItems": 64,
+                                      "uniqueItems": true,
+                                      "items": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 128
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        },
+                        {
+                          "type": "array",
+                          "maxItems": 32,
+                          "items": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "id",
+                              "kind",
+                              "vendor",
+                              "credential_reference",
+                              "billing_owner"
+                            ],
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+                              },
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "rpc-verification",
+                                  "rpc-submission",
+                                  "other"
+                                ]
+                              },
+                              "vendor": {
+                                "type": "string",
+                                "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+                              },
+                              "credential_reference": {
+                                "type": "string",
+                                "pattern": "^[a-zA-Z0-9_-]{1,128}$",
+                                "description": "Opaque application-local secret-store reference. Never a credential, URL, environment-variable lookup or authority to read another application’s secret. Runtime resolution is not enabled by registration."
+                              },
+                              "billing_owner": {
+                                "type": "string",
+                                "enum": ["application"]
+                              }
+                            }
+                          }
+                        },
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "chain_id",
+                            "funding_agreement",
+                            "maximum_gas_budget_wei",
+                            "account_model",
+                            "asset_model"
+                          ],
+                          "properties": {
+                            "chain_id": {
+                              "type": "string",
+                              "enum": ["eip155:8453", "eip155:84532"]
+                            },
+                            "funding_agreement": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 256
+                            },
+                            "maximum_gas_budget_wei": {
+                              "type": "string",
+                              "pattern": "^[1-9][0-9]{0,77}$"
+                            },
+                            "account_model": {
+                              "type": "string",
+                              "enum": ["provider-controlled-application-safe"]
+                            },
+                            "asset_model": {
+                              "type": "string",
+                              "enum": ["individual-user-wallets"]
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    "submitted_at": { "type": "string", "format": "date-time" },
+                    "decision": {
+                      "type": "string",
+                      "enum": ["pending", "accepted", "rejected"]
+                    },
+                    "decision_revision": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]{0,19})$"
+                    },
+                    "decided_at": { "type": "string", "format": "date-time" }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/provider/applications/{applicationId}/obligations/sponsorship/decision": {
+      "post": {
+        "operationId": "decideApplicationSponsorship",
+        "tags": ["Application obligations"],
+        "description": "Protected, application-scoped declarations and provider decisions. Acceptance records an agreement only: it does not resolve credentials, fund gas, provision a Safe, activate execution or authorize spending. User assets remain in individual user wallets. Secrets and actual user payloads must not be submitted here.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "expected_revision",
+                  "expected_decision_revision",
+                  "decision"
+                ],
+                "properties": {
+                  "expected_revision": {
+                    "type": "string",
+                    "pattern": "^(0|[1-9][0-9]{0,19})$"
+                  },
+                  "expected_decision_revision": {
+                    "type": "string",
+                    "pattern": "^(0|[1-9][0-9]{0,19})$"
+                  },
+                  "decision": {
+                    "type": "string",
+                    "enum": ["accepted", "rejected"]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+            "in": "path",
+            "name": "applicationId",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            },
+            "in": "header",
+            "name": "idempotency-key",
+            "required": true
+          }
+        ],
+        "security": [{ "accessToken": [] }],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "application_id",
+                    "kind",
+                    "revision",
+                    "value",
+                    "submitted_at",
+                    "decision",
+                    "decision_revision"
+                  ],
+                  "properties": {
+                    "application_id": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": ["actions", "services", "sponsorship"]
+                    },
+                    "revision": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]{0,19})$"
+                    },
+                    "value": {
+                      "anyOf": [
+                        {
+                          "type": "array",
+                          "maxItems": 64,
+                          "items": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": ["name", "description", "fields"],
+                            "properties": {
+                              "name": {
+                                "type": "string",
+                                "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+                              },
+                              "description": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 256
+                              },
+                              "fields": {
+                                "type": "array",
+                                "maxItems": 32,
+                                "items": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "required": [
+                                    "name",
+                                    "required",
+                                    "allowed_values"
+                                  ],
+                                  "properties": {
+                                    "name": {
+                                      "type": "string",
+                                      "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+                                    },
+                                    "required": { "type": "boolean" },
+                                    "allowed_values": {
+                                      "type": "array",
+                                      "minItems": 1,
+                                      "maxItems": 64,
+                                      "uniqueItems": true,
+                                      "items": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 128
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        },
+                        {
+                          "type": "array",
+                          "maxItems": 32,
+                          "items": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "id",
+                              "kind",
+                              "vendor",
+                              "credential_reference",
+                              "billing_owner"
+                            ],
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+                              },
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "rpc-verification",
+                                  "rpc-submission",
+                                  "other"
+                                ]
+                              },
+                              "vendor": {
+                                "type": "string",
+                                "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+                              },
+                              "credential_reference": {
+                                "type": "string",
+                                "pattern": "^[a-zA-Z0-9_-]{1,128}$",
+                                "description": "Opaque application-local secret-store reference. Never a credential, URL, environment-variable lookup or authority to read another application’s secret. Runtime resolution is not enabled by registration."
+                              },
+                              "billing_owner": {
+                                "type": "string",
+                                "enum": ["application"]
+                              }
+                            }
+                          }
+                        },
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "chain_id",
+                            "funding_agreement",
+                            "maximum_gas_budget_wei",
+                            "account_model",
+                            "asset_model"
+                          ],
+                          "properties": {
+                            "chain_id": {
+                              "type": "string",
+                              "enum": ["eip155:8453", "eip155:84532"]
+                            },
+                            "funding_agreement": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 256
+                            },
+                            "maximum_gas_budget_wei": {
+                              "type": "string",
+                              "pattern": "^[1-9][0-9]{0,77}$"
+                            },
+                            "account_model": {
+                              "type": "string",
+                              "enum": ["provider-controlled-application-safe"]
+                            },
+                            "asset_model": {
+                              "type": "string",
+                              "enum": ["individual-user-wallets"]
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    "submitted_at": { "type": "string", "format": "date-time" },
+                    "decision": {
+                      "type": "string",
+                      "enum": ["pending", "accepted", "rejected"]
+                    },
+                    "decision_revision": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]{0,19})$"
+                    },
+                    "decided_at": { "type": "string", "format": "date-time" }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/applications/configurations": {
+      "get": {
+        "operationId": "listApplicationConfigurations",
         "tags": ["Runtime configuration"],
         "description": "Optional runtime configuration control plane. Application proposals and provider publications are configuration records, not wallet grants, signing authority or execution activation. Publications become readable immediately without restarting the service. Immutable historical revisions remain available. Requires the documented scope and configured application or operator identity.",
         "parameters": [
@@ -14050,9 +17801,9 @@
         }
       }
     },
-    "/v1/runtime-configuration/batches": {
+    "/v1/wallet/batches": {
       "get": {
-        "operationId": "listRuntimeBatches",
+        "operationId": "listWalletBatches",
         "tags": ["Runtime configuration"],
         "description": "Optional runtime configuration control plane. Application proposals and provider publications are configuration records, not wallet grants, signing authority or execution activation. Publications become readable immediately without restarting the service. Immutable historical revisions remain available. Requires the documented scope and configured application or operator identity.",
         "security": [{ "accessToken": [] }],

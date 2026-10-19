@@ -3,9 +3,8 @@
 Applications may need to register additional contracts without a service restart.
 Enable runtime configuration in [Policies](setup-wizard.md#_4-policies) to let
 registered applications propose methods and separately authorized provider
-operators publish versioned policies. The [runtime workspace](runtime-workspace.md)
-offers forms for this task. This guide describes its API, revision rules and
-optional financial authority so your application developer can implement the same flow.
+operators publish versioned policies. Use the [application management APIs](runtime-workspace.md) and deployed Swagger explorer.
+This guide describes policy contracts, revision rules and optional financial authority.
 
 Application-led providers can opt into runtime contract authority for the existing
 Base Sepolia Safe 1.4.1 execution mechanism. Published targets, methods, native-value
@@ -14,8 +13,8 @@ preparation, signing and designated execution. Registration alone grants no wall
 access or spending authority. Without the explicit financial opt-in, the registry
 remains a configuration-only service and existing startup policies keep their behavior.
 
-Use the [runtime workspace](runtime-workspace.md) for contract registration,
-policy review/publication and batch tracking through forms. Providers explicitly
+Use the [application management APIs](runtime-workspace.md) for contract registration,
+policy publication and batch tracking. Providers explicitly
 allow automatic contract/method acceptance per application; provider requirements
 remain controlled by the published policy. The setup wizard can configure the
 operator boundary without editing JSON.
@@ -271,7 +270,7 @@ or vault effects. They do not certify beneficiary settlement. Native-value limit
 review permitted methods and their argument semantics accordingly. New execution
 mechanisms, business-effect verifiers and policy rule types require implementation.
 The [EIP-5792 adapter](wallet-calls.md) supplies standard batch submission and
-status for this Safe profile. Use the [runtime workspace](runtime-workspace.md) for operator forms. Real
+status for this Safe profile. Use the [application management APIs](runtime-workspace.md) for provider operations. Real
 test-network, provider and recovery acceptance remain required for your deployment;
 see the [support and acceptance reference](v1-standards.md).
 
@@ -289,7 +288,6 @@ uses the same provider/account/token allowance as ERC-3009. Publication requires
 fresh financial consent and retains existing usage; automatic contract acceptance
 does not approve changes to these terms. See [cumulative token allowances](approved-contract-calls.md#cumulative-token-allowances)
 for activation inventory, uncertainty, account compatibility and unsupported
-indirect asset exposure. Provider operators can edit these terms in the
-[runtime workspace](runtime-workspace.md#configure-optional-policy-adapters),
-review the change summary and publish through the existing configuration API.
+indirect asset exposure. Provider operators can review and publish these terms through the
+[configuration API](runtime-workspace.md#configure-optional-policy-adapters).
 Applications can view the published terms but cannot edit provider adapter rules.

@@ -113,11 +113,73 @@ export function operationStatus(
     return 'Not enabled: Wallet operations are disabled in Deployment';
   return 'Settings are present; deployed access has not been checked';
 }
+function obligationExample(
+  kind: string,
+  network?: ProviderConfiguration['network'],
+) {
+  if (kind === 'actions')
+    return [
+      {
+        name: 'pay_invoice',
+        description: 'Pay an approved invoice.',
+        fields: [
+          {
+            name: 'invoice_status',
+            required: true,
+            allowed_values: ['approved'],
+          },
+        ],
+      },
+    ];
+  if (kind === 'services')
+    return [
+      {
+        id: 'verification',
+        kind: 'rpc-verification',
+        vendor: 'example',
+        credential_reference: 'verification-primary',
+        billing_owner: 'application',
+      },
+    ];
+  return {
+    chain_id: providerNetwork(network).caip,
+    funding_agreement: 'Application-funded gas agreement',
+    maximum_gas_budget_wei: '1000000000000000',
+    account_model: 'provider-controlled-application-safe',
+    asset_model: 'individual-user-wallets',
+  };
+}
 export function requestExample(
   id: string,
   config: ProviderConfiguration,
   applicationIndex: number,
 ): object | undefined {
+  if (
+    [
+      'submitApplicationActions',
+      'submitApplicationServices',
+      'submitApplicationSponsorship',
+    ].includes(id)
+  )
+    return {
+      expected_revision: '0',
+      value: obligationExample(
+        id.slice('submitApplication'.length).toLowerCase(),
+        config.network,
+      ),
+    };
+  if (
+    [
+      'decideApplicationActions',
+      'decideApplicationServices',
+      'decideApplicationSponsorship',
+    ].includes(id)
+  )
+    return {
+      expected_revision: '1',
+      expected_decision_revision: '0',
+      decision: 'accepted',
+    };
   if (
     id === 'proposeRuntimeConfiguration' ||
     id === 'updateRuntimeConfiguration'
@@ -322,6 +384,43 @@ export function responseExample(
   config?: ProviderConfiguration,
   requestedPermissions?: string[],
 ): object {
+  if (
+    [
+      'readApplicationObligations',
+      'readProviderApplicationObligations',
+    ].includes(id)
+  )
+    return {
+      application_id: 'a'.repeat(64),
+      resources: [],
+      authorizes_spending: false,
+      activates_execution: false,
+    };
+  if (
+    [
+      'submitApplicationActions',
+      'submitApplicationServices',
+      'submitApplicationSponsorship',
+      'decideApplicationActions',
+      'decideApplicationServices',
+      'decideApplicationSponsorship',
+    ].includes(id)
+  ) {
+    const decision = id.startsWith('decide');
+    const kind = id
+      .slice((decision ? 'decideApplication' : 'submitApplication').length)
+      .toLowerCase();
+    return {
+      application_id: 'a'.repeat(64),
+      kind,
+      revision: '1',
+      value: obligationExample(kind, config?.network),
+      submitted_at: '2030-01-01T00:00:00.000Z',
+      decision: decision ? 'accepted' : 'pending',
+      decision_revision: decision ? '1' : '0',
+      ...(decision ? { decided_at: '2030-01-01T00:01:00.000Z' } : {}),
+    };
+  }
   if (id === 'authorizeSafeNonceCancellation')
     return {
       action_id: exampleId,
@@ -337,7 +436,7 @@ export function responseExample(
       address: '0x1111111111111111111111111111111111111111',
       status: 'pending',
     };
-  if (id === 'readRuntimeWorkspace')
+  if (id === 'listApplicationConfigurations')
     return {
       role: 'application',
       applications: [
@@ -351,7 +450,7 @@ export function responseExample(
         },
       ],
     };
-  if (id === 'listRuntimeBatches') return { truncated: false, batches: [] };
+  if (id === 'listWalletBatches') return { truncated: false, batches: [] };
   if (id === 'setRuntimeReviewMode')
     return { mode: 'automatic', revision: '1', approved_by: 'c'.repeat(64) };
   if (

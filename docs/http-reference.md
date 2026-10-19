@@ -7802,9 +7802,1881 @@ Success response schema:
 }
 ```
 
-## GET /v1/runtime-configuration/workspace
+## GET /v1/application/obligations
 
-Operation: `readRuntimeWorkspace`.
+Operation: `readApplicationObligations`.
+
+Protected, application-scoped declarations and provider decisions. Acceptance records an agreement only: it does not resolve credentials, fund gas, provision a Safe, activate execution or authorize spending. User assets remain in individual user wallets. Secrets and actual user payloads must not be submitted here.
+
+| Status | Content type             | Description      |
+| ------ | ------------------------ | ---------------- |
+| 200    | application/json         | Default Response |
+| 400    | application/problem+json | Problem response |
+| 401    | application/problem+json | Problem response |
+| 403    | application/problem+json | Problem response |
+| 409    | application/problem+json | Problem response |
+| 413    | application/problem+json | Problem response |
+| 415    | application/problem+json | Problem response |
+| 422    | application/problem+json | Problem response |
+| 429    | application/problem+json | Problem response |
+| 500    | application/problem+json | Problem response |
+| 503    | application/problem+json | Problem response |
+
+Success response schema:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "application_id",
+    "resources",
+    "authorizes_spending",
+    "activates_execution"
+  ],
+  "properties": {
+    "application_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "resources": {
+      "type": "array",
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "application_id",
+          "kind",
+          "revision",
+          "value",
+          "submitted_at",
+          "decision",
+          "decision_revision"
+        ],
+        "properties": {
+          "application_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "kind": {
+            "type": "string",
+            "enum": ["actions", "services", "sponsorship"]
+          },
+          "revision": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]{0,19})$"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "array",
+                "maxItems": 64,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["name", "description", "fields"],
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+                    },
+                    "description": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 256
+                    },
+                    "fields": {
+                      "type": "array",
+                      "maxItems": 32,
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["name", "required", "allowed_values"],
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+                          },
+                          "required": {
+                            "type": "boolean"
+                          },
+                          "allowed_values": {
+                            "type": "array",
+                            "minItems": 1,
+                            "maxItems": 64,
+                            "uniqueItems": true,
+                            "items": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 128
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "type": "array",
+                "maxItems": 32,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "id",
+                    "kind",
+                    "vendor",
+                    "credential_reference",
+                    "billing_owner"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": ["rpc-verification", "rpc-submission", "other"]
+                    },
+                    "vendor": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+                    },
+                    "credential_reference": {
+                      "type": "string",
+                      "pattern": "^[a-zA-Z0-9_-]{1,128}$",
+                      "description": "Opaque application-local secret-store reference. Never a credential, URL, environment-variable lookup or authority to read another application’s secret. Runtime resolution is not enabled by registration."
+                    },
+                    "billing_owner": {
+                      "type": "string",
+                      "enum": ["application"]
+                    }
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "chain_id",
+                  "funding_agreement",
+                  "maximum_gas_budget_wei",
+                  "account_model",
+                  "asset_model"
+                ],
+                "properties": {
+                  "chain_id": {
+                    "type": "string",
+                    "enum": ["eip155:8453", "eip155:84532"]
+                  },
+                  "funding_agreement": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  },
+                  "maximum_gas_budget_wei": {
+                    "type": "string",
+                    "pattern": "^[1-9][0-9]{0,77}$"
+                  },
+                  "account_model": {
+                    "type": "string",
+                    "enum": ["provider-controlled-application-safe"]
+                  },
+                  "asset_model": {
+                    "type": "string",
+                    "enum": ["individual-user-wallets"]
+                  }
+                }
+              }
+            ]
+          },
+          "submitted_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "decision": {
+            "type": "string",
+            "enum": ["pending", "accepted", "rejected"]
+          },
+          "decision_revision": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]{0,19})$"
+          },
+          "decided_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      }
+    },
+    "authorizes_spending": {
+      "type": "boolean",
+      "enum": [false]
+    },
+    "activates_execution": {
+      "type": "boolean",
+      "enum": [false]
+    }
+  }
+}
+```
+
+## GET /v1/provider/applications/{applicationId}/obligations
+
+Operation: `readProviderApplicationObligations`.
+
+Protected, application-scoped declarations and provider decisions. Acceptance records an agreement only: it does not resolve credentials, fund gas, provision a Safe, activate execution or authorize spending. User assets remain in individual user wallets. Secrets and actual user payloads must not be submitted here.
+
+| Parameter       | Location | Required | Schema                                         |
+| --------------- | -------- | -------- | ---------------------------------------------- |
+| `applicationId` | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{64}$"}` |
+
+| Status | Content type             | Description      |
+| ------ | ------------------------ | ---------------- |
+| 200    | application/json         | Default Response |
+| 400    | application/problem+json | Problem response |
+| 401    | application/problem+json | Problem response |
+| 403    | application/problem+json | Problem response |
+| 409    | application/problem+json | Problem response |
+| 413    | application/problem+json | Problem response |
+| 415    | application/problem+json | Problem response |
+| 422    | application/problem+json | Problem response |
+| 429    | application/problem+json | Problem response |
+| 500    | application/problem+json | Problem response |
+| 503    | application/problem+json | Problem response |
+
+Success response schema:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "application_id",
+    "resources",
+    "authorizes_spending",
+    "activates_execution"
+  ],
+  "properties": {
+    "application_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "resources": {
+      "type": "array",
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "application_id",
+          "kind",
+          "revision",
+          "value",
+          "submitted_at",
+          "decision",
+          "decision_revision"
+        ],
+        "properties": {
+          "application_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "kind": {
+            "type": "string",
+            "enum": ["actions", "services", "sponsorship"]
+          },
+          "revision": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]{0,19})$"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "array",
+                "maxItems": 64,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["name", "description", "fields"],
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+                    },
+                    "description": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 256
+                    },
+                    "fields": {
+                      "type": "array",
+                      "maxItems": 32,
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["name", "required", "allowed_values"],
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+                          },
+                          "required": {
+                            "type": "boolean"
+                          },
+                          "allowed_values": {
+                            "type": "array",
+                            "minItems": 1,
+                            "maxItems": 64,
+                            "uniqueItems": true,
+                            "items": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 128
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "type": "array",
+                "maxItems": 32,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "id",
+                    "kind",
+                    "vendor",
+                    "credential_reference",
+                    "billing_owner"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": ["rpc-verification", "rpc-submission", "other"]
+                    },
+                    "vendor": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+                    },
+                    "credential_reference": {
+                      "type": "string",
+                      "pattern": "^[a-zA-Z0-9_-]{1,128}$",
+                      "description": "Opaque application-local secret-store reference. Never a credential, URL, environment-variable lookup or authority to read another application’s secret. Runtime resolution is not enabled by registration."
+                    },
+                    "billing_owner": {
+                      "type": "string",
+                      "enum": ["application"]
+                    }
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "chain_id",
+                  "funding_agreement",
+                  "maximum_gas_budget_wei",
+                  "account_model",
+                  "asset_model"
+                ],
+                "properties": {
+                  "chain_id": {
+                    "type": "string",
+                    "enum": ["eip155:8453", "eip155:84532"]
+                  },
+                  "funding_agreement": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  },
+                  "maximum_gas_budget_wei": {
+                    "type": "string",
+                    "pattern": "^[1-9][0-9]{0,77}$"
+                  },
+                  "account_model": {
+                    "type": "string",
+                    "enum": ["provider-controlled-application-safe"]
+                  },
+                  "asset_model": {
+                    "type": "string",
+                    "enum": ["individual-user-wallets"]
+                  }
+                }
+              }
+            ]
+          },
+          "submitted_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "decision": {
+            "type": "string",
+            "enum": ["pending", "accepted", "rejected"]
+          },
+          "decision_revision": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]{0,19})$"
+          },
+          "decided_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      }
+    },
+    "authorizes_spending": {
+      "type": "boolean",
+      "enum": [false]
+    },
+    "activates_execution": {
+      "type": "boolean",
+      "enum": [false]
+    }
+  }
+}
+```
+
+## PUT /v1/application/obligations/actions
+
+Operation: `submitApplicationActions`.
+
+Protected, application-scoped declarations and provider decisions. Acceptance records an agreement only: it does not resolve credentials, fund gas, provision a Safe, activate execution or authorize spending. User assets remain in individual user wallets. Secrets and actual user payloads must not be submitted here.
+
+| Parameter         | Location | Required | Schema                                                                                                |
+| ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
+| `idempotency-key` | header   | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+
+Request body (application/json):
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["expected_revision", "value"],
+  "properties": {
+    "expected_revision": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,19})$"
+    },
+    "value": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "description", "fields"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "fields": {
+            "type": "array",
+            "maxItems": 32,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["name", "required", "allowed_values"],
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+                },
+                "required": {
+                  "type": "boolean"
+                },
+                "allowed_values": {
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 64,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+| Status | Content type             | Description      |
+| ------ | ------------------------ | ---------------- |
+| 200    | application/json         | Default Response |
+| 400    | application/problem+json | Problem response |
+| 401    | application/problem+json | Problem response |
+| 403    | application/problem+json | Problem response |
+| 409    | application/problem+json | Problem response |
+| 413    | application/problem+json | Problem response |
+| 415    | application/problem+json | Problem response |
+| 422    | application/problem+json | Problem response |
+| 429    | application/problem+json | Problem response |
+| 500    | application/problem+json | Problem response |
+| 503    | application/problem+json | Problem response |
+
+Success response schema:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "application_id",
+    "kind",
+    "revision",
+    "value",
+    "submitted_at",
+    "decision",
+    "decision_revision"
+  ],
+  "properties": {
+    "application_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "kind": {
+      "type": "string",
+      "enum": ["actions", "services", "sponsorship"]
+    },
+    "revision": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,19})$"
+    },
+    "value": {
+      "anyOf": [
+        {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "description", "fields"],
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+              },
+              "description": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "fields": {
+                "type": "array",
+                "maxItems": 32,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["name", "required", "allowed_values"],
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+                    },
+                    "required": {
+                      "type": "boolean"
+                    },
+                    "allowed_values": {
+                      "type": "array",
+                      "minItems": 1,
+                      "maxItems": 64,
+                      "uniqueItems": true,
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "kind",
+              "vendor",
+              "credential_reference",
+              "billing_owner"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+              },
+              "kind": {
+                "type": "string",
+                "enum": ["rpc-verification", "rpc-submission", "other"]
+              },
+              "vendor": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+              },
+              "credential_reference": {
+                "type": "string",
+                "pattern": "^[a-zA-Z0-9_-]{1,128}$",
+                "description": "Opaque application-local secret-store reference. Never a credential, URL, environment-variable lookup or authority to read another application’s secret. Runtime resolution is not enabled by registration."
+              },
+              "billing_owner": {
+                "type": "string",
+                "enum": ["application"]
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "chain_id",
+            "funding_agreement",
+            "maximum_gas_budget_wei",
+            "account_model",
+            "asset_model"
+          ],
+          "properties": {
+            "chain_id": {
+              "type": "string",
+              "enum": ["eip155:8453", "eip155:84532"]
+            },
+            "funding_agreement": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "maximum_gas_budget_wei": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,77}$"
+            },
+            "account_model": {
+              "type": "string",
+              "enum": ["provider-controlled-application-safe"]
+            },
+            "asset_model": {
+              "type": "string",
+              "enum": ["individual-user-wallets"]
+            }
+          }
+        }
+      ]
+    },
+    "submitted_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "decision": {
+      "type": "string",
+      "enum": ["pending", "accepted", "rejected"]
+    },
+    "decision_revision": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,19})$"
+    },
+    "decided_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}
+```
+
+## POST /v1/provider/applications/{applicationId}/obligations/actions/decision
+
+Operation: `decideApplicationActions`.
+
+Protected, application-scoped declarations and provider decisions. Acceptance records an agreement only: it does not resolve credentials, fund gas, provision a Safe, activate execution or authorize spending. User assets remain in individual user wallets. Secrets and actual user payloads must not be submitted here.
+
+| Parameter         | Location | Required | Schema                                                                                                |
+| ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
+| `applicationId`   | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{64}$"}`                                                        |
+| `idempotency-key` | header   | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+
+Request body (application/json):
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["expected_revision", "expected_decision_revision", "decision"],
+  "properties": {
+    "expected_revision": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,19})$"
+    },
+    "expected_decision_revision": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,19})$"
+    },
+    "decision": {
+      "type": "string",
+      "enum": ["accepted", "rejected"]
+    }
+  }
+}
+```
+
+| Status | Content type             | Description      |
+| ------ | ------------------------ | ---------------- |
+| 200    | application/json         | Default Response |
+| 400    | application/problem+json | Problem response |
+| 401    | application/problem+json | Problem response |
+| 403    | application/problem+json | Problem response |
+| 409    | application/problem+json | Problem response |
+| 413    | application/problem+json | Problem response |
+| 415    | application/problem+json | Problem response |
+| 422    | application/problem+json | Problem response |
+| 429    | application/problem+json | Problem response |
+| 500    | application/problem+json | Problem response |
+| 503    | application/problem+json | Problem response |
+
+Success response schema:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "application_id",
+    "kind",
+    "revision",
+    "value",
+    "submitted_at",
+    "decision",
+    "decision_revision"
+  ],
+  "properties": {
+    "application_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "kind": {
+      "type": "string",
+      "enum": ["actions", "services", "sponsorship"]
+    },
+    "revision": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,19})$"
+    },
+    "value": {
+      "anyOf": [
+        {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "description", "fields"],
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+              },
+              "description": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "fields": {
+                "type": "array",
+                "maxItems": 32,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["name", "required", "allowed_values"],
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+                    },
+                    "required": {
+                      "type": "boolean"
+                    },
+                    "allowed_values": {
+                      "type": "array",
+                      "minItems": 1,
+                      "maxItems": 64,
+                      "uniqueItems": true,
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "kind",
+              "vendor",
+              "credential_reference",
+              "billing_owner"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+              },
+              "kind": {
+                "type": "string",
+                "enum": ["rpc-verification", "rpc-submission", "other"]
+              },
+              "vendor": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+              },
+              "credential_reference": {
+                "type": "string",
+                "pattern": "^[a-zA-Z0-9_-]{1,128}$",
+                "description": "Opaque application-local secret-store reference. Never a credential, URL, environment-variable lookup or authority to read another application’s secret. Runtime resolution is not enabled by registration."
+              },
+              "billing_owner": {
+                "type": "string",
+                "enum": ["application"]
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "chain_id",
+            "funding_agreement",
+            "maximum_gas_budget_wei",
+            "account_model",
+            "asset_model"
+          ],
+          "properties": {
+            "chain_id": {
+              "type": "string",
+              "enum": ["eip155:8453", "eip155:84532"]
+            },
+            "funding_agreement": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "maximum_gas_budget_wei": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,77}$"
+            },
+            "account_model": {
+              "type": "string",
+              "enum": ["provider-controlled-application-safe"]
+            },
+            "asset_model": {
+              "type": "string",
+              "enum": ["individual-user-wallets"]
+            }
+          }
+        }
+      ]
+    },
+    "submitted_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "decision": {
+      "type": "string",
+      "enum": ["pending", "accepted", "rejected"]
+    },
+    "decision_revision": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,19})$"
+    },
+    "decided_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}
+```
+
+## PUT /v1/application/obligations/services
+
+Operation: `submitApplicationServices`.
+
+Protected, application-scoped declarations and provider decisions. Acceptance records an agreement only: it does not resolve credentials, fund gas, provision a Safe, activate execution or authorize spending. User assets remain in individual user wallets. Secrets and actual user payloads must not be submitted here.
+
+| Parameter         | Location | Required | Schema                                                                                                |
+| ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
+| `idempotency-key` | header   | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+
+Request body (application/json):
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["expected_revision", "value"],
+  "properties": {
+    "expected_revision": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,19})$"
+    },
+    "value": {
+      "type": "array",
+      "maxItems": 32,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "kind",
+          "vendor",
+          "credential_reference",
+          "billing_owner"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+          },
+          "kind": {
+            "type": "string",
+            "enum": ["rpc-verification", "rpc-submission", "other"]
+          },
+          "vendor": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+          },
+          "credential_reference": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9_-]{1,128}$",
+            "description": "Opaque application-local secret-store reference. Never a credential, URL, environment-variable lookup or authority to read another application’s secret. Runtime resolution is not enabled by registration."
+          },
+          "billing_owner": {
+            "type": "string",
+            "enum": ["application"]
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+| Status | Content type             | Description      |
+| ------ | ------------------------ | ---------------- |
+| 200    | application/json         | Default Response |
+| 400    | application/problem+json | Problem response |
+| 401    | application/problem+json | Problem response |
+| 403    | application/problem+json | Problem response |
+| 409    | application/problem+json | Problem response |
+| 413    | application/problem+json | Problem response |
+| 415    | application/problem+json | Problem response |
+| 422    | application/problem+json | Problem response |
+| 429    | application/problem+json | Problem response |
+| 500    | application/problem+json | Problem response |
+| 503    | application/problem+json | Problem response |
+
+Success response schema:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "application_id",
+    "kind",
+    "revision",
+    "value",
+    "submitted_at",
+    "decision",
+    "decision_revision"
+  ],
+  "properties": {
+    "application_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "kind": {
+      "type": "string",
+      "enum": ["actions", "services", "sponsorship"]
+    },
+    "revision": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,19})$"
+    },
+    "value": {
+      "anyOf": [
+        {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "description", "fields"],
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+              },
+              "description": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "fields": {
+                "type": "array",
+                "maxItems": 32,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["name", "required", "allowed_values"],
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+                    },
+                    "required": {
+                      "type": "boolean"
+                    },
+                    "allowed_values": {
+                      "type": "array",
+                      "minItems": 1,
+                      "maxItems": 64,
+                      "uniqueItems": true,
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "kind",
+              "vendor",
+              "credential_reference",
+              "billing_owner"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+              },
+              "kind": {
+                "type": "string",
+                "enum": ["rpc-verification", "rpc-submission", "other"]
+              },
+              "vendor": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+              },
+              "credential_reference": {
+                "type": "string",
+                "pattern": "^[a-zA-Z0-9_-]{1,128}$",
+                "description": "Opaque application-local secret-store reference. Never a credential, URL, environment-variable lookup or authority to read another application’s secret. Runtime resolution is not enabled by registration."
+              },
+              "billing_owner": {
+                "type": "string",
+                "enum": ["application"]
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "chain_id",
+            "funding_agreement",
+            "maximum_gas_budget_wei",
+            "account_model",
+            "asset_model"
+          ],
+          "properties": {
+            "chain_id": {
+              "type": "string",
+              "enum": ["eip155:8453", "eip155:84532"]
+            },
+            "funding_agreement": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "maximum_gas_budget_wei": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,77}$"
+            },
+            "account_model": {
+              "type": "string",
+              "enum": ["provider-controlled-application-safe"]
+            },
+            "asset_model": {
+              "type": "string",
+              "enum": ["individual-user-wallets"]
+            }
+          }
+        }
+      ]
+    },
+    "submitted_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "decision": {
+      "type": "string",
+      "enum": ["pending", "accepted", "rejected"]
+    },
+    "decision_revision": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,19})$"
+    },
+    "decided_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}
+```
+
+## POST /v1/provider/applications/{applicationId}/obligations/services/decision
+
+Operation: `decideApplicationServices`.
+
+Protected, application-scoped declarations and provider decisions. Acceptance records an agreement only: it does not resolve credentials, fund gas, provision a Safe, activate execution or authorize spending. User assets remain in individual user wallets. Secrets and actual user payloads must not be submitted here.
+
+| Parameter         | Location | Required | Schema                                                                                                |
+| ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
+| `applicationId`   | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{64}$"}`                                                        |
+| `idempotency-key` | header   | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+
+Request body (application/json):
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["expected_revision", "expected_decision_revision", "decision"],
+  "properties": {
+    "expected_revision": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,19})$"
+    },
+    "expected_decision_revision": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,19})$"
+    },
+    "decision": {
+      "type": "string",
+      "enum": ["accepted", "rejected"]
+    }
+  }
+}
+```
+
+| Status | Content type             | Description      |
+| ------ | ------------------------ | ---------------- |
+| 200    | application/json         | Default Response |
+| 400    | application/problem+json | Problem response |
+| 401    | application/problem+json | Problem response |
+| 403    | application/problem+json | Problem response |
+| 409    | application/problem+json | Problem response |
+| 413    | application/problem+json | Problem response |
+| 415    | application/problem+json | Problem response |
+| 422    | application/problem+json | Problem response |
+| 429    | application/problem+json | Problem response |
+| 500    | application/problem+json | Problem response |
+| 503    | application/problem+json | Problem response |
+
+Success response schema:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "application_id",
+    "kind",
+    "revision",
+    "value",
+    "submitted_at",
+    "decision",
+    "decision_revision"
+  ],
+  "properties": {
+    "application_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "kind": {
+      "type": "string",
+      "enum": ["actions", "services", "sponsorship"]
+    },
+    "revision": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,19})$"
+    },
+    "value": {
+      "anyOf": [
+        {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "description", "fields"],
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+              },
+              "description": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "fields": {
+                "type": "array",
+                "maxItems": 32,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["name", "required", "allowed_values"],
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+                    },
+                    "required": {
+                      "type": "boolean"
+                    },
+                    "allowed_values": {
+                      "type": "array",
+                      "minItems": 1,
+                      "maxItems": 64,
+                      "uniqueItems": true,
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "kind",
+              "vendor",
+              "credential_reference",
+              "billing_owner"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+              },
+              "kind": {
+                "type": "string",
+                "enum": ["rpc-verification", "rpc-submission", "other"]
+              },
+              "vendor": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+              },
+              "credential_reference": {
+                "type": "string",
+                "pattern": "^[a-zA-Z0-9_-]{1,128}$",
+                "description": "Opaque application-local secret-store reference. Never a credential, URL, environment-variable lookup or authority to read another application’s secret. Runtime resolution is not enabled by registration."
+              },
+              "billing_owner": {
+                "type": "string",
+                "enum": ["application"]
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "chain_id",
+            "funding_agreement",
+            "maximum_gas_budget_wei",
+            "account_model",
+            "asset_model"
+          ],
+          "properties": {
+            "chain_id": {
+              "type": "string",
+              "enum": ["eip155:8453", "eip155:84532"]
+            },
+            "funding_agreement": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "maximum_gas_budget_wei": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,77}$"
+            },
+            "account_model": {
+              "type": "string",
+              "enum": ["provider-controlled-application-safe"]
+            },
+            "asset_model": {
+              "type": "string",
+              "enum": ["individual-user-wallets"]
+            }
+          }
+        }
+      ]
+    },
+    "submitted_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "decision": {
+      "type": "string",
+      "enum": ["pending", "accepted", "rejected"]
+    },
+    "decision_revision": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,19})$"
+    },
+    "decided_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}
+```
+
+## PUT /v1/application/obligations/sponsorship
+
+Operation: `submitApplicationSponsorship`.
+
+Protected, application-scoped declarations and provider decisions. Acceptance records an agreement only: it does not resolve credentials, fund gas, provision a Safe, activate execution or authorize spending. User assets remain in individual user wallets. Secrets and actual user payloads must not be submitted here.
+
+| Parameter         | Location | Required | Schema                                                                                                |
+| ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
+| `idempotency-key` | header   | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+
+Request body (application/json):
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["expected_revision", "value"],
+  "properties": {
+    "expected_revision": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,19})$"
+    },
+    "value": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "chain_id",
+        "funding_agreement",
+        "maximum_gas_budget_wei",
+        "account_model",
+        "asset_model"
+      ],
+      "properties": {
+        "chain_id": {
+          "type": "string",
+          "enum": ["eip155:8453", "eip155:84532"]
+        },
+        "funding_agreement": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "maximum_gas_budget_wei": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]{0,77}$"
+        },
+        "account_model": {
+          "type": "string",
+          "enum": ["provider-controlled-application-safe"]
+        },
+        "asset_model": {
+          "type": "string",
+          "enum": ["individual-user-wallets"]
+        }
+      }
+    }
+  }
+}
+```
+
+| Status | Content type             | Description      |
+| ------ | ------------------------ | ---------------- |
+| 200    | application/json         | Default Response |
+| 400    | application/problem+json | Problem response |
+| 401    | application/problem+json | Problem response |
+| 403    | application/problem+json | Problem response |
+| 409    | application/problem+json | Problem response |
+| 413    | application/problem+json | Problem response |
+| 415    | application/problem+json | Problem response |
+| 422    | application/problem+json | Problem response |
+| 429    | application/problem+json | Problem response |
+| 500    | application/problem+json | Problem response |
+| 503    | application/problem+json | Problem response |
+
+Success response schema:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "application_id",
+    "kind",
+    "revision",
+    "value",
+    "submitted_at",
+    "decision",
+    "decision_revision"
+  ],
+  "properties": {
+    "application_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "kind": {
+      "type": "string",
+      "enum": ["actions", "services", "sponsorship"]
+    },
+    "revision": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,19})$"
+    },
+    "value": {
+      "anyOf": [
+        {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "description", "fields"],
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+              },
+              "description": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "fields": {
+                "type": "array",
+                "maxItems": 32,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["name", "required", "allowed_values"],
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+                    },
+                    "required": {
+                      "type": "boolean"
+                    },
+                    "allowed_values": {
+                      "type": "array",
+                      "minItems": 1,
+                      "maxItems": 64,
+                      "uniqueItems": true,
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "kind",
+              "vendor",
+              "credential_reference",
+              "billing_owner"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+              },
+              "kind": {
+                "type": "string",
+                "enum": ["rpc-verification", "rpc-submission", "other"]
+              },
+              "vendor": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+              },
+              "credential_reference": {
+                "type": "string",
+                "pattern": "^[a-zA-Z0-9_-]{1,128}$",
+                "description": "Opaque application-local secret-store reference. Never a credential, URL, environment-variable lookup or authority to read another application’s secret. Runtime resolution is not enabled by registration."
+              },
+              "billing_owner": {
+                "type": "string",
+                "enum": ["application"]
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "chain_id",
+            "funding_agreement",
+            "maximum_gas_budget_wei",
+            "account_model",
+            "asset_model"
+          ],
+          "properties": {
+            "chain_id": {
+              "type": "string",
+              "enum": ["eip155:8453", "eip155:84532"]
+            },
+            "funding_agreement": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "maximum_gas_budget_wei": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,77}$"
+            },
+            "account_model": {
+              "type": "string",
+              "enum": ["provider-controlled-application-safe"]
+            },
+            "asset_model": {
+              "type": "string",
+              "enum": ["individual-user-wallets"]
+            }
+          }
+        }
+      ]
+    },
+    "submitted_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "decision": {
+      "type": "string",
+      "enum": ["pending", "accepted", "rejected"]
+    },
+    "decision_revision": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,19})$"
+    },
+    "decided_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}
+```
+
+## POST /v1/provider/applications/{applicationId}/obligations/sponsorship/decision
+
+Operation: `decideApplicationSponsorship`.
+
+Protected, application-scoped declarations and provider decisions. Acceptance records an agreement only: it does not resolve credentials, fund gas, provision a Safe, activate execution or authorize spending. User assets remain in individual user wallets. Secrets and actual user payloads must not be submitted here.
+
+| Parameter         | Location | Required | Schema                                                                                                |
+| ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
+| `applicationId`   | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{64}$"}`                                                        |
+| `idempotency-key` | header   | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+
+Request body (application/json):
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["expected_revision", "expected_decision_revision", "decision"],
+  "properties": {
+    "expected_revision": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,19})$"
+    },
+    "expected_decision_revision": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,19})$"
+    },
+    "decision": {
+      "type": "string",
+      "enum": ["accepted", "rejected"]
+    }
+  }
+}
+```
+
+| Status | Content type             | Description      |
+| ------ | ------------------------ | ---------------- |
+| 200    | application/json         | Default Response |
+| 400    | application/problem+json | Problem response |
+| 401    | application/problem+json | Problem response |
+| 403    | application/problem+json | Problem response |
+| 409    | application/problem+json | Problem response |
+| 413    | application/problem+json | Problem response |
+| 415    | application/problem+json | Problem response |
+| 422    | application/problem+json | Problem response |
+| 429    | application/problem+json | Problem response |
+| 500    | application/problem+json | Problem response |
+| 503    | application/problem+json | Problem response |
+
+Success response schema:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "application_id",
+    "kind",
+    "revision",
+    "value",
+    "submitted_at",
+    "decision",
+    "decision_revision"
+  ],
+  "properties": {
+    "application_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "kind": {
+      "type": "string",
+      "enum": ["actions", "services", "sponsorship"]
+    },
+    "revision": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,19})$"
+    },
+    "value": {
+      "anyOf": [
+        {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "description", "fields"],
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+              },
+              "description": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "fields": {
+                "type": "array",
+                "maxItems": 32,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["name", "required", "allowed_values"],
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+                    },
+                    "required": {
+                      "type": "boolean"
+                    },
+                    "allowed_values": {
+                      "type": "array",
+                      "minItems": 1,
+                      "maxItems": 64,
+                      "uniqueItems": true,
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "kind",
+              "vendor",
+              "credential_reference",
+              "billing_owner"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+              },
+              "kind": {
+                "type": "string",
+                "enum": ["rpc-verification", "rpc-submission", "other"]
+              },
+              "vendor": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+              },
+              "credential_reference": {
+                "type": "string",
+                "pattern": "^[a-zA-Z0-9_-]{1,128}$",
+                "description": "Opaque application-local secret-store reference. Never a credential, URL, environment-variable lookup or authority to read another application’s secret. Runtime resolution is not enabled by registration."
+              },
+              "billing_owner": {
+                "type": "string",
+                "enum": ["application"]
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "chain_id",
+            "funding_agreement",
+            "maximum_gas_budget_wei",
+            "account_model",
+            "asset_model"
+          ],
+          "properties": {
+            "chain_id": {
+              "type": "string",
+              "enum": ["eip155:8453", "eip155:84532"]
+            },
+            "funding_agreement": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "maximum_gas_budget_wei": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,77}$"
+            },
+            "account_model": {
+              "type": "string",
+              "enum": ["provider-controlled-application-safe"]
+            },
+            "asset_model": {
+              "type": "string",
+              "enum": ["individual-user-wallets"]
+            }
+          }
+        }
+      ]
+    },
+    "submitted_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "decision": {
+      "type": "string",
+      "enum": ["pending", "accepted", "rejected"]
+    },
+    "decision_revision": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,19})$"
+    },
+    "decided_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}
+```
+
+## GET /v1/applications/configurations
+
+Operation: `listApplicationConfigurations`.
 
 Optional runtime configuration control plane. Application proposals and provider publications are configuration records, not wallet grants, signing authority or execution activation. Publications become readable immediately without restarting the service. Immutable historical revisions remain available. Requires the documented scope and configured application or operator identity.
 
@@ -9406,9 +11278,9 @@ Success response schema:
 }
 ```
 
-## GET /v1/runtime-configuration/batches
+## GET /v1/wallet/batches
 
-Operation: `listRuntimeBatches`.
+Operation: `listWalletBatches`.
 
 Optional runtime configuration control plane. Application proposals and provider publications are configuration records, not wallet grants, signing authority or execution activation. Publications become readable immediately without restarting the service. Immutable historical revisions remain available. Requires the documented scope and configured application or operator identity.
 

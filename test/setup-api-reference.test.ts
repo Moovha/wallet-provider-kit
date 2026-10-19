@@ -28,7 +28,7 @@ describe('operator API reference', () => {
   it('uses canonical request/response contracts, includes unavailable advanced profiles and does not mutate them', () => {
     const config = fixture();
     const operations = referenceOperations(contract, config, 0);
-    expect(operations).toHaveLength(40);
+    expect(operations).toHaveLength(Object.keys(operationGuides).length);
     expect(
       Object.values(contract.paths)
         .flatMap((methods) =>

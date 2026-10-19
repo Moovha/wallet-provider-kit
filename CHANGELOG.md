@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased application configuration APIs
+
+- Remove the standalone operator workspace. Move application configuration listing to `/v1/applications/configurations` and batch listing to `/v1/wallet/batches`; existing clients must update the two former runtime-configuration URLs.
+- Add application-scoped action, service-account and gas sponsorship declarations with separate provider decisions, revision checks and durable idempotent retries. Declarations do not resolve credentials, enforce action policies, provision a shared Safe or activate financial operations.
+
 ## Unreleased RPC throttling recovery
 
 - Serialize fixed read-only RPC methods and allow at most three read attempts for HTTP 429 responses with bounded server backoff. Reject financial RPC methods before transport and preserve all quorum checks and financial no-redispatch rules.

@@ -183,7 +183,7 @@ describe.each(['base', 'base-sepolia'] as const)(
           .chain_id,
       ).toBe(chain.caip);
       expect(
-        (await f.request('/v1/runtime-configuration/workspace')).body.network,
+        (await f.request('/v1/applications/configurations')).body.network,
       ).toBe(network);
       const wrong = structuredClone(policy);
       wrong.chain_id = providerNetwork(
