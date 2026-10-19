@@ -2317,6 +2317,7 @@ Import from `@moovha/wallet-provider-kit/storage`. [Integration guide](storage.m
 - [FinancialAuthorityOptions](#financialauthorityoptions)
 - [FinancialAuthorization](#financialauthorization)
 - [openProviderDatabase](#openproviderdatabase)
+- [PolicyBudgetCharge](#policybudgetcharge)
 - [ProviderDatabase](#providerdatabase)
 - [ProviderDatabaseOptions](#providerdatabaseoptions)
 
@@ -2325,11 +2326,8 @@ Import from `@moovha/wallet-provider-kit/storage`. [Integration guide](storage.m
 [Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/storage/types.ts).
 
 ```ts
-export interface AssetBudgetCharge {
-  budgetId: string;
-  units: string;
-  maximum: string;
-}
+/** Compatibility name for direct-token allowance charges. */
+export interface AssetBudgetCharge extends PolicyBudgetCharge {}
 ```
 
 ### assetBudgetId
@@ -2398,7 +2396,7 @@ export interface FinancialApproval {
   action: TypedDataAction | RelayerExecutionAction;
   budgetId: string;
   units: string;
-  additionalBudgets?: AssetBudgetCharge[];
+  additionalBudgets?: PolicyBudgetCharge[];
 }
 ```
 
@@ -2547,6 +2545,19 @@ export declare function openProviderDatabase(
 };
 ```
 
+### PolicyBudgetCharge
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/storage/types.ts).
+
+```ts
+/** Explicit optional policy charge; units and meaning are defined by the selecting adapter. */
+export interface PolicyBudgetCharge {
+  budgetId: string;
+  units: string;
+  maximum: string;
+}
+```
+
 ### ProviderDatabase
 
 [Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/storage/index.ts).
@@ -2584,6 +2595,7 @@ Import from `@moovha/wallet-provider-kit/deployment`. [Integration guide](setup.
 - [buildApprovedCallIntent](#buildapprovedcallintent)
 - [BundledAuthorizationConfiguration](#bundledauthorizationconfiguration)
 - [ChainObservation](#chainobservation)
+- [CompiledOperationAdapter](#compiledoperationadapter)
 - [compileOperationAdapter](#compileoperationadapter)
 - [ConfigurationError](#configurationerror)
 - [createConfiguredProvider](#createconfiguredprovider)
@@ -2612,6 +2624,7 @@ Import from `@moovha/wallet-provider-kit/deployment`. [Integration guide](setup.
 - [loadProviderConfiguration](#loadproviderconfiguration)
 - [NonceSnapshot](#noncesnapshot)
 - [OperationAdapters](#operationadapters)
+- [OperationAdapterTerms](#operationadapterterms)
 - [OperationsConfiguration](#operationsconfiguration)
 - [OperationsHealth](#operationshealth)
 - [PayerEvent](#payerevent)
@@ -2717,13 +2730,8 @@ export type ApprovedCallInput =
 [Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/approved-calls.ts).
 
 ```ts
-export interface ApprovedCallIntent {
+export interface ApprovedCallIntent extends OperationAdapterTerms {
   adapterInput?: AdapterInput;
-  assetBudgets?: {
-    token: string;
-    units: string;
-    maximum: string;
-  }[];
   nativeRecipients?: string[];
   version: '1';
   mechanism: 'safe-1.4.1';
@@ -2948,6 +2956,18 @@ export interface ChainObservation {
 }
 ```
 
+### CompiledOperationAdapter
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/operation-adapters.ts).
+
+```ts
+export interface CompiledOperationAdapter extends OperationAdapterTerms {
+  calls: ApprovedContractCall[];
+  contracts: PinnedContract[];
+  effects: ApprovedCallIntent['effects'];
+}
+```
+
 ### compileOperationAdapter
 
 [Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/operation-adapters.ts).
@@ -2959,17 +2979,7 @@ export declare function compileOperationAdapter(
   input: ApprovedCallInput,
   account: SafeAccountBinding,
   expiresAt: string,
-): {
-  calls: ApprovedContractCall[];
-  contracts: PinnedContract[];
-  effects: {
-    token: string;
-    from: string;
-    to: string;
-    minimum: string;
-    maximum?: string;
-  }[];
-};
+): CompiledOperationAdapter;
 ```
 
 ### ConfigurationError
@@ -3497,6 +3507,21 @@ export interface OperationAdapters {
   tokenTransfers?: TokenTransferAdapter[];
   swaps?: NonNullable<ApprovedCallPolicy['swaps']>;
   vaults?: NonNullable<ApprovedCallPolicy['vaults']>;
+}
+```
+
+### OperationAdapterTerms
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/operation-adapters.ts).
+
+```ts
+/** Optional terms supplied by selected policy adapters; absent when no additional adapter terms are selected. */
+export interface OperationAdapterTerms {
+  assetBudgets?: {
+    token: string;
+    units: string;
+    maximum: string;
+  }[];
 }
 ```
 

@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased optional allowance adapter boundaries
+
+- Move cumulative token interpretation, terms and activation into optional policy
+  adapters. Generic calls do not inherit ERC-3009 allowances or inspect asset
+  history without a selected cumulative term.
+- Keep the shared journal's additional budget charges numeric and optional;
+  separate sponsor gas eligibility and capacity from asset policies while
+  preserving atomic admission when both are selected.
+- Preserve ERC-3009 endpoints, payloads, allowance usage and durable reservation
+  identities. Existing intent fields and the `AssetBudgetCharge` type remain
+  compatible; `PolicyBudgetCharge` describes the shared optional charge contract.
+
 ## Unreleased cumulative direct-token allowances
 
 - Add optional `lifetimeAmount` to selected token-transfer adapters and runtime

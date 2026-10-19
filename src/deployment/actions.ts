@@ -1,4 +1,7 @@
-import { assetBudgetId } from '../storage/asset-budgets.js';
+import {
+  adapterAllowanceCharges,
+  prepareAdapterAllowances,
+} from './adapter-allowances.js';
 import { adapterInput } from '../execution/operation-adapters.js';
 import {
   currentRuntimePolicy,
@@ -184,21 +187,12 @@ export class SupportedActions {
       deny();
     if (record.runtimePolicy && !this.onboarding.runtimeContracts) deny();
   }
-  private assetCharges(intent: ApprovedCallIntent) {
-    return (intent.assetBudgets ?? []).map((charge) => ({
-      budgetId: assetBudgetId(
-        this.onboarding.policy.provider.origin,
-        intent.account.accountId,
-        charge.token,
-      ),
-      units: charge.units,
-      maximum:
-        this.transferPolicy?.token.address.toLowerCase() ===
-          charge.token.toLowerCase() &&
-        BigInt(this.policy.lifetimeAmount) < BigInt(charge.maximum)
-          ? this.policy.lifetimeAmount
-          : charge.maximum,
-    }));
+  private adapterCharges(intent: ApprovedCallIntent) {
+    return adapterAllowanceCharges(
+      intent,
+      this.onboarding.policy.provider.origin,
+      this.transferPolicy,
+    );
   }
   private current(
     record: TransferRecord,
@@ -244,7 +238,7 @@ export class SupportedActions {
         validateApprovedCallAction(policy ?? deny(), record.intent, action);
         if (
           fingerprint(record.approval.additionalBudgets ?? []) !==
-          fingerprint(this.assetCharges(record.intent))
+          fingerprint(this.adapterCharges(record.intent))
         )
           deny();
         return;
@@ -746,8 +740,8 @@ export class SupportedActions {
             input.account_id,
           ]),
           units: '1',
-          ...(this.assetCharges(intent).length
-            ? { additionalBudgets: this.assetCharges(intent) }
+          ...(this.adapterCharges(intent).length
+            ? { additionalBudgets: this.adapterCharges(intent) }
             : {}),
         },
       };
@@ -768,24 +762,13 @@ export class SupportedActions {
       this.callConfiguration?.policy.lifetimeOperations,
       this.revision,
     );
-    for (const charge of record.intent?.assetBudgets ?? []) {
-      const effective = this.assetCharges(record.intent!).find(
-        (entry) =>
-          entry.budgetId ===
-          assetBudgetId(
-            this.onboarding.policy.provider.origin,
-            input.account_id,
-            charge.token,
-          ),
-      )!;
-      await this.database.ensureAssetBudget(
-        this.onboarding.policy.provider.origin,
-        input.account_id,
-        charge.token,
-        effective.maximum,
-        this.revision,
-      );
-    }
+    await prepareAdapterAllowances(
+      this.database,
+      record.intent!,
+      this.onboarding.policy.provider.origin,
+      this.revision,
+      this.transferPolicy,
+    );
     await this.database.approveAction(record.approval);
     await this.permitted(context.principal, record);
     await this.onboarding.store.transaction((state) => {

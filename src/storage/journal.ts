@@ -1,4 +1,4 @@
-import { reserveAssetBudgets } from './asset-budgets.js';
+import { reserveAdditionalBudgets } from './budget-reservations.js';
 import { randomUUID } from 'node:crypto';
 import { getAddress, recoverAddress } from 'ethers';
 import type {
@@ -254,7 +254,7 @@ export function sqliteJournal(
             String(admitted.approval_id),
           );
           if (!row) unavailable();
-          reserveAssetBudgets(connection, JSON.parse(String(row.record)));
+          reserveAdditionalBudgets(connection, JSON.parse(String(row.record)));
         }
         const leaseToken = randomUUID();
         const expires = Date.now() + 30000;

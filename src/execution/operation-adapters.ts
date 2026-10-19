@@ -41,6 +41,23 @@ export interface OperationAdapters {
   swaps?: NonNullable<ApprovedCallPolicy['swaps']>;
   vaults?: NonNullable<ApprovedCallPolicy['vaults']>;
 }
+/** Optional terms supplied by selected policy adapters; absent when no additional adapter terms are selected. */
+export interface OperationAdapterTerms {
+  assetBudgets?: { token: string; units: string; maximum: string }[];
+}
+export interface CompiledOperationAdapter extends OperationAdapterTerms {
+  calls: ApprovedContractCall[];
+  contracts: PinnedContract[];
+  effects: ApprovedCallIntent['effects'];
+}
+/** Copy only adapter authorization terms into the immutable intent. */
+export function operationAdapterTerms(
+  compiled?: CompiledOperationAdapter,
+): OperationAdapterTerms {
+  return compiled?.assetBudgets
+    ? { assetBudgets: structuredClone(compiled.assetBudgets) }
+    : {};
+}
 export type AdapterInput =
   | Exclude<ApprovedCallInput, { kind: 'contract-call' }>
   | {
@@ -58,7 +75,7 @@ export function compileOperationAdapter(
   input: ApprovedCallInput,
   account: SafeAccountBinding,
   expiresAt: string,
-) {
+): CompiledOperationAdapter {
   const calls: ApprovedContractCall[] = [],
     contracts: PinnedContract[] = [],
     effects: ApprovedCallIntent['effects'] = [];
@@ -223,6 +240,17 @@ export function matchOperationAdapter(
           amount,
         },
         compiled: {
+          ...(transfer.lifetimeAmount !== undefined
+            ? {
+                assetBudgets: [
+                  {
+                    token: transfer.token.address,
+                    units: amount,
+                    maximum: transfer.lifetimeAmount,
+                  },
+                ],
+              }
+            : {}),
           calls: input.calls,
           contracts: [transfer.token],
           effects: [
@@ -335,4 +363,73 @@ export function matchOperationAdapter(
   )
     denied();
   return undefined;
+}
+
+/** Validate only explicitly configured adapters and compatibility routes. */
+export function validateOperationAdapters(
+  policy: ApprovedCallPolicy,
+  register: (pin: PinnedContract) => void,
+) {
+  if (
+    policy.adapters &&
+    Object.keys(policy.adapters).some(
+      (k) => !['tokenTransfers', 'swaps', 'vaults'].includes(k),
+    )
+  )
+    denied();
+  const transferTokens = new Set<string>();
+  for (const transfer of policy.adapters?.tokenTransfers ?? []) {
+    exact(transfer, [
+      'token',
+      'recipients',
+      'maximumAmount',
+      ...(transfer.lifetimeAmount !== undefined ? ['lifetimeAmount'] : []),
+    ]);
+    if (transfer.lifetimeAmount !== undefined)
+      uint(transfer.lifetimeAmount, true);
+    register(transfer.token);
+    const tokenAddress = transfer.token.address.toLowerCase();
+    if (transferTokens.has(tokenAddress)) denied();
+    transferTokens.add(tokenAddress);
+    uint(transfer.maximumAmount, true);
+    if (
+      !Array.isArray(transfer.recipients) ||
+      !transfer.recipients.length ||
+      transfer.recipients.length > 128 ||
+      new Set(transfer.recipients.map(getAddress)).size !==
+        transfer.recipients.length ||
+      transfer.recipients.some((r) => getAddress(r) === ZeroAddress)
+    )
+      denied();
+  }
+  const swaps = [...(policy.swaps ?? []), ...(policy.adapters?.swaps ?? [])],
+    vaults = [...(policy.vaults ?? []), ...(policy.adapters?.vaults ?? [])];
+  if (
+    swaps.length > 128 ||
+    vaults.length > 128 ||
+    (policy.adapters?.tokenTransfers?.length ?? 0) > 128
+  )
+    denied();
+  for (const routes of [swaps, vaults])
+    if (new Set(routes.map((r) => r.id)).size !== routes.length) denied();
+  for (const route of swaps) {
+    register(route.router);
+    register(route.tokenIn);
+    register(route.tokenOut);
+    uint(route.maximumInput, true);
+    if (
+      route.tokenIn.address.toLowerCase() ===
+        route.tokenOut.address.toLowerCase() ||
+      !Number.isInteger(route.fee) ||
+      route.fee <= 0 ||
+      route.fee >= 1000000
+    )
+      denied();
+  }
+  for (const route of vaults) {
+    register(route.router);
+    register(route.vault);
+    register(route.asset);
+    uint(route.maximumAssets, true);
+  }
 }

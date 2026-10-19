@@ -47,6 +47,7 @@ export async function fixture(
   configure?: (config: Safe4337SigningConfiguration) => void,
   nativeRecipient?: string,
   assetBudget?: { maximumAmount: string; lifetimeAmount?: string },
+  selectTokenAdapter = true,
 ) {
   const directory = await mkdtemp(join(tmpdir(), 'wpk-as2-'));
   dirs.push(directory);
@@ -165,13 +166,14 @@ export async function fixture(
   );
   const target = pin();
   const recipient = Wallet.createRandom().address;
-  const adapters = assetBudget
-    ? {
-        tokenTransfers: [
-          { token: target, recipients: [recipient], ...assetBudget },
-        ],
-      }
-    : undefined;
+  const adapters =
+    assetBudget && selectTokenAdapter
+      ? {
+          tokenTransfers: [
+            { token: target, recipients: [recipient], ...assetBudget },
+          ],
+        }
+      : undefined;
   const proposal = await runtime.propose(context, {
     expected_revision: '0',
     policy: {
@@ -254,7 +256,11 @@ export async function fixture(
     contracts: [
       {
         ...target,
-        selectors: [iface.getFunction('work')!.selector],
+        selectors: [
+          assetBudget
+            ? tokenInterface.getFunction('transfer')!.selector
+            : iface.getFunction('work')!.selector,
+        ],
         maximumValueWei: '10',
       },
     ],

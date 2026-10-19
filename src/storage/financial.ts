@@ -1,4 +1,4 @@
-import { validateAssetBudgetCharges } from './asset-budgets.js';
+import { validateAdditionalBudgets } from './budget-reservations.js';
 import {
   bindExecutionMechanism,
   approvalMechanism,
@@ -72,7 +72,7 @@ export function validateApproval(
   )
     throw new WalletProviderError('wallet_provider_input');
   units(approval.units);
-  validateAssetBudgetCharges(approval.additionalBudgets);
+  validateAdditionalBudgets(approval.additionalBudgets);
   if (
     approval.additionalBudgets?.some(
       (charge) => charge.budgetId === approval.budgetId,

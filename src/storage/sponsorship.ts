@@ -1,4 +1,4 @@
-import { reserveAssetBudgets } from './asset-budgets.js';
+import { reserveAdditionalBudgets } from './budget-reservations.js';
 import { randomUUID } from 'node:crypto';
 import { WalletProviderError } from '../domain/signing.js';
 import { fingerprint, uuid } from '../onboarding/policy.js';
@@ -66,7 +66,7 @@ export function sqliteSponsorshipStore(connection: StorageConnection) {
       bindExecutionMechanism(connection, proposed.source, 'safe-4337-v07');
       // Both counters and mechanism selection commit together, before any usable sponsorship.
       reserveBudget(proposed.source.budgetId, proposed.source.units);
-      reserveAssetBudgets(connection, proposed.source);
+      reserveAdditionalBudgets(connection, proposed.source);
       reserveBudget(proposed.gasBudgetId, proposed.maximumCostWei);
       const record = { ...proposed, signingActionId: randomUUID(), phases: {} };
       save(record);

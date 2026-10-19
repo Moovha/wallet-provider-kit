@@ -34,6 +34,7 @@ export type { ProviderDatabaseOptions } from './connection.js';
 export type { AttemptAdmission } from './journal.js';
 export type {
   AssetBudgetCharge,
+  PolicyBudgetCharge,
   FinancialApproval,
   FinancialAuthorization,
   FinancialAuthorityOptions,
