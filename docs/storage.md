@@ -297,11 +297,19 @@ receivers must retain deduplication across the restoration window. See
 ## Shared direct-token allowances
 
 Optional cumulative token-transfer policies reuse the ERC-3009 budget key and
-reserved counter. Generic approvals carry immutable `additionalBudgets` alongside
-their primary operation charge. Dispatch and sponsorship transactions reserve
-all required counters together. The `assetReservations` JSON collection prevents
+reserved counter. Selected adapters attach immutable `additionalBudgets` to approvals alongside
+their primary operation charge. The shared journal treats these as optional
+`PolicyBudgetCharge` records; it does not interpret tokens or select allowances.
+`AssetBudgetCharge` remains a compatible public type name. Calls without cumulative
+adapter terms do not initialize allowances or inventory asset history. Dispatch and sponsorship transactions reserve
+all explicitly required counters together. Sponsorship gas remains a separate
+application ledger and sponsorship decision, even when reserved in that same
+transaction. The `assetReservations` JSON collection prevents
 charging the same operation's asset amount again through a signer namespace or
 SafeOp phase. Unknown effects retain reservations.
+
+The existing `assetReservations` collection name and reservation keys are
+preserved for stored-data compatibility.
 
 The `assetBudgetMigrations` collection records completed per-allowance inventory
 of earlier admitted generic authorizations. Activation retains existing ceilings

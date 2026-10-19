@@ -1,6 +1,9 @@
 import {
   compileOperationAdapter,
   matchOperationAdapter,
+  operationAdapterTerms,
+  validateOperationAdapters,
+  type OperationAdapterTerms,
   type OperationAdapters,
   type AdapterInput,
 } from './operation-adapters.js';
@@ -84,9 +87,8 @@ export type ApprovedCallInput =
       assets: string;
       minimum_shares: string;
     };
-export interface ApprovedCallIntent {
+export interface ApprovedCallIntent extends OperationAdapterTerms {
   adapterInput?: AdapterInput;
-  assetBudgets?: { token: string; units: string; maximum: string }[];
   nativeRecipients?: string[];
   version: '1';
   mechanism: 'safe-1.4.1';
@@ -231,13 +233,6 @@ export function validateApprovedCallPolicy(policy: ApprovedCallPolicy): void {
       denied();
     targets.add(target.address.toLowerCase());
   }
-  if (
-    policy.adapters &&
-    Object.keys(policy.adapters).some(
-      (k) => !['tokenTransfers', 'swaps', 'vaults'].includes(k),
-    )
-  )
-    denied();
   if (policy.nativeTransfers) {
     exact(policy.nativeTransfers, ['recipients']);
     if (
@@ -261,61 +256,7 @@ export function validateApprovedCallPolicy(policy: ApprovedCallPolicy): void {
       recipients.add(address);
     }
   }
-  const transferTokens = new Set<string>();
-  for (const transfer of policy.adapters?.tokenTransfers ?? []) {
-    exact(transfer, [
-      'token',
-      'recipients',
-      'maximumAmount',
-      ...(transfer.lifetimeAmount !== undefined ? ['lifetimeAmount'] : []),
-    ]);
-    if (transfer.lifetimeAmount !== undefined)
-      uint(transfer.lifetimeAmount, true);
-    register(transfer.token);
-    const tokenAddress = transfer.token.address.toLowerCase();
-    if (transferTokens.has(tokenAddress)) denied();
-    transferTokens.add(tokenAddress);
-    uint(transfer.maximumAmount, true);
-    if (
-      !Array.isArray(transfer.recipients) ||
-      !transfer.recipients.length ||
-      transfer.recipients.length > 128 ||
-      new Set(transfer.recipients.map(getAddress)).size !==
-        transfer.recipients.length ||
-      transfer.recipients.some((r) => getAddress(r) === ZeroAddress)
-    )
-      denied();
-  }
-  const swaps = [...(policy.swaps ?? []), ...(policy.adapters?.swaps ?? [])],
-    vaults = [...(policy.vaults ?? []), ...(policy.adapters?.vaults ?? [])];
-  if (
-    swaps.length > 128 ||
-    vaults.length > 128 ||
-    (policy.adapters?.tokenTransfers?.length ?? 0) > 128
-  )
-    denied();
-  for (const routes of [swaps, vaults])
-    if (new Set(routes.map((r) => r.id)).size !== routes.length) denied();
-  for (const route of swaps) {
-    register(route.router);
-    register(route.tokenIn);
-    register(route.tokenOut);
-    uint(route.maximumInput, true);
-    if (
-      route.tokenIn.address.toLowerCase() ===
-        route.tokenOut.address.toLowerCase() ||
-      !Number.isInteger(route.fee) ||
-      route.fee <= 0 ||
-      route.fee >= 1000000
-    )
-      denied();
-  }
-  for (const route of vaults) {
-    register(route.router);
-    register(route.vault);
-    register(route.asset);
-    uint(route.maximumAssets, true);
-  }
+  validateOperationAdapters(policy, register);
 }
 /** Construct exact calls server-side; callers cannot supply a signature, nonce or Safe transaction. */
 export function buildApprovedCallIntent(
@@ -420,13 +361,6 @@ export function buildApprovedCallIntent(
     )
   )
     denied();
-  const transferBudget =
-    adapter?.kind === 'token-transfer'
-      ? policy.adapters?.tokenTransfers?.find(
-          (entry) =>
-            entry.token.address.toLowerCase() === adapter.token.toLowerCase(),
-        )?.lifetimeAmount
-      : undefined;
   return structuredClone({
     version: '1',
     mechanism: 'safe-1.4.1',
@@ -439,17 +373,7 @@ export function buildApprovedCallIntent(
     ],
     effects,
     ...(adapter ? { adapterInput: adapter } : {}),
-    ...(adapter?.kind === 'token-transfer' && transferBudget
-      ? {
-          assetBudgets: [
-            {
-              token: adapter.token,
-              units: adapter.amount,
-              maximum: transferBudget,
-            },
-          ],
-        }
-      : {}),
+    ...operationAdapterTerms(compiled),
     ...(nativeRecipients.length ? { nativeRecipients } : {}),
     nonce,
   });

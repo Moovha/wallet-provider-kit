@@ -5,11 +5,15 @@ import type {
 import type { EmbeddedAccount, TypedDataAction } from '../domain/signing.js';
 import type { RelayerExecutionAction } from '../domain/relayer-execution.js';
 
-export interface AssetBudgetCharge {
+/** Explicit optional policy charge; units and meaning are defined by the selecting adapter. */
+export interface PolicyBudgetCharge {
   budgetId: string;
   units: string;
   maximum: string;
 }
+
+/** Compatibility name for direct-token allowance charges. */
+export interface AssetBudgetCharge extends PolicyBudgetCharge {}
 
 /** Insert only from the host's trusted exact-action authorization flow, never an HTTP body. */
 export interface FinancialApproval {
@@ -22,7 +26,7 @@ export interface FinancialApproval {
   action: TypedDataAction | RelayerExecutionAction;
   budgetId: string;
   units: string;
-  additionalBudgets?: AssetBudgetCharge[];
+  additionalBudgets?: PolicyBudgetCharge[];
 }
 
 /** Fresh host evidence; matching a stored approval is necessary but is not a policy check. */

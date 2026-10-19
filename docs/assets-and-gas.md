@@ -95,6 +95,12 @@ obtain the owner's required delegation, request approved actions, call `/execute
 with their stored IDs and stable idempotency keys, then consume status/events.
 The coordinated path does not require the application to broadcast transactions.
 
+Gas sponsorship budgets apply to the selected execution service. They do not
+classify calls or impose a cumulative token allowance. Generic call access and
+optional asset-policy adapters are separate decisions: an asset allowance cannot
+fund gas, and gas capacity does not authorize asset spending. See
+[call authority, allowances and sponsorship](approved-contract-calls.md#separate-call-authority-allowances-and-sponsorship).
+
 Each service reserves `gasLimit × maxFeePerGas + l1FeeReserveWei` against a
 lifetime admission budget. A funded account can still be denied when that budget
 is exhausted. Reservations remain after success, failure and uncertainty; there

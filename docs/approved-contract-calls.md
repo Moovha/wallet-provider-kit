@@ -115,9 +115,33 @@ only verify observed results. Other routers, token models and vault methods can
 use generic calls under their own reviewed policy without implementing a toolkit
 adapter. Do not describe them as having an unselected adapter's guarantees.
 
+## Separate call authority, allowances and sponsorship
+
+The generic calls core checks current access, owner consent, permitted exact
+calls, account/nonce bindings and execution recovery. It does not require a
+cumulative asset allowance or infer one from a transfer selector. Existing
+operation-count limits are provider service controls, not token-spending limits.
+
+Cumulative asset accounting belongs to an explicitly selected policy adapter.
+A token-transfer adapter without `lifetimeAmount` enforces its per-transfer
+terms without a lifetime allowance. Calls without that adapter do not decode
+transfer amounts or inspect asset history. An existing ERC-3009 policy alone
+does not impose its allowance on a separately delegated generic call. Its endpoint
+and allowance continue to apply to requests made under that compatibility profile.
+Choose the adapter when the generic delegation must preserve that spending promise;
+an unselected adapter supplies no such guarantee.
+
+Gas sponsorship has a separate payer, eligibility decision and application gas
+ledger. Granting call access or configuring an asset allowance does not grant gas
+capacity. Generic action preparation and signing do not reserve sponsor gas;
+the selected sponsorship/execution service admits that cost before its effects.
+When sponsorship is requested, its gas charge, operation charge and any selected
+adapter charges still commit atomically. This keeps the policies separate while
+preventing partially admitted financial effects.
+
 ## Cumulative token allowances
 
-Set `lifetimeAmount` on a selected `tokenTransfers` adapter when the delegation
+Opt into `lifetimeAmount` on a selected `tokenTransfers` adapter when the delegation
 must limit total direct token transfers. For example, the adapter entry contains
 `token`, `recipients`, `maximumAmount: "1000000"` and
 `lifetimeAmount: "5000000"`. Amounts are decimal token base units. Static
@@ -130,7 +154,7 @@ publish these terms.
 The allowance identity is the existing ERC-3009 identity: provider origin,
 logical account ID and token address on the supported Base Sepolia profile.
 Applications, signer namespaces and relayer/ERC-4337 mechanisms share that
-allowance. Existing reserved usage is retained. Generic activation never raises
+allowance. Existing reserved usage is retained. Selected-adapter activation never raises
 an existing ceiling. When a matching ERC-3009 policy is configured, its lifetime
 ceiling also caps generic approval, including when the generic path initializes
 the allowance first. Changing a policy does not refund usage or grant a new

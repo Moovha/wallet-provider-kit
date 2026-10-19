@@ -75,6 +75,12 @@ Hash vectors are checked independently against viem 2.57.7 and the
 
 ## Keep one application gas ledger
 
+This ledger limits the sponsor's network-fee exposure. Optional policy adapters
+may attach separate asset charges to the source action; neither those charges nor
+generic call access grant sponsorship capacity. ERC-3009 compatibility allowances
+are not gas allowances. Admission still reserves gas, operations and any selected
+adapter charges atomically before usable sponsorship.
+
 `applicationGasBudgetId(providerOrigin, issuer, clientId)` preserves the existing
 relayer budget identity exactly. The mechanism, payer and paymaster do not create
 new application allowances. `applicationGasBudgetLimit` takes the lowest limit

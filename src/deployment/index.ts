@@ -129,6 +129,8 @@ export type { BundledAuthorizationConfiguration } from './authorization-contract
 export { compileOperationAdapter } from '../execution/operation-adapters.js';
 export type {
   OperationAdapters,
+  OperationAdapterTerms,
+  CompiledOperationAdapter,
   TokenTransferAdapter,
   AdapterInput,
 } from '../execution/operation-adapters.js';

@@ -1,3 +1,7 @@
+import {
+  budgetReservationId,
+  reserveAdditionalBudget,
+} from './budget-reservations.js';
 import { getAddress, ZeroAddress } from 'ethers';
 import { WalletProviderError } from '../domain/signing.js';
 import { fingerprint, text, uuid } from '../onboarding/policy.js';
@@ -20,95 +24,6 @@ export function assetBudgetId(
   )
     throw new WalletProviderError('wallet_provider_input');
   return fingerprint(['transfer', origin, accountId, token.toLowerCase()]);
-}
-export function validateAssetBudgetCharges(
-  charges: AssetBudgetCharge[] | undefined,
-) {
-  if (charges === undefined) return;
-  if (!Array.isArray(charges) || !charges.length || charges.length > 16)
-    throw new WalletProviderError('wallet_provider_input');
-  const ids = new Set<string>();
-  for (const charge of charges) {
-    if (
-      !charge ||
-      Object.keys(charge).sort().join(',') !== 'budgetId,maximum,units' ||
-      !text(charge.budgetId) ||
-      ids.has(charge.budgetId) ||
-      units(charge.units) === 0n ||
-      units(charge.maximum) === 0n ||
-      units(charge.maximum) >= 2n ** 256n ||
-      units(charge.units) > units(charge.maximum)
-    )
-      throw new WalletProviderError('wallet_provider_input');
-    ids.add(charge.budgetId);
-  }
-}
-function reservationId(approval: FinancialApproval, budgetId: string) {
-  return fingerprint([
-    'asset-reservation-v1',
-    approval.ownerSubject,
-    approval.account.accountId,
-    approval.action.kind === 'sign_typed_data'
-      ? approval.action.operation_id
-      : approval.action.operationId,
-    budgetId,
-  ]);
-}
-function reserve(
-  connection: StorageConnection,
-  approval: FinancialApproval,
-  charge: AssetBudgetCharge,
-  historical = false,
-) {
-  connection.requireTransaction();
-  const id = reservationId(approval, charge.budgetId),
-    row = connection.get(
-      'SELECT record FROM onboarding_records WHERE collection=? AND id=?',
-      'assetReservations',
-      id,
-    );
-  if (row) {
-    const prior = JSON.parse(String(row.record));
-    if (prior.budgetId !== charge.budgetId || prior.units !== charge.units)
-      throw new WalletProviderError('wallet_attempt_conflict');
-    return;
-  }
-  const budget = connection.get(
-    'SELECT maximum,reserved FROM budgets WHERE id=?',
-    charge.budgetId,
-  );
-  if (!budget) throw new WalletProviderError('wallet_authorization_denied');
-  const reserved = units(String(budget.reserved)) + units(charge.units);
-  if (
-    !historical &&
-    (reserved > units(String(budget.maximum)) ||
-      reserved > units(charge.maximum))
-  )
-    throw new WalletProviderError('wallet_authorization_denied');
-  connection.run(
-    'UPDATE budgets SET reserved=? WHERE id=?',
-    reserved.toString(),
-    charge.budgetId,
-  );
-  connection.run(
-    'INSERT INTO onboarding_records(collection,id,record) VALUES(?,?,?)',
-    'assetReservations',
-    id,
-    JSON.stringify({ budgetId: charge.budgetId, units: charge.units }),
-  );
-  connection.audit(
-    historical ? 'historical_asset_reserved' : 'asset_reserved',
-    id,
-  );
-}
-/** The same operation reserves each asset once across signer namespaces and SafeOp phases. */
-export function reserveAssetBudgets(
-  connection: StorageConnection,
-  approval: FinancialApproval,
-) {
-  validateAssetBudgetCharges(approval.additionalBudgets);
-  for (const charge of approval.additionalBudgets ?? [])
-    reserve(connection, approval, charge);
 }
 /** Trusted activation port. Retains existing counters, never increases their ceiling, and inventories earlier generic authorizations. */
 export function ensureAssetBudget(
@@ -195,7 +110,7 @@ export function ensureAssetBudget(
         connection.get(
           'SELECT id FROM onboarding_records WHERE collection=? AND id=?',
           'assetReservations',
-          reservationId(approval, id),
+          budgetReservationId(approval, id),
         )
       )
         continue;
@@ -251,7 +166,7 @@ export function ensureAssetBudget(
           amount += BigInt(decoded[1]);
       }
       if (amount > 0n)
-        reserve(
+        reserveAdditionalBudget(
           connection,
           record.approval,
           { budgetId: id, units: amount.toString(), maximum },

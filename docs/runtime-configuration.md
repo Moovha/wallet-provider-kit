@@ -277,6 +277,12 @@ see the [support and acceptance reference](v1-standards.md).
 
 ### Cumulative direct-transfer terms
 
+These terms are optional adapter policy. Registering a token contract or
+`transfer` method does not enable them; neither does an existing ERC-3009
+configuration. Calls without cumulative adapter terms do not run allowance
+migration. Sponsor gas eligibility and capacity remain separate from both
+contract publication and asset-policy terms.
+
 A reviewed `call_adapters.tokenTransfers` entry may include `lifetimeAmount`
 alongside its token pin, recipients and `maximumAmount`. This cumulative term
 uses the same provider/account/token allowance as ERC-3009. Publication requires
