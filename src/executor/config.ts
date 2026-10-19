@@ -1,3 +1,4 @@
+import { maximumSponsorGasLimit } from '../execution/defaults.js';
 import type { ProviderNetwork } from '../networks.js';
 import { validateReplacementSponsors } from '../execution/replacement.js';
 import { validateOperations } from '../execution/operations.js';
@@ -172,7 +173,8 @@ export function validateExecutionServiceConfiguration(
               JSON.stringify([provider.id, sponsor.clientId])) ||
           !sponsor.fundingAgreement.trim() ||
           BigInt(sponsor.gasLimit) < 21000n ||
-          BigInt(sponsor.gasLimit) > 1000000n ||
+          BigInt(sponsor.gasLimit) >
+            maximumSponsorGasLimit(!!provider.contractCalls) ||
           BigInt(sponsor.maxFeePerGas) === 0n ||
           BigInt(sponsor.maxPriorityFeePerGas) > BigInt(sponsor.maxFeePerGas) ||
           [sponsor.maxFeePerGas, sponsor.maxPriorityFeePerGas].some(

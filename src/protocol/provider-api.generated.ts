@@ -150,6 +150,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/actions/{actionId}/cancel-nonce": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Explicitly authorize cancellation of a stored, signed Safe action before any provider submission admission. Bundled local execution only. Requires the original caller, current owner/grant/identity/consent and contracts delegation. The service constructs a zero-value empty CALL to the same Safe at the exact expected nonce. Execute the returned action separately; the original remains blocked and the queue is released only after independently verified finalized cancellation. No arbitrary replacement payload or signature export. */
+        post: operations["authorizeSafeNonceCancellation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/contract-call-requests": {
         parameters: {
             query?: never;
@@ -1939,6 +1956,10 @@ export interface operations {
                                 maximum?: string;
                             }[];
                             nonce: string;
+                            cancellation?: {
+                                actionId: string;
+                                payloadHash: string;
+                            };
                             assetBudgets?: {
                                 token: string;
                                 units: string;
@@ -2315,6 +2336,10 @@ export interface operations {
                                 maximum?: string;
                             }[];
                             nonce: string;
+                            cancellation?: {
+                                actionId: string;
+                                payloadHash: string;
+                            };
                             assetBudgets?: {
                                 token: string;
                                 units: string;
@@ -2514,6 +2539,46 @@ export interface operations {
                         request_id: string;
                         /** @enum {string} */
                         outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+        };
+    };
+    authorizeSafeNonceCancellation: {
+        parameters: {
+            query?: never;
+            header: {
+                "idempotency-key": string;
+            };
+            path: {
+                actionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    expected_nonce: string;
+                    expected_payload_hash: string;
+                    /** @enum {string} */
+                    authorization: "invalidate-signed-action";
+                };
+            };
+        };
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        action_id: string;
+                        cancelled_action_id: string;
+                        nonce: string;
+                        payload_hash: string;
+                        /** Format: date-time */
+                        expires_at: string;
                     };
                 };
             };
@@ -2809,6 +2874,10 @@ export interface operations {
                                 maximum?: string;
                             }[];
                             nonce: string;
+                            cancellation?: {
+                                actionId: string;
+                                payloadHash: string;
+                            };
                             assetBudgets?: {
                                 token: string;
                                 units: string;

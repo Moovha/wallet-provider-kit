@@ -5,6 +5,7 @@ import { approvedCallsFixture } from './helpers/approved-calls.js';
 import { executionFixture } from './helpers/execution.js';
 import {
   buildApprovedCallIntent,
+  buildNonceCancellationIntent,
   buildApprovedCallAction,
   validateApprovedCallAction,
   approvedCallPayload,
@@ -499,3 +500,43 @@ it.each(['success', 'simulation-revert', 'sponsor-empty'] as const)(
     expect(f.state.posts).toBe(0);
   },
 );
+
+it('canonicalizes nonce cancellation without enabling generic Safe self-calls', () => {
+  const f = setup();
+  const intent = buildNonceCancellationIntent(f.policy, f.id, '7', {
+    actionId: randomUUID(),
+    payloadHash: '0x' + 'a'.repeat(64),
+  });
+  const action = buildApprovedCallAction(
+    intent,
+    f.owner,
+    f.expiresAt,
+    randomUUID(),
+  );
+  expect(action.payload.message).toMatchObject({
+    to: intent.account.address,
+    value: '0',
+    data: '0x',
+    operation: '0',
+    nonce: '7',
+  });
+  expect(() =>
+    validateApprovedCallAction(f.policy, intent, action),
+  ).not.toThrow();
+  expect(() =>
+    buildApprovedCallIntent(f.policy, intent.input, '7', f.expiresAt),
+  ).toThrow();
+  for (const call of [
+    { ...intent.calls[0], value: '1' },
+    { ...intent.calls[0], data: '0x12345678' },
+    { ...intent.calls[0], to: f.recipient },
+  ]) {
+    expect(() =>
+      validateApprovedCallAction(
+        f.policy,
+        { ...intent, calls: [call] },
+        action,
+      ),
+    ).toThrow();
+  }
+});

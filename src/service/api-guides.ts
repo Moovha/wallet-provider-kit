@@ -323,6 +323,18 @@ export const operationGuides: Record<string, OperationGuide> = {
     success:
       '200: refreshed original execution and operational diagnosis. The procedure performs only read-only provider and RPC lookup, preserves attempts and budgets, and never signs, claims dispatch, reprices, cancels or clears a nonce. Only exact verified finalized receipts clear corresponding quarantine reasons; nonce consumption without matching effects requires operator review.',
   },
+  authorizeSafeNonceCancellation: {
+    title: 'Authorize cancellation of an unsubmitted signed Safe action',
+    group: 'Execution recovery',
+    scope: 'wallet:actions',
+    permission: 'contracts:request',
+    approvedAction: true,
+    execution: true,
+    prerequisite:
+      'Use bundled local Safe execution, the original caller and current owner, grant, identity, consent and action policy. Supply the stored action ID, exact expected_nonce and expected_payload_hash, authorization: invalidate-signed-action, and a stable UUIDv4 Idempotency-Key. Any submission admission, including an unclaimed one, prevents cancellation. Unknown or submitted actions require reconciliation.',
+    success:
+      '200: a separate immutable cancellation action ID. Execute it through the normal execute endpoint with signing and execution scopes. It sends zero value and empty calldata to the same Safe at the original nonce. The original action is blocked immediately; its queue is cancelled only after RPC-quorum finalized cancellation. Gas and lifetime reservations remain retained. Signatures are never exported.',
+  },
   executeTransfer: {
     title: 'Execute an approved action with a gas sponsor',
     group: 'Execution coordination',
@@ -420,6 +432,7 @@ export const operationGuides: Record<string, OperationGuide> = {
 };
 
 export interface ApiFeatures {
+  nonceCancellation?: boolean;
   onboarding: boolean;
   enrollment: boolean;
   financial: boolean;
@@ -445,6 +458,8 @@ export function operationUnavailableReason(
   const guide = operationGuides[id];
   if (!guide || id === 'getCapabilities' || id === 'getExecutionCapabilities')
     return undefined;
+  if (id === 'authorizeSafeNonceCancellation' && !features.nonceCancellation)
+    return 'Bundled local Safe execution is not configured';
   if (id === 'readProvisionedSafe' && !features.safeProvisioning)
     return 'Automatic Safe provisioning is not configured';
   if (guide.runtimeConfiguration)

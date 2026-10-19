@@ -1,4 +1,4 @@
-import { Wallet, keccak256, toQuantity } from 'ethers';
+import { Wallet, keccak256, toQuantity, id, toBeHex } from 'ethers';
 import {
   safeInterface,
   tokenInterface,
@@ -82,12 +82,14 @@ export function approvedCallsFixture(
       {
         ...common,
         address: state.target,
-        ...safeInterface.encodeEventLog(
-          safeInterface.getEvent(
-            state.safeSuccess ? 'ExecutionSuccess' : 'ExecutionFailure',
-          )!,
-          [state.digest, 0],
-        ),
+        // Safe 1.4.1 indexes txHash; keep this wire fixture independent of the observer ABI.
+        topics: [
+          id(
+            `${state.safeSuccess ? 'ExecutionSuccess' : 'ExecutionFailure'}(bytes32,uint256)`,
+          ),
+          state.digest,
+        ],
+        data: toBeHex(0, 32),
       },
     ];
     if (state.minimumEffects && state.intent)

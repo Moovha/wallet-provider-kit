@@ -300,7 +300,7 @@ export class WalletCallsService {
     if (driver) return driver.status(principal, accountId, id);
     let stored = await this.queue!.walletCallsRecord(principal, accountId, id);
     let fresh = true;
-    if (stored.actionId) {
+    if (stored.actionId && !['cancelled', 'expired'].includes(stored.status)) {
       try {
         await this.execution!.refresh(stored.actionId);
       } catch {

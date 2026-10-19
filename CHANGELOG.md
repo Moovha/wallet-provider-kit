@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased Safe batch gas limits
+
+- Allow explicitly configured Safe contract-call sponsors to use up to 5,000,000 gas per execution. Keep transfer-only configurations capped at 1,000,000, defaults unchanged, and exact sponsor fee/lifetime-budget admission in both wallet and designated executor validation.
+
+## Unreleased receipt lookup recovery
+
+- Verify known transaction hashes through the full RPC quorum before searching log history. Preserve the scan cursor until history is actually searched, and keep discovery as a fallback when known receipts cannot establish the exact result.
+- Observe explicit nonce cancellation instead of repeatedly scanning the unsubmitted original. Keep direct reconciliation and all receipt/finality checks.
+
+## Unreleased signed Safe recovery
+
+- Decode Safe 1.4.1 execution events with their indexed transaction hash so independent receipt verification recognizes successful and failed executions.
+
+- Authorize a separate zero-value Safe nonce cancellation for an original caller's signed action that has no provider submission admission. Fence original dispatch atomically and release its queue only after independently verified finalized cancellation.
+- Restore persisted automatic Safe bindings before runtime execution reads after restart. Allow a held unsubmitted head to use its own cancellation slot in a bounded sponsor pool.
+- Simulate bundled Safe calls before signing, while retaining signed-transaction simulation and current authority checks before submission. Keep uncertain provider attempts and lifetime reservations held.
+
+## Unreleased bundled wallet-call admission
+
+- Admit EIP-5792 Safe batches through the bundled local engine with the same wallet-attempt size limit. Apply designated-service envelope checks only to designated execution.
+
 ## Unreleased atomic native funding
 
 - Accept native funds received by earlier calls when simulating an atomic Safe batch, including unwrap-and-send operations. Keep configured native-value ceilings, sponsor funding checks and full transaction simulation.

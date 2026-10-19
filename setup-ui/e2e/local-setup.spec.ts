@@ -268,6 +268,7 @@ test('a failed runtime installation unlocks configuration and can be checked and
       runtime.calls.some((call) => call.args.includes('init-storage')),
     ).toBe(false);
   } finally {
+    await page.close();
     await server.close();
     await rm(directory, { recursive: true, force: true });
   }

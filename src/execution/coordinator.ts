@@ -84,6 +84,9 @@ export class ApprovedExecutionCoordinator {
       executionConfigurationIdentity(configuration),
     );
   }
+  get nonceCancellationEnabled() {
+    return !!this.config.local && this.profile === 'approved-evm-executor-v1';
+  }
   private buildPlan(
     action: import('../domain/signing.js').TypedDataAction,
     sponsor: ExecutionConfiguration['sponsors'][number],
@@ -132,7 +135,10 @@ export class ApprovedExecutionCoordinator {
     principal: VerifiedPrincipal,
     input: import('./approved-calls.js').ApprovedCallInput,
   ) {
-    if (!this.config.service || this.profile !== 'approved-evm-executor-v1')
+    if (
+      this.profile !== 'approved-evm-executor-v1' ||
+      (!this.config.service && !this.config.local)
+    )
       deny();
     const preview = await this.actions.previewWalletCalls(principal, input);
     const sponsors = this.config.sponsors.filter(
@@ -159,6 +165,7 @@ export class ApprovedExecutionCoordinator {
         plan.action.action_id,
         executionAttemptInput(plan),
       );
+      if (!this.config.service) continue;
       const dispatch = {
         contract: 'execution-dispatch-v1',
         execution_id: executionId,
@@ -371,6 +378,17 @@ export class ApprovedExecutionCoordinator {
             const occupied = Object.values(state.supportedActions ?? {}).filter(
               (entry) => {
                 const execution = entry.execution;
+                // Finalized nonce invalidation ends the original reservation's payer occupancy.
+                if (entry.nonceReleased) return false;
+                // An unsubmitted signed head must not consume the slot needed to invalidate its own nonce.
+                if (
+                  latest.intent?.cancellation?.actionId ===
+                    entry.approval.action.action_id &&
+                  entry.cancellationId === latest.approval.action.action_id &&
+                  execution &&
+                  !this.database.hasExecutionAdmission(execution.executionId)
+                )
+                  return false;
                 if (
                   !execution ||
                   execution.sponsorClientId !== candidate.clientId ||
@@ -456,6 +474,7 @@ export class ApprovedExecutionCoordinator {
             sponsors[0].accountId),
       ) ?? deny();
     if (record.intent && this.profile !== 'approved-evm-executor-v1') deny();
+    if (record.intent?.cancellation && !this.nonceCancellationEnabled) deny();
     const existing = await this.claim(record);
     if (existing || record.execution?.effectObserved) {
       if (
@@ -492,7 +511,36 @@ export class ApprovedExecutionCoordinator {
         )
       )
         deny();
-      const scanFromBlock = await this.observer.anchor();
+      let scanFromBlock: string;
+      try {
+        scanFromBlock = await this.observer.anchor();
+        if (this.config.local && record.intent) {
+          if (!this.observer.preflightUnsigned) deny();
+          await this.observer.preflightUnsigned(
+            this.buildPlan(
+              record.approval.action,
+              sponsor,
+              scanFromBlock,
+              '0x' + '1'.repeat(128) + '1b',
+              record.intent,
+              record.runtimePolicy,
+            ),
+          );
+        }
+      } catch (error) {
+        if (
+          error instanceof WalletProviderError &&
+          error.code === 'wallet_provider_unavailable' &&
+          this.config.local &&
+          record.intent &&
+          !this.database.hasActionAttempts(id)
+        )
+          throw new WalletProviderError(
+            'wallet_provider_unavailable',
+            'not_dispatched',
+          );
+        throw error;
+      }
       const signature = Signature.from(
         await this.wallet.sign(
           { ...context, idempotencyKey: record.execution.signingKey },
@@ -555,7 +603,7 @@ export class ApprovedExecutionCoordinator {
       BigInt(sponsor.gasLimit) * BigInt(sponsor.maxFeePerGas) +
       BigInt(sponsor.l1FeeReserveWei)
     ).toString();
-    await this.database.admitAttempt({ request, budgetId, units });
+    await this.database.admitExecutionAttempt({ request, budgetId, units }, id);
     const lifecycle = createAttemptLifecycle(this.profile, {
       namespace: 'configured-execution-v1',
       journal: this.database.journal,
@@ -1169,6 +1217,36 @@ export class ApprovedExecutionCoordinator {
           revision: this.actions.revision,
         });
       }
+      if (
+        plan.intent?.cancellation &&
+        observation.chain_status === 'finalized' &&
+        observation.verification === 'rpc-quorum' &&
+        observation.outcome === 'succeeded'
+      ) {
+        const originalId = plan.intent.cancellation.actionId;
+        const original = state.supportedActions?.[originalId];
+        if (
+          !original ||
+          original.cancellationId !== id ||
+          original.approval.action.payload_hash !==
+            plan.intent.cancellation.payloadHash ||
+          original.intent?.nonce !== plan.intent.nonce ||
+          this.database.hasExecutionAdmission(original.execution!.executionId)
+        )
+          deny();
+        if (!original.nonceReleased) {
+          original.nonceReleased = true;
+          for (const entry of Object.values(state.safeRequests ?? {})) {
+            if (entry.actionId === originalId) entry.status = 'cancelled';
+          }
+          state.audit.push({
+            at: Date.now(),
+            event: 'safe_nonce_cancellation_finalized',
+            resource: originalId,
+            revision: this.actions.revision,
+          });
+        }
+      }
       latest.lastDispatchStatus = eventData.dispatch_status;
       return true;
     });
@@ -1189,6 +1267,7 @@ export class ApprovedExecutionCoordinator {
             .filter(
               ([, record]) =>
                 record.execution?.plan &&
+                !record.cancellationId &&
                 !record.execution.integrityFailure &&
                 record.execution.observation?.chain_status !== 'finalized',
             )

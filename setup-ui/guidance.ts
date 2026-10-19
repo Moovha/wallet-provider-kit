@@ -68,7 +68,7 @@ export const settings = {
   executionGas: setting(
     'Exact decimal gas and native-fee admission limits in wei.',
     'A durable dispatch reserves gas limit × maximum fee per gas plus the L1 reserve against the application lifetime budget. Unknown and failed work retains reservations; a new policy does not reset them.',
-    'Set limits from measured staging transactions and your reviewed funding budget. Bundled setup disables Relayer gas estimation and applies the configured fee cap automatically. Existing Relayer services must enforce gas_limit_estimation=false and a positive gas_price_cap no greater than the approved maximum. Account separately for actual L1 fees and recovery/cancellation costs; the admission reservation is not a hard bound on every upstream cost.',
+    'Set limits from measured staging transactions and your reviewed funding budget. Safe contract-call execution supports 21,000–5,000,000 gas; ERC-3009 transfer execution supports 21,000–1,000,000. Defaults remain unchanged. Bundled setup disables Relayer gas estimation and applies the configured fee cap automatically. Existing Relayer services must enforce gas_limit_estimation=false and a positive gas_price_cap no greater than the approved maximum. Account separately for actual L1 fees and recovery/cancellation costs; the admission reservation is not a hard bound on every upstream cost.',
     'execution.html#configure-and-accept-execution',
   ),
   executionEvidence: setting(

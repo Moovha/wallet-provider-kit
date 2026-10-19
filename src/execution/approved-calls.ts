@@ -89,6 +89,7 @@ export type ApprovedCallInput =
       minimum_shares: string;
     };
 export interface ApprovedCallIntent extends OperationAdapterTerms {
+  cancellation?: { actionId: string; payloadHash: string };
   adapterInput?: AdapterInput;
   nativeRecipients?: string[];
   version: '1';
@@ -115,8 +116,8 @@ export const safeInterface = new Interface([
   'function getThreshold() view returns(uint256)',
   'function VERSION() view returns(string)',
   'function masterCopy() view returns(address)',
-  'event ExecutionSuccess(bytes32 txHash,uint256 payment)',
-  'event ExecutionFailure(bytes32 txHash,uint256 payment)',
+  'event ExecutionSuccess(bytes32 indexed txHash,uint256 payment)',
+  'event ExecutionFailure(bytes32 indexed txHash,uint256 payment)',
 ]);
 export const multiSendInterface = new Interface([
   'function multiSend(bytes transactions)',
@@ -382,6 +383,39 @@ export function buildApprovedCallIntent(
     nonce,
   });
 }
+/** The only cancellation payload is an empty, zero-value CALL to the bound Safe itself. */
+export function buildNonceCancellationIntent(
+  policy: ApprovedCallPolicy,
+  accountId: string,
+  nonce: string,
+  cancellation: { actionId: string; payloadHash: string },
+): ApprovedCallIntent {
+  validateApprovedCallPolicy(policy);
+  uint(nonce);
+  exact(cancellation, ['actionId', 'payloadHash']);
+  if (
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(
+      cancellation.actionId,
+    ) ||
+    !/^0x[0-9a-f]{64}$/.test(cancellation.payloadHash)
+  )
+    denied();
+  const account =
+    policy.accounts.find((a) => a.accountId === accountId) ?? denied();
+  const calls = [{ to: account.address, value: '0', data: '0x' }];
+  return structuredClone({
+    version: '1',
+    mechanism: 'safe-1.4.1',
+    input: { kind: 'contract-call', account_id: accountId, calls },
+    account,
+    multiSend: policy.multiSend,
+    calls,
+    contracts: [],
+    effects: [],
+    nonce,
+    cancellation,
+  });
+}
 export function approvedCallPayload(
   intent: ApprovedCallIntent,
   network?: ProviderNetwork,
@@ -479,12 +513,19 @@ export function validateApprovedCallAction(
   action: TypedDataAction,
   network?: ProviderNetwork,
 ): void {
-  const expected = buildApprovedCallIntent(
-    policy,
-    intent.input,
-    intent.nonce,
-    action.expires_at,
-  );
+  const expected = intent.cancellation
+    ? buildNonceCancellationIntent(
+        policy,
+        intent.input.account_id,
+        intent.nonce,
+        intent.cancellation,
+      )
+    : buildApprovedCallIntent(
+        policy,
+        intent.input,
+        intent.nonce,
+        action.expires_at,
+      );
   const payload = approvedCallPayload(expected, network),
     digest = TypedDataEncoder.hash(
       payload.domain,

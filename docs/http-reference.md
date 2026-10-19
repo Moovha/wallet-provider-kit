@@ -1119,6 +1119,21 @@ Success response schema:
               "type": "string",
               "pattern": "^(0|[1-9][0-9]{0,77})$"
             },
+            "cancellation": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["actionId", "payloadHash"],
+              "properties": {
+                "actionId": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                },
+                "payloadHash": {
+                  "type": "string",
+                  "pattern": "^0x[0-9a-f]{64}$"
+                }
+              }
+            },
             "assetBudgets": {
               "type": "array",
               "minItems": 1,
@@ -1903,6 +1918,21 @@ Success response schema:
               "type": "string",
               "pattern": "^(0|[1-9][0-9]{0,77})$"
             },
+            "cancellation": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["actionId", "payloadHash"],
+              "properties": {
+                "actionId": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                },
+                "payloadHash": {
+                  "type": "string",
+                  "pattern": "^0x[0-9a-f]{64}$"
+                }
+              }
+            },
             "assetBudgets": {
               "type": "array",
               "minItems": 1,
@@ -2039,6 +2069,81 @@ Success response schema:
       }
     }
   ]
+}
+```
+
+## POST /v1/actions/{actionId}/cancel-nonce
+
+Operation: `authorizeSafeNonceCancellation`.
+
+Explicitly authorize cancellation of a stored, signed Safe action before any provider submission admission. Bundled local execution only. Requires the original caller, current owner/grant/identity/consent and contracts delegation. The service constructs a zero-value empty CALL to the same Safe at the exact expected nonce. Execute the returned action separately; the original remains blocked and the queue is released only after independently verified finalized cancellation. No arbitrary replacement payload or signature export.
+
+| Parameter         | Location | Required | Schema                                                                                                |
+| ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
+| `actionId`        | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+| `idempotency-key` | header   | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+
+Request body (application/json):
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["expected_nonce", "expected_payload_hash", "authorization"],
+  "properties": {
+    "expected_nonce": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,77})$"
+    },
+    "expected_payload_hash": {
+      "type": "string",
+      "pattern": "^0x[0-9a-f]{64}$"
+    },
+    "authorization": {
+      "type": "string",
+      "enum": ["invalidate-signed-action"]
+    }
+  }
+}
+```
+
+| Status | Content type     | Description      |
+| ------ | ---------------- | ---------------- |
+| 200    | application/json | Default Response |
+
+Success response schema:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "action_id",
+    "cancelled_action_id",
+    "nonce",
+    "payload_hash",
+    "expires_at"
+  ],
+  "properties": {
+    "action_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "cancelled_action_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "nonce": {
+      "type": "string"
+    },
+    "payload_hash": {
+      "type": "string"
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
 }
 ```
 
@@ -2956,6 +3061,21 @@ Success response schema:
         "nonce": {
           "type": "string",
           "pattern": "^(0|[1-9][0-9]{0,77})$"
+        },
+        "cancellation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["actionId", "payloadHash"],
+          "properties": {
+            "actionId": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            },
+            "payloadHash": {
+              "type": "string",
+              "pattern": "^0x[0-9a-f]{64}$"
+            }
+          }
         },
         "assetBudgets": {
           "type": "array",

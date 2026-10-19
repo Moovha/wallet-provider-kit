@@ -73,6 +73,9 @@ export function operationStatus(
     wallet: true,
     financial: !!config.financial,
     execution: !!config.execution,
+    nonceCancellation:
+      !!config.execution?.local &&
+      config.execution.profile === 'approved-evm-executor-v1',
     safeQueue: !!config.execution?.safeQueue,
     safeProvisioning: !!config.safeProvisioning,
     walletCalls:
@@ -241,6 +244,12 @@ export function requestExample(
         },
       ],
     };
+  if (id === 'authorizeSafeNonceCancellation')
+    return {
+      expected_nonce: '0',
+      expected_payload_hash: '0x' + 'a'.repeat(64),
+      authorization: 'invalidate-signed-action',
+    };
   if (id === 'requestTransferAuthorization')
     return {
       account_id: exampleId,
@@ -313,6 +322,14 @@ export function responseExample(
   config?: ProviderConfiguration,
   requestedPermissions?: string[],
 ): object {
+  if (id === 'authorizeSafeNonceCancellation')
+    return {
+      action_id: exampleId,
+      cancelled_action_id: '22222222-2222-4222-8222-222222222222',
+      nonce: '0',
+      payload_hash: '0x' + 'b'.repeat(64),
+      expires_at: '2030-01-01T00:05:00.000Z',
+    };
   if (id === 'readProvisionedSafe')
     return {
       profile: 'safe-1.4.1',

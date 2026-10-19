@@ -1,3 +1,4 @@
+import { maximumSponsorGasLimit } from '../execution/defaults.js';
 import type { ProviderNetwork } from '../networks.js';
 import {
   localExecutionOrigin,
@@ -460,7 +461,10 @@ export function validateProviderConfiguration(
           !app ||
           sponsor.fundingAgreement.trim().length === 0 ||
           BigInt(sponsor.gasLimit) < 21000n ||
-          BigInt(sponsor.gasLimit) > 1000000n ||
+          BigInt(sponsor.gasLimit) >
+            maximumSponsorGasLimit(
+              execution.profile === 'approved-evm-executor-v1',
+            ) ||
           BigInt(sponsor.maxFeePerGas) === 0n ||
           BigInt(sponsor.maxPriorityFeePerGas) > BigInt(sponsor.maxFeePerGas) ||
           [sponsor.maxFeePerGas, sponsor.maxPriorityFeePerGas].some(

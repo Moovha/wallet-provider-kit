@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { Wallet, TypedDataEncoder } from 'ethers';
+import { Wallet, TypedDataEncoder, id, toBeHex } from 'ethers';
 import { randomUUID } from 'node:crypto';
 import { approvedCallsFixture } from './helpers/approved-calls.js';
 import { executionFixture } from './helpers/execution.js';
 import {
+  safeInterface,
   approvedCallPayload,
   buildApprovedCallIntent,
   validateApprovedCallAction,
@@ -184,3 +185,17 @@ describe('approved contract action policy', () => {
     expect(() => validateApprovedCallPolicy(self.policy)).toThrow();
   });
 });
+
+it.each(['ExecutionSuccess', 'ExecutionFailure'])(
+  'decodes the Safe 1.4.1 indexed %s wire event',
+  (name) => {
+    const digest = '0x' + 'a'.repeat(64);
+    const parsed = safeInterface.parseLog({
+      topics: [id(name + '(bytes32,uint256)'), digest],
+      data: toBeHex(0, 32),
+    });
+    expect(parsed?.name).toBe(name);
+    expect(parsed?.args.txHash).toBe(digest);
+    expect(parsed?.args.payment).toBe(0n);
+  },
+);

@@ -153,6 +153,8 @@ export async function createServer(options: ServerOptions = {}) {
           enrollment: !!options.enrollment,
           financial: !!options.onboarding?.actions?.consentTerms(),
           execution: !!options.onboarding?.execution,
+          nonceCancellation:
+            !!options.onboarding?.execution?.nonceCancellationEnabled,
           safeQueue: !!options.onboarding?.safeQueue,
           safeProvisioning: !!options.safeProvisioning,
           walletCalls: !!options.walletCalls,
