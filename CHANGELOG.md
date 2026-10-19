@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased atomic native funding
+
+- Accept native funds received by earlier calls when simulating an atomic Safe batch, including unwrap-and-send operations. Keep configured native-value ceilings, sponsor funding checks and full transaction simulation.
+
 ## Unreleased automatic Safe provisioning
 
 - Deploy a deterministic Safe 1.4.1 account for a provisioned signing wallet through the bundled execution engine. Verify pinned deployment code, sole ownership and finalized RPC agreement before enabling its approved calls.

@@ -467,6 +467,7 @@ export class QuorumExecutionObserver implements ExecutionObserver {
   }
   private async preflightCalls(plan: TransferExecutionPlan) {
     const intent = plan.intent!;
+    // The full atomic simulation verifies solvency, including native funds received by earlier calls.
     await Promise.all(
       this.readers.map(async (reader) => {
         const owner = plan.action.chain_account_id.split(':')[2];
@@ -476,12 +477,11 @@ export class QuorumExecutionObserver implements ExecutionObserver {
         )
           unavailable();
         await this.pinnedCalls(reader, intent, 'latest');
-        const [balance, accountBalance, simulation] = await Promise.all([
+        const [balance, simulation] = await Promise.all([
           reader.call('eth_getBalance', [
             plan.sponsor.binding.address,
             'latest',
           ]),
-          reader.call('eth_getBalance', [intent.account.address, 'latest']),
           reader.call('eth_call', [
             {
               from: plan.sponsor.binding.address,
@@ -501,11 +501,6 @@ export class QuorumExecutionObserver implements ExecutionObserver {
           quantity(balance) <
             BigInt(plan.sponsor.gasLimit) * BigInt(plan.sponsor.maxFeePerGas) +
               BigInt(plan.sponsor.l1FeeReserveWei) ||
-          quantity(accountBalance) <
-            intent.calls.reduce(
-              (total, call) => total + BigInt(call.value),
-              0n,
-            ) ||
           safeInterface.decodeFunctionResult(
             'execTransaction',
             String(simulation),
