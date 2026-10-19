@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PolicyAdapters from './PolicyAdapters.vue';
 import SetupField from './SetupField.vue';
 import ContractPinFields from './ContractPinFields.vue';
 import type { ProviderConfiguration } from '../model';
@@ -169,110 +170,127 @@ function toggle(enabled: unknown) {
       >
         Add contract rule
       </button>
-      <h4>Uniswap V3 exact-input routes</h4>
-      <section
-        v-for="(route, index) in model.approvedCalls.policy.swaps"
-        :key="index"
-        class="feature-panel"
-      >
-        <SetupField
-          guide="approvedCalls"
-          type="text"
-          label="Swap route ID"
-          v-model="route.id"
-          validation="required"
-        />
-        <ContractPinFields label="Uniswap V3 router" v-model="route.router" />
-        <ContractPinFields label="Input token" v-model="route.tokenIn" />
-        <ContractPinFields label="Output token" v-model="route.tokenOut" />
-        <SetupField
-          guide="approvedCalls"
-          type="number"
-          :number="true"
-          label="Pool fee (millionths)"
-          v-model="route.fee"
-          validation="required"
-        />
-        <SetupField
-          guide="approvedCalls"
-          type="text"
-          label="Maximum input atomic units"
-          v-model="route.maximumInput"
-          validation="required"
-        />
+      <PolicyAdapters
+        v-model="model.approvedCalls.policy.adapters"
+        :contracts="model.approvedCalls.policy.contracts"
+        :compatibility="{
+          swaps: model.approvedCalls.policy.swaps,
+          vaults: model.approvedCalls.policy.vaults,
+        }"
+        :transfer="model.financial"
+        :tokenCodeHash="model.execution?.rpc.tokenCodeHash"
+      />
+      <details>
+        <summary>Compatibility request routes</summary>
+        <p>
+          These routes support existing swap and vault request bodies. They do
+          not enable adapters for generic calls.
+        </p>
+        <h4>Uniswap V3 exact-input routes</h4>
+        <section
+          v-for="(route, index) in model.approvedCalls.policy.swaps"
+          :key="index"
+          class="feature-panel"
+        >
+          <SetupField
+            guide="approvedCalls"
+            type="text"
+            label="Swap route ID"
+            v-model="route.id"
+            validation="required"
+          />
+          <ContractPinFields label="Uniswap V3 router" v-model="route.router" />
+          <ContractPinFields label="Input token" v-model="route.tokenIn" />
+          <ContractPinFields label="Output token" v-model="route.tokenOut" />
+          <SetupField
+            guide="approvedCalls"
+            type="number"
+            :number="true"
+            label="Pool fee (millionths)"
+            v-model="route.fee"
+            validation="required"
+          />
+          <SetupField
+            guide="approvedCalls"
+            type="text"
+            label="Maximum input atomic units"
+            v-model="route.maximumInput"
+            validation="required"
+          />
+          <button
+            type="button"
+            class="secondary"
+            @click="model.approvedCalls.policy.swaps?.splice(index, 1)"
+          >
+            Remove swap route
+          </button>
+        </section>
         <button
           type="button"
           class="secondary"
-          @click="model.approvedCalls.policy.swaps?.splice(index, 1)"
+          @click="
+            (model.approvedCalls.policy.swaps ??= []).push({
+              id: '',
+              router: pin(),
+              tokenIn: pin(),
+              tokenOut: pin(),
+              fee: 3000,
+              maximumInput: '',
+            })
+          "
         >
-          Remove swap route
+          Add swap route
         </button>
-      </section>
-      <button
-        type="button"
-        class="secondary"
-        @click="
-          (model.approvedCalls.policy.swaps ??= []).push({
-            id: '',
-            router: pin(),
-            tokenIn: pin(),
-            tokenOut: pin(),
-            fee: 3000,
-            maximumInput: '',
-          })
-        "
-      >
-        Add swap route
-      </button>
-      <h4>ERC-4626 deposit routes</h4>
-      <section
-        v-for="(route, index) in model.approvedCalls.policy.vaults"
-        :key="index"
-        class="feature-panel"
-      >
-        <SetupField
-          guide="approvedCalls"
-          type="text"
-          label="Vault route ID"
-          v-model="route.id"
-          validation="required"
-        />
-        <ContractPinFields
-          label="Yearn4626-compatible router"
-          v-model="route.router"
-        />
-        <ContractPinFields label="ERC-4626 vault" v-model="route.vault" />
-        <ContractPinFields label="Vault asset" v-model="route.asset" />
-        <SetupField
-          guide="approvedCalls"
-          type="text"
-          label="Maximum deposited atomic units"
-          v-model="route.maximumAssets"
-          validation="required"
-        />
+        <h4>ERC-4626 deposit routes</h4>
+        <section
+          v-for="(route, index) in model.approvedCalls.policy.vaults"
+          :key="index"
+          class="feature-panel"
+        >
+          <SetupField
+            guide="approvedCalls"
+            type="text"
+            label="Vault route ID"
+            v-model="route.id"
+            validation="required"
+          />
+          <ContractPinFields
+            label="Yearn4626-compatible router"
+            v-model="route.router"
+          />
+          <ContractPinFields label="ERC-4626 vault" v-model="route.vault" />
+          <ContractPinFields label="Vault asset" v-model="route.asset" />
+          <SetupField
+            guide="approvedCalls"
+            type="text"
+            label="Maximum deposited atomic units"
+            v-model="route.maximumAssets"
+            validation="required"
+          />
+          <button
+            type="button"
+            class="secondary"
+            @click="model.approvedCalls.policy.vaults?.splice(index, 1)"
+          >
+            Remove vault route
+          </button>
+        </section>
         <button
           type="button"
           class="secondary"
-          @click="model.approvedCalls.policy.vaults?.splice(index, 1)"
+          @click="
+            (model.approvedCalls.policy.vaults ??= []).push({
+              id: '',
+              router: pin(),
+              vault: pin(),
+              asset: pin(),
+              maximumAssets: '',
+            })
+          "
         >
-          Remove vault route
+          Add vault route
         </button>
-      </section>
-      <button
-        type="button"
-        class="secondary"
-        @click="
-          (model.approvedCalls.policy.vaults ??= []).push({
-            id: '',
-            router: pin(),
-            vault: pin(),
-            asset: pin(),
-            maximumAssets: '',
-          })
-        "
-      >
-        Add vault route
-      </button>
+      </details>
     </template>
   </section>
 </template>

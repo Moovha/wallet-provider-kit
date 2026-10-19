@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased operator policy and gas forms
+
+- Configure optional token-transfer, swap and vault adapters through setup and
+  provider runtime forms. Keep adapters unselected by default and cumulative
+  accounting a separate opt-in. Applications see published terms without provider
+  editing controls.
+- Prefill from registered pins, configured ERC-3009 policy and explicitly copied
+  compatibility routes while preserving imports and existing compatibility rules.
+- Edit gas budgets in ETH/gwei with exact wei conversion, cost summaries and
+  explicit test-network defaults. Prefill additional sponsors from known
+  application settings without resetting budgets or funding accounts.
+
 ## Unreleased optional allowance adapter boundaries
 
 - Move cumulative token interpretation, terms and activation into optional policy

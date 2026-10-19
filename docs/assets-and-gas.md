@@ -174,3 +174,14 @@ The [ERC-4337/7677 release milestones](account-abstraction-sponsorship.md) retai
 the relayer mechanisms and one application gas ledger. Unsigned runtime-policy
 preparation and paymaster transport helpers are implemented; configured signing,
 bundler submission, capability wiring and staged acceptance remain pending.
+
+## Edit sponsorship limits through forms
+
+The setup wizard's Deployment step offers ETH/gwei controls, exact stored-wei
+values under advanced settings, and a maximum-admission cost summary. Defaults
+and prefills are described in [operator setup](setup-wizard.md#optional-adapters-and-gas-starting-values).
+Imported limits are preserved. Apply reviewed exports through the normal
+deployment process; runtime adapter publication cannot change sponsor capacity.
+The forms do not fund accounts, report live remaining capacity or reset recorded
+usage. Gas eligibility and budgets remain separate from generic call permissions
+and optional asset allowances.

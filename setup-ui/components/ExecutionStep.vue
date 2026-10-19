@@ -8,6 +8,9 @@ import {
   defaultReplacementPolicy,
   defaultSponsorGas,
 } from '../../src/execution/defaults';
+import AmountField from './AmountField.vue';
+import AdvancedSettings from './AdvancedSettings.vue';
+import { formatEther } from 'ethers';
 import SetupField from './SetupField.vue';
 import type { ProviderConfiguration } from '../model';
 const model = defineModel<ProviderConfiguration>({ required: true });
@@ -24,8 +27,18 @@ const applications = computed(() =>
 );
 function sponsor() {
   const accountId = crypto.randomUUID();
+  const clientId =
+    applications.value.find(
+      (app) =>
+        !model.value.execution?.sponsors.some((s) => s.clientId === app.value),
+    )?.value ??
+    applications.value[0]?.value ??
+    '';
+  const existing = model.value.execution?.sponsors.find(
+    (s) => s.clientId === clientId,
+  );
   return {
-    clientId: applications.value[0]?.value ?? '',
+    clientId,
     accountId,
     binding: {
       ...(model.value.execution?.profile === 'erc3009-relayer-v1'
@@ -35,9 +48,32 @@ function sponsor() {
       address: model.value.execution?.local ? 'managed' : '',
       bindingRevision: '1',
     },
-    fundingAgreement: '',
+    fundingAgreement: existing?.fundingAgreement ?? '',
     ...defaultSponsorGas,
+    ...(existing
+      ? {
+          gasLimit: existing.gasLimit,
+          maxFeePerGas: existing.maxFeePerGas,
+          maxPriorityFeePerGas: existing.maxPriorityFeePerGas,
+          l1FeeReserveWei: existing.l1FeeReserveWei,
+          lifetimeBudgetWei: existing.lifetimeBudgetWei,
+        }
+      : {}),
   };
+}
+function gasSummary(
+  entry: NonNullable<ProviderConfiguration['execution']>['sponsors'][number],
+) {
+  try {
+    const cost =
+      BigInt(entry.gasLimit) * BigInt(entry.maxFeePerGas) +
+      BigInt(entry.l1FeeReserveWei);
+    if (cost <= 0n)
+      return 'Complete the gas limits to see the admission ceiling.';
+    return `Maximum admission cost: ${formatEther(cost)} ETH. Budget size: ${BigInt(entry.lifetimeBudgetWei) / cost} admissions at this ceiling; recorded usage reduces remaining capacity.`;
+  } catch {
+    return 'Complete the gas limits to see the admission ceiling.';
+  }
 }
 function toggle(value: unknown) {
   if (!value) {
@@ -662,35 +698,74 @@ function toggleReplacement(value: unknown) {
             :label="`Gas limit ${index + 1}`"
             validation="required"
           />
-          <SetupField
-            guide="executionGas"
-            v-model="entry.maxFeePerGas"
-            type="text"
-            :label="`Maximum fee per gas in wei ${index + 1}`"
-            validation="required"
-          />
-          <SetupField
-            guide="executionGas"
-            v-model="entry.maxPriorityFeePerGas"
-            type="text"
-            :label="`Maximum priority fee per gas in wei ${index + 1}`"
-            validation="required"
-          />
-          <SetupField
-            guide="executionGas"
-            v-model="entry.l1FeeReserveWei"
-            type="text"
-            :label="`L1 fee reserve in wei ${index + 1}`"
-            validation="required"
-          />
-          <SetupField
-            guide="executionGas"
+        </div>
+        <div class="field-grid">
+          <AmountField
+            :label="`Lifetime sponsorship budget (ETH) ${index + 1}`"
+            :decimals="18"
             v-model="entry.lifetimeBudgetWei"
-            type="text"
-            :label="`Lifetime gas budget in wei ${index + 1}`"
-            validation="required"
+          />
+          <AmountField
+            :label="`Maximum fee per gas (gwei) ${index + 1}`"
+            :decimals="9"
+            v-model="entry.maxFeePerGas"
+          />
+          <AmountField
+            :label="`Priority fee per gas (gwei) ${index + 1}`"
+            :decimals="9"
+            v-model="entry.maxPriorityFeePerGas"
+          />
+          <AmountField
+            :label="`L1 fee reserve (ETH) ${index + 1}`"
+            :decimals="18"
+            v-model="entry.l1FeeReserveWei"
           />
         </div>
+        <p class="help-text">{{ gasSummary(entry) }}</p>
+        <p class="help-text">
+          Gas budgets limit network fees for this application, independently of
+          optional asset allowances. No balance is funded or allowance reset by
+          editing these settings.
+        </p>
+        <button
+          type="button"
+          class="secondary"
+          @click="Object.assign(entry, defaultSponsorGas)"
+        >
+          Use suggested test-network gas limits {{ index + 1 }}
+        </button>
+        <AdvancedSettings :label="`Advanced gas values in wei ${index + 1}`"
+          ><div class="field-grid">
+            <SetupField
+              guide="executionGas"
+              v-model="entry.maxFeePerGas"
+              type="text"
+              :label="`Maximum fee per gas in wei ${index + 1}`"
+              validation="required"
+            />
+            <SetupField
+              guide="executionGas"
+              v-model="entry.maxPriorityFeePerGas"
+              type="text"
+              :label="`Maximum priority fee per gas in wei ${index + 1}`"
+              validation="required"
+            />
+            <SetupField
+              guide="executionGas"
+              v-model="entry.l1FeeReserveWei"
+              type="text"
+              :label="`L1 fee reserve in wei ${index + 1}`"
+              validation="required"
+            />
+            <SetupField
+              guide="executionGas"
+              v-model="entry.lifetimeBudgetWei"
+              type="text"
+              :label="`Lifetime gas budget in wei ${index + 1}`"
+              validation="required"
+            />
+          </div>
+        </AdvancedSettings>
         <button
           v-if="model.execution.sponsors.length > 1"
           type="button"

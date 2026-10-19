@@ -41,8 +41,9 @@ The disabled [wallet configuration](provider.config.contracts.example.json) and
 [executor configuration](executor.contracts.config.example.json) show the existing
 configuration format. Their addresses, hashes and account IDs are fictional.
 The configured wizard supplies infrastructure and existing compatibility controls.
-The native-recipient and adapter fields below currently use reviewed host/file
-configuration and the runtime policy API; dedicated form controls are not supplied.
+Configure optional adapters in the setup wizard or provider runtime workspace
+without editing JSON. Native-recipient fields still use reviewed host/file
+configuration and the runtime policy API.
 
 For native transfers, explicitly enable `nativeTransfers` in the provider policy:
 

@@ -370,3 +370,44 @@ deployment's access mode or reinitialize it to bypass the migration fence. Refer
 
 Keep exports private. They contain policy and variable names, not secret values.
 Do not share API explorer screenshots containing tokens, personal data or signatures.
+
+## Optional adapters and gas starting values
+
+In **Deployment**, select the approved EVM execution profile and enable the
+contract-call policy when using existing accepted Safe accounts. **Optional policy
+adapters** offers token-transfer, swap and vault forms. Leave them empty for
+generic calls. Native-recipient configuration remains an advanced configuration
+option.
+
+Token rules accept a registered pin, recipient list and per-transfer amount in
+base units. If an ERC-3009 policy is configured, **Prefill from ERC-3009 policy**
+copies its known token, recipients and maximum; cumulative accounting stays off
+until you select it. Its starting cumulative amount uses the matching ERC-3009
+limit when known, otherwise the per-transfer amount. Verify and edit it before
+export. Unknown token amounts, addresses and hashes remain blank.
+
+**Use compatibility routes as optional adapters** copies configured swap/vault
+routes with distinct adapter IDs while retaining the compatibility routes. It
+does not run automatically. Imported adapter terms, implementation pins and
+amounts remain intact until edited. Removing the last adapter removes that
+optional setting without changing generic contract permissions or gas budgets.
+
+Gas sponsorship has separate forms. Starting values are 500,000 gas, a 3 gwei
+maximum fee, 1 gwei priority fee, 0.000001 ETH L1 reserve and 0.01 ETH lifetime
+budget. These editable test-network values are not live fee estimates or funded
+balances. Review current network conditions and the application funding agreement
+before activation. **Use suggested test-network gas limits** explicitly restores
+these amounts; importing a configuration never applies them over saved values.
+
+New sponsors select the first eligible application without a sponsor, when one
+exists. Another sponsor for the same application prefills its existing gas limits
+and funding-agreement reference; its account ID and binding remain distinct.
+Sponsors in a pool share the application gas ledger and the lowest configured
+ceiling. Review pool selection and bindings before validation/export. Unknown
+funding agreements and externally managed addresses require operator input.
+
+Use ETH/gwei fields for ordinary editing or expand **Advanced gas values in wei**.
+Conversions retain integer precision; invalid precision blocks a valid export
+instead of retaining an earlier amount. The cost summary describes admission
+limits, not a remaining balance. Changing configuration never refunds recorded
+usage, resets an asset allowance or transfers funds.
