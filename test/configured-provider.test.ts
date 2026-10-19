@@ -4986,11 +4986,13 @@ it.each([false, true])(
       ),
     ).not.toBe(true);
     f.calls.state.included = true;
-    f.calls.state.mutate = (method, result, _origin, params) =>
-      method === 'eth_getBlockByNumber' &&
-      ['safe', 'finalized'].includes(String(params[0]))
+    f.calls.state.mutate = (method, result, _origin, params) => {
+      if (method === 'eth_getLogs') throw Error('Offline history unavailable');
+      return method === 'eth_getBlockByNumber' &&
+        ['safe', 'finalized'].includes(String(params[0]))
         ? { ...(result as object), number: '0x64' }
         : result;
+    };
     const included = await f.app.inject({
       url: '/v1/actions/' + cancellationId + '/execution',
       headers: {
@@ -5005,7 +5007,10 @@ it.each([false, true])(
         (state) => state.supportedActions![originalId].nonceReleased,
       ),
     ).not.toBe(true);
-    f.calls.state.mutate = undefined;
+    f.calls.state.mutate = (method, value) => {
+      if (method === 'eth_getLogs') throw Error('Offline history unavailable');
+      return value;
+    };
     const receipt = await f.app.inject({
       url: '/v1/actions/' + cancellationId + '/execution',
       headers: {

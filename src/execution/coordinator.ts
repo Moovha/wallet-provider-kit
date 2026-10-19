@@ -1267,6 +1267,7 @@ export class ApprovedExecutionCoordinator {
             .filter(
               ([, record]) =>
                 record.execution?.plan &&
+                !record.cancellationId &&
                 !record.execution.integrityFailure &&
                 record.execution.observation?.chain_status !== 'finalized',
             )

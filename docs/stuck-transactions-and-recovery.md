@@ -108,6 +108,21 @@ disables those autonomous mutations and is required for the bounded worker.
 The implementation research used Relayer v1.8.0; accept and test
 the exact deployed version before enabling funded execution.
 
+## Verify a known transaction before searching history
+
+When the provider or retained journal supplies a transaction hash, the observer
+first verifies that transaction and its receipt through every configured RPC.
+Exact calldata, owner/account bindings, code pins, operation effects, canonical
+blocks and finality remain required. A verified receipt does not depend on a
+separate log-history query. This lookup does not advance the history-scan cursor.
+
+If a known candidate does not establish the exact outcome, the observer searches
+bounded history for matching effects. Historical RPC access remains necessary for
+recovery without a usable transaction hash. Missing or conflicting evidence never
+authorizes another submission. During explicit nonce cancellation, background
+observation follows the cancellation; the fenced original remains available for
+explicit reconciliation.
+
 ## Retain a signed Safe head
 
 The outer payer nonce and Safe authorization nonce are separate. Service expiry

@@ -291,3 +291,10 @@ An expired signature remains valid on chain for its Safe nonce. A signed action
 that has never entered submission can use the [explicit nonce cancellation
 procedure](stuck-transactions-and-recovery.md#explicitly-cancel-an-unsubmitted-signed-safe-action).
 Submitted or uncertain attempts stay held for reconciliation.
+
+Safe contract-call sponsors may configure 21,000–5,000,000 gas per execution;
+ERC-3009 transfer-only configurations retain their 1,000,000-gas ceiling. Defaults
+do not increase automatically. Set the sponsor's limit from the full batch's
+simulation, then fund and admit its exact gas limit × maximum fee plus L1 reserve
+within the existing application lifetime budget. A designated executor with
+contract-call support must configure matching sponsor bounds.

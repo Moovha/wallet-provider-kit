@@ -1128,75 +1128,90 @@ export class QuorumExecutionObserver implements ExecutionObserver {
     // Advance only across finalized history; re-scan the unfinalized tail after reorgs.
     const next = (end < finalized ? end : finalized) + 1n;
     const scanNextBlock = (next > from ? next : from).toString();
+    const known = [
+      ...new Set([...(ownHash ? [ownHash] : []), ...input].map(hash)),
+    ].slice(0, 8);
+    let reorged = false;
+    let pending = false;
+    const verifyCandidates = async (
+      candidates: string[],
+      nextBlock: string,
+    ): Promise<(ChainObservation & { scanNextBlock: string }) | undefined> => {
+      for (const candidate of candidates) {
+        const observations = await Promise.all(
+          this.readers.map((reader, index) =>
+            this.verify(
+              reader,
+              plan,
+              candidate,
+              ownHash?.toLowerCase(),
+              heads[index],
+            ),
+          ),
+        );
+        if (observations.includes('reorged')) {
+          reorged = true;
+          continue;
+        }
+        if (observations.some((value) => value === null)) {
+          pending = true;
+          continue;
+        }
+        const values = observations as ChainObservation[];
+        if (
+          values.some(
+            (value) =>
+              value.transaction_hash !== values[0].transaction_hash ||
+              value.block_hash !== values[0].block_hash ||
+              value.block_number !== values[0].block_number ||
+              value.outcome !== values[0].outcome ||
+              value.execution_origin !== values[0].execution_origin ||
+              serviceHash(value.callsReceipt ?? null) !==
+                serviceHash(values[0].callsReceipt ?? null),
+          )
+        )
+          unavailable();
+        const status = values.every(
+          (value) => value.chain_status === 'finalized',
+        )
+          ? 'finalized'
+          : values.every(
+                (value) =>
+                  value.chain_status === 'safe' ||
+                  value.chain_status === 'finalized',
+              )
+            ? 'safe'
+            : 'included';
+        return {
+          ...values[0],
+          scanNextBlock: nextBlock,
+          chain_status: status,
+          settlement:
+            status === 'finalized'
+              ? (values[0].outcome as 'succeeded' | 'reverted')
+              : 'pending',
+          observed_at: new Date(Date.now()).toISOString(),
+        };
+      }
+      return undefined;
+    };
+    // Exact known receipts need no history scan, but still require every RPC's full verification.
+    const direct = await verifyCandidates(known, scanFromBlock);
+    if (direct) return direct;
     const found = await Promise.all(
       this.readers.map((reader, index) =>
         this.find(reader, plan, heads[index].latest, from),
       ),
     );
-    const common = found[0].filter((candidate) =>
-      found.every((group) => group.includes(candidate)),
-    );
-    const candidates = [
-      ...new Set(
-        [...common, ...(ownHash ? [ownHash] : []), ...input].map(hash),
-      ),
-    ].slice(0, 8);
-    let reorged = false;
-    let pending = false;
-    for (const candidate of candidates) {
-      const observations = await Promise.all(
-        this.readers.map((reader, index) =>
-          this.verify(
-            reader,
-            plan,
-            candidate,
-            ownHash?.toLowerCase(),
-            heads[index],
-          ),
-        ),
-      );
-      if (observations.includes('reorged')) {
-        reorged = true;
-        continue;
-      }
-      if (observations.some((value) => value === null)) {
-        pending = true;
-        continue;
-      }
-      const values = observations as ChainObservation[];
-      if (
-        values.some(
-          (value) =>
-            value.transaction_hash !== values[0].transaction_hash ||
-            value.block_hash !== values[0].block_hash ||
-            value.block_number !== values[0].block_number ||
-            value.outcome !== values[0].outcome ||
-            value.execution_origin !== values[0].execution_origin ||
-            serviceHash(value.callsReceipt ?? null) !==
-              serviceHash(values[0].callsReceipt ?? null),
-        )
+    const common = found[0]
+      .filter(
+        (candidate) =>
+          !known.includes(candidate) &&
+          found.every((group) => group.includes(candidate)),
       )
-        unavailable();
-      const status = values.every((value) => value.chain_status === 'finalized')
-        ? 'finalized'
-        : values.every(
-              (value) =>
-                value.chain_status === 'safe' ||
-                value.chain_status === 'finalized',
-            )
-          ? 'safe'
-          : 'included';
-      return {
-        ...values[0],
-        scanNextBlock,
-        chain_status: status,
-        settlement:
-          status === 'finalized'
-            ? (values[0].outcome as 'succeeded' | 'reverted')
-            : 'pending',
-        observed_at: new Date(Date.now()).toISOString(),
-      };
-    }
+      .slice(0, 8 - known.length);
+    const discovered = await verifyCandidates(common, scanNextBlock);
+    if (discovered) return discovered;
     return {
       scanNextBlock,
       chain_status: reorged ? 'reorged' : pending ? 'pending' : 'unobserved',

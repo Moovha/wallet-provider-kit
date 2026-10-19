@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased Safe batch gas limits
+
+- Allow explicitly configured Safe contract-call sponsors to use up to 5,000,000 gas per execution. Keep transfer-only configurations capped at 1,000,000, defaults unchanged, and exact sponsor fee/lifetime-budget admission in both wallet and designated executor validation.
+
+## Unreleased receipt lookup recovery
+
+- Verify known transaction hashes through the full RPC quorum before searching log history. Preserve the scan cursor until history is actually searched, and keep discovery as a fallback when known receipts cannot establish the exact result.
+- Observe explicit nonce cancellation instead of repeatedly scanning the unsubmitted original. Keep direct reconciliation and all receipt/finality checks.
+
 ## Unreleased signed Safe recovery
 
 - Decode Safe 1.4.1 execution events with their indexed transaction hash so independent receipt verification recognizes successful and failed executions.

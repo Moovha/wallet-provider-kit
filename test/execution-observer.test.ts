@@ -268,3 +268,42 @@ describe('fixed transfer execution wire profile', () => {
       ).toThrow();
   });
 });
+
+it.each(['owned', 'cached', 'missing'] as const)(
+  'verifies a %s hash independently before relying on log-history availability',
+  async (source) => {
+    const f = executionFixture();
+    const plan = await f.plan();
+    f.state.included = true;
+    f.state.finality = 'finalized';
+    let scans = 0;
+    f.state.mutate = (method, value) => {
+      if (method === 'eth_getLogs') {
+        scans++;
+        throw Error('Offline history unavailable');
+      }
+      return value;
+    };
+    const read = observer(f).observe(
+      plan,
+      source === 'cached' ? [f.transactionHash] : [],
+      source === 'owned' ? f.transactionHash : undefined,
+    );
+    if (source === 'missing') {
+      await expect(read).rejects.toMatchObject({
+        code: 'wallet_provider_unavailable',
+      });
+      expect(scans).toBeGreaterThan(0);
+    } else {
+      expect(await read).toMatchObject({
+        verification: 'rpc-quorum',
+        chain_status: 'finalized',
+        outcome: 'succeeded',
+        transaction_hash: f.transactionHash,
+        scanNextBlock: plan.scanFromBlock,
+      });
+      expect(scans).toBe(0);
+    }
+    expect(f.state.posts).toBe(0);
+  },
+);

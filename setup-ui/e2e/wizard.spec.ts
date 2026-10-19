@@ -629,7 +629,7 @@ test('API reference follows the configuration, preserves edits, shows Swagger sc
   await expect(
     page.getByRole('heading', { name: 'Provider API reference', exact: true }),
   ).toBeVisible();
-  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(39);
+  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(40);
   await expect(
     page
       .getByText('Not enabled: Wallet operations are disabled in Deployment', {
@@ -671,7 +671,7 @@ test('API reference follows the configuration, preserves edits, shows Swagger sc
     page.getByLabel('cURL request example', { exact: true }),
   ).toContainText('wallet.example.com/v1/accounts/');
   await page.getByLabel('Find an endpoint', { exact: true }).fill('');
-  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(39);
+  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(40);
   await page
     .getByLabel('Example endpoint', { exact: true })
     .selectOption('signAction');
@@ -730,7 +730,7 @@ test('API reference follows the configuration, preserves edits, shows Swagger sc
     permissions: ['account:read', 'transfers:request'],
   });
   await imported(page, financial);
-  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(39);
+  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(40);
   await page
     .getByLabel('Example endpoint', { exact: true })
     .selectOption('signAction');
@@ -813,7 +813,7 @@ test('API renderer can retry a failed bundled asset without losing setup', async
   await page
     .getByRole('button', { name: 'Reload API reference', exact: true })
     .click();
-  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(39);
+  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(40);
   await page
     .getByRole('button', { name: 'Setup configuration', exact: true })
     .click();
@@ -1389,7 +1389,7 @@ test('operators can export per-Safe queue limits and multiple sponsors for one a
   await page
     .getByRole('button', { name: 'API reference', exact: true })
     .click();
-  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(39);
+  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(40);
   await page
     .getByLabel('Example endpoint', { exact: true })
     .selectOption('enqueueContractCall');

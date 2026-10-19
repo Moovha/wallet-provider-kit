@@ -15,3 +15,8 @@ export const defaultSponsorGas = Object.freeze({
   l1FeeReserveWei: '1000000000000',
   lifetimeBudgetWei: '10000000000000000',
 });
+
+/** Hard configuration ceiling; sponsors retain their own lower gas and lifetime-budget bounds. */
+export function maximumSponsorGasLimit(contractCalls: boolean): bigint {
+  return contractCalls ? 5_000_000n : 1_000_000n;
+}
