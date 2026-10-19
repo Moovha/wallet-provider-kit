@@ -9,7 +9,11 @@ import {
   RuntimeConfigurationService,
   runtimeApplicationId,
 } from '../runtime-configuration/service.js';
-import type { ApplicationObligations } from '../runtime-configuration/obligations.js';
+import {
+  sponsorshipGas,
+  minimumSponsorFunding,
+  type ApplicationObligations,
+} from '../runtime-configuration/obligations.js';
 import {
   ApplicationCredentialCipher,
   type ApplicationCredential,
@@ -18,7 +22,6 @@ import type {
   ExecutionConfiguration,
   ExecutionSponsor,
 } from '../execution/types.js';
-import { defaultSponsorGas } from '../execution/defaults.js';
 import {
   localSponsorIds,
   localExecutionOrigin,
@@ -86,6 +89,9 @@ export class ApplicationSponsorService {
     if (declaration?.decision !== 'accepted') deny();
     const agreement =
       declaration.value as ApplicationObligations['sponsorship'];
+    const gas = sponsorshipGas(agreement);
+    if (BigInt(agreement.maximum_gas_budget_wei) < minimumSponsorFunding(gas))
+      deny();
     const application =
       this.resources.onboardingPolicy.applications.find(
         (a) => runtimeApplicationId(a.issuer, a.clientId) === applicationId,
@@ -119,7 +125,7 @@ export class ApplicationSponsorService {
       return (records[applicationId] = {
         applicationId,
         sponsor: {
-          ...defaultSponsorGas,
+          ...gas,
           accountId,
           clientId: application.clientId,
           binding: {
@@ -145,7 +151,11 @@ export class ApplicationSponsorService {
     });
     if (
       saved.sponsor.fundingAgreement !== agreement.funding_agreement ||
-      saved.sponsor.lifetimeBudgetWei !== agreement.maximum_gas_budget_wei
+      saved.sponsor.lifetimeBudgetWei !== agreement.maximum_gas_budget_wei ||
+      Object.entries(gas).some(
+        ([field, value]) =>
+          saved.sponsor[field as keyof ExecutionSponsor] !== value,
+      )
     )
       deny();
     const ids = saved.sponsor.binding;
@@ -158,8 +168,8 @@ export class ApplicationSponsorService {
         '/signers',
         JSON.stringify({
           id: ids.signerId,
-          type: 'local',
-          config: { key: this.cipher.open(saved.key) },
+          type: 'plain',
+          config: { key: this.cipher.open(saved.key).slice(2) },
         }),
       );
       signer = await this.client.call('GET', '/signers/' + ids.signerId);

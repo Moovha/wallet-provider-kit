@@ -1,5 +1,18 @@
 # Changelog
 
+## Application provisioning and funding recovery
+
+- Create dynamic gas signers with the pinned Relayer API’s `plain` request type
+  and unprefixed hexadecimal key format, retaining `local` response verification.
+- Accept provider-reviewed per-transaction gas limits and reject underfunded
+  sponsor budgets before infrastructure creation. Safe reads expose the network
+  and exact configured admission reserve alongside the sponsor funding address.
+- Keep retained Safe reconciliation available after sponsor funds are spent, and
+  allow protected provisioning responses up to sixty seconds for RPC reconciliation.
+- Create service-owned storage and vault subdirectories in new local deployments
+  so bind-mount root ownership does not prevent first startup. Existing stores
+  keep their configured paths.
+
 ## Application-scoped setup and shared Safes
 
 - New wizard deployments prebundle execution and defer application RPC credentials,

@@ -210,3 +210,10 @@ for application authority, backend and restore tests. Record actual evidence bef
 explicit activation. Setup does not provision wallets or sign actions to test
 credentials. Health checks do not validate token issuance, KYC assertions, vendor
 credentials, signing, sponsorship or settlement.
+
+New local container deployments keep SQLite in `.provider-data/storage` and the
+OWS vault in `.provider-vault/vault`. The container service account creates these
+private subdirectories so ownership checks also work when a container runtime
+reports a bind mount root as owned by root. Existing deployments retain their
+configured paths and records; do not reinitialize or move an occupied store to
+adopt this layout.

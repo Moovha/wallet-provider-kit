@@ -122,6 +122,27 @@ Empty action or service arrays withdraw those declarations for review. Sponsorsh
 budgets must be positive unsigned 256-bit decimal values on the provider's network.
 No balance check, gas transfer or blockchain transaction occurs during registration.
 
+You can include optional `gas_limits` in sponsorship declarations to bound the
+transaction gas, EIP-1559 fee caps and Base L1 data-fee reserve. For example:
+
+```json
+{
+  "gas_limit": "1000000",
+  "max_fee_per_gas": "10000000",
+  "max_priority_fee_per_gas": "1000000",
+  "l1_fee_reserve_wei": "1000000000000"
+}
+```
+
+These decimal values use gas units for `gas_limit` and wei for fee fields. They
+are example ceilings, not current network fee quotes. The lifetime budget must
+cover at least `gas_limit × max_fee_per_gas + l1_fee_reserve_wei`. Review the
+actual deployment and call simulation before accepting limits. If omitted, the
+service uses its documented default sponsor gas settings. Small agreement records
+remain readable, but sponsor creation denies a budget below that minimum before
+creating a key or calling the Relayer. Accepted gas settings become part of the
+retained sponsor identity; changing them requires an infrastructure migration.
+
 ## Inspect and decide
 
 Applications read their resources with `GET /v1/application/obligations`.
@@ -174,15 +195,21 @@ Complete these steps after the application connects:
    empty object and UUIDv4 `Idempotency-Key`. This prepares an application-specific
    gas signer and relayer, returning `funding_address`. It does not transfer funds.
 4. The application reads `GET /v1/application/safe` and arranges funding of the
-   returned `funding_addresses` on the configured chain. The provider can inspect
-   the same state with `GET /v1/provider/applications/{applicationId}/safe`.
+   returned `funding_addresses` on the returned `chain_id`. The response's
+   `funding_requirements` gives each sponsor's `minimum_balance_wei`, accepted
+   `gas_limits` and `maximum_gas_budget_wei`. The minimum is one transaction's
+   admission reserve; allow for deployment gas already spent before submitting
+   later operations. A lifetime budget is an authorization ceiling, not a balance.
+   The provider can inspect the same state with `GET /v1/provider/applications/{applicationId}/safe`.
 5. With wallet operations activated, the provider calls
    `POST /v1/provider/applications/{applicationId}/safe` with an empty object and
    UUIDv4 key. Independent application RPCs must agree that the sponsor has enough
    gas before the backend creates the retained Safe owner key. Deployment uses the
    accepted application sponsor. Repeat the request to reconcile retained
-   provisioning until the status is `ready`; uncertain attempts keep their original
-   identities and transaction plans.
+   provisioning until the status is `ready`. These protected provisioning routes
+   allow up to sixty seconds for retained reconciliation; a transport timeout still
+   requires reading retained state and retrying the original request. Uncertain
+   attempts keep their original identities and transaction plans.
 6. Users obtain individual wallet grants and consent to the current application
    terms. Submit user-bound contract calls with the required `application_action`.
    The provider rechecks user authority, current policy and immutable attempts

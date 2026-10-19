@@ -11,7 +11,7 @@ import type { WalletAttemptRequest } from '../domain/attempt-journal.js';
 import type { ProviderDatabase } from '../storage/index.js';
 import { deny, fingerprint, uuid } from '../onboarding/policy.js';
 import type { OnboardingService } from '../onboarding/service.js';
-import type { ProviderNetwork } from '../networks.js';
+import { providerNetwork, type ProviderNetwork } from '../networks.js';
 import type { ExecutionConfiguration } from '../execution/types.js';
 import { QuorumExecutionObserver } from '../execution/chain.js';
 import { createWalletAttemptRequest } from '../providers/attempt-lifecycle.js';
@@ -19,7 +19,11 @@ import {
   RuntimeConfigurationService,
   runtimeApplicationId,
 } from '../runtime-configuration/service.js';
-import type { ApplicationObligations } from '../runtime-configuration/obligations.js';
+import {
+  minimumSponsorFunding,
+  sponsorshipGas,
+  type ApplicationObligations,
+} from '../runtime-configuration/obligations.js';
 import {
   SafeProvisioningService,
   type SafeProvisioningConfiguration,
@@ -81,7 +85,11 @@ export class ApplicationSafeService {
     if (
       sponsor.fundingAgreement !== agreement.funding_agreement ||
       BigInt(sponsor.lifetimeBudgetWei) >
-        BigInt(agreement.maximum_gas_budget_wei)
+        BigInt(agreement.maximum_gas_budget_wei) ||
+      (this.sponsors &&
+        Object.entries(sponsorshipGas(agreement)).some(
+          ([field, value]) => sponsor[field as keyof typeof sponsor] !== value,
+        ))
     )
       deny();
     return {
@@ -165,6 +173,18 @@ export class ApplicationSafeService {
     return {
       application_id: resources.application_id,
       funding_addresses: sponsors.map((s) => s.binding.address),
+      chain_id: providerNetwork(this.network).caip,
+      funding_requirements: sponsors.map((sponsor) => ({
+        address: sponsor.binding.address,
+        minimum_balance_wei: minimumSponsorFunding(sponsor).toString(),
+        maximum_gas_budget_wei: sponsor.lifetimeBudgetWei,
+        gas_limits: {
+          gas_limit: sponsor.gasLimit,
+          max_fee_per_gas: sponsor.maxFeePerGas,
+          max_priority_fee_per_gas: sponsor.maxPriorityFeePerGas,
+          l1_fee_reserve_wei: sponsor.l1FeeReserveWei,
+        },
+      })),
       status:
         deployment?.state ??
         (saved?.account
@@ -182,21 +202,24 @@ export class ApplicationSafeService {
     if (!this.enabled || !uuid.test(context.idempotencyKey)) deny();
     this.resources.assertOperator(context.principal);
     const terms = await this.terms(context.principal, applicationId);
-    const observer = new QuorumExecutionObserver(
-      terms.endpoints,
-      terms.execution.rpc.genesisHash,
-      terms.execution.maxLogRange,
-      this.request,
-      this.network,
-    );
-    const minimum =
-      BigInt(terms.sponsor.gasLimit) * BigInt(terms.sponsor.maxFeePerGas) +
-      BigInt(terms.sponsor.l1FeeReserveWei);
-    if (
-      BigInt(await observer.payerBalance(terms.sponsor.binding.address)) <
-      minimum
-    )
-      deny();
+    const retained = await this.stored(applicationId);
+    if (!retained?.account) {
+      const observer = new QuorumExecutionObserver(
+        terms.endpoints,
+        terms.execution.rpc.genesisHash,
+        terms.execution.maxLogRange,
+        this.request,
+        this.network,
+      );
+      const minimum =
+        BigInt(terms.sponsor.gasLimit) * BigInt(terms.sponsor.maxFeePerGas) +
+        BigInt(terms.sponsor.l1FeeReserveWei);
+      if (
+        BigInt(await observer.payerBalance(terms.sponsor.binding.address)) <
+        minimum
+      )
+        deny();
+    }
     const saved = await this.database.onboardingStore.transaction((state) => {
       if (
         state.deploymentBindings?.['service-v1']?.activeRevision !==
