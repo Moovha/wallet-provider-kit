@@ -1,3 +1,5 @@
+import { ensureAssetBudget } from './asset-budgets.js';
+export { assetBudgetId } from './asset-budgets.js';
 import { sqliteSponsorshipStore } from './sponsorship.js';
 import type {
   WalletAttemptRequest,
@@ -31,6 +33,7 @@ import type { FinancialApproval, FinancialAuthorityOptions } from './types.js';
 export type { ProviderDatabaseOptions } from './connection.js';
 export type { AttemptAdmission } from './journal.js';
 export type {
+  AssetBudgetCharge,
   FinancialApproval,
   FinancialAuthorization,
   FinancialAuthorityOptions,
@@ -83,6 +86,22 @@ export function openProviderDatabase(options: ProviderDatabaseOptions) {
         );
         connection.audit('budget_configured', id);
       });
+    },
+    async ensureAssetBudget(
+      origin: string,
+      accountId: string,
+      token: string,
+      maximum: string,
+      revision: string,
+    ) {
+      return ensureAssetBudget(
+        connection,
+        origin,
+        accountId,
+        token,
+        maximum,
+        revision,
+      );
     },
     async budget(id: string) {
       const row = connection.get(

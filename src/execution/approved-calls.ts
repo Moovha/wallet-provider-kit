@@ -86,6 +86,7 @@ export type ApprovedCallInput =
     };
 export interface ApprovedCallIntent {
   adapterInput?: AdapterInput;
+  assetBudgets?: { token: string; units: string; maximum: string }[];
   nativeRecipients?: string[];
   version: '1';
   mechanism: 'safe-1.4.1';
@@ -262,7 +263,14 @@ export function validateApprovedCallPolicy(policy: ApprovedCallPolicy): void {
   }
   const transferTokens = new Set<string>();
   for (const transfer of policy.adapters?.tokenTransfers ?? []) {
-    exact(transfer, ['token', 'recipients', 'maximumAmount']);
+    exact(transfer, [
+      'token',
+      'recipients',
+      'maximumAmount',
+      ...(transfer.lifetimeAmount !== undefined ? ['lifetimeAmount'] : []),
+    ]);
+    if (transfer.lifetimeAmount !== undefined)
+      uint(transfer.lifetimeAmount, true);
     register(transfer.token);
     const tokenAddress = transfer.token.address.toLowerCase();
     if (transferTokens.has(tokenAddress)) denied();
@@ -412,6 +420,13 @@ export function buildApprovedCallIntent(
     )
   )
     denied();
+  const transferBudget =
+    adapter?.kind === 'token-transfer'
+      ? policy.adapters?.tokenTransfers?.find(
+          (entry) =>
+            entry.token.address.toLowerCase() === adapter.token.toLowerCase(),
+        )?.lifetimeAmount
+      : undefined;
   return structuredClone({
     version: '1',
     mechanism: 'safe-1.4.1',
@@ -424,6 +439,17 @@ export function buildApprovedCallIntent(
     ],
     effects,
     ...(adapter ? { adapterInput: adapter } : {}),
+    ...(adapter?.kind === 'token-transfer' && transferBudget
+      ? {
+          assetBudgets: [
+            {
+              token: adapter.token,
+              units: adapter.amount,
+              maximum: transferBudget,
+            },
+          ],
+        }
+      : {}),
     ...(nativeRecipients.length ? { nativeRecipients } : {}),
     nonce,
   });

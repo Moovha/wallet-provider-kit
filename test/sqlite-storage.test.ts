@@ -1024,3 +1024,135 @@ describe('SQLite optional enrollment and execution profiles', () => {
     });
   });
 });
+
+describe('additional asset budgets at the financial dispatch boundary', () => {
+  async function additional(
+    f: Awaited<ReturnType<typeof fixture>>,
+    amount: string,
+    operationId = randomUUID(),
+    maximum = '9',
+  ) {
+    const action = {
+      ...f.action,
+      action_id: randomUUID(),
+      operation_id: operationId,
+    };
+    const approval = {
+      ...f.approval,
+      action,
+      additionalBudgets: [
+        { budgetId: 'shared-token-allowance', units: amount, maximum },
+      ],
+    };
+    await f.db.approveAction(approval);
+    return approval;
+  }
+  it('combines old allowance usage and generic asset usage and rolls back the operation charge on denial', async () => {
+    const f = await fixture();
+    await f.db.setBudget('shared-token-allowance', '9');
+    const old = {
+      ...f.approval,
+      action: { ...f.action, action_id: randomUUID() },
+      budgetId: 'shared-token-allowance',
+      units: '5',
+    };
+    await f.db.approveAction(old);
+    await f.service.sign(
+      { ...f.context, idempotencyKey: randomUUID() },
+      old.action.action_id,
+    );
+    const generic = await additional(f, '4');
+    await f.service.sign(
+      { ...f.context, idempotencyKey: randomUUID() },
+      generic.action.action_id,
+    );
+    const denied = await additional(f, '1');
+    await expect(
+      f.service.sign(
+        { ...f.context, idempotencyKey: randomUUID() },
+        denied.action.action_id,
+      ),
+    ).rejects.toThrow('wallet_attempt_unavailable');
+    expect(await f.db.budget('shared-token-allowance')).toEqual({
+      maximum: '9',
+      reserved: '9',
+    });
+    expect(await f.db.budget(f.approval.budgetId)).toEqual({
+      maximum: '2',
+      reserved: '1',
+    });
+    expect(f.provider.signTypedData).toHaveBeenCalledTimes(2);
+  });
+  it('charges the asset once for the same operation across signer namespaces, including uncertain signing', async () => {
+    const f = await fixture();
+    await f.db.setBudget('shared-token-allowance', '9');
+    const generic = await additional(f, '4');
+    f.provider.signTypedData = vi.fn(async () => {
+      throw new Error('Offline response loss');
+    });
+    await expect(
+      f.service.sign(
+        { ...f.context, idempotencyKey: randomUUID() },
+        generic.action.action_id,
+      ),
+    ).rejects.toThrow();
+    const other = f.db.financialAuthority({
+      ...f.options,
+      namespace: 'other-signer',
+    });
+    const service = new EmbeddedWalletService(
+      other.authority,
+      createJournaledWalletProvider(f.provider, {
+        namespace: 'other-signer',
+        journal: other.journal,
+        authorizeAttempt: other.authorizeAttempt,
+      }),
+    );
+    await expect(
+      service.sign(f.context, generic.action.action_id),
+    ).rejects.toThrow();
+    expect(await f.db.budget('shared-token-allowance')).toEqual({
+      maximum: '9',
+      reserved: '4',
+    });
+  });
+  it('honors a narrower approval ceiling without raising the existing allowance', async () => {
+    const f = await fixture();
+    await f.db.setBudget('shared-token-allowance', '9');
+    const one = await additional(f, '4', undefined, '5');
+    await f.service.sign(
+      { ...f.context, idempotencyKey: randomUUID() },
+      one.action.action_id,
+    );
+    const two = await additional(f, '2', undefined, '5');
+    await expect(
+      f.service.sign(
+        { ...f.context, idempotencyKey: randomUUID() },
+        two.action.action_id,
+      ),
+    ).rejects.toThrow('wallet_attempt_unavailable');
+    expect(await f.db.budget('shared-token-allowance')).toEqual({
+      maximum: '9',
+      reserved: '4',
+    });
+  });
+  it('rejects duplicate, primary and missing asset budgets before approval', async () => {
+    const f = await fixture();
+    for (const charges of [
+      [{ budgetId: f.approval.budgetId, units: '1', maximum: '2' }],
+      [{ budgetId: 'missing', units: '1', maximum: '2' }],
+      [
+        { budgetId: 'a', units: '1', maximum: '2' },
+        { budgetId: 'a', units: '1', maximum: '2' },
+      ],
+    ])
+      await expect(
+        f.db.approveAction({
+          ...f.approval,
+          action: { ...f.action, action_id: randomUUID() },
+          additionalBudgets: charges,
+        }),
+      ).rejects.toThrow();
+    expect(f.provider.signTypedData).not.toHaveBeenCalled();
+  });
+});

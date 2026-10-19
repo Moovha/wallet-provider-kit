@@ -776,6 +776,10 @@
                         "maximumAmount": {
                           "type": "string",
                           "pattern": "^(0|[1-9][0-9]{0,77})$"
+                        },
+                        "lifetimeAmount": {
+                          "type": "string",
+                          "pattern": "^(0|[1-9][0-9]{0,77})$"
                         }
                       }
                     }

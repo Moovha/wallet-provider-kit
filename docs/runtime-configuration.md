@@ -274,3 +274,14 @@ The [EIP-5792 adapter](wallet-calls.md) supplies standard batch submission and
 status for this Safe profile. Use the [runtime workspace](runtime-workspace.md) for operator forms. Real
 test-network, provider and recovery acceptance remain required for your deployment;
 see the [support and acceptance reference](v1-standards.md).
+
+### Cumulative direct-transfer terms
+
+A reviewed `call_adapters.tokenTransfers` entry may include `lifetimeAmount`
+alongside its token pin, recipients and `maximumAmount`. This cumulative term
+uses the same provider/account/token allowance as ERC-3009. Publication requires
+fresh financial consent and retains existing usage; automatic contract acceptance
+does not approve changes to these terms. See [cumulative token allowances](approved-contract-calls.md#cumulative-token-allowances)
+for activation inventory, uncertainty, account compatibility and unsupported
+indirect asset exposure. Dedicated adapter editing forms remain unavailable;
+provider operators can publish these terms through the configuration API.

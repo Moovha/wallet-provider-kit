@@ -293,3 +293,20 @@ conditions and webhook delivery intents use `operations` in each separate store.
 They reuse the verified JSON catalog without DDL. Backups can redeliver old events;
 receivers must retain deduplication across the restoration window. See
 [payer events and health](payer-events-and-health.md).
+
+## Shared direct-token allowances
+
+Optional cumulative token-transfer policies reuse the ERC-3009 budget key and
+reserved counter. Generic approvals carry immutable `additionalBudgets` alongside
+their primary operation charge. Dispatch and sponsorship transactions reserve
+all required counters together. The `assetReservations` JSON collection prevents
+charging the same operation's asset amount again through a signer namespace or
+SafeOp phase. Unknown effects retain reservations.
+
+The `assetBudgetMigrations` collection records completed per-allowance inventory
+of earlier admitted generic authorizations. Activation retains existing ceilings
+and usage, counts identifiable direct transfers once, and fails closed for opaque
+history. Full historical usage is retained even when it exceeds the ceiling.
+Both collections use the verified version-1 `onboarding_records` catalog without
+DDL. Preserve them in backups and use the existing restore/fencing controls;
+see [allowance activation](approved-contract-calls.md#activate-with-existing-authorizations).

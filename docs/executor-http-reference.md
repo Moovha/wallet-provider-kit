@@ -1150,6 +1150,30 @@ Request body:
                   "type": "string",
                   "pattern": "^(0|[1-9][0-9]{0,77})$"
                 },
+                "assetBudgets": {
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 16,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["token", "units", "maximum"],
+                    "properties": {
+                      "token": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                      },
+                      "units": {
+                        "type": "string",
+                        "pattern": "^(0|[1-9][0-9]{0,77})$"
+                      },
+                      "maximum": {
+                        "type": "string",
+                        "pattern": "^(0|[1-9][0-9]{0,77})$"
+                      }
+                    }
+                  }
+                },
                 "nativeRecipients": {
                   "type": "array",
                   "minItems": 1,
@@ -1418,6 +1442,10 @@ Request body:
                                 }
                               },
                               "maximumAmount": {
+                                "type": "string",
+                                "pattern": "^(0|[1-9][0-9]{0,77})$"
+                              },
+                              "lifetimeAmount": {
                                 "type": "string",
                                 "pattern": "^(0|[1-9][0-9]{0,77})$"
                               }
