@@ -24,6 +24,8 @@ profile. Both consume the common call intent and optional policy adapters.
 An EOA's existing ERC-3009 authorization is a separate compatibility mechanism;
 using generic calls does not convert that EOA into a Safe or move its assets.
 
+Native funds can arrive during an earlier call and fund a later call in the same atomic batch, such as unwrapping wrapped ETH before sending ETH. Preflight simulates the complete signed Safe transaction; the provider still bounds the sum of outgoing native values and the sponsor gas ceiling.
+
 A successful generic batch means the exact calls executed. It does not certify a
 quote, beneficiary settlement, swap output or vault result. Optional adapters can
 interpret supported calldata and require additional evidence. The provider chooses

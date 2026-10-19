@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { Wallet, keccak256 } from 'ethers';
+import { Interface, Wallet, keccak256 } from 'ethers';
 import { randomUUID } from 'node:crypto';
 import { approvedCallsFixture } from './helpers/approved-calls.js';
 import { executionFixture } from './helpers/execution.js';
@@ -8,6 +8,8 @@ import {
   buildApprovedCallAction,
   validateApprovedCallAction,
   approvedCallPayload,
+  approvedCallData,
+  safeInterface,
   type ApprovedCallPolicy,
   tokenInterface,
   swapInterface,
@@ -19,7 +21,7 @@ import {
 import { normalizeRuntimePolicy } from '../src/runtime-configuration/service.js';
 import { serviceHash } from '../src/executor/auth.js';
 import { verifyAdapterEffects } from '../src/execution/adapter-effects.js';
-import { RpcReader } from '../src/execution/chain.js';
+import { QuorumExecutionObserver, RpcReader } from '../src/execution/chain.js';
 function setup() {
   const id = randomUUID(),
     owner = Wallet.createRandom().address,
@@ -408,3 +410,92 @@ describe('unified approved calls and optional operation adapters', () => {
     ).toThrow();
   });
 });
+
+it.each(['success', 'simulation-revert', 'sponsor-empty'] as const)(
+  'simulates native funding within an atomic unwrap/send batch: %s',
+  async (condition) => {
+    const original = executionFixture(),
+      owner = Wallet.createRandom(),
+      accountId = randomUUID();
+    const f = approvedCallsFixture(accountId, owner.address, original);
+    const recipient = Wallet.createRandom().address;
+    const wrapped = new Interface(['function withdraw(uint256)']);
+    f.policy.contracts[0].selectors = [
+      wrapped.getFunction('withdraw')!.selector,
+    ];
+    f.policy.nativeTransfers = {
+      recipients: [
+        { address: recipient, codeHash: keccak256('0x'), maximumValueWei: '4' },
+      ],
+    };
+    const expiresAt = new Date(Date.now() + 60000).toISOString();
+    const intent = buildApprovedCallIntent(
+      f.policy,
+      {
+        account_id: accountId,
+        kind: 'contract-call',
+        calls: [
+          {
+            to: f.policy.contracts[0].address,
+            value: '0',
+            data: wrapped.encodeFunctionData('withdraw', [4]),
+          },
+          { to: recipient, value: '4', data: '0x' },
+        ],
+      },
+      '0',
+      expiresAt,
+    );
+    const action = buildApprovedCallAction(
+      intent,
+      owner.address,
+      expiresAt,
+      randomUUID(),
+    );
+    const signature = await owner.signTypedData(
+      action.payload.domain,
+      action.payload.types,
+      action.payload.message,
+    );
+    const plan = {
+      ...(await original.plan()),
+      profile: 'approved-evm-executor-v1' as const,
+      action,
+      intent,
+      data: approvedCallData(action, signature),
+    };
+    f.state.mutate = (method, result, _origin, params) => {
+      if (
+        method === 'eth_getCode' &&
+        String(params[0]).toLowerCase() === recipient.toLowerCase()
+      )
+        return '0x';
+      if (
+        method === 'eth_getBalance' &&
+        String(params[0]).toLowerCase() === intent.account.address.toLowerCase()
+      )
+        return '0x0';
+      if (method === 'eth_getBalance' && condition === 'sponsor-empty')
+        return '0x0';
+      if (
+        method === 'eth_call' &&
+        String((params[0] as { data: string }).data).startsWith(
+          safeInterface.getFunction('execTransaction')!.selector,
+        ) &&
+        condition === 'simulation-revert'
+      )
+        return safeInterface.encodeFunctionResult('execTransaction', [false]);
+      return result;
+    };
+    const observer = new QuorumExecutionObserver(
+      ['https://primary.example.test', 'https://secondary.example.test'],
+      original.configuration.rpc.genesisHash,
+      10000,
+      f.request,
+    );
+    if (condition === 'success')
+      await expect(observer.preflight(plan)).resolves.toBeUndefined();
+    else await expect(observer.preflight(plan)).rejects.toThrow();
+    expect(f.state.posts).toBe(0);
+  },
+);
