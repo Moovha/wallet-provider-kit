@@ -88,15 +88,16 @@ real financial contracts nor establish mainnet execution acceptance.
 | Transaction family                            | Current toolkit path                          | Remaining acceptance                                                            |
 | --------------------------------------------- | --------------------------------------------- | ------------------------------------------------------------------------------- |
 | Token transfer                                | EOA ERC-3009 or bound Safe calls              | Verify token domain/code and exact finalized transfer                           |
-| Native transfer and ordered contract batch    | Bound Safe 1.4.1 calls                        | Existing account/code/owner binding, funding and gas acceptance                 |
+| Native transfer and ordered contract batch    | Bound Safe 1.4.1 calls                        | Automatic or existing account binding, funding and gas acceptance               |
 | Swap                                          | Generic calls; optional reviewed swap adapter | Actual router/version, bounded debit, minimum output and recipient effects      |
 | Vault deposit                                 | Generic calls; optional vault adapter         | Actual asset/vault/router and minimum shares                                    |
 | Withdrawal, redemption, approval and wrapping | Registered exact calls                        | Reviewed calldata and required product-specific outcome checks                  |
 | Bridge                                        | Source and destination calls                  | Route-specific attestation, finality, fees and durable cross-chain continuation |
 | Payout or off-chain cashout                   | Approved chain-side action                    | Separate payout authority, settlement and refund orchestration                  |
 
-OWS provisioning creates an EOA. The Safe execution profile requires an already
-deployed Safe whose owner, singleton, threshold and module state match configured
-pins; this preview does not deploy one. Selecting automatic Safe creation requires
-a reviewed provisioning mechanism and deployment funding. Generic transaction
+OWS provisioning creates an EOA. Use [automatic Safe provisioning](safe-provisioning.md)
+with the normal bundled deployment process to create its Safe, or configure an
+existing Safe with verified owner, singleton, threshold and module state. The
+unfunded native preview does not deploy Safes. Safe deployment requires a funded
+application sponsor and separate acceptance evidence. Generic transaction
 success cannot certify swap, bridge, vault or payout business completion.

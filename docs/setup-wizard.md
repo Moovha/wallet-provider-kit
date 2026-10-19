@@ -224,14 +224,16 @@ RPC sources, fixed gas limits, budgets and outcome meanings. The
 provider ID/revision and service-key environment references. The wizard configures
 the wallet side; it does not deploy that dispatcher.
 
-For contract calls, choose **Approved EVM actions through designated service**
-and enable **Approved contract-call policy**. Configure pre-existing Safe 1.4.1
-account bindings, code pins and allowed functions. The existing swap/vault
-fields configure optional compatibility request builders. Generic native-recipient
-and operation-adapter terms currently use reviewed configuration/API fields. The
-[approved-call guide](approved-contract-calls.md) explains those requirements and
-how they connect to `contracts:request` consent in Policies. The wizard does not
-create or fund Safe accounts.
+For contract calls, select the approved EVM execution profile and enable
+**Approved contract-call policy**. With the bundled local engine, enable
+[automatic Safe provisioning](safe-provisioning.md) or configure existing Safe
+1.4.1 bindings. Fund the application sponsor before provisioning. Configure code
+pins and permitted functions, then obtain separate `contracts:request` consent.
+The swap/vault fields configure optional compatibility request builders; generic
+native-recipient terms use reviewed configuration/API fields. Optional adapters
+are available in the policy forms. The [approved-call guide](approved-contract-calls.md)
+explains operation limits and outcome verification. The application separately
+funds the Safe with assets for its approved calls.
 
 Optional execution settings support [Safe queues and sponsor pools](safe-queue-and-sponsor-pools.md),
 [stuck-transaction detection and recovery](stuck-transactions-and-recovery.md),

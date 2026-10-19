@@ -1930,7 +1930,20 @@ test('automatic Safe provisioning exports canonical pins without a static accoun
       exact: true,
     })
     .click();
+  await page
+    .getByText('Enable durable per-Safe request queues', { exact: true })
+    .click();
+  await page
+    .getByText('Enable round-robin sponsor pools', { exact: true })
+    .click();
+  await expect(
+    page.getByLabel('Automatically provision a Safe for each new wallet', {
+      exact: true,
+    }),
+  ).toBeChecked();
   let saved = await exported(page);
+  expect(saved.execution.safeQueue).toBeDefined();
+  expect(saved.execution.sponsorPool).toBeDefined();
   expect(saved.safeProvisioning.factory.address).toBe(
     '0x4e1DCf7AD4e460CfD30791CCC4F9c8a4f820ec67',
   );

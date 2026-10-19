@@ -177,7 +177,6 @@ function mode(value: unknown) {
 function togglePool(value: unknown) {
   const execution = model.value.execution;
   if (!execution) return;
-  if (value !== 'local-approved') delete model.value.safeProvisioning;
   if (value)
     execution.sponsorPool = {
       strategy: 'round-robin',
@@ -188,7 +187,6 @@ function togglePool(value: unknown) {
 function toggleQueue(value: unknown) {
   const execution = model.value.execution;
   if (!execution) return;
-  if (value !== 'local-approved') delete model.value.safeProvisioning;
   if (value) execution.safeQueue = { maxDepthPerSafe: 20, maxWaitSeconds: 300 };
   else delete execution.safeQueue;
 }
