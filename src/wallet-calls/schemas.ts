@@ -158,6 +158,12 @@ export const rpcResponseSchema = {
               additionalProperties: false,
               required: ['atomic'],
               properties: {
+                applicationAction: {
+                  type: 'object',
+                  additionalProperties: false,
+                  required: ['supported'],
+                  properties: { supported: { type: 'boolean', enum: [true] } },
+                },
                 paymasterService: {
                   type: 'object',
                   additionalProperties: false,
@@ -179,6 +185,12 @@ export const rpcResponseSchema = {
               additionalProperties: false,
               required: ['atomic'],
               properties: {
+                applicationAction: {
+                  type: 'object',
+                  additionalProperties: false,
+                  required: ['supported'],
+                  properties: { supported: { type: 'boolean', enum: [true] } },
+                },
                 paymasterService: {
                   type: 'object',
                   additionalProperties: false,

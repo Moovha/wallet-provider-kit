@@ -1,3 +1,4 @@
+import type { VerifiedPrincipal } from '../domain/principal.js';
 import { runtimeSnapshotSchema } from '../runtime-configuration/schemas.js';
 import type { SafeExecutionQueue } from '../execution/queue.js';
 import {
@@ -85,6 +86,7 @@ export interface OnboardingHttpOptions {
   contractNonce?: (
     binding: SafeAccountBinding,
     owner: string,
+    principal?: VerifiedPrincipal,
   ) => Promise<string>;
   /** Fence superseded configured-service instances, including browser authority writers. */
   currentConfiguration?: () => Promise<boolean>;

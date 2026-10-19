@@ -26,11 +26,23 @@ const call = object({
 });
 export const approvedCallInputSchema = {
   oneOf: [
-    object({
-      account_id: uuidSchema,
-      kind: { type: 'string', enum: ['contract-call'] },
-      calls: { type: 'array', minItems: 1, maxItems: 16, items: call },
-    }),
+    object(
+      {
+        account_id: uuidSchema,
+        kind: { type: 'string', enum: ['contract-call'] },
+        calls: { type: 'array', minItems: 1, maxItems: 16, items: call },
+        application_action: object({
+          name: { type: 'string', pattern: '^[a-z][a-z0-9_-]{0,63}$' },
+          payload: {
+            type: 'object',
+            maxProperties: 32,
+            propertyNames: { pattern: '^[a-z][a-z0-9_-]{0,63}$' },
+            additionalProperties: { type: 'string', maxLength: 128 },
+          },
+        }),
+      },
+      ['application_action'],
+    ),
     object({
       account_id: uuidSchema,
       kind: { type: 'string', enum: ['swap'] },

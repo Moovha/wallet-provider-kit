@@ -6,6 +6,9 @@ import type { ProviderConfiguration } from './config.js';
 /** Names eligible for generation during explicit new-deployment setup, never service startup. */
 export function generatedSecretNames(config: ProviderConfiguration): string[] {
   return [
+    ...(config.runtimeConfiguration?.credentialKey
+      ? [config.runtimeConfiguration.credentialKey.env]
+      : []),
     ...(config.localExecution
       ? [
           config.localExecution.apiKey.env,
@@ -45,7 +48,10 @@ export function generateDeploymentSecrets(
         use: 'sig',
         alg: 'RS256',
       });
-    } else if (name === config.localExecution?.storageKey.env)
+    } else if (
+      name === config.localExecution?.storageKey.env ||
+      name === config.runtimeConfiguration?.credentialKey?.env
+    )
       values[name] = randomBytes(32).toString('base64');
     else values[name] = randomBytes(48).toString('base64url');
   }

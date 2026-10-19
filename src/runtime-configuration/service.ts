@@ -1,4 +1,11 @@
 import {
+  ApplicationCredentialCipher,
+  credentialMetadata,
+  credentialOrigin,
+  type ApplicationCredential,
+  type CredentialMetadata,
+} from './credentials.js';
+import {
   normalizeObligation,
   type ApplicationObligations,
   type ObligationKind,
@@ -36,9 +43,12 @@ import { policyChangeSchema, runtimeConfigurationSchema } from './schemas.js';
 
 export interface RuntimeConfigurationOptions {
   authorizeContracts?: boolean;
+  credentialKey?: { env: string };
   operators: { issuer: string; clientId: string; subject: string }[];
 }
 export interface RuntimePolicy {
+  action_requirements?: ApplicationObligations['actions'];
+  application_resources_hash?: string;
   version: '1';
   native_transfers?: {
     address: string;
@@ -92,6 +102,11 @@ export interface RuntimeReview {
 }
 export interface RuntimeConfigurationState {
   obligations?: ObligationRegistry;
+  credentials?: Record<string, ApplicationCredential>;
+  credentialReceipts?: Record<
+    string,
+    { hash: string; metadata: CredentialMetadata }
+  >;
   reviews?: Record<string, RuntimeReview>;
   reviewReceipts?: Record<string, RuntimeReview>;
   heads: Record<string, string>;
@@ -163,6 +178,11 @@ export function normalizeRuntimePolicy(
     invalid();
   const result = structuredClone(change);
   const policy = result.policy;
+  if (policy.action_requirements)
+    policy.action_requirements = normalizeObligation(
+      'actions',
+      policy.action_requirements,
+    );
   const uint = (value: string) => {
     if (BigInt(value) >= 2n ** 256n) invalid();
   };
@@ -286,6 +306,7 @@ export class RuntimeConfigurationService {
     private readonly deploymentRevision: string,
     private readonly transportRevision?: string,
     private readonly network?: ProviderNetwork,
+    private readonly credentialCipher?: ApplicationCredentialCipher,
   ) {
     if (!text(deploymentRevision))
       throw new WalletProviderError('wallet_provider_configuration');
@@ -416,6 +437,124 @@ export class RuntimeConfigurationService {
       revision,
     });
     return record;
+  }
+  async readCredentials(principal: VerifiedPrincipal, applicationId?: string) {
+    const selected = applicationId ?? this.application(principal);
+    if (applicationId) {
+      this.assertOperator(principal);
+      this.target(selected);
+    } else if (!principal.scopes.includes('wallet:configuration:read')) deny();
+    return this.transaction((registry) =>
+      Object.values(registry.credentials ?? {})
+        .filter((entry) => entry.application_id === selected)
+        .map(credentialMetadata),
+    );
+  }
+  async writeCredential(
+    context: AuthorityContext,
+    reference: string,
+    input: { expected_revision: string; endpoint: string | null },
+  ) {
+    context = structuredClone(context);
+    input = structuredClone(input);
+    const applicationId = this.application(context.principal);
+    const key = this.key(
+      context,
+      'wallet:configuration:propose',
+      'credential-' + reference,
+      applicationId,
+    );
+    if (!this.credentialCipher) deny();
+    if (
+      !/^[A-Za-z0-9_-]{1,128}$/.test(reference) ||
+      !input ||
+      Object.keys(input).sort().join(',') !== 'endpoint,expected_revision' ||
+      !/^(0|[1-9][0-9]{0,3})$/.test(input.expected_revision)
+    )
+      invalid();
+    const origin =
+      input.endpoint === null ? '' : credentialOrigin(input.endpoint);
+    const hash = this.credentialCipher.digest([
+      applicationId,
+      reference,
+      input,
+    ]);
+    return this.transaction((registry) => {
+      const receipts = (registry.credentialReceipts ??= {});
+      if (receipts[key]) {
+        if (receipts[key].hash !== hash) conflict();
+        return structuredClone(receipts[key].metadata);
+      }
+      const records = (registry.credentials ??= {}),
+        id = applicationId + ':' + reference;
+      const previous = records[id];
+      if ((previous?.revision ?? '0') !== input.expected_revision) conflict();
+      if (
+        Number(input.expected_revision) >= 256 ||
+        (!previous &&
+          Object.values(records).filter(
+            (r) => r.application_id === applicationId,
+          ).length >= 32)
+      )
+        deny();
+      const metadata: CredentialMetadata = {
+        application_id: applicationId,
+        reference,
+        revision: String(Number(input.expected_revision) + 1),
+        origin,
+        status: input.endpoint === null ? 'revoked' : 'active',
+      };
+      records[id] = this.credentialCipher!.seal(metadata, input.endpoint ?? '');
+      const services =
+        registry.obligations?.records[applicationId + ':services'];
+      if (
+        services &&
+        (services.value as ApplicationObligations['services']).some(
+          (s) => s.credential_reference === reference,
+        )
+      ) {
+        services.decision = 'pending';
+        services.decision_revision = String(
+          Number(services.decision_revision) + 1,
+        );
+        delete services.decided_at;
+      }
+      receipts[key] = { hash, metadata };
+      return structuredClone(metadata);
+    });
+  }
+  /** Resolve only accepted resources belonging to the authenticated application's identity. */
+  async rpcEndpoints(applicationId: string): Promise<string[]> {
+    this.target(applicationId);
+    return this.transaction((registry) => {
+      if (!this.credentialCipher) deny();
+      const services =
+        registry.obligations?.records[applicationId + ':services'];
+      if (services?.decision !== 'accepted') deny();
+      const endpoints = (services.value as ApplicationObligations['services'])
+        .filter((s) => s.kind === 'rpc-verification')
+        .map((s) => {
+          const record =
+            registry.credentials?.[
+              applicationId + ':' + s.credential_reference
+            ];
+          if (
+            !record ||
+            record.application_id !== applicationId ||
+            record.status !== 'active'
+          )
+            deny();
+          return this.credentialCipher!.open(record);
+        });
+      if (
+        endpoints.length < 2 ||
+        endpoints.length > 3 ||
+        new Set(endpoints.map((e) => new URL(e).origin)).size !==
+          endpoints.length
+      )
+        deny();
+      return endpoints;
+    });
   }
   async readObligations(principal: VerifiedPrincipal, applicationId?: string) {
     principal = structuredClone(principal);

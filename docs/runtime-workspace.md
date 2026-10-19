@@ -23,7 +23,7 @@ manual contract review. Publication requires current user consent before new
 financial effects. Automatic review accepts only contract changes within unchanged
 provider terms; it does not delegate provider policy or spending authority.
 
-The [application obligations API](application-obligations.md) separately stores
+The [application obligations API](application-obligations.md) manages
 expected off-chain action fields, application-paid service declarations and gas
 sponsorship agreements. Those records do not currently activate execution or
 provision the shared application Safe.
@@ -63,3 +63,9 @@ This API reorganization does not migrate user-owned Safes into shared applicatio
 Safes. Existing account identities and durable financial attempts retain their
 original meaning. No wallet or service credential is moved by reading or updating
 configuration records.
+
+Policy routes use `/v1/application/policy` for application reads and proposals,
+`/v1/provider/applications/{applicationId}/policy` for provider management, and
+`/v1/provider/policy/proposals/{proposalId}/publish` for publication. The former
+`/v1/runtime-configuration` routes are removed. Update clients to the generated
+HTTP contract before upgrading.

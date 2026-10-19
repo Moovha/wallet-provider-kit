@@ -181,12 +181,12 @@ if (!receipt) {
     max_validity_seconds: 60,
     claim_requirements: [],
   };
-  const proposed = await api('/v1/runtime-configuration/proposals', {
+  const proposed = await api('/v1/application/policy/proposals', {
     expected_revision: '0',
     policy,
   });
   await api(
-    '/v1/runtime-configuration/proposals/' + proposed.proposal_id + '/publish',
+    '/v1/provider/policy/proposals/' + proposed.proposal_id + '/publish',
     { expected_revision: '0' },
     true,
   );

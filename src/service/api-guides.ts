@@ -24,6 +24,36 @@ export interface OperationGuide {
 }
 // Shared operator guidance. Runtime authentication and authority remain authoritative.
 export const operationGuides: Record<string, OperationGuide> = {
+  readApplicationCredentials: {
+    title: 'Read application credential metadata',
+    group: 'Application configuration',
+    scope: 'wallet:configuration:read',
+    runtimeConfiguration: true,
+    prerequisite:
+      'Use the registered application identity. Credential values are never returned.',
+    success:
+      '200: application-local references, revisions, origins and active or revoked status.',
+  },
+  readProviderApplicationCredentials: {
+    title: 'Review application credential origins',
+    group: 'Application configuration',
+    scope: 'wallet:configuration:write',
+    runtimeConfiguration: true,
+    prerequisite:
+      'Use an exact configured provider identity and the application ID. Review each origin before accepting the service declaration.',
+    success:
+      '200: credential metadata without secret paths. Reject service declarations to prevent their use.',
+  },
+  writeApplicationCredential: {
+    title: 'Store or revoke an application credential',
+    group: 'Application configuration',
+    scope: 'wallet:configuration:propose',
+    runtimeConfiguration: true,
+    prerequisite:
+      'Configure a retained runtimeConfiguration.credentialKey. Use the application identity, an original idempotency key and the current credential revision. Supply a vendor HTTPS endpoint or null to revoke it.',
+    success:
+      '200: encrypted credential retained and metadata returned. Referencing service declarations return to pending review. No provider secrets can be selected.',
+  },
   readApplicationObligations: {
     title: 'Read your application obligations',
     group: 'Application obligations',
@@ -32,7 +62,7 @@ export const operationGuides: Record<string, OperationGuide> = {
     prerequisite:
       'Use an enabled registered application for its own declarations, or an exact configured provider operator for decisions and cross-application inspection. Writes require a UUIDv4 idempotency key and the current resource revision. Decisions also require the current decision revision.',
     success:
-      '200: durable application-scoped declarations or provider decisions. Changes return to pending review. Acceptance does not activate execution, resolve credentials, provision accounts or authorize spending. Submit schema declarations and opaque application-local secret references, never actual user payloads or credentials.',
+      '200: durable application-scoped declarations or provider decisions. Changes return to pending review. Accepted actions constrain off-chain payloads; accepted services enable application-owned verifier credentials when credential storage is configured. Acceptance does not activate execution, provision a shared Safe or authorize spending. Submit schema declarations and opaque application-local secret references, never actual user payloads or credentials.',
   },
   readProviderApplicationObligations: {
     title: 'Inspect application obligations as provider',
@@ -42,7 +72,7 @@ export const operationGuides: Record<string, OperationGuide> = {
     prerequisite:
       'Use an enabled registered application for its own declarations, or an exact configured provider operator for decisions and cross-application inspection. Writes require a UUIDv4 idempotency key and the current resource revision. Decisions also require the current decision revision.',
     success:
-      '200: durable application-scoped declarations or provider decisions. Changes return to pending review. Acceptance does not activate execution, resolve credentials, provision accounts or authorize spending. Submit schema declarations and opaque application-local secret references, never actual user payloads or credentials.',
+      '200: durable application-scoped declarations or provider decisions. Changes return to pending review. Accepted actions constrain off-chain payloads; accepted services enable application-owned verifier credentials when credential storage is configured. Acceptance does not activate execution, provision a shared Safe or authorize spending. Submit schema declarations and opaque application-local secret references, never actual user payloads or credentials.',
   },
   submitApplicationActions: {
     title: 'Declare expected actions and off-chain fields',
@@ -52,7 +82,7 @@ export const operationGuides: Record<string, OperationGuide> = {
     prerequisite:
       'Use an enabled registered application for its own declarations, or an exact configured provider operator for decisions and cross-application inspection. Writes require a UUIDv4 idempotency key and the current resource revision. Decisions also require the current decision revision.',
     success:
-      '200: durable application-scoped declarations or provider decisions. Changes return to pending review. Acceptance does not activate execution, resolve credentials, provision accounts or authorize spending. Submit schema declarations and opaque application-local secret references, never actual user payloads or credentials.',
+      '200: durable application-scoped declarations or provider decisions. Changes return to pending review. Accepted actions constrain off-chain payloads; accepted services enable application-owned verifier credentials when credential storage is configured. Acceptance does not activate execution, provision a shared Safe or authorize spending. Submit schema declarations and opaque application-local secret references, never actual user payloads or credentials.',
   },
   submitApplicationServices: {
     title: 'Declare application-paid service accounts',
@@ -62,7 +92,7 @@ export const operationGuides: Record<string, OperationGuide> = {
     prerequisite:
       'Use an enabled registered application for its own declarations, or an exact configured provider operator for decisions and cross-application inspection. Writes require a UUIDv4 idempotency key and the current resource revision. Decisions also require the current decision revision.',
     success:
-      '200: durable application-scoped declarations or provider decisions. Changes return to pending review. Acceptance does not activate execution, resolve credentials, provision accounts or authorize spending. Submit schema declarations and opaque application-local secret references, never actual user payloads or credentials.',
+      '200: durable application-scoped declarations or provider decisions. Changes return to pending review. Accepted actions constrain off-chain payloads; accepted services enable application-owned verifier credentials when credential storage is configured. Acceptance does not activate execution, provision a shared Safe or authorize spending. Submit schema declarations and opaque application-local secret references, never actual user payloads or credentials.',
   },
   submitApplicationSponsorship: {
     title: 'Declare application gas sponsorship',
@@ -72,7 +102,7 @@ export const operationGuides: Record<string, OperationGuide> = {
     prerequisite:
       'Use an enabled registered application for its own declarations, or an exact configured provider operator for decisions and cross-application inspection. Writes require a UUIDv4 idempotency key and the current resource revision. Decisions also require the current decision revision.',
     success:
-      '200: durable application-scoped declarations or provider decisions. Changes return to pending review. Acceptance does not activate execution, resolve credentials, provision accounts or authorize spending. Submit schema declarations and opaque application-local secret references, never actual user payloads or credentials.',
+      '200: durable application-scoped declarations or provider decisions. Changes return to pending review. Accepted actions constrain off-chain payloads; accepted services enable application-owned verifier credentials when credential storage is configured. Acceptance does not activate execution, provision a shared Safe or authorize spending. Submit schema declarations and opaque application-local secret references, never actual user payloads or credentials.',
   },
   decideApplicationActions: {
     title: 'Accept or reject declared actions',
@@ -82,7 +112,7 @@ export const operationGuides: Record<string, OperationGuide> = {
     prerequisite:
       'Use an enabled registered application for its own declarations, or an exact configured provider operator for decisions and cross-application inspection. Writes require a UUIDv4 idempotency key and the current resource revision. Decisions also require the current decision revision.',
     success:
-      '200: durable application-scoped declarations or provider decisions. Changes return to pending review. Acceptance does not activate execution, resolve credentials, provision accounts or authorize spending. Submit schema declarations and opaque application-local secret references, never actual user payloads or credentials.',
+      '200: durable application-scoped declarations or provider decisions. Changes return to pending review. Accepted actions constrain off-chain payloads; accepted services enable application-owned verifier credentials when credential storage is configured. Acceptance does not activate execution, provision a shared Safe or authorize spending. Submit schema declarations and opaque application-local secret references, never actual user payloads or credentials.',
   },
   decideApplicationServices: {
     title: 'Accept or reject declared service accounts',
@@ -92,7 +122,7 @@ export const operationGuides: Record<string, OperationGuide> = {
     prerequisite:
       'Use an enabled registered application for its own declarations, or an exact configured provider operator for decisions and cross-application inspection. Writes require a UUIDv4 idempotency key and the current resource revision. Decisions also require the current decision revision.',
     success:
-      '200: durable application-scoped declarations or provider decisions. Changes return to pending review. Acceptance does not activate execution, resolve credentials, provision accounts or authorize spending. Submit schema declarations and opaque application-local secret references, never actual user payloads or credentials.',
+      '200: durable application-scoped declarations or provider decisions. Changes return to pending review. Accepted actions constrain off-chain payloads; accepted services enable application-owned verifier credentials when credential storage is configured. Acceptance does not activate execution, provision a shared Safe or authorize spending. Submit schema declarations and opaque application-local secret references, never actual user payloads or credentials.',
   },
   decideApplicationSponsorship: {
     title: 'Accept or reject declared gas sponsorship',
@@ -102,11 +132,11 @@ export const operationGuides: Record<string, OperationGuide> = {
     prerequisite:
       'Use an enabled registered application for its own declarations, or an exact configured provider operator for decisions and cross-application inspection. Writes require a UUIDv4 idempotency key and the current resource revision. Decisions also require the current decision revision.',
     success:
-      '200: durable application-scoped declarations or provider decisions. Changes return to pending review. Acceptance does not activate execution, resolve credentials, provision accounts or authorize spending. Submit schema declarations and opaque application-local secret references, never actual user payloads or credentials.',
+      '200: durable application-scoped declarations or provider decisions. Changes return to pending review. Accepted actions constrain off-chain payloads; accepted services enable application-owned verifier credentials when credential storage is configured. Acceptance does not activate execution, provision a shared Safe or authorize spending. Submit schema declarations and opaque application-local secret references, never actual user payloads or credentials.',
   },
   listApplicationConfigurations: {
     title: 'List application configurations',
-    group: 'Runtime configuration',
+    group: 'Application configuration',
     scope: 'wallet:configuration:read',
     runtimeConfiguration: true,
     prerequisite:
@@ -127,7 +157,7 @@ export const operationGuides: Record<string, OperationGuide> = {
   },
   setRuntimeReviewMode: {
     title: 'Allow automatic application contract registration',
-    group: 'Runtime configuration',
+    group: 'Application configuration',
     scope: 'wallet:configuration:write',
     runtimeConfiguration: true,
     prerequisite:
@@ -147,7 +177,7 @@ export const operationGuides: Record<string, OperationGuide> = {
   },
   readRuntimeApplicationConfiguration: {
     title: 'Read an application policy as provider operator',
-    group: 'Runtime configuration',
+    group: 'Application configuration',
     scope: 'wallet:configuration:write',
     runtimeConfiguration: true,
     prerequisite:
@@ -157,7 +187,7 @@ export const operationGuides: Record<string, OperationGuide> = {
   },
   readRuntimeConfiguration: {
     title: 'Read the active application configuration',
-    group: 'Runtime configuration',
+    group: 'Application configuration',
     scope: 'wallet:configuration:read',
     runtimeConfiguration: true,
     prerequisite:
@@ -167,7 +197,7 @@ export const operationGuides: Record<string, OperationGuide> = {
   },
   readRuntimeConfigurationRevision: {
     title: 'Read an immutable configuration revision',
-    group: 'Runtime configuration',
+    group: 'Application configuration',
     scope: 'wallet:configuration:read',
     runtimeConfiguration: true,
     prerequisite:
@@ -177,7 +207,7 @@ export const operationGuides: Record<string, OperationGuide> = {
   },
   proposeRuntimeConfiguration: {
     title: 'Propose application contracts and policy',
-    group: 'Runtime configuration',
+    group: 'Application configuration',
     scope: 'wallet:configuration:propose',
     runtimeConfiguration: true,
     prerequisite:
@@ -187,7 +217,7 @@ export const operationGuides: Record<string, OperationGuide> = {
   },
   readRuntimeConfigurationProposal: {
     title: 'Read a configuration proposal',
-    group: 'Runtime configuration',
+    group: 'Application configuration',
     scope: 'wallet:configuration:read',
     runtimeConfiguration: true,
     prerequisite:
@@ -197,7 +227,7 @@ export const operationGuides: Record<string, OperationGuide> = {
   },
   publishRuntimeConfiguration: {
     title: 'Publish an application proposal as provider operator',
-    group: 'Runtime configuration',
+    group: 'Application configuration',
     scope: 'wallet:configuration:write',
     runtimeConfiguration: true,
     prerequisite:
@@ -207,7 +237,7 @@ export const operationGuides: Record<string, OperationGuide> = {
   },
   updateRuntimeConfiguration: {
     title: 'Publish a provider policy revision',
-    group: 'Runtime configuration',
+    group: 'Application configuration',
     scope: 'wallet:configuration:write',
     runtimeConfiguration: true,
     prerequisite:

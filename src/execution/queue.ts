@@ -68,6 +68,7 @@ export class SafeExecutionQueue {
     private readonly nonce: (
       binding: SafeAccountBinding,
       owner: string,
+      principal?: VerifiedPrincipal,
     ) => Promise<string>,
     configuration: NonNullable<ExecutionConfiguration['safeQueue']>,
     private readonly pollIntervalSeconds: number,

@@ -3,7 +3,7 @@
 ## Unreleased application configuration APIs
 
 - Remove the standalone operator workspace. Move application configuration listing to `/v1/applications/configurations` and batch listing to `/v1/wallet/batches`; existing clients must update the two former runtime-configuration URLs.
-- Add application-scoped action, service-account and gas sponsorship declarations with separate provider decisions, revision checks and durable idempotent retries. Declarations do not resolve credentials, enforce action policies, provision a shared Safe or activate financial operations.
+- Add application-scoped action, service-account and gas sponsorship declarations with separate provider decisions, revision checks and durable idempotent retries. Accepted action declarations constrain off-chain payloads. Application-owned verifier credentials support encrypted storage, rotation, revocation and scoped RPC selection. Shared Safe provisioning and execution activation remain outside declaration authority.
 
 ## Unreleased RPC throttling recovery
 

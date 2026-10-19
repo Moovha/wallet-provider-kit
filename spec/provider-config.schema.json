@@ -2051,6 +2051,17 @@
         },
         "authorizeContracts": {
           "type": "boolean"
+        },
+        "credentialKey": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["env"],
+          "properties": {
+            "env": {
+              "type": "string",
+              "pattern": "^[A-Z][A-Z0-9_]{0,127}$"
+            }
+          }
         }
       }
     },

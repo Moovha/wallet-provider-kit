@@ -154,6 +154,11 @@ export function requestExample(
   config: ProviderConfiguration,
   applicationIndex: number,
 ): object | undefined {
+  if (id === 'writeApplicationCredential')
+    return {
+      expected_revision: '0',
+      endpoint: 'https://rpc.example.test/application-key',
+    };
   if (
     [
       'submitApplicationActions',
@@ -384,6 +389,22 @@ export function responseExample(
   config?: ProviderConfiguration,
   requestedPermissions?: string[],
 ): object {
+  if (
+    [
+      'readApplicationCredentials',
+      'readProviderApplicationCredentials',
+      'writeApplicationCredential',
+    ].includes(id)
+  ) {
+    const metadata = {
+      application_id: 'a'.repeat(64),
+      reference: 'verification-primary',
+      revision: '1',
+      origin: 'https://rpc.example.test',
+      status: 'active',
+    };
+    return id === 'writeApplicationCredential' ? metadata : [metadata];
+  }
   if (
     [
       'readApplicationObligations',

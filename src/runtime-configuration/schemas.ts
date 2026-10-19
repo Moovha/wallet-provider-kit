@@ -1,3 +1,4 @@
+import { obligationSchemas } from './obligations.js';
 import { operationAdaptersSchema } from '../execution/call-schemas.js';
 const string = { type: 'string', minLength: 1, maxLength: 256 };
 const uint = { type: 'string', pattern: '^(0|[1-9][0-9]{0,77})$' };
@@ -15,6 +16,14 @@ export const runtimeConfigurationSchema = {
   required: ['operators'],
   properties: {
     authorizeContracts: { type: 'boolean' },
+    credentialKey: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['env'],
+      properties: {
+        env: { type: 'string', pattern: '^[A-Z][A-Z0-9_]{0,127}$' },
+      },
+    },
     operators: {
       type: 'array',
       minItems: 1,
@@ -51,6 +60,8 @@ export const runtimePolicySchema = {
     'claim_requirements',
   ],
   properties: {
+    action_requirements: obligationSchemas.actions,
+    application_resources_hash: applicationIdSchema,
     version: { type: 'string', enum: ['1'] },
     enabled: { type: 'boolean' },
     chain_id: { type: 'string', enum: ['eip155:84532', 'eip155:8453'] },

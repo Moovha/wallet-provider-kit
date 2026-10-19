@@ -584,6 +584,9 @@ export function secretReferences(
   config: ProviderConfiguration,
 ): SecretReference[] {
   return [
+    ...(config.runtimeConfiguration?.credentialKey
+      ? [config.runtimeConfiguration.credentialKey]
+      : []),
     ...(config.localExecution
       ? [
           config.localExecution.apiKey,

@@ -245,11 +245,89 @@ export async function registerRuntimeConfigurationRoutes(
   const schema = (operationId: string, response: object, extra = {}) => ({
     operationId,
     description,
-    tags: ['Runtime configuration'],
+    tags: ['Application configuration'],
     security: [{ accessToken: [] }],
     ...extra,
     response: { 200: response, ...errors },
   });
+  const credentialSchema = {
+    type: 'object',
+    additionalProperties: false,
+    required: ['application_id', 'reference', 'revision', 'origin', 'status'],
+    properties: {
+      application_id: applicationIdSchema,
+      reference: { type: 'string', pattern: '^[A-Za-z0-9_-]{1,128}$' },
+      revision: revisionSchema,
+      origin: { type: 'string' },
+      status: { type: 'string', enum: ['active', 'revoked'] },
+    },
+  };
+  app.get(
+    '/v1/application/credentials',
+    {
+      schema: schema('readApplicationCredentials', {
+        type: 'array',
+        maxItems: 32,
+        items: credentialSchema,
+      }),
+    },
+    async (request) =>
+      configured().readCredentials(
+        await principal(request, 'wallet:configuration:read'),
+      ),
+  );
+  app.get<{ Params: { applicationId: string } }>(
+    '/v1/provider/applications/:applicationId/credentials',
+    {
+      schema: schema(
+        'readProviderApplicationCredentials',
+        { type: 'array', maxItems: 32, items: credentialSchema },
+        { params: params('applicationId', applicationIdSchema) },
+      ),
+    },
+    async (request) =>
+      configured().readCredentials(
+        await principal(request, 'wallet:configuration:write'),
+        request.params.applicationId,
+      ),
+  );
+  app.put<{
+    Params: { reference: string };
+    Body: { expected_revision: string; endpoint: string | null };
+  }>(
+    '/v1/application/credentials/:reference',
+    {
+      bodyLimit: 8192,
+      schema: {
+        ...schema('writeApplicationCredential', credentialSchema, {
+          headers,
+          params: params('reference', credentialSchema.properties.reference),
+          body: {
+            type: 'object',
+            additionalProperties: false,
+            required: ['expected_revision', 'endpoint'],
+            properties: {
+              expected_revision: revisionSchema,
+              endpoint: {
+                anyOf: [
+                  { type: 'string', minLength: 1, maxLength: 4096 },
+                  { type: 'null' },
+                ],
+              },
+            },
+          },
+        }),
+        description:
+          'Store or rotate an application-owned HTTPS service endpoint in encrypted storage. Send null to revoke it. Secret paths are never returned. Associated service declarations require provider review after every change.',
+      },
+    },
+    async (request) =>
+      configured().writeCredential(
+        await context(request, 'wallet:configuration:propose'),
+        request.params.reference,
+        request.body,
+      ),
+  );
   const obligationRecordSchema = {
     type: 'object',
     additionalProperties: false,
@@ -297,7 +375,7 @@ export async function registerRuntimeConfigurationRoutes(
     ...schema(operationId, response, extra),
     tags: ['Application obligations'],
     description:
-      'Protected, application-scoped declarations and provider decisions. Acceptance records an agreement only: it does not resolve credentials, fund gas, provision a Safe, activate execution or authorize spending. User assets remain in individual user wallets. Secrets and actual user payloads must not be submitted here.',
+      'Protected, application-scoped declarations and provider decisions. Accepted actions constrain off-chain payloads. Accepted service declarations permit resolving application-owned verifier credentials when credential storage is configured. Acceptance does not fund gas, provision a shared Safe, activate execution or authorize spending. User assets remain in individual user wallets. Secrets and actual user payloads must not be submitted here.',
   });
   app.get(
     '/v1/application/obligations',
@@ -468,7 +546,7 @@ export async function registerRuntimeConfigurationRoutes(
       mode: 'automatic' | 'manual';
     };
   }>(
-    '/v1/runtime-configuration/applications/:applicationId/review',
+    '/v1/provider/applications/:applicationId/policy/review',
     {
       schema: schema(
         'setRuntimeReviewMode',
@@ -506,7 +584,7 @@ export async function registerRuntimeConfigurationRoutes(
       ),
   );
   app.get(
-    '/v1/runtime-configuration',
+    '/v1/application/policy',
     {
       schema: schema('readRuntimeConfiguration', currentSchema),
     },
@@ -514,7 +592,7 @@ export async function registerRuntimeConfigurationRoutes(
       configured().read(await principal(request, 'wallet:configuration:read')),
   );
   app.get<{ Params: { applicationId: string } }>(
-    '/v1/runtime-configuration/applications/:applicationId',
+    '/v1/provider/applications/:applicationId/policy',
     {
       schema: schema('readRuntimeApplicationConfiguration', currentSchema, {
         params: params('applicationId', applicationIdSchema),
@@ -527,7 +605,7 @@ export async function registerRuntimeConfigurationRoutes(
       ),
   );
   app.get<{ Params: { revision: string } }>(
-    '/v1/runtime-configuration/revisions/:revision',
+    '/v1/application/policy/revisions/:revision',
     {
       schema: schema('readRuntimeConfigurationRevision', currentSchema, {
         params: params('revision', revisionSchema),
@@ -540,7 +618,7 @@ export async function registerRuntimeConfigurationRoutes(
       ),
   );
   app.post<{ Body: RuntimePolicyChange }>(
-    '/v1/runtime-configuration/proposals',
+    '/v1/application/policy/proposals',
     {
       bodyLimit: 32768,
       schema: schema('proposeRuntimeConfiguration', proposalSchema, {
@@ -555,7 +633,7 @@ export async function registerRuntimeConfigurationRoutes(
       ),
   );
   app.get<{ Params: { proposalId: string } }>(
-    '/v1/runtime-configuration/proposals/:proposalId',
+    '/v1/application/policy/proposals/:proposalId',
     {
       schema: schema('readRuntimeConfigurationProposal', proposalSchema, {
         params: params('proposalId', uuidSchema),
@@ -577,7 +655,7 @@ export async function registerRuntimeConfigurationRoutes(
     Params: { proposalId: string };
     Body: { expected_revision: string };
   }>(
-    '/v1/runtime-configuration/proposals/:proposalId/publish',
+    '/v1/provider/policy/proposals/:proposalId/publish',
     {
       schema: schema('publishRuntimeConfiguration', publicationSchema, {
         headers,
@@ -598,7 +676,7 @@ export async function registerRuntimeConfigurationRoutes(
       ),
   );
   app.post<{ Params: { applicationId: string }; Body: RuntimePolicyChange }>(
-    '/v1/runtime-configuration/applications/:applicationId/revisions',
+    '/v1/provider/applications/:applicationId/policy/revisions',
     {
       bodyLimit: 32768,
       schema: schema('updateRuntimeConfiguration', publicationSchema, {

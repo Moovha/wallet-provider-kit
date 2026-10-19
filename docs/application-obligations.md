@@ -4,11 +4,15 @@ Connected applications can declare their expected actions, application-paid
 services and gas sponsorship agreement after deployment. The provider reviews
 these resources separately for each application through authenticated APIs.
 
-This API currently stores declarations and provider decisions. It does **not**
-activate execution, resolve service credentials, generate sponsor addresses or
-provision a shared Safe. Accepted declarations are not enforced action policies.
-Use the [runtime policy API](runtime-configuration.md) for the existing supported
-policy enforcement. The shared application Safe execution path is not implemented.
+Accepted action declarations constrain the off-chain payload accompanying contract
+calls. Provider policy publications can further restrict those fields. Application
+credentials can supply the RPC quorum used for chain verification and Safe
+provisioning. Neither configuration acceptance nor an OAuth scope authorizes
+spending: current user authority and durable attempt admission remain required.
+
+Shared application Safe signing, application-managed submission services and
+post-deployment sponsor provisioning are not implemented. Existing execution
+infrastructure still requires deployment configuration.
 
 ## Authenticate each role
 
@@ -59,12 +63,52 @@ actual user's request:
 }
 ```
 
-Do not send real user payloads, credentials, RPC URLs or environment variable
-references. A service's `credential_reference` is only an application-local name
-for a secret-store entry. Registration neither reads that entry nor gives the
-application access to provider secrets. Vendor names do not prove independent
-RPC verification. CDP wallet backend credentials remain provider deployment
-settings; these declarations do not transfer their billing responsibility.
+Send action schemas to the declaration endpoints, not real user payloads or
+credentials. A service's `credential_reference` names a credential belonging to
+that application. It cannot name a provider environment variable. Vendor names
+do not prove independent RPC verification. CDP wallet credentials remain provider
+deployment settings and retain their provider billing responsibility.
+
+## Store application RPC credentials
+
+Configure `runtimeConfiguration.credentialKey` with an environment reference to a
+retained 32-byte base64 encryption key. New-deployment setup generates this key
+when the reference is present. Retain it with the private database containing encrypted credential records;
+changing it without re-encrypting the records makes existing credentials unusable.
+
+Applications use `PUT /v1/application/credentials/{reference}` with an
+`Idempotency-Key`, `expected_revision` and `endpoint`. Endpoints must use HTTPS,
+with no user information, query or fragment. A vendor key may appear in the path.
+Use `endpoint: null` to revoke a credential. Metadata reads are available at
+`GET /v1/application/credentials` and
+`GET /v1/provider/applications/{applicationId}/credentials`; neither returns the
+secret path. The provider must review each disclosed origin before accepting the
+service declaration, including its network reachability and billing agreement.
+
+Register two or three `rpc-verification` services with distinct endpoint origins.
+The provider accepts the service declaration after reviewing the credential
+metadata. Rotation or revocation resets the associated declaration to pending
+review. With credential storage configured, verification and Safe provisioning
+use these application endpoints and fail closed when they are missing, revoked
+or unaccepted. They do not fall back to deployment RPC credentials. Submission
+RPCs and other service types remain declarations only.
+
+## Supply action payloads
+
+Contract-call requests include `application_action` with `name` and `payload`.
+For `wallet_sendCalls`, supply the same object through the top-level
+`capabilities.applicationAction`. The payload contains only declared string
+fields. Required fields must be present; every value must be a permitted enum.
+Unknown actions, undeclared fields and out-of-enum values are denied. The
+capability applies to the entire batch, not individual calls.
+
+Once an action declaration exists, it must be accepted before contract calls can
+proceed. An accepted empty action array disables action admission. Deployments
+without an action declaration retain their existing published-policy behavior.
+Provider `action_requirements` can narrow the accepted declaration's actions and
+enums; they cannot widen it. Resource revisions bind to the consent snapshot, so
+changed resources require fresh authority. Off-chain values remain application
+attestations; the provider does not independently verify their factual truth.
 
 Empty action or service arrays withdraw those declarations for review. Sponsorship
 budgets must be positive unsigned 256-bit decimal values on the provider's network.

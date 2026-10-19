@@ -57,12 +57,12 @@ the registry. Unconfigured optional endpoints return 503.
 
 ## Propose contracts and policy
 
-Read `GET /v1/runtime-configuration` with `wallet:configuration:read`. It returns
+Read `GET /v1/application/policy` with `wallet:configuration:read`. It returns
 your opaque `application_id`, `active_revision` and `authorizes_spending: false`.
 Revision `"0"` means nothing has been published. The namespace is derived from
 the authenticated issuer/client; applications cannot select another namespace.
 
-Submit `POST /v1/runtime-configuration/proposals` with
+Submit `POST /v1/application/policy/proposals` with
 `wallet:configuration:propose`, a new UUIDv4 `Idempotency-Key` and:
 
 ```json
@@ -114,7 +114,7 @@ exceed the document limit; neither field bounds token allowances or unknown effe
 The response contains stable `proposal_id`, `application_id`, predecessor revision
 and normalized policy/hash. Creation does not publish the proposal. An application
 can read only its own proposal through
-`GET /v1/runtime-configuration/proposals/{proposalId}`. A configured operator can
+`GET /v1/application/policy/proposals/{proposalId}`. A configured operator can
 read it with write scope. Do not put personal evidence or beneficiary details in
 registration documents.
 
@@ -123,7 +123,7 @@ registration documents.
 After reviewing the exact proposal, the operator calls:
 
 ```http
-POST /v1/runtime-configuration/proposals/{proposalId}/publish
+POST /v1/provider/policy/proposals/{proposalId}/publish
 Authorization: Bearer <operator-access-token>
 Idempotency-Key: <new-uuid-v4>
 Content-Type: application/json
@@ -137,11 +137,11 @@ Current-policy reads immediately return it. For provider-authored changes, send
 the complete policy-change shape above to:
 
 ```http
-POST /v1/runtime-configuration/applications/{applicationId}/revisions
+POST /v1/provider/applications/{applicationId}/policy/revisions
 ```
 
 Read the current application document as an operator through
-`GET /v1/runtime-configuration/applications/{applicationId}` before updating it.
+`GET /v1/provider/applications/{applicationId}/policy` before updating it.
 Use the current `expected_revision`. `policy.enabled: false` publishes a disabled
 document. In runtime financial mode, publication immediately invalidates financial
 consent for earlier revisions; a disabled document stops new financial effects.
@@ -154,7 +154,7 @@ automatically without reviewing its terms.
 
 ## History, retries and storage
 
-Read `GET /v1/runtime-configuration/revisions/{revision}` for your application's
+Read `GET /v1/application/policy/revisions/{revision}` for your application's
 immutable snapshot and the current active revision. Rollback publishes a new
 revision containing reviewed earlier terms. There is no history deletion, head
 rewind or automatic modification of stored financial actions.

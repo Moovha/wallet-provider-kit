@@ -1,3 +1,8 @@
+import { defaultSafeProvisioning } from '../src/provisioning/defaults.js';
+import { ApplicationExecutionObserver } from '../src/runtime-configuration/observer.js';
+import { executionFixture } from './helpers/execution.js';
+import { ApplicationCredentialCipher } from '../src/runtime-configuration/credentials.js';
+import { currentRuntimePolicy } from '../src/runtime-configuration/authority.js';
 import { randomUUID } from 'node:crypto';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -433,14 +438,14 @@ describe('runtime configuration HTTP contract', () => {
     servers.push(app);
     const proposal = await app.inject({
       method: 'POST',
-      url: '/v1/runtime-configuration/proposals',
+      url: '/v1/application/policy/proposals',
       headers: { authorization: 'Bearer app', 'idempotency-key': randomUUID() },
       payload: { expected_revision: '0', policy: document() },
     });
     expect(proposal.statusCode).toBe(200);
     const publication = await app.inject({
       method: 'POST',
-      url: `/v1/runtime-configuration/proposals/${proposal.json().proposal_id}/publish`,
+      url: `/v1/provider/policy/proposals/${proposal.json().proposal_id}/publish`,
       headers: {
         authorization: 'Bearer operator',
         'idempotency-key': randomUUID(),
@@ -449,7 +454,7 @@ describe('runtime configuration HTTP contract', () => {
     });
     expect(publication.statusCode).toBe(200);
     const current = await app.inject({
-      url: '/v1/runtime-configuration',
+      url: '/v1/application/policy',
       headers: { authorization: 'Bearer app' },
     });
     expect(current.json()).toMatchObject({
@@ -457,14 +462,12 @@ describe('runtime configuration HTTP contract', () => {
       authorizes_spending: false,
     });
     expect((await app.inject('/health/ready')).statusCode).toBe(503);
-    expect((await app.inject('/v1/runtime-configuration')).statusCode).toBe(
-      401,
-    );
+    expect((await app.inject('/v1/application/policy')).statusCode).toBe(401);
     expect(
       (
         await app.inject({
           method: 'POST',
-          url: `/v1/runtime-configuration/applications/${proposal.json().application_id}/revisions`,
+          url: `/v1/provider/applications/${proposal.json().application_id}/policy/revisions`,
           headers: {
             authorization: 'Bearer app',
             'idempotency-key': randomUUID(),
@@ -477,7 +480,7 @@ describe('runtime configuration HTTP contract', () => {
       (
         await app.inject({
           method: 'POST',
-          url: '/v1/runtime-configuration/proposals',
+          url: '/v1/application/policy/proposals',
           headers: {
             authorization: 'Bearer app',
             'idempotency-key': randomUUID(),
@@ -494,12 +497,10 @@ describe('runtime configuration HTTP contract', () => {
   it('keeps optional endpoints unavailable without configured runtime authority', async () => {
     const app = await createServer({ documentation: false });
     servers.push(app);
-    expect((await app.inject('/v1/runtime-configuration')).statusCode).toBe(
-      503,
-    );
+    expect((await app.inject('/v1/application/policy')).statusCode).toBe(503);
     const result = await app.inject({
       method: 'POST',
-      url: '/v1/runtime-configuration/proposals',
+      url: '/v1/application/policy/proposals',
       headers: { 'idempotency-key': randomUUID() },
       payload: { expected_revision: '0', policy: document() },
     });
@@ -968,5 +969,250 @@ describe('application obligations', () => {
       activates_execution: false,
       resources: [{ kind: 'actions', decision: 'pending' }],
     });
+  });
+});
+
+describe('application credentials', () => {
+  it('encrypts, isolates, fences rotations and retains idempotent receipts', async () => {
+    const { db } = await fixture();
+    const cipher = new ApplicationCredentialCipher(
+      Buffer.alloc(32, 7).toString('base64'),
+    );
+    const service = new RuntimeConfigurationService(
+      policy,
+      db.onboardingStore,
+      options,
+      'deployment-1',
+      undefined,
+      undefined,
+      cipher,
+    );
+    const appId = runtimeApplicationId(issuer, 'first');
+    const request = context();
+    const first = await service.writeCredential(request, 'primary', {
+      expected_revision: '0',
+      endpoint: 'https://rpc.first.test/private-token',
+    });
+    expect(first).toMatchObject({
+      revision: '1',
+      origin: 'https://rpc.first.test',
+      status: 'active',
+    });
+    expect(await service.readCredentials(application('second'))).toEqual([]);
+    expect(await service.readCredentials(operator, appId)).toEqual([first]);
+    expect(
+      JSON.stringify(await db.onboardingStore.transaction((s) => s)),
+    ).not.toContain('private-token');
+    const saved = await db.onboardingStore.transaction(
+      (s) =>
+        s.deploymentBindings!['service-v1'].runtimeConfiguration!.credentials![
+          appId + ':primary'
+        ],
+    );
+    expect(cipher.open(saved)).toBe('https://rpc.first.test/private-token');
+    expect(() =>
+      cipher.open({ ...saved, application_id: 'a'.repeat(64) }),
+    ).toThrow();
+    await service.writeCredential(context(), 'secondary', {
+      expected_revision: '0',
+      endpoint: 'https://rpc.second.test/other-token',
+    });
+    await service.submitObligation(context(), 'services', {
+      expected_revision: '0',
+      value: ['primary', 'secondary'].map((id) => ({
+        id,
+        kind: 'rpc-verification' as const,
+        vendor: id,
+        credential_reference: id,
+        billing_owner: 'application' as const,
+      })),
+    });
+    await expect(service.rpcEndpoints(appId)).rejects.toThrow();
+    await service.decideObligation(context(operator), appId, 'services', {
+      expected_revision: '1',
+      expected_decision_revision: '0',
+      decision: 'accepted',
+    });
+    expect(await service.rpcEndpoints(appId)).toEqual([
+      'https://rpc.first.test/private-token',
+      'https://rpc.second.test/other-token',
+    ]);
+    await service.writeCredential(context(), 'primary', {
+      expected_revision: '1',
+      endpoint: 'https://rpc.changed.test/new-token',
+    });
+    await expect(service.rpcEndpoints(appId)).rejects.toThrow();
+    expect(
+      await service.writeCredential(request, 'primary', {
+        expected_revision: '0',
+        endpoint: 'https://rpc.first.test/private-token',
+      }),
+    ).toEqual(first);
+    await expect(
+      service.writeCredential(request, 'primary', {
+        expected_revision: '0',
+        endpoint: 'https://rpc.first.test/different',
+      }),
+    ).rejects.toThrow();
+    await expect(
+      service.writeCredential(context(), 'primary', {
+        expected_revision: '1',
+        endpoint: null,
+      }),
+    ).rejects.toThrow();
+    const revoked = await service.writeCredential(context(), 'primary', {
+      expected_revision: '2',
+      endpoint: null,
+    });
+    expect(revoked.status).toBe('revoked');
+  });
+  it('routes quorum reads only to the caller application and stops after revocation', async () => {
+    const { db } = await fixture();
+    const service = new RuntimeConfigurationService(
+      policy,
+      db.onboardingStore,
+      options,
+      'deployment-1',
+      undefined,
+      undefined,
+      new ApplicationCredentialCipher(Buffer.alloc(32, 9).toString('base64')),
+    );
+    const appId = runtimeApplicationId(issuer, 'first');
+    for (const reference of ['primary', 'secondary'])
+      await service.writeCredential(context(), reference, {
+        expected_revision: '0',
+        endpoint: 'https://' + reference + '.example.test/app-key',
+      });
+    await service.submitObligation(context(), 'services', {
+      expected_revision: '0',
+      value: ['primary', 'secondary'].map((id) => ({
+        id,
+        kind: 'rpc-verification' as const,
+        vendor: id,
+        credential_reference: id,
+        billing_owner: 'application' as const,
+      })),
+    });
+    await service.decideObligation(context(operator), appId, 'services', {
+      expected_revision: '1',
+      expected_decision_revision: '0',
+      decision: 'accepted',
+    });
+    const config = executionFixture().configuration;
+    const visited: string[] = [];
+    const observer = new ApplicationExecutionObserver(
+      service,
+      db.onboardingStore,
+      config,
+      undefined,
+      async (url, init) => {
+        visited.push(String(url));
+        const request = JSON.parse(String(init?.body));
+        const result =
+          request.method === 'eth_chainId'
+            ? '0x14a34'
+            : {
+                hash: config.rpc.genesisHash,
+                number: request.params[0] === '0x0' ? '0x0' : '0x10',
+              };
+        return Response.json({ jsonrpc: '2.0', id: request.id, result });
+      },
+    );
+    await expect(observer.anchor(application('second'))).rejects.toThrow();
+    expect(visited).toEqual([]);
+    expect(await observer.anchor(application())).toBe('16');
+    expect(new Set(visited)).toEqual(
+      new Set([
+        'https://primary.example.test/app-key',
+        'https://secondary.example.test/app-key',
+      ]),
+    );
+    const count = visited.length;
+    const safe = defaultSafeProvisioning(),
+      accountId = randomUUID();
+    const binding = {
+      accountId,
+      address: '0x' + '1'.repeat(40),
+      codeHash: safe.proxyCodeHash,
+      singleton: safe.singleton,
+    };
+    const owner = '0x' + '2'.repeat(40);
+    await db.onboardingStore.transaction((state) => {
+      state.deploymentBindings!['service-v1'].safeAccounts = {
+        [accountId]: {
+          attemptId: randomUUID(),
+          caller: application(),
+          configurationHash: 'offline',
+          state: 'ready',
+          plan: {
+            accountId,
+            owner,
+            address: binding.address,
+            saltNonce: '0',
+            data: '0x',
+            chainId: '84532',
+            factory: safe.factory,
+            singleton: safe.singleton,
+            proxyCodeHash: safe.proxyCodeHash,
+            sponsor: config.sponsors[0],
+            expiresAt: new Date(Date.now() + 60000).toISOString(),
+          },
+        },
+      };
+    });
+    await expect(
+      observer.contractNonce(binding, owner, application('second')),
+    ).rejects.toThrow();
+    expect(visited).toHaveLength(count);
+    await service.writeCredential(context(), 'primary', {
+      expected_revision: '1',
+      endpoint: null,
+    });
+    await expect(observer.anchor(application())).rejects.toThrow();
+    expect(visited).toHaveLength(count);
+  });
+  it('binds action acceptance revisions to consent snapshots and denies pending or rejected manifests', async () => {
+    const { db, service } = await fixture();
+    const appId = runtimeApplicationId(issuer, 'first');
+    await service.update(context(operator), appId, {
+      expected_revision: '0',
+      policy: document(),
+    });
+    await service.submitObligation(context(), 'actions', {
+      expected_revision: '0',
+      value: [
+        {
+          name: 'purchase',
+          description: 'Purchase',
+          fields: [
+            { name: 'tier', required: true, allowed_values: ['retail'] },
+          ],
+        },
+      ],
+    });
+    const snapshot = () =>
+      db.onboardingStore.transaction((state) =>
+        currentRuntimePolicy(state, application()),
+      );
+    await expect(snapshot()).rejects.toThrow();
+    await service.decideObligation(context(operator), appId, 'actions', {
+      expected_revision: '1',
+      expected_decision_revision: '0',
+      decision: 'accepted',
+    });
+    const first = await snapshot();
+    expect(first.policy.action_requirements![0].name).toBe('purchase');
+    await service.decideObligation(context(operator), appId, 'actions', {
+      expected_revision: '1',
+      expected_decision_revision: '1',
+      decision: 'rejected',
+    });
+    await expect(snapshot()).rejects.toThrow();
+    await service.decideObligation(context(operator), appId, 'actions', {
+      expected_revision: '1',
+      expected_decision_revision: '2',
+      decision: 'accepted',
+    });
+    expect((await snapshot()).policy_hash).not.toBe(first.policy_hash);
   });
 });

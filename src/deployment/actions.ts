@@ -686,6 +686,7 @@ export class SupportedActions {
     nonce: (
       binding: import('../execution/approved-calls.js').SafeAccountBinding,
       owner: string,
+      principal?: VerifiedPrincipal,
     ) => Promise<string>,
     queued?: { id: string; expiresAt: string },
     requestedExpiresAt?: string,
@@ -744,6 +745,7 @@ export class SupportedActions {
             (binding) => binding.accountId === input.account_id,
           ) ?? deny(),
           account.address!,
+          context.principal,
         ),
         expiresAt,
       );
@@ -893,6 +895,7 @@ export class SupportedActions {
     nonce: (
       binding: import('../execution/approved-calls.js').SafeAccountBinding,
       owner: string,
+      principal?: VerifiedPrincipal,
     ) => Promise<string>,
   ) {
     if (
@@ -920,6 +923,7 @@ export class SupportedActions {
       (await nonce(
         original.intent.account,
         original.approval.account.address,
+        context.principal,
       )) !== original.intent.nonce
     )
       deny();

@@ -182,7 +182,7 @@ export class SafeProvisioningService {
   private readonly config: SafeProvisioningConfiguration;
   private readonly execution: ExecutionConfiguration;
   private readonly readers: RpcReader[];
-  private readonly observer: QuorumExecutionObserver;
+  private readonly observer?: QuorumExecutionObserver;
   private readonly configurationHash: string;
   private readonly network: ReturnType<typeof providerNetwork>;
   constructor(
@@ -194,19 +194,25 @@ export class SafeProvisioningService {
     private readonly driver: SafeDeploymentDriver,
     endpoints: string[],
     network?: ProviderNetwork,
-    request: typeof fetch = fetch,
+    private readonly request: typeof fetch = fetch,
+    private readonly resolveEndpoints?: (
+      context: AuthorityContext,
+    ) => Promise<string[]>,
+    private readonly assertResources?: () => Promise<void>,
   ) {
     this.config = structuredClone(config);
     this.execution = structuredClone(execution);
     this.network = providerNetwork(network);
     this.readers = endpoints.map((url) => new RpcReader(url, request));
-    this.observer = new QuorumExecutionObserver(
-      endpoints,
-      execution.rpc.genesisHash,
-      execution.maxLogRange,
-      request,
-      network,
-    );
+    this.observer = resolveEndpoints
+      ? undefined
+      : new QuorumExecutionObserver(
+          endpoints,
+          execution.rpc.genesisHash,
+          execution.maxLogRange,
+          request,
+          network,
+        );
     this.configurationHash = safeProvisioningIdentity(this.config, network);
   }
   private async authority(
@@ -214,6 +220,7 @@ export class SafeProvisioningService {
     id: string,
     provision = true,
   ) {
+    await this.assertResources?.();
     if (
       !uuid.test(id) ||
       !uuid.test(context.idempotencyKey) ||
@@ -247,7 +254,7 @@ export class SafeProvisioningService {
     });
   }
   private async creationCode() {
-    await this.observer.anchor();
+    await this.observer!.anchor();
     const results = await Promise.all(
       this.readers.map(async (reader) => {
         const [factory, singleton, encoded] = await Promise.all([
@@ -294,7 +301,7 @@ export class SafeProvisioningService {
     };
   }
   private async deployed(plan: SafeDeploymentPlan): Promise<boolean> {
-    await this.observer.anchor();
+    await this.observer!.anchor();
     const heads = await Promise.all(
       this.readers.map((r) =>
         r.call('eth_getBlockByNumber', ['finalized', false]),
@@ -338,7 +345,7 @@ export class SafeProvisioningService {
       unavailable();
     if (observations[0].code === '0x') return false;
     if (keccak256(observations[0].code) !== plan.proxyCodeHash) unavailable();
-    await this.observer.contractNonce(this.binding(plan), plan.owner);
+    await this.observer!.contractNonce(this.binding(plan), plan.owner);
     const guardSlot = hashText('guard_manager.guard.address');
     const fallbackSlot = hashText('fallback_manager.handler.address');
     const storage = await Promise.all(
@@ -391,7 +398,40 @@ export class SafeProvisioningService {
       }),
     );
   }
-  async read(context: AuthorityContext, id: string) {
+  private async scoped(context: AuthorityContext) {
+    context = structuredClone(context);
+    const endpoints = await this.resolveEndpoints!(context);
+    return new SafeProvisioningService(
+      this.onboarding,
+      this.database,
+      this.config,
+      this.execution,
+      this.revision,
+      this.driver,
+      endpoints,
+      this.network.name,
+      this.request,
+      undefined,
+      async () => {
+        if (
+          fingerprint(await this.resolveEndpoints!(context)) !==
+          fingerprint(endpoints)
+        )
+          denied();
+      },
+    );
+  }
+  async read(
+    context: AuthorityContext,
+    id: string,
+  ): Promise<{
+    profile: 'safe-1.4.1';
+    chain_id: string;
+    address: string;
+    status: SafeDeploymentRecord['state'];
+  }> {
+    if (this.resolveEndpoints)
+      return (await this.scoped(context)).read(context, id);
     const authority = await this.authority(context, id, false);
     const record = await this.database.onboardingStore.transaction(
       (state) => state.deploymentBindings?.['service-v1']?.safeAccounts?.[id],
@@ -433,7 +473,17 @@ export class SafeProvisioningService {
       status: record.state,
     };
   }
-  async provision(input: AuthorityContext, id: string) {
+  async provision(
+    input: AuthorityContext,
+    id: string,
+  ): Promise<{
+    profile: 'safe-1.4.1';
+    chain_id: string;
+    address: string;
+    status: SafeDeploymentRecord['state'];
+  }> {
+    if (this.resolveEndpoints)
+      return (await this.scoped(input)).provision(input, id);
     const context = structuredClone(input),
       authority = await this.authority(context, id);
     const creation = await this.creationCode();

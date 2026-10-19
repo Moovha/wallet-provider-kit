@@ -513,7 +513,7 @@ export class ApprovedExecutionCoordinator {
         deny();
       let scanFromBlock: string;
       try {
-        scanFromBlock = await this.observer.anchor();
+        scanFromBlock = await this.observer.anchor(context.principal);
         if (this.config.local && record.intent) {
           if (!this.observer.preflightUnsigned) deny();
           await this.observer.preflightUnsigned(

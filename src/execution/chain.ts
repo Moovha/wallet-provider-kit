@@ -475,6 +475,7 @@ export class QuorumExecutionObserver implements ExecutionObserver {
   async contractNonce(
     binding: SafeAccountBinding,
     owner: string,
+    _principal?: import('../domain/principal.js').VerifiedPrincipal,
   ): Promise<string> {
     try {
       const values = await Promise.all(

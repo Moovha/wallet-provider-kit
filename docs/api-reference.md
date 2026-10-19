@@ -2732,6 +2732,10 @@ export type ApprovedCallInput =
       account_id: string;
       kind: 'contract-call';
       calls: ApprovedContractCall[];
+      application_action?: {
+        name: string;
+        payload: Record<string, string>;
+      };
     }
   | {
       account_id: string;
@@ -3288,7 +3292,7 @@ export interface ExecutionObserver {
     plan: TransferExecutionPlan,
     ownHash?: string,
   ): Promise<import('./recovery.js').NonceSnapshot>;
-  anchor(): Promise<string>;
+  anchor(principal?: VerifiedPrincipal): Promise<string>;
   preflightUnsigned?(plan: TransferExecutionPlan): Promise<void>;
   preflight(plan: TransferExecutionPlan): Promise<void>;
   observe(
@@ -3788,7 +3792,11 @@ export declare class QuorumExecutionObserver implements ExecutionObserver {
   preflightUnsigned(plan: TransferExecutionPlan): Promise<void>;
   preflight(plan: TransferExecutionPlan): Promise<void>;
   /** Read-only verified account binding and common nonce before constructing an approved action. */
-  contractNonce(binding: SafeAccountBinding, owner: string): Promise<string>;
+  contractNonce(
+    binding: SafeAccountBinding,
+    owner: string,
+    _principal?: import('../domain/principal.js').VerifiedPrincipal,
+  ): Promise<string>;
   /** Native balance at a common canonical block, with chain identity and block-hash agreement. */
   payerBalance(sponsor: string): Promise<string>;
   /** Read-only nonce diagnostics at common canonical block heights; pending counts are explicitly local hints. */
@@ -3828,7 +3836,11 @@ export declare class QuorumExecutionObserver implements ExecutionObserver {
   preflightUnsigned(plan: TransferExecutionPlan): Promise<void>;
   preflight(plan: TransferExecutionPlan): Promise<void>;
   /** Read-only verified account binding and common nonce before constructing an approved action. */
-  contractNonce(binding: SafeAccountBinding, owner: string): Promise<string>;
+  contractNonce(
+    binding: SafeAccountBinding,
+    owner: string,
+    _principal?: import('../domain/principal.js').VerifiedPrincipal,
+  ): Promise<string>;
   /** Native balance at a common canonical block, with chain identity and block-hash agreement. */
   payerBalance(sponsor: string): Promise<string>;
   /** Read-only nonce diagnostics at common canonical block heights; pending counts are explicitly local hints. */
@@ -3980,6 +3992,9 @@ export declare const runtimeApplicationId: (
 ```ts
 export interface RuntimeConfigurationOptions {
   authorizeContracts?: boolean;
+  credentialKey?: {
+    env: string;
+  };
   operators: {
     issuer: string;
     clientId: string;
@@ -4003,9 +4018,24 @@ export declare class RuntimeConfigurationService {
     deploymentRevision: string,
     transportRevision?: string | undefined,
     network?: ProviderNetwork | undefined,
+    credentialCipher?: ApplicationCredentialCipher | undefined,
   );
   assertOperator(principal: VerifiedPrincipal): void;
   assertOperatorState(principal: VerifiedPrincipal, state: ProviderState): void;
+  readCredentials(
+    principal: VerifiedPrincipal,
+    applicationId?: string,
+  ): Promise<CredentialMetadata[]>;
+  writeCredential(
+    context: AuthorityContext,
+    reference: string,
+    input: {
+      expected_revision: string;
+      endpoint: string | null;
+    },
+  ): Promise<CredentialMetadata>;
+  /** Resolve only accepted resources belonging to the authenticated application's identity. */
+  rpcEndpoints(applicationId: string): Promise<string[]>;
   readObligations(
     principal: VerifiedPrincipal,
     applicationId?: string,
@@ -4114,6 +4144,8 @@ export declare class RuntimeConfigurationService {
 
 ```ts
 export interface RuntimePolicy {
+  action_requirements?: ApplicationObligations['actions'];
+  application_resources_hash?: string;
   version: '1';
   native_transfers?: {
     address: string;
@@ -4272,7 +4304,11 @@ export declare class SafeExecutionQueue {
     actions: SupportedActions,
     database: ProviderDatabase,
     execution: Pick<ApprovedExecutionCoordinator, 'refresh' | 'execute'>,
-    nonce: (binding: SafeAccountBinding, owner: string) => Promise<string>,
+    nonce: (
+      binding: SafeAccountBinding,
+      owner: string,
+      principal?: VerifiedPrincipal,
+    ) => Promise<string>,
     configuration: NonNullable<ExecutionConfiguration['safeQueue']>,
     pollIntervalSeconds: number,
   );
@@ -4429,24 +4465,27 @@ export declare class SafeProvisioningService {
     endpoints: string[],
     network?: ProviderNetwork,
     request?: typeof fetch,
+    resolveEndpoints?:
+      ((context: AuthorityContext) => Promise<string[]>) | undefined,
+    assertResources?: (() => Promise<void>) | undefined,
   );
   read(
     context: AuthorityContext,
     id: string,
   ): Promise<{
     profile: 'safe-1.4.1';
-    chain_id: import('../networks.js').ProviderChainId;
+    chain_id: string;
     address: string;
-    status: 'pending' | 'unknown' | 'ready' | 'prepared';
+    status: SafeDeploymentRecord['state'];
   }>;
   provision(
     input: AuthorityContext,
     id: string,
   ): Promise<{
     profile: 'safe-1.4.1';
-    chain_id: import('../networks.js').ProviderChainId;
+    chain_id: string;
     address: string;
-    status: 'pending' | 'unknown' | 'ready' | 'prepared';
+    status: SafeDeploymentRecord['state'];
   }>;
 }
 ```

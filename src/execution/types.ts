@@ -179,7 +179,7 @@ export interface ExecutionObserver {
     plan: TransferExecutionPlan,
     ownHash?: string,
   ): Promise<import('./recovery.js').NonceSnapshot>;
-  anchor(): Promise<string>;
+  anchor(principal?: VerifiedPrincipal): Promise<string>;
   preflightUnsigned?(plan: TransferExecutionPlan): Promise<void>;
   preflight(plan: TransferExecutionPlan): Promise<void>;
   observe(

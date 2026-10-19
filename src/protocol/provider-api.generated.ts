@@ -480,6 +480,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/application/credentials": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Optional runtime configuration control plane. Application proposals and provider publications are configuration records, not wallet grants, signing authority or execution activation. Publications become readable immediately without restarting the service. Immutable historical revisions remain available. Requires the documented scope and configured application or operator identity. */
+        get: operations["readApplicationCredentials"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/provider/applications/{applicationId}/credentials": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Optional runtime configuration control plane. Application proposals and provider publications are configuration records, not wallet grants, signing authority or execution activation. Publications become readable immediately without restarting the service. Immutable historical revisions remain available. Requires the documented scope and configured application or operator identity. */
+        get: operations["readProviderApplicationCredentials"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/application/credentials/{reference}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** @description Store or rotate an application-owned HTTPS service endpoint in encrypted storage. Send null to revoke it. Secret paths are never returned. Associated service declarations require provider review after every change. */
+        put: operations["writeApplicationCredential"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/application/obligations": {
         parameters: {
             query?: never;
@@ -487,7 +538,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Protected, application-scoped declarations and provider decisions. Acceptance records an agreement only: it does not resolve credentials, fund gas, provision a Safe, activate execution or authorize spending. User assets remain in individual user wallets. Secrets and actual user payloads must not be submitted here. */
+        /** @description Protected, application-scoped declarations and provider decisions. Accepted actions constrain off-chain payloads. Accepted service declarations permit resolving application-owned verifier credentials when credential storage is configured. Acceptance does not fund gas, provision a shared Safe, activate execution or authorize spending. User assets remain in individual user wallets. Secrets and actual user payloads must not be submitted here. */
         get: operations["readApplicationObligations"];
         put?: never;
         post?: never;
@@ -504,7 +555,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Protected, application-scoped declarations and provider decisions. Acceptance records an agreement only: it does not resolve credentials, fund gas, provision a Safe, activate execution or authorize spending. User assets remain in individual user wallets. Secrets and actual user payloads must not be submitted here. */
+        /** @description Protected, application-scoped declarations and provider decisions. Accepted actions constrain off-chain payloads. Accepted service declarations permit resolving application-owned verifier credentials when credential storage is configured. Acceptance does not fund gas, provision a shared Safe, activate execution or authorize spending. User assets remain in individual user wallets. Secrets and actual user payloads must not be submitted here. */
         get: operations["readProviderApplicationObligations"];
         put?: never;
         post?: never;
@@ -522,7 +573,7 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** @description Protected, application-scoped declarations and provider decisions. Acceptance records an agreement only: it does not resolve credentials, fund gas, provision a Safe, activate execution or authorize spending. User assets remain in individual user wallets. Secrets and actual user payloads must not be submitted here. */
+        /** @description Protected, application-scoped declarations and provider decisions. Accepted actions constrain off-chain payloads. Accepted service declarations permit resolving application-owned verifier credentials when credential storage is configured. Acceptance does not fund gas, provision a shared Safe, activate execution or authorize spending. User assets remain in individual user wallets. Secrets and actual user payloads must not be submitted here. */
         put: operations["submitApplicationActions"];
         post?: never;
         delete?: never;
@@ -540,7 +591,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Protected, application-scoped declarations and provider decisions. Acceptance records an agreement only: it does not resolve credentials, fund gas, provision a Safe, activate execution or authorize spending. User assets remain in individual user wallets. Secrets and actual user payloads must not be submitted here. */
+        /** @description Protected, application-scoped declarations and provider decisions. Accepted actions constrain off-chain payloads. Accepted service declarations permit resolving application-owned verifier credentials when credential storage is configured. Acceptance does not fund gas, provision a shared Safe, activate execution or authorize spending. User assets remain in individual user wallets. Secrets and actual user payloads must not be submitted here. */
         post: operations["decideApplicationActions"];
         delete?: never;
         options?: never;
@@ -556,7 +607,7 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** @description Protected, application-scoped declarations and provider decisions. Acceptance records an agreement only: it does not resolve credentials, fund gas, provision a Safe, activate execution or authorize spending. User assets remain in individual user wallets. Secrets and actual user payloads must not be submitted here. */
+        /** @description Protected, application-scoped declarations and provider decisions. Accepted actions constrain off-chain payloads. Accepted service declarations permit resolving application-owned verifier credentials when credential storage is configured. Acceptance does not fund gas, provision a shared Safe, activate execution or authorize spending. User assets remain in individual user wallets. Secrets and actual user payloads must not be submitted here. */
         put: operations["submitApplicationServices"];
         post?: never;
         delete?: never;
@@ -574,7 +625,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Protected, application-scoped declarations and provider decisions. Acceptance records an agreement only: it does not resolve credentials, fund gas, provision a Safe, activate execution or authorize spending. User assets remain in individual user wallets. Secrets and actual user payloads must not be submitted here. */
+        /** @description Protected, application-scoped declarations and provider decisions. Accepted actions constrain off-chain payloads. Accepted service declarations permit resolving application-owned verifier credentials when credential storage is configured. Acceptance does not fund gas, provision a shared Safe, activate execution or authorize spending. User assets remain in individual user wallets. Secrets and actual user payloads must not be submitted here. */
         post: operations["decideApplicationServices"];
         delete?: never;
         options?: never;
@@ -590,7 +641,7 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** @description Protected, application-scoped declarations and provider decisions. Acceptance records an agreement only: it does not resolve credentials, fund gas, provision a Safe, activate execution or authorize spending. User assets remain in individual user wallets. Secrets and actual user payloads must not be submitted here. */
+        /** @description Protected, application-scoped declarations and provider decisions. Accepted actions constrain off-chain payloads. Accepted service declarations permit resolving application-owned verifier credentials when credential storage is configured. Acceptance does not fund gas, provision a shared Safe, activate execution or authorize spending. User assets remain in individual user wallets. Secrets and actual user payloads must not be submitted here. */
         put: operations["submitApplicationSponsorship"];
         post?: never;
         delete?: never;
@@ -608,7 +659,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Protected, application-scoped declarations and provider decisions. Acceptance records an agreement only: it does not resolve credentials, fund gas, provision a Safe, activate execution or authorize spending. User assets remain in individual user wallets. Secrets and actual user payloads must not be submitted here. */
+        /** @description Protected, application-scoped declarations and provider decisions. Accepted actions constrain off-chain payloads. Accepted service declarations permit resolving application-owned verifier credentials when credential storage is configured. Acceptance does not fund gas, provision a shared Safe, activate execution or authorize spending. User assets remain in individual user wallets. Secrets and actual user payloads must not be submitted here. */
         post: operations["decideApplicationSponsorship"];
         delete?: never;
         options?: never;
@@ -650,7 +701,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/runtime-configuration/applications/{applicationId}/review": {
+    "/v1/provider/applications/{applicationId}/policy/review": {
         parameters: {
             query?: never;
             header?: never;
@@ -667,7 +718,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/runtime-configuration": {
+    "/v1/application/policy": {
         parameters: {
             query?: never;
             header?: never;
@@ -684,7 +735,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/runtime-configuration/applications/{applicationId}": {
+    "/v1/provider/applications/{applicationId}/policy": {
         parameters: {
             query?: never;
             header?: never;
@@ -701,7 +752,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/runtime-configuration/revisions/{revision}": {
+    "/v1/application/policy/revisions/{revision}": {
         parameters: {
             query?: never;
             header?: never;
@@ -718,7 +769,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/runtime-configuration/proposals": {
+    "/v1/application/policy/proposals": {
         parameters: {
             query?: never;
             header?: never;
@@ -735,7 +786,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/runtime-configuration/proposals/{proposalId}": {
+    "/v1/application/policy/proposals/{proposalId}": {
         parameters: {
             query?: never;
             header?: never;
@@ -752,7 +803,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/runtime-configuration/proposals/{proposalId}/publish": {
+    "/v1/provider/policy/proposals/{proposalId}/publish": {
         parameters: {
             query?: never;
             header?: never;
@@ -769,7 +820,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/runtime-configuration/applications/{applicationId}/revisions": {
+    "/v1/provider/applications/{applicationId}/policy/revisions": {
         parameters: {
             query?: never;
             header?: never;
@@ -2030,6 +2081,12 @@ export interface operations {
                                     value: string;
                                     data: string;
                                 }[];
+                                application_action?: {
+                                    name: string;
+                                    payload: {
+                                        [key: string]: string;
+                                    };
+                                };
                             } | {
                                 account_id: string;
                                 /** @enum {string} */
@@ -2410,6 +2467,12 @@ export interface operations {
                                     value: string;
                                     data: string;
                                 }[];
+                                application_action?: {
+                                    name: string;
+                                    payload: {
+                                        [key: string]: string;
+                                    };
+                                };
                             } | {
                                 account_id: string;
                                 /** @enum {string} */
@@ -2740,6 +2803,12 @@ export interface operations {
                         value: string;
                         data: string;
                     }[];
+                    application_action?: {
+                        name: string;
+                        payload: {
+                            [key: string]: string;
+                        };
+                    };
                 } | {
                     account_id: string;
                     /** @enum {string} */
@@ -2867,6 +2936,12 @@ export interface operations {
                         value: string;
                         data: string;
                     }[];
+                    application_action?: {
+                        name: string;
+                        payload: {
+                            [key: string]: string;
+                        };
+                    };
                 } | {
                     account_id: string;
                     /** @enum {string} */
@@ -2948,6 +3023,12 @@ export interface operations {
                                     value: string;
                                     data: string;
                                 }[];
+                                application_action?: {
+                                    name: string;
+                                    payload: {
+                                        [key: string]: string;
+                                    };
+                                };
                             } | {
                                 account_id: string;
                                 /** @enum {string} */
@@ -5136,6 +5217,16 @@ export interface operations {
                             revision: string;
                             policy_hash: string;
                             policy: {
+                                action_requirements?: {
+                                    name: string;
+                                    description: string;
+                                    fields: {
+                                        name: string;
+                                        required: boolean;
+                                        allowed_values: string[];
+                                    }[];
+                                }[];
+                                application_resources_hash?: string;
                                 /** @enum {string} */
                                 version: "1";
                                 enabled: boolean;
@@ -6471,6 +6562,10 @@ export interface operations {
                             }[];
                         } | {
                             "0x14a34"?: {
+                                applicationAction?: {
+                                    /** @enum {boolean} */
+                                    supported: true;
+                                };
                                 paymasterService?: {
                                     /** @enum {boolean} */
                                     supported: true;
@@ -6481,6 +6576,10 @@ export interface operations {
                                 };
                             };
                             "0x2105"?: {
+                                applicationAction?: {
+                                    /** @enum {boolean} */
+                                    supported: true;
+                                };
                                 paymasterService?: {
                                     /** @enum {boolean} */
                                     supported: true;
@@ -6539,6 +6638,610 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+        };
+    };
+    readApplicationCredentials: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        application_id: string;
+                        reference: string;
+                        revision: string;
+                        origin: string;
+                        /** @enum {string} */
+                        status: "active" | "revoked";
+                    }[];
+                };
+            };
+            /** @description Problem response */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+        };
+    };
+    readProviderApplicationCredentials: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                applicationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        application_id: string;
+                        reference: string;
+                        revision: string;
+                        origin: string;
+                        /** @enum {string} */
+                        status: "active" | "revoked";
+                    }[];
+                };
+            };
+            /** @description Problem response */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+        };
+    };
+    writeApplicationCredential: {
+        parameters: {
+            query?: never;
+            header: {
+                "idempotency-key": string;
+            };
+            path: {
+                reference: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    expected_revision: string;
+                    endpoint: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        application_id: string;
+                        reference: string;
+                        revision: string;
+                        origin: string;
+                        /** @enum {string} */
+                        status: "active" | "revoked";
+                    };
+                };
+            };
+            /** @description Problem response */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
                         type: string;
                         title: string;
                         status: number;
@@ -8523,6 +9226,16 @@ export interface operations {
                                 previous_revision: string;
                                 policy_hash: string;
                                 policy: {
+                                    action_requirements?: {
+                                        name: string;
+                                        description: string;
+                                        fields: {
+                                            name: string;
+                                            required: boolean;
+                                            allowed_values: string[];
+                                        }[];
+                                    }[];
+                                    application_resources_hash?: string;
                                     /** @enum {string} */
                                     version: "1";
                                     enabled: boolean;
@@ -8637,6 +9350,16 @@ export interface operations {
                                 previous_revision: string;
                                 policy_hash: string;
                                 policy: {
+                                    action_requirements?: {
+                                        name: string;
+                                        description: string;
+                                        fields: {
+                                            name: string;
+                                            required: boolean;
+                                            allowed_values: string[];
+                                        }[];
+                                    }[];
+                                    application_resources_hash?: string;
                                     /** @enum {string} */
                                     version: "1";
                                     enabled: boolean;
@@ -8758,6 +9481,16 @@ export interface operations {
                                 based_on_revision: string;
                                 policy_hash: string;
                                 policy: {
+                                    action_requirements?: {
+                                        name: string;
+                                        description: string;
+                                        fields: {
+                                            name: string;
+                                            required: boolean;
+                                            allowed_values: string[];
+                                        }[];
+                                    }[];
+                                    application_resources_hash?: string;
                                     /** @enum {string} */
                                     version: "1";
                                     enabled: boolean;
@@ -9498,6 +10231,16 @@ export interface operations {
                             previous_revision: string;
                             policy_hash: string;
                             policy: {
+                                action_requirements?: {
+                                    name: string;
+                                    description: string;
+                                    fields: {
+                                        name: string;
+                                        required: boolean;
+                                        allowed_values: string[];
+                                    }[];
+                                }[];
+                                application_resources_hash?: string;
                                 /** @enum {string} */
                                 version: "1";
                                 enabled: boolean;
@@ -9810,6 +10553,16 @@ export interface operations {
                             previous_revision: string;
                             policy_hash: string;
                             policy: {
+                                action_requirements?: {
+                                    name: string;
+                                    description: string;
+                                    fields: {
+                                        name: string;
+                                        required: boolean;
+                                        allowed_values: string[];
+                                    }[];
+                                }[];
+                                application_resources_hash?: string;
                                 /** @enum {string} */
                                 version: "1";
                                 enabled: boolean;
@@ -10122,6 +10875,16 @@ export interface operations {
                             previous_revision: string;
                             policy_hash: string;
                             policy: {
+                                action_requirements?: {
+                                    name: string;
+                                    description: string;
+                                    fields: {
+                                        name: string;
+                                        required: boolean;
+                                        allowed_values: string[];
+                                    }[];
+                                }[];
+                                application_resources_hash?: string;
                                 /** @enum {string} */
                                 version: "1";
                                 enabled: boolean;
@@ -10421,6 +11184,16 @@ export interface operations {
                 "application/json": {
                     expected_revision: string;
                     policy: {
+                        action_requirements?: {
+                            name: string;
+                            description: string;
+                            fields: {
+                                name: string;
+                                required: boolean;
+                                allowed_values: string[];
+                            }[];
+                        }[];
+                        application_resources_hash?: string;
                         /** @enum {string} */
                         version: "1";
                         enabled: boolean;
@@ -10540,6 +11313,16 @@ export interface operations {
                         based_on_revision: string;
                         policy_hash: string;
                         policy: {
+                            action_requirements?: {
+                                name: string;
+                                description: string;
+                                fields: {
+                                    name: string;
+                                    required: boolean;
+                                    allowed_values: string[];
+                                }[];
+                            }[];
+                            application_resources_hash?: string;
                             /** @enum {string} */
                             version: "1";
                             enabled: boolean;
@@ -10843,6 +11626,16 @@ export interface operations {
                         based_on_revision: string;
                         policy_hash: string;
                         policy: {
+                            action_requirements?: {
+                                name: string;
+                                description: string;
+                                fields: {
+                                    name: string;
+                                    required: boolean;
+                                    allowed_values: string[];
+                                }[];
+                            }[];
+                            application_resources_hash?: string;
                             /** @enum {string} */
                             version: "1";
                             enabled: boolean;
@@ -11154,6 +11947,16 @@ export interface operations {
                         previous_revision: string;
                         policy_hash: string;
                         policy: {
+                            action_requirements?: {
+                                name: string;
+                                description: string;
+                                fields: {
+                                    name: string;
+                                    required: boolean;
+                                    allowed_values: string[];
+                                }[];
+                            }[];
+                            application_resources_hash?: string;
                             /** @enum {string} */
                             version: "1";
                             enabled: boolean;
@@ -11452,6 +12255,16 @@ export interface operations {
                 "application/json": {
                     expected_revision: string;
                     policy: {
+                        action_requirements?: {
+                            name: string;
+                            description: string;
+                            fields: {
+                                name: string;
+                                required: boolean;
+                                allowed_values: string[];
+                            }[];
+                        }[];
+                        application_resources_hash?: string;
                         /** @enum {string} */
                         version: "1";
                         enabled: boolean;
@@ -11571,6 +12384,16 @@ export interface operations {
                         previous_revision: string;
                         policy_hash: string;
                         policy: {
+                            action_requirements?: {
+                                name: string;
+                                description: string;
+                                fields: {
+                                    name: string;
+                                    required: boolean;
+                                    allowed_values: string[];
+                                }[];
+                            }[];
+                            application_resources_hash?: string;
                             /** @enum {string} */
                             version: "1";
                             enabled: boolean;
