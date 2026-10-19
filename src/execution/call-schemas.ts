@@ -85,6 +85,7 @@ export const approvedCallIntentSchema = object({
 
 approvedCallIntentSchema.properties = {
   ...approvedCallIntentSchema.properties,
+  cancellation: object({ actionId: uuidSchema, payloadHash: hash }),
   assetBudgets: {
     type: 'array',
     minItems: 1,

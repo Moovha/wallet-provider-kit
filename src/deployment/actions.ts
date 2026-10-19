@@ -21,6 +21,7 @@ import {
 import { serviceHash } from '../executor/auth.js';
 import {
   buildApprovedCallIntent,
+  buildNonceCancellationIntent,
   buildApprovedCallAction,
   validateApprovedCallAction,
   type ApprovedCallInput,
@@ -79,6 +80,7 @@ export interface TransferRecord {
   runtimePolicy?: RuntimePolicySnapshot;
   intent?: import('../execution/approved-calls.js').ApprovedCallIntent;
   nonceReleased?: boolean;
+  cancellationId?: string;
   execution?: TransferExecutionRecord;
   transactionEvents?: TransactionEventReport[];
   approval: FinancialApproval & { action: TypedDataAction };
@@ -242,6 +244,26 @@ export class SupportedActions {
     };
   }
   private currentRuntime(state: ProviderState, record: TransferRecord) {
+    if (record.intent?.cancellation) {
+      const reference = record.intent.cancellation;
+      const original = state.supportedActions?.[reference.actionId];
+      if (
+        !original?.intent ||
+        original.intent.cancellation ||
+        original.cancellationId !== record.approval.action.action_id ||
+        original.approval.action.payload_hash !== reference.payloadHash ||
+        original.intent.nonce !== record.intent.nonce ||
+        fingerprint(original.intent.account) !==
+          fingerprint(record.intent.account) ||
+        fingerprint(original.approval.caller) !==
+          fingerprint(record.approval.caller) ||
+        original.approval.ownerSubject !== record.approval.ownerSubject ||
+        !original.execution?.plan ||
+        this.database.hasExecutionAdmission(original.execution.executionId)
+      )
+        deny();
+    }
+
     if (
       record.intent &&
       this.onboarding.runtimeContracts &&
@@ -274,7 +296,7 @@ export class SupportedActions {
             )
           : this.callConfiguration?.policy;
         if (this.onboarding.runtimeContracts !== !!record.runtimePolicy) deny();
-        if (record.runtimePolicy)
+        if (record.runtimePolicy && !record.intent.cancellation)
           validateRuntimeCalls(record.runtimePolicy, record.intent.input);
         if (
           !this.callConfiguration?.policy ||
@@ -388,6 +410,7 @@ export class SupportedActions {
     allowExpired = false,
   ) {
     await this.refreshAccounts();
+    if (!allowExpired && record.cancellationId) deny();
     this.current(record, includeDenied, allowExpired);
     await this.onboarding.store.transaction((state) =>
       this.currentRuntime(state, record),
@@ -858,6 +881,147 @@ export class SupportedActions {
     });
     return this.read(context.principal, record.approval.action.action_id);
   }
+  /** Explicit recovery authority; callers can select only the stored action, never replacement calldata. */
+  async requestNonceCancellation(
+    context: AuthorityContext,
+    id: string,
+    input: {
+      expected_nonce: string;
+      expected_payload_hash: string;
+      authorization: 'invalidate-signed-action';
+    },
+    nonce: (
+      binding: import('../execution/approved-calls.js').SafeAccountBinding,
+      owner: string,
+    ) => Promise<string>,
+  ) {
+    if (
+      !context.principal.scopes.includes('wallet:actions') ||
+      !uuid.test(context.idempotencyKey) ||
+      input.authorization !== 'invalidate-signed-action'
+    )
+      deny();
+    const original = await this.load(id);
+    await this.permitted(context.principal, original, false, true);
+    if (
+      !original.intent ||
+      original.intent.cancellation ||
+      !original.execution?.plan ||
+      original.execution.integrityFailure ||
+      original.execution.effectObserved ||
+      original.intent.nonce !== input.expected_nonce ||
+      original.approval.action.payload_hash !== input.expected_payload_hash ||
+      !this.database.hasActionAttempts(id) ||
+      !(await this.database.isApprovedAction(original.approval, true))
+    )
+      deny();
+    const authority = await this.callAuthority(context.principal);
+    if (
+      (await nonce(
+        original.intent.account,
+        original.approval.account.address,
+      )) !== original.intent.nonce
+    )
+      deny();
+    const key = fingerprint([
+      'nonce-cancellation',
+      context.principal.issuer,
+      context.principal.subject,
+      context.principal.clientId,
+      context.idempotencyKey,
+    ]);
+    const hash = fingerprint([id, input, this.revision]);
+    const record = await this.onboarding.withAccountAccess(
+      context.principal,
+      original.approval.account.accountId,
+      'contracts:request',
+      (state, grant) => {
+        const latest = state.supportedActions?.[id] ?? deny();
+        if (
+          state.deploymentBindings?.['service-v1']?.activeRevision !==
+            this.revision ||
+          latest.status !== 'authorized' ||
+          latest.execution?.integrityFailure ||
+          latest.execution?.effectObserved ||
+          fingerprint(latest.execution?.plan) !==
+            fingerprint(original.execution?.plan) ||
+          fingerprint(latest.approval) !== fingerprint(original.approval) ||
+          grant.id !== original.approval.grantId ||
+          grant.owner !== original.approval.ownerSubject ||
+          grant.requestId !== original.approval.consentReference ||
+          this.database.hasExecutionAdmission(original.execution!.executionId)
+        )
+          deny();
+        this.currentRuntime(state, latest);
+        const previous = state.idempotency[key];
+        if (previous) {
+          if (previous.hash !== hash || latest.cancellationId !== previous.id)
+            throw new WalletProviderError('wallet_attempt_conflict');
+          return state.supportedActions![previous.id] ?? deny();
+        }
+        if (latest.cancellationId)
+          throw new WalletProviderError('wallet_attempt_conflict');
+        const cancellationId = randomUUID();
+        const intent = buildNonceCancellationIntent(
+          authority.policy,
+          original.approval.account.accountId,
+          original.intent!.nonce,
+          { actionId: id, payloadHash: original.approval.action.payload_hash },
+        );
+        if (
+          fingerprint(intent.account) !== fingerprint(original.intent!.account)
+        )
+          deny();
+        const action = buildApprovedCallAction(
+          intent,
+          original.approval.account.address,
+          this.queueExpiry(authority.validity),
+          cancellationId,
+          this.network.name,
+        );
+        const { additionalBudgets: _originalBudgets, ...baseApproval } =
+          structuredClone(original.approval);
+        const created: TransferRecord = {
+          intent,
+          ...(authority.snapshot ? { runtimePolicy: authority.snapshot } : {}),
+          revision: this.revision,
+          status: 'authorizing',
+          approval: {
+            ...baseApproval,
+            action,
+            units: '1',
+          },
+        };
+        latest.cancellationId = cancellationId;
+        state.supportedActions![cancellationId] = created;
+        state.idempotency[key] = { id: cancellationId, hash };
+        this.currentRuntime(state, created);
+        state.audit.push({
+          at: Date.now(),
+          event: 'safe_nonce_cancellation_authorized',
+          resource: id,
+          revision: this.revision,
+        });
+        return created;
+      },
+    );
+    await this.permitted(context.principal, record);
+    await this.database.approveAction(record.approval);
+    await this.onboarding.store.transaction((state) => {
+      const latest =
+        state.supportedActions?.[record.approval.action.action_id] ?? deny();
+      this.currentRuntime(state, latest);
+      this.current(latest);
+      latest.status = 'authorized';
+    });
+    return {
+      action_id: record.approval.action.action_id,
+      cancelled_action_id: id,
+      nonce: record.intent!.nonce,
+      payload_hash: record.approval.action.payload_hash,
+      expires_at: record.approval.action.expires_at,
+    };
+  }
   private receipt(record: TransferRecord) {
     const action = record.approval.action;
     return {
@@ -889,6 +1053,7 @@ export class SupportedActions {
     id: string,
     operation: (state: ProviderState, record: TransferRecord) => T,
   ): Promise<T> {
+    await this.refreshAccounts();
     const record = await this.load(id);
     if (!record.runtimePolicy)
       return this.withAuthorizedTransfer(principal, id, operation, true);
@@ -939,6 +1104,7 @@ export class SupportedActions {
         if (
           !latest ||
           latest.status !== 'authorized' ||
+          (!allowExpired && !!latest.cancellationId) ||
           fingerprint(latest.approval) !== fingerprint(before.approval) ||
           fingerprint(grant) !== fingerprint(currentGrant) ||
           state.accounts[grant.accountId]?.address?.toLowerCase() !==

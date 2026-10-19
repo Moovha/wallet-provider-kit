@@ -368,6 +368,10 @@ export interface operations {
                                 maximum?: string;
                             }[];
                             nonce: string;
+                            cancellation?: {
+                                actionId: string;
+                                payloadHash: string;
+                            };
                             assetBudgets?: {
                                 token: string;
                                 units: string;

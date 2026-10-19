@@ -277,3 +277,17 @@ exact matching, any extra authorization terms and the evidence they claim to
 verify. Keep application business policy, wallet authority, gas sponsorship and
 business settlement distinct. Live deployment, provider and recovery acceptance
 remain required; offline fixtures are not production certification.
+
+## Simulation and signed nonce recovery
+
+Bundled local execution simulates the exact Safe calls before requesting the
+owner signature. This read-only check uses the sole owner's prevalidated Safe
+signature and the configured gas limit. The service still simulates the real
+signed transaction with its sponsor before submission. An unsuccessful unsigned
+simulation creates no signing admission. State changes between checks can still
+make a signed transaction fail its later preflight.
+
+An expired signature remains valid on chain for its Safe nonce. A signed action
+that has never entered submission can use the [explicit nonce cancellation
+procedure](stuck-transactions-and-recovery.md#explicitly-cancel-an-unsubmitted-signed-safe-action).
+Submitted or uncertain attempts stay held for reconciliation.

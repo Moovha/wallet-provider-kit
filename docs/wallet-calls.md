@@ -9,8 +9,9 @@ while retaining your existing contract permissions. Configure the
 `wallet_showCallsStatus` through your application's UI callback. The headless
 server returns `4200` for that display method.
 
-This is a Base Sepolia (`0x14a34`) profile of the existing Safe 1.4.1 mechanism.
-The configured service uses the Safe relayer queue. Advanced embedded hosts can
+Select Base mainnet (`0x2105`) or Base Sepolia (`0x14a34`) for the Safe 1.4.1
+mechanism. The examples below use Sepolia; use your selected chain ID and verified
+deployments for mainnet. The configured service uses the Safe relayer queue. Advanced embedded hosts can
 select the [ERC-4337 bundler driver](user-operation-execution.md) for accepted accounts
 behind the same endpoint. Current owner identity,
 contract delegation, runtime revision, claim freshness, registered methods,
@@ -23,9 +24,10 @@ execution and keeps provider ledger access separate from application owner acces
 ## Configure and connect an account
 
 Complete the [runtime policy and consent flow](runtime-configuration.md#use-registered-contracts-for-consent-and-execution).
-Configure `runtimeConfiguration.authorizeContracts: true`, the designated
-`approved-evm-executor-v1` profile and `execution.safeQueue`. The matching executor
-must opt into runtime contracts. No additional trust roots or deployment changes
+Configure `runtimeConfiguration.authorizeContracts: true`, the
+`approved-evm-executor-v1` profile and `execution.safeQueue`. Use the bundled local
+execution engine or a separately configured designated executor. A designated
+executor must opt into runtime contracts. No additional trust roots or deployment changes
 are needed for subsequent accepted contract/method publications.
 
 The authenticated JSON-RPC endpoint is:
@@ -38,7 +40,7 @@ Content-Type: application/json
 
 The path selects an existing provider account and owner grant. The transaction
 sender is its **configured Safe address**, not the EOA address of the signing
-backend. Use the Safe address supplied during account binding. A provided `from`
+backend. Use the Safe address supplied during account binding or [automatic provisioning](safe-provisioning.md). A provided `from`
 must match it. Omitting `from` selects that one configured Safe; this headless
 profile does not open an account-selection window or change an account binding.
 
@@ -134,8 +136,9 @@ The profile accepts up to 16 calls or the lower published limit, with at most
 2 KiB of aggregate calldata from the existing Safe mechanism. Normalized calls
 plus the publication snapshot must fit 8 KiB; the HTTP body is bounded to 64 KiB.
 The service additionally constructs a side-effect-free size preview of the
-encoded Safe plan and both journal envelopes, using the largest nonce and block
-quantities and every eligible configured sponsor. Oversized supported-envelope
+encoded Safe plan and wallet-attempt envelope, using the largest nonce and block
+quantities and every eligible configured sponsor. Designated execution also checks
+its service handoff envelope. Oversized supported-envelope
 requests return `5740` before admission, signing or nonce reservation. Larger transport bodies can receive HTTP 413.
 
 The `atomicRequired` flag is supported directly. The embedded ERC-4337 driver

@@ -2531,6 +2531,13 @@ export declare function openProviderDatabase(
   ): Promise<boolean>;
   /** Synchronous inside the shared storage transaction; any admission retains possible signing exposure. */
   hasActionAttempts(id: string): boolean;
+  /** Synchronous with cancellation admission: a provider handoff, even before claim, prevents cancellation. */
+  hasExecutionAdmission(executionId: string): boolean;
+  /** Fence submission admission and cancellation intent in the same SQLite write transaction. */
+  admitExecutionAttempt(
+    input: AttemptAdmission,
+    actionId: string,
+  ): Promise<WalletAttemptRequest>;
   revokeAction(id: string): Promise<void>;
   financialAuthority: (configuration: FinancialAuthorityOptions) => {
     authority: import('../core.js').EmbeddedWalletAuthority;
@@ -2749,6 +2756,10 @@ export type ApprovedCallInput =
 
 ```ts
 export interface ApprovedCallIntent extends OperationAdapterTerms {
+  cancellation?: {
+    actionId: string;
+    payloadHash: string;
+  };
   adapterInput?: AdapterInput;
   nativeRecipients?: string[];
   version: '1';
@@ -2861,6 +2872,7 @@ export declare class ApprovedExecutionCoordinator {
     observer: ExecutionObserver,
     operations?: PayerOperations | undefined,
   );
+  get nonceCancellationEnabled(): boolean;
   /** Bound every encoded wallet/executor envelope before accepting a standard batch. No signatures or attempts are issued. */
   assertWalletCallsSize(
     principal: VerifiedPrincipal,
@@ -3277,6 +3289,7 @@ export interface ExecutionObserver {
     ownHash?: string,
   ): Promise<import('./recovery.js').NonceSnapshot>;
   anchor(): Promise<string>;
+  preflightUnsigned?(plan: TransferExecutionPlan): Promise<void>;
   preflight(plan: TransferExecutionPlan): Promise<void>;
   observe(
     plan: TransferExecutionPlan,
@@ -3771,6 +3784,8 @@ export declare class QuorumExecutionObserver implements ExecutionObserver {
     network?: ProviderNetwork | undefined,
   );
   anchor(): Promise<string>;
+  /** Read-only Safe simulation using its owner's prevalidated signature; never a dispatch payload. */
+  preflightUnsigned(plan: TransferExecutionPlan): Promise<void>;
   preflight(plan: TransferExecutionPlan): Promise<void>;
   /** Read-only verified account binding and common nonce before constructing an approved action. */
   contractNonce(binding: SafeAccountBinding, owner: string): Promise<string>;
@@ -3809,6 +3824,8 @@ export declare class QuorumExecutionObserver implements ExecutionObserver {
     network?: ProviderNetwork | undefined,
   );
   anchor(): Promise<string>;
+  /** Read-only Safe simulation using its owner's prevalidated signature; never a dispatch payload. */
+  preflightUnsigned(plan: TransferExecutionPlan): Promise<void>;
   preflight(plan: TransferExecutionPlan): Promise<void>;
   /** Read-only verified account binding and common nonce before constructing an approved action. */
   contractNonce(binding: SafeAccountBinding, owner: string): Promise<string>;
@@ -4569,6 +4586,7 @@ export declare class ApprovedExecutionCoordinator {
     observer: ExecutionObserver,
     operations?: PayerOperations | undefined,
   );
+  get nonceCancellationEnabled(): boolean;
   /** Bound every encoded wallet/executor envelope before accepting a standard batch. No signatures or attempts are issued. */
   assertWalletCallsSize(
     principal: VerifiedPrincipal,

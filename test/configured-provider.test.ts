@@ -1,3 +1,10 @@
+import { defaultSafeProvisioning } from '../src/provisioning/defaults.js';
+import { safeProvisioningIdentity } from '../src/provisioning/safe.js';
+import {
+  defaultLocalExecution,
+  localExecutionOrigin,
+  localSponsorIds,
+} from '../src/deployment/local-execution-contract.js';
 import { runtimeApplicationId } from '../src/runtime-configuration/service.js';
 import { replacementWire } from './helpers/replacements.js';
 import { defaultReplacementPolicy } from '../src/execution/replacement.js';
@@ -3871,7 +3878,7 @@ it.each(['contract-call', 'swap', 'vault-deposit'] as const)(
 );
 
 /** Offline application-led wallet and authenticated executor, with independent persistent stores. */
-async function runtimeFinancialFixture(queue = false) {
+async function runtimeFinancialFixture(queue = false, local = false) {
   const t = await designatedFixture();
   const config = validateProviderConfiguration(
     JSON.parse(await readFile('docs/provider.config.example.json', 'utf8')),
@@ -3980,6 +3987,40 @@ async function runtimeFinancialFixture(queue = false) {
   config.execution.service!.providerRevision = '2';
   t.f.config.execution!.service!.providerRevision = '2';
   await t.restart();
+  if (local) {
+    config.localExecution = defaultLocalExecution();
+    config.execution.local = true;
+    delete config.execution.service;
+    config.execution.relayer = {
+      url: localExecutionOrigin,
+      apiKey: config.localExecution.apiKey,
+    };
+    for (const sponsor of config.execution.sponsors)
+      sponsor.binding = {
+        ...localSponsorIds(sponsor.accountId),
+        address: sponsor.binding.address,
+        bindingRevision: '1',
+      };
+    vi.stubEnv('LOCAL_EXECUTION_API_KEY', randomBytes(32).toString('hex'));
+    const fixtureRequest = calls.request;
+    const managed = localSponsorIds(config.execution.sponsors[0].accountId);
+    t.f.execution!.request = (async (input, options) => {
+      const url = new URL(String(input));
+      if (url.origin !== 'http://local-execution:8080')
+        return fixtureRequest(input, options);
+      const path = url.pathname.replace(managed.relayerId, 'sponsor-relayer');
+      const response = await fixtureRequest(
+        t.f.execution!.configuration.relayer!.url + path,
+        options,
+      );
+      return new Response(
+        (await response.text())
+          .replaceAll('sponsor-relayer', managed.relayerId)
+          .replaceAll('sponsor-signer', managed.signerId),
+        { status: response.status },
+      );
+    }) as typeof fetch;
+  }
   const restart = async () => {
     await app.close();
     app = await createConfiguredProvider(config);
@@ -4273,14 +4314,14 @@ it('caps queued runtime requests to the publication lifetime and binds their mat
   expect(result.json().status).toBe('executing');
 }, 15000);
 
-async function walletCallsFixture() {
+async function walletCallsFixture(local = false) {
   let worker: SafeExecutionQueue;
   vi.spyOn(SafeExecutionQueue.prototype, 'start').mockImplementation(function (
     this: SafeExecutionQueue,
   ) {
     worker = this;
   });
-  const f = await runtimeFinancialFixture(true);
+  const f = await runtimeFinancialFixture(true, local);
   vi.mocked(injected.backend!.signTypedData).mockImplementation(
     async (_account, action) => {
       f.calls.state.digest = action.payload_hash;
@@ -4316,7 +4357,15 @@ async function walletCallsFixture() {
     atomicRequired: true,
     calls: f.input().calls.map((call) => ({ ...call, value: '0x1' })),
   });
-  return { ...f, rpc, batch, process: () => worker!.process() };
+  return {
+    ...f,
+    get app() {
+      return f.app;
+    },
+    rpc,
+    batch,
+    process: () => worker!.process(),
+  };
 }
 
 describe('EIP-5792 runtime wallet calls', () => {
@@ -4775,4 +4824,351 @@ it('requires renewed financial consent after a provider-allowed application auto
   const admitted = await f.request();
   expect(admitted.statusCode, admitted.body).toBe(200);
   expect(f.calls.state.posts).toBe(0);
+});
+
+it('admits EIP-5792 batches through the bundled local engine without a designated-service envelope or financial effects', async () => {
+  const f = await walletCallsFixture(true);
+  const sent = await f.rpc('wallet_sendCalls', [f.batch()]);
+  expect(sent.error).toBeUndefined();
+  expect(sent.result.id).toMatch(/^0x[0-9a-f]{64}$/);
+  expect(
+    (await f.rpc('wallet_getCallsStatus', [sent.result.id])).result.status,
+  ).toBe(100);
+  expect(injected.backend!.signTypedData).not.toHaveBeenCalled();
+  expect(f.calls.state.posts).toBe(0);
+});
+
+it('fails an undersized local Safe simulation before signing or submission', async () => {
+  const f = await walletCallsFixture(true);
+  const action = await f.request();
+  expect(action.statusCode).toBe(200);
+  f.calls.state.mutate = (method, result, _origin, params) =>
+    method === 'eth_call' &&
+    String((params[0] as { data?: string }).data).startsWith('0x6a761202')
+      ? '0x' + '0'.repeat(64)
+      : result;
+  const executed = await f.post(
+    '/v1/actions/' + action.json().action_id + '/execute',
+    {},
+  );
+  expect(executed.statusCode).toBe(503);
+  expect(executed.json().outcome).toBe('not_dispatched');
+  expect(injected.backend!.signTypedData).not.toHaveBeenCalled();
+  expect(f.calls.state.posts).toBe(0);
+  const db = openProviderDatabase({ directory: f.config.storage.directory });
+  expect(db.hasActionAttempts(action.json().action_id)).toBe(false);
+  db.close();
+});
+
+it.each([false, true])(
+  'authorizes exact nonce cancellation and releases only finalized recovery (queued=%s)',
+  async (queued) => {
+    const f = await walletCallsFixture(true);
+    f.config.execution!.sponsorPool = {
+      strategy: 'round-robin',
+      maxInFlightPerSponsor: 1,
+    };
+    await f.restart();
+    expect((await f.consent()).json().status).toBe('granted');
+    const signedPreflight = vi.spyOn(
+      QuorumExecutionObserver.prototype,
+      'preflight',
+    );
+    signedPreflight.mockRejectedValueOnce(
+      new WalletProviderError('wallet_provider_unavailable'),
+    );
+    let originalId: string, payloadHash: string, batchId: string | undefined;
+    if (queued) {
+      const sent = await f.rpc('wallet_sendCalls', [f.batch()]);
+      expect(sent.error).toBeUndefined();
+      batchId = sent.result.id;
+      await f.process();
+      const db = openProviderDatabase({
+        directory: f.config.storage.directory,
+      });
+      const original = await db.onboardingStore.transaction(
+        (state) => Object.values(state.supportedActions!)[0],
+      );
+      originalId = original.approval.action.action_id;
+      payloadHash = original.approval.action.payload_hash;
+      db.close();
+    } else {
+      const action = await f.request();
+      expect(action.statusCode, action.body).toBe(200);
+      originalId = action.json().action_id;
+      payloadHash = action.json().payload_hash;
+      expect(
+        (await f.post('/v1/actions/' + originalId + '/execute', {})).statusCode,
+      ).toBe(503);
+    }
+    expect(injected.backend!.signTypedData).toHaveBeenCalledTimes(1);
+    expect(f.calls.state.posts).toBe(0);
+    const payload = {
+      expected_nonce: '0',
+      expected_payload_hash: payloadHash,
+      authorization: 'invalidate-signed-action',
+    };
+    expect(
+      (
+        await f.post('/v1/actions/' + originalId + '/cancel-nonce', {
+          ...payload,
+          expected_nonce: '1',
+        })
+      ).statusCode,
+    ).toBe(403);
+    const key = randomUUID();
+    const headers = {
+      authorization: await f.t.f.token(),
+      'idempotency-key': key,
+    };
+    const create = () =>
+      f.app.inject({
+        method: 'POST',
+        url: '/v1/actions/' + originalId + '/cancel-nonce',
+        headers,
+        payload,
+      });
+    const created = await create();
+    expect(created.statusCode, created.body).toBe(200);
+    const cancellationId = created.json().action_id;
+    expect((await create()).json()).toEqual(created.json());
+    expect(
+      (await f.post('/v1/actions/' + originalId + '/execute', {})).statusCode,
+    ).toBe(403);
+    const db = openProviderDatabase({ directory: f.config.storage.directory });
+    const child = await db.onboardingStore.transaction(
+      (state) => state.supportedActions![cancellationId],
+    );
+    const original = await db.onboardingStore.transaction(
+      (state) => state.supportedActions![originalId],
+    );
+    const blockedRequest = createWalletAttemptRequest(
+      'configured-execution-v1',
+      'approved-evm-executor-v1',
+      'relay_transaction',
+      original.approval.account.accountId,
+      original.execution!.executionId,
+      originalId,
+      {},
+    );
+    await db.setBudget('offline-blocked-submission', '1');
+    await expect(
+      db.admitExecutionAttempt(
+        {
+          request: blockedRequest,
+          budgetId: 'offline-blocked-submission',
+          units: '1',
+        },
+        originalId,
+      ),
+    ).rejects.toMatchObject({ code: 'wallet_authorization_denied' });
+    expect(db.hasExecutionAdmission(original.execution!.executionId)).toBe(
+      false,
+    );
+
+    expect(child.approval.action.payload.message).toMatchObject({
+      to: f.calls.policy.accounts[0].address,
+      value: '0',
+      data: '0x',
+      operation: '0',
+      nonce: '0',
+    });
+    f.calls.state.intent = child.intent;
+    const executed = await f.post(
+      '/v1/actions/' + cancellationId + '/execute',
+      {},
+    );
+    expect(executed.statusCode, executed.body).toBe(200);
+    expect(f.calls.state.posts).toBe(1);
+    expect(
+      await db.onboardingStore.transaction(
+        (state) => state.supportedActions![originalId].nonceReleased,
+      ),
+    ).not.toBe(true);
+    f.calls.state.included = true;
+    f.calls.state.mutate = (method, result, _origin, params) =>
+      method === 'eth_getBlockByNumber' &&
+      ['safe', 'finalized'].includes(String(params[0]))
+        ? { ...(result as object), number: '0x64' }
+        : result;
+    const included = await f.app.inject({
+      url: '/v1/actions/' + cancellationId + '/execution',
+      headers: {
+        authorization: await f.t.f.token(),
+        'execution-profile': 'approved-evm-executor-v1',
+        'execution-profile-revision': '1',
+      },
+    });
+    expect(included.json().chain_status).toBe('included');
+    expect(
+      await db.onboardingStore.transaction(
+        (state) => state.supportedActions![originalId].nonceReleased,
+      ),
+    ).not.toBe(true);
+    f.calls.state.mutate = undefined;
+    const receipt = await f.app.inject({
+      url: '/v1/actions/' + cancellationId + '/execution',
+      headers: {
+        authorization: await f.t.f.token(),
+        'execution-profile': 'approved-evm-executor-v1',
+        'execution-profile-revision': '1',
+      },
+    });
+    expect(receipt.statusCode, receipt.body).toBe(200);
+    expect(receipt.json().chain_status).toBe('finalized');
+    expect(
+      await db.onboardingStore.transaction(
+        (state) => state.supportedActions![originalId].nonceReleased,
+      ),
+    ).toBe(true);
+    if (batchId) {
+      expect(
+        await db.onboardingStore.transaction(
+          (state) => Object.values(state.safeRequests!)[0].status,
+        ),
+      ).toBe('cancelled');
+      expect(
+        (await f.rpc('wallet_getCallsStatus', [batchId])).result.status,
+      ).toBe(400);
+    }
+    db.close();
+    await f.restart();
+    expect(
+      (await f.post('/v1/actions/' + originalId + '/execute', {})).statusCode,
+    ).toBe(403);
+  },
+);
+
+it.each([
+  'admitted without claim',
+  'foreign caller',
+  'revoked approval',
+  'changed nonce',
+  'runtime policy changed',
+] as const)('denies nonce cancellation when %s', async (kind) => {
+  const f = await walletCallsFixture(true);
+  const action = await f.request();
+  const id = action.json().action_id;
+  vi.spyOn(
+    QuorumExecutionObserver.prototype,
+    'preflight',
+  ).mockRejectedValueOnce(
+    new WalletProviderError('wallet_provider_unavailable'),
+  );
+  await f.post('/v1/actions/' + id + '/execute', {});
+  const db = openProviderDatabase({ directory: f.config.storage.directory });
+  const record = await db.onboardingStore.transaction(
+    (state) => state.supportedActions![id],
+  );
+  expect(record.execution?.plan).toBeDefined();
+  if (kind === 'admitted without claim') {
+    const request = createWalletAttemptRequest(
+      'configured-execution-v1',
+      'approved-evm-executor-v1',
+      'relay_transaction',
+      record.approval.account.accountId,
+      record.execution!.executionId,
+      id,
+      {},
+    );
+    await db.setBudget('offline-submission', '1');
+    await db.admitExecutionAttempt(
+      { request, budgetId: 'offline-submission', units: '1' },
+      id,
+    );
+    expect(await db.journal.read(request)).toBeNull();
+  }
+  if (kind === 'revoked approval') await db.revokeAction(id);
+  if (kind === 'changed nonce') f.calls.state.nonce = '1';
+  if (kind === 'runtime policy changed') await f.publish();
+  const response = await f.app.inject({
+    method: 'POST',
+    url: '/v1/actions/' + id + '/cancel-nonce',
+    headers: {
+      authorization: await f.t.f.token(
+        undefined,
+        undefined,
+        kind === 'foreign caller' ? 'foreign' : undefined,
+      ),
+      'idempotency-key': randomUUID(),
+    },
+    payload: {
+      expected_nonce: '0',
+      expected_payload_hash: action.json().payload_hash,
+      authorization: 'invalidate-signed-action',
+    },
+  });
+  expect(response.statusCode, response.body).toBe(403);
+  expect(f.calls.state.posts).toBe(0);
+  expect(injected.backend!.signTypedData).toHaveBeenCalledTimes(1);
+  db.close();
+});
+
+it('reads runtime execution evidence from an automatically provisioned Safe immediately after restart', async () => {
+  const f = await walletCallsFixture(true);
+  const binding = f.calls.policy.accounts[0];
+  const safe = {
+    ...defaultSafeProvisioning(),
+    singleton: binding.singleton,
+    proxyCodeHash: binding.codeHash,
+  };
+  f.config.safeProvisioning = safe;
+  f.config.activation.safeProvisioningAcceptance = 'offline-ready-Safe-fixture';
+  f.config.approvedCalls!.policy = structuredClone(
+    f.config.approvedCalls!.policy,
+  );
+  f.config.approvedCalls!.policy.accounts = [];
+  const db = openProviderDatabase({ directory: f.config.storage.directory });
+  await db.onboardingStore.transaction((state) => {
+    state.deploymentBindings!['service-v1'].safeAccounts = {
+      [binding.accountId]: {
+        attemptId: randomUUID(),
+        caller: {
+          issuer: f.config.oauth.issuer,
+          clientId: f.config.policy.applications[0].clientId,
+          subject: 'application-user',
+        },
+        configurationHash: safeProvisioningIdentity(safe, 'base-sepolia'),
+        state: 'ready',
+        plan: {
+          accountId: binding.accountId,
+          owner: f.t.f.wallet.address,
+          address: binding.address,
+          saltNonce: '0',
+          data: '0x',
+          chainId: '84532',
+          factory: safe.factory,
+          singleton: safe.singleton,
+          proxyCodeHash: safe.proxyCodeHash,
+          sponsor: f.config.execution!.sponsors[0],
+          expiresAt: new Date(Date.now() + 300000).toISOString(),
+        },
+      },
+    };
+  });
+  await f.restart();
+  expect((await f.consent()).json().status).toBe('granted');
+  const action = await f.request();
+  expect(action.statusCode, action.body).toBe(200);
+  vi.spyOn(
+    QuorumExecutionObserver.prototype,
+    'preflight',
+  ).mockRejectedValueOnce(
+    new WalletProviderError('wallet_provider_unavailable'),
+  );
+  await f.post('/v1/actions/' + action.json().action_id + '/execute', {});
+  expect(injected.backend!.signTypedData).toHaveBeenCalledTimes(1);
+  await f.restart();
+  const observed = await f.app.inject({
+    url: '/v1/actions/' + action.json().action_id + '/execution',
+    headers: {
+      authorization: await f.t.f.token(),
+      'execution-profile': 'approved-evm-executor-v1',
+      'execution-profile-revision': '1',
+    },
+  });
+  expect(observed.statusCode, observed.body).toBe(200);
+  expect(observed.json().dispatch_status).toBe('not_started');
+  expect(f.calls.state.posts).toBe(0);
+  db.close();
 });

@@ -132,6 +132,32 @@ export function openProviderDatabase(options: ProviderDatabaseOptions) {
         id,
       );
     },
+    /** Synchronous with cancellation admission: a provider handoff, even before claim, prevents cancellation. */
+    hasExecutionAdmission(executionId: string): boolean {
+      return !!connection.get(
+        'SELECT 1 FROM admissions WHERE namespace=? AND attempt_id=? LIMIT 1',
+        'configured-execution-v1',
+        executionId,
+      );
+    },
+    /** Fence submission admission and cancellation intent in the same SQLite write transaction. */
+    async admitExecutionAttempt(input: AttemptAdmission, actionId: string) {
+      return connection.transaction(() => {
+        const row = connection.get(
+          'SELECT record FROM onboarding_records WHERE collection=? AND id=?',
+          'supportedActions',
+          actionId,
+        );
+        const record = row && JSON.parse(String(row.record));
+        if (
+          !record ||
+          record.cancellationId ||
+          record.execution?.executionId !== input.request.attemptId
+        )
+          throw new WalletProviderError('wallet_authorization_denied');
+        return admission(connection, structuredClone(input));
+      });
+    },
     async revokeAction(id: string) {
       connection.transaction(() => {
         connection.run('UPDATE approvals SET revoked=1 WHERE id=?', id);

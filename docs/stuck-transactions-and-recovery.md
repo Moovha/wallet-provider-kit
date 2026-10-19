@@ -116,13 +116,54 @@ the supported zero-refund Safe profile, a reverted outer execution can also reve
 the Safe nonce increment. Keep a signed queue head until exact finalized success;
 never skip it based on age, an outer cancellation or an unexplained nonce change.
 
-A separately authorized owner recovery transaction may invalidate an old Safe
-signature by consuming its nonce. Initiating that recovery transaction and
-migrating a blocked queue after invalidation are not implemented by this profile.
-Fence the lane and review the finalized Safe history, outstanding signatures and
-both journals before an explicit recovery migration. Never clear the lane by
-removing queue entries or editing nonce reservations. Unsigned heads retain their
-existing safe cancellation/expiry procedure.
+## Explicitly cancel an unsubmitted signed Safe action
+
+With bundled local execution, the original application can authorize a separate
+cancellation action using `POST /v1/actions/{actionId}/cancel-nonce`. This recovery
+is limited to a stored signed Safe action with **no submission admission**. An
+admission without a provider claim still prevents cancellation. Submitted or
+uncertain provider attempts require reconciliation; this endpoint cannot replace
+them. The current owner, original caller, grant, identity, consent, contracts
+permission and published policy must still pass, even when the original signing
+expiry has elapsed.
+
+Retain a UUIDv4 `Idempotency-Key` and send the original action's exact nonce and
+payload hash with an explicit authorization:
+
+```json
+{
+  "expected_nonce": "0",
+  "expected_payload_hash": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "authorization": "invalidate-signed-action"
+}
+```
+
+The response contains `action_id` for the cancellation, `cancelled_action_id`,
+`nonce`, `payload_hash` and `expires_at`. Authorizing cancellation immediately
+blocks original dispatch under the same durable storage fence used by submission
+admission. Execute the returned cancellation action through the normal
+[execution endpoint](http-reference.md#post-v1-actions-actionid-execute), with its
+own stable idempotency key, execution profile headers, signing scope and execution
+scope. Authorization alone does not broadcast or release the nonce.
+
+The service constructs exactly one zero-value, empty-data CALL to the bound Safe
+itself, at the original Safe nonce. Applications cannot select a destination,
+value, calldata, sponsor or different nonce. Generic contract calls continue to
+reject Safe self-calls. Simulation, private owner signing, shared gas budgeting,
+durable submission and independent receipt checks apply to the cancellation.
+The operation consumes sponsor gas and an operation allowance; existing lifetime
+reservations are retained.
+
+Poll the cancellation's execution receipt. Only its matching successful,
+RPC-quorum **finalized** receipt releases the original nonce reservation and
+marks its queue entry cancelled. The original batch then reports EIP-5792 status
+`400`, without a success receipt for calls that never ran. Inclusion, expiry, a
+bare nonce increment, a failed cancellation or an RPC outage leaves the lane held.
+Retries and restarts retain the same cancellation action and attempts. If the
+cancellation itself becomes signed and expires before submission, retain the
+lane for explicit recovery review; cancelling a cancellation is unsupported.
+Never remove queue entries or edit nonce reservations to recover a signed lane.
+Unsigned heads retain their existing cancellation and expiry procedure.
 
 Offline fixtures test detection, quarantine, evidence outages, exact finalized
 recovery, concurrent queues and restarts. They do not certify live nonce recovery,

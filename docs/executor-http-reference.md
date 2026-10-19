@@ -1150,6 +1150,21 @@ Request body:
                   "type": "string",
                   "pattern": "^(0|[1-9][0-9]{0,77})$"
                 },
+                "cancellation": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["actionId", "payloadHash"],
+                  "properties": {
+                    "actionId": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                    },
+                    "payloadHash": {
+                      "type": "string",
+                      "pattern": "^0x[0-9a-f]{64}$"
+                    }
+                  }
+                },
                 "assetBudgets": {
                   "type": "array",
                   "minItems": 1,

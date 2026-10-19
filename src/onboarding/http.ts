@@ -354,6 +354,82 @@ export async function registerOnboardingRoutes(
       next_poll_after_ms: { type: 'integer', minimum: 5000, maximum: 300000 },
     },
   };
+  app.post<{
+    Params: { actionId: string };
+    Body: {
+      expected_nonce: string;
+      expected_payload_hash: string;
+      authorization: 'invalidate-signed-action';
+    };
+  }>(
+    '/v1/actions/:actionId/cancel-nonce',
+    {
+      schema: {
+        ...schema(
+          'authorizeSafeNonceCancellation',
+          {
+            type: 'object',
+            additionalProperties: false,
+            required: [
+              'expected_nonce',
+              'expected_payload_hash',
+              'authorization',
+            ],
+            properties: {
+              expected_nonce: {
+                type: 'string',
+                pattern: '^(0|[1-9][0-9]{0,77})$',
+              },
+              expected_payload_hash: {
+                type: 'string',
+                pattern: '^0x[0-9a-f]{64}$',
+              },
+              authorization: {
+                type: 'string',
+                const: 'invalidate-signed-action',
+              },
+            },
+          },
+          actionParams,
+        ),
+        description:
+          'Explicitly authorize cancellation of a stored, signed Safe action before any provider submission admission. Bundled local execution only. Requires the original caller, current owner/grant/identity/consent and contracts delegation. The service constructs a zero-value empty CALL to the same Safe at the exact expected nonce. Execute the returned action separately; the original remains blocked and the queue is released only after independently verified finalized cancellation. No arbitrary replacement payload or signature export.',
+        response: {
+          200: {
+            type: 'object',
+            additionalProperties: false,
+            required: [
+              'action_id',
+              'cancelled_action_id',
+              'nonce',
+              'payload_hash',
+              'expires_at',
+            ],
+            properties: {
+              action_id: uuidSchema,
+              cancelled_action_id: uuidSchema,
+              nonce: { type: 'string' },
+              payload_hash: { type: 'string' },
+              expires_at: { type: 'string', format: 'date-time' },
+            },
+          },
+        },
+      },
+    },
+    async (request) => {
+      if (
+        !options?.execution?.nonceCancellationEnabled ||
+        !options.contractNonce
+      )
+        unavailable();
+      return actions().requestNonceCancellation(
+        await context(request, 'wallet:actions'),
+        request.params.actionId,
+        request.body,
+        options!.contractNonce!,
+      );
+    },
+  );
   app.post<{ Body: ApprovedCallInput }>(
     '/v1/contract-call-requests',
     {

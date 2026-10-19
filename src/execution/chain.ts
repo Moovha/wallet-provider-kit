@@ -5,6 +5,7 @@ import { serviceHash } from '../executor/auth.js';
 import type { WalletCallsReceipt } from '../wallet-calls/types.js';
 import type { NonceSnapshot } from './recovery.js';
 import {
+  approvedCallData,
   implementationSlot,
   allowsEmptyRecipientCode,
   safeInterface,
@@ -258,6 +259,20 @@ export class QuorumExecutionObserver implements ExecutionObserver {
     );
     return heights.reduce((a, b) => (a < b ? a : b)).toString();
   }
+  /** Read-only Safe simulation using its owner's prevalidated signature; never a dispatch payload. */
+  async preflightUnsigned(plan: TransferExecutionPlan): Promise<void> {
+    try {
+      this.validatePlanNetwork(plan);
+      if (!plan.intent) unavailable();
+      const owner = plan.action.chain_account_id.split(':')[2];
+      const signature = zeroPadValue(owner, 32) + '00'.repeat(32) + '01';
+      const preview = structuredClone(plan);
+      preview.data = approvedCallData(plan.action, signature);
+      await this.preflightCalls(preview, owner);
+    } catch {
+      unavailable();
+    }
+  }
   async preflight(plan: TransferExecutionPlan): Promise<void> {
     try {
       await this.preflightRead(structuredClone(plan));
@@ -465,7 +480,10 @@ export class QuorumExecutionObserver implements ExecutionObserver {
         unavailable();
     }
   }
-  private async preflightCalls(plan: TransferExecutionPlan) {
+  private async preflightCalls(
+    plan: TransferExecutionPlan,
+    unsignedOwner?: string,
+  ) {
     const intent = plan.intent!;
     // The full atomic simulation verifies solvency, including native funds received by earlier calls.
     await Promise.all(
@@ -484,15 +502,19 @@ export class QuorumExecutionObserver implements ExecutionObserver {
           ]),
           reader.call('eth_call', [
             {
-              from: plan.sponsor.binding.address,
+              from: unsignedOwner ?? plan.sponsor.binding.address,
               to: intent.account.address,
               data: plan.data,
               value: '0x0',
               gas: toQuantity(BigInt(plan.sponsor.gasLimit)),
-              maxFeePerGas: toQuantity(BigInt(plan.sponsor.maxFeePerGas)),
-              maxPriorityFeePerGas: toQuantity(
-                BigInt(plan.sponsor.maxPriorityFeePerGas),
-              ),
+              ...(unsignedOwner
+                ? { gasPrice: '0x0' }
+                : {
+                    maxFeePerGas: toQuantity(BigInt(plan.sponsor.maxFeePerGas)),
+                    maxPriorityFeePerGas: toQuantity(
+                      BigInt(plan.sponsor.maxPriorityFeePerGas),
+                    ),
+                  }),
             },
             'latest',
           ]),
