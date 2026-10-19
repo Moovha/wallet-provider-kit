@@ -11,8 +11,8 @@ connected application. Your service checks its attestations against your policy
 and stores limited, revocable access. You configure that relationship in Policies
 as part of the same setup.
 
-The current service is experimental and supports one active POSIX host on Base
-Sepolia. Production custody acceptance and mainnet support remain pending. You
+The current service is experimental and supports one active POSIX host with selectable Base
+mainnet or Base Sepolia. Production custody and funded mainnet acceptance remain pending. You
 can explore the wizard without external credentials. The recommended setup supplies
 the wallet engine, application token service, private execution engine, durable
 storage and HTTPS gateway. Record your provider domain, policies and application
@@ -139,3 +139,5 @@ storage system or financial rule, the [developer API guide](api.md),
 explain the extension interfaces. The [configuration reference](setup.md) describes
 the JSON produced by the wizard. Contributor workflows are in
 [Contributing](../CONTRIBUTING.md).
+
+For an isolated native Base evaluation, follow the [local preview and acceptance guide](local-preview.md).

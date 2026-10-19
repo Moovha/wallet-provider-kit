@@ -389,7 +389,7 @@ Success response schema:
 
 Operation: `requestTransferAuthorization`.
 
-Fixed Base Sepolia ERC-3009 transfer authorization. Explicit transfer delegation, current owner-bound access, identity and provider policy authorization are required. No per-transfer owner prompt. No broadcast or settlement.
+ERC-3009 transfer authorization on the configured network. Explicit transfer delegation, current owner-bound access, identity and provider policy authorization are required. No per-transfer owner prompt. No broadcast or settlement.
 
 | Parameter         | Location | Required | Schema                                                                                                |
 | ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
@@ -492,7 +492,7 @@ Success response schema:
                 },
                 "chainId": {
                   "type": "string",
-                  "enum": ["84532"]
+                  "enum": ["84532", "8453"]
                 },
                 "verifyingContract": {
                   "type": "string",
@@ -625,7 +625,7 @@ Success response schema:
               "properties": {
                 "chainId": {
                   "type": "string",
-                  "enum": ["84532"]
+                  "enum": ["84532", "8453"]
                 },
                 "verifyingContract": {
                   "type": "string",
@@ -1197,7 +1197,7 @@ Success response schema:
 
 Operation: `getTransferAuthorization`.
 
-Fixed Base Sepolia ERC-3009 transfer authorization. Explicit transfer delegation, current owner-bound access, identity and provider policy authorization are required. No per-transfer owner prompt. No broadcast or settlement.
+ERC-3009 transfer authorization on the configured network. Explicit transfer delegation, current owner-bound access, identity and provider policy authorization are required. No per-transfer owner prompt. No broadcast or settlement.
 
 | Parameter  | Location | Required | Schema                                                                                                |
 | ---------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
@@ -1276,7 +1276,7 @@ Success response schema:
                 },
                 "chainId": {
                   "type": "string",
-                  "enum": ["84532"]
+                  "enum": ["84532", "8453"]
                 },
                 "verifyingContract": {
                   "type": "string",
@@ -1409,7 +1409,7 @@ Success response schema:
               "properties": {
                 "chainId": {
                   "type": "string",
-                  "enum": ["84532"]
+                  "enum": ["84532", "8453"]
                 },
                 "verifyingContract": {
                   "type": "string",
@@ -2463,7 +2463,7 @@ Success response schema:
           "properties": {
             "chainId": {
               "type": "string",
-              "enum": ["84532"]
+              "enum": ["84532", "8453"]
             },
             "verifyingContract": {
               "type": "string",
@@ -4974,7 +4974,7 @@ Request body (application/json):
     },
     "chain_id": {
       "type": "string",
-      "enum": ["eip155:84532"]
+      "enum": ["eip155:84532", "eip155:8453"]
     },
     "transaction_hash": {
       "type": "string",
@@ -5027,7 +5027,7 @@ Success response schema:
     },
     "chain_id": {
       "type": "string",
-      "enum": ["eip155:84532"]
+      "enum": ["eip155:84532", "eip155:8453"]
     },
     "transaction_hash": {
       "type": "string",
@@ -5118,7 +5118,7 @@ Success response schema:
           },
           "chain_id": {
             "type": "string",
-            "enum": ["eip155:84532"]
+            "enum": ["eip155:84532", "eip155:8453"]
           },
           "transaction_hash": {
             "type": "string",
@@ -5418,6 +5418,10 @@ Success response schema:
     "provider_review_required"
   ],
   "properties": {
+    "chain_id": {
+      "type": "string",
+      "enum": ["eip155:8453", "eip155:84532"]
+    },
     "source": {
       "type": "string",
       "enum": [
@@ -6249,7 +6253,7 @@ Success response schema:
             },
             "chain_id": {
               "type": "string",
-              "enum": ["eip155:84532"]
+              "enum": ["eip155:84532", "eip155:8453"]
             },
             "contracts": {
               "type": "array",
@@ -7562,6 +7566,35 @@ Success response schema:
                   }
                 }
               }
+            },
+            "0x2105": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["atomic"],
+              "properties": {
+                "paymasterService": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["supported"],
+                  "properties": {
+                    "supported": {
+                      "type": "boolean",
+                      "enum": [true]
+                    }
+                  }
+                },
+                "atomic": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["status"],
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": ["supported"]
+                    }
+                  }
+                }
+              }
             }
           }
         }
@@ -7616,6 +7649,10 @@ Success response schema:
   "additionalProperties": false,
   "required": ["role", "applications"],
   "properties": {
+    "network": {
+      "type": "string",
+      "enum": ["base", "base-sepolia"]
+    },
     "role": {
       "type": "string",
       "enum": ["provider", "application"]
@@ -7698,7 +7735,7 @@ Success response schema:
                   },
                   "chain_id": {
                     "type": "string",
-                    "enum": ["eip155:84532"]
+                    "enum": ["eip155:84532", "eip155:8453"]
                   },
                   "contracts": {
                     "type": "array",
@@ -8195,7 +8232,7 @@ Success response schema:
                     },
                     "chain_id": {
                       "type": "string",
-                      "enum": ["eip155:84532"]
+                      "enum": ["eip155:84532", "eip155:8453"]
                     },
                     "contracts": {
                       "type": "array",
@@ -8726,7 +8763,7 @@ Success response schema:
                     },
                     "chain_id": {
                       "type": "string",
-                      "enum": ["eip155:84532"]
+                      "enum": ["eip155:84532", "eip155:8453"]
                     },
                     "contracts": {
                       "type": "array",
@@ -9275,7 +9312,7 @@ Success response schema:
           },
           "chainId": {
             "type": "string",
-            "enum": ["0x14a34"]
+            "enum": ["0x14a34", "0x2105"]
           },
           "status": {
             "type": "integer",
@@ -9520,7 +9557,7 @@ Success response schema:
             },
             "chain_id": {
               "type": "string",
-              "enum": ["eip155:84532"]
+              "enum": ["eip155:84532", "eip155:8453"]
             },
             "contracts": {
               "type": "array",
@@ -10071,7 +10108,7 @@ Success response schema:
             },
             "chain_id": {
               "type": "string",
-              "enum": ["eip155:84532"]
+              "enum": ["eip155:84532", "eip155:8453"]
             },
             "contracts": {
               "type": "array",
@@ -10622,7 +10659,7 @@ Success response schema:
             },
             "chain_id": {
               "type": "string",
-              "enum": ["eip155:84532"]
+              "enum": ["eip155:84532", "eip155:8453"]
             },
             "contracts": {
               "type": "array",
@@ -11117,7 +11154,7 @@ Request body (application/json):
         },
         "chain_id": {
           "type": "string",
-          "enum": ["eip155:84532"]
+          "enum": ["eip155:84532", "eip155:8453"]
         },
         "contracts": {
           "type": "array",
@@ -11611,7 +11648,7 @@ Success response schema:
         },
         "chain_id": {
           "type": "string",
-          "enum": ["eip155:84532"]
+          "enum": ["eip155:84532", "eip155:8453"]
         },
         "contracts": {
           "type": "array",
@@ -12119,7 +12156,7 @@ Success response schema:
         },
         "chain_id": {
           "type": "string",
-          "enum": ["eip155:84532"]
+          "enum": ["eip155:84532", "eip155:8453"]
         },
         "contracts": {
           "type": "array",
@@ -12645,7 +12682,7 @@ Success response schema:
         },
         "chain_id": {
           "type": "string",
-          "enum": ["eip155:84532"]
+          "enum": ["eip155:84532", "eip155:8453"]
         },
         "contracts": {
           "type": "array",
@@ -13129,7 +13166,7 @@ Request body (application/json):
         },
         "chain_id": {
           "type": "string",
-          "enum": ["eip155:84532"]
+          "enum": ["eip155:84532", "eip155:8453"]
         },
         "contracts": {
           "type": "array",
@@ -13624,7 +13661,7 @@ Success response schema:
         },
         "chain_id": {
           "type": "string",
-          "enum": ["eip155:84532"]
+          "enum": ["eip155:84532", "eip155:8453"]
         },
         "contracts": {
           "type": "array",

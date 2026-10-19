@@ -66,7 +66,10 @@ export function safeOpPayloadV07(
   )
     throw new WalletProviderError('wallet_provider_input');
   return {
-    domain: { chainId: '84532', verifyingContract: operationAddress(module) },
+    domain: {
+      chainId: BigInt(selected.chainId).toString(),
+      verifyingContract: operationAddress(module),
+    },
     primaryType: 'SafeOp',
     types: structuredClone(safeOpTypes),
     message: {
@@ -117,8 +120,12 @@ export function safeOpActionV07(
     profile: 'evm_eoa_v1',
     profile_revision: '1',
     status: 'ready',
-    chain_id: 'eip155:84532',
-    chain_account_id: 'eip155:84532:' + operationAddress(signer.address),
+    chain_id: 'eip155:' + payload.domain.chainId,
+    chain_account_id:
+      'eip155:' +
+      payload.domain.chainId +
+      ':' +
+      operationAddress(signer.address),
     binding_revision: '1',
     capability_revision: '1',
     plan_revision: '1',

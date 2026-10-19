@@ -1,3 +1,4 @@
+import { providerNetwork, type ProviderNetwork } from '../networks.js';
 import { lstatSync } from 'node:fs';
 import { isAbsolute } from 'node:path';
 import {
@@ -15,10 +16,11 @@ import {
 } from '../domain/signing.js';
 import { owsCommand } from './ows-process.js';
 import type { WalletInfo } from '@open-wallet-standard/core';
-import { baseSepoliaPayload } from './evm-typed-data.js';
+import { evmTypedDataPayload } from './evm-typed-data.js';
 import { createJournaledWalletProvider } from './journaled.js';
 
 export interface OwsProviderOptions {
+  network?: ProviderNetwork;
   /** Dedicated, existing, operator-owned vault; never the ambient ~/.ows vault. */
   vaultPath: string;
   /** Owner credential from the host secret store. Never from an HTTP caller. */
@@ -33,6 +35,7 @@ export function createOwsWalletProvider(
   options: OwsProviderOptions,
   attempts: JournaledProviderOptions,
 ): WalletSigningProvider {
+  const selected = providerNetwork(options.network);
   const vaultPath = options.vaultPath;
   const passphrase = options.passphrase;
   function checkVault(): void {
@@ -129,7 +132,11 @@ export function createOwsWalletProvider(
     async signTypedData(account, action) {
       const boundAccount = structuredClone(account);
       const boundAction = structuredClone(action);
-      const canonical = baseSepoliaPayload(boundAccount, boundAction);
+      const canonical = evmTypedDataPayload(
+        boundAccount,
+        boundAction,
+        selected.name,
+      );
       const secret = await credential();
       const stored = await lookup(boundAccount.accountId);
       if (
@@ -138,7 +145,7 @@ export function createOwsWalletProvider(
           boundAccount.address.toLowerCase()
       )
         throw new WalletProviderError('wallet_provider_input');
-      baseSepoliaPayload(boundAccount, boundAction); // Recheck expiry after secret-store work.
+      evmTypedDataPayload(boundAccount, boundAction, selected.name); // Recheck expiry after secret-store work.
       const { EIP712Domain: _domain, ...types } = boundAction.payload.types;
       // OWS 1.4.3 accepts full-width integer hex; its decimal parser is limited to u128.
       // Fixed-width encoding also avoids its rejection of odd-length hex chain IDs.
@@ -158,7 +165,7 @@ export function createOwsWalletProvider(
         ...canonical,
         domain: {
           ...(canonical.domain as object),
-          chainId: toBeHex(84532, 32),
+          chainId: toBeHex(selected.chainId, 32),
         },
         message,
       };
@@ -166,6 +173,7 @@ export function createOwsWalletProvider(
       try {
         const result = (await owsCommand({
           command: 'sign',
+          chainId: selected.caip,
           walletId: stored.walletId,
           payload: JSON.stringify(payload),
           secret,

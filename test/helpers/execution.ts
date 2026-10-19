@@ -1,3 +1,4 @@
+import { providerNetwork, type ProviderNetwork } from '../../src/networks.js';
 import { randomUUID } from 'node:crypto';
 import {
   Interface,
@@ -28,11 +29,14 @@ export function executionFixture(
   token = Wallet.createRandom().address,
   name = 'Test Token',
   version = '1',
+  network?: ProviderNetwork,
 ) {
+  const selected = providerNetwork(network);
   const sponsor = Wallet.createRandom();
   const configuration: ExecutionConfiguration & {
     relayer: NonNullable<ExecutionConfiguration['relayer']>;
   } = {
+    ...(network ? { network } : {}),
     profile: 'erc3009-relayer-v1',
     relayer: {
       url: 'https://execution.example.test',
@@ -70,7 +74,12 @@ export function executionFixture(
   const transactionId = randomUUID();
   const transactionHash = '0x' + '2'.repeat(64);
   const blockHash = '0x' + '3'.repeat(64);
-  const domain = { name, version, chainId: '84532', verifyingContract: token };
+  const domain = {
+    name,
+    version,
+    chainId: selected.chainId,
+    verifyingContract: token,
+  };
   const state = {
     included: false,
     finality: 'included' as 'included' | 'safe' | 'finalized',
@@ -145,19 +154,19 @@ export function executionFixture(
           id: 'sponsor-relayer',
           signer_id: 'sponsor-signer',
           address: sponsor.address,
-          network: 'base-sepolia',
+          network: selected.name,
           network_type: 'evm',
           paused: false,
           system_disabled: false,
           policies: { gas_limit_estimation: false, gas_price_cap: 3000000000 },
         };
-      else if (url.pathname === '/api/v1/networks/evm%3Abase-sepolia')
+      else if (url.pathname === '/api/v1/networks/evm%3A' + selected.name)
         result = {
-          id: 'evm:base-sepolia',
-          name: 'base-sepolia',
+          id: 'evm:' + selected.name,
+          name: selected.name,
           network_type: 'evm',
-          chain_id: 84532,
-          is_testnet: true,
+          chain_id: Number(selected.chainId),
+          is_testnet: selected.testnet,
         };
       else if (
         url.pathname === '/api/v1/relayers/sponsor-relayer/transactions' &&
@@ -195,7 +204,7 @@ export function executionFixture(
     const latest = state.included ? 110 : 100;
     switch (body.method) {
       case 'eth_chainId':
-        result = toQuantity(84532);
+        result = selected.hex;
         break;
       case 'eth_getBlockByNumber': {
         const tag = body.params[0];
@@ -263,7 +272,7 @@ export function executionFixture(
           state.included && body.params[0] === transactionHash
             ? {
                 hash: transactionHash,
-                chainId: toQuantity(84532),
+                chainId: selected.hex,
                 type: '0x2',
                 nonce: '0x0',
                 from: sponsor.address,
@@ -340,8 +349,8 @@ export function executionFixture(
       profile: 'evm_eoa_v1',
       profile_revision: '1',
       status: 'ready',
-      chain_id: 'eip155:84532',
-      chain_account_id: `eip155:84532:${owner.address}`,
+      chain_id: selected.caip,
+      chain_account_id: `${selected.caip}:${owner.address}`,
       binding_revision: '1',
       capability_revision: '1',
       plan_revision: '1',

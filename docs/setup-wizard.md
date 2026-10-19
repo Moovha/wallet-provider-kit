@@ -9,7 +9,7 @@ you define here.
 Start from [getting started](README.md#open-the-wizard) to install and open the
 wizard. Keep its terminal running and use the complete private session link.
 FormKit is bundled and needs no Pro subscription. The service is experimental,
-single-host and Base Sepolia only; production custody acceptance remains pending.
+single-host, with selectable Base mainnet or Base Sepolia; production custody acceptance remains pending.
 
 ## Complete the six steps
 

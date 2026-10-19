@@ -54,8 +54,8 @@ function removeSigner(index: number) {
       The recommended OWS option includes a local engine and private wallet
       vault. CDP optionally connects to a managed Coinbase project. Relayer
       connects to a separate signing service you already operate. All three
-      profiles are experimental and support Base Sepolia test-network accounts
-      only.
+      profiles are experimental and support Base mainnet or Base Sepolia
+      accounts only.
     </p>
     <p>
       Credential fields below contain variable names: labels that tell the

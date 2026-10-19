@@ -16,7 +16,7 @@ mode or execution-provider identity.
 ## Operation profiles and outcome meaning
 
 The configured relayer profile uses pre-existing Safe 1.4.1 accounts with one EOA
-owner, threshold one and no enabled modules on Base Sepolia. The advanced
+owner, threshold one and no enabled modules on the configured Base network. The advanced
 [ERC-4337 driver](user-operation-execution.md) uses a separately accepted module
 profile. Both consume the common call intent and optional policy adapters.
 An EOA's existing ERC-3009 authorization is a separate compatibility mechanism;
@@ -153,7 +153,7 @@ when a runtime publication changes it. Automatic contract acceptance cannot
 publish these terms.
 
 The allowance identity is the existing ERC-3009 identity: provider origin,
-logical account ID and token address on the supported Base Sepolia profile.
+logical account ID and token address within one network-bound deployment.
 Applications, signer namespaces and relayer/ERC-4337 mechanisms share that
 allowance. Existing reserved usage is retained. Selected-adapter activation never raises
 an existing ceiling. When a matching ERC-3009 policy is configured, its lifetime

@@ -66,7 +66,7 @@ and current owner consent.
 
 ### Verified lookup and ABI fallback
 
-Verified lookup sends the public Base Sepolia address directly from your browser
+Verified lookup sends the public address and selected Base network directly from your browser
 to [Sourcify's contract lookup API](https://docs.sourcify.dev/blog/apiv2-lookup-endpoints/).
 It sends no provider token, cookies or referrer and follows no redirects. The
 provider's browser policy permits that fixed verification origin for this feature.

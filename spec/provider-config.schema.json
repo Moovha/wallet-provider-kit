@@ -2139,6 +2139,11 @@
           "$ref": "#/$defs/secret"
         }
       }
+    },
+    "network": {
+      "type": "string",
+      "enum": ["base", "base-sepolia"],
+      "description": "Server-selected network. Omission preserves Base Sepolia. Use separate storage for each network."
     }
   },
   "$defs": {

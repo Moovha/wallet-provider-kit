@@ -1,8 +1,10 @@
+import { providerNetwork, type ProviderNetwork } from '../networks.js';
 import type { WalletCallsStatus } from './types.js';
 export type { WalletCallsStatus, WalletCallsReceipt } from './types.js';
 
 /** Host-authorized transport. Never place an OAuth client secret in a browser. */
 export interface WalletCallsClientOptions {
+  network?: ProviderNetwork;
   url: string;
   authorization: () => Promise<string>;
   fetch?: typeof fetch;
@@ -19,6 +21,7 @@ export class WalletCallsRpcError extends Error {
 }
 /** EIP-1193-shaped request interface for EIP-5792, bound to one provider account endpoint. */
 export function createWalletCallsProvider(options: WalletCallsClientOptions) {
+  const network = providerNetwork(options.network);
   const url = new URL(options.url);
   if (
     url.protocol !== 'https:' ||
@@ -127,7 +130,7 @@ export function createWalletCallsProvider(options: WalletCallsClientOptions) {
         status.version !== '2.0.0' ||
         typeof status.id !== 'string' ||
         status.id !== (input.params as unknown[])?.[0] ||
-        status.chainId !== '0x14a34' ||
+        status.chainId !== network.hex ||
         status.atomic !== true ||
         ![100, 200, 400, 500].includes(status.status ?? 0) ||
         (status.status === 200 &&

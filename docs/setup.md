@@ -16,7 +16,7 @@ configuration, deployment and HTTP API consumption; they do not require a Node.j
 host application, authority callbacks, database adapters or journal implementations.
 Custom adapters and embedded library composition are advanced integrations.
 
-The service remains experimental and test-network-only. Configuration selects an
+The service remains experimental; Base mainnet configuration does not establish funded acceptance. Configuration selects an
 implemented profile; it does not establish production custody or vendor acceptance.
 
 ## Initialize and validate
@@ -190,7 +190,7 @@ record your evidence references explicitly:
 
 These references are operator attestations, not an automated certification. For
 the financial profile below, also provide `tokenAcceptance` after verifying the
-configured token contract/domain and authorization behavior on the test network.
+configured token contract/domain and authorization behavior on the selected network.
 Secrets alone never activate the service. Start it with:
 
 ```sh
@@ -243,7 +243,7 @@ content. Provider-hosted login and review are covered in the optional
 
 The optional `provider-authorized-erc3009-v1` profile builds an exact
 [ERC-3009 TransferWithAuthorization](https://eips.ethereum.org/EIPS/eip-3009) EIP-712
-message on **Base Sepolia, chain 84532**. Clients supply only account, recipient and
+message on the configured **Base mainnet (8453) or Base Sepolia (84532)** network. Clients supply only account, recipient and
 integer atomic-unit amount. They cannot supply a digest, nonce, domain, arbitrary
 typed data, expiry or authority record. The server fixes these from configuration
 and generates a cryptographically random nonce.

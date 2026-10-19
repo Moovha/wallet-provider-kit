@@ -42,6 +42,7 @@ import {
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { AuthenticationError, type Authenticate } from '../service/auth.js';
+import { providerNetwork, type ProviderNetwork } from '../networks.js';
 import { problemSchema, uuidSchema } from '../service/schemas.js';
 import {
   accessType,
@@ -69,6 +70,7 @@ callTermsSchema.properties.policy.required =
   );
 
 export interface OnboardingHttpOptions {
+  network?: ProviderNetwork;
   service: OnboardingService;
   login?: OwnerLogin;
   /** Provider IdP subjects allowed to review; applications cannot grant themselves staff access. */
@@ -226,6 +228,11 @@ export async function registerOnboardingRoutes(
   const unavailable = () => {
     throw Object.assign(new Error('Unavailable'), { statusCode: 503 });
   };
+  const network = providerNetwork(
+    options?.network ?? options?.actions?.network.name,
+  );
+  if (options?.actions && options.actions.network.name !== network.name)
+    throw new WalletProviderError('wallet_provider_configuration');
   const service = () => options?.service ?? unavailable();
   async function context(request: FastifyRequest, scope: string) {
     if (!authenticate || !options || !(await ready())) return unavailable();
@@ -293,7 +300,7 @@ export async function registerOnboardingRoutes(
     return {
       ...base,
       description:
-        'Fixed Base Sepolia ERC-3009 transfer authorization. Explicit transfer delegation, current owner-bound access, identity and provider policy authorization are required. No per-transfer owner prompt. No broadcast or settlement.',
+        'ERC-3009 transfer authorization on the configured network. Explicit transfer delegation, current owner-bound access, identity and provider policy authorization are required. No per-transfer owner prompt. No broadcast or settlement.',
       response: { ...base.response, 200: transferReceiptSchema },
     };
   };
@@ -518,7 +525,7 @@ export async function registerOnboardingRoutes(
           implemented: true,
           configured: options?.execution?.profile === profile,
           ready: options?.execution?.profile === profile && readyValue,
-          chain_id: 'eip155:84532',
+          chain_id: network.caip,
           account_type:
             profile === 'approved-evm-executor-v1'
               ? 'eoa-or-safe-1.4.1'
@@ -809,6 +816,10 @@ export async function registerOnboardingRoutes(
               'provider_review_required',
             ],
             properties: {
+              chain_id: {
+                type: 'string',
+                enum: ['eip155:8453', 'eip155:84532'],
+              },
               source: {
                 type: 'string',
                 enum: [
@@ -850,6 +861,7 @@ export async function registerOnboardingRoutes(
       const transfer = options?.actions?.consentTerms();
       return {
         ...terms,
+        chain_id: network.caip,
         ...(calls ? { contract_call_terms: calls } : {}),
         ...(transfer ? { transfer_terms: transfer } : {}),
       };
@@ -1452,14 +1464,14 @@ ${
 <ul>${view.permissions.map((p) => `<li>${escape(permissionLabels[p])}</li>`).join('')}</ul>
 ${
   view.permissions.includes('contracts:request')
-    ? `<p>Wallet-call delegation on Base Sepolia: you permit exact calls within the accepted policy, including explicitly allowed native recipients and any selected optional operation adapters. Limits and account bindings: <code>${escape(JSON.stringify(actions().callConsentTerms()))}</code>. Contract-call signatures remain private to coordinated execution. Safe signatures have no native expiry; revocation stops new service dispatch but cannot recall an already submitted authorization.</p>`
+    ? `<p>Wallet-call delegation on ${escape(actions().network.label)}: you permit exact calls within the accepted policy, including explicitly allowed native recipients and any selected optional operation adapters. Limits and account bindings: <code>${escape(JSON.stringify(actions().callConsentTerms()))}</code>. Contract-call signatures remain private to coordinated execution. Safe signatures have no native expiry; revocation stops new service dispatch but cannot recall an already submitted authorization.</p>`
     : ''
 }
 ${
   view.permissions.includes('transfers:request')
     ? (() => {
         const terms = actions().consentTerms() ?? deny();
-        return `<p>Transfer delegation: ${escape(terms.token.symbol)} on Base Sepolia. Token contract: <code>${escape(terms.token.address)}</code>. Domain: ${escape(terms.token.name)} / ${escape(terms.token.version)}. Maximum per transfer: ${escape(formatUnits(terms.maximumAmount, terms.token.decimals))} ${escape(terms.token.symbol)}. Lifetime limit per account/token across applications: ${escape(formatUnits(terms.lifetimeAmount, terms.token.decimals))} ${escape(terms.token.symbol)}. Allowed recipients: ${terms.recipients.map((a) => `<code>${escape(a)}</code>`).join(', ')}. Each signature is valid for up to ${escape(terms.maxValiditySeconds)} seconds. The provider checks each request against these terms without another approval prompt. Revoking access stops new signing; signatures already issued may remain usable until expiry.</p>`;
+        return `<p>Transfer delegation: ${escape(terms.token.symbol)} on ${escape(actions().network.label)}. Token contract: <code>${escape(terms.token.address)}</code>. Domain: ${escape(terms.token.name)} / ${escape(terms.token.version)}. Maximum per transfer: ${escape(formatUnits(terms.maximumAmount, terms.token.decimals))} ${escape(terms.token.symbol)}. Lifetime limit per account/token across applications: ${escape(formatUnits(terms.lifetimeAmount, terms.token.decimals))} ${escape(terms.token.symbol)}. Allowed recipients: ${terms.recipients.map((a) => `<code>${escape(a)}</code>`).join(', ')}. Each signature is valid for up to ${escape(terms.maxValiditySeconds)} seconds. The provider checks each request against these terms without another approval prompt. Revoking access stops new signing; signatures already issued may remain usable until expiry.</p>`;
       })()
     : ''
 }

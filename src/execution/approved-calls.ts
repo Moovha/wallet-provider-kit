@@ -1,3 +1,4 @@
+import { providerNetwork, type ProviderNetwork } from '../networks.js';
 import {
   compileOperationAdapter,
   matchOperationAdapter,
@@ -380,6 +381,7 @@ export function buildApprovedCallIntent(
 }
 export function approvedCallPayload(
   intent: ApprovedCallIntent,
+  network?: ProviderNetwork,
 ): TypedDataAction['payload'] {
   const packed = concat(
     intent.calls.map((call) =>
@@ -391,7 +393,10 @@ export function approvedCallPayload(
   );
   const single = intent.calls.length === 1 ? intent.calls[0] : undefined;
   return {
-    domain: { chainId: '84532', verifyingContract: intent.account.address },
+    domain: {
+      chainId: providerNetwork(network).chainId,
+      verifyingContract: intent.account.address,
+    },
     primaryType: 'SafeTx',
     types: safeTypes,
     message: {
@@ -418,8 +423,9 @@ export function buildApprovedCallAction(
   owner: string,
   expiresAt: string,
   id: string,
+  network?: ProviderNetwork,
 ): TypedDataAction {
-  const payload = approvedCallPayload(intent);
+  const payload = approvedCallPayload(intent, network);
   const digest = TypedDataEncoder.hash(
     payload.domain,
     payload.types,
@@ -432,8 +438,8 @@ export function buildApprovedCallAction(
     profile: 'evm_eoa_v1',
     profile_revision: '1',
     status: 'ready',
-    chain_id: 'eip155:84532',
-    chain_account_id: 'eip155:84532:' + owner,
+    chain_id: providerNetwork(network).caip,
+    chain_account_id: providerNetwork(network).caip + ':' + owner,
     binding_revision: '1',
     capability_revision: '1',
     plan_revision: '1',
@@ -468,6 +474,7 @@ export function validateApprovedCallAction(
   policy: ApprovedCallPolicy,
   intent: ApprovedCallIntent,
   action: TypedDataAction,
+  network?: ProviderNetwork,
 ): void {
   const expected = buildApprovedCallIntent(
     policy,
@@ -475,7 +482,7 @@ export function validateApprovedCallAction(
     intent.nonce,
     action.expires_at,
   );
-  const payload = approvedCallPayload(expected),
+  const payload = approvedCallPayload(expected, network),
     digest = TypedDataEncoder.hash(
       payload.domain,
       payload.types,

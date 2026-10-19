@@ -1,3 +1,4 @@
+import type { ProviderNetwork } from '../networks.js';
 import {
   localExecutionOrigin,
   localSponsorIds,
@@ -36,6 +37,7 @@ export interface SecretReference {
   env: string;
 }
 export interface ProviderConfiguration {
+  network?: ProviderNetwork;
   runtimeConfiguration?: RuntimeConfigurationOptions;
   localExecution?: LocalExecutionConfiguration;
   configVersion: 1;

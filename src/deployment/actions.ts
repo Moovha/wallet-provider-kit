@@ -1,4 +1,9 @@
 import {
+  providerNetwork,
+  type ProviderNetwork,
+  type ProviderChainId,
+} from '../networks.js';
+import {
   adapterAllowanceCharges,
   prepareAdapterAllowances,
 } from './adapter-allowances.js';
@@ -57,7 +62,7 @@ export interface TransferInput {
 }
 export interface TransactionEventInput {
   event: 'submitted' | 'confirmed' | 'failed';
-  chain_id: 'eip155:84532';
+  chain_id: ProviderChainId;
   transaction_hash: string;
   observed_at: string;
 }
@@ -108,6 +113,7 @@ function sameCaller(
 /** Construct exact policy-approved transfers and contract actions under explicit owner delegation. HTTP never supplies signing payloads or authority records. */
 export class SupportedActions {
   readonly revision: string;
+  readonly network: ReturnType<typeof providerNetwork>;
   private readonly transferPolicy?: TransferPolicy;
   private readonly callConfiguration?: import('../execution/approved-calls.js').ApprovedCallsConfiguration;
   private get policy(): TransferPolicy {
@@ -119,7 +125,9 @@ export class SupportedActions {
     policy: TransferPolicy | undefined,
     revision?: string,
     callConfiguration?: import('../execution/approved-calls.js').ApprovedCallsConfiguration,
+    network?: ProviderNetwork,
   ) {
+    this.network = providerNetwork(network);
     this.transferPolicy = policy ? structuredClone(policy) : undefined;
     this.callConfiguration = callConfiguration
       ? structuredClone(callConfiguration)
@@ -130,6 +138,7 @@ export class SupportedActions {
         onboarding.policy.revision,
         policy ?? null,
         callConfiguration ?? null,
+        ...(this.network.testnet ? [] : [this.network.name]),
       ]);
   }
   /** Public terms shown when the owner delegates transfers during onboarding. */
@@ -139,6 +148,7 @@ export class SupportedActions {
       : undefined;
   }
   callConsentTerms(snapshot?: RuntimePolicySnapshot) {
+    if (snapshot && snapshot.policy.chain_id !== this.network.caip) deny();
     if (
       !this.callConfiguration ||
       (this.onboarding.runtimeContracts && !snapshot)
@@ -164,6 +174,7 @@ export class SupportedActions {
           currentRuntimePolicy(state, principal),
         )
       : undefined;
+    if (snapshot && snapshot.policy.chain_id !== this.network.caip) deny();
     return {
       snapshot,
       policy: snapshot
@@ -229,13 +240,19 @@ export class SupportedActions {
                 1000 ||
           units !== '1' ||
           action.operation_id !== action.action_id ||
-          action.chain_id !== 'eip155:84532' ||
-          action.chain_account_id !== 'eip155:84532:' + account.address ||
+          action.chain_id !== this.network.caip ||
+          action.chain_account_id !==
+            this.network.caip + ':' + account.address ||
           action.profile !== 'evm_eoa_v1' ||
           action.status !== 'ready'
         )
           deny();
-        validateApprovedCallAction(policy ?? deny(), record.intent, action);
+        validateApprovedCallAction(
+          policy ?? deny(),
+          record.intent,
+          action,
+          this.network.name,
+        );
         if (
           fingerprint(record.approval.additionalBudgets ?? []) !==
           fingerprint(this.adapterCharges(record.intent))
@@ -248,7 +265,7 @@ export class SupportedActions {
       const expectedDomain = {
         name: this.policy.token.name,
         version: this.policy.token.version,
-        chainId: '84532',
+        chainId: this.network.chainId,
         verifyingContract: this.policy.token.address,
       };
       if (
@@ -393,7 +410,7 @@ export class SupportedActions {
       const domain = {
         name: this.policy.token.name,
         version: this.policy.token.version,
-        chainId: '84532',
+        chainId: this.network.chainId,
         verifyingContract: this.policy.token.address,
       };
       const message = {
@@ -418,8 +435,8 @@ export class SupportedActions {
         profile: 'evm_eoa_v1',
         profile_revision: '1',
         status: 'ready',
-        chain_id: 'eip155:84532',
-        chain_account_id: `eip155:84532:${account.address}`,
+        chain_id: this.network.caip,
+        chain_account_id: `${this.network.caip}:${account.address}`,
         binding_revision: '1',
         capability_revision: '1',
         plan_revision: '1',
@@ -564,6 +581,7 @@ export class SupportedActions {
         account.address!,
         expiresAt,
         randomUUID(),
+        this.network.name,
       ),
     };
   }
@@ -716,6 +734,7 @@ export class SupportedActions {
         account.address!,
         expiresAt,
         id,
+        this.network.name,
       );
       const created: TransferRecord = {
         intent,
@@ -896,7 +915,7 @@ export class SupportedActions {
       Object.keys(input).sort().join(',') !==
         'chain_id,event,observed_at,transaction_hash' ||
       !['submitted', 'confirmed', 'failed'].includes(input.event) ||
-      input.chain_id !== 'eip155:84532' ||
+      input.chain_id !== this.network.caip ||
       !/^0x[0-9a-f]{64}$/.test(input.transaction_hash) ||
       typeof input.observed_at !== 'string' ||
       !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/.test(

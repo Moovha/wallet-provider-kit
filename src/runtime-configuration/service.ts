@@ -1,3 +1,8 @@
+import {
+  providerNetwork,
+  type ProviderNetwork,
+  type ProviderChainId,
+} from '../networks.js';
 import { randomUUID } from 'node:crypto';
 import { Ajv } from 'ajv';
 import { FunctionFragment, ZeroAddress, getAddress, id } from 'ethers';
@@ -35,7 +40,7 @@ export interface RuntimePolicy {
   }[];
   call_adapters?: import('../execution/operation-adapters.js').OperationAdapters;
   enabled: boolean;
-  chain_id: 'eip155:84532';
+  chain_id: ProviderChainId;
   contracts: {
     address: string;
     code_hash: string;
@@ -272,6 +277,7 @@ export class RuntimeConfigurationService {
     options: RuntimeConfigurationOptions,
     private readonly deploymentRevision: string,
     private readonly transportRevision?: string,
+    private readonly network?: ProviderNetwork,
   ) {
     if (!text(deploymentRevision))
       throw new WalletProviderError('wallet_provider_configuration');
@@ -413,6 +419,8 @@ export class RuntimeConfigurationService {
       applicationId,
     );
     const change = normalizeRuntimePolicy(input);
+    if (change.policy.chain_id !== providerNetwork(this.network).caip)
+      invalid();
     const hash = serviceHash(change);
     return this.transaction((registry, state) => {
       const previous = this.receipt(registry, key, hash);
@@ -492,6 +500,7 @@ export class RuntimeConfigurationService {
       if (own && applicationId !== own) deny();
     }
     return this.transaction((registry) => ({
+      network: providerNetwork(this.network).name,
       role: provider ? ('provider' as const) : ('application' as const),
       applications: this.onboardingPolicy.applications
         .filter((app) => app.enabled !== false)
@@ -722,8 +731,10 @@ export class RuntimeConfigurationService {
       'update',
       applicationId,
     );
-    const change = normalizeRuntimePolicy(input),
-      hash = serviceHash(change);
+    const change = normalizeRuntimePolicy(input);
+    if (change.policy.chain_id !== providerNetwork(this.network).caip)
+      invalid();
+    const hash = serviceHash(change);
     return this.transaction((registry, state) => {
       const previous = this.receipt(registry, key, hash);
       if (previous) return previous as RuntimePolicyRevision;

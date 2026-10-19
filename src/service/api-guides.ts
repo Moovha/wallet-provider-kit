@@ -299,7 +299,7 @@ export const operationGuides: Record<string, OperationGuide> = {
     prerequisite:
       'Public discovery. Read the exact profile ID and revision before requesting execution. Implemented, configured and ready are distinct; none establishes provider certification or production custody acceptance.',
     success:
-      '200: implemented transfer and approved EVM execution profiles on Base Sepolia, their revisions, required scopes and finalized RPC-quorum verification policy. Unsupported wallet/account standards are not advertised as executable capabilities.',
+      '200: implemented transfer and approved EVM execution profiles on the configured Base network, their revisions, required scopes and finalized RPC-quorum verification policy. Unsupported wallet/account standards are not advertised as executable capabilities.',
   },
   reconcileExecution: {
     title: 'Reconcile an existing execution without provider mutations',
@@ -351,7 +351,7 @@ export const operationGuides: Record<string, OperationGuide> = {
     scope: 'wallet:events',
     approvedAction: true,
     prerequisite:
-      'Use an existing authorized action_id for the same application, caller, owner and current delegation for the action. Report submitted, confirmed or failed with the Base Sepolia transaction hash and observation time. Keep the original idempotency key for retries. Reports may arrive after signing authorization expires; current access and policy must still pass.',
+      'Use an existing authorized action_id for the same application, caller, owner and current delegation for the action. Report submitted, confirmed or failed with the configured network’s transaction hash and observation time. Keep the original idempotency key for retries. Reports may arrive after signing authorization expires; current access and policy must still pass.',
     success:
       '200: a durable application report marked unverified. Recording a report does not broadcast, verify a receipt, establish settlement, reconcile a signing attempt or release a budget reservation. At most 32 reports are retained per action; reports can arrive out of order and do not form an authoritative transaction status.',
   },

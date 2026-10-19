@@ -1043,7 +1043,7 @@ test('optional execution sponsor settings survive wizard import, edits and expor
     .getByLabel('Execution Relayer HTTPS origin', { exact: true })
     .fill('https://sponsor.example.test');
   await page
-    .getByLabel('Accepted Base Sepolia genesis hash', { exact: true })
+    .getByLabel('Accepted network genesis hash', { exact: true })
     .fill('0x' + '1'.repeat(64));
   await page
     .getByLabel('Accepted token runtime code hash', { exact: true })
@@ -1880,4 +1880,18 @@ test('ERC-3009 prefill requires an explicit cumulative opt-in and invalid gas de
     saved.approvedCalls.policy.adapters.tokenTransfers[0],
   ).not.toHaveProperty('lifetimeAmount');
   expect(saved.financial).toEqual(config.financial);
+});
+
+test('network selection defaults new drafts to Base and preserves omitted Sepolia imports', async ({
+  page,
+}) => {
+  const selector = page.getByLabel('Blockchain network', { exact: true });
+  await expect(selector).toHaveValue('base');
+  await imported(page);
+  await step(page, 'Provider');
+  await expect(selector).toHaveValue('base-sepolia');
+  expect(await exported(page)).not.toHaveProperty('network');
+  await step(page, 'Provider');
+  await selector.selectOption('base');
+  expect((await exported(page)).network).toBe('base');
 });

@@ -23,7 +23,7 @@ base units in API requests. Vault shares and the assets they represent are
 different tokens with different units; a share balance must not be presented as
 the same amount of its underlying asset.
 
-The experimental Base Sepolia profiles support ERC-3009 transfer authorizations
+The experimental Base mainnet and Base Sepolia profiles support ERC-3009 transfer authorizations
 and generic Safe call batches, including explicitly permitted native transfers.
 Optional policy adapters add supported token-transfer, swap and vault checks. The optional coordinator uses a configured
 application sponsor and verifies the evidence required for each operation.

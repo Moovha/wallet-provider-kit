@@ -306,3 +306,23 @@ it('persists managed sponsor keys before publishing their resolved configuration
   expect(run.status().plan!.config).toEqual(saved);
   expect(JSON.stringify(run.status())).not.toContain(wallet.privateKey);
 });
+
+it('renders mainnet Relayer identity without testnet metadata or financial activation', async () => {
+  const config = await configuration();
+  config.network = 'base';
+  const prepared = prepareLocalExecution(
+    config,
+    generateDeploymentSecrets(config, {}),
+  );
+  expect(prepared.relayer.networks[0]).toMatchObject({
+    network: 'base',
+    chain_id: 8453,
+    is_testnet: false,
+    tags: ['mainnet'],
+  });
+  expect(prepared.relayer.networks[0].rpc_urls).toEqual([
+    'https://mainnet.base.org',
+    'https://base.drpc.org',
+  ]);
+  expect(prepared.relayer.relayers).toEqual([]);
+});

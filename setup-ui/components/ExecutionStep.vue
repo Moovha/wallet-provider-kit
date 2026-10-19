@@ -375,11 +375,10 @@ function toggleReplacement(value: unknown) {
         </button>
       </section>
       <p class="callout">
-        Base Sepolia EOA transfers and explicitly approved Safe calls. Bundled
-        setup creates encrypted gas-sponsor keys separately from OWS
-        owner-wallet signers. With existing services, supply their sponsor
-        bindings. Fund gas accounts and complete execution acceptance before
-        activation.
+        Base EOA transfers and explicitly approved Safe calls. Bundled setup
+        creates encrypted gas-sponsor keys separately from OWS owner-wallet
+        signers. With existing services, supply their sponsor bindings. Fund gas
+        accounts and complete execution acceptance before activation.
       </p>
       <div
         v-if="model.execution.relayer && !model.execution.local"
@@ -414,7 +413,7 @@ function toggleReplacement(value: unknown) {
           guide="executionRpc"
           v-model="model.execution.rpc.genesisHash"
           type="text"
-          label="Accepted Base Sepolia genesis hash"
+          label="Accepted network genesis hash"
           validation="required"
         />
         <SetupField

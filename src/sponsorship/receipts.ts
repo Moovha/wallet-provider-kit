@@ -146,7 +146,7 @@ export class UserOperationReceiptObserver {
       address(receipt.to) !== entry ||
       address(tx.to) !== entry ||
       address(receipt.from) !== address(tx.from) ||
-      quantity(tx.chainId) !== 84532n ||
+      quantity(tx.chainId) !== BigInt(this.acceptance.domain.chainId) ||
       quantity(tx.value) !== 0n ||
       quantity(receipt.status) !== 1n
     )

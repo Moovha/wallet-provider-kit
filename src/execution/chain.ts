@@ -1,3 +1,4 @@
+import { providerNetwork, type ProviderNetwork } from '../networks.js';
 import { verifyAdapterEffects } from './adapter-effects.js';
 import { adapterInput } from './operation-adapters.js';
 import { serviceHash } from '../executor/auth.js';
@@ -200,7 +201,9 @@ export class QuorumExecutionObserver implements ExecutionObserver {
     private readonly genesisHash: string,
     private readonly maxLogRange: number,
     request: typeof fetch = fetch,
+    private readonly network?: ProviderNetwork,
   ) {
+    providerNetwork(network);
     try {
       if (
         endpoints.length < 2 ||
@@ -221,13 +224,23 @@ export class QuorumExecutionObserver implements ExecutionObserver {
     }
   }
 
+  private validatePlanNetwork(plan: TransferExecutionPlan): void {
+    const network = providerNetwork(this.network);
+    if (
+      plan.action.chain_id !== network.caip ||
+      plan.action.payload.domain.chainId !== network.chainId ||
+      !plan.action.chain_account_id.startsWith(network.caip + ':')
+    )
+      unavailable();
+  }
+
   private async identity(reader: RpcReader): Promise<void> {
     const [chain, genesis] = await Promise.all([
       reader.call('eth_chainId', []),
       reader.call('eth_getBlockByNumber', ['0x0', false]),
     ]);
     if (
-      quantity(chain) !== 84532n ||
+      quantity(chain) !== BigInt(providerNetwork(this.network).chainId) ||
       hash(checked(genesis).hash) !== this.genesisHash.toLowerCase() ||
       quantity(checked(genesis).number) !== 0n
     )
@@ -253,6 +266,7 @@ export class QuorumExecutionObserver implements ExecutionObserver {
     }
   }
   private async preflightRead(plan: TransferExecutionPlan): Promise<void> {
+    this.validatePlanNetwork(plan);
     if (plan.intent) return this.preflightCalls(plan);
     const token = String(plan.action.payload.domain.verifyingContract);
     const owner = String(plan.action.payload.message.from);
@@ -568,7 +582,8 @@ export class QuorumExecutionObserver implements ExecutionObserver {
       address(transaction.to) !== intent.account.address.toLowerCase() ||
       address(receipt.to) !== intent.account.address.toLowerCase() ||
       quantity(transaction.value) !== 0n ||
-      quantity(transaction.chainId) !== 84532n ||
+      quantity(transaction.chainId) !==
+        BigInt(providerNetwork(this.network).chainId) ||
       String(transaction.input).toLowerCase() !== plan.data
     )
       return null;
@@ -801,7 +816,8 @@ export class QuorumExecutionObserver implements ExecutionObserver {
       address(transaction.to) !== token ||
       address(receipt.to) !== token ||
       quantity(transaction.value) !== 0n ||
-      quantity(transaction.chainId) !== 84532n ||
+      quantity(transaction.chainId) !==
+        BigInt(providerNetwork(this.network).chainId) ||
       typeof transaction.input !== 'string' ||
       transaction.input.toLowerCase() !== plan.data.toLowerCase()
     )
@@ -924,6 +940,7 @@ export class QuorumExecutionObserver implements ExecutionObserver {
     ownHash?: string,
   ): Promise<NonceSnapshot> {
     plan = structuredClone(plan);
+    this.validatePlanNetwork(plan);
     if (plan.genesisHash.toLowerCase() !== this.genesisHash.toLowerCase())
       unavailable();
     const heads = await Promise.all(
@@ -982,7 +999,8 @@ export class QuorumExecutionObserver implements ExecutionObserver {
                 plan.action.payload.domain.verifyingContract,
               ).toLowerCase() ||
             quantity(tx.value) !== 0n ||
-            quantity(tx.chainId) !== 84532n ||
+            quantity(tx.chainId) !==
+              BigInt(providerNetwork(this.network).chainId) ||
             String(tx.input).toLowerCase() !== plan.data.toLowerCase() ||
             tx.type !== '0x2' ||
             quantity(tx.gas) !== BigInt(plan.sponsor.gasLimit) ||
@@ -1077,6 +1095,7 @@ export class QuorumExecutionObserver implements ExecutionObserver {
     ownHash?: string,
     scanFromBlock = plan.scanFromBlock,
   ): Promise<ChainObservation & { scanNextBlock?: string }> {
+    this.validatePlanNetwork(plan);
     if (plan.genesisHash.toLowerCase() !== this.genesisHash.toLowerCase())
       unavailable();
     const heads = await Promise.all(

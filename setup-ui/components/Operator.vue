@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
+import { providerNetwork, type ProviderNetwork } from '../../src/networks';
 import { FunctionFragment, getAddress } from 'ethers';
 import PolicyAdapterSummary from './PolicyAdapterSummary.vue';
 import PolicyAdapters from './PolicyAdapters.vue';
@@ -25,6 +26,7 @@ type Application = {
   publications: RuntimePolicyRevision[];
 };
 type Workspace = {
+  network?: ProviderNetwork;
   role: 'provider' | 'application';
   applications: Application[];
 };
@@ -80,7 +82,7 @@ function baseline(): RuntimePolicy {
   return {
     version: '1',
     enabled: true,
-    chain_id: 'eip155:84532',
+    chain_id: providerNetwork(workspace.value?.network).caip,
     contracts: [],
     maximum_calls: 4,
     maximum_native_value_wei: '0',
@@ -659,7 +661,10 @@ async function refreshBatch(batch: Batch) {
                 Provider terms: {{ terms(draft) }}. Registered methods still
                 require current owner consent and execution authority.
               </p>
-              <RuntimeContracts v-model="draft.contracts" />
+              <RuntimeContracts
+                v-model="draft.contracts"
+                :network="workspace?.network"
+              />
               <PolicyAdapters
                 v-if="provider"
                 v-model="draft.call_adapters"
@@ -685,8 +690,9 @@ async function refreshBatch(batch: Batch) {
                 changes require renewed owner consent.
               </p>
               <p>
-                Network: Base Sepolia. Publishing changes financial consent
-                terms; registration alone cannot sign or execute a transaction.
+                Network: {{ providerNetwork(workspace?.network).label }}.
+                Publishing changes financial consent terms; registration alone
+                cannot sign or execute a transaction.
               </p>
               <button :disabled="busy" class="primary">
                 {{ provider ? 'Publish policy' : 'Submit registration' }}

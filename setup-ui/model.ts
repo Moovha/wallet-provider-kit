@@ -81,6 +81,7 @@ export function emptyConfiguration(
   template: ProviderConfiguration,
 ): ProviderConfiguration {
   const config = structuredClone(template);
+  config.network = 'base';
   config.policy.provider = { name: '', origin: '', privacyUrl: '' };
   config.policy.applications = [
     {
@@ -262,7 +263,7 @@ export function deploymentChecklist(
     '## Integrate',
     `- Consume the implemented HTTP API: ${docs}http-api.html`,
     `- Deployment instructions: ${docs}operator-deployment.html`,
-    '- Experimental Base Sepolia EOA profile only. Signing alone does not submit a transaction. Optional execution requires a dedicated sponsor and independent RPC acceptance; otherwise the application owns submission and settlement verification.',
+    '- Experimental Base EOA profile on the selected network. Signing alone does not submit a transaction. Optional execution requires a dedicated sponsor and independent RPC acceptance; otherwise the application owns submission and settlement verification.',
     '- To update settings, import your saved configuration in the wizard, edit, validate and export again. Deploy the reviewed files and restart the service. Policy changes invalidate previous grants and approvals; applications need consent to the current terms before requesting fresh access.',
     '- Stop the local setup wizard with Ctrl+C when finished.',
     '',

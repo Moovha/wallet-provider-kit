@@ -32,7 +32,7 @@ async function run(): Promise<void> {
     case 'sign':
       result = signTypedData(
         input.walletId,
-        'eip155:84532',
+        input.chainId,
         input.payload,
         input.secret,
         0,

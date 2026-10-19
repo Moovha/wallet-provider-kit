@@ -26,7 +26,7 @@ export interface UserOperationV07 {
 export interface UserOperationDomainV07 {
   entryPointVersion: '0.7';
   entryPoint: string;
-  chainId: '0x14a34';
+  chainId: '0x14a34' | '0x2105';
 }
 export function invalidUserOperation(): never {
   throw new WalletProviderError('wallet_provider_input');
@@ -126,7 +126,7 @@ export function normalizeUserOperationDomainV07(
     Object.keys(input).sort().join(',') !==
       'chainId,entryPoint,entryPointVersion' ||
     input.entryPointVersion !== '0.7' ||
-    input.chainId !== '0x14a34'
+    !['0x14a34', '0x2105'].includes(input.chainId)
   )
     invalidUserOperation();
   return { ...input, entryPoint: operationAddress(input.entryPoint) };

@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased Base network and local preview
+
+- Select Base mainnet across wallet signing, runtime policies, execution verification and operator configuration; keep omitted network selections on Base Sepolia. Reject network changes to occupied stores and wrong-network actions.
+- Run a private native OWS preview with application authentication, operator policy approval and idempotent wallet provisioning. Financial submission and mainnet certification remain separate acceptance steps.
+- Allow the terminal local setup path to use bundled OWS and generated deployment credentials.
+
 ## Unreleased operator policy and gas forms
 
 - Configure optional token-transfer, swap and vault adapters through setup and

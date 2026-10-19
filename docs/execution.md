@@ -7,7 +7,7 @@ needs the transfer delegation configured in Policies. This guide follows that
 request from the stored authorization to its verified status, then explains the
 settings and acceptance tests. New setups use the [bundled local Relayer and Valkey](bundled-setup.md#local-execution-persistence-and-recovery), enabled in Services. Configure policies, RPC verification and sponsor funding; setup supplies keys and bindings. The local transfer path uses `erc3009-relayer-v1` with `execution.local: true`. Use `erc3009-executor-v1` for an optional existing
 [designated service](execution-service.md), or `erc3009-relayer-v1` for direct
-Relayer compatibility. Both are experimental Base Sepolia EOA profiles;
+Relayer compatibility. Both are experimental Base EOA profiles;
 configuration and offline tests do not establish live execution or custody acceptance.
 
 Generic wallet calls, including explicitly allowed native transfers and optional operation adapters, use the same execution and recovery foundation through `approved-evm-executor-v1`. They require separate contract delegation and explicitly bound Safe accounts; see [approved contract calls](approved-contract-calls.md). The steps below describe the ERC-3009 transfer operation.
@@ -70,7 +70,7 @@ action. A signature already returned to an application remains usable on chain
 until its token-contract expiry, even after API access is revoked.
 
 The Relayer's accepted UUID or `confirmed` status is not settlement evidence.
-The observer checks each configured RPC source for chain ID 84532, the accepted
+The observer checks each configured RPC source for the configured chain ID (8453 or 84532), the accepted
 genesis hash, exact transaction and receipt identity, token target, zero native
 value, exact calldata and canonical receipt block. A successful receipt must
 contain exactly one matching `AuthorizationUsed` and `Transfer` effect. Sponsor
@@ -137,7 +137,7 @@ An existing execution service is optional. For that path, follow its
 For direct Relayer compatibility, supply these deployment-specific values:
 
 - A private HTTPS Relayer origin and API key environment variable, with a
-  pre-existing dedicated Base Sepolia EVM sponsor signer for each application.
+  pre-existing dedicated EVM sponsor on the selected Base network signer for each application.
   Sponsor accounts must be separate from owner wallet signers. Signer creation
   and gas funding are operator/application responsibilities.
 - Two independently operated HTTPS RPC sources, supplied as complete URLs in
@@ -166,8 +166,7 @@ Activation additionally requires `activation.executionAcceptance`, identifying
 your acceptance evidence. Validate authorization denial, wire compatibility,
 quorum disagreement, reorgs, lost responses, depleted budgets and recovery with
 your actual services before setting it. Configuration validation alone does not
-perform these checks. This profile does not extend the supported network beyond
-Base Sepolia or establish production financial readiness.
+perform these checks. This profile does not extend the supported network to unconfigured networks or establish production financial readiness.
 
 ## Event delivery contract
 

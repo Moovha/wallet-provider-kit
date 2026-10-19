@@ -1,5 +1,6 @@
+import type { ProviderNetwork } from './networks.js';
 import { getAddress, recoverAddress, Signature } from 'ethers';
-import { baseSepoliaPayload } from './providers/evm-typed-data.js';
+import { evmTypedDataPayload } from './providers/evm-typed-data.js';
 import {
   WalletProviderError,
   type EmbeddedAccount,
@@ -62,6 +63,7 @@ export interface StoredWalletBackendConfiguration<
 > {
   /** Explicit host opt-in; credentials never activate this backend. */
   enabled: boolean;
+  network?: ProviderNetwork;
   provider: WalletSigningProvider;
   signingAuthority: StoredSigningAuthority<SigningContext>;
   accountAuthority: StoredAccountAuthority<AccountContext>;
@@ -88,6 +90,7 @@ function checkedAddress(account: EmbeddedAccount, expectedId: string): string {
 export function createDurableSigningService<Context>(
   authority: StoredSigningAuthority<Context>,
   signer: StoredTypedDataSigner,
+  network?: ProviderNetwork,
 ) {
   if (
     !authority ||
@@ -133,7 +136,7 @@ export function createDurableSigningService<Context>(
           accountId: claimed.accountId,
           address: claimed.address,
         };
-        baseSepoliaPayload(account, claimed.action);
+        evmTypedDataPayload(account, claimed.action, network);
         signature = Signature.from(
           await signTypedData(structuredClone(claimed)),
         ).serialized.toLowerCase();
@@ -191,15 +194,19 @@ export function createStoredWalletBackend<SigningContext, AccountContext>(
   const finish = configuration.accountAuthority.finish.bind(
     configuration.accountAuthority,
   );
-  const signing = createDurableSigningService(configuration.signingAuthority, {
-    provider: provider.provider,
-    signTypedData: (record) =>
-      signTypedData(
-        { accountId: record.accountId, address: record.address },
-        record.action,
-        record.attemptId,
-      ),
-  });
+  const signing = createDurableSigningService(
+    configuration.signingAuthority,
+    {
+      provider: provider.provider,
+      signTypedData: (record) =>
+        signTypedData(
+          { accountId: record.accountId, address: record.address },
+          record.action,
+          record.attemptId,
+        ),
+    },
+    configuration.network,
+  );
   return {
     sign: signing.sign,
     async account(

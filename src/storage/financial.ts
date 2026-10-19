@@ -1,3 +1,4 @@
+import { networkForChain } from '../networks.js';
 import { validateAdditionalBudgets } from './budget-reservations.js';
 import {
   bindExecutionMechanism,
@@ -16,7 +17,7 @@ import type {
 import { validateRelayerAction } from '../domain/relayer-execution.js';
 import type { WalletAttemptRequest } from '../domain/attempt-journal.js';
 import { WalletProviderError } from '../domain/signing.js';
-import { baseSepoliaPayload } from '../providers/evm-typed-data.js';
+import { evmTypedDataPayload } from '../providers/evm-typed-data.js';
 import { createWalletAttemptRequest } from '../providers/attempt-lifecycle.js';
 import { fingerprint, text, uuid } from '../onboarding/policy.js';
 import { StorageConnection, unavailable } from './connection.js';
@@ -98,8 +99,19 @@ export function validateApproval(
     )
       throw new WalletProviderError('wallet_provider_input');
     // Expired actions may be read for reconciliation, but can never authorize signing/replay.
-    if (unexpired) baseSepoliaPayload(approval.account, approval.action);
-  } else validateRelayerAction(approval.account, approval.action, unexpired);
+    if (unexpired)
+      evmTypedDataPayload(
+        approval.account,
+        approval.action,
+        networkForChain(approval.action.chain_id),
+      );
+  } else
+    validateRelayerAction(
+      approval.account,
+      approval.action,
+      unexpired,
+      networkForChain(approval.action.chainId),
+    );
 }
 
 export function loadApproval(

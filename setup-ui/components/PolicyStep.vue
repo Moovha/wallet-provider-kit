@@ -402,8 +402,8 @@ function financial(enabled: unknown) {
     </p>
     <p class="callout">
       Use an independently verified ERC-3009 token and a key-controlled wallet
-      account (EOA) on Base Sepolia. Signing does not send the transaction, pay
-      network fees or confirm that a transfer completed.
+      account (EOA) on the selected Base network. Signing does not send the
+      transaction, pay network fees or confirm that a transfer completed.
     </p>
     <SetupField
       guide="tokenAddress"

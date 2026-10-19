@@ -17,7 +17,7 @@ The workstation runs the local wizard. The **deployment host** runs the wallet
 service and owns its persistent records. They can be the same machine for an
 isolated evaluation. A hosted deployment needs HTTPS, service supervision and
 backups in addition to the exported files. The profile remains experimental and
-Base Sepolia only and is not approved for production custody.
+supports selectable Base mainnet or Base Sepolia and is not approved for production custody.
 
 For a repeatable acceptance run, use the [standard staging walkthrough](staging-walkthrough.md).
 It specifies which work happens in the configuration GUI, deployment CLI and

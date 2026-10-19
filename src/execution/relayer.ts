@@ -1,3 +1,4 @@
+import { providerNetwork } from '../networks.js';
 import { initialFees, replacementProviderContract } from './replacement.js';
 import type { RelayerBinding } from '../providers/relayer-client.js';
 import { toQuantity } from 'ethers';
@@ -22,6 +23,15 @@ export function createTransferExecutionProvider(
 ): ExecutionProvider {
   if (!configuration.relayer)
     throw new WalletProviderError('wallet_provider_configuration');
+  const network = providerNetwork(configuration.network);
+  function validateNetwork(plan: TransferExecutionPlan) {
+    if (
+      plan.action.chain_id !== network.caip ||
+      plan.action.payload.domain.chainId !== network.chainId ||
+      !plan.action.chain_account_id.startsWith(network.caip + ':')
+    )
+      throw new WalletProviderError('wallet_authorization_denied');
+  }
   const sponsors = structuredClone(configuration.sponsors);
   for (const sponsor of sponsors)
     if (!sponsor.binding.relayerId || !sponsor.binding.signerId)
@@ -30,6 +40,7 @@ export function createTransferExecutionProvider(
     {
       url: configuration.relayer.url,
       apiKey,
+      network: configuration.network,
       resolveAccount: async (id) =>
         (sponsors.find((sponsor) => sponsor.accountId === id)?.binding as
           RelayerBinding | undefined) ?? null,
@@ -107,6 +118,7 @@ export function createTransferExecutionProvider(
       return true;
     },
     async prepare(plan) {
+      validateNetwork(plan);
       const selected = await client.binding(plan.sponsor.accountId);
       const policies = selected?.metadata.policies;
       if (
@@ -129,6 +141,7 @@ export function createTransferExecutionProvider(
         throw new WalletProviderError('wallet_provider_configuration');
     },
     async submit(plan, context) {
+      validateNetwork(plan);
       await client.current(
         plan.sponsor.accountId,
         plan.sponsor.binding as RelayerBinding,
@@ -155,6 +168,7 @@ export function createTransferExecutionProvider(
       return response(plan, accepted).id;
     },
     async replace(plan, transactionId, proposal, authorizeEffect) {
+      validateNetwork(plan);
       if (!plan.replacement || !uuid.test(transactionId))
         throw new WalletProviderError('wallet_authorization_denied');
       const current = await client.binding(plan.sponsor.accountId);
@@ -216,6 +230,7 @@ export function createTransferExecutionProvider(
       return accepted.hash;
     },
     async inspect(plan, transactionId) {
+      validateNetwork(plan);
       if (!uuid.test(transactionId))
         throw new WalletProviderError('wallet_authorization_denied');
       await client.current(
@@ -251,6 +266,7 @@ export function createTransferExecutionProvider(
       };
     },
     async transactionHash(plan, transactionId) {
+      validateNetwork(plan);
       if (!uuid.test(transactionId))
         throw new WalletProviderError('wallet_authorization_denied');
       await client.current(

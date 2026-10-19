@@ -7,7 +7,7 @@ export const defaultReplacementPolicy: Readonly<ReplacementPolicy> =
     maxAttempts: 3,
     intervalSeconds: 30,
   });
-/** Editable starting configuration for Base Sepolia; deployment simulation and funding acceptance remain required. */
+/** Editable starting configuration for Base evaluation; deployment simulation and funding acceptance remain required. */
 export const defaultSponsorGas = Object.freeze({
   gasLimit: '500000',
   maxFeePerGas: '3000000000',

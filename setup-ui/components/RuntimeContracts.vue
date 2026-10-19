@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import type { ProviderNetwork } from '../../src/networks';
+defineProps<{ network?: ProviderNetwork }>();
 import ContractDiscovery from './ContractDiscovery.vue';
 import type { RuntimePolicy } from '../../src/runtime-configuration/service';
 const model = defineModel<RuntimePolicy['contracts']>({ required: true });
@@ -33,7 +35,7 @@ function add() {
           pattern="0x[0-9a-fA-F]{40}"
           autocomplete="off"
       /></label>
-      <ContractDiscovery v-model="model[index]" />
+      <ContractDiscovery v-model="model[index]" :network="network" />
       <label
         >Bytecode hash<input
           v-model="contract.code_hash"

@@ -1,3 +1,4 @@
+import { providerNetwork, type ProviderNetwork } from '../networks.js';
 import { getAddress } from 'ethers';
 import { WalletProviderError } from '../domain/signing.js';
 
@@ -9,6 +10,7 @@ export interface RelayerBinding {
 }
 
 export interface RelayerConnection {
+  network?: ProviderNetwork;
   /** Operator-configured HTTPS origin, without path, query, credentials or fragment. */
   url: string;
   apiKey: string;
@@ -28,6 +30,7 @@ export function createRelayerClient(
   options: RelayerConnection,
   request: typeof fetch,
 ) {
+  const selectedNetwork = providerNetwork(options.network);
   let origin: string;
   try {
     const url = new URL(options.url);
@@ -148,12 +151,15 @@ export function createRelayerClient(
     const selected = await resolve(accountId);
     if (!selected) return null;
     const metadata = await call('GET', `/relayers/${selected.relayerId}`);
-    const network = await call('GET', '/networks/evm%3Abase-sepolia');
+    const network = await call(
+      'GET',
+      '/networks/evm%3A' + selectedNetwork.name,
+    );
     if (
       !metadata ||
       metadata.id !== selected.relayerId ||
       metadata.signer_id !== selected.signerId ||
-      metadata.network !== 'base-sepolia' ||
+      metadata.network !== selectedNetwork.name ||
       metadata.network_type !== 'evm' ||
       typeof metadata.paused !== 'boolean' ||
       (metadata.system_disabled !== undefined &&
@@ -165,11 +171,11 @@ export function createRelayerClient(
       typeof metadata.address !== 'string' ||
       metadata.address.toLowerCase() !== selected.address.toLowerCase() ||
       !network ||
-      network.id !== 'evm:base-sepolia' ||
-      network.name !== 'base-sepolia' ||
+      network.id !== 'evm:' + selectedNetwork.name ||
+      network.name !== selectedNetwork.name ||
       network.network_type !== 'evm' ||
-      network.chain_id !== 84532 ||
-      network.is_testnet !== true
+      network.chain_id !== Number(selectedNetwork.chainId) ||
+      network.is_testnet !== selectedNetwork.testnet
     )
       throw new WalletProviderError('wallet_provider_response');
     await current(accountId, selected);

@@ -73,6 +73,7 @@ const workspaceSchema = {
   additionalProperties: false,
   required: ['role', 'applications'],
   properties: {
+    network: { type: 'string', enum: ['base', 'base-sepolia'] },
     role: { type: 'string', enum: ['provider', 'application'] },
     applications: {
       type: 'array',
@@ -160,7 +161,7 @@ const batchesSchema = {
           expires_at: { type: 'string', format: 'date-time' },
           application_id: applicationIdSchema,
           version: { type: 'string', enum: ['2.0.0'] },
-          chainId: { type: 'string', enum: ['0x14a34'] },
+          chainId: { type: 'string', enum: ['0x14a34', '0x2105'] },
           status: { type: 'integer', enum: [100, 200, 400, 500] },
           atomic: { type: 'boolean', enum: [true] },
           receipts: { type: 'array', items: walletCallsReceiptSchema },

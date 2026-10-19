@@ -1121,6 +1121,11 @@
           },
           "runtimeContracts": {
             "type": "boolean"
+          },
+          "network": {
+            "type": "string",
+            "enum": ["base", "base-sepolia"],
+            "description": "Server-selected network. Omission preserves Base Sepolia. Use separate storage for each network."
           }
         },
         "allOf": [

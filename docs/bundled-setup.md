@@ -111,7 +111,7 @@ Relayer owns submission and nonce handling; the wallet service still verifies
 current owner, grant, identity, consent, immutable action and durable attempt
 before dispatch. Independent RPC agreement verifies chain outcomes. Engine
 readiness alone supplies no spending authority, gas funding or settlement proof.
-The supported network remains Base Sepolia. Automatic fee replacement through
+Choose Base mainnet or Base Sepolia in Provider. Existing configurations without a network keep Base Sepolia. Automatic fee replacement through
 the designated-service extension remains an optional separate acceptance path.
 
 The separate Relayer image is distributed upstream under **AGPL-3.0-only**;
@@ -193,6 +193,6 @@ authoritative copies of a restored deployment.
 
 The bundle cannot supply domain ownership, vendor contracts, a provider's legal
 privacy policy or application gas funding. Optional hosted login/KYC vendor profiles and external execution providers retain their explicit configuration
-and acceptance contracts. Experimental Base Sepolia limits and production
+and acceptance contracts. Experimental profile limits and production
 custody acceptance gates still apply. Offline tests are not live-provider or
 public TLS acceptance evidence.

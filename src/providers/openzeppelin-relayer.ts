@@ -21,7 +21,7 @@ import {
   createAttemptLifecycle,
   journalUnavailable,
 } from './attempt-lifecycle.js';
-import { baseSepoliaPayload } from './evm-typed-data.js';
+import { evmTypedDataPayload } from './evm-typed-data.js';
 import { createJournaledWalletProvider } from './journaled.js';
 import {
   createRelayerClient,
@@ -94,7 +94,7 @@ export function createOpenZeppelinRelayerWalletProvider(
     async signTypedData(account, action, attemptId) {
       const boundAccount = structuredClone(account);
       const boundAction = structuredClone(action);
-      baseSepoliaPayload(boundAccount, boundAction);
+      evmTypedDataPayload(boundAccount, boundAction, connection.network);
       const selected = await client.binding(boundAccount.accountId);
       if (
         !selected ||
@@ -118,7 +118,7 @@ export function createOpenZeppelinRelayerWalletProvider(
       );
       await authorize(policy.authorizeAttempt, admitted);
       await client.current(boundAccount.accountId, selected.binding);
-      baseSepoliaPayload(boundAccount, boundAction);
+      evmTypedDataPayload(boundAccount, boundAction, connection.network);
       const { EIP712Domain: _domain, ...types } = boundAction.payload.types;
       const body = JSON.stringify({
         domain_separator: TypedDataEncoder.hashDomain(
@@ -263,7 +263,12 @@ export function createOpenZeppelinRelayerExecutor(
     try {
       const boundAccount = structuredClone(account);
       const boundAction = structuredClone(action);
-      validateRelayerAction(boundAccount, boundAction, requireUnexpired);
+      validateRelayerAction(
+        boundAccount,
+        boundAction,
+        requireUnexpired,
+        connection.network,
+      );
       return { boundAccount, boundAction };
     } catch {
       throw new WalletProviderError('wallet_provider_input');
@@ -298,7 +303,12 @@ export function createOpenZeppelinRelayerExecutor(
             throw new WalletProviderError('wallet_provider_configuration');
           await authorize(policy.authorizeAttempt, admitted);
           await client.current(boundAccount.accountId, selected.binding);
-          validateRelayerAction(boundAccount, boundAction);
+          validateRelayerAction(
+            boundAccount,
+            boundAction,
+            true,
+            connection.network,
+          );
           // v1.8.0 uses Alloy U256 hex strings; bounded u64/u128 fields use exact safe JSON numbers.
           const body = JSON.stringify({
             to: tx.to,
@@ -326,7 +336,13 @@ export function createOpenZeppelinRelayerExecutor(
           };
         },
         result,
-        () => validateRelayerAction(boundAccount, boundAction),
+        () =>
+          validateRelayerAction(
+            boundAccount,
+            boundAction,
+            true,
+            connection.network,
+          ),
       );
       if (accepted.kind !== 'relay_transaction') throw journalUnavailable();
       return { transactionId: accepted.transactionId };
