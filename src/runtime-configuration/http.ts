@@ -277,8 +277,10 @@ export async function registerRuntimeConfigurationRoutes(
     async (request) => {
       if (!applicationSponsors)
         throw Object.assign(new Error('Unavailable'), { statusCode: 503 });
+      const authority = await context(request, 'wallet:configuration:write');
+      request.raw.socket?.setTimeout?.(60000);
       return applicationSponsors.provision(
-        await context(request, 'wallet:configuration:write'),
+        authority,
         request.params.applicationId,
       );
     },
@@ -296,6 +298,26 @@ export async function registerRuntimeConfigurationRoutes(
     properties: {
       application_id: applicationIdSchema,
       funding_addresses: { type: 'array', items: { type: 'string' } },
+      chain_id: { type: 'string', enum: ['eip155:8453', 'eip155:84532'] },
+      funding_requirements: {
+        type: 'array',
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          required: [
+            'address',
+            'minimum_balance_wei',
+            'maximum_gas_budget_wei',
+            'gas_limits',
+          ],
+          properties: {
+            address: { type: 'string' },
+            minimum_balance_wei: { type: 'string' },
+            maximum_gas_budget_wei: { type: 'string' },
+            gas_limits: obligationSchemas.sponsorship.properties.gas_limits,
+          },
+        },
+      },
       status: {
         type: 'string',
         enum: [
@@ -349,11 +371,11 @@ export async function registerRuntimeConfigurationRoutes(
         body: { type: 'object', additionalProperties: false, properties: {} },
       }),
     },
-    async (request) =>
-      safes().provision(
-        await context(request, 'wallet:configuration:write'),
-        request.params.applicationId,
-      ),
+    async (request) => {
+      const authority = await context(request, 'wallet:configuration:write');
+      request.raw.socket?.setTimeout?.(60000);
+      return safes().provision(authority, request.params.applicationId);
+    },
   );
   const credentialSchema = {
     type: 'object',

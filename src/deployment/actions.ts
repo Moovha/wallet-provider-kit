@@ -1,3 +1,4 @@
+import { sponsorshipGas } from '../runtime-configuration/obligations.js';
 import { runtimeApplicationId } from '../runtime-configuration/service.js';
 import {
   safeProvisioningIdentity,
@@ -278,7 +279,11 @@ export class SupportedActions {
     if (
       sponsor &&
       (sponsor.status !== 'ready' ||
-        fingerprint(sponsor.sponsor) !== fingerprint(safe.plan.sponsor))
+        fingerprint(sponsor.sponsor) !== fingerprint(safe.plan.sponsor) ||
+        Object.entries(sponsorshipGas(sponsorship)).some(
+          ([field, value]) =>
+            sponsor.sponsor[field as keyof typeof sponsor.sponsor] !== value,
+        ))
     )
       deny();
     return {

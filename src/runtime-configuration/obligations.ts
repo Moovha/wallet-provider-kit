@@ -1,4 +1,8 @@
 import { Ajv } from 'ajv';
+import {
+  defaultSponsorGas,
+  maximumSponsorGasLimit,
+} from '../execution/defaults.js';
 import { invalid } from '../onboarding/policy.js';
 
 /** Application declarations require provider acceptance; they never grant spending authority. */
@@ -23,6 +27,12 @@ export interface ApplicationObligations {
     chain_id: 'eip155:8453' | 'eip155:84532';
     funding_agreement: string;
     maximum_gas_budget_wei: string;
+    gas_limits?: {
+      gas_limit: string;
+      max_fee_per_gas: string;
+      max_priority_fee_per_gas: string;
+      l1_fee_reserve_wei: string;
+    };
     account_model: 'provider-controlled-application-safe';
     asset_model: 'individual-user-wallets';
   };
@@ -53,6 +63,19 @@ const object = (properties: Record<string, unknown>) => ({
   required: Object.keys(properties),
   properties,
 });
+const sponsorshipProperties = {
+  chain_id: { type: 'string', enum: ['eip155:8453', 'eip155:84532'] },
+  funding_agreement: boundedText,
+  maximum_gas_budget_wei: {
+    type: 'string',
+    pattern: '^[1-9][0-9]{0,77}$',
+  },
+  account_model: {
+    type: 'string',
+    enum: ['provider-controlled-application-safe'],
+  },
+  asset_model: { type: 'string', enum: ['individual-user-wallets'] },
+};
 export const obligationSchemas = {
   actions: {
     type: 'array',
@@ -96,19 +119,25 @@ export const obligationSchemas = {
       billing_owner: { type: 'string', enum: ['application'] },
     }),
   },
-  sponsorship: object({
-    chain_id: { type: 'string', enum: ['eip155:8453', 'eip155:84532'] },
-    funding_agreement: boundedText,
-    maximum_gas_budget_wei: {
-      type: 'string',
-      pattern: '^[1-9][0-9]{0,77}$',
+  sponsorship: {
+    ...object(sponsorshipProperties),
+    properties: {
+      ...sponsorshipProperties,
+      gas_limits: object(
+        Object.fromEntries(
+          [
+            'gas_limit',
+            'max_fee_per_gas',
+            'max_priority_fee_per_gas',
+            'l1_fee_reserve_wei',
+          ].map((name) => [
+            name,
+            { type: 'string', pattern: '^(0|[1-9][0-9]{0,77})$' },
+          ]),
+        ),
+      ),
     },
-    account_model: {
-      type: 'string',
-      enum: ['provider-controlled-application-safe'],
-    },
-    asset_model: { type: 'string', enum: ['individual-user-wallets'] },
-  }),
+  },
 } as const;
 const ajv = new Ajv({ strict: true });
 const validators = Object.fromEntries(
@@ -148,12 +177,46 @@ export function normalizeObligation<K extends ObligationKind>(
     const services = result as ApplicationObligations['services'];
     unique(services.map((service) => service.id));
     services.sort((a, b) => a.id.localeCompare(b.id, 'en'));
-  } else if (
-    BigInt(
-      (result as ApplicationObligations['sponsorship']).maximum_gas_budget_wei,
-    ) >=
-    2n ** 256n
-  )
-    invalid();
+  } else {
+    const sponsorship = result as ApplicationObligations['sponsorship'];
+    const gas = sponsorshipGas(sponsorship);
+    if (
+      BigInt(sponsorship.maximum_gas_budget_wei) >= 2n ** 256n ||
+      BigInt(gas.gasLimit) < 21000n ||
+      BigInt(gas.gasLimit) > maximumSponsorGasLimit(true) ||
+      BigInt(gas.maxFeePerGas) === 0n ||
+      BigInt(gas.maxPriorityFeePerGas) > BigInt(gas.maxFeePerGas) ||
+      [gas.maxFeePerGas, gas.maxPriorityFeePerGas].some(
+        (value) => BigInt(value) > BigInt(Number.MAX_SAFE_INTEGER),
+      ) ||
+      BigInt(gas.l1FeeReserveWei) === 0n ||
+      BigInt(gas.l1FeeReserveWei) >= 2n ** 256n ||
+      (sponsorship.gas_limits !== undefined &&
+        BigInt(sponsorship.maximum_gas_budget_wei) < minimumSponsorFunding(gas))
+    )
+      invalid();
+  }
   return result;
+}
+export function sponsorshipGas(value: ApplicationObligations['sponsorship']) {
+  const limits = value.gas_limits;
+  return limits
+    ? {
+        gasLimit: limits.gas_limit,
+        maxFeePerGas: limits.max_fee_per_gas,
+        maxPriorityFeePerGas: limits.max_priority_fee_per_gas,
+        l1FeeReserveWei: limits.l1_fee_reserve_wei,
+      }
+    : {
+        gasLimit: defaultSponsorGas.gasLimit,
+        maxFeePerGas: defaultSponsorGas.maxFeePerGas,
+        maxPriorityFeePerGas: defaultSponsorGas.maxPriorityFeePerGas,
+        l1FeeReserveWei: defaultSponsorGas.l1FeeReserveWei,
+      };
+}
+export function minimumSponsorFunding(gas: ReturnType<typeof sponsorshipGas>) {
+  return (
+    BigInt(gas.gasLimit) * BigInt(gas.maxFeePerGas) +
+    BigInt(gas.l1FeeReserveWei)
+  );
 }

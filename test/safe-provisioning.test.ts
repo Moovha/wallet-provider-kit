@@ -664,6 +664,29 @@ it('provisions one provider-owned application Safe and preserves two users indep
   service = create();
   const ready = await service.provision(providerContext(), applicationId);
   expect(ready.status).toBe('ready');
+  expect(ready.chain_id).toBe('eip155:84532');
+  expect(ready.funding_requirements).toEqual([
+    {
+      address: sponsor.binding.address,
+      minimum_balance_wei: (
+        BigInt(sponsor.gasLimit) * BigInt(sponsor.maxFeePerGas) +
+        BigInt(sponsor.l1FeeReserveWei)
+      ).toString(),
+      maximum_gas_budget_wei: sponsor.lifetimeBudgetWei,
+      gas_limits: {
+        gas_limit: sponsor.gasLimit,
+        max_fee_per_gas: sponsor.maxFeePerGas,
+        max_priority_fee_per_gas: sponsor.maxPriorityFeePerGas,
+        l1_fee_reserve_wei: sponsor.l1FeeReserveWei,
+      },
+    },
+  ]);
+  expect(created).toBe(1);
+  expect(f.state.submissions).toBe(1);
+  f.state.balance = '0x0';
+  expect(await service.provision(providerContext(), applicationId)).toEqual(
+    ready,
+  );
   expect(created).toBe(1);
   expect(f.state.submissions).toBe(1);
   const signer = await f.db.onboardingStore.transaction(
@@ -920,7 +943,13 @@ it('reconciles an uncertain application sponsor creation and stops submission af
     value: {
       chain_id: 'eip155:84532',
       funding_agreement: 'offline-funding',
-      maximum_gas_budget_wei: '1000000000000000000',
+      maximum_gas_budget_wei: '20000000000000',
+      gas_limits: {
+        gas_limit: '750000',
+        max_fee_per_gas: '10000000',
+        max_priority_fee_per_gas: '1000000',
+        l1_fee_reserve_wei: '1000000000000',
+      },
       account_model: 'provider-controlled-application-safe',
       asset_model: 'individual-user-wallets',
     },
@@ -944,15 +973,18 @@ it('reconciles an uncertain application sponsor creation and stops submission af
       Response.json({ success: true, data: value });
     if (init?.method === 'POST' && path.endsWith('/signers')) {
       signerCreates++;
+      expect(data.config.key).toMatch(/^[0-9a-f]{64}$/);
+      expect(data.type).toBe('plain');
       signer = {
         id: data.id,
-        type: data.type,
-        address: new Wallet(data.config.key).address,
+        type: 'local',
+        address: new Wallet('0x' + data.config.key).address,
       };
       throw new Error('Offline lost response after creation');
     }
     if (init?.method === 'POST' && path.endsWith('/relayers')) {
       relayerCreates++;
+      expect(data.policies.gas_price_cap).toBe(10000000);
       expect(data.custom_rpc_urls).toEqual([{ url: endpoint, weight: 100 }]);
       relayer = { ...data, address: signer!.address };
       return ok(relayer);
@@ -991,6 +1023,8 @@ it('reconciles an uncertain application sponsor creation and stops submission af
   expect(signerCreates).toBe(1);
   expect(relayerCreates).toBe(1);
   const execution = await service.configuration(id);
+  expect(execution.sponsors[0].gasLimit).toBe('750000');
+  expect(execution.sponsors[0].maxFeePerGas).toBe('10000000');
   const url =
     localExecutionOrigin +
     '/api/v1/relayers/' +

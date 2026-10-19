@@ -8100,6 +8100,62 @@ Success response schema:
         "type": "string"
       }
     },
+    "chain_id": {
+      "type": "string",
+      "enum": ["eip155:8453", "eip155:84532"]
+    },
+    "funding_requirements": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "address",
+          "minimum_balance_wei",
+          "maximum_gas_budget_wei",
+          "gas_limits"
+        ],
+        "properties": {
+          "address": {
+            "type": "string"
+          },
+          "minimum_balance_wei": {
+            "type": "string"
+          },
+          "maximum_gas_budget_wei": {
+            "type": "string"
+          },
+          "gas_limits": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "gas_limit",
+              "max_fee_per_gas",
+              "max_priority_fee_per_gas",
+              "l1_fee_reserve_wei"
+            ],
+            "properties": {
+              "gas_limit": {
+                "type": "string",
+                "pattern": "^(0|[1-9][0-9]{0,77})$"
+              },
+              "max_fee_per_gas": {
+                "type": "string",
+                "pattern": "^(0|[1-9][0-9]{0,77})$"
+              },
+              "max_priority_fee_per_gas": {
+                "type": "string",
+                "pattern": "^(0|[1-9][0-9]{0,77})$"
+              },
+              "l1_fee_reserve_wei": {
+                "type": "string",
+                "pattern": "^(0|[1-9][0-9]{0,77})$"
+              }
+            }
+          }
+        }
+      }
+    },
     "status": {
       "type": "string",
       "enum": [
@@ -8173,6 +8229,62 @@ Success response schema:
       "type": "array",
       "items": {
         "type": "string"
+      }
+    },
+    "chain_id": {
+      "type": "string",
+      "enum": ["eip155:8453", "eip155:84532"]
+    },
+    "funding_requirements": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "address",
+          "minimum_balance_wei",
+          "maximum_gas_budget_wei",
+          "gas_limits"
+        ],
+        "properties": {
+          "address": {
+            "type": "string"
+          },
+          "minimum_balance_wei": {
+            "type": "string"
+          },
+          "maximum_gas_budget_wei": {
+            "type": "string"
+          },
+          "gas_limits": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "gas_limit",
+              "max_fee_per_gas",
+              "max_priority_fee_per_gas",
+              "l1_fee_reserve_wei"
+            ],
+            "properties": {
+              "gas_limit": {
+                "type": "string",
+                "pattern": "^(0|[1-9][0-9]{0,77})$"
+              },
+              "max_fee_per_gas": {
+                "type": "string",
+                "pattern": "^(0|[1-9][0-9]{0,77})$"
+              },
+              "max_priority_fee_per_gas": {
+                "type": "string",
+                "pattern": "^(0|[1-9][0-9]{0,77})$"
+              },
+              "l1_fee_reserve_wei": {
+                "type": "string",
+                "pattern": "^(0|[1-9][0-9]{0,77})$"
+              }
+            }
+          }
+        }
       }
     },
     "status": {
@@ -8259,6 +8371,62 @@ Success response schema:
       "type": "array",
       "items": {
         "type": "string"
+      }
+    },
+    "chain_id": {
+      "type": "string",
+      "enum": ["eip155:8453", "eip155:84532"]
+    },
+    "funding_requirements": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "address",
+          "minimum_balance_wei",
+          "maximum_gas_budget_wei",
+          "gas_limits"
+        ],
+        "properties": {
+          "address": {
+            "type": "string"
+          },
+          "minimum_balance_wei": {
+            "type": "string"
+          },
+          "maximum_gas_budget_wei": {
+            "type": "string"
+          },
+          "gas_limits": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "gas_limit",
+              "max_fee_per_gas",
+              "max_priority_fee_per_gas",
+              "l1_fee_reserve_wei"
+            ],
+            "properties": {
+              "gas_limit": {
+                "type": "string",
+                "pattern": "^(0|[1-9][0-9]{0,77})$"
+              },
+              "max_fee_per_gas": {
+                "type": "string",
+                "pattern": "^(0|[1-9][0-9]{0,77})$"
+              },
+              "max_priority_fee_per_gas": {
+                "type": "string",
+                "pattern": "^(0|[1-9][0-9]{0,77})$"
+              },
+              "l1_fee_reserve_wei": {
+                "type": "string",
+                "pattern": "^(0|[1-9][0-9]{0,77})$"
+              }
+            }
+          }
+        }
       }
     },
     "status": {
@@ -8665,6 +8833,34 @@ Success response schema:
                   "asset_model": {
                     "type": "string",
                     "enum": ["individual-user-wallets"]
+                  },
+                  "gas_limits": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "gas_limit",
+                      "max_fee_per_gas",
+                      "max_priority_fee_per_gas",
+                      "l1_fee_reserve_wei"
+                    ],
+                    "properties": {
+                      "gas_limit": {
+                        "type": "string",
+                        "pattern": "^(0|[1-9][0-9]{0,77})$"
+                      },
+                      "max_fee_per_gas": {
+                        "type": "string",
+                        "pattern": "^(0|[1-9][0-9]{0,77})$"
+                      },
+                      "max_priority_fee_per_gas": {
+                        "type": "string",
+                        "pattern": "^(0|[1-9][0-9]{0,77})$"
+                      },
+                      "l1_fee_reserve_wei": {
+                        "type": "string",
+                        "pattern": "^(0|[1-9][0-9]{0,77})$"
+                      }
+                    }
                   }
                 }
               }
@@ -8890,6 +9086,34 @@ Success response schema:
                   "asset_model": {
                     "type": "string",
                     "enum": ["individual-user-wallets"]
+                  },
+                  "gas_limits": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "gas_limit",
+                      "max_fee_per_gas",
+                      "max_priority_fee_per_gas",
+                      "l1_fee_reserve_wei"
+                    ],
+                    "properties": {
+                      "gas_limit": {
+                        "type": "string",
+                        "pattern": "^(0|[1-9][0-9]{0,77})$"
+                      },
+                      "max_fee_per_gas": {
+                        "type": "string",
+                        "pattern": "^(0|[1-9][0-9]{0,77})$"
+                      },
+                      "max_priority_fee_per_gas": {
+                        "type": "string",
+                        "pattern": "^(0|[1-9][0-9]{0,77})$"
+                      },
+                      "l1_fee_reserve_wei": {
+                        "type": "string",
+                        "pattern": "^(0|[1-9][0-9]{0,77})$"
+                      }
+                    }
                   }
                 }
               }
@@ -9163,6 +9387,34 @@ Success response schema:
             "asset_model": {
               "type": "string",
               "enum": ["individual-user-wallets"]
+            },
+            "gas_limits": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "gas_limit",
+                "max_fee_per_gas",
+                "max_priority_fee_per_gas",
+                "l1_fee_reserve_wei"
+              ],
+              "properties": {
+                "gas_limit": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,77})$"
+                },
+                "max_fee_per_gas": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,77})$"
+                },
+                "max_priority_fee_per_gas": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,77})$"
+                },
+                "l1_fee_reserve_wei": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,77})$"
+                }
+              }
             }
           }
         }
@@ -9385,6 +9637,34 @@ Success response schema:
             "asset_model": {
               "type": "string",
               "enum": ["individual-user-wallets"]
+            },
+            "gas_limits": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "gas_limit",
+                "max_fee_per_gas",
+                "max_priority_fee_per_gas",
+                "l1_fee_reserve_wei"
+              ],
+              "properties": {
+                "gas_limit": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,77})$"
+                },
+                "max_fee_per_gas": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,77})$"
+                },
+                "max_priority_fee_per_gas": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,77})$"
+                },
+                "l1_fee_reserve_wei": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,77})$"
+                }
+              }
             }
           }
         }
@@ -9636,6 +9916,34 @@ Success response schema:
             "asset_model": {
               "type": "string",
               "enum": ["individual-user-wallets"]
+            },
+            "gas_limits": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "gas_limit",
+                "max_fee_per_gas",
+                "max_priority_fee_per_gas",
+                "l1_fee_reserve_wei"
+              ],
+              "properties": {
+                "gas_limit": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,77})$"
+                },
+                "max_fee_per_gas": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,77})$"
+                },
+                "max_priority_fee_per_gas": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,77})$"
+                },
+                "l1_fee_reserve_wei": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,77})$"
+                }
+              }
             }
           }
         }
@@ -9858,6 +10166,34 @@ Success response schema:
             "asset_model": {
               "type": "string",
               "enum": ["individual-user-wallets"]
+            },
+            "gas_limits": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "gas_limit",
+                "max_fee_per_gas",
+                "max_priority_fee_per_gas",
+                "l1_fee_reserve_wei"
+              ],
+              "properties": {
+                "gas_limit": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,77})$"
+                },
+                "max_fee_per_gas": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,77})$"
+                },
+                "max_priority_fee_per_gas": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,77})$"
+                },
+                "l1_fee_reserve_wei": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,77})$"
+                }
+              }
             }
           }
         }
@@ -9936,6 +10272,34 @@ Request body (application/json):
         "asset_model": {
           "type": "string",
           "enum": ["individual-user-wallets"]
+        },
+        "gas_limits": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "gas_limit",
+            "max_fee_per_gas",
+            "max_priority_fee_per_gas",
+            "l1_fee_reserve_wei"
+          ],
+          "properties": {
+            "gas_limit": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]{0,77})$"
+            },
+            "max_fee_per_gas": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]{0,77})$"
+            },
+            "max_priority_fee_per_gas": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]{0,77})$"
+            },
+            "l1_fee_reserve_wei": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]{0,77})$"
+            }
+          }
         }
       }
     }
@@ -10105,6 +10469,34 @@ Success response schema:
             "asset_model": {
               "type": "string",
               "enum": ["individual-user-wallets"]
+            },
+            "gas_limits": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "gas_limit",
+                "max_fee_per_gas",
+                "max_priority_fee_per_gas",
+                "l1_fee_reserve_wei"
+              ],
+              "properties": {
+                "gas_limit": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,77})$"
+                },
+                "max_fee_per_gas": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,77})$"
+                },
+                "max_priority_fee_per_gas": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,77})$"
+                },
+                "l1_fee_reserve_wei": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,77})$"
+                }
+              }
             }
           }
         }
@@ -10327,6 +10719,34 @@ Success response schema:
             "asset_model": {
               "type": "string",
               "enum": ["individual-user-wallets"]
+            },
+            "gas_limits": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "gas_limit",
+                "max_fee_per_gas",
+                "max_priority_fee_per_gas",
+                "l1_fee_reserve_wei"
+              ],
+              "properties": {
+                "gas_limit": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,77})$"
+                },
+                "max_fee_per_gas": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,77})$"
+                },
+                "max_priority_fee_per_gas": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,77})$"
+                },
+                "l1_fee_reserve_wei": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,77})$"
+                }
+              }
             }
           }
         }

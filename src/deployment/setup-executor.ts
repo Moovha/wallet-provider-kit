@@ -473,13 +473,13 @@ export function createSetupExecutor(options: SetupExecutorOptions = {}) {
         port: config.http?.port ?? 8080,
         config: {
           ...config,
-          storage: { kind: 'sqlite', directory: '.provider-data' },
+          storage: { kind: 'sqlite', directory: '.provider-data/storage' },
           http: { ...config.http, host: '0.0.0.0', port: 8080 },
           ...(config.backend.kind === 'ows'
             ? {
                 backend: {
                   ...config.backend,
-                  vaultDirectory: '.provider-vault',
+                  vaultDirectory: '.provider-vault/vault',
                 },
               }
             : {}),

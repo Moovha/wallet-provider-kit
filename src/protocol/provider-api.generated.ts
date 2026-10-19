@@ -6925,6 +6925,19 @@ export interface operations {
                         application_id: string;
                         funding_addresses: string[];
                         /** @enum {string} */
+                        chain_id?: "eip155:8453" | "eip155:84532";
+                        funding_requirements?: {
+                            address: string;
+                            minimum_balance_wei: string;
+                            maximum_gas_budget_wei: string;
+                            gas_limits: {
+                                gas_limit: string;
+                                max_fee_per_gas: string;
+                                max_priority_fee_per_gas: string;
+                                l1_fee_reserve_wei: string;
+                            };
+                        }[];
+                        /** @enum {string} */
                         status: "unprovisioned" | "signer_ready" | "signer_pending" | "prepared" | "pending" | "ready" | "unknown";
                         address?: string;
                         /** @enum {string} */
@@ -7126,6 +7139,19 @@ export interface operations {
                     "application/json": {
                         application_id: string;
                         funding_addresses: string[];
+                        /** @enum {string} */
+                        chain_id?: "eip155:8453" | "eip155:84532";
+                        funding_requirements?: {
+                            address: string;
+                            minimum_balance_wei: string;
+                            maximum_gas_budget_wei: string;
+                            gas_limits: {
+                                gas_limit: string;
+                                max_fee_per_gas: string;
+                                max_priority_fee_per_gas: string;
+                                l1_fee_reserve_wei: string;
+                            };
+                        }[];
                         /** @enum {string} */
                         status: "unprovisioned" | "signer_ready" | "signer_pending" | "prepared" | "pending" | "ready" | "unknown";
                         address?: string;
@@ -7334,6 +7360,19 @@ export interface operations {
                     "application/json": {
                         application_id: string;
                         funding_addresses: string[];
+                        /** @enum {string} */
+                        chain_id?: "eip155:8453" | "eip155:84532";
+                        funding_requirements?: {
+                            address: string;
+                            minimum_balance_wei: string;
+                            maximum_gas_budget_wei: string;
+                            gas_limits: {
+                                gas_limit: string;
+                                max_fee_per_gas: string;
+                                max_priority_fee_per_gas: string;
+                                l1_fee_reserve_wei: string;
+                            };
+                        }[];
                         /** @enum {string} */
                         status: "unprovisioned" | "signer_ready" | "signer_pending" | "prepared" | "pending" | "ready" | "unknown";
                         address?: string;
@@ -8168,6 +8207,12 @@ export interface operations {
                                 account_model: "provider-controlled-application-safe";
                                 /** @enum {string} */
                                 asset_model: "individual-user-wallets";
+                                gas_limits?: {
+                                    gas_limit: string;
+                                    max_fee_per_gas: string;
+                                    max_priority_fee_per_gas: string;
+                                    l1_fee_reserve_wei: string;
+                                };
                             };
                             /** Format: date-time */
                             submitted_at: string;
@@ -8406,6 +8451,12 @@ export interface operations {
                                 account_model: "provider-controlled-application-safe";
                                 /** @enum {string} */
                                 asset_model: "individual-user-wallets";
+                                gas_limits?: {
+                                    gas_limit: string;
+                                    max_fee_per_gas: string;
+                                    max_priority_fee_per_gas: string;
+                                    l1_fee_reserve_wei: string;
+                                };
                             };
                             /** Format: date-time */
                             submitted_at: string;
@@ -8657,6 +8708,12 @@ export interface operations {
                             account_model: "provider-controlled-application-safe";
                             /** @enum {string} */
                             asset_model: "individual-user-wallets";
+                            gas_limits?: {
+                                gas_limit: string;
+                                max_fee_per_gas: string;
+                                max_priority_fee_per_gas: string;
+                                l1_fee_reserve_wei: string;
+                            };
                         };
                         /** Format: date-time */
                         submitted_at: string;
@@ -8899,6 +8956,12 @@ export interface operations {
                             account_model: "provider-controlled-application-safe";
                             /** @enum {string} */
                             asset_model: "individual-user-wallets";
+                            gas_limits?: {
+                                gas_limit: string;
+                                max_fee_per_gas: string;
+                                max_priority_fee_per_gas: string;
+                                l1_fee_reserve_wei: string;
+                            };
                         };
                         /** Format: date-time */
                         submitted_at: string;
@@ -9146,6 +9209,12 @@ export interface operations {
                             account_model: "provider-controlled-application-safe";
                             /** @enum {string} */
                             asset_model: "individual-user-wallets";
+                            gas_limits?: {
+                                gas_limit: string;
+                                max_fee_per_gas: string;
+                                max_priority_fee_per_gas: string;
+                                l1_fee_reserve_wei: string;
+                            };
                         };
                         /** Format: date-time */
                         submitted_at: string;
@@ -9388,6 +9457,12 @@ export interface operations {
                             account_model: "provider-controlled-application-safe";
                             /** @enum {string} */
                             asset_model: "individual-user-wallets";
+                            gas_limits?: {
+                                gas_limit: string;
+                                max_fee_per_gas: string;
+                                max_priority_fee_per_gas: string;
+                                l1_fee_reserve_wei: string;
+                            };
                         };
                         /** Format: date-time */
                         submitted_at: string;
@@ -9593,6 +9668,12 @@ export interface operations {
                         account_model: "provider-controlled-application-safe";
                         /** @enum {string} */
                         asset_model: "individual-user-wallets";
+                        gas_limits?: {
+                            gas_limit: string;
+                            max_fee_per_gas: string;
+                            max_priority_fee_per_gas: string;
+                            l1_fee_reserve_wei: string;
+                        };
                     };
                 };
             };
@@ -9635,6 +9716,12 @@ export interface operations {
                             account_model: "provider-controlled-application-safe";
                             /** @enum {string} */
                             asset_model: "individual-user-wallets";
+                            gas_limits?: {
+                                gas_limit: string;
+                                max_fee_per_gas: string;
+                                max_priority_fee_per_gas: string;
+                                l1_fee_reserve_wei: string;
+                            };
                         };
                         /** Format: date-time */
                         submitted_at: string;
@@ -9877,6 +9964,12 @@ export interface operations {
                             account_model: "provider-controlled-application-safe";
                             /** @enum {string} */
                             asset_model: "individual-user-wallets";
+                            gas_limits?: {
+                                gas_limit: string;
+                                max_fee_per_gas: string;
+                                max_priority_fee_per_gas: string;
+                                l1_fee_reserve_wei: string;
+                            };
                         };
                         /** Format: date-time */
                         submitted_at: string;

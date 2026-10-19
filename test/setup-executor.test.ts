@@ -93,6 +93,9 @@ describe('explicit local container executor with offline command fixtures', () =
     );
     expect(saved.http).toMatchObject({ host: '0.0.0.0', port: 8080 });
     expect(saved.policy).toEqual(config.policy);
+    expect(saved.storage.directory).toBe('.provider-data/storage');
+    if (saved.backend.kind === 'ows')
+      expect(saved.backend.vaultDirectory).toBe('.provider-vault/vault');
     expect(
       parseEnv(await readFile(join(plan.directory, 'provider.env'), 'utf8')),
     ).toEqual(secretValues);
