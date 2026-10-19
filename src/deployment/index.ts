@@ -134,3 +134,12 @@ export type {
   TokenTransferAdapter,
   AdapterInput,
 } from '../execution/operation-adapters.js';
+
+export { SafeProvisioningService } from '../provisioning/safe.js';
+export type {
+  SafeProvisioningConfiguration,
+  SafeDeploymentDriver,
+  SafeDeploymentPlan,
+} from '../provisioning/safe.js';
+
+export { defaultSafeProvisioning } from '../provisioning/defaults.js';

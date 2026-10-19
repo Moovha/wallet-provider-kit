@@ -593,6 +593,7 @@ See the [HTTP reference](http-reference.md).
 
 ```ts
 export interface ServerOptions {
+  safeProvisioning?: import('../provisioning/safe.js').SafeProvisioningService;
   authorizationServer?: {
     register(app: import('fastify').FastifyInstance): void;
   };
@@ -1498,6 +1499,10 @@ export interface ProviderState {
       activeRevision?: string;
       transportRevision?: string;
       accessMode?: 'application' | 'hosted';
+      safeAccounts?: Record<
+        string,
+        import('../provisioning/safe.js').SafeDeploymentRecord
+      >;
       runtimeConfiguration?: import('../runtime-configuration/service.js').RuntimeConfigurationState;
     }
   >;
@@ -2612,6 +2617,7 @@ Import from `@moovha/wallet-provider-kit/deployment`. [Integration guide](setup.
 - [createTransferExecutionProvider](#createtransferexecutionprovider)
 - [createWalletCallsProvider](#createwalletcallsprovider)
 - [defaultReplacementPolicy](#defaultreplacementpolicy)
+- [defaultSafeProvisioning](#defaultsafeprovisioning)
 - [defaultSponsorGas](#defaultsponsorgas)
 - [ExecutionAuthorityRequest](#executionauthorityrequest)
 - [ExecutionCloudEvent](#executioncloudevent)
@@ -2659,7 +2665,11 @@ Import from `@moovha/wallet-provider-kit/deployment`. [Integration guide](setup.
 - [RuntimePolicySnapshot](#runtimepolicysnapshot)
 - [RuntimeReview](#runtimereview)
 - [SafeAccountBinding](#safeaccountbinding)
+- [SafeDeploymentDriver](#safedeploymentdriver)
+- [SafeDeploymentPlan](#safedeploymentplan)
 - [SafeExecutionQueue](#safeexecutionqueue)
+- [SafeProvisioningConfiguration](#safeprovisioningconfiguration)
+- [SafeProvisioningService](#safeprovisioningservice)
 - [SafeQueueRecord](#safequeuerecord)
 - [SecretReference](#secretreference)
 - [ServiceIdentity](#serviceidentity)
@@ -3126,6 +3136,15 @@ export declare function createWalletCallsProvider(
 
 ```ts
 export declare const defaultReplacementPolicy: Readonly<ReplacementPolicy>;
+```
+
+### defaultSafeProvisioning
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/provisioning/defaults.ts).
+
+```ts
+/** Safe 1.4.1 canonical deployments from safe-deployments v1.37.40 and safe-contracts 1.4.1. Runtime code is checked through both RPCs before deployment. */
+export declare function defaultSafeProvisioning(): SafeProvisioningConfiguration;
 ```
 
 ### defaultSponsorGas
@@ -3640,6 +3659,7 @@ export type PinnedReplacementPolicy = {
 ```ts
 export interface ProviderConfiguration {
   network?: ProviderNetwork;
+  safeProvisioning?: import('../provisioning/safe.js').SafeProvisioningConfiguration;
   runtimeConfiguration?: RuntimeConfigurationOptions;
   localExecution?: LocalExecutionConfiguration;
   configVersion: 1;
@@ -3708,6 +3728,7 @@ export interface ProviderConfiguration {
     recoveryAcceptance?: string;
     tokenAcceptance?: string;
     executionAcceptance?: string;
+    safeProvisioningAcceptance?: string;
   };
   financial?: TransferPolicy;
   approvedCalls?: import('../execution/approved-calls.js').ApprovedCallsConfiguration;
@@ -4161,6 +4182,41 @@ export interface SafeAccountBinding extends PinnedContract {
 }
 ```
 
+### SafeDeploymentDriver
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/provisioning/safe.ts).
+
+```ts
+/** Trusted narrow deployment driver. Submit must recheck authorizeEffect immediately before a provider mutation. */
+export interface SafeDeploymentDriver {
+  prepare(plan: SafeDeploymentPlan): Promise<void>;
+  submit(
+    plan: SafeDeploymentPlan,
+    authorizeEffect: () => Promise<void>,
+  ): Promise<string>;
+}
+```
+
+### SafeDeploymentPlan
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/provisioning/safe.ts).
+
+```ts
+export interface SafeDeploymentPlan {
+  accountId: string;
+  owner: string;
+  address: string;
+  saltNonce: string;
+  data: string;
+  chainId: string;
+  factory: PinnedContract;
+  singleton: PinnedContract;
+  proxyCodeHash: string;
+  sponsor: ExecutionSponsor;
+  expiresAt: string;
+}
+```
+
 ### SafeExecutionQueue
 
 [Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/queue.ts).
@@ -4295,6 +4351,59 @@ export declare class SafeExecutionQueue {
   process(): Promise<void>;
   start(): void;
   close(): Promise<void>;
+}
+```
+
+### SafeProvisioningConfiguration
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/provisioning/safe.ts).
+
+```ts
+export interface SafeProvisioningConfiguration {
+  profile: 'safe-1.4.1';
+  factory: PinnedContract;
+  singleton: PinnedContract;
+  proxyCodeHash: string;
+  maxValiditySeconds: number;
+}
+```
+
+### SafeProvisioningService
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/provisioning/safe.ts).
+
+```ts
+/** Fixed Safe factory initialization; no caller-selected owner, modules, delegatecall, payment or native value. */
+export declare class SafeProvisioningService {
+  constructor(
+    onboarding: OnboardingService,
+    database: ProviderDatabase,
+    config: SafeProvisioningConfiguration,
+    execution: ExecutionConfiguration,
+    revision: string,
+    driver: SafeDeploymentDriver,
+    endpoints: string[],
+    network?: ProviderNetwork,
+    request?: typeof fetch,
+  );
+  read(
+    context: AuthorityContext,
+    id: string,
+  ): Promise<{
+    profile: 'safe-1.4.1';
+    chain_id: import('../networks.js').ProviderChainId;
+    address: string;
+    status: 'pending' | 'unknown' | 'ready' | 'prepared';
+  }>;
+  provision(
+    input: AuthorityContext,
+    id: string,
+  ): Promise<{
+    profile: 'safe-1.4.1';
+    chain_id: import('../networks.js').ProviderChainId;
+    address: string;
+    status: 'pending' | 'unknown' | 'ready' | 'prepared';
+  }>;
 }
 ```
 
@@ -4550,6 +4659,7 @@ export interface TransferPolicy {
 /** Operator policies explicitly delegate targets/functions; unknown contracts are denied. */
 export declare function validateApprovedCallPolicy(
   policy: ApprovedCallPolicy,
+  allowUnboundAccounts?: boolean,
 ): void;
 ```
 

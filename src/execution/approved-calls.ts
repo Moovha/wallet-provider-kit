@@ -168,10 +168,13 @@ function pin(value: PinnedContract) {
     denied();
 }
 /** Operator policies explicitly delegate targets/functions; unknown contracts are denied. */
-export function validateApprovedCallPolicy(policy: ApprovedCallPolicy): void {
+export function validateApprovedCallPolicy(
+  policy: ApprovedCallPolicy,
+  allowUnboundAccounts = false,
+): void {
   if (
     policy.mechanism !== 'safe-1.4.1' ||
-    !policy.accounts.length ||
+    (!allowUnboundAccounts && !policy.accounts.length) ||
     policy.accounts.length > 256 ||
     policy.contracts.length > 128 ||
     (policy.swaps?.length ?? 0) > 128 ||

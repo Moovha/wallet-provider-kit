@@ -171,6 +171,14 @@ function updateHttp(
       label="Execution, RPC and submission recovery test report reference"
       validation="required|length:1,256"
     />
+    <SetupField
+      v-if="model.safeProvisioning"
+      guide="executionEvidence"
+      v-model="model.activation.safeProvisioningAcceptance"
+      type="text"
+      label="Safe provisioning, gas budget and deployment recovery test report reference"
+      validation="required|length:1,256"
+    />
     <p class="help-text">
       Enter references to completed test reports or reviewed tickets. The wizard
       does not run these tests or verify the reports.

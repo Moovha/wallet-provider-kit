@@ -1,4 +1,8 @@
 import {
+  safeProvisioningIdentity,
+  type SafeProvisioningConfiguration,
+} from '../provisioning/safe.js';
+import {
   providerNetwork,
   type ProviderNetwork,
   type ProviderChainId,
@@ -116,6 +120,7 @@ export class SupportedActions {
   readonly network: ReturnType<typeof providerNetwork>;
   private readonly transferPolicy?: TransferPolicy;
   private readonly callConfiguration?: import('../execution/approved-calls.js').ApprovedCallsConfiguration;
+  private readonly configuredAccounts: import('../execution/approved-calls.js').SafeAccountBinding[];
   private get policy(): TransferPolicy {
     return this.transferPolicy ?? deny();
   }
@@ -126,12 +131,17 @@ export class SupportedActions {
     revision?: string,
     callConfiguration?: import('../execution/approved-calls.js').ApprovedCallsConfiguration,
     network?: ProviderNetwork,
+    private readonly automaticSafes:
+      SafeProvisioningConfiguration | false = false,
   ) {
     this.network = providerNetwork(network);
     this.transferPolicy = policy ? structuredClone(policy) : undefined;
     this.callConfiguration = callConfiguration
       ? structuredClone(callConfiguration)
       : undefined;
+    this.configuredAccounts = structuredClone(
+      callConfiguration?.policy.accounts ?? [],
+    );
     this.revision =
       revision ??
       fingerprint([
@@ -155,7 +165,11 @@ export class SupportedActions {
     )
       return undefined;
     const effective = snapshot
-      ? runtimeCallPolicy(this.callConfiguration.policy, snapshot)
+      ? runtimeCallPolicy(
+          this.callConfiguration.policy,
+          snapshot,
+          !!this.automaticSafes,
+        )
       : this.callConfiguration.policy;
     const { accounts: _accounts, ...policy } = effective;
     return structuredClone({
@@ -167,7 +181,47 @@ export class SupportedActions {
       policy,
     });
   }
+  private async refreshAccounts() {
+    if (!this.automaticSafes || !this.callConfiguration) return;
+    const accounts = await this.onboarding.store.transaction((state) => {
+      const deployment = state.deploymentBindings?.['service-v1'];
+      if (deployment?.activeRevision !== this.revision) deny();
+      return Object.values(deployment.safeAccounts ?? {})
+        .filter(
+          (record) =>
+            record.state === 'ready' &&
+            record.configurationHash ===
+              safeProvisioningIdentity(
+                this.automaticSafes as SafeProvisioningConfiguration,
+                this.network.name,
+              ) &&
+            record.plan.chainId === this.network.chainId &&
+            state.accounts[record.plan.accountId]?.address?.toLowerCase() ===
+              record.plan.owner.toLowerCase(),
+        )
+        .map((record) => ({
+          accountId: record.plan.accountId,
+          address: record.plan.address,
+          codeHash: record.plan.proxyCodeHash,
+          singleton: record.plan.singleton,
+        }));
+    });
+    for (const account of accounts) {
+      const previous = this.configuredAccounts.find(
+        (a) => a.accountId === account.accountId,
+      );
+      if (previous && fingerprint(previous) !== fingerprint(account)) deny();
+    }
+    this.callConfiguration.policy.accounts = [
+      ...this.configuredAccounts,
+      ...accounts.filter(
+        (a) =>
+          !this.configuredAccounts.some((b) => b.accountId === a.accountId),
+      ),
+    ];
+  }
   private async callAuthority(principal: VerifiedPrincipal) {
+    await this.refreshAccounts();
     if (!this.callConfiguration) deny();
     const snapshot = this.onboarding.runtimeContracts
       ? await this.onboarding.store.transaction((state) =>
@@ -333,6 +387,7 @@ export class SupportedActions {
     includeDenied = false,
     allowExpired = false,
   ) {
+    await this.refreshAccounts();
     this.current(record, includeDenied, allowExpired);
     await this.onboarding.store.transaction((state) =>
       this.currentRuntime(state, record),
@@ -662,7 +717,7 @@ export class SupportedActions {
         authority.policy,
         input,
         await nonce(
-          this.callConfiguration?.policy.accounts.find(
+          authority.policy.accounts.find(
             (binding) => binding.accountId === input.account_id,
           ) ?? deny(),
           account.address!,

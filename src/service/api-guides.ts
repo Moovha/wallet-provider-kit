@@ -8,6 +8,7 @@ export interface OperationGuide {
   enrollment?: boolean;
   execution?: boolean;
   safeQueue?: boolean;
+  safeProvisioning?: boolean;
   walletCalls?: boolean;
   runtimeConfiguration?: boolean;
   applicationLed?: boolean;
@@ -254,6 +255,16 @@ export const operationGuides: Record<string, OperationGuide> = {
     success:
       '200: accepted or provisioned account status. An address is present after provisioning.',
   },
+  readProvisionedSafe: {
+    title: 'Read the account’s provisioned Safe',
+    group: 'Wallet accounts',
+    scope: 'wallet:account:read',
+    permission: 'account:read',
+    prerequisite:
+      'Enable automatic Safe provisioning and use the owner account UUID with current account-read delegation. Poll this endpoint after wallet provisioning returns a pending smart_account.',
+    success:
+      '200: the deterministic Safe address and deployment status. Ready requires matching finalized proxy code and current owner, threshold, singleton, module, guard and fallback checks across both configured RPCs. Reading never submits a deployment.',
+  },
   provisionAccount: {
     title: 'Create the account’s wallet',
     group: 'Wallet accounts',
@@ -261,7 +272,7 @@ export const operationGuides: Record<string, OperationGuide> = {
     prerequisite:
       'Use the accepted account_id with current owner-granted access and an empty JSON body: {}. Keep the original idempotency key when retrying. Investigate an unknown outcome before trying again.',
     success:
-      '200: account_id and wallet address. A permitted retry returns the saved result without creating another wallet. Wallet creation does not grant spending permission.',
+      '200: account_id and signing wallet address, plus smart_account when automatic Safe provisioning is configured. Safe deployment consumes the application sponsor’s gas budget and requires operations:request delegation. Pending deployment can be polled through the Safe read endpoint. A permitted retry reuses the saved deployment attempt. Wallet creation does not grant spending permission.',
   },
   requestTransferAuthorization: {
     title: 'Request provider transfer authorization',
@@ -414,6 +425,7 @@ export interface ApiFeatures {
   financial: boolean;
   execution?: boolean;
   safeQueue?: boolean;
+  safeProvisioning?: boolean;
   walletCalls?: boolean;
   runtimeConfiguration?: boolean;
   executionService?: boolean;
@@ -433,6 +445,8 @@ export function operationUnavailableReason(
   const guide = operationGuides[id];
   if (!guide || id === 'getCapabilities' || id === 'getExecutionCapabilities')
     return undefined;
+  if (id === 'readProvisionedSafe' && !features.safeProvisioning)
+    return 'Automatic Safe provisioning is not configured';
   if (guide.runtimeConfiguration)
     return features.runtimeConfiguration
       ? undefined

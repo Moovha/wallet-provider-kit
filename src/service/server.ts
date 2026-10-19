@@ -43,6 +43,7 @@ import {
 } from './schemas.js';
 
 export interface ServerOptions {
+  safeProvisioning?: import('../provisioning/safe.js').SafeProvisioningService;
   authorizationServer?: {
     register(app: import('fastify').FastifyInstance): void;
   };
@@ -153,6 +154,7 @@ export async function createServer(options: ServerOptions = {}) {
           financial: !!options.onboarding?.actions?.consentTerms(),
           execution: !!options.onboarding?.execution,
           safeQueue: !!options.onboarding?.safeQueue,
+          safeProvisioning: !!options.safeProvisioning,
           walletCalls: !!options.walletCalls,
           runtimeConfiguration: !!options.runtimeConfiguration,
           executionService: !!options.onboarding?.executionIdentity,
@@ -515,7 +517,44 @@ export async function createServer(options: ServerOptions = {}) {
                 }
               : undefined,
           );
-      return { account_id: account.accountId, address: account.address };
+      const smart_account = await options.safeProvisioning?.provision(
+        context,
+        request.params.accountId,
+      );
+      return {
+        account_id: account.accountId,
+        address: account.address,
+        ...(smart_account ? { smart_account } : {}),
+      };
+    },
+  );
+  app.get<{ Params: { accountId: string } }>(
+    '/v1/accounts/:accountId/safe',
+    {
+      schema: {
+        operationId: 'readProvisionedSafe',
+        security: [{ accessToken: [] }],
+        params: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['accountId'],
+          properties: { accountId: uuidSchema },
+        },
+        response: {
+          200: accountSchema.properties.smart_account,
+          403: problemSchema,
+          503: problemSchema,
+        },
+      },
+      onRequest: (request) => authorize(request, 'wallet:account:read'),
+    },
+    async (request) => {
+      if (!(await isReady()) || !options.safeProvisioning)
+        throw Object.assign(new Error('Unavailable'), { statusCode: 503 });
+      return options.safeProvisioning.read(
+        { principal: principals.get(request)!, idempotencyKey: randomUUID() },
+        request.params.accountId,
+      );
     },
   );
   app.post<{ Params: { actionId: string } }>(

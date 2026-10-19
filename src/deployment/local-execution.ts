@@ -60,9 +60,15 @@ export function prepareLocalExecution(
       address: wallet.address,
       bindingRevision: '1',
     };
+    const keystore = JSON.parse(
+      wallet.encryptSync(values[engine.keystorePassphrase.env]),
+    );
+    // oz-keystore requires the lowercase Web3 Secret Storage v3 field.
+    keystore.crypto = keystore.Crypto ?? keystore.crypto;
+    delete keystore.Crypto;
     keys.push({
       name: sponsor.accountId + '.json',
-      contents: wallet.encryptSync(values[engine.keystorePassphrase.env]),
+      contents: JSON.stringify(keystore),
     });
   }
   const rpc = execution

@@ -15,8 +15,10 @@ mode or execution-provider identity.
 
 ## Operation profiles and outcome meaning
 
-The configured relayer profile uses pre-existing Safe 1.4.1 accounts with one EOA
-owner, threshold one and no enabled modules on the configured Base network. The advanced
+The configured relayer profile uses Safe 1.4.1 accounts with one EOA
+owner, threshold one and no enabled modules on the configured Base network.
+Use [automatic Safe provisioning](safe-provisioning.md) with the bundled local
+execution engine, or configure existing Safe bindings. The advanced
 [ERC-4337 driver](user-operation-execution.md) uses a separately accepted module
 profile. Both consume the common call intent and optional policy adapters.
 An EOA's existing ERC-3009 authorization is a separate compatibility mechanism;

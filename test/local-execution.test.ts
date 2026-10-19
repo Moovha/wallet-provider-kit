@@ -140,6 +140,12 @@ it('creates an ephemeral encrypted sponsor keystore matching its durable public 
   values.EXECUTION_RPC_PRIMARY_URL = 'https://rpc-one.example.test';
   values.EXECUTION_RPC_SECONDARY_URL = 'https://rpc-two.example.test';
   const prepared = prepareLocalExecution(config, values);
+  const encrypted = JSON.parse(prepared.keys[0].contents);
+  expect(encrypted.crypto).toMatchObject({
+    cipher: 'aes-128-ctr',
+    kdf: 'scrypt',
+  });
+  expect(encrypted.Crypto).toBeUndefined();
   const wallet = await Wallet.fromEncryptedJson(
     prepared.keys[0].contents,
     values.LOCAL_EXECUTION_KEYSTORE_PASSPHRASE,

@@ -148,7 +148,7 @@ maps these names to configuration, API fields and the user's consent screen.
 For your next step, follow the [operator getting-started guide](docs/README.md).
 For unsupported integrations, use the [advanced adapter guide](docs/custom-adapters.md).
 
-The [approved contract-call guide](docs/approved-contract-calls.md) explains the general execution profile, pre-existing smart-account bindings, separate consent, operation limits and verified outcome scopes.
+The [approved contract-call guide](docs/approved-contract-calls.md) explains the general execution profile, automatic or existing smart-account bindings, separate consent, operation limits and verified outcome scopes.
 
 ## A foundation for adopting teams
 
@@ -342,9 +342,11 @@ An authorization signature, transaction submission, verified chain result and
 business settlement describe different outcomes. The connected application
 arranges gas funding through its accepted execution rail. For the supplied
 coordinator, configure [execution](docs/execution.md) in Deployment. General calls
-require pre-existing, explicitly bound Safe 1.4.1 accounts; the wizard does not
-create smart accounts. Mainnet, WalletConnect and ERC-1271/4337/7702 execution are
-not enabled by this service. The separate
+use explicitly bound Safe 1.4.1 accounts, including
+[automatically provisioned Safes](docs/safe-provisioning.md) with the bundled
+execution engine. Select Base mainnet or Base Sepolia and complete acceptance
+for the selected chain. WalletConnect and ERC-1271/4337/7702 execution require
+separate integration profiles. The separate
 [orchestration draft](spec/orchestration-draft.json) describes business API routes
 that this kit does not implement.
 

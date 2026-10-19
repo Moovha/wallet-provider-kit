@@ -629,7 +629,7 @@ test('API reference follows the configuration, preserves edits, shows Swagger sc
   await expect(
     page.getByRole('heading', { name: 'Provider API reference', exact: true }),
   ).toBeVisible();
-  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(38);
+  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(39);
   await expect(
     page
       .getByText('Not enabled: Wallet operations are disabled in Deployment', {
@@ -665,13 +665,13 @@ test('API reference follows the configuration, preserves edits, shows Swagger sc
     '[Not enabled]',
   );
   expect(spec.servers).toEqual([{ url: sample.policy.provider.origin }]);
-  await page.getByLabel('Find an endpoint', { exact: true }).fill('provision');
+  await page.getByLabel('Find an endpoint', { exact: true }).fill('/provision');
   await expect(page.locator('.swagger-ui .opblock')).toHaveCount(1);
   await expect(
     page.getByLabel('cURL request example', { exact: true }),
   ).toContainText('wallet.example.com/v1/accounts/');
   await page.getByLabel('Find an endpoint', { exact: true }).fill('');
-  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(38);
+  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(39);
   await page
     .getByLabel('Example endpoint', { exact: true })
     .selectOption('signAction');
@@ -730,7 +730,7 @@ test('API reference follows the configuration, preserves edits, shows Swagger sc
     permissions: ['account:read', 'transfers:request'],
   });
   await imported(page, financial);
-  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(38);
+  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(39);
   await page
     .getByLabel('Example endpoint', { exact: true })
     .selectOption('signAction');
@@ -813,7 +813,7 @@ test('API renderer can retry a failed bundled asset without losing setup', async
   await page
     .getByRole('button', { name: 'Reload API reference', exact: true })
     .click();
-  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(38);
+  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(39);
   await page
     .getByRole('button', { name: 'Setup configuration', exact: true })
     .click();
@@ -1389,7 +1389,7 @@ test('operators can export per-Safe queue limits and multiple sponsors for one a
   await page
     .getByRole('button', { name: 'API reference', exact: true })
     .click();
-  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(38);
+  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(39);
   await page
     .getByLabel('Example endpoint', { exact: true })
     .selectOption('enqueueContractCall');
@@ -1894,4 +1894,67 @@ test('network selection defaults new drafts to Base and preserves omitted Sepoli
   await step(page, 'Provider');
   await selector.selectOption('base');
   expect((await exported(page)).network).toBe('base');
+});
+
+test('automatic Safe provisioning exports canonical pins without a static account and preserves existing bindings', async ({
+  page,
+}) => {
+  const config = JSON.parse(
+    await readFile(
+      new URL(
+        '../../docs/provider.config.contracts.example.json',
+        import.meta.url,
+      ),
+      'utf8',
+    ),
+  );
+  const { defaultLocalExecution, localSponsorIds, localExecutionOrigin } =
+    await import('../../dist/deployment/local-execution-contract.js');
+  config.localExecution = defaultLocalExecution();
+  config.execution.local = true;
+  delete config.execution.service;
+  config.execution.relayer = {
+    url: localExecutionOrigin,
+    apiKey: config.localExecution.apiKey,
+  };
+  for (const s of config.execution.sponsors)
+    s.binding = {
+      ...localSponsorIds(s.accountId),
+      address: 'managed',
+      bindingRevision: '1',
+    };
+  await imported(page, config);
+  await step(page, 'Deployment');
+  await page
+    .getByText('Automatically provision a Safe for each new wallet', {
+      exact: true,
+    })
+    .click();
+  await page
+    .getByText('Enable durable per-Safe request queues', { exact: true })
+    .click();
+  await page
+    .getByText('Enable round-robin sponsor pools', { exact: true })
+    .click();
+  await expect(
+    page.getByLabel('Automatically provision a Safe for each new wallet', {
+      exact: true,
+    }),
+  ).toBeChecked();
+  let saved = await exported(page);
+  expect(saved.execution.safeQueue).toBeDefined();
+  expect(saved.execution.sponsorPool).toBeDefined();
+  expect(saved.safeProvisioning.factory.address).toBe(
+    '0x4e1DCf7AD4e460CfD30791CCC4F9c8a4f820ec67',
+  );
+  expect(saved.approvedCalls.policy.accounts).toEqual(
+    config.approvedCalls.policy.accounts,
+  );
+  await step(page, 'Deployment');
+  await page
+    .getByRole('button', { name: 'Remove account binding', exact: true })
+    .click();
+  saved = await exported(page);
+  expect(saved.approvedCalls.policy.accounts).toEqual([]);
+  expect(saved.safeProvisioning.profile).toBe('safe-1.4.1');
 });

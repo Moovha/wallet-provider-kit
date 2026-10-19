@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased automatic Safe provisioning
+
+- Deploy a deterministic Safe 1.4.1 account for a provisioned signing wallet through the bundled execution engine. Verify pinned deployment code, sole ownership and finalized RPC agreement before enabling its approved calls.
+- Share the application gas ledger with transaction execution, retain uncertain attempts across retries and restarts, and expose read-only deployment status.
+- Configure automatic deployment and acceptance evidence in the setup wizard. Existing Safe bindings remain supported.
+
 ## Unreleased Base network and local preview
 
 - Select Base mainnet across wallet signing, runtime policies, execution verification and operator configuration; keep omitted network selections on Base Sepolia. Reject network changes to occupied stores and wrong-network actions.

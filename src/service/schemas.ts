@@ -30,6 +30,20 @@ export const accountSchema = {
   required: ['account_id', 'address'],
   properties: {
     account_id: uuidSchema,
+    smart_account: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['profile', 'chain_id', 'address', 'status'],
+      properties: {
+        profile: { type: 'string', const: 'safe-1.4.1' },
+        chain_id: { type: 'string', enum: ['eip155:8453', 'eip155:84532'] },
+        address: { type: 'string', pattern: '^0x[0-9a-fA-F]{40}$' },
+        status: {
+          type: 'string',
+          enum: ['prepared', 'pending', 'ready', 'unknown'],
+        },
+      },
+    },
     address: { type: 'string', pattern: '^0x[0-9a-fA-F]{40}$' },
   },
 };

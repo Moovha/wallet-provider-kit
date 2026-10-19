@@ -93,6 +93,7 @@ export function validateRuntimeClaims(
 export function runtimeCallPolicy(
   base: ApprovedCallPolicy,
   snapshot: RuntimePolicySnapshot,
+  allowUnboundAccounts = false,
 ): ApprovedCallPolicy {
   validateRuntimeSnapshot(snapshot);
   const { adapters: _staticAdapters, ...infrastructure } =
@@ -150,7 +151,7 @@ export function runtimeCallPolicy(
         }
       : {}),
   };
-  validateApprovedCallPolicy(policy);
+  validateApprovedCallPolicy(policy, allowUnboundAccounts);
   return policy;
 }
 export function validateRuntimeCalls(

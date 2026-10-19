@@ -543,7 +543,7 @@ export const settings = {
   approvedCalls: setting(
     'Explicit smart-account bindings and permitted contract actions.',
     'Contract-call delegation is separate from transfer delegation. Only reviewed targets, functions, swap routes and vault routes are admitted. Native value and operation limits do not bound every possible token effect of an arbitrary contract.',
-    'Use an existing single-owner Safe 1.4.1 account, verified runtime hashes and the approved EVM execution profile. Review every target and consent term before activation. The wizard does not deploy accounts or certify contracts.',
+    'Select the approved EVM execution profile and verified runtime hashes. With the bundled local engine, enable automatic single-owner Safe 1.4.1 provisioning or configure existing bindings. Fund the sponsor before provisioning and review every target and consent term before activation. Deployment does not certify contracts.',
     'approved-contract-calls.html',
   ),
 } as const;

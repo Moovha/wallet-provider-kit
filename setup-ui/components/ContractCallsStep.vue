@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { defaultSafeProvisioning } from '../../src/provisioning/defaults';
 import PolicyAdapters from './PolicyAdapters.vue';
 import SetupField from './SetupField.vue';
 import ContractPinFields from './ContractPinFields.vue';
@@ -8,6 +9,7 @@ const pin = () => ({ address: '', codeHash: '' });
 function toggle(enabled: unknown) {
   if (!enabled) {
     delete model.value.approvedCalls;
+    delete model.value.safeProvisioning;
     return;
   }
   model.value.approvedCalls = {
@@ -24,6 +26,23 @@ function toggle(enabled: unknown) {
     },
   };
 }
+function automaticSafe(enabled: unknown) {
+  if (!enabled) {
+    delete model.value.safeProvisioning;
+    return;
+  }
+  model.value.safeProvisioning = defaultSafeProvisioning();
+  if (model.value.approvedCalls)
+    model.value.approvedCalls.policy.accounts =
+      model.value.approvedCalls.policy.accounts.filter(
+        (a) =>
+          a.accountId ||
+          a.address ||
+          a.codeHash ||
+          a.singleton.address ||
+          a.singleton.codeHash,
+      );
+}
 </script>
 <template>
   <section class="feature-panel">
@@ -37,9 +56,10 @@ function toggle(enabled: unknown) {
       @update:modelValue="toggle"
     />
     <p>
-      Choose the approved EVM execution profile first. Configure pre-existing
-      Safe accounts explicitly; assets used by these calls must be held by those
-      accounts. Applications need separate contracts:request consent.
+      Choose the approved EVM execution profile first. Use automatic Safe
+      provisioning with the bundled local execution engine, or configure
+      existing Safe accounts. Assets used by these calls must be held by the
+      Safe. Applications need separate contracts:request consent.
     </p>
     <template v-if="model.approvedCalls">
       <SetupField
@@ -71,7 +91,49 @@ function toggle(enabled: unknown) {
           validation="required"
         />
       </div>
-      <h4>Safe account bindings</h4>
+      <SetupField
+        guide="approvedCalls"
+        type="checkbox"
+        label="Automatically provision a Safe for each new wallet"
+        :modelValue="!!model.safeProvisioning"
+        :disabled="!model.execution?.local"
+        @update:modelValue="automaticSafe"
+      />
+      <section v-if="model.safeProvisioning" class="feature-panel">
+        <p>
+          The signing wallet is the Safe’s sole owner with threshold one.
+          Deployment uses the application sponsor and shares its gas budget. The
+          service verifies the pinned factory, singleton and proxy code through
+          both RPCs. No modules, guard, fallback handler or setup payment are
+          installed.
+        </p>
+        <ContractPinFields
+          :implementationAllowed="false"
+          label="Safe proxy factory"
+          v-model="model.safeProvisioning.factory"
+        />
+        <ContractPinFields
+          :implementationAllowed="false"
+          label="Safe singleton"
+          v-model="model.safeProvisioning.singleton"
+        />
+        <SetupField
+          guide="approvedCalls"
+          type="text"
+          label="Safe proxy runtime code hash"
+          v-model="model.safeProvisioning.proxyCodeHash"
+          validation="required"
+        />
+        <SetupField
+          guide="approvedCalls"
+          type="number"
+          :number="true"
+          label="Safe deployment dispatch validity (seconds)"
+          v-model="model.safeProvisioning.maxValiditySeconds"
+          validation="required|between:30,900"
+        />
+      </section>
+      <h4>Existing Safe account bindings</h4>
       <section
         v-for="(account, index) in model.approvedCalls.policy.accounts"
         :key="index"

@@ -231,6 +231,10 @@ export interface ProviderState {
       activeRevision?: string;
       transportRevision?: string;
       accessMode?: 'application' | 'hosted';
+      safeAccounts?: Record<
+        string,
+        import('../provisioning/safe.js').SafeDeploymentRecord
+      >;
       runtimeConfiguration?: import('../runtime-configuration/service.js').RuntimeConfigurationState;
     }
   >;
