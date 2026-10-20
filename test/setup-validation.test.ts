@@ -32,16 +32,6 @@ it('points operators to the visible step and repeated field instead of a JSON pa
   expect(message).not.toContain('monthlyLimitMinor');
 });
 
-it('explains conflicting transfer limits without exposing configuration property names', () => {
-  const message = explainIssue(
-    '/financial/maximumAmount: must not exceed lifetimeAmount',
-  );
-  expect(message).toContain(
-    'maximum per transfer cannot exceed the total limit',
-  );
-  expect(message).not.toContain('lifetimeAmount');
-});
-
 it('does not reflect unknown imported fields or unexpected diagnostic text into the UI', () => {
   const unknownField = explainIssue(
     '/identity/didit/private-fixture-reference: additionalProperties',

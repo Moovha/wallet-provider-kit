@@ -70,7 +70,7 @@ describe('real OWS 1.4.3 offline engine integration', () => {
         action_id: randomUUID(),
         operation_id: randomUUID(),
         kind: 'sign_typed_data',
-        profile: 'evm_eoa_v1',
+        profile: 'safe_owner_v1',
         profile_revision: '1',
         status: 'ready',
         chain_id: 'eip155:84532',

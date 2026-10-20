@@ -10,11 +10,6 @@ import type {
   SigningAuthority,
 } from '../domain/embedded-wallet.js';
 import type { AuthorityContext } from '../domain/principal.js';
-import type {
-  RelayerExecutionAuthority,
-  RelayerExecutionAuthorityRecord,
-} from '../domain/relayer-execution.js';
-import { validateRelayerAction } from '../domain/relayer-execution.js';
 import type { WalletAttemptRequest } from '../domain/attempt-journal.js';
 import { WalletProviderError } from '../domain/signing.js';
 import { evmTypedDataPayload } from '../providers/evm-typed-data.js';
@@ -29,28 +24,18 @@ import type {
 } from './types.js';
 
 export function approvalId(approval: FinancialApproval) {
-  return approval.action.kind === 'sign_typed_data'
-    ? approval.action.action_id
-    : approval.action.actionId;
+  return approval.action.action_id;
 }
 
 function revisions(approval: FinancialApproval) {
   const action = approval.action;
-  return action.kind === 'sign_typed_data'
-    ? {
-        bindingRevision: action.binding_revision,
-        capabilityRevision: action.capability_revision,
-        planRevision: action.plan_revision,
-        planHash: action.plan_hash,
-        expiresAt: action.expires_at,
-      }
-    : {
-        bindingRevision: action.bindingRevision,
-        capabilityRevision: action.capabilityRevision,
-        planRevision: action.planRevision,
-        planHash: action.planHash,
-        expiresAt: action.expiresAt,
-      };
+  return {
+    bindingRevision: action.binding_revision,
+    capabilityRevision: action.capability_revision,
+    planRevision: action.plan_revision,
+    planHash: action.plan_hash,
+    expiresAt: action.expires_at,
+  };
 }
 
 export function validateApproval(
@@ -105,13 +90,7 @@ export function validateApproval(
         approval.action,
         networkForChain(approval.action.chain_id),
       );
-  } else
-    validateRelayerAction(
-      approval.account,
-      approval.action,
-      unexpired,
-      networkForChain(approval.action.chainId),
-    );
+  } else throw new WalletProviderError('wallet_provider_input');
 }
 
 export function loadApproval(
@@ -211,10 +190,7 @@ function matches(
     current.address.toLowerCase() === approval.account.address.toLowerCase() &&
     typeof current.chainAccountId === 'string' &&
     current.chainAccountId.toLowerCase() ===
-      (approval.action.kind === 'sign_typed_data'
-        ? approval.action.chain_account_id
-        : approval.action.chainAccountId
-      ).toLowerCase() &&
+      approval.action.chain_account_id.toLowerCase() &&
     current.grantId === approval.grantId &&
     current.consentReference === approval.consentReference &&
     current.policyRevision === approval.policyRevision &&
@@ -244,7 +220,7 @@ export function sqliteFinancialAuthority(
   async function permitted(
     input: AuthorityContext,
     approval: FinancialApproval,
-    purpose: 'sign' | 'submit' | 'status',
+    purpose: 'sign' | 'status',
   ): Promise<boolean> {
     const context = structuredClone(input);
     if (
@@ -281,15 +257,14 @@ export function sqliteFinancialAuthority(
   async function admit(
     input: AuthorityContext,
     id: string,
-    purpose: 'sign' | 'submit' | 'status',
+    purpose: 'sign' | 'status',
   ) {
     const context = structuredClone(input);
     if (!uuid.test(id)) throw new WalletProviderError('wallet_provider_input');
     const approval = loadApproval(connection, id, purpose !== 'status');
     if (
       !approval ||
-      ((purpose === 'sign') !== (approval.action.kind === 'sign_typed_data') &&
-        purpose !== 'status') ||
+      approval.action.kind !== 'sign_typed_data' ||
       !(await permitted(context, approval, purpose))
     )
       return null;
@@ -379,31 +354,6 @@ export function sqliteFinancialAuthority(
       };
     },
   };
-  const executionAuthority: RelayerExecutionAuthority = {
-    async execution(
-      context,
-      id,
-      purpose,
-    ): Promise<RelayerExecutionAuthorityRecord | null> {
-      const admitted = await admit(context, id, purpose);
-      if (!admitted || admitted.approval.action.kind !== 'relay_transaction')
-        return null;
-      const { approval, attemptId } = admitted;
-      const action = admitted.approval.action;
-      return {
-        sessionSubject: approval.ownerSubject,
-        ownerSubject: approval.ownerSubject,
-        currentUserStatus: 'ID VERIFIED',
-        accountId: approval.account.accountId,
-        attemptId,
-        account: approval.account,
-        bindingRevision: action.bindingRevision,
-        capabilityRevision: action.capabilityRevision,
-        action,
-      };
-    },
-  };
-
   async function authorizeRequest(
     input: WalletAttemptRequest,
     status: boolean,
@@ -431,20 +381,11 @@ export function sqliteFinancialAuthority(
     )
       return false;
     const context: AuthorityContext = JSON.parse(String(row.context));
-    return permitted(
-      context,
-      approval,
-      status
-        ? 'status'
-        : approval.action.kind === 'sign_typed_data'
-          ? 'sign'
-          : 'submit',
-    );
+    return permitted(context, approval, status ? 'status' : 'sign');
   }
 
   return {
     authority,
-    executionAuthority,
     journal: sqliteJournal(connection),
     authorizeAttempt: (request: WalletAttemptRequest) =>
       authorizeRequest(request, false),

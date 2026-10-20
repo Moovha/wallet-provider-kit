@@ -18,7 +18,6 @@ describe('live API explorer boundaries', () => {
     const live = liveApiSpecification(contract, {
       onboarding: true,
       enrollment: false,
-      financial: true,
       wallet: true,
       flow: 'application',
     });
@@ -53,7 +52,6 @@ describe('live API explorer boundaries', () => {
       const live = liveApiSpecification(contract, {
         onboarding: true,
         enrollment: false,
-        financial: false,
         wallet: true,
         flow,
         records: flow === 'hosted',
@@ -62,9 +60,7 @@ describe('live API explorer boundaries', () => {
         Object.keys(contract.paths).sort(),
       );
       for (const path of [
-        '/v1/transfer-authorizations',
-        '/v1/actions/{actionId}/sign',
-        '/v1/actions/{actionId}/transaction-events',
+        '/v1/accounts/{accountId}/wallet',
         '/v1/enrollments',
       ]) {
         expect(live.paths[path].post.summary).toContain('[Not enabled]');
@@ -77,22 +73,20 @@ describe('live API explorer boundaries', () => {
         live.paths['/v1/access-grants/{grantId}/revoke'].post.summary,
       ).toContain(flow === 'application' ? '[Configured]' : '[Not enabled]');
       expect(live.info.description).toContain(
-        'POST /v1/actions/{actionId}/execute',
+        'sponsored Safe ERC-4337 UserOperation',
       );
     }
     const embedded = liveApiSpecification(contract, {
       onboarding: false,
       enrollment: true,
-      financial: false,
       wallet: true,
-      signing: true,
     });
     expect(embedded.paths['/v1/enrollments'].post.summary).toContain(
       '[Configured]',
     );
     expect(
-      embedded.paths['/v1/actions/{actionId}/sign'].post.summary,
-    ).toContain('[Configured]');
+      embedded.paths['/v1/accounts/{accountId}/wallet'].post.summary,
+    ).toContain('[Not enabled]');
     expect(embedded.paths['/v1/access-requests'].post.summary).toContain(
       '[Not enabled]',
     );

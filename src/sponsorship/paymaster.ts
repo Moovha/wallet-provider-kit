@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { WalletProviderError } from '../domain/signing.js';
 import { text, uuid } from '../onboarding/policy.js';
-import { record } from '../providers/relayer-client.js';
+import { record } from '../domain/json.js';
 import {
   maximumUserOperationCostV07,
   normalizeUserOperationV07,

@@ -833,7 +833,7 @@ describe('enrollment HTTP boundary', () => {
         headers: f.headers,
         payload: {},
       });
-    expect((await provision()).statusCode).toBe(403);
+    expect((await provision()).statusCode).toBe(503);
     const token = await proof(record);
     const completed = await f.app.inject({
       method: 'POST',
@@ -846,7 +846,7 @@ describe('enrollment HTTP boundary', () => {
     expect(completed.body).not.toMatch(
       /Example|Person|birthdate|nonce|proofHash|id_token/,
     );
-    expect((await provision()).statusCode).toBe(200);
+    expect((await provision()).statusCode).toBe(503);
     const read = await f.app.inject({
       method: 'GET',
       url: `/v1/enrollments/${record.enrollmentId}`,

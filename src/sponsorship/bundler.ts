@@ -2,7 +2,7 @@ import { rpcCapacity } from '../execution/rpc-capacity.js';
 import { randomUUID } from 'node:crypto';
 import { concat, toBeHex } from 'ethers';
 import { WalletProviderError } from '../domain/signing.js';
-import { record } from '../providers/relayer-client.js';
+import { record } from '../domain/json.js';
 import {
   normalizeUserOperationV07,
   normalizeUserOperationDomainV07,

@@ -71,17 +71,17 @@ export class OnboardingService {
     readonly store: OnboardingStore,
     adapters: IdentityAdapter[] = [],
     private readonly walletReader?: Pick<WalletSigningProvider, 'findAccount'>,
-    private readonly transferPolicyRevision?: string,
+    private readonly actionPolicyRevision?: string,
     readonly runtimeContracts = false,
     readonly safeOnlyWallet = false,
   ) {
     const resolved = defineOnboardingPolicy(input);
     if (
       (resolved.identity.records &&
-        (adapters.length || transferPolicyRevision)) ||
+        (adapters.length || actionPolicyRevision)) ||
       (resolved.access.mode === 'application' && adapters.length > 0) ||
       (runtimeContracts &&
-        (resolved.access.mode !== 'application' || !transferPolicyRevision))
+        (resolved.access.mode !== 'application' || !actionPolicyRevision))
     )
       throw new WalletProviderError('wallet_provider_configuration');
     this.policy = Object.freeze({
@@ -129,15 +129,15 @@ export class OnboardingService {
   ) {
     return this.runtimeContracts
       ? fingerprint([
-          this.transferPolicyRevision,
+          this.actionPolicyRevision,
           currentRuntimePolicy(state, principal),
         ])
-      : this.transferPolicyRevision;
+      : this.actionPolicyRevision;
   }
   private requestRevisionCurrent(state: ProviderState, request: AccessRequest) {
     try {
       return (
-        request.transferPolicyRevision ===
+        request.actionPolicyRevision ===
         this.actionRevision(state, request.caller)
       );
     } catch {
@@ -152,7 +152,6 @@ export class OnboardingService {
       return {
         ...terms,
         action_policy_revision: this.actionRevision(state, principal),
-        transfer_policy_revision: this.actionRevision(state, principal),
         required_fields: [
           ...new Set([
             ...terms.required_fields,
@@ -174,9 +173,9 @@ export class OnboardingService {
       request.revision !== this.policy.revision ||
       (!allowExpired && request.expiresAt <= Date.now()) ||
       (request.input.authorization_details[0].actions.some((permission) =>
-        ['transfers:request', 'contracts:request'].includes(permission),
+        ['contracts:request'].includes(permission),
       ) &&
-        (!this.transferPolicyRevision ||
+        (!this.actionPolicyRevision ||
           !this.requestRevisionCurrent(state, request)))
     )
       deny();
@@ -204,7 +203,7 @@ export class OnboardingService {
     if (
       request.revision !== this.policy.revision ||
       (request.input.authorization_details[0].actions.some((permission) =>
-        ['transfers:request', 'contracts:request'].includes(permission),
+        ['contracts:request'].includes(permission),
       ) &&
         !this.requestRevisionCurrent(state, request))
     )
@@ -271,10 +270,9 @@ export class OnboardingService {
       this.policy.access.mode === 'application',
     );
     const delegatesTransfers = input.authorization_details[0].actions.some(
-      (permission) =>
-        ['transfers:request', 'contracts:request'].includes(permission),
+      (permission) => ['contracts:request'].includes(permission),
     );
-    if (delegatesTransfers && !this.transferPolicyRevision) deny();
+    if (delegatesTransfers && !this.actionPolicyRevision) deny();
     const key = fingerprint([
       context.principal.issuer,
       context.principal.subject,
@@ -319,9 +317,7 @@ export class OnboardingService {
         input,
         ...(snapshot ? { runtimePolicy: snapshot } : {}),
         revision: this.policy.revision,
-        ...(delegatesTransfers
-          ? { transferPolicyRevision: actionRevision }
-          : {}),
+        ...(delegatesTransfers ? { actionPolicyRevision: actionRevision } : {}),
         createdAt: Date.now(),
         expiresAt: Date.now() + day,
         accountId: input.account_id ?? randomUUID(),
@@ -421,10 +417,9 @@ export class OnboardingService {
     return {
       flow: this.policy.access.mode,
       policy_revision: this.policy.revision,
-      ...(this.transferPolicyRevision
+      ...(this.actionPolicyRevision
         ? {
-            transfer_policy_revision: this.transferPolicyRevision,
-            action_policy_revision: this.transferPolicyRevision,
+            action_policy_revision: this.actionPolicyRevision,
           }
         : {}),
       max_identity_age_days: this.policy.identity.maxAgeDays,
@@ -606,8 +601,8 @@ export class OnboardingService {
       owner: request.owner,
       caller: request.caller,
       permissions: [...request.input.authorization_details[0].actions],
-      ...(request.transferPolicyRevision
-        ? { transferPolicyRevision: request.transferPolicyRevision }
+      ...(request.actionPolicyRevision
+        ? { actionPolicyRevision: request.actionPolicyRevision }
         : {}),
       revision: this.policy.revision,
       expiresAt: Math.min(
@@ -1181,16 +1176,12 @@ export class OnboardingService {
         (!permission || g.permissions.includes(permission)),
     );
     if (!grant) deny();
-    if (
-      permission === 'transfers:request' ||
-      permission === 'contracts:request'
-    ) {
+    if (permission === 'contracts:request') {
       const request = state.requests[grant.requestId];
       const consent = request?.consent;
       if (
-        !this.transferPolicyRevision ||
-        grant.transferPolicyRevision !==
-          this.actionRevision(state, principal) ||
+        !this.actionPolicyRevision ||
+        grant.actionPolicyRevision !== this.actionRevision(state, principal) ||
         !request ||
         !this.requestRevisionCurrent(state, request) ||
         !consent ||

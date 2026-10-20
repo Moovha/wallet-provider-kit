@@ -248,6 +248,7 @@ async function setup(
           id,
           version: '2.0.0',
           atomicRequired: true,
+          capabilities: { applicationAction: f.input.application_action },
           chainId: '0x14a34',
           calls: (nativeRecipient
             ? [{ to: nativeRecipient, value: '4', data: '0x' }]
@@ -453,15 +454,7 @@ describe('ERC-4337 wallet calls durable submission and independent receipt recov
     t.s.lost = true;
     await t.submit();
     await t.ports.driver.runOnce();
-    const plan = (
-      await t.f.onboarding.store.transaction((s) =>
-        Object.values(s.userOperationExecutions!),
-      )
-    )[0];
     const before = await t.f.onboarding.store.transaction((s) => s.budgets);
-    await expect(
-      t.f.relay().authority.sign(t.f.context, plan.operationId),
-    ).rejects.toBeDefined();
     t.s.included = true;
     t.s.success = false;
     t.s.finalized = true;

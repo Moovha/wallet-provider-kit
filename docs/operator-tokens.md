@@ -82,8 +82,6 @@ along with the existing `/onboarding/callback`. Preserve the configured public
 Host header through ingress; forwarded host headers are not trusted. Restrict documentation at ingress
 according to your operator access policy. Use your real HTTPS origin.
 
-![Optional operator token configuration with subjects, application secret variable and scope limits](public/screenshots/operator-token-setup.webp)
-
 ## Get a token and send a request
 
 Open the wizard's **Open deployed Try it out** link, or your provider's HTTPS
@@ -106,8 +104,6 @@ Changing the application/scopes clears the previous token. Managed token control
 also clear Swagger's manual bearer authorization to avoid mixing callers.
 POST calls have real effects, including durable records, vendor charges and
 signatures that may authorize later transactions. This panel is not a simulator.
-
-![Application tokens panel with Get token, Renew token, Clear token and expiry countdown](public/screenshots/operator-tokens.webp)
 
 These interface screenshots use an offline fixture, invented identities and no
 real application secret or valid API token. They illustrate the controls without

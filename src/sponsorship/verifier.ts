@@ -1,5 +1,5 @@
 import { etherscanEndpoint } from '../execution/etherscan.js';
-import { serviceHash } from '../executor/auth.js';
+import { canonicalHash } from '../domain/canonical.js';
 import { RpcEndpointPool } from '../execution/rpc-pool.js';
 import { allowsEmptyRecipientCode } from '../execution/approved-calls.js';
 import { vaultInterface } from '../execution/operation-interfaces.js';
@@ -39,7 +39,7 @@ export interface Safe4337Acceptance {
   aggregateReads?: boolean;
   observationRpcUrls?: string[];
 }
-/** Independent chain reads at a common block. No module installation or relaxation of the SafeTx verifier. */
+/** Independent chain reads at a common block. Checks only the accepted ERC-4337 account configuration. */
 export class Safe4337Verifier {
   private readonly config: Safe4337Acceptance;
   private readonly readers: RpcReader[];
@@ -224,7 +224,7 @@ export class Safe4337Verifier {
                 });
           if (!/^0x[0-9a-f]{64}$/.test(block?.hash) || block.number !== tag)
             throw new Error();
-          const proofKey = serviceHash([
+          const proofKey = canonicalHash([
             this.readers.indexOf(r),
             tag,
             block.hash,

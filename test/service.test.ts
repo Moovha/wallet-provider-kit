@@ -152,7 +152,7 @@ describe('provider HTTP boundary', () => {
     });
     expect((await app.inject('/docs/')).body).toContain('swagger-ui');
     expect((await app.inject('/openapi.json')).json().paths).toHaveProperty(
-      '/v1/actions/{actionId}/sign',
+      '/v1/accounts/{accountId}/wallet',
     );
     expect(
       (
@@ -175,16 +175,16 @@ describe('provider HTTP boundary', () => {
     expect(live.paths['/v1/enrollments'].post.summary).toContain(
       '[Not enabled]',
     );
-    expect(live.paths['/v1/actions/{actionId}/sign'].post.summary).toContain(
-      '[Not enabled]',
-    );
+    expect(
+      live.paths['/v1/accounts/{accountId}/wallet'].post.summary,
+    ).toContain('[Not enabled]');
     expect(live.servers).toEqual([{ url: '/' }]);
     expect(live.info.description).toContain('Execute sends a real request');
     expect(
       live.paths['/v1/accounts/{accountId}/provision'].post.description,
     ).toContain('wallet:provision');
     const canonical = (await app.inject('/openapi.json')).json();
-    expect(canonical.paths).toHaveProperty('/v1/actions/{actionId}/sign');
+    expect(canonical.paths).toHaveProperty('/v1/accounts/{accountId}/wallet');
     expect(canonical.info.title).toBe('Moovha Wallet Provider Service');
     const initializer = (
       await app.inject('/docs/static/swagger-initializer.js')
@@ -195,63 +195,6 @@ describe('provider HTTP boundary', () => {
     servers.push(disabled);
     expect((await disabled.inject('/docs/')).statusCode).toBe(404);
   });
-  it('passes verified identity and idempotency context, never body authority', async () => {
-    const { app, headers, provision, provider } = await fixture();
-    const response = await app.inject({
-      method: 'POST',
-      url: `/v1/accounts/${accountId}/provision`,
-      headers,
-      payload: {},
-    });
-    expect(response.statusCode).toBe(200);
-    expect(response.headers['cache-control']).toBe('no-store');
-    expect(provision).toHaveBeenCalledWith(
-      expect.objectContaining({
-        principal: expect.objectContaining({
-          clientId: 'client-a',
-          subject: 'owner-a',
-        }),
-        idempotencyKey: attemptId,
-      }),
-      accountId,
-    );
-    expect(provider.createAccount).toHaveBeenCalledWith(accountId, attemptId);
-  });
-  it.each(['INCOMPLETE', 'REJECTED', null])(
-    'denies stored KYC %s before side effects',
-    async (status) => {
-      const { app, headers, provider } = await fixture(status);
-      const response = await app.inject({
-        method: 'POST',
-        url: `/v1/accounts/${accountId}/provision`,
-        headers,
-        payload: {},
-      });
-      expect(response.statusCode).toBe(403);
-      expect(response.headers['content-type']).toContain(
-        'application/problem+json',
-      );
-      expect(provider.createAccount).not.toHaveBeenCalled();
-    },
-  );
-  it.each([{ sub: 'owner-b' }, { client_id: 'client-b' }])(
-    'isolates account access for %j',
-    async (claims) => {
-      const { app, headers, provider } = await fixture();
-      headers.authorization = `Bearer ${await token(claims)}`;
-      expect(
-        (
-          await app.inject({
-            method: 'POST',
-            url: `/v1/accounts/${accountId}/provision`,
-            headers,
-            payload: {},
-          })
-        ).statusCode,
-      ).toBe(403);
-      expect(provider.createAccount).not.toHaveBeenCalled();
-    },
-  );
   it('rejects malformed authorization before parsing the body or consulting authority', async () => {
     const { app, headers, provision } = await fixture();
     headers.authorization = 'Bearer invalid';
@@ -309,89 +252,6 @@ describe('provider HTTP boundary', () => {
     ).toBe(413);
     expect(provision).not.toHaveBeenCalled();
   });
-  it('retains unknown provider outcome without leaking exceptions', async () => {
-    const { app, headers, provider } = await fixture();
-    vi.mocked(provider.createAccount).mockRejectedValue(
-      new WalletProviderError('wallet_provider_unavailable', 'unknown'),
-    );
-    const response = await app.inject({
-      method: 'POST',
-      url: `/v1/accounts/${accountId}/provision`,
-      headers,
-      payload: {},
-    });
-    expect(response.statusCode).toBe(503);
-    expect(response.json()).toMatchObject({
-      outcome: 'unknown',
-      code: 'wallet_provider_unavailable',
-    });
-    expect(response.body).not.toContain('stack');
-  });
-  it('signs only the stored approved action after successful authorization', async () => {
-    const { headers, provider } = await fixture();
-    const stored: SigningAuthority = {
-      sessionSubject: 'owner-a',
-      ownerSubject: 'owner-a',
-      currentUserStatus: 'ID VERIFIED',
-      accountId,
-      attemptId,
-      account: { accountId, address: '0x' + '1'.repeat(40) },
-      chainAccountId: 'eip155:84532:0x' + '1'.repeat(40),
-      bindingRevision: '1',
-      capabilityRevision: '1',
-      action: {
-        action_id: accountId,
-        operation_id: attemptId,
-        kind: 'sign_typed_data',
-        profile: 'evm_eoa_v1',
-        profile_revision: '1',
-        status: 'ready',
-        chain_id: 'eip155:84532',
-        chain_account_id: 'eip155:84532:0x' + '1'.repeat(40),
-        binding_revision: '1',
-        capability_revision: '1',
-        plan_revision: '1',
-        plan_hash: '0x' + '1'.repeat(64),
-        dependencies: [],
-        expires_at: new Date(Date.now() + 60000).toISOString(),
-        payload_hash: '0x' + '2'.repeat(64),
-        payload: {
-          domain: { chainId: '84532' },
-          types: { Proof: [{ name: 'challenge', type: 'string' }] },
-          primaryType: 'Proof',
-          message: { challenge: 'offline-route-fixture' },
-        },
-      },
-    };
-    const sign = vi.fn(async () => stored);
-    const service = new EmbeddedWalletService(
-      { provision: async () => null, sign },
-      provider,
-    );
-    const app = await createServer({
-      authenticate,
-      service,
-      ready: async () => true,
-    });
-    servers.push(app);
-    const response = await app.inject({
-      method: 'POST',
-      url: `/v1/actions/${accountId}/sign`,
-      headers,
-      payload: {},
-    });
-    expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual({ signature: '0x' + '1'.repeat(130) });
-    expect(sign).toHaveBeenCalledWith(
-      expect.objectContaining({ idempotencyKey: attemptId }),
-      accountId,
-    );
-    expect(provider.signTypedData).toHaveBeenCalledWith(
-      stored.account,
-      stored.action,
-      attemptId,
-    );
-  });
 
   it('does not dispatch when the readiness check fails or throws', async () => {
     const { headers, provider } = await fixture();
@@ -418,48 +278,6 @@ describe('provider HTTP boundary', () => {
         ).statusCode,
       ).toBe(503);
     }
-    expect(provider.createAccount).not.toHaveBeenCalled();
-  });
-
-  it('denies signing when authoritative action is absent', async () => {
-    const { app, headers, provider } = await fixture();
-    expect(
-      (
-        await app.inject({
-          method: 'POST',
-          url: `/v1/actions/${accountId}/sign`,
-          headers,
-          payload: {},
-        })
-      ).statusCode,
-    ).toBe(403);
-    expect(provider.signTypedData).not.toHaveBeenCalled();
-  });
-  it('fails closed when a dependency becomes unavailable', async () => {
-    const { headers, provider } = await fixture();
-    const service = new EmbeddedWalletService(
-      {
-        provision: async () => {
-          throw new Error('credential-bearing-storage-error');
-        },
-        sign: async () => null,
-      },
-      provider,
-    );
-    const app = await createServer({
-      authenticate,
-      service,
-      ready: async () => true,
-    });
-    servers.push(app);
-    const response = await app.inject({
-      method: 'POST',
-      url: `/v1/accounts/${accountId}/provision`,
-      headers,
-      payload: {},
-    });
-    expect(response.statusCode).toBe(500);
-    expect(response.body).not.toContain('credential-bearing-storage-error');
     expect(provider.createAccount).not.toHaveBeenCalled();
   });
 });

@@ -48,10 +48,7 @@ async function bootstrap(maximum: string, invisibleBlocks = 0) {
   f.runtime.withRpc = async (_id, work) => work(['https://rpc.example.test']);
   const config = JSON.parse(
     await readFile(
-      new URL(
-        '../docs/provider.config.application.example.json',
-        import.meta.url,
-      ),
+      new URL('../docs/provider.config.safe.example.json', import.meta.url),
       'utf8',
     ),
   ) as ProviderConfiguration;

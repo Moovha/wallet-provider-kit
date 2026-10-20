@@ -23,18 +23,3 @@ export type {
   WalletAttemptFailure,
   WalletAttemptClaim,
 } from './domain/attempt-journal.js';
-
-export {
-  createDurableSigningService,
-  createStoredWalletBackend,
-} from './backend.js';
-export type {
-  StoredSigningResult,
-  StoredSigningDispatch,
-  StoredSigningAuthority,
-  StoredTypedDataSigner,
-  StoredAccountRecord,
-  StoredAccountResult,
-  StoredAccountAuthority,
-  StoredWalletBackendConfiguration,
-} from './backend.js';

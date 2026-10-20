@@ -44,10 +44,7 @@ import {
 
 export interface ServerOptions {
   requestsPerMinute?: number;
-  safeProvisioning?: import('../provisioning/safe.js').SafeProvisioningService;
   safeWallet?: import('../sponsorship/safe-wallet.js').SafeWalletRuntime;
-  applicationSafes?: import('../provisioning/application.js').ApplicationSafeService;
-  applicationSponsors?: import('../provisioning/application-sponsor.js').ApplicationSponsorService;
   authorizationServer?: {
     register(app: import('fastify').FastifyInstance): void;
   };
@@ -61,16 +58,11 @@ export interface ServerOptions {
   onboarding?: OnboardingHttpOptions;
   /** Must check durable authority/recovery dependencies; never infer readiness from env keys. */
   ready?: () => Promise<boolean>;
-  operationsHealth?: () => Promise<
-    import('../execution/operations.js').OperationsHealth
-  >;
   documentation?: boolean;
   /** Optional operator-authenticated client-credentials broker for the deployed explorer. */
   documentationTokens?: DocumentationTokenOptions;
   configurationProfile?: 'provider-service-v1';
-  actionProfiles?: readonly (
-    'provider-authorized-erc3009-v1' | 'provider-approved-contracts-v1'
-  )[];
+  actionProfiles?: readonly 'provider-approved-contracts-v1'[];
   /** Release host-owned resources when the service closes. Registered before ready. */
   onClose?: () => Promise<void>;
 }
@@ -112,17 +104,10 @@ export async function createServer(options: ServerOptions = {}) {
         title: 'Moovha Wallet Provider Service',
         version: '0.1.0',
         description:
-          'Experimental wallet-provider API. Configured deployments use one Safe account per user, private ERC-4337 v0.7 bundling and an application-owned verifying paymaster. Applications submit policy-approved calls through the account wallet endpoint and observe independently verified inclusion. Current owner, identity, consent, immutable calls and durable attempt authority precede effects. Acknowledgement, wallet inclusion and business settlement are distinct. Low-level signing and historical host interfaces are retained as reference contracts; they do not select another supported configured execution flow. Not the Moovha operation orchestration API.',
+          'Experimental wallet-provider API. Configured deployments use one Safe account per user, private ERC-4337 v0.7 bundling and an application-owned verifying paymaster. Applications submit policy-approved calls through the account wallet endpoint and observe independently verified inclusion. Current owner, identity, consent, immutable calls and durable attempt authority precede effects. Acknowledgement, wallet inclusion and business settlement are distinct. Not the Moovha operation orchestration API.',
       },
       components: {
         securitySchemes: {
-          serviceProof: {
-            type: 'http',
-            scheme: 'bearer',
-            bearerFormat: 'wpk-service-request+jwt',
-            description:
-              'Request-bound proof produced by the designated executor. Application tokens and private keys are not accepted here; this callback cannot be executed by the application-token explorer.',
-          },
           accessToken: {
             type: 'http',
             scheme: 'bearer',
@@ -162,20 +147,9 @@ export async function createServer(options: ServerOptions = {}) {
         liveApiSpecification(document, {
           onboarding: !!options.onboarding,
           enrollment: !!options.enrollment,
-          financial: !!options.onboarding?.actions?.consentTerms(),
-          execution: !!options.onboarding?.execution,
-          nonceCancellation:
-            !!options.onboarding?.execution?.nonceCancellationEnabled,
-          safeQueue: !!options.onboarding?.safeQueue,
-          safeProvisioning: !!options.safeProvisioning,
           walletCalls: !!options.walletCalls,
           safeWallet: !!options.safeWallet,
           runtimeConfiguration: !!options.runtimeConfiguration,
-          executionService: !!options.onboarding?.executionIdentity,
-          contractCalls: !!options.onboarding?.contractNonce,
-          signing:
-            !!options.onboarding?.actions?.consentTerms() ||
-            (!!options.service && !options.configurationProfile),
           wallet:
             !!options.service && !!options.authenticate && !!options.ready,
           flow: options.onboarding?.service.policy.access.mode,
@@ -287,18 +261,36 @@ export async function createServer(options: ServerOptions = {}) {
       const ready = await isReady();
       return reply.code(ready ? 200 : 503).send({
         status: ready ? 'ready' : 'unconfigured',
-        ...(options.operationsHealth
-          ? {
-              operations: await options
-                .operationsHealth()
-                .catch(() => ({ status: 'unavailable' })),
-            }
-          : {}),
       });
     },
   );
   app.get('/openapi.json', { schema: { hide: true } }, async () =>
     app.swagger(),
+  );
+  app.get(
+    '/v1/execution-capabilities',
+    {
+      schema: {
+        operationId: 'getExecutionCapabilities',
+        response: {
+          200: {
+            type: 'object',
+            additionalProperties: false,
+            required: ['profile', 'revision', 'configured'],
+            properties: {
+              profile: { const: 'safe-only-4337-v1' },
+              revision: { const: '1' },
+              configured: { type: 'boolean' },
+            },
+          },
+        },
+      },
+    },
+    async () => ({
+      profile: 'safe-only-4337-v1',
+      revision: '1',
+      configured: !!options.safeWallet && (await isReady()),
+    }),
   );
   app.get(
     '/v1/capabilities',
@@ -311,7 +303,7 @@ export async function createServer(options: ServerOptions = {}) {
             required: ['profile', 'status', 'configured'],
             additionalProperties: false,
             properties: {
-              profile: { type: 'string', enum: ['provider-signing-preview'] },
+              profile: { type: 'string', enum: ['safe-wallet-service'] },
               status: { type: 'string', enum: ['experimental'] },
               configured: { type: 'boolean' },
               configuration_profile: {
@@ -322,10 +314,7 @@ export async function createServer(options: ServerOptions = {}) {
                 type: 'array',
                 items: {
                   type: 'string',
-                  enum: [
-                    'provider-authorized-erc3009-v1',
-                    'provider-approved-contracts-v1',
-                  ],
+                  enum: ['provider-approved-contracts-v1'],
                 },
               },
             },
@@ -334,7 +323,7 @@ export async function createServer(options: ServerOptions = {}) {
       },
     },
     async () => ({
-      profile: 'provider-signing-preview',
+      profile: 'safe-wallet-service',
       status: 'experimental',
       configured: await isReady(),
       ...(options.configurationProfile
@@ -503,7 +492,7 @@ export async function createServer(options: ServerOptions = {}) {
       onRequest: (request) => authorize(request, 'wallet:provision'),
     },
     async (request) => {
-      if (!(await isReady()))
+      if (!(await isReady()) || !options.safeWallet)
         throw Object.assign(new Error('Unavailable'), { statusCode: 503 });
       const context = {
         principal: principals.get(request)!,
@@ -534,15 +523,7 @@ export async function createServer(options: ServerOptions = {}) {
           );
       if (options.safeWallet)
         return options.safeWallet.provision(context, request.params.accountId);
-      const smart_account = await options.safeProvisioning?.provision(
-        context,
-        request.params.accountId,
-      );
-      return {
-        account_id: account.accountId,
-        address: account.address,
-        ...(smart_account ? { smart_account } : {}),
-      };
+      throw Object.assign(new Error('Unavailable'), { statusCode: 503 });
     },
   );
   app.get<{ Params: { applicationId: string } }>(
@@ -648,72 +629,6 @@ export async function createServer(options: ServerOptions = {}) {
       ),
   );
 
-  app.get<{ Params: { accountId: string } }>(
-    '/v1/accounts/:accountId/safe',
-    {
-      schema: {
-        operationId: 'readProvisionedSafe',
-        hide: !!options.applicationSafes,
-        security: [{ accessToken: [] }],
-        params: {
-          type: 'object',
-          additionalProperties: false,
-          required: ['accountId'],
-          properties: { accountId: uuidSchema },
-        },
-        response: {
-          200: accountSchema.properties.smart_account,
-          403: problemSchema,
-          503: problemSchema,
-        },
-      },
-      onRequest: (request) => authorize(request, 'wallet:account:read'),
-    },
-    async (request) => {
-      if (!(await isReady()) || !options.safeProvisioning)
-        throw Object.assign(new Error('Unavailable'), { statusCode: 503 });
-      return options.safeProvisioning.read(
-        { principal: principals.get(request)!, idempotencyKey: randomUUID() },
-        request.params.accountId,
-      );
-    },
-  );
-  app.post<{ Params: { actionId: string } }>(
-    '/v1/actions/:actionId/sign',
-    {
-      schema: mutationSchema('actionId', 'signAction', signatureSchema),
-      onRequest: (request) => authorize(request, 'wallet:sign'),
-    },
-    async (request) => {
-      if (!(await isReady()))
-        throw Object.assign(new Error('Unavailable'), { statusCode: 503 });
-      const context = {
-        principal: principals.get(request)!,
-        idempotencyKey: request.headers['idempotency-key'] as string,
-      };
-      await options.onboarding?.actions?.assertSignatureExport(
-        request.params.actionId,
-      );
-      const signature = await options.service!.sign(
-        context,
-        request.params.actionId,
-        options.onboarding
-          ? async (owner, accountId) => {
-              const grant = await options.onboarding!.service.authorize(
-                context.principal,
-                accountId,
-                options.onboarding!.actions
-                  ? 'transfers:request'
-                  : 'operations:request',
-              );
-              if (grant.owner !== owner)
-                throw new WalletProviderError('wallet_authorization_denied');
-            }
-          : undefined,
-      );
-      return { signature };
-    },
-  );
   await registerOnboardingRoutes(
     app,
     options.onboarding,
@@ -731,8 +646,6 @@ export async function createServer(options: ServerOptions = {}) {
     options.runtimeConfiguration,
     options.authenticate,
     options.walletCalls,
-    options.applicationSafes,
-    options.applicationSponsors,
     options.safeWallet,
   );
   if (options.documentation !== false && options.documentationTokens)

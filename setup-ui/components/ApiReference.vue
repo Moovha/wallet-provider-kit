@@ -260,7 +260,7 @@ async function copy() {
     </div>
     <p class="help-text">
       {{ shown.length }} endpoint(s). All implemented provider API endpoints are
-      shown by default, including advanced profiles.
+      shown by default, including unavailable services.
       <strong>Not enabled</strong>
       marks missing configuration; showing an endpoint does not enable it or
       grant access. The search field filters the displayed reference and its

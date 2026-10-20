@@ -38,7 +38,7 @@ Use the wizard's **Policies → Access flow → Application-led access (standard
 Set the required identity level and field names. In **Policies**, register each
 application's exact issuer/client ID, allowed permissions and reviewed identity
 and consent trust-agreement reference. Configure maximum identity age and access
-duration. The [standard example](provider.config.example.json) uses `verified`,
+duration. The [standard example](provider.config.safe.example.json) uses `verified`,
 requires `country`, accepts identity evidence for at most 90 days and caps access
 at seven days. These are example requirements to review for your product.
 
@@ -156,14 +156,7 @@ policy, owner binding, identity age and revocation before wallet effects and
 before returning a saved operation result. Preserve original attempt identities
 when investigating timeouts; do not repeat an uncertain mutation with a new key.
 
-Optional transfer signing also requires explicit `transfers:request` permission.
-Present the exact configured token, recipients, limits and validity to the user
-in your application. Read the exact `transfer_terms` and `transfer_policy_revision` from the access policy and
-include that revision in `user.consent.transfer_policy_revision` when requesting
-transfer delegation. Changing the transfer terms invalidates the old delegation.
-The provider still authorizes each immutable transfer and journals every signing
-attempt. Access or an OAuth scope alone does not authorize spending. Signing does
-not submit a transaction, pay gas or establish settlement.
+Safe calls require current `contracts:request` consent bound to `action_policy_revision`. Use the [wallet API](wallet-calls.md) for approved batches.
 
 ## Withdrawal, renewal and recovery
 
@@ -184,23 +177,3 @@ Keep stable application and user identifiers, backend bindings, storage and atte
 records across restarts. A changed application identity is not an automatic account
 migration. Restore and reconcile using the [deployment guide](operator-deployment.md)
 and [durable attempt guide](durable-attempts.md).
-
-## Hosted compatibility and migration
-
-[Provider-hosted access](onboarding.md) remains available by explicitly selecting
-`policy.access.mode: "hosted"`. Existing configurations that omit `mode` retain
-that legacy behavior. They are not silently upgraded. Hosted configurations require
-their login, consent and reviewer setup. [Application-record evaluation](application-records.md)
-is a hosted compatibility feature, not the standard attestation contract.
-
-The configured service binds its access mode to its private store. Switching an
-occupied hosted deployment to application-led access is rejected. Do not delete
-that binding or reinitialize storage to bypass the check. Existing owner IDs and
-grants need a reviewed mapping and migration; no automatic migration is supplied.
-Use a new empty deployment for an independent evaluation, and retain recovery
-records for any existing wallets. Do not downgrade an application-led store to a revision that predates this access mode. Use matching code and recovery records. The SQLite schema is unchanged: additive access
-records use its existing transactional JSON collections.
-
-## Contract-call delegation
-
-`contracts:request` is separate from transfer delegation. Read `contract_call_terms` and `action_policy_revision`, show the permitted contracts/functions, operation limits and swap/vault routes to the owner, and include `user.consent.action_policy_revision` in application-led requests. The legacy `transfer_policy_revision` alias remains accepted; conflicting aliases are denied. Account bindings stay private. See [approved contract calls](approved-contract-calls.md) for execution, nonce recovery and the limits of general function delegation.

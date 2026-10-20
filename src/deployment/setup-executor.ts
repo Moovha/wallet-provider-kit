@@ -1,4 +1,4 @@
-import { localExecutionImages } from './local-execution-contract.js';
+import { bundlerStoreImage } from '../sponsorship/images.js';
 import { caddyImage, caddyConfiguration } from './https-ingress.js';
 import {
   generatedSecretNames,
@@ -195,7 +195,7 @@ export function localCompose(plan: SetupPlan, buildSource: string) {
               stop_grace_period: '30s',
             },
             'bundler-store': {
-              image: localExecutionImages.store,
+              image: bundlerStoreImage,
               user: `${process.getuid?.()}:${process.getgid?.()}`,
               command: [
                 'valkey-server',

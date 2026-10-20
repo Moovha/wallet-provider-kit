@@ -10,13 +10,6 @@ export function generatedSecretNames(config: ProviderConfiguration): string[] {
     ...(config.runtimeConfiguration?.credentialKey
       ? [config.runtimeConfiguration.credentialKey.env]
       : []),
-    ...(config.localExecution
-      ? [
-          config.localExecution.apiKey.env,
-          config.localExecution.keystorePassphrase.env,
-          config.localExecution.storageKey.env,
-        ]
-      : []),
     ...(config.authorizationServer
       ? [
           config.authorizationServer.signingKey.env,
@@ -49,33 +42,10 @@ export function generateDeploymentSecrets(
         use: 'sig',
         alg: 'RS256',
       });
-    } else if (
-      name === config.localExecution?.storageKey.env ||
-      name === config.runtimeConfiguration?.credentialKey?.env
-    )
+    } else if (name === config.runtimeConfiguration?.credentialKey?.env)
       values[name] = randomBytes(32).toString('base64');
     else values[name] = randomBytes(48).toString('base64url');
   }
-  if (
-    config.localExecution &&
-    (new Set([
-      values[config.localExecution.apiKey.env],
-      values[config.localExecution.keystorePassphrase.env],
-      values[config.localExecution.storageKey.env],
-    ]).size !== 3 ||
-      !/^[A-Za-z0-9+/]{43}=$/.test(
-        values[config.localExecution.storageKey.env],
-      ) ||
-      Buffer.from(values[config.localExecution.storageKey.env], 'base64')
-        .length !== 32 ||
-      values[config.localExecution.keystorePassphrase.env].length < 32 ||
-      !/^[A-Za-z0-9_-]{32,4096}$/.test(
-        values[config.localExecution.apiKey.env],
-      ))
-  )
-    throw new ConfigurationError([
-      '/localExecution: retain a 32-byte base64 storage key and strong separate API and keystore credentials',
-    ]);
   if (config.authorizationServer)
     createBundledAuthorizationServer(config, values);
   if (config.backend.kind === 'ows') {

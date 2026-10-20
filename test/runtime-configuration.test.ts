@@ -1,6 +1,4 @@
 import { defaultSafeProvisioning } from '../src/provisioning/defaults.js';
-import { ApplicationExecutionObserver } from '../src/runtime-configuration/observer.js';
-import { executionFixture } from './helpers/execution.js';
 import { ApplicationCredentialCipher } from '../src/runtime-configuration/credentials.js';
 import { currentRuntimePolicy } from '../src/runtime-configuration/authority.js';
 import { randomUUID } from 'node:crypto';
@@ -390,7 +388,7 @@ describe('runtime application contracts and provider policies', () => {
             ?.count,
         ).toBe(0);
       expect(database.prepare('PRAGMA user_version').get()?.user_version).toBe(
-        1,
+        2,
       );
     } finally {
       database.close();
@@ -399,11 +397,18 @@ describe('runtime application contracts and provider policies', () => {
   it('validates bootstrap operator separation and keeps its generated configuration schema current', async () => {
     const input = JSON.parse(
       await readFile(
-        new URL('../docs/provider.config.example.json', import.meta.url),
+        new URL('../docs/provider.config.safe.example.json', import.meta.url),
         'utf8',
       ),
     );
-    input.runtimeConfiguration = structuredClone(options);
+    input.runtimeConfiguration = {
+      ...input.runtimeConfiguration,
+      ...structuredClone(options),
+    };
+    input.runtimeConfiguration.operators[0].subject =
+      input.runtimeConfiguration.operators[0].clientId;
+    input.authorizationServer.operatorClients[0].clientId =
+      input.runtimeConfiguration.operators[0].clientId;
     // The sample issuer is independent of this fixture's issuer.
     input.runtimeConfiguration.operators[0].issuer = input.oauth.issuer;
     expect(
@@ -877,7 +882,8 @@ describe('application obligations', () => {
       chain_id: 'eip155:8453' as const,
       funding_agreement: 'Application pays gas',
       maximum_gas_budget_wei: '100',
-      account_model: 'provider-controlled-application-safe' as const,
+      account_model: 'provider-controlled-user-safe' as const,
+      maximum_execution_accounts: 10,
       asset_model: 'individual-user-wallets' as const,
     };
     await expect(
@@ -1109,198 +1115,6 @@ describe('application credentials', () => {
     });
     expect(revoked.status).toBe('revoked');
   });
-  it('obtains one scan anchor with a fee quote, enforcing application RPC revocation', async () => {
-    const { db } = await fixture();
-    const service = new RuntimeConfigurationService(
-      policy,
-      db.onboardingStore,
-      { ...options, rpcVerification: 'single' },
-      'deployment-1',
-      undefined,
-      undefined,
-      new ApplicationCredentialCipher(Buffer.alloc(32, 9).toString('base64')),
-    );
-    const appId = runtimeApplicationId(issuer, 'first');
-    await service.writeCredential(context(), 'primary', {
-      expected_revision: '0',
-      endpoint: 'https://primary.example.test/app-key',
-    });
-    await service.submitObligation(context(), 'services', {
-      expected_revision: '0',
-      value: [
-        {
-          id: 'primary',
-          kind: 'rpc-verification',
-          vendor: 'offline',
-          credential_reference: 'primary',
-          billing_owner: 'application',
-        },
-      ],
-    });
-    await service.decideObligation(context(operator), appId, 'services', {
-      expected_revision: '1',
-      expected_decision_revision: '0',
-      decision: 'accepted',
-    });
-    const config = executionFixture().configuration;
-    const methods: string[] = [];
-    const observer = new ApplicationExecutionObserver(
-      service,
-      db.onboardingStore,
-      config,
-      undefined,
-      async (_url, init) => {
-        const request = JSON.parse(String(init?.body));
-        methods.push(request.method);
-        const result =
-          request.method === 'eth_chainId'
-            ? '0x14a34'
-            : request.method === 'eth_feeHistory'
-              ? {
-                  baseFeePerGas: Array(6).fill('0x1'),
-                  reward: Array(5).fill(['0x1']),
-                }
-              : {
-                  hash: config.rpc.genesisHash,
-                  number: request.params[0] === '0x0' ? '0x0' : '0x10',
-                };
-        return Response.json({ jsonrpc: '2.0', id: 1, result });
-      },
-      true,
-    );
-    expect(
-      await observer.anchorWithFees(config.sponsors[0], application()),
-    ).toMatchObject({
-      scanFromBlock: '16',
-      networkFees: { maxFeePerGas: '3', maxPriorityFeePerGas: '1' },
-    });
-    expect(methods.filter((method) => method === 'eth_chainId')).toHaveLength(
-      1,
-    );
-    expect(
-      methods.filter((method) => method === 'eth_getBlockByNumber'),
-    ).toHaveLength(2);
-    expect(
-      methods.filter((method) => method === 'eth_feeHistory'),
-    ).toHaveLength(1);
-    methods.length = 0;
-    await expect(
-      observer.anchorWithFees(config.sponsors[0], application('second')),
-    ).rejects.toThrow();
-    await service.writeCredential(context(), 'primary', {
-      expected_revision: '1',
-      endpoint: null,
-    });
-    await expect(
-      observer.anchorWithFees(config.sponsors[0], application()),
-    ).rejects.toThrow();
-    expect(methods).toHaveLength(0);
-  });
-  it('routes quorum reads only to the caller application and stops after revocation', async () => {
-    const { db } = await fixture();
-    const service = new RuntimeConfigurationService(
-      policy,
-      db.onboardingStore,
-      options,
-      'deployment-1',
-      undefined,
-      undefined,
-      new ApplicationCredentialCipher(Buffer.alloc(32, 9).toString('base64')),
-    );
-    const appId = runtimeApplicationId(issuer, 'first');
-    for (const reference of ['primary', 'secondary'])
-      await service.writeCredential(context(), reference, {
-        expected_revision: '0',
-        endpoint: 'https://' + reference + '.example.test/app-key',
-      });
-    await service.submitObligation(context(), 'services', {
-      expected_revision: '0',
-      value: ['primary', 'secondary'].map((id) => ({
-        id,
-        kind: 'rpc-verification' as const,
-        vendor: id,
-        credential_reference: id,
-        billing_owner: 'application' as const,
-      })),
-    });
-    await service.decideObligation(context(operator), appId, 'services', {
-      expected_revision: '1',
-      expected_decision_revision: '0',
-      decision: 'accepted',
-    });
-    const config = executionFixture().configuration;
-    const visited: string[] = [];
-    const observer = new ApplicationExecutionObserver(
-      service,
-      db.onboardingStore,
-      config,
-      undefined,
-      async (url, init) => {
-        visited.push(String(url));
-        const request = JSON.parse(String(init?.body));
-        const result =
-          request.method === 'eth_chainId'
-            ? '0x14a34'
-            : {
-                hash: config.rpc.genesisHash,
-                number: request.params[0] === '0x0' ? '0x0' : '0x10',
-              };
-        return Response.json({ jsonrpc: '2.0', id: request.id, result });
-      },
-    );
-    await expect(observer.anchor(application('second'))).rejects.toThrow();
-    expect(visited).toEqual([]);
-    expect(await observer.anchor(application())).toBe('16');
-    expect(new Set(visited)).toEqual(
-      new Set([
-        'https://primary.example.test/app-key',
-        'https://secondary.example.test/app-key',
-      ]),
-    );
-    const count = visited.length;
-    const safe = defaultSafeProvisioning(),
-      accountId = randomUUID();
-    const binding = {
-      accountId,
-      address: '0x' + '1'.repeat(40),
-      codeHash: safe.proxyCodeHash,
-      singleton: safe.singleton,
-    };
-    const owner = '0x' + '2'.repeat(40);
-    await db.onboardingStore.transaction((state) => {
-      state.deploymentBindings!['service-v1'].safeAccounts = {
-        [accountId]: {
-          attemptId: randomUUID(),
-          caller: application(),
-          configurationHash: 'offline',
-          state: 'ready',
-          plan: {
-            accountId,
-            owner,
-            address: binding.address,
-            saltNonce: '0',
-            data: '0x',
-            chainId: '84532',
-            factory: safe.factory,
-            singleton: safe.singleton,
-            proxyCodeHash: safe.proxyCodeHash,
-            sponsor: config.sponsors[0],
-            expiresAt: new Date(Date.now() + 60000).toISOString(),
-          },
-        },
-      };
-    });
-    await expect(
-      observer.contractNonce(binding, owner, application('second')),
-    ).rejects.toThrow();
-    expect(visited).toHaveLength(count);
-    await service.writeCredential(context(), 'primary', {
-      expected_revision: '1',
-      endpoint: null,
-    });
-    await expect(observer.anchor(application())).rejects.toThrow();
-    expect(visited).toHaveLength(count);
-  });
   it('binds action acceptance revisions to consent snapshots and denies pending or rejected manifests', async () => {
     const { db, service } = await fixture();
     const appId = runtimeApplicationId(issuer, 'first');
@@ -1344,152 +1158,5 @@ describe('application credentials', () => {
       decision: 'accepted',
     });
     expect((await snapshot()).policy_hash).not.toBe(first.policy_hash);
-  });
-});
-
-it('requires provider publication for shared-Safe methods and validates user-address ABI indices', async () => {
-  const { db } = await fixture();
-  const service = new RuntimeConfigurationService(
-    policy,
-    db.onboardingStore,
-    { ...options, sharedApplicationSafes: true },
-    'deployment-1',
-  );
-  const appId = runtimeApplicationId(issuer, 'first');
-  await expect(
-    service.setReview(context(operator), appId, {
-      expected_revision: '0',
-      expected_review_revision: '0',
-      mode: 'automatic',
-    }),
-  ).rejects.toThrow();
-  const value = document();
-  value.contracts[0].methods[0].user_address_parameters = [0];
-  await expect(
-    service.update(context(operator), appId, {
-      expected_revision: '0',
-      policy: value,
-    }),
-  ).rejects.toThrow();
-  value.contracts[0].methods[0].user_address_parameters = [1];
-  expect(
-    (
-      await service.update(context(operator), appId, {
-        expected_revision: '0',
-        policy: value,
-      })
-    ).revision,
-  ).toBe('1');
-});
-
-it('lets the bound application configure its pool with concurrency checks before provisioning', async () => {
-  const { service } = await fixture();
-  expect(await service.readPool(application())).toMatchObject({
-    safe_count: 1,
-    sponsor_count: 1,
-  });
-  const input = {
-    expected_safe_count: 1,
-    expected_sponsor_count: 1,
-    safe_count: 5,
-    sponsor_count: 5,
-  };
-  await expect(
-    service.configurePool(
-      context({ ...application(), scopes: ['wallet:configuration:read'] }),
-      input,
-    ),
-  ).rejects.toMatchObject(denied);
-  expect(await service.configurePool(context(), input)).toMatchObject({
-    safe_count: 5,
-    sponsor_count: 5,
-  });
-  expect(await service.readPool(application('second'))).toMatchObject({
-    safe_count: 1,
-    sponsor_count: 1,
-  });
-  await expect(
-    service.configurePool(context(), { ...input, safe_count: 4 }),
-  ).rejects.toMatchObject(conflicted);
-  await expect(
-    service.configurePool(context(), { ...input, safe_count: 17 }),
-  ).rejects.toThrow();
-});
-
-it('binds pool configuration idempotency to the exact request and refuses resizing retained infrastructure', async () => {
-  const { service, db } = await fixture();
-  const ctx = context();
-  const input = {
-    expected_safe_count: 1,
-    expected_sponsor_count: 1,
-    safe_count: 5,
-    sponsor_count: 5,
-  };
-  const saved = await service.configurePool(ctx, input);
-  expect(await service.configurePool(ctx, input)).toEqual(saved);
-  await expect(
-    service.configurePool(ctx, { ...input, safe_count: 4 }),
-  ).rejects.toMatchObject(conflicted);
-  const app = runtimeApplicationId(
-    application().issuer,
-    application().clientId,
-  );
-  await db.onboardingStore.transaction((s) => {
-    s.deploymentBindings![
-      'service-v1'
-    ].runtimeConfiguration!.applicationSponsors = {
-      [app]: { applicationId: app },
-    } as never;
-  });
-  await expect(
-    service.configurePool(context(), {
-      expected_safe_count: 5,
-      expected_sponsor_count: 5,
-      safe_count: 6,
-      sponsor_count: 5,
-    }),
-  ).rejects.toMatchObject(conflicted);
-  expect(await service.readPool(application())).toMatchObject({
-    safe_count: 5,
-    sponsor_count: 5,
-  });
-});
-
-it('defaults new shared applications to five members while preserving retained legacy single-member applications', async () => {
-  const { db } = await fixture();
-  const service = new RuntimeConfigurationService(
-    policy,
-    db.onboardingStore,
-    { ...options, sharedApplicationSafes: true },
-    'deployment-1',
-  );
-  expect(await service.readPool(application())).toMatchObject({
-    safe_count: 5,
-    sponsor_count: 5,
-  });
-  await service.configurePool(context(), {
-    expected_safe_count: 5,
-    expected_sponsor_count: 5,
-    safe_count: 3,
-    sponsor_count: 2,
-  });
-  expect(await service.readPool(application())).toMatchObject({
-    safe_count: 3,
-    sponsor_count: 2,
-  });
-  const legacy = runtimeApplicationId(
-    application('second').issuer,
-    application('second').clientId,
-  );
-  await db.onboardingStore.transaction((s) => {
-    s.deploymentBindings![
-      'service-v1'
-    ].runtimeConfiguration!.applicationSponsors = {
-      [legacy]: { applicationId: legacy },
-    } as never;
-  });
-  expect(await service.readPool(application('second'))).toMatchObject({
-    safe_count: 1,
-    sponsor_count: 1,
   });
 });

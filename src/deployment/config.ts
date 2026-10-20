@@ -1,22 +1,13 @@
-import { maximumSponsorGasLimit } from '../execution/defaults.js';
 import type { ProviderNetwork } from '../networks.js';
-import {
-  localExecutionOrigin,
-  localSponsorIds,
-  type LocalExecutionConfiguration,
-} from './local-execution-contract.js';
 import {
   bundledOAuth,
   type BundledAuthorizationConfiguration,
 } from './authorization-contract.js';
-import { validateReplacementSponsors } from '../execution/replacement.js';
 import {
   validateRuntimeConfiguration,
   type RuntimeConfigurationOptions,
 } from '../runtime-configuration/service.js';
-import { validateOperations } from '../execution/operations.js';
 import { validateApprovedCallPolicy } from '../execution/approved-calls.js';
-import type { ExecutionConfiguration } from '../execution/types.js';
 import type { ExplorerTokensConfiguration } from './explorer-tokens.js';
 import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
@@ -30,9 +21,6 @@ import {
   trustedHttpsUrl,
   type OAuthConfiguration,
 } from '../service/auth.js';
-import type { RelayerBinding } from '../providers/openzeppelin-relayer.js';
-import type { TransferPolicy } from './actions.js';
-import { amount } from './actions.js';
 
 export interface SecretReference {
   env: string;
@@ -42,7 +30,6 @@ export interface ProviderConfiguration {
   network?: ProviderNetwork;
   safeProvisioning?: import('../provisioning/safe.js').SafeProvisioningConfiguration;
   runtimeConfiguration?: RuntimeConfigurationOptions;
-  localExecution?: LocalExecutionConfiguration;
   configVersion: 1;
   profile: 'provider-service-v1';
   policy: OnboardingPolicy;
@@ -72,46 +59,19 @@ export interface ProviderConfiguration {
       verificationPrice?: VendorPrice;
     };
   };
-  backend:
-    | {
-        kind: 'cdp';
-        binding: string;
-        apiKeyId: SecretReference;
-        apiKeySecret: SecretReference;
-        walletSecret: SecretReference;
-      }
-    | {
-        kind: 'ows';
-        binding: string;
-        vaultDirectory: string;
-        passphrase: SecretReference;
-      }
-    | {
-        kind: 'openzeppelin-relayer';
-        binding: string;
-        url: string;
-        apiKey: SecretReference;
-        signers: RelayerBinding[];
-      }
-    | {
-        kind: 'custom';
-        binding: string;
-        module: string;
-        options?: Record<string, unknown>;
-      };
+  backend: {
+    kind: 'ows';
+    binding: string;
+    vaultDirectory: string;
+    passphrase: SecretReference;
+  };
   storage: { kind: 'sqlite'; directory: string };
   activation: {
     enabled: boolean;
     backendAcceptance?: string;
     recoveryAcceptance?: string;
-    tokenAcceptance?: string;
-    executionAcceptance?: string;
-    safeProvisioningAcceptance?: string;
   };
-  financial?: TransferPolicy;
   approvedCalls?: import('../execution/approved-calls.js').ApprovedCallsConfiguration;
-  execution?: ExecutionConfiguration;
-  operations?: import('../execution/operations.js').OperationsConfiguration;
   http?: {
     requestsPerMinute?: number;
     host?: '127.0.0.1' | '0.0.0.0' | '::1' | '::';
@@ -126,27 +86,26 @@ export class ConfigurationError extends Error {
   }
 }
 const validate = new Ajv({ allErrors: true, strict: true }).compile(schema);
-/** Reject retired execution configurations before opening storage or contacting a backend.
- * Parsing an old export does not migrate its accounts, attempts or reservations.
- */
+/** Require the Safe account and its application-owned ERC-4337 infrastructure. */
 export function assertSafeWalletConfiguration(
   config: ProviderConfiguration,
 ): asserts config is ProviderConfiguration & {
   safeWallet: import('../sponsorship/safe-wallet.js').SafeWalletConfiguration;
-  backend: Extract<ProviderConfiguration['backend'], { kind: 'ows' }>;
+  safeProvisioning: import('../provisioning/safe.js').SafeProvisioningConfiguration;
+  approvedCalls: import('../execution/approved-calls.js').ApprovedCallsConfiguration;
+  runtimeConfiguration: RuntimeConfigurationOptions;
 } {
   if (
     !config.safeWallet ||
+    !config.safeProvisioning ||
+    !config.approvedCalls ||
     config.backend.kind !== 'ows' ||
-    config.financial ||
-    config.execution ||
-    config.localExecution ||
-    config.operations ||
-    config.runtimeConfiguration?.sharedApplicationSafes ||
-    config.runtimeConfiguration?.executionPool
+    !config.runtimeConfiguration?.authorizeContracts ||
+    !config.runtimeConfiguration.credentialKey ||
+    config.runtimeConfiguration.rpcVerification !== 'single'
   ) {
     throw new ConfigurationError([
-      '/safeWallet: only per-user Safe accounts with the bundled ERC-4337 bundler and application paymaster are supported; reconcile retained legacy work before migrating configuration',
+      '/safeWallet: per-user Safe accounts, application contracts, encrypted credentials and bundled ERC-4337 infrastructure are required',
     ]);
   }
 }
@@ -167,73 +126,12 @@ export function validateProviderConfiguration(
     );
   const config = structuredClone(input) as unknown as ProviderConfiguration;
   try {
-    if (
-      config.safeWallet &&
-      (config.backend.kind !== 'ows' ||
-        !config.runtimeConfiguration?.authorizeContracts ||
-        !config.runtimeConfiguration.credentialKey ||
-        !config.approvedCalls ||
-        config.financial ||
-        config.execution ||
-        config.localExecution ||
-        config.operations ||
-        !config.safeProvisioning ||
-        config.runtimeConfiguration.sharedApplicationSafes ||
-        config.runtimeConfiguration.rpcVerification !== 'single' ||
-        config.runtimeConfiguration.executionPool)
-    )
-      throw new ConfigurationError([
-        '/safeWallet: requires OWS, application contracts, credential encryption and activation; EOA transfers are unavailable',
-      ]);
-    if (config.localExecution) {
-      const names = [
-        config.localExecution.apiKey.env,
-        config.localExecution.keystorePassphrase.env,
-        config.localExecution.storageKey.env,
-      ];
-      if (
-        new Set(names).size !== 3 ||
-        names.some((name) =>
-          secretReferences({
-            ...config,
-            localExecution: undefined,
-            execution: config.execution?.local
-              ? { ...config.execution, relayer: undefined }
-              : config.execution,
-          }).some((ref) => ref.env === name),
-        )
-      )
-        throw new ConfigurationError([
-          '/localExecution: use separate private secret variables',
-        ]);
-    }
-    if (config.operations) validateOperations(config.operations);
-    if (config.operations && !config.execution) throw new Error();
+    assertSafeWalletConfiguration(config);
     const resolvedPolicy = defineOnboardingPolicy(config.policy);
-    if (
-      config.runtimeConfiguration?.authorizeContracts &&
-      (config.policy.access?.mode !== 'application' ||
-        !config.approvedCalls ||
-        (!config.safeWallet &&
-          config.execution?.profile !== 'approved-evm-executor-v1'))
-    )
-      throw new Error();
-    if (
-      config.runtimeConfiguration?.sharedApplicationSafes &&
-      (!config.runtimeConfiguration.authorizeContracts ||
-        !config.runtimeConfiguration.credentialKey ||
-        !config.execution?.local ||
-        !config.safeProvisioning ||
-        !config.approvedCalls ||
-        config.approvedCalls.policy.accounts.length !== 0 ||
-        config.execution.sponsors.length !== 0 ||
-        config.execution.rpc.endpoints.length !== 0 ||
-        config.operations ||
-        config.financial)
-    )
-      throw new Error(
-        'Shared application Safes require application credentials, runtime authority, local execution and automatic Safe provisioning without user Safe bindings',
-      );
+    if (config.policy.access?.mode !== 'application')
+      throw new ConfigurationError([
+        '/policy/access: application-led identity and consent are required',
+      ]);
     if (config.runtimeConfiguration) {
       validateRuntimeConfiguration(config.runtimeConfiguration, resolvedPolicy);
       if (
@@ -265,7 +163,6 @@ export function validateProviderConfiguration(
       if (
         config.identity.didit ||
         config.identity.sumsub ||
-        config.financial ||
         config.approvedCalls
       )
         throw new ConfigurationError([
@@ -375,225 +272,15 @@ export function validateProviderConfiguration(
         ]);
     }
     if (
-      config.backend.kind === 'custom' &&
-      !(
-        config.backend.module.startsWith('./') ||
-        config.backend.module.startsWith('/')
-      )
-    )
-      throw new ConfigurationError([
-        '/backend/module: use an absolute local path or ./ relative path',
-      ]);
-    if (
       config.activation.enabled &&
       (!config.activation.backendAcceptance ||
-        !config.activation.recoveryAcceptance ||
-        (config.financial && !config.activation.tokenAcceptance))
+        !config.activation.recoveryAcceptance)
     )
       throw new ConfigurationError([
-        '/activation: backendAcceptance and recoveryAcceptance are required when enabled; financial setup also requires tokenAcceptance',
+        '/activation: backendAcceptance and recoveryAcceptance are required',
       ]);
-    if (config.backend.kind === 'openzeppelin-relayer') {
-      const url = trustedHttpsUrl(config.backend.url);
-      if (url.pathname !== '/')
-        throw new ConfigurationError(['/backend/url: must be an HTTPS origin']);
-      const signers = config.backend.signers;
-      if (
-        new Set(signers.map((s) => s.address.toLowerCase())).size !==
-          signers.length ||
-        new Set(signers.map((s) => s.relayerId)).size !== signers.length ||
-        new Set(signers.map((s) => s.signerId)).size !== signers.length
-      )
-        throw new ConfigurationError([
-          '/backend/signers: duplicate addresses, relayers or signers are not allowed',
-        ]);
-      for (const signer of signers)
-        if (/^0x0{40}$/i.test(getAddress(signer.address))) throw new Error();
-    }
-    if (
-      config.runtimeConfiguration?.executionPool &&
-      !config.runtimeConfiguration.sharedApplicationSafes
-    )
-      throw new ConfigurationError([
-        '/runtimeConfiguration/executionPool: shared application Safes are required',
-      ]);
-    if (config.execution) {
-      const execution = config.execution;
-      if (
-        !config.runtimeConfiguration?.sharedApplicationSafes &&
-        (execution.sponsors.length < 1 || execution.rpc.endpoints.length < 2)
-      )
-        throw new Error();
-      if (
-        execution.local &&
-        (!config.localExecution ||
-          execution.service ||
-          execution.relayer?.url !== localExecutionOrigin ||
-          execution.relayer.apiKey.env !== config.localExecution.apiKey.env ||
-          execution.replacement)
-      )
-        throw new ConfigurationError([
-          '/execution/local: use the bundled engine connection without a designated service or replacement policy',
-        ]);
-      if (!execution.local && execution.relayer?.url === localExecutionOrigin)
-        throw new Error();
-      if (execution.replacement) {
-        if (!execution.service || !execution.recovery) throw new Error();
-        validateReplacementSponsors(execution.replacement, execution.sponsors);
-      }
-      if (
-        (!config.financial && !config.approvedCalls) ||
-        config.policy.identity?.records ||
-        (config.activation.enabled &&
-          !config.runtimeConfiguration?.sharedApplicationSafes &&
-          !config.activation.executionAcceptance)
-      )
-        throw new ConfigurationError([
-          '/execution: an approved-action policy and separate execution acceptance are required',
-        ]);
-      if (
-        execution.relayer &&
-        trustedHttpsUrl(execution.relayer.url).pathname !== '/'
-      )
-        throw new Error();
-      if (
-        new Set(execution.rpc.endpoints.map((entry) => entry.env)).size !==
-          execution.rpc.endpoints.length ||
-        /^0x0{64}$/.test(execution.rpc.genesisHash) ||
-        (config.financial &&
-          (!execution.rpc.tokenCodeHash ||
-            /^0x0{64}$/.test(execution.rpc.tokenCodeHash)))
-      )
-        throw new Error();
-      if (
-        execution.safeQueue &&
-        (execution.profile !== 'approved-evm-executor-v1' ||
-          !config.approvedCalls)
-      )
-        throw new Error();
-      for (const field of execution.sponsorPool
-        ? (['accountId'] as const)
-        : (['clientId', 'accountId'] as const))
-        if (
-          new Set(execution.sponsors.map((entry) => entry[field])).size !==
-          execution.sponsors.length
-        )
-          throw new Error();
-      if (execution.service) {
-        if (
-          trustedHttpsUrl(execution.service.url).origin !==
-            execution.service.url ||
-          execution.service.url === config.policy.provider.origin ||
-          execution.service.keys.length !==
-            new Set(execution.service.keys.map((key) => key.id)).size
-        )
-          throw new Error();
-      }
-      for (const field of execution.relayer
-        ? (['relayerId', 'signerId', 'address'] as const)
-        : (['address'] as const))
-        if (
-          new Set(
-            execution.sponsors.map((entry) =>
-              execution.local &&
-              field === 'address' &&
-              entry.binding.address === 'managed'
-                ? entry.accountId
-                : (entry.binding[field] ?? '').toLowerCase(),
-            ),
-          ).size !== execution.sponsors.length
-        )
-          throw new Error();
-      for (const sponsor of execution.sponsors) {
-        if (
-          execution.local &&
-          (sponsor.binding.relayerId !==
-            localSponsorIds(sponsor.accountId).relayerId ||
-            sponsor.binding.signerId !==
-              localSponsorIds(sponsor.accountId).signerId ||
-            sponsor.binding.bindingRevision !== '1')
-        )
-          throw new ConfigurationError([
-            '/execution/sponsors: retain the managed local sponsor IDs',
-          ]);
-        const managed =
-          execution.local && sponsor.binding.address === 'managed';
-        if (
-          sponsor.binding.address === 'managed' &&
-          (!managed || config.activation.enabled)
-        )
-          throw new ConfigurationError([
-            '/execution/sponsors: complete local setup before activation',
-          ]);
-        const app = config.policy.applications.find(
-          (candidate) =>
-            candidate.clientId === sponsor.clientId &&
-            candidate.enabled !== false &&
-            candidate.permissions?.some((permission) =>
-              ['transfers:request', 'contracts:request'].includes(permission),
-            ),
-        );
-        if (
-          !app ||
-          sponsor.fundingAgreement.trim().length === 0 ||
-          BigInt(sponsor.gasLimit) < 21000n ||
-          BigInt(sponsor.gasLimit) >
-            maximumSponsorGasLimit(
-              execution.profile === 'approved-evm-executor-v1',
-            ) ||
-          BigInt(sponsor.maxFeePerGas) === 0n ||
-          BigInt(sponsor.maxPriorityFeePerGas) > BigInt(sponsor.maxFeePerGas) ||
-          [sponsor.maxFeePerGas, sponsor.maxPriorityFeePerGas].some(
-            (value) => BigInt(value) > BigInt(Number.MAX_SAFE_INTEGER),
-          ) ||
-          BigInt(sponsor.l1FeeReserveWei) === 0n ||
-          BigInt(sponsor.lifetimeBudgetWei) <
-            BigInt(sponsor.gasLimit) * BigInt(sponsor.maxFeePerGas) +
-              BigInt(sponsor.l1FeeReserveWei)
-        )
-          throw new Error();
-        const binding = sponsor.binding;
-        sponsor.binding = execution.relayer
-          ? {
-              relayerId: binding.relayerId,
-              signerId: binding.signerId,
-              address: managed ? binding.address : getAddress(binding.address),
-              bindingRevision: binding.bindingRevision,
-            }
-          : {
-              address: managed ? binding.address : getAddress(binding.address),
-              bindingRevision: binding.bindingRevision,
-            };
-        if (
-          /^0x0{40}$/i.test(sponsor.binding.address) ||
-          (config.backend.kind === 'openzeppelin-relayer' &&
-            config.backend.signers.some(
-              (signer) =>
-                signer.address.toLowerCase() ===
-                  sponsor.binding.address.toLowerCase() ||
-                signer.relayerId === sponsor.binding.relayerId ||
-                signer.signerId === sponsor.binding.signerId,
-            ))
-        )
-          throw new Error();
-      }
-    }
     if (config.safeProvisioning) {
       const p = config.safeProvisioning;
-      if (
-        !config.approvedCalls ||
-        (!config.safeWallet &&
-          (config.execution?.profile !== 'approved-evm-executor-v1' ||
-            !config.execution.local ||
-            !config.localExecution ||
-            config.execution.service ||
-            (config.activation.enabled &&
-              !config.runtimeConfiguration?.sharedApplicationSafes &&
-              !config.activation.safeProvisioningAcceptance)))
-      )
-        throw new ConfigurationError([
-          '/safeProvisioning: requires approved EVM calls, the bundled local execution engine and explicit deployment acceptance',
-        ]);
       for (const pin of [p.factory, p.singleton]) {
         if (
           pin.implementation ||
@@ -614,27 +301,6 @@ export function validateProviderConfiguration(
         config.approvedCalls.policy,
         !!config.safeProvisioning,
       );
-      if (
-        !config.safeWallet &&
-        (config.execution?.profile !== 'approved-evm-executor-v1' ||
-          (!config.execution.service && !config.execution.local))
-      )
-        throw new Error();
-    }
-    if (config.financial) {
-      const p = config.financial;
-
-      if (amount(p.maximumAmount) > amount(p.lifetimeAmount))
-        throw new ConfigurationError([
-          '/financial/maximumAmount: must not exceed lifetimeAmount',
-        ]);
-      for (const a of [p.token.address, ...p.recipients])
-        if (/^0x0{40}$/i.test(getAddress(a))) throw new Error();
-      if (
-        new Set(p.recipients.map((a) => a.toLowerCase())).size !==
-        p.recipients.length
-      )
-        throw new Error();
     }
   } catch (error) {
     if (error instanceof ConfigurationError) throw error;
@@ -670,62 +336,24 @@ export function secretReferences(
     ...(config.runtimeConfiguration?.credentialKey
       ? [config.runtimeConfiguration.credentialKey]
       : []),
-    ...(config.localExecution
-      ? [
-          config.localExecution.apiKey,
-          config.localExecution.keystorePassphrase,
-          config.localExecution.storageKey,
-        ]
-      : []),
     ...(config.authorizationServer
       ? [
           config.authorizationServer.signingKey,
           ...(config.authorizationServer.operatorClients ?? []).map(
-            (entry) => entry.clientSecret,
+            (c) => c.clientSecret,
           ),
-          ...config.authorizationServer.clients.map(
-            (entry) => entry.clientSecret,
-          ),
-        ]
-      : []),
-    ...(config.operations?.webhooks.flatMap((entry) => [
-      entry.endpoint,
-      ...entry.signingSecrets,
-    ]) ?? []),
-    ...(config.execution
-      ? [
-          ...(config.execution.relayer
-            ? [config.execution.relayer.apiKey]
-            : []),
-          ...(config.execution.service
-            ? [
-                config.execution.service.signing.privateKey,
-                ...config.execution.service.keys.map((key) => key.publicKey),
-              ]
-            : []),
-          ...config.execution.rpc.endpoints,
+          ...config.authorizationServer.clients.map((c) => c.clientSecret),
         ]
       : []),
     ...(config.safeWallet ? [config.safeWallet.bundlerAuthorization] : []),
+    ...(config.apiExplorer
+      ? config.apiExplorer.clients.map((c) => c.clientSecret)
+      : []),
     ...(config.ownerLogin ? [config.ownerLogin.clientSecret] : []),
-    ...(config.apiExplorer?.clients.map((entry) => entry.clientSecret) ?? []),
-    ...(config.identity.didit ? [config.identity.didit.apiKey] : []),
-    ...(config.identity.sumsub
-      ? [config.identity.sumsub.appToken, config.identity.sumsub.secretKey]
-      : []),
-    ...(config.backend.kind === 'ows' ? [config.backend.passphrase] : []),
-    ...(config.backend.kind === 'openzeppelin-relayer'
-      ? [config.backend.apiKey]
-      : []),
-    ...(config.backend.kind === 'cdp'
-      ? [
-          config.backend.apiKeyId,
-          config.backend.apiKeySecret,
-          config.backend.walletSecret,
-        ]
-      : []),
+    config.backend.passphrase,
   ];
 }
+
 export function resolveSecret(
   reference: SecretReference,
   environment: NodeJS.ProcessEnv = process.env,

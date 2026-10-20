@@ -59,11 +59,6 @@ export function operationStatus(
   config: ProviderConfiguration,
   applicationIndex: number,
 ) {
-  if (guide.serviceAuthenticated)
-    return config.execution?.service
-      ? 'Signed execution-service request required; application tokens are not accepted'
-      : 'Not enabled: The designated execution service is not configured';
-  if (!guide.scope) return 'No access token needed';
   const id =
     Object.entries(operationGuides).find(([, entry]) => entry === guide)?.[0] ??
     '';
@@ -71,27 +66,15 @@ export function operationStatus(
     onboarding: true,
     enrollment: false,
     wallet: true,
-    financial: !!config.financial,
-    execution: !!config.execution,
-    nonceCancellation:
-      !!config.execution?.local &&
-      config.execution.profile === 'approved-evm-executor-v1',
-    safeQueue: !!config.execution?.safeQueue,
-    safeProvisioning:
-      !!config.safeProvisioning &&
-      !config.runtimeConfiguration?.sharedApplicationSafes,
     safeWallet: !!config.safeWallet,
-    walletCalls:
-      (!!config.runtimeConfiguration?.authorizeContracts &&
-        !!config.execution?.safeQueue) ||
-      !!config.safeWallet,
+    walletCalls: !!config.safeWallet,
     runtimeConfiguration: !!config.runtimeConfiguration,
-    executionService: !!config.execution?.service,
-    contractCalls: !!config.approvedCalls?.policy,
-    flow: config.policy.access?.mode ?? 'hosted',
+    flow: config.policy.access?.mode ?? 'application',
     records: !!config.policy.identity?.records,
     vendor: !!config.identity.didit || !!config.identity.sumsub,
   });
+  if (!guide.scope && !guide.serviceAuthenticated)
+    return 'No access token needed';
   if (unavailable) return `Not enabled: ${unavailable}`;
   if (guide.scope === 'wallet:configuration:write')
     return 'Use a dedicated configured provider operator token; application tokens cannot publish policy';
@@ -114,7 +97,7 @@ export function operationStatus(
     )
   )
     return 'Select the required permission for this application in Applications';
-  if (!config.activation.enabled)
+  if (guide.scope && !config.activation.enabled)
     return 'Not enabled: Wallet operations are disabled in Deployment';
   return 'Settings are present; deployed access has not been checked';
 }
@@ -150,8 +133,9 @@ function obligationExample(
     chain_id: providerNetwork(network).caip,
     funding_agreement: 'Application-funded gas agreement',
     maximum_gas_budget_wei: '1000000000000000',
-    account_model: 'provider-controlled-application-safe',
+    account_model: 'provider-controlled-user-safe',
     asset_model: 'individual-user-wallets',
+    maximum_execution_accounts: 10,
   };
 }
 export function requestExample(
@@ -160,15 +144,6 @@ export function requestExample(
   applicationIndex: number,
 ): object | undefined {
   if (id === 'provisionSafeWalletInfrastructure') return {};
-  if (id === 'configureApplicationExecutionPool')
-    return {
-      expected_safe_count: 5,
-      expected_sponsor_count: 5,
-      safe_count: 5,
-      sponsor_count: 5,
-    };
-  if (['provisionApplicationSafe', 'provisionApplicationSponsor'].includes(id))
-    return {};
   if (id === 'writeApplicationCredential')
     return {
       expected_revision: '0',
@@ -208,30 +183,14 @@ export function requestExample(
       expected_revision: '0',
       policy: {
         ...runtimePolicyExample,
-        chain_id: providerNetwork(config.network).caip,
+        chain_id: providerNetwork(config?.network).caip,
       },
     };
   if (id === 'publishRuntimeConfiguration') return { expected_revision: '0' };
-  if (id === 'checkExecutionAuthority')
-    return {
-      provider_id: 'application-sponsor',
-      provider_revision: '1',
-      execution_id: exampleId,
-      action_id: exampleId,
-      plan_hash: '0'.repeat(64),
-      request_hash: '0'.repeat(64),
-    };
   if (id === 'beginEnrollment')
     return { identity_subject: 'example-provider-subject' };
   if (id === 'submitEnrollmentIdentity')
     return { id_token: 'e30.e30.Zml4dHVyZQ' };
-  if (id === 'reportTransactionEvent')
-    return {
-      event: 'submitted',
-      chain_id: providerNetwork(config.network).caip,
-      transaction_hash: '0x' + '1'.repeat(64),
-      observed_at: '2030-01-01T00:00:00.000Z',
-    };
   const identityRecord = {
     reference: 'evaluation-owner-001',
     fields: Object.fromEntries(
@@ -271,9 +230,7 @@ export function requestExample(
                 granted_at: '2030-01-01T00:00:00.000Z',
                 expires_at: '2030-01-02T00:00:00.000Z',
                 policy_revision: 'a'.repeat(64),
-                ...(config.financial
-                  ? { transfer_policy_revision: 'b'.repeat(64) }
-                  : {}),
+                action_policy_revision: 'b'.repeat(64),
               },
             },
           }
@@ -307,38 +264,8 @@ export function requestExample(
       method: 'wallet_getCapabilities',
       params: [
         '0x1111111111111111111111111111111111111111',
-        [providerNetwork(config.network).hex],
+        [providerNetwork(config?.network).hex],
       ],
-    };
-  if (id === 'requestContractCall' || id === 'enqueueContractCall')
-    return {
-      account_id: exampleId,
-      kind: 'contract-call',
-      calls: [
-        {
-          to:
-            config.approvedCalls?.policy?.contracts[0]?.address ??
-            '0x1111111111111111111111111111111111111111',
-          value: '0',
-          data:
-            config.approvedCalls?.policy?.contracts[0]?.selectors[0] ??
-            '0x12345678',
-        },
-      ],
-    };
-  if (id === 'authorizeSafeNonceCancellation')
-    return {
-      expected_nonce: '0',
-      expected_payload_hash: '0x' + 'a'.repeat(64),
-      authorization: 'invalidate-signed-action',
-    };
-  if (id === 'requestTransferAuthorization')
-    return {
-      account_id: exampleId,
-      recipient:
-        config.financial?.recipients[0] ||
-        '0x1111111111111111111111111111111111111111',
-      amount: '1',
     };
   if (
     id === 'provisionAccount' ||
@@ -365,8 +292,6 @@ export function referenceOperations(
               method,
               operation,
               guide,
-              executionProfile:
-                config.execution?.profile ?? 'erc3009-relayer-v1',
               status: operationStatus(guide, config, applicationIndex),
               body: requestExample(
                 operation.operationId,
@@ -404,13 +329,11 @@ export function responseExample(
   config?: ProviderConfiguration,
   requestedPermissions?: string[],
 ): object | string {
-  if (
-    [
-      'readApplicationExecutionPool',
-      'configureApplicationExecutionPool',
-    ].includes(id)
-  )
-    return { application_id: 'a'.repeat(64), safe_count: 5, sponsor_count: 5 };
+  const address = '0x1111111111111111111111111111111111111111';
+  const consent_url =
+    referenceOrigin(config?.policy.provider.origin ?? '') +
+    '/onboarding/' +
+    exampleId;
   if (
     [
       'readSafeWalletInfrastructure',
@@ -424,23 +347,13 @@ export function responseExample(
       status: 'needs-funding',
       funding_address: '0x' + '1'.repeat(40),
     };
-  if (id === 'readApplicationGasFunding' && config?.safeWallet)
-    return {
-      application_id: 'a'.repeat(64),
-      chain_id: providerNetwork(config.network).caip,
-      profile: 'safe-only-4337-v1',
-      status: 'needs-funding',
-      funding_address: '0x' + '1'.repeat(40),
-    };
   if (id === 'readApplicationGasFunding')
     return {
       application_id: 'a'.repeat(64),
-      funding_address: '0x' + '1'.repeat(40),
       chain_id: providerNetwork(config?.network).caip,
-      sponsor_count: 5,
-      ready_sponsors: 5,
-      minimum_initial_funding_wei: '66550000000000',
-      status: 'ready',
+      profile: 'safe-only-4337-v1',
+      status: 'needs-funding',
+      funding_address: '0x' + '1'.repeat(40),
     };
   if (id === 'streamWalletCallsStatus')
     return (
@@ -458,27 +371,6 @@ export function responseExample(
     return {
       address: '0x' + '2'.repeat(40),
       chainId: providerNetwork(config?.network).hex,
-    };
-  if (id === 'provisionApplicationSponsor')
-    return {
-      application_id: 'a'.repeat(64),
-      funding_address: '0x' + '1'.repeat(40),
-      status: 'ready',
-    };
-  if (
-    [
-      'readApplicationSafe',
-      'readProviderApplicationSafe',
-      'provisionApplicationSafe',
-    ].includes(id)
-  )
-    return {
-      application_id: 'a'.repeat(64),
-      funding_addresses: ['0x' + '1'.repeat(40)],
-      status: 'pending',
-      address: '0x' + '2'.repeat(40),
-      asset_model: 'individual-user-wallets',
-      account_model: 'provider-controlled-application-safe',
     };
   if (
     [
@@ -533,21 +425,6 @@ export function responseExample(
       ...(decision ? { decided_at: '2030-01-01T00:01:00.000Z' } : {}),
     };
   }
-  if (id === 'authorizeSafeNonceCancellation')
-    return {
-      action_id: exampleId,
-      cancelled_action_id: '22222222-2222-4222-8222-222222222222',
-      nonce: '0',
-      payload_hash: '0x' + 'b'.repeat(64),
-      expires_at: '2030-01-01T00:05:00.000Z',
-    };
-  if (id === 'readProvisionedSafe')
-    return {
-      profile: 'safe-1.4.1',
-      chain_id: config?.network === 'base' ? 'eip155:8453' : 'eip155:84532',
-      address: '0x1111111111111111111111111111111111111111',
-      status: 'pending',
-    };
   if (id === 'listApplicationConfigurations')
     return {
       role: 'application',
@@ -613,20 +490,6 @@ export function responseExample(
       published_at: '2030-01-01T00:00:00.000Z',
       published_by: 'c'.repeat(64),
     };
-  if (
-    [
-      'enqueueContractCall',
-      'readContractCallRequest',
-      'cancelContractCallRequest',
-    ].includes(id)
-  )
-    return {
-      request_id: exampleId,
-      account_id: exampleId,
-      status: id === 'cancelContractCallRequest' ? 'cancelled' : 'queued',
-      expires_at: '2030-01-01T00:05:00.000Z',
-      next_poll_after_ms: 15000,
-    };
   const applicationLed = config?.policy.access?.mode === 'application';
   if (id === 'revokeAccountAccess')
     return { grant_id: exampleId, status: 'revoked' };
@@ -661,157 +524,16 @@ export function responseExample(
           }
         : {}),
     };
-  if (id === 'requestContractCall') {
-    const target = '0x1111111111111111111111111111111111111111',
-      codeHash = '0x' + '1'.repeat(64);
-    const input = {
-      account_id: exampleId,
-      kind: 'contract-call',
-      calls: [{ to: target, value: '0', data: '0x12345678' }],
-    };
-    return {
-      action_id: exampleId,
-      account_id: exampleId,
-      status: 'authorized',
-      expires_at: '2030-01-01T00:05:00.000Z',
-      payload_hash: '0x' + '0'.repeat(64),
-      payload: {
-        primaryType: 'SafeTx',
-        domain: {
-          chainId: providerNetwork(config?.network).chainId,
-          verifyingContract: target,
-        },
-        types: {
-          SafeTx: [
-            ['to', 'address'],
-            ['value', 'uint256'],
-            ['data', 'bytes'],
-            ['operation', 'uint8'],
-            ['safeTxGas', 'uint256'],
-            ['baseGas', 'uint256'],
-            ['gasPrice', 'uint256'],
-            ['gasToken', 'address'],
-            ['refundReceiver', 'address'],
-            ['nonce', 'uint256'],
-          ].map(([name, type]) => ({ name, type })),
-        },
-        message: {
-          to: target,
-          value: '0',
-          data: '0x12345678',
-          operation: '0',
-          safeTxGas: '0',
-          baseGas: '0',
-          gasPrice: '0',
-          gasToken: '0x0000000000000000000000000000000000000000',
-          refundReceiver: '0x0000000000000000000000000000000000000000',
-          nonce: '0',
-        },
-      },
-      intent: {
-        version: '1',
-        mechanism: 'safe-1.4.1',
-        input,
-        account: {
-          address: target,
-          codeHash,
-          accountId: exampleId,
-          singleton: { address: target, codeHash },
-        },
-        multiSend: { address: target, codeHash },
-        calls: input.calls,
-        contracts: [{ address: target, codeHash }],
-        effects: [],
-        nonce: '0',
-      },
-    };
-  }
-  if (id === 'checkExecutionAuthority')
-    return {
-      allowed: true,
-      provider_id: 'application-sponsor',
-      provider_revision: '1',
-      execution_id: exampleId,
-      action_id: exampleId,
-      plan_hash: '0'.repeat(64),
-      request_hash: '0'.repeat(64),
-    };
   if (id === 'getExecutionCapabilities')
     return {
-      contract_version: '1',
-      profiles: [
-        'erc3009-relayer-v1',
-        'erc3009-executor-v1',
-        'approved-evm-executor-v1',
-      ].map((profile) => ({
-        id: profile,
-        revision: '1',
-        implemented: true,
-        configured: config?.execution?.profile === profile,
-        ready: false,
-        chain_id: providerNetwork(config?.network).caip,
-        account_type: 'eoa',
-        signing: 'eip-712',
-        token_authorization: 'erc-3009',
-        submission:
-          profile === 'erc3009-relayer-v1'
-            ? 'openzeppelin-relayer-1.8.0'
-            : 'designated-execution-service-v1',
-        verification: 'rpc-quorum',
-        finality: 'finalized',
-        minimum_rpc_sources: 2,
-        execute_scopes: ['wallet:execute', 'wallet:sign'],
-        read_scopes: ['wallet:execute:read'],
-      })),
+      profile: 'safe-only-4337-v1',
+      revision: '1',
+      configured: !!config?.safeWallet,
     };
-  if (id === 'getExecutionEvents')
-    return {
-      profile: config?.execution?.profile ?? 'erc3009-relayer-v1',
-      profile_revision: '1',
-      action_id: exampleId,
-      events: [],
-      oldest_sequence: 0,
-      next_sequence: 0,
-      history_truncated: false,
-    };
-  if (
-    id === 'executeTransfer' ||
-    id === 'getTransferExecution' ||
-    id === 'reconcileExecution'
-  )
-    return {
-      profile: config?.execution?.profile ?? 'erc3009-relayer-v1',
-      profile_revision: '1',
-      action_id: exampleId,
-      execution_id: exampleId,
-      dispatch_status: 'accepted',
-      observation_revision: 1,
-      next_poll_after_ms: 15000,
-      chain_status: 'unobserved',
-      verification: 'unverified',
-      outcome: 'unknown',
-      settlement: 'pending',
-      observed_at: '2030-01-01T00:00:00.000Z',
-    };
-  if (['reportTransactionEvent', 'getTransactionEvents'].includes(id)) {
-    const report = {
-      event: 'submitted',
-      chain_id: providerNetwork(config?.network).caip,
-      transaction_hash: '0x' + '1'.repeat(64),
-      observed_at: '2030-01-01T00:00:00.000Z',
-      report_id: exampleId,
-      recorded_at: '2030-01-01T00:00:01.000Z',
-      verification: 'unverified',
-    };
-    return id === 'getTransactionEvents'
-      ? { action_id: exampleId, events: [report] }
-      : { action_id: exampleId, ...report };
-  }
-  const address = '0x1111111111111111111111111111111111111111';
-  const consent_url = `https://wallet.example.com/onboarding/${exampleId}`;
+
   if (id === 'getCapabilities')
     return {
-      profile: 'provider-signing-preview',
+      profile: 'safe-wallet-service',
       status: 'experimental',
       configured: false,
     };
@@ -819,12 +541,7 @@ export function responseExample(
     return {
       flow: applicationLed ? 'application' : 'hosted',
       policy_revision: 'a'.repeat(64),
-      ...(applicationLed && config?.financial
-        ? {
-            transfer_policy_revision: 'b'.repeat(64),
-            transfer_terms: config.financial,
-          }
-        : {}),
+
       ...(applicationLed
         ? {
             verification_level:
@@ -863,7 +580,6 @@ export function responseExample(
   if (id === 'provisionAccount') return { account_id: exampleId, address };
   if (id === 'readGrantedAccount')
     return { account_id: exampleId, status: 'provisioned', address };
-  if (id === 'signAction') return { signature: '0x' + '0'.repeat(130) };
   if (id === 'requestAccountAccess')
     return { request_id: exampleId, status: 'consent_required', consent_url };
   if (id === 'importAccessIdentity')
@@ -882,40 +598,7 @@ export function responseExample(
       permissions: ['account:read'],
       expires_at: '2030-01-01T00:00:00.000Z',
     };
-  return {
-    action_id: exampleId,
-    account_id: exampleId,
-    status: 'authorized',
-    expires_at: '2030-01-01T00:00:00.000Z',
-    payload_hash: '0x' + '0'.repeat(64),
-    payload: {
-      primaryType: 'TransferWithAuthorization',
-      domain: {
-        name: 'Example Token',
-        version: '1',
-        chainId: providerNetwork(config?.network).chainId,
-        verifyingContract: address,
-      },
-      types: {
-        TransferWithAuthorization: [
-          ['from', 'address'],
-          ['to', 'address'],
-          ['value', 'uint256'],
-          ['validAfter', 'uint256'],
-          ['validBefore', 'uint256'],
-          ['nonce', 'bytes32'],
-        ].map(([name, type]) => ({ name, type })),
-      },
-      message: {
-        from: address,
-        to: '0x2222222222222222222222222222222222222222',
-        value: '1',
-        validAfter: '0',
-        validBefore: '1893456000',
-        nonce: '0x' + '0'.repeat(64),
-      },
-    },
-  };
+  throw new Error('Missing API response example: ' + id);
 }
 export function referenceSpec(
   contract: ApiContract,
@@ -927,14 +610,14 @@ export function referenceSpec(
     ...spec.info,
     title: 'Wallet API reference · local preview',
     description:
-      'All implemented provider API endpoints are shown by default, including unavailable profiles. Not enabled identifies missing configuration; draft settings do not prove live access. No API requests are sent.\n\n' +
+      'All implemented provider API endpoints are shown by default, including unavailable services. Not enabled identifies missing configuration; draft settings do not prove live access. No API requests are sent.\n\n' +
       transactionBoundaryDescription,
   };
   spec.servers = [{ url: referenceOrigin(config.policy.provider.origin) }];
   spec.paths = {};
   for (const item of operations) {
     const op = structuredClone(item.operation);
-    op.summary = `[${item.status === 'No access token needed' ? 'Public' : item.status.startsWith('Settings are present') || item.status.startsWith('Signed execution-service') ? 'Configured in draft' : 'Not enabled'}] ${item.guide.title}`;
+    op.summary = `[${item.status === 'No access token needed' ? 'Public' : item.status.startsWith('Settings are present') ? 'Configured in draft' : 'Not enabled'}] ${item.guide.title}`;
     op.tags = [item.guide.group];
     op.description = [
       `**Configuration preview:** ${item.status}.`,
@@ -990,15 +673,6 @@ export function curlExample(item: ReferenceOperation, origin: string) {
         }),
     )}`,
   ];
-  if (item.guide.execution)
-    lines.push(
-      `  --header 'Execution-Profile: ${item.executionProfile ?? 'erc3009-relayer-v1'}'`,
-      "  --header 'Execution-Profile-Revision: 1'",
-    );
-  if (item.guide.serviceAuthenticated)
-    lines.push(
-      "  --header 'Authorization: Bearer <SIGNED_SERVICE_REQUEST_PROOF>'",
-    );
   if (item.guide.scope)
     lines.push(
       item.guide.scope === 'wallet:configuration:write'

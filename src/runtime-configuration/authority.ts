@@ -10,7 +10,7 @@ import type {
 } from '../execution/approved-calls.js';
 import { validateApprovedCallPolicy } from '../execution/approved-calls.js';
 import { deny } from '../onboarding/policy.js';
-import { serviceHash } from '../executor/auth.js';
+import { canonicalHash } from '../domain/canonical.js';
 import {
   normalizeRuntimePolicy,
   runtimeApplicationId,
@@ -33,8 +33,8 @@ export function validateRuntimeSnapshot(snapshot: RuntimePolicySnapshot): void {
     !/^[1-9][0-9]{0,19}$/.test(snapshot.revision) ||
     BigInt(snapshot.revision) >= 2n ** 64n ||
     !snapshot.policy.enabled ||
-    snapshot.policy_hash !== serviceHash(snapshot.policy) ||
-    serviceHash(
+    snapshot.policy_hash !== canonicalHash(snapshot.policy) ||
+    canonicalHash(
       normalizeRuntimePolicy({
         expected_revision: '0',
         policy: snapshot.policy,
@@ -60,7 +60,7 @@ export function currentRuntimePolicy(
     !publication ||
     publication.application_id !== application_id ||
     publication.revision !== revision ||
-    publication.policy_hash !== serviceHash(publication.policy)
+    publication.policy_hash !== canonicalHash(publication.policy)
   )
     deny();
   const policy = structuredClone(publication.policy);
@@ -108,7 +108,7 @@ export function currentRuntimePolicy(
     (c) => c.application_id === application_id,
   );
   if (resources.length || credentials.length) {
-    policy.application_resources_hash = serviceHash([
+    policy.application_resources_hash = canonicalHash([
       resources.sort((a, b) => a.kind.localeCompare(b.kind)),
       credentials
         .map(({ sealed: _sealed, ...metadata }) => metadata)
@@ -118,7 +118,7 @@ export function currentRuntimePolicy(
   const snapshot = {
     application_id,
     revision,
-    policy_hash: serviceHash(policy),
+    policy_hash: canonicalHash(policy),
     policy,
   };
   validateRuntimeSnapshot(snapshot);
@@ -280,21 +280,21 @@ export function validateRuntimeCalls(
   }
 }
 
-/** Shared-Safe contracts must bind every policy-designated user address to the currently authorized individual wallet. */
-export function validateRuntimeUserCalls(
+/** Enforce explicit Safe-address ABI constraints without imposing a shared-account execution model. */
+export function validateSafeAddressParameters(
   snapshot: RuntimePolicySnapshot,
   input: ApprovedCallInput,
   userAddress: string,
 ): void {
   validateRuntimeCalls(snapshot, input);
-  if (input.kind !== 'contract-call') deny();
+  if (input.kind !== 'contract-call') return;
   for (const call of input.calls) {
     const method = snapshot.policy.contracts
       .find((c) => c.address.toLowerCase() === call.to.toLowerCase())
       ?.methods.find(
         (m) => id(m.signature).slice(0, 10) === call.data.slice(0, 10),
       );
-    if (!method?.user_address_parameters?.length || call.value !== '0') deny();
+    if (!method?.user_address_parameters?.length) continue;
     const abi = new Interface(['function ' + method.signature]);
     const fragment = abi.getFunction(method.signature);
     const decoded = abi.decodeFunctionData(method.signature, call.data);

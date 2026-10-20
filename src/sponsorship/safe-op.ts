@@ -117,7 +117,7 @@ export function safeOpActionV07(
     action_id: actionId,
     operation_id: operationId,
     kind: 'sign_typed_data',
-    profile: 'evm_eoa_v1',
+    profile: 'safe_owner_v1',
     profile_revision: '1',
     status: 'ready',
     chain_id: 'eip155:' + payload.domain.chainId,

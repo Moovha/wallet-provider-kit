@@ -27,7 +27,7 @@ import type {
   VerifiedPrincipal,
 } from '../domain/principal.js';
 import { WalletProviderError } from '../domain/signing.js';
-import { serviceHash } from '../executor/auth.js';
+import { canonicalHash } from '../domain/canonical.js';
 import {
   application,
   fingerprint,
@@ -48,8 +48,6 @@ export interface RuntimeConfigurationOptions {
   rpcVerification?: 'single' | 'quorum';
   authorizeContracts?: boolean;
   credentialKey?: { env: string };
-  sharedApplicationSafes?: boolean;
-  executionPool?: { safeCount: number; sponsorCount: number };
   operators: { issuer: string; clientId: string; subject: string }[];
 }
 export interface RuntimePolicy {
@@ -120,34 +118,6 @@ export interface RuntimeConfigurationState {
     import('../sponsorship/safe-wallet.js').SafeWalletInfrastructure
   >;
 
-  poolConfigurationReceipts?: Record<
-    string,
-    {
-      hash: string;
-      result: {
-        application_id: string;
-        safe_count: number;
-        sponsor_count: number;
-      };
-    }
-  >;
-  applicationFunding?: Record<
-    string,
-    import('../provisioning/application-funding.js').ApplicationFundingRecord
-  >;
-  applicationPoolConfigurations?: Record<
-    string,
-    { safeCount: number; sponsorCount: number }
-  >;
-  applicationSafeAssignments?: Record<string, Record<string, string>>;
-  applicationSponsors?: Record<
-    string,
-    import('../provisioning/application-sponsor.js').ApplicationSponsorRecord
-  >;
-  applicationSafes?: Record<
-    string,
-    import('../provisioning/application.js').ApplicationSafeAccount
-  >;
   obligations?: ObligationRegistry;
   credentials?: Record<string, ApplicationCredential>;
   credentialReceipts?: Record<
@@ -177,7 +147,7 @@ const empty = (): RuntimeConfigurationState => ({
   idempotency: {},
 });
 export const runtimeApplicationId = (issuer: string, clientId: string) =>
-  serviceHash(['runtime-application-v1', issuer, clientId]);
+  canonicalHash(['runtime-application-v1', issuer, clientId]);
 const revisionKey = (applicationId: string, revision: string) =>
   applicationId + ':' + revision;
 
@@ -196,7 +166,7 @@ export function validateRuntimeConfiguration(
     )
       throw new WalletProviderError('wallet_provider_configuration');
     trustedHttpsUrl(operator.issuer);
-    const key = serviceHash(operator);
+    const key = canonicalHash(operator);
     if (
       identities.has(key) ||
       policy.applications.some(
@@ -360,10 +330,7 @@ export class RuntimeConfigurationService {
     { hash: string; pool: RpcEndpointPool; transport: typeof fetch }
   >();
   get rpcVerification() {
-    return (
-      this.options.rpcVerification ??
-      (this.options.sharedApplicationSafes ? 'single' : 'quorum')
-    );
+    return this.options.rpcVerification ?? 'single';
   }
   async withRpc<T>(
     applicationId: string,
@@ -377,11 +344,7 @@ export class RuntimeConfigurationService {
     if (cached?.hash !== hash || cached.transport !== transport) {
       cached = {
         hash,
-        pool: new RpcEndpointPool(
-          endpoints,
-          transport,
-          this.options.sharedApplicationSafes,
-        ),
+        pool: new RpcEndpointPool(endpoints, transport),
         transport,
       };
       this.rpcPools.set(applicationId, cached);
@@ -400,11 +363,7 @@ export class RuntimeConfigurationService {
     if (cached?.hash !== hash || cached.transport !== transport) {
       cached = {
         hash,
-        pool: new RpcEndpointPool(
-          endpoints,
-          transport,
-          this.options.sharedApplicationSafes,
-        ),
+        pool: new RpcEndpointPool(endpoints, transport),
         transport,
       };
       this.rpcPools.set(key, cached);
@@ -413,12 +372,6 @@ export class RuntimeConfigurationService {
     return pool.run((endpoint) =>
       work(endpoint, () => pool.cooldown(endpoint)),
     );
-  }
-  get executionPool() {
-    return this.options.executionPool ?? { safeCount: 1, sponsorCount: 1 };
-  }
-  get hasExecutionPool() {
-    return !!this.options.executionPool;
   }
   constructor(
     readonly onboardingPolicy: ResolvedPolicy,
@@ -493,7 +446,7 @@ export class RuntimeConfigurationService {
       !uuid.test(context.idempotencyKey)
     )
       deny();
-    return serviceHash([
+    return canonicalHash([
       context.principal.issuer,
       context.principal.clientId,
       context.principal.subject,
@@ -538,11 +491,11 @@ export class RuntimeConfigurationService {
       published_by:
         typeof actor === 'string'
           ? actor
-          : serviceHash([actor.issuer, actor.clientId, actor.subject]),
+          : canonicalHash([actor.issuer, actor.clientId, actor.subject]),
       application_id: applicationId,
       revision,
       previous_revision: change.expected_revision,
-      policy_hash: serviceHash(change.policy),
+      policy_hash: canonicalHash(change.policy),
       policy: change.policy,
       published_at: new Date().toISOString(),
       ...(proposalId ? { proposal_id: proposalId } : {}),
@@ -690,117 +643,6 @@ export class RuntimeConfigurationService {
       return endpoints;
     });
   }
-  private configuredPool(
-    registry: RuntimeConfigurationState,
-    applicationId: string,
-  ) {
-    const saved = registry.applicationPoolConfigurations?.[applicationId];
-    if (saved) return saved;
-    const safes = Object.values(registry.applicationSafes ?? {}).filter(
-      (r) => r.applicationId === applicationId && r.userAccountId === undefined,
-    );
-    const sponsors = Object.values(registry.applicationSponsors ?? {}).filter(
-      (r) => r.applicationId === applicationId,
-    );
-    if (safes.length || sponsors.length)
-      return {
-        safeCount: Math.max(1, ...safes.map((r) => (r.poolIndex ?? 0) + 1)),
-        sponsorCount: Math.max(
-          1,
-          ...sponsors.map((r) => (r.poolIndex ?? 0) + 1),
-        ),
-      };
-    return (
-      this.options.executionPool ??
-      (this.options.sharedApplicationSafes
-        ? { safeCount: 5, sponsorCount: 5 }
-        : this.executionPool)
-    );
-  }
-  async poolConfiguration(applicationId: string) {
-    this.target(applicationId);
-    return this.transaction((registry) =>
-      structuredClone(this.configuredPool(registry, applicationId)),
-    );
-  }
-  async readPool(principal: VerifiedPrincipal) {
-    if (!principal.scopes.includes('wallet:configuration:read')) deny();
-    const applicationId = this.application(principal);
-    const pool = await this.poolConfiguration(applicationId);
-    return {
-      application_id: applicationId,
-      safe_count: pool.safeCount,
-      sponsor_count: pool.sponsorCount,
-    };
-  }
-  async configurePool(
-    context: AuthorityContext,
-    input: {
-      expected_safe_count: number;
-      expected_sponsor_count: number;
-      safe_count: number;
-      sponsor_count: number;
-    },
-  ) {
-    const applicationId = this.application(context.principal);
-    const key = this.key(
-      context,
-      'wallet:configuration:propose',
-      'execution-pool',
-      applicationId,
-    );
-    if (
-      !input ||
-      Object.keys(input).sort().join(',') !==
-        'expected_safe_count,expected_sponsor_count,safe_count,sponsor_count' ||
-      Object.values(input).some((n) => !Number.isInteger(n) || n < 1 || n > 16)
-    )
-      invalid();
-    input = structuredClone(input);
-    const hash = fingerprint(input);
-    return this.transaction((registry) => {
-      const receipts = (registry.poolConfigurationReceipts ??= {});
-      if (receipts[key]) {
-        if (receipts[key].hash !== hash) conflict();
-        return structuredClone(receipts[key].result);
-      }
-      const result = {
-        application_id: applicationId,
-        safe_count: input.safe_count,
-        sponsor_count: input.sponsor_count,
-      };
-      const retain = () => {
-        receipts[key] = { hash, result };
-        return structuredClone(result);
-      };
-      const current = this.configuredPool(registry, applicationId);
-      if (
-        current.safeCount === input.safe_count &&
-        current.sponsorCount === input.sponsor_count
-      )
-        return retain();
-      if (
-        current.safeCount !== input.expected_safe_count ||
-        current.sponsorCount !== input.expected_sponsor_count
-      )
-        conflict();
-      // Choose capacity before provisioning; changing a signed execution configuration requires a separate migration.
-      if (
-        Object.values(registry.applicationSafes ?? {}).some(
-          (r) => r.applicationId === applicationId,
-        ) ||
-        Object.values(registry.applicationSponsors ?? {}).some(
-          (r) => r.applicationId === applicationId,
-        )
-      )
-        conflict();
-      (registry.applicationPoolConfigurations ??= {})[applicationId] = {
-        safeCount: input.safe_count,
-        sponsorCount: input.sponsor_count,
-      };
-      return retain();
-    });
-  }
   async acceptedSponsorship(applicationId: string) {
     this.target(applicationId);
     return this.transaction((registry) => {
@@ -856,7 +698,7 @@ export class RuntimeConfigurationService {
         providerNetwork(this.network).caip
     )
       invalid();
-    const hash = serviceHash([expected, value]);
+    const hash = canonicalHash([expected, value]);
     return this.transaction((registry) => {
       const obligations = (registry.obligations ??= {
         records: {},
@@ -915,7 +757,7 @@ export class RuntimeConfigurationService {
       'decide-obligation-' + kind,
       applicationId,
     );
-    const hash = serviceHash(input);
+    const hash = canonicalHash(input);
     return this.transaction((registry) => {
       const obligations = registry.obligations ?? conflict();
       const previous = obligations?.receipts[key];
@@ -952,7 +794,7 @@ export class RuntimeConfigurationService {
     const change = normalizeRuntimePolicy(input);
     if (change.policy.chain_id !== providerNetwork(this.network).caip)
       invalid();
-    const hash = serviceHash(change);
+    const hash = canonicalHash(change);
     return this.transaction((registry, state) => {
       const previous = this.receipt(registry, key, hash);
       if (previous) return previous as RuntimePolicyProposal;
@@ -968,7 +810,7 @@ export class RuntimeConfigurationService {
         application_id: applicationId,
         based_on_revision: change.expected_revision,
         policy: change.policy,
-        policy_hash: serviceHash(change.policy),
+        policy_hash: canonicalHash(change.policy),
         created_at: new Date().toISOString(),
       };
       registry.proposals[record.proposal_id] = record;
@@ -989,23 +831,19 @@ export class RuntimeConfigurationService {
           revisionKey(applicationId, change.expected_revision)
         ];
       // Automatic acceptance delegates contract registration, never provider terms.
-      if (
-        review?.mode === 'automatic' &&
-        current &&
-        !this.options.sharedApplicationSafes
-      ) {
+      if (review?.mode === 'automatic' && current) {
         const { contracts: _old, ...terms } = current.policy;
         const { contracts: _new, ...requestedTerms } = change.policy;
         if (
           current.policy.enabled &&
-          serviceHash(terms) === serviceHash(requestedTerms)
+          canonicalHash(terms) === canonicalHash(requestedTerms)
         ) {
           this.publishRevision(
             registry,
             state,
             applicationId,
             change,
-            serviceHash(['automatic-publication', record.proposal_id]),
+            canonicalHash(['automatic-publication', record.proposal_id]),
             hash,
             review.approved_by,
             record.proposal_id,
@@ -1109,8 +947,7 @@ export class RuntimeConfigurationService {
       ) ||
       !/^(0|[1-9][0-9]{0,19})$/.test(input.expected_revision) ||
       !/^(0|[1-9][0-9]{0,19})$/.test(input.expected_review_revision) ||
-      !['automatic', 'manual'].includes(input.mode) ||
-      (this.options.sharedApplicationSafes && input.mode === 'automatic')
+      !['automatic', 'manual'].includes(input.mode)
     )
       invalid();
     const key = this.key(
@@ -1122,7 +959,7 @@ export class RuntimeConfigurationService {
     return this.transaction((registry, state) => {
       // Review decisions share the policy revision fence so publication and mode changes cannot race.
       const previous = registry.idempotency[key];
-      const hash = serviceHash(input);
+      const hash = canonicalHash(input);
       if (previous) {
         if (previous.hash !== hash) conflict();
         return registry.reviewReceipts?.[key] ?? conflict();
@@ -1148,7 +985,7 @@ export class RuntimeConfigurationService {
       reviews[applicationId] = {
         mode: input.mode,
         revision,
-        approved_by: serviceHash([
+        approved_by: canonicalHash([
           context.principal.issuer,
           context.principal.clientId,
           context.principal.subject,
@@ -1233,7 +1070,7 @@ export class RuntimeConfigurationService {
       'publish',
       proposalId,
     );
-    const hash = serviceHash([proposalId, expectedRevision]);
+    const hash = canonicalHash([proposalId, expectedRevision]);
     return this.transaction((registry, state) => {
       const proposal = registry.proposals[proposalId];
       if (!proposal) deny();
@@ -1270,7 +1107,7 @@ export class RuntimeConfigurationService {
     const change = normalizeRuntimePolicy(input);
     if (change.policy.chain_id !== providerNetwork(this.network).caip)
       invalid();
-    const hash = serviceHash(change);
+    const hash = canonicalHash(change);
     return this.transaction((registry, state) => {
       const previous = this.receipt(registry, key, hash);
       if (previous) return previous as RuntimePolicyRevision;

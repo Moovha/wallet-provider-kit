@@ -3,28 +3,25 @@ export interface OperationGuide {
   group: string;
   scope?: string;
   serviceAuthenticated?: boolean;
-  financial?: boolean;
-  approvedAction?: boolean;
   enrollment?: boolean;
-  execution?: boolean;
-  safeQueue?: boolean;
-  safeProvisioning?: boolean;
   walletCalls?: boolean;
   safeWallet?: boolean;
   runtimeConfiguration?: boolean;
   applicationLed?: boolean;
   records?: boolean;
   vendor?: boolean;
-  permission?:
-    | 'account:read'
-    | 'operations:request'
-    | 'transfers:request'
-    | 'contracts:request';
+  permission?: 'account:read' | 'operations:request' | 'contracts:request';
   prerequisite: string;
   success: string;
 }
 // Shared operator guidance. Runtime authentication and authority remain authoritative.
 export const operationGuides: Record<string, OperationGuide> = {
+  getExecutionCapabilities: {
+    title: 'Read the execution contract',
+    group: 'Discovery',
+    prerequisite: 'No authentication required.',
+    success: '200: the Safe ERC-4337 contract and configuration availability.',
+  },
   readSafeWalletInfrastructure: {
     title: 'Inspect Safe-only sponsorship',
     group: 'Application infrastructure',
@@ -45,34 +42,15 @@ export const operationGuides: Record<string, OperationGuide> = {
     success:
       '200: journaled paymaster deployment and gas funding. Uncertain transactions retain their original signed payload and hash.',
   },
-
-  readApplicationExecutionPool: {
-    title: 'Read application execution capacity',
-    group: 'Application infrastructure',
-    scope: 'wallet:configuration:read',
-    runtimeConfiguration: true,
-    prerequisite: 'Connect the enabled application.',
-    success: '200: configured Safe and sponsor counts for this application.',
-  },
-  configureApplicationExecutionPool: {
-    title: 'Configure application execution capacity',
-    group: 'Application infrastructure',
-    scope: 'wallet:configuration:propose',
-    runtimeConfiguration: true,
-    prerequisite:
-      'Choose counts from one to sixteen before provisioning any pool member. Supply expected counts and a UUIDv4 idempotency key.',
-    success:
-      '200: selected counts. Stale updates and resizing a provisioned pool conflict.',
-  },
   readApplicationGasFunding: {
     title: 'Read the application gas funding address',
     group: 'Application infrastructure',
     scope: 'wallet:configuration:read',
     runtimeConfiguration: true,
     prerequisite:
-      'Have the provider accept sponsorship and prepare the application execution profile.',
+      'Have the provider accept sponsorship and prepare the application infrastructure.',
     success:
-      '200: one stable application gas-funding address and infrastructure status for the selected execution profile.',
+      '200: one stable application gas-funding address and infrastructure status for the application.',
   },
   readWalletExecutionAccount: {
     title: 'Read the user’s assigned execution Safe',
@@ -80,49 +58,9 @@ export const operationGuides: Record<string, OperationGuide> = {
     scope: 'wallet:execute:read',
     walletCalls: true,
     prerequisite:
-      'Use current account access and contract delegation after the application execution pool is ready.',
+      'Use current account access and contract delegation after the application bundler and paymaster are ready.',
     success:
-      '200: the Safe address and chain ID. In the Safe-only profile, this is the user’s deposit, balance and execution address.',
-  },
-  readApplicationSafe: {
-    title: 'Read application funding addresses and Safe status',
-    group: 'Application infrastructure',
-    scope: 'wallet:configuration:read',
-    runtimeConfiguration: true,
-    prerequisite:
-      'Connect an enabled application to a provider configured for shared application Safes.',
-    success:
-      '200: funding addresses and retained provisioning status. Individual user wallets retain their assets.',
-  },
-  readProviderApplicationSafe: {
-    title: 'Inspect an application Safe',
-    group: 'Application infrastructure',
-    scope: 'wallet:configuration:write',
-    runtimeConfiguration: true,
-    prerequisite:
-      'Use an exact configured provider identity and an application ID.',
-    success:
-      '200: public addresses and provisioning status, without signer identifiers or credentials.',
-  },
-  provisionApplicationSponsor: {
-    title: 'Prepare application gas sponsorship',
-    group: 'Application infrastructure',
-    scope: 'wallet:configuration:write',
-    runtimeConfiguration: true,
-    prerequisite:
-      'Accept the application sponsorship and submission service declarations. The bundled engine and encrypted credential storage must be configured.',
-    success:
-      '200: the retained application gas funding address, shared by all pool members. Retries reconcile the same sponsor and relayer identities.',
-  },
-  provisionApplicationSafe: {
-    title: 'Provision a funded application Safe',
-    group: 'Application infrastructure',
-    scope: 'wallet:configuration:write',
-    runtimeConfiguration: true,
-    prerequisite:
-      'Use a provider token after accepting sponsorship and verifier services, preparing the sponsor and funding its gas ceiling. Wallet activation must be enabled.',
-    success:
-      '200: pending, unknown or finalized-ready deployment status. The provider-owned application signer is separate from every user wallet. Unknown submissions are never blindly repeated.',
+      '200: the Safe address and chain ID. This is the user’s deposit, balance and execution address.',
   },
   readApplicationCredentials: {
     title: 'Read application credential metadata',
@@ -162,7 +100,7 @@ export const operationGuides: Record<string, OperationGuide> = {
     prerequisite:
       'Use an enabled registered application for its own declarations, or an exact configured provider operator for decisions and cross-application inspection. Writes require a UUIDv4 idempotency key and the current resource revision. Decisions also require the current decision revision.',
     success:
-      '200: durable application-scoped declarations or provider decisions. Changes return to pending review. Accepted actions constrain off-chain payloads; accepted services enable application-owned verifier credentials when credential storage is configured. Acceptance does not activate execution or authorize spending. Shared Safe provisioning requires its separate provider endpoint and funded sponsorship. Submit schema declarations and opaque application-local secret references, never actual user payloads or credentials.',
+      '200: durable application-scoped declarations or provider decisions. Changes return to pending review. Accepted actions constrain off-chain payloads; accepted services enable application-owned verifier credentials when credential storage is configured. Acceptance does not activate execution or authorize spending. Safe provisioning requires accepted application infrastructure and funded sponsorship. Submit schema declarations and opaque application-local secret references, never actual user payloads or credentials.',
   },
   readProviderApplicationObligations: {
     title: 'Inspect application obligations as provider',
@@ -172,7 +110,7 @@ export const operationGuides: Record<string, OperationGuide> = {
     prerequisite:
       'Use an enabled registered application for its own declarations, or an exact configured provider operator for decisions and cross-application inspection. Writes require a UUIDv4 idempotency key and the current resource revision. Decisions also require the current decision revision.',
     success:
-      '200: durable application-scoped declarations or provider decisions. Changes return to pending review. Accepted actions constrain off-chain payloads; accepted services enable application-owned verifier credentials when credential storage is configured. Acceptance does not activate execution or authorize spending. Shared Safe provisioning requires its separate provider endpoint and funded sponsorship. Submit schema declarations and opaque application-local secret references, never actual user payloads or credentials.',
+      '200: durable application-scoped declarations or provider decisions. Changes return to pending review. Accepted actions constrain off-chain payloads; accepted services enable application-owned verifier credentials when credential storage is configured. Acceptance does not activate execution or authorize spending. Safe provisioning requires accepted application infrastructure and funded sponsorship. Submit schema declarations and opaque application-local secret references, never actual user payloads or credentials.',
   },
   submitApplicationActions: {
     title: 'Declare expected actions and off-chain fields',
@@ -182,7 +120,7 @@ export const operationGuides: Record<string, OperationGuide> = {
     prerequisite:
       'Use an enabled registered application for its own declarations, or an exact configured provider operator for decisions and cross-application inspection. Writes require a UUIDv4 idempotency key and the current resource revision. Decisions also require the current decision revision.',
     success:
-      '200: durable application-scoped declarations or provider decisions. Changes return to pending review. Accepted actions constrain off-chain payloads; accepted services enable application-owned verifier credentials when credential storage is configured. Acceptance does not activate execution or authorize spending. Shared Safe provisioning requires its separate provider endpoint and funded sponsorship. Submit schema declarations and opaque application-local secret references, never actual user payloads or credentials.',
+      '200: durable application-scoped declarations or provider decisions. Changes return to pending review. Accepted actions constrain off-chain payloads; accepted services enable application-owned verifier credentials when credential storage is configured. Acceptance does not activate execution or authorize spending. Safe provisioning requires accepted application infrastructure and funded sponsorship. Submit schema declarations and opaque application-local secret references, never actual user payloads or credentials.',
   },
   submitApplicationServices: {
     title: 'Declare application-paid service accounts',
@@ -192,7 +130,7 @@ export const operationGuides: Record<string, OperationGuide> = {
     prerequisite:
       'Use an enabled registered application for its own declarations, or an exact configured provider operator for decisions and cross-application inspection. Writes require a UUIDv4 idempotency key and the current resource revision. Decisions also require the current decision revision.',
     success:
-      '200: durable application-scoped declarations or provider decisions. Changes return to pending review. Accepted actions constrain off-chain payloads; accepted services enable application-owned verifier credentials when credential storage is configured. Acceptance does not activate execution or authorize spending. Shared Safe provisioning requires its separate provider endpoint and funded sponsorship. Submit schema declarations and opaque application-local secret references, never actual user payloads or credentials.',
+      '200: durable application-scoped declarations or provider decisions. Changes return to pending review. Accepted actions constrain off-chain payloads; accepted services enable application-owned verifier credentials when credential storage is configured. Acceptance does not activate execution or authorize spending. Safe provisioning requires accepted application infrastructure and funded sponsorship. Submit schema declarations and opaque application-local secret references, never actual user payloads or credentials.',
   },
   submitApplicationSponsorship: {
     title: 'Declare application gas sponsorship',
@@ -202,7 +140,7 @@ export const operationGuides: Record<string, OperationGuide> = {
     prerequisite:
       'Use an enabled registered application for its own declarations, or an exact configured provider operator for decisions and cross-application inspection. Writes require a UUIDv4 idempotency key and the current resource revision. Decisions also require the current decision revision.',
     success:
-      '200: durable application-scoped declarations or provider decisions. Changes return to pending review. Accepted actions constrain off-chain payloads; accepted services enable application-owned verifier credentials when credential storage is configured. Acceptance does not activate execution or authorize spending. Shared Safe provisioning requires its separate provider endpoint and funded sponsorship. Submit schema declarations and opaque application-local secret references, never actual user payloads or credentials.',
+      '200: durable application-scoped declarations or provider decisions. Changes return to pending review. Accepted actions constrain off-chain payloads; accepted services enable application-owned verifier credentials when credential storage is configured. Acceptance does not activate execution or authorize spending. Safe provisioning requires accepted application infrastructure and funded sponsorship. Submit schema declarations and opaque application-local secret references, never actual user payloads or credentials.',
   },
   decideApplicationActions: {
     title: 'Accept or reject declared actions',
@@ -212,7 +150,7 @@ export const operationGuides: Record<string, OperationGuide> = {
     prerequisite:
       'Use an enabled registered application for its own declarations, or an exact configured provider operator for decisions and cross-application inspection. Writes require a UUIDv4 idempotency key and the current resource revision. Decisions also require the current decision revision.',
     success:
-      '200: durable application-scoped declarations or provider decisions. Changes return to pending review. Accepted actions constrain off-chain payloads; accepted services enable application-owned verifier credentials when credential storage is configured. Acceptance does not activate execution or authorize spending. Shared Safe provisioning requires its separate provider endpoint and funded sponsorship. Submit schema declarations and opaque application-local secret references, never actual user payloads or credentials.',
+      '200: durable application-scoped declarations or provider decisions. Changes return to pending review. Accepted actions constrain off-chain payloads; accepted services enable application-owned verifier credentials when credential storage is configured. Acceptance does not activate execution or authorize spending. Safe provisioning requires accepted application infrastructure and funded sponsorship. Submit schema declarations and opaque application-local secret references, never actual user payloads or credentials.',
   },
   decideApplicationServices: {
     title: 'Accept or reject declared service accounts',
@@ -222,7 +160,7 @@ export const operationGuides: Record<string, OperationGuide> = {
     prerequisite:
       'Use an enabled registered application for its own declarations, or an exact configured provider operator for decisions and cross-application inspection. Writes require a UUIDv4 idempotency key and the current resource revision. Decisions also require the current decision revision.',
     success:
-      '200: durable application-scoped declarations or provider decisions. Changes return to pending review. Accepted actions constrain off-chain payloads; accepted services enable application-owned verifier credentials when credential storage is configured. Acceptance does not activate execution or authorize spending. Shared Safe provisioning requires its separate provider endpoint and funded sponsorship. Submit schema declarations and opaque application-local secret references, never actual user payloads or credentials.',
+      '200: durable application-scoped declarations or provider decisions. Changes return to pending review. Accepted actions constrain off-chain payloads; accepted services enable application-owned verifier credentials when credential storage is configured. Acceptance does not activate execution or authorize spending. Safe provisioning requires accepted application infrastructure and funded sponsorship. Submit schema declarations and opaque application-local secret references, never actual user payloads or credentials.',
   },
   decideApplicationSponsorship: {
     title: 'Accept or reject declared gas sponsorship',
@@ -232,7 +170,7 @@ export const operationGuides: Record<string, OperationGuide> = {
     prerequisite:
       'Use an enabled registered application for its own declarations, or an exact configured provider operator for decisions and cross-application inspection. Writes require a UUIDv4 idempotency key and the current resource revision. Decisions also require the current decision revision.',
     success:
-      '200: durable application-scoped declarations or provider decisions. Changes return to pending review. Accepted actions constrain off-chain payloads; accepted services enable application-owned verifier credentials when credential storage is configured. Acceptance does not activate execution or authorize spending. Shared Safe provisioning requires its separate provider endpoint and funded sponsorship. Submit schema declarations and opaque application-local secret references, never actual user payloads or credentials.',
+      '200: durable application-scoped declarations or provider decisions. Changes return to pending review. Accepted actions constrain off-chain payloads; accepted services enable application-owned verifier credentials when credential storage is configured. Acceptance does not activate execution or authorize spending. Safe provisioning requires accepted application infrastructure and funded sponsorship. Submit schema declarations and opaque application-local secret references, never actual user payloads or credentials.',
   },
   listApplicationConfigurations: {
     title: 'List application configurations',
@@ -281,7 +219,7 @@ export const operationGuides: Record<string, OperationGuide> = {
     scope: 'wallet:access:read',
     walletCalls: true,
     prerequisite:
-      'Enable runtime financial authority and the Safe queue. The account endpoint binds the authenticated application and current owner. Send requires wallet:actions, wallet:sign and wallet:execute plus contracts:request consent; status/discovery require wallet:execute:read.',
+      'Enable Safe wallet calls. The account endpoint binds the authenticated application and current owner. Send requires wallet:actions, wallet:sign and wallet:execute plus contracts:request consent; status/discovery require wallet:execute:read.',
     success:
       '200: a JSON-RPC result or sanitized RPC error. Use EIP-5792 version 2.0.0, retain the batch ID and poll wallet_getCallsStatus. Inclusion is distinct from finality. HTTP authentication/readiness failures use the normal problem envelope.',
   },
@@ -355,51 +293,6 @@ export const operationGuides: Record<string, OperationGuide> = {
     success:
       '200: a durable proposal, publication or current configuration. Publications are visible without restart. Mutations require an original UUIDv4 idempotency key and expected_revision; stale updates conflict. Historical revisions remain immutable. Applications can read only their own records.',
   },
-  enqueueContractCall: {
-    title: 'Queue an approved Safe operation for automatic execution',
-    group: 'Safe execution queue',
-    scope: 'wallet:actions',
-    safeQueue: true,
-    permission: 'contracts:request',
-    prerequisite:
-      'Enable the bounded Safe queue and approved-evm-executor-v1. Also require wallet:sign and wallet:execute. This request authorizes delayed execution of the exact policy-controlled input under the original owner, grant, consent and policy until its bounded expiry. The worker rechecks all current authority before signing and dispatch; queued requests contain no signature or assigned Safe nonce.',
-    success:
-      '202: a durable request ID. Per-Safe FIFO ordering survives restart. Only the head materializes an immutable action; action_id appears after admission. Follow this request and then its verified action execution. Unknown signed attempts block the lane. Acceptance is not execution or settlement.',
-  },
-  readContractCallRequest: {
-    title: 'Read a queued Safe request',
-    group: 'Safe execution queue',
-    scope: 'wallet:execute:read',
-    safeQueue: true,
-    permission: 'contracts:request',
-    prerequisite:
-      'Use the original request ID and current owner-bound application access. Reading never signs, dispatches or advances the queue.',
-    success:
-      '200: queued, executing, included, succeeded, failed, cancelled, expired or blocked and an action_id when materialized. Verified inclusion with consumed Safe nonce allows the next head; settlement remains pending until finality. Unknown effects and unconsumed Safe nonces require recovery.',
-  },
-  cancelContractCallRequest: {
-    title: 'Cancel an unsigned queued Safe request',
-    group: 'Safe execution queue',
-    scope: 'wallet:execute',
-    safeQueue: true,
-    permission: 'contracts:request',
-    prerequisite:
-      'Use an empty body, UUIDv4 Idempotency-Key and current original-caller authority. Cancellation is allowed only when durable storage proves no signing admission exists, including after a crash during action materialization.',
-    success:
-      '200: cancelled. A signed or uncertain action returns conflict and retains its Safe nonce and queue position; cancellation cannot recall an issued signature.',
-  },
-  requestContractCall: {
-    title: 'Authorize generic wallet calls',
-    group: 'Approved contract calls',
-    scope: 'wallet:actions',
-    approvedAction: true,
-    execution: true,
-    permission: 'contracts:request',
-    prerequisite:
-      'Enable approved-evm-executor-v1 and the contract-call policy. Obtain contracts:request consent to the exact policy revision and use an explicitly bound Safe 1.4.1 account. Contract methods and native recipients follow published policy; optional adapters supply explicitly selected protocol checks. Callers cannot supply signing data, a nonce or provider identity.',
-    success:
-      '200: the immutable action, exact calls and Safe authorization. Execute by stored action ID. Contract-call signatures are retained for coordinated dispatch; /sign does not export them. Execution success alone does not establish an arbitrary business outcome.',
-  },
   getCapabilities: {
     title: 'Discover this provider',
     group: 'Discovery',
@@ -424,7 +317,7 @@ export const operationGuides: Record<string, OperationGuide> = {
     prerequisite:
       'Use an enabled application registration and its API token. The response identifies the provider’s identity source and required submission fields without returning customer records.',
     success:
-      '200: flow, policy_revision, required_fields, verification_level, age limits and provider login/review requirements. action_policy_revision identifies the configured transfer and contract terms; transfer_policy_revision remains a compatibility alias. Record the user’s consent to those terms in your application before requesting transfer access.',
+      '200: flow, policy_revision, required_fields, verification_level, age limits and provider login/review requirements. action_policy_revision identifies the configured Safe call policy. Record the user’s consent to those terms before requesting contract access.',
   },
   submitAccountAccessRecords: {
     records: true,
@@ -475,16 +368,6 @@ export const operationGuides: Record<string, OperationGuide> = {
     success:
       '200: accepted or provisioned account status. An address is present after provisioning.',
   },
-  readProvisionedSafe: {
-    title: 'Read the account’s provisioned Safe',
-    group: 'Wallet accounts',
-    scope: 'wallet:account:read',
-    permission: 'account:read',
-    prerequisite:
-      'Enable automatic Safe provisioning and use the owner account UUID with current account-read delegation. Poll this endpoint after wallet provisioning returns a pending smart_account.',
-    success:
-      '200: the deterministic Safe address and deployment status. Ready requires matching finalized proxy code and current owner, threshold, singleton, module, guard and fallback checks across both configured RPCs. Reading never submits a deployment.',
-  },
   provisionAccount: {
     title: 'Create the account’s wallet',
     group: 'Wallet accounts',
@@ -492,121 +375,7 @@ export const operationGuides: Record<string, OperationGuide> = {
     prerequisite:
       'Use the accepted account_id with current owner-granted access and an empty JSON body: {}. Keep the original idempotency key when retrying. Investigate an unknown outcome before trying again.',
     success:
-      '200: account_id and signing wallet address, plus smart_account when automatic Safe provisioning is configured. Safe deployment consumes the application sponsor’s gas budget and requires operations:request delegation. Pending deployment can be polled through the Safe read endpoint. A permitted retry reuses the saved deployment attempt. Wallet creation does not grant spending permission.',
-  },
-  requestTransferAuthorization: {
-    title: 'Request provider transfer authorization',
-    group: 'Provider-authorized transfers',
-    scope: 'wallet:actions',
-    financial: true,
-    permission: 'transfers:request',
-    prerequisite:
-      'Configure ERC-3009 transfer signing, create the wallet and obtain the owner’s transfers:request delegation in the application for the exact transfer_policy_revision (or through hosted consent in compatibility mode). The provider checks current owner access, identity, consent, recipient and amount limits for each request without another owner prompt.',
-    success:
-      '200: authorized with the exact stored payload and expiry. Signing, submission and settlement are separate.',
-  },
-  getTransferAuthorization: {
-    title: 'Read a stored approved action',
-    group: 'Provider-authorized transfers',
-    scope: 'wallet:actions:read',
-    approvedAction: true,
-    prerequisite:
-      'Use the returned action_id with a token for the authorized application and caller. The provider rechecks current owner access, identity and policy.',
-    success:
-      '200: authorizing, authorized or denied. authorized means the provider has stored the approved action; signing, submission and completion are separate steps.',
-  },
-  checkExecutionAuthority: {
-    title: 'Recheck wallet authority for the designated executor',
-    group: 'Execution service authority',
-    serviceAuthenticated: true,
-    prerequisite:
-      'Only the configured executor may call this read-only endpoint using a short-lived request-bound service proof. Application OAuth tokens are rejected. The stored execution plan, original caller and durable attempt must match, with an unexpired handoff lease. Current owner, grant, identity, consent and exact approval checks remain mandatory.',
-    success:
-      '200: signed permission for the exact current execution callback. This response does not create an action, sign a payload, dispatch a transaction or renew a handoff lease.',
-  },
-  getExecutionCapabilities: {
-    title: 'Discover execution profiles and verification requirements',
-    group: 'Execution coordination',
-    prerequisite:
-      'Public discovery. Read the exact profile ID and revision before requesting execution. Implemented, configured and ready are distinct; none establishes provider certification or production custody acceptance.',
-    success:
-      '200: implemented transfer and approved EVM execution profiles on the configured Base network, their revisions, required scopes and finalized RPC-quorum verification policy. Unsupported wallet/account standards are not advertised as executable capabilities.',
-  },
-  reconcileExecution: {
-    title: 'Reconcile an existing execution without provider mutations',
-    group: 'Execution recovery',
-    scope: 'wallet:execute:read',
-    execution: true,
-    approvedAction: true,
-    prerequisite:
-      'Use the original action ID, an empty body, exact execution profile headers and a UUIDv4 Idempotency-Key. Current original caller, owner, grant, identity, consent and approval remain required; status reconciliation is allowed after signing expiry. Optional recovery configuration adds nonce diagnostics and durable payer quarantine.',
-    success:
-      '200: refreshed original execution and operational diagnosis. The procedure performs only read-only provider and RPC lookup, preserves attempts and budgets, and never signs, claims dispatch, reprices, cancels or clears a nonce. Matching canonical finalized evidence remains finalized when a rotated RPC reports lagging heads. Explicit reconciliation bypasses inclusion caches and can clear an integrity fence only after a fresh full proof restores the original plan, transaction, block and outcome. Only exact verified finalized receipts clear corresponding quarantine reasons; nonce consumption without matching effects requires operator review.',
-  },
-  authorizeSafeNonceCancellation: {
-    title: 'Authorize cancellation of an unsubmitted signed Safe action',
-    group: 'Execution recovery',
-    scope: 'wallet:actions',
-    permission: 'contracts:request',
-    approvedAction: true,
-    execution: true,
-    prerequisite:
-      'Use bundled local Safe execution, the original caller and current owner, grant, identity, consent and action policy. Supply the stored action ID, exact expected_nonce and expected_payload_hash, authorization: invalidate-signed-action, and a stable UUIDv4 Idempotency-Key. Any submission admission, including an unclaimed one, prevents cancellation. Unknown or submitted actions require reconciliation.',
-    success:
-      '200: a separate immutable cancellation action ID. Execute it through the normal execute endpoint with signing and execution scopes. It sends zero value and empty calldata to the same Safe at the original nonce. The original action is blocked immediately; its queue is cancelled only after RPC-quorum finalized cancellation. Gas and lifetime reservations remain retained. Signatures are never exported.',
-  },
-  executeTransfer: {
-    title: 'Execute an approved action with a gas sponsor',
-    group: 'Execution coordination',
-    scope: 'wallet:execute',
-    approvedAction: true,
-    execution: true,
-    prerequisite:
-      'Also require wallet:sign. Configure dedicated application sponsors, admitted gas budgets, two independent RPC origins, the accepted genesis and operation-specific runtime hashes and execution acceptance. Send {} with the explicitly configured Execution-Profile (erc3009-relayer-v1, erc3009-executor-v1 or approved-evm-executor-v1), Execution-Profile-Revision: 1 and a UUIDv4 Idempotency-Key. The provider keeps its current owner, grant, identity, consent, exact approval and durable signing/dispatch checks. Callers cannot supply calldata, signatures, fees, sponsors or transaction nonces.',
-    success:
-      '200: durable execution/dispatch status, not a settlement guarantee. One execution identity per action survives retries and restart. A lost submission response remains unknown and is never dispatched again. Read execution status to obtain independently checked chain effects and finality. Gas reservations and signing exposure are not refunded automatically.',
-  },
-  getTransferExecution: {
-    title: 'Read independently verified execution and finality',
-    group: 'Execution coordination',
-    scope: 'wallet:execute:read',
-    approvedAction: true,
-    execution: true,
-    prerequisite:
-      'Use the original action ID and exact Execution-Profile/Execution-Profile-Revision headers. Current caller, owner, action delegation, identity, consent and approval must still pass; reads remain possible after signing expiry. The observer checks receipts, canonical blocks, code pins and operation-specific execution/asset evidence through all configured RPC sources.',
-    success:
-      '200: separate dispatch, chain, outcome and settlement fields. Only finalized matching effects have settlement succeeded or reverted. Relayer acceptance, application reports and inclusion alone do not establish settlement. RPC outages return unavailable; contradictory finalized evidence fences the execution for operator investigation.',
-  },
-  getExecutionEvents: {
-    title: 'Read durable CloudEvents execution observations',
-    group: 'Execution coordination',
-    scope: 'wallet:execute:read',
-    approvedAction: true,
-    execution: true,
-    prerequisite:
-      'Use the exact execution profile headers and current owner-bound access for the action. Pass the last next_sequence as the after query parameter. Event data uses the pinned execution profile revision; the envelope uses CloudEvents specversion 1.0. Reading this feed never refreshes or dispatches a transaction.',
-    success:
-      '200: up to 64 durable observed transitions. Persist event IDs for deduplication. history_truncated requires resynchronization through verified execution status; a cursor beyond stored history returns 409. Events distinguish unverified observations, inclusion and finalized effects and do not form an exhaustive chain or accounting ledger.',
-  },
-  reportTransactionEvent: {
-    title: 'Report a transaction event',
-    group: 'Transaction telemetry',
-    scope: 'wallet:events',
-    approvedAction: true,
-    prerequisite:
-      'Use an existing authorized action_id for the same application, caller, owner and current delegation for the action. Report submitted, confirmed or failed with the configured network’s transaction hash and observation time. Keep the original idempotency key for retries. Reports may arrive after signing authorization expires; current access and policy must still pass.',
-    success:
-      '200: a durable application report marked unverified. Recording a report does not broadcast, verify a receipt, establish settlement, reconcile a signing attempt or release a budget reservation. At most 32 reports are retained per action; reports can arrive out of order and do not form an authoritative transaction status.',
-  },
-  getTransactionEvents: {
-    title: 'Read reported transaction events',
-    group: 'Transaction telemetry',
-    scope: 'wallet:events:read',
-    approvedAction: true,
-    prerequisite:
-      'Use an action_id belonging to the same application and caller with current owner access, identity and transfer delegation. Signing expiry does not prevent report reads; revoked access or changed policy denies them.',
-    success:
-      '200: application reports in recording order, each marked unverified. An empty list is not proof that no transaction was submitted. Confirm settlement independently from chain receipts, exact transfer effects and your finality policy.',
+      '200: the user Safe account address and provisioning status. Deployment uses accepted application infrastructure. Pending deployment retains its original attempt; retry with the same identity. Wallet creation does not grant spending permission.',
   },
   beginEnrollment: {
     title: 'Begin advanced OIDC enrollment',
@@ -638,33 +407,14 @@ export const operationGuides: Record<string, OperationGuide> = {
     success:
       '200: the current enrollment receipt without identity attributes or proof tokens.',
   },
-  signAction: {
-    title: 'Sign an approved action (no submission)',
-    group: 'Provider-authorized transfers',
-    scope: 'wallet:sign',
-    financial: true,
-    permission: 'transfers:request',
-    prerequisite:
-      'Transfer signature export only; contract calls use coordinated execution. Use the stored action_id and an empty JSON body: {}. The provider rechecks its exact authorization, the owner’s current delegation for the action, identity, consent, policy, budget and recorded attempt before signing. Keep the original idempotency key when retrying, including after a timeout.',
-    success:
-      '200: a verified signature, or the saved signature for a permitted retry. The application must submit the transaction and arrange network fees separately. A signature can remain usable until its on-chain expiry even if access is later revoked.',
-  },
 };
 
 export interface ApiFeatures {
-  nonceCancellation?: boolean;
   onboarding: boolean;
   enrollment: boolean;
-  financial: boolean;
-  execution?: boolean;
-  safeQueue?: boolean;
-  safeProvisioning?: boolean;
   walletCalls?: boolean;
   safeWallet?: boolean;
   runtimeConfiguration?: boolean;
-  executionService?: boolean;
-  contractCalls?: boolean;
-  signing?: boolean;
   wallet: boolean;
   flow?: 'application' | 'hosted';
   records?: boolean;
@@ -677,51 +427,38 @@ export function operationUnavailableReason(
   features: ApiFeatures,
 ): string | undefined {
   const guide = operationGuides[id];
-  if (!guide || id === 'getCapabilities' || id === 'getExecutionCapabilities')
+  if (
+    !guide ||
+    [
+      'getCapabilities',
+      'getExecutionCapabilities',
+      'readAccessPolicy',
+    ].includes(id)
+  )
     return undefined;
-  if (id === 'authorizeSafeNonceCancellation' && !features.nonceCancellation)
-    return 'Bundled local Safe execution is not configured';
-  if (id === 'readProvisionedSafe' && !features.safeProvisioning)
-    return 'Automatic Safe provisioning is not configured';
-  if (guide.runtimeConfiguration)
-    return features.runtimeConfiguration
-      ? undefined
-      : 'Runtime configuration control plane is not configured';
   if (guide.safeWallet && !features.safeWallet)
-    return 'Requires the Safe-only wallet profile.';
+    return 'Safe wallet infrastructure is not configured';
   if (guide.walletCalls && !features.walletCalls)
-    return 'Runtime financial authority and Safe queue are not configured';
-  if (guide.safeQueue && !features.safeQueue)
-    return 'Durable Safe execution queue is not configured';
-  if (id === 'requestContractCall' && !features.contractCalls)
-    return 'Approved contract-call policy and execution mechanism are not configured';
-  if (guide.serviceAuthenticated && !features.executionService)
-    return 'The designated execution service is not configured';
-  if (guide.execution && !features.execution)
-    return 'Execution coordination and RPC verification are not configured';
+    return 'The Safe UserOperation driver is not configured';
+  if (guide.runtimeConfiguration && !features.runtimeConfiguration)
+    return 'Application configuration is not configured';
   if (guide.enrollment)
     return features.enrollment
       ? undefined
-      : 'Advanced OIDC enrollment is not configured';
-  if (id === 'signAction' && features.signing && features.wallet)
-    return undefined;
-  if (guide.approvedAction && !features.financial && !features.contractCalls)
-    return 'Approved-action policy is not configured';
-  if (guide.financial && !features.financial)
-    return 'Transfer signing is off in Applications';
-  if (['provisionAccount', 'signAction'].includes(id))
-    return features.wallet ? undefined : 'Wallet authority is not configured';
+      : 'OIDC enrollment is not configured';
+  if (id === 'provisionAccount' && (!features.safeWallet || !features.wallet))
+    return 'Safe wallet provisioning is not configured';
   if (!features.onboarding)
     return 'Application access onboarding is not configured';
   if (guide.applicationLed && features.flow !== 'application')
     return 'Requires application-led access';
   if ((guide.records || guide.vendor) && features.flow === 'application')
-    return 'Requires hosted compatibility access';
+    return 'Requires hosted identity access';
   if (guide.records && !features.records)
-    return 'Select application records in Applications to use batch submission';
+    return 'Application identity records are not configured';
   if (guide.vendor && !features.vendor)
-    return 'Select an identity vendor in Services to import verification';
+    return 'Identity verification is not configured';
   return undefined;
 }
-
-export const transactionBoundaryDescription = `Signing, execution and transaction reports are separate contracts. POST /v1/transfer-authorizations stores an exact authorized ERC-3009 transfer; POST /v1/actions/{actionId}/sign returns its transfer signature without broadcasting. POST /v1/actions/contract-calls stores exact policy-approved generic calls, including accepted native transfers and optional adapter protections, for an explicitly bound Safe account; those signatures remain private to coordinated execution. With an optional explicitly selected execution profile, POST /v1/actions/{actionId}/execute coordinates signing, simulation, gas-budget admission and one durable direct-provider dispatch or authenticated designated-service handoff. The designated service has its own provider journal and calls back for fresh wallet authority. GET /v1/actions/{actionId}/execution independently checks chain effects through configured RPC sources and separates inclusion, safe and finalized status. Applications can still arrange submission separately when coordination is absent. Transaction-event reports remain unverified and never determine settlement or release budgets. Monitoring metrics and traces are exported separately to an OTLP collector.`;
+export const transactionBoundaryDescription =
+  'Applications submit policy-approved calls through the account wallet endpoint. Every user execution is a sponsored Safe ERC-4337 UserOperation. Durable acknowledgement precedes chain inclusion; independently verified inclusion and business settlement remain separate. Signing authority, sponsor reservations and immutable dispatch are checked at their respective boundaries.';

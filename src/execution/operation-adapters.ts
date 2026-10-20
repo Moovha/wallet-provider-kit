@@ -1,6 +1,6 @@
 import { ZeroAddress, getAddress } from 'ethers';
 import { WalletProviderError } from '../domain/signing.js';
-import { serviceHash } from '../executor/auth.js';
+import { canonicalHash } from '../domain/canonical.js';
 import {
   tokenInterface,
   swapInterface,
@@ -298,10 +298,12 @@ export function matchOperationAdapter(
         expiresAt,
       );
       if (
-        serviceHash(
+        canonicalHash(
           compiled.calls.map((c) => ({ ...c, to: c.to.toLowerCase() })),
         ) !==
-        serviceHash(input.calls.map((c) => ({ ...c, to: c.to.toLowerCase() })))
+        canonicalHash(
+          input.calls.map((c) => ({ ...c, to: c.to.toLowerCase() })),
+        )
       )
         denied();
       return { input: candidate, compiled };
@@ -333,10 +335,12 @@ export function matchOperationAdapter(
         expiresAt,
       );
       if (
-        serviceHash(
+        canonicalHash(
           compiled.calls.map((c) => ({ ...c, to: c.to.toLowerCase() })),
         ) !==
-        serviceHash(input.calls.map((c) => ({ ...c, to: c.to.toLowerCase() })))
+        canonicalHash(
+          input.calls.map((c) => ({ ...c, to: c.to.toLowerCase() })),
+        )
       )
         denied();
       return { input: candidate, compiled };

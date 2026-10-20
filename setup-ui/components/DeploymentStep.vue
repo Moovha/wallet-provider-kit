@@ -140,7 +140,7 @@ function updateHttp(
     <p>
       The bundled signing engine stays behind each user's Safe. Applications
       fund one gas address; the service replenishes its own paymaster and
-      private bundler. No sponsor pool or separate user gas wallet is required.
+      private bundler. Application infrastructure funds submission gas.
     </p>
   </div>
   <h3>Enable wallet operations</h3>
@@ -167,34 +167,6 @@ function updateHttp(
       v-model="model.activation.recoveryAcceptance"
       type="text"
       label="Recovery test report reference"
-      validation="required|length:1,256"
-    /><SetupField
-      guide="tokenEvidence"
-      v-if="model.financial"
-      v-model="model.activation.tokenAcceptance"
-      type="text"
-      label="Token signing test report reference"
-      validation="required|length:1,256"
-    />
-    <SetupField
-      v-if="
-        model.execution && !model.runtimeConfiguration?.sharedApplicationSafes
-      "
-      guide="executionEvidence"
-      v-model="model.activation.executionAcceptance"
-      type="text"
-      label="Execution, RPC and submission recovery test report reference"
-      validation="required|length:1,256"
-    />
-    <SetupField
-      v-if="
-        model.safeProvisioning &&
-        !model.runtimeConfiguration?.sharedApplicationSafes
-      "
-      guide="executionEvidence"
-      v-model="model.activation.safeProvisioningAcceptance"
-      type="text"
-      label="Safe provisioning, gas budget and deployment recovery test report reference"
       validation="required|length:1,256"
     />
     <p class="help-text">

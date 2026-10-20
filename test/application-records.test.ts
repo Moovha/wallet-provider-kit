@@ -385,7 +385,7 @@ describe('application record evaluation', () => {
       }),
     ).toThrow('wallet_provider_configuration');
     const template = JSON.parse(
-      await readFile('docs/provider.config.records.example.json', 'utf8'),
+      await readFile('docs/provider.config.safe.example.json', 'utf8'),
     ) as ProviderConfiguration;
     expect(validateProviderConfiguration(template).identity).toEqual({});
     expect(() =>
@@ -398,29 +398,6 @@ describe('application record evaluation', () => {
           },
         },
       }),
-    ).toThrow();
-    const financial = {
-      profile: 'provider-authorized-erc3009-v1' as const,
-      token: {
-        address: '0x1111111111111111111111111111111111111111',
-        name: 'Offline Token',
-        version: '1',
-        symbol: 'TEST',
-        decimals: 6,
-      },
-      recipients: ['0x2222222222222222222222222222222222222222'],
-      maximumAmount: '100',
-      lifetimeAmount: '1000',
-      maxValiditySeconds: 300,
-    };
-    const vendorTemplate = JSON.parse(
-      await readFile('docs/provider.config.hosted.example.json', 'utf8'),
-    ) as ProviderConfiguration;
-    expect(
-      validateProviderConfiguration({ ...vendorTemplate, financial }).financial,
-    ).toEqual(financial);
-    expect(() =>
-      validateProviderConfiguration({ ...template, financial }),
     ).toThrow();
   });
 

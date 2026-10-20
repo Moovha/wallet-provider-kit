@@ -37,7 +37,7 @@ const policy: OnboardingPolicy = {
     clientId,
     name: clientId,
     assertionTrust: { agreement: 'reviewed-test-agreement' },
-    permissions: ['account:read', 'operations:request', 'transfers:request'],
+    permissions: ['account:read', 'operations:request', 'contracts:request'],
   })),
   access: { mode: 'application', maxAgeDays: 7 },
   identity: {
@@ -224,19 +224,19 @@ it.each([
     await f.store.transaction((state) => Object.keys(state.grants)),
   ).toHaveLength(0);
 });
-it('requires explicit application trust and binds transfer delegation to the exact transfer policy', async () => {
-  const f = await fixture('transfer-policy-1');
+it('requires explicit application trust and binds contract delegation to the exact action policy', async () => {
+  const f = await fixture('action-policy-1');
   const input = f.input();
-  input.authorization_details[0].actions.push('transfers:request');
+  input.authorization_details[0].actions.push('contracts:request');
   await expect(f.service.request(context(), input)).rejects.toThrow();
-  input.user!.consent.transfer_policy_revision = 'transfer-policy-1';
+  input.user!.consent.action_policy_revision = 'action-policy-1';
   const granted = await f.service.request(context(), input);
   expect(
     (
       await f.service.authorize(
         context().principal,
         granted.account_id!,
-        'transfers:request',
+        'contracts:request',
       )
     ).owner,
   ).toBeTruthy();
@@ -245,13 +245,13 @@ it('requires explicit application trust and binds transfer delegation to the exa
     f.store,
     [],
     undefined,
-    'transfer-policy-2',
+    'action-policy-2',
   );
   await expect(
     changed.authorize(
       context().principal,
       granted.account_id!,
-      'transfers:request',
+      'contracts:request',
     ),
   ).rejects.toThrow();
   const untrusted = structuredClone(policy);
@@ -324,7 +324,9 @@ it('serves the application-led HTTP contract without an owner login and denies h
 });
 it('validates the standard example without owner login, reviewers or vendor credentials', async () => {
   const config = validateProviderConfiguration(
-    JSON.parse(await readFile('docs/provider.config.example.json', 'utf8')),
+    JSON.parse(
+      await readFile('docs/provider.config.safe.example.json', 'utf8'),
+    ),
   );
   expect(config.policy.access?.mode).toBe('application');
   expect(config.ownerLogin).toBeUndefined();
@@ -385,11 +387,10 @@ it('serializes concurrent access requests for a new application user into one ac
   ).rejects.toThrow();
 });
 
-it('binds contract delegation to the action-policy consent revision and rejects conflicting compatibility aliases', async () => {
+it('binds contract delegation to the action-policy consent revision and rejects a changed consent revision', async () => {
   const f = await fixture(),
     configured = structuredClone(policy),
     revision = 'a'.repeat(64);
-  configured.applications[0].permissions!.push('contracts:request');
   const service = new OnboardingService(
     configured,
     f.store,
@@ -414,13 +415,6 @@ it('binds contract delegation to the action-policy consent revision and rejects 
       )
     ).owner,
   ).toBeTruthy();
-  await expect(
-    service.authorize(
-      context().principal,
-      granted.account_id!,
-      'transfers:request',
-    ),
-  ).rejects.toThrow();
-  input.user!.consent.transfer_policy_revision = 'b'.repeat(64);
+  input.user!.consent.action_policy_revision = 'b'.repeat(64);
   await expect(service.request(context(), input)).rejects.toThrow();
 });

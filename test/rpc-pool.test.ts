@@ -3,8 +3,6 @@ import { RpcEndpointPool } from '../src/execution/rpc-pool.js';
 import { RpcReader } from '../src/execution/chain.js';
 import { rpcCapacity } from '../src/execution/rpc-capacity.js';
 import { WalletProviderError } from '../src/domain/signing.js';
-import { SingleRpcExecutionObserver } from '../src/execution/single-rpc.js';
-import { executionFixture } from './helpers/execution.js';
 afterEach(() => vi.useRealTimers());
 const endpoints = [
   'https://primary.example.test',
@@ -89,63 +87,6 @@ it('keeps submission nonce cooldowns separate from funding and read capacity', a
   expect(rpcCapacity(transport, endpoints[0]).retryAfter).toBe(0);
   expect(await reads.run(async (endpoint) => endpoint)).toBe(endpoints[0]);
 });
-it('labels one-provider receipts honestly and rotates independent complete observations', async () => {
-  const f = executionFixture(),
-    plan = await f.plan();
-  f.state.included = true;
-  const used: string[] = [];
-  const transport = (async (input, init) => {
-    used.push(String(input));
-    return f.request(input, init);
-  }) as typeof fetch;
-  const observer = new SingleRpcExecutionObserver(
-    endpoints,
-    f.configuration.rpc.genesisHash,
-    10000,
-    transport,
-  );
-  expect(
-    await observer.observe(plan, [f.transactionHash], f.transactionHash),
-  ).toMatchObject({ verification: 'rpc-single', outcome: 'succeeded' });
-  expect(new Set(used)).toEqual(new Set([endpoints[0]]));
-  used.length = 0;
-  expect(
-    await observer.observe(plan, [f.transactionHash], f.transactionHash),
-  ).toMatchObject({ verification: 'rpc-single', outcome: 'succeeded' });
-  expect(new Set(used)).toEqual(new Set([endpoints[1]]));
-});
-it.each([429, 503, 'timeout'] as const)(
-  'restarts a single-source observation on the alternate RPC after %s',
-  async (failure) => {
-    vi.useFakeTimers();
-    const f = executionFixture(),
-      plan = await f.plan();
-    f.state.included = true;
-    const transport = (async (input, init) => {
-      if (String(input) !== endpoints[0]) return f.request(input, init);
-      if (failure === 'timeout')
-        throw new DOMException('Timed out', 'TimeoutError');
-      return new Response('', {
-        status: failure,
-        headers: { 'retry-after': '60' },
-      });
-    }) as typeof fetch;
-    const observer = new SingleRpcExecutionObserver(
-      endpoints,
-      f.configuration.rpc.genesisHash,
-      10000,
-      transport,
-    );
-    const result = expect(
-      observer.observe(plan, [f.transactionHash], f.transactionHash),
-    ).resolves.toMatchObject({
-      verification: 'rpc-single',
-      outcome: 'succeeded',
-    });
-    await vi.runAllTimersAsync();
-    await result;
-  },
-);
 it('fails immediately when every endpoint is cooling down', async () => {
   const transport = vi.fn() as unknown as typeof fetch;
   for (const endpoint of endpoints)
@@ -156,49 +97,6 @@ it('fails immediately when every endpoint is cooling down', async () => {
   ).rejects.toMatchObject({ code: 'wallet_provider_unavailable' });
   expect(work).not.toHaveBeenCalled();
 });
-it.each(['short throttle', 'internal error'] as const)(
-  'fails over an optimized complete proof after %s without sleeping or retrying the affected endpoint',
-  async (failure) => {
-    vi.useFakeTimers();
-    const f = executionFixture(),
-      plan = await f.plan();
-    f.state.included = true;
-    let failedReads = 0;
-    const transport = (async (input, init) => {
-      if (String(input) !== endpoints[0]) return f.request(input, init);
-      failedReads++;
-      return failure === 'short throttle'
-        ? new Response('', { status: 429, headers: { 'retry-after': '1' } })
-        : Response.json({
-            jsonrpc: '2.0',
-            id: 1,
-            error: { code: -32603, message: 'Offline unavailable' },
-          });
-    }) as typeof fetch;
-    const observer = new SingleRpcExecutionObserver(
-      endpoints,
-      f.configuration.rpc.genesisHash,
-      10000,
-      transport,
-      undefined,
-      true,
-    );
-    const started = Date.now();
-    await expect(
-      observer.observe(plan, [f.transactionHash], f.transactionHash),
-    ).resolves.toMatchObject({
-      verification: 'rpc-single',
-      outcome: 'succeeded',
-    });
-    expect(Date.now()).toBe(started);
-    expect(failedReads).toBeGreaterThan(0);
-    expect(failedReads).toBeLessThanOrEqual(4);
-    expect(rpcCapacity(transport, endpoints[0]).retryAfter).toBeGreaterThan(
-      Date.now(),
-    );
-    await vi.runAllTimersAsync();
-  },
-);
 it('prefers responsive RPCs, spills concurrent work to the alternate, probes stale providers and retains throttle backoff', async () => {
   vi.useFakeTimers();
   const transport = vi.fn() as unknown as typeof fetch;

@@ -36,7 +36,7 @@ export function checkApplicationAssertion(
   policy: ResolvedPolicy,
   principal: VerifiedPrincipal,
   value: ApplicationUserAssertion | undefined,
-  transferRevision?: string,
+  actionRevision?: string,
   additionalFields: string[] = [],
 ) {
   const app = application(policy, principal);
@@ -52,7 +52,6 @@ export function checkApplicationAssertion(
       'granted_at',
       'expires_at',
       'policy_revision',
-      'transfer_policy_revision',
       'action_policy_revision',
     ])
   )
@@ -88,12 +87,7 @@ export function checkApplicationAssertion(
     consentExpiry <= now ||
     consentExpiry > consentAt + policy.access.maxAgeDays * day ||
     user.consent.policy_revision !== policy.revision ||
-    (user.consent.action_policy_revision ??
-      user.consent.transfer_policy_revision) !== transferRevision ||
-    (user.consent.action_policy_revision !== undefined &&
-      user.consent.transfer_policy_revision !== undefined &&
-      user.consent.action_policy_revision !==
-        user.consent.transfer_policy_revision)
+    user.consent.action_policy_revision !== actionRevision
   )
     deny();
   return {

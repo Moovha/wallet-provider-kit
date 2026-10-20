@@ -140,18 +140,16 @@ test('shows the bundled Safe infrastructure without backend, relayer or pool sel
   });
 });
 
-test('rejects a retired EOA export without starting integrations or reflecting credentials', async ({
+test('rejects an incomplete Safe export without starting integrations or reflecting credentials', async ({
   page,
 }) => {
   const retired = JSON.parse(
     await readFile(
-      new URL(
-        '../../docs/provider.config.hosted.example.json',
-        import.meta.url,
-      ),
+      new URL('../../docs/provider.config.safe.example.json', import.meta.url),
       'utf8',
     ),
   );
+  delete retired.safeWallet;
   await page
     .getByLabel('Import provider configuration', { exact: true })
     .setInputFiles({

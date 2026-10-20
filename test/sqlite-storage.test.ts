@@ -28,12 +28,6 @@ import { OnboardingService } from '../src/onboarding/service.js';
 import { createOnboardingJournal } from '../src/onboarding/journal.js';
 import { accessType } from '../src/onboarding/types.js';
 import { AuthenticationError } from '../src/service/auth.js';
-import {
-  createOpenZeppelinRelayerExecutor,
-  RelayerExecutionService,
-  hashRelayerTransaction,
-  type RelayerExecutionAction,
-} from '../src/providers/openzeppelin-relayer.js';
 
 const directories: string[] = [];
 const databases: ProviderDatabase[] = [];
@@ -67,8 +61,8 @@ async function fixture() {
   const account = { accountId: randomUUID(), address: wallet.address };
   const payload = {
     domain: { name: 'Offline SQLite proof', chainId: '84532' },
-    types: { Proof: [{ name: 'challenge', type: 'string' }] },
-    primaryType: 'Proof',
+    types: { SafeCallIntent: [{ name: 'challenge', type: 'string' }] },
+    primaryType: 'SafeCallIntent',
     message: { challenge: 'unfunded' },
   };
   const action: TypedDataAction = {
@@ -77,7 +71,7 @@ async function fixture() {
     chain_id: 'eip155:84532',
     chain_account_id: `eip155:84532:${wallet.address}`,
     kind: 'sign_typed_data',
-    profile: 'evm_eoa_v1',
+    profile: 'safe_owner_v1',
     profile_revision: '1',
     status: 'ready',
     binding_revision: '1',
@@ -225,7 +219,7 @@ describe('toolkit-owned SQLite storage', () => {
     expect(() => open(directory)).toThrow('wallet_provider_configuration');
     await chmod(join(directory, 'provider.sqlite'), 0o600);
     const unknown = new DatabaseSync(join(directory, 'provider.sqlite'));
-    unknown.exec('PRAGMA user_version=2');
+    unknown.exec('PRAGMA user_version=999');
     unknown.close();
     expect(() => open(directory, true)).toThrow(
       'wallet_provider_configuration',
@@ -908,120 +902,6 @@ describe('SQLite optional enrollment and execution profiles', () => {
       join(directories.at(-1)!, 'provider.sqlite-wal'),
     );
     expect(bytes.includes(Buffer.from('must-not-persist'))).toBe(false);
-  });
-
-  it('persists Relayer acceptance, replays submit and reads status after action expiry without spending again', async () => {
-    const f = await fixture();
-    const transaction = {
-      to: Wallet.createRandom().address,
-      value: '0',
-      data: '0x',
-      gasLimit: '21000',
-      maxFeePerGas: '10',
-      maxPriorityFeePerGas: '1',
-    };
-    const action: RelayerExecutionAction = {
-      actionId: randomUUID(),
-      operationId: randomUUID(),
-      kind: 'relay_transaction',
-      profile: 'oz_relayer_evm_v1',
-      profileRevision: '1',
-      status: 'ready',
-      chainId: 'eip155:84532',
-      chainAccountId: `eip155:84532:${f.account.address}`,
-      bindingRevision: '1',
-      capabilityRevision: '1',
-      planRevision: '1',
-      planHash: f.action.plan_hash,
-      payloadHash: hashRelayerTransaction(transaction),
-      expiresAt: new Date(Date.now() + 1000).toISOString(),
-      transaction,
-    };
-    await f.db.approveAction({ ...f.approval, action });
-    const transactionId = randomUUID();
-    const binding = {
-      relayerId: 'fixture',
-      signerId: 'fixture',
-      address: f.account.address,
-      bindingRevision: '1',
-    };
-    const metadata = {
-      id: 'fixture',
-      address: f.account.address,
-      network: 'base-sepolia',
-      network_type: 'evm',
-      paused: false,
-      system_disabled: false,
-      signer_id: 'fixture',
-      policies: { gas_limit_estimation: false, gas_price_cap: 10 },
-    };
-    const remoteResult = {
-      id: transactionId,
-      relayer_id: 'fixture',
-      from: f.account.address,
-      status: 'pending',
-      to: transaction.to,
-      value: '0x0',
-      data: '0x',
-      gas_limit: 21000,
-    };
-    const fetcher = vi.fn<typeof fetch>(async (_url, init) => {
-      if (String(_url).includes('/networks/'))
-        return Response.json({
-          success: true,
-          data: {
-            id: 'evm:base-sepolia',
-            name: 'base-sepolia',
-            network_type: 'evm',
-            chain_id: 84532,
-            is_testnet: true,
-          },
-        });
-      if (String(_url).endsWith('/transactions') && init?.method === 'POST')
-        return Response.json({ success: true, data: remoteResult });
-      if (String(_url).endsWith('/transactions/' + transactionId))
-        return Response.json({ success: true, data: remoteResult });
-      return Response.json({ success: true, data: metadata });
-    });
-    const financial = f.db.financialAuthority({
-      ...f.options,
-      provider: 'openzeppelin-relayer-execution-v1',
-    });
-    const provider = createOpenZeppelinRelayerExecutor(
-      {
-        url: 'https://relayer.example.test',
-        apiKey: 'offline-fixture-token',
-        resolveAccount: async () => binding,
-      },
-      {
-        namespace: f.options.namespace,
-        journal: financial.journal,
-        authorizeAttempt: financial.authorizeAttempt,
-        authorizeStatus: financial.authorizeStatus,
-      },
-      fetcher,
-    );
-    const service = new RelayerExecutionService(
-      financial.executionAuthority,
-      provider,
-    );
-    expect(await service.submit(f.context, action.actionId)).toEqual({
-      transactionId,
-    });
-    expect(await service.submit(f.context, action.actionId)).toEqual({
-      transactionId,
-    });
-    vi.spyOn(Date, 'now').mockReturnValue(Date.parse(action.expiresAt) + 1);
-    expect(
-      await service.status(f.context, action.actionId, transactionId),
-    ).toMatchObject({ transactionId, status: 'pending' });
-    expect(
-      fetcher.mock.calls.filter(([, init]) => init?.method === 'POST'),
-    ).toHaveLength(1);
-    expect(await f.db.budget(f.approval.budgetId)).toEqual({
-      maximum: '2',
-      reserved: '1',
-    });
   });
 });
 

@@ -1,45 +1,9 @@
 import { setAuthenticatedResponseTimeout } from '../service/response-timeout.js';
 import type { VerifiedPrincipal } from '../domain/principal.js';
 import { runtimeSnapshotSchema } from '../runtime-configuration/schemas.js';
-import type { SafeExecutionQueue } from '../execution/queue.js';
-import {
-  approvedCallInputSchema,
-  approvedCallIntentSchema,
-  safePayloadSchema,
-} from '../execution/call-schemas.js';
-import type {
-  ApprovedCallInput,
-  SafeAccountBinding,
-} from '../execution/approved-calls.js';
-import {
-  canonicalServiceBody,
-  canonicalServiceJson,
-  type ServiceIdentity,
-} from '../executor/auth.js';
-import {
-  authoritySchema,
-  authorityReceiptSchema,
-} from '../executor/schemas.js';
-import type { ExecutionAuthorityRequest } from '../executor/protocol.js';
 import providerConfigurationSchema from '../../spec/provider-config.schema.json' with { type: 'json' };
-import {
-  executionHeaders,
-  executionReceiptSchema,
-  executionCapabilitiesSchema,
-  executionEventsSchema,
-} from '../execution/schemas.js';
 import { formatUnits } from 'ethers';
-import type {
-  SupportedActions,
-  TransferInput,
-  TransactionEventInput,
-} from '../deployment/actions.js';
-import {
-  transferReceiptSchema,
-  transactionEventInputSchema,
-  transactionEventReceiptSchema,
-  transactionEventsSchema,
-} from '../deployment/schemas.js';
+import type { SupportedActions } from '../deployment/actions.js';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { AuthenticationError, type Authenticate } from '../service/auth.js';
@@ -78,17 +42,8 @@ export interface OnboardingHttpOptions {
   reviewers: readonly string[];
   /** Allow the fixed operator-login return target only when integrated API tokens are configured. */
   apiExplorerLogin?: boolean;
-  /** Configuration-first provider-authorized transfers; absent in the onboarding-only profile. */
+  /** Safe wallet calls are configured by the provider service. */
   actions?: SupportedActions;
-  execution?: import('../execution/application-coordinator.js').ExecutionCoordinatorPort;
-  rpcVerification?: 'single' | 'quorum';
-  safeQueue?: SafeExecutionQueue;
-  executionIdentity?: ServiceIdentity;
-  contractNonce?: (
-    binding: SafeAccountBinding,
-    owner: string,
-    principal?: VerifiedPrincipal,
-  ) => Promise<string>;
   /** Fence superseded configured-service instances, including browser authority writers. */
   currentConfiguration?: () => Promise<boolean>;
 }
@@ -162,8 +117,6 @@ const permissionLabels = {
     'Request wallet operations, subject to your provider’s approvals',
   'contracts:request':
     'Request approved contract calls under the configured target, function and operation limits.',
-  'transfers:request':
-    'Request transfers on your behalf under the provider’s limits, without asking you to approve each transfer again',
 };
 const statusLabels: Record<string, string> = {
   consent_required: 'Your permission is needed.',
@@ -279,500 +232,17 @@ export async function registerOnboardingRoutes(
     };
   }
   const actions = () => options?.actions ?? unavailable();
-  const actionParams = {
-    type: 'object',
-    additionalProperties: false,
-    required: ['actionId'],
-    properties: { actionId: uuidSchema },
-  };
-  const transferBody = {
-    type: 'object',
-    additionalProperties: false,
-    required: ['account_id', 'recipient', 'amount'],
-    properties: {
-      account_id: uuidSchema,
-      recipient: { type: 'string', pattern: '^0x[0-9a-fA-F]{40}$' },
-      amount: { type: 'string', pattern: '^[1-9][0-9]{0,77}$' },
-    },
-  };
-  const transferSchema = (
-    operationId: string,
-    body?: object,
-    params?: object,
-  ) => {
-    const base = schema(operationId, body, params);
-    return {
-      ...base,
-      description:
-        'ERC-3009 transfer authorization on the configured network. Explicit transfer delegation, current owner-bound access, identity and provider policy authorization are required. No per-transfer owner prompt. No broadcast or settlement.',
-      response: { ...base.response, 200: transferReceiptSchema },
-    };
-  };
-  app.post<{ Body: TransferInput }>(
-    '/v1/transfer-authorizations',
-    { schema: transferSchema('requestTransferAuthorization', transferBody) },
-    async (request) =>
-      actions().request(await context(request, 'wallet:actions'), request.body),
-  );
-  app.get<{ Params: { actionId: string } }>(
-    '/v1/transfer-authorizations/:actionId',
-    {
-      schema: transferSchema(
-        'getTransferAuthorization',
-        undefined,
-        actionParams,
-      ),
-    },
-    async (request) =>
-      actions().read(
-        (await context(request, 'wallet:actions:read')).principal,
-        request.params.actionId,
-      ),
-  );
-  const queueReceiptSchema = {
-    type: 'object',
-    additionalProperties: false,
-    required: [
-      'request_id',
-      'account_id',
-      'status',
-      'expires_at',
-      'next_poll_after_ms',
-    ],
-    properties: {
-      request_id: uuidSchema,
-      account_id: uuidSchema,
-      action_id: uuidSchema,
-      status: {
-        type: 'string',
-        enum: [
-          'queued',
-          'executing',
-          'included',
-          'failed',
-          'succeeded',
-          'cancelled',
-          'expired',
-          'blocked',
-        ],
-      },
-      expires_at: { type: 'string', format: 'date-time' },
-      next_poll_after_ms: { type: 'integer', minimum: 5000, maximum: 300000 },
-    },
-  };
-  app.post<{
-    Params: { actionId: string };
-    Body: {
-      expected_nonce: string;
-      expected_payload_hash: string;
-      authorization: 'invalidate-signed-action';
-    };
-  }>(
-    '/v1/actions/:actionId/cancel-nonce',
-    {
-      schema: {
-        ...schema(
-          'authorizeSafeNonceCancellation',
-          {
-            type: 'object',
-            additionalProperties: false,
-            required: [
-              'expected_nonce',
-              'expected_payload_hash',
-              'authorization',
-            ],
-            properties: {
-              expected_nonce: {
-                type: 'string',
-                pattern: '^(0|[1-9][0-9]{0,77})$',
-              },
-              expected_payload_hash: {
-                type: 'string',
-                pattern: '^0x[0-9a-f]{64}$',
-              },
-              authorization: {
-                type: 'string',
-                const: 'invalidate-signed-action',
-              },
-            },
-          },
-          actionParams,
-        ),
-        description:
-          'Explicitly authorize cancellation of a stored, signed Safe action before any provider submission admission. Bundled local execution only. Requires the original caller, current owner/grant/identity/consent and contracts delegation. The service constructs a zero-value empty CALL to the same Safe at the exact expected nonce. Execute the returned action separately; the original remains blocked and the queue is released only after independently verified finalized cancellation. No arbitrary replacement payload or signature export.',
-        response: {
-          200: {
-            type: 'object',
-            additionalProperties: false,
-            required: [
-              'action_id',
-              'cancelled_action_id',
-              'nonce',
-              'payload_hash',
-              'expires_at',
-            ],
-            properties: {
-              action_id: uuidSchema,
-              cancelled_action_id: uuidSchema,
-              nonce: { type: 'string' },
-              payload_hash: { type: 'string' },
-              expires_at: { type: 'string', format: 'date-time' },
-            },
-          },
-        },
-      },
-    },
-    async (request) => {
-      if (
-        !options?.execution?.nonceCancellationEnabled ||
-        !options.contractNonce
-      )
-        unavailable();
-      return actions().requestNonceCancellation(
-        await context(request, 'wallet:actions'),
-        request.params.actionId,
-        request.body,
-        options!.contractNonce!,
-      );
-    },
-  );
-  app.post<{ Body: ApprovedCallInput }>(
-    '/v1/contract-call-requests',
-    {
-      schema: {
-        ...schema('enqueueContractCall', approvedCallInputSchema),
-        response: { 202: queueReceiptSchema },
-      },
-    },
-    async (request, reply) => {
-      const queue = options?.safeQueue ?? unavailable();
-      const result = await queue.enqueue(
-        await context(request, 'wallet:actions'),
-        request.body,
-      );
-      return reply.code(202).send(result);
-    },
-  );
-  app.get<{ Params: { requestId: string } }>(
-    '/v1/contract-call-requests/:requestId',
-    {
-      schema: {
-        ...schema('readContractCallRequest'),
-        params: {
-          type: 'object',
-          required: ['requestId'],
-          properties: { requestId: uuidSchema },
-        },
-        response: { 200: queueReceiptSchema },
-      },
-    },
-    async (request) =>
-      (options?.safeQueue ?? unavailable()).read(
-        (await context(request, 'wallet:execute:read')).principal,
-        request.params.requestId,
-      ),
-  );
-  app.post<{ Params: { requestId: string } }>(
-    '/v1/contract-call-requests/:requestId/cancel',
-    {
-      schema: {
-        ...schema('cancelContractCallRequest', {
-          type: 'object',
-          additionalProperties: false,
-        }),
-        params: {
-          type: 'object',
-          required: ['requestId'],
-          properties: { requestId: uuidSchema },
-        },
-        response: { 200: queueReceiptSchema },
-      },
-    },
-    async (request) =>
-      (options?.safeQueue ?? unavailable()).cancel(
-        await context(request, 'wallet:execute'),
-        request.params.requestId,
-      ),
-  );
-  app.post<{ Body: ApprovedCallInput }>(
-    '/v1/actions/contract-calls',
-    {
-      schema: {
-        ...schema('requestContractCall', approvedCallInputSchema),
-        description:
-          'Request an immutable approved contract call, Uniswap V3 exact-input swap or bounded ERC-4626 router deposit. Requires separately consented contracts:request delegation, current owner/grant/KYC/consent and configured target policies. The service constructs the Safe transaction and reserves its nonce; callers never supply signatures or a signing payload.',
-        response: {
-          200: {
-            type: 'object',
-            additionalProperties: false,
-            required: [
-              'action_id',
-              'account_id',
-              'status',
-              'expires_at',
-              'payload_hash',
-              'payload',
-              'intent',
-            ],
-            properties: {
-              action_id: uuidSchema,
-              account_id: uuidSchema,
-              status: { type: 'string' },
-              expires_at: { type: 'string', format: 'date-time' },
-              payload_hash: { type: 'string' },
-              payload: safePayloadSchema,
-              intent: approvedCallIntentSchema,
-            },
-          },
-        },
-      },
-    },
-    async (request) => {
-      if (!options?.contractNonce) return unavailable();
-      return actions().requestCalls(
-        await context(request, 'wallet:actions'),
-        request.body,
-        options.contractNonce,
-      );
-    },
-  );
-  const execution = (request?: FastifyRequest) => {
-    const coordinator = options?.execution ?? unavailable();
-    if (request && request.headers['execution-profile'] !== coordinator.profile)
-      throw new WalletProviderError('wallet_provider_input');
-    return coordinator;
-  };
-  app.post<{ Body: ExecutionAuthorityRequest }>(
-    '/v1/internal/execution-authority',
-    {
-      preParsing: canonicalServiceBody,
-      onSend: async (_request, _reply, payload) =>
-        typeof payload === 'string'
-          ? canonicalServiceJson(JSON.parse(payload))
-          : payload,
-      schema: {
-        operationId: 'checkExecutionAuthority',
-        security: [{ serviceProof: [] }],
-        description:
-          'Authority callback for the configured designated executor. Initial dispatch requires the exact stored plan/attempt and an unexpired handoff lease. Optional bounded replacements require a separate durable proposal, fresh RPC nonce/fee evidence and a short replacement lease. Every effect rechecks current owner, grant, KYC, consent, immutable approval and active revision. Application OAuth tokens do not authenticate this endpoint.',
-        body: authoritySchema,
-        response: { 200: authorityReceiptSchema },
-      },
-    },
-    async (request, reply) => {
-      if (!options?.executionIdentity || !(await ready())) return unavailable();
-      if (request.url !== '/v1/internal/execution-authority')
-        throw new AuthenticationError(401);
-      const proof = await options.executionIdentity.verify(
-        request.headers.authorization,
-        'authority',
-        'POST',
-        '/v1/internal/execution-authority',
-        request.body,
-      );
-      const value = await execution().authorizeRemote(request.body);
-      const signed = await options.executionIdentity.sign(
-        proof.origin,
-        'authority',
-        'POST',
-        '/v1/internal/execution-authority',
-        value,
-        { requestId: proof.requestId, status: 200 },
-      );
-      reply.header('execution-service-proof', signed.proof);
-      return value;
-    },
-  );
-  app.get(
-    '/v1/execution-capabilities',
-    {
-      schema: {
-        operationId: 'getExecutionCapabilities',
-        description:
-          'Execution discovery for per-user Safe accounts using ERC-4337 and an application paymaster. Readiness does not establish production custody acceptance.',
-        response: { 200: executionCapabilitiesSchema },
-      },
-    },
-    async () => {
-      const readyValue = await ready();
-      return {
-        contract_version: '1',
-        profiles: [
-          {
-            id: 'safe-only-4337-v1',
-            revision: '1',
-            implemented: true,
-            configured: options?.service.safeOnlyWallet === true,
-            ready: options?.service.safeOnlyWallet === true && readyValue,
-            chain_id: network.caip,
-            account_type: 'safe-1.4.1',
-            signing: 'safe-4337-module-0.3.0',
-            token_authorization: 'approved-contract-calls',
-            submission: 'erc-4337-v0.7-bundler',
-            verification: 'rpc-single',
-            finality: 'finalized',
-            minimum_rpc_sources: 1,
-            execute_scopes: ['wallet:actions', 'wallet:sign', 'wallet:execute'],
-            read_scopes: ['wallet:execute:read'],
-          },
-        ],
-      };
-    },
-  );
-  app.post<{ Params: { actionId: string } }>(
-    '/v1/actions/:actionId/reconcile',
-    {
-      schema: {
-        ...schema(
-          'reconcileExecution',
-          { type: 'object', additionalProperties: false },
-          actionParams,
-        ),
-        headers: {
-          ...executionHeaders,
-          required: [...executionHeaders.required, 'idempotency-key'],
-          properties: {
-            ...executionHeaders.properties,
-            'idempotency-key': uuidSchema,
-          },
-        },
-        response: { 200: executionReceiptSchema },
-      },
-    },
-    async (request) =>
-      execution(request).reconcile(
-        await context(request, 'wallet:execute:read'),
-        request.params.actionId,
-      ),
-  );
-  const executionDescription =
-    'Optional immutable approved-action execution with exact version selection, current owner/grant/identity/consent/approval checks, durable signing and submission authority, application gas sponsorship and independent RPC receipt/finality verification. Unknown provider submission outcomes never permit redispatch. Contract calls require the approved-evm-executor-v1 profile and a stored policy-approved action; execute never accepts replacement calldata.';
-  const executeSchema = schema(
-    'executeTransfer',
-    { type: 'object', additionalProperties: false },
-    actionParams,
-  );
-  app.post<{ Params: { actionId: string } }>(
-    '/v1/actions/:actionId/execute',
-    {
-      schema: {
-        ...executeSchema,
-        headers: {
-          ...executionHeaders,
-          required: [...executionHeaders.required, 'idempotency-key'],
-          properties: {
-            ...executionHeaders.properties,
-            'idempotency-key': uuidSchema,
-          },
-        },
-        description: executionDescription,
-        response: { ...executeSchema.response, 200: executionReceiptSchema },
-      },
-    },
-    async (request) =>
-      execution(request).execute(
-        await context(request, 'wallet:execute'),
-        request.params.actionId,
-      ),
-  );
-  const readExecutionSchema = schema(
-    'getTransferExecution',
-    undefined,
-    actionParams,
-  );
-  app.get<{ Params: { actionId: string } }>(
-    '/v1/actions/:actionId/execution',
-    {
-      schema: {
-        ...readExecutionSchema,
-        headers: executionHeaders,
-        description: executionDescription,
-        response: {
-          ...readExecutionSchema.response,
-          200: executionReceiptSchema,
-        },
-      },
-    },
-    async (request) =>
-      execution(request).read(
-        (await context(request, 'wallet:execute:read')).principal,
-        request.params.actionId,
-      ),
-  );
-  const executionEvents = schema('getExecutionEvents', undefined, actionParams);
-  app.get<{ Params: { actionId: string }; Querystring: { after?: string } }>(
-    '/v1/actions/:actionId/execution-events',
-    {
-      schema: {
-        ...executionEvents,
-        headers: executionHeaders,
-        querystring: {
-          type: 'object',
-          additionalProperties: false,
-          properties: {
-            after: { type: 'string', pattern: '^(0|[1-9][0-9]{0,15})$' },
-          },
-        },
-        description:
-          'Authenticated CloudEvents 1.0 execution observations with a monotonic sequence in the active store. At most 64 transitions are retained per execution; history_truncated signals a cursor gap requiring verified-status resynchronization. Reports never become verified events without RPC evidence. This endpoint does not refresh, submit or release budgets.',
-        response: { ...executionEvents.response, 200: executionEventsSchema },
-      },
-    },
-    async (request) =>
-      execution(request).events(
-        (await context(request, 'wallet:execute:read')).principal,
-        request.params.actionId,
-        request.query.after,
-      ),
-  );
-  const eventDescription =
-    'Record or read unverified application transaction observations for an existing authorized transfer. Current caller, owner, grant, identity, consent and policy checks apply even after signing expiry. Reports never broadcast, reconcile attempts, verify settlement or release budgets.';
-  app.post<{ Params: { actionId: string }; Body: TransactionEventInput }>(
-    '/v1/actions/:actionId/transaction-events',
-    {
-      schema: {
-        ...schema(
-          'reportTransactionEvent',
-          transactionEventInputSchema,
-          actionParams,
-        ),
-        description: eventDescription,
-        response: {
-          ...schema('reportTransactionEvent').response,
-          200: transactionEventReceiptSchema,
-        },
-      },
-    },
-    async (request) =>
-      actions().reportTransactionEvent(
-        await context(request, 'wallet:events'),
-        request.params.actionId,
-        request.body,
-      ),
-  );
-  app.get<{ Params: { actionId: string } }>(
-    '/v1/actions/:actionId/transaction-events',
-    {
-      schema: {
-        ...schema('getTransactionEvents', undefined, actionParams),
-        description: eventDescription,
-        response: {
-          ...schema('getTransactionEvents').response,
-          200: transactionEventsSchema,
-        },
-      },
-    },
-    async (request) =>
-      actions().transactionEvents(
-        (await context(request, 'wallet:events:read')).principal,
-        request.params.actionId,
-      ),
-  );
   const requestParams = {
     type: 'object',
     additionalProperties: false,
     required: ['requestId'],
     properties: { requestId: uuidSchema },
+  };
+  const actionParams = {
+    type: 'object',
+    additionalProperties: false,
+    required: ['actionId'],
+    properties: { actionId: uuidSchema },
   };
   app.post<{ Body: AccessInput }>(
     '/v1/access-requests',
@@ -831,10 +301,6 @@ export async function registerOnboardingRoutes(
                     pattern: '^[a-f0-9]{64}$',
                   },
                   action_policy_revision: {
-                    type: 'string',
-                    pattern: '^[a-f0-9]{64}$',
-                  },
-                  transfer_policy_revision: {
                     type: 'string',
                     pattern: '^[a-f0-9]{64}$',
                   },
@@ -908,8 +374,6 @@ export async function registerOnboardingRoutes(
               flow: { type: 'string', enum: ['application', 'hosted'] },
               policy_revision: { type: 'string' },
               action_policy_revision: { type: 'string' },
-              transfer_policy_revision: { type: 'string' },
-              transfer_terms: providerConfigurationSchema.properties.financial,
               contract_call_terms: callTermsSchema,
               runtime_contract_terms: runtimeSnapshotSchema,
               max_identity_age_days: { type: 'integer' },
@@ -929,12 +393,10 @@ export async function registerOnboardingRoutes(
           ? terms.runtime_contract_terms
           : undefined;
       const calls = options?.actions?.callConsentTerms(snapshot);
-      const transfer = options?.actions?.consentTerms();
       return {
         ...terms,
         chain_id: network.caip,
         ...(calls ? { contract_call_terms: calls } : {}),
-        ...(transfer ? { transfer_terms: transfer } : {}),
       };
     },
   );
@@ -1536,14 +998,6 @@ ${
 ${
   view.permissions.includes('contracts:request')
     ? `<p>Wallet-call delegation on ${escape(actions().network.label)}: you permit exact calls within the accepted policy, including explicitly allowed native recipients and any selected optional operation adapters. Limits and account bindings: <code>${escape(JSON.stringify(actions().callConsentTerms()))}</code>. Contract-call signatures remain private to coordinated execution. Safe signatures have no native expiry; revocation stops new service dispatch but cannot recall an already submitted authorization.</p>`
-    : ''
-}
-${
-  view.permissions.includes('transfers:request')
-    ? (() => {
-        const terms = actions().consentTerms() ?? deny();
-        return `<p>Transfer delegation: ${escape(terms.token.symbol)} on ${escape(actions().network.label)}. Token contract: <code>${escape(terms.token.address)}</code>. Domain: ${escape(terms.token.name)} / ${escape(terms.token.version)}. Maximum per transfer: ${escape(formatUnits(terms.maximumAmount, terms.token.decimals))} ${escape(terms.token.symbol)}. Lifetime limit per account/token across applications: ${escape(formatUnits(terms.lifetimeAmount, terms.token.decimals))} ${escape(terms.token.symbol)}. Allowed recipients: ${terms.recipients.map((a) => `<code>${escape(a)}</code>`).join(', ')}. Each signature is valid for up to ${escape(terms.maxValiditySeconds)} seconds. The provider checks each request against these terms without another approval prompt. Revoking access stops new signing; signatures already issued may remain usable until expiry.</p>`;
-      })()
     : ''
 }
 <p>Access lasts up to ${view.durationDays} days. You can pause or revoke it at any time. Each financial action still needs the provider’s authorization.</p>

@@ -19,7 +19,7 @@ import {
 } from 'ethers';
 import type { TypedDataAction } from '../domain/signing.js';
 import { WalletProviderError } from '../domain/signing.js';
-import { serviceHash } from '../executor/auth.js';
+import { canonicalHash } from '../domain/canonical.js';
 
 export interface PinnedContract {
   address: string;
@@ -94,7 +94,6 @@ export type ApprovedCallInput =
       minimum_shares: string;
     };
 export interface ApprovedCallIntent extends OperationAdapterTerms {
-  cancellation?: { actionId: string; payloadHash: string };
   adapterInput?: AdapterInput;
   nativeRecipients?: string[];
   version: '1';
@@ -114,15 +113,11 @@ export interface ApprovedCallIntent extends OperationAdapterTerms {
   nonce: string;
 }
 export const safeInterface = new Interface([
-  'function execTransaction(address to,uint256 value,bytes data,uint8 operation,uint256 safeTxGas,uint256 baseGas,uint256 gasPrice,address gasToken,address refundReceiver,bytes signatures) returns (bool)',
   'function getModulesPaginated(address start,uint256 pageSize) view returns(address[] array,address next)',
-  'function nonce() view returns(uint256)',
   'function getOwners() view returns(address[])',
   'function getThreshold() view returns(uint256)',
   'function VERSION() view returns(string)',
   'function masterCopy() view returns(address)',
-  'event ExecutionSuccess(bytes32 indexed txHash,uint256 payment)',
-  'event ExecutionFailure(bytes32 indexed txHash,uint256 payment)',
 ]);
 export const multiSendInterface = new Interface([
   'function multiSend(bytes transactions)',
@@ -133,20 +128,6 @@ export {
   vaultRouterInterface,
   vaultInterface,
 } from './operation-interfaces.js';
-export const safeTypes = {
-  SafeTx: [
-    { name: 'to', type: 'address' },
-    { name: 'value', type: 'uint256' },
-    { name: 'data', type: 'bytes' },
-    { name: 'operation', type: 'uint8' },
-    { name: 'safeTxGas', type: 'uint256' },
-    { name: 'baseGas', type: 'uint256' },
-    { name: 'gasPrice', type: 'uint256' },
-    { name: 'gasToken', type: 'address' },
-    { name: 'refundReceiver', type: 'address' },
-    { name: 'nonce', type: 'uint256' },
-  ],
-};
 function denied(): never {
   throw new WalletProviderError('wallet_authorization_denied');
 }
@@ -212,7 +193,7 @@ export function validateApprovedCallPolicy(
   const register = (value: PinnedContract) => {
     pin(value);
     const address = value.address.toLowerCase(),
-      identity = serviceHash({
+      identity = canonicalHash({
         address,
         codeHash: value.codeHash,
         ...(value.implementation
@@ -393,43 +374,7 @@ export function buildApprovedCallIntent(
     nonce,
   });
 }
-/** The only cancellation payload is an empty, zero-value CALL to the bound Safe itself. */
-export function buildNonceCancellationIntent(
-  policy: ApprovedCallPolicy,
-  accountId: string,
-  nonce: string,
-  cancellation: { actionId: string; payloadHash: string },
-): ApprovedCallIntent {
-  validateApprovedCallPolicy(policy);
-  uint(nonce);
-  exact(cancellation, ['actionId', 'payloadHash']);
-  if (
-    !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(
-      cancellation.actionId,
-    ) ||
-    !/^0x[0-9a-f]{64}$/.test(cancellation.payloadHash)
-  )
-    denied();
-  const account =
-    policy.accounts.find((a) => a.accountId === accountId) ?? denied();
-  const calls = [{ to: account.address, value: '0', data: '0x' }];
-  return structuredClone({
-    version: '1',
-    mechanism: 'safe-1.4.1',
-    input: { kind: 'contract-call', account_id: accountId, calls },
-    account,
-    multiSend: policy.multiSend,
-    calls,
-    contracts: [],
-    effects: [],
-    nonce,
-    cancellation,
-  });
-}
-export function approvedCallPayload(
-  intent: ApprovedCallIntent,
-  network?: ProviderNetwork,
-): TypedDataAction['payload'] {
+export function approvedCallExecution(intent: ApprovedCallIntent) {
   const packed = concat(
     intent.calls.map((call) =>
       solidityPacked(
@@ -440,28 +385,28 @@ export function approvedCallPayload(
   );
   const single = intent.calls.length === 1 ? intent.calls[0] : undefined;
   return {
+    to: single?.to ?? intent.multiSend.address,
+    value: single?.value ?? '0',
+    data:
+      single?.data ??
+      multiSendInterface
+        .encodeFunctionData('multiSend', [packed])
+        .toLowerCase(),
+    operation: single ? '0' : '1',
+  };
+}
+export function approvedCallPayload(
+  intent: ApprovedCallIntent,
+  network?: ProviderNetwork,
+): TypedDataAction['payload'] {
+  return {
     domain: {
       chainId: providerNetwork(network).chainId,
       verifyingContract: intent.account.address,
     },
-    primaryType: 'SafeTx',
-    types: safeTypes,
-    message: {
-      to: single?.to ?? intent.multiSend.address,
-      value: single?.value ?? '0',
-      data:
-        single?.data ??
-        multiSendInterface
-          .encodeFunctionData('multiSend', [packed])
-          .toLowerCase(),
-      operation: single ? '0' : '1',
-      safeTxGas: '0',
-      baseGas: '0',
-      gasPrice: '0',
-      gasToken: ZeroAddress,
-      refundReceiver: ZeroAddress,
-      nonce: intent.nonce,
-    },
+    primaryType: 'SafeCallIntent',
+    types: { SafeCallIntent: [{ name: 'intentHash', type: 'bytes32' }] },
+    message: { intentHash: '0x' + canonicalHash(intent) },
   };
 }
 /** Construct the same exact Safe signing action for admission previews and durable preparation. */
@@ -482,7 +427,7 @@ export function buildApprovedCallAction(
     action_id: id,
     operation_id: id,
     kind: 'sign_typed_data',
-    profile: 'evm_eoa_v1',
+    profile: 'safe_owner_v1',
     profile_revision: '1',
     status: 'ready',
     chain_id: providerNetwork(network).caip,
@@ -497,45 +442,18 @@ export function buildApprovedCallAction(
     payload,
   };
 }
-export function approvedCallData(
-  action: TypedDataAction,
-  signature: string,
-): string {
-  const m = action.payload.message;
-  return safeInterface
-    .encodeFunctionData('execTransaction', [
-      m.to,
-      m.value,
-      m.data,
-      m.operation,
-      m.safeTxGas,
-      m.baseGas,
-      m.gasPrice,
-      m.gasToken,
-      m.refundReceiver,
-      signature,
-    ])
-    .toLowerCase();
-}
 export function validateApprovedCallAction(
   policy: ApprovedCallPolicy,
   intent: ApprovedCallIntent,
   action: TypedDataAction,
   network?: ProviderNetwork,
 ): void {
-  const expected = intent.cancellation
-    ? buildNonceCancellationIntent(
-        policy,
-        intent.input.account_id,
-        intent.nonce,
-        intent.cancellation,
-      )
-    : buildApprovedCallIntent(
-        policy,
-        intent.input,
-        intent.nonce,
-        action.expires_at,
-      );
+  const expected = buildApprovedCallIntent(
+    policy,
+    intent.input,
+    intent.nonce,
+    action.expires_at,
+  );
   const payload = approvedCallPayload(expected, network),
     digest = TypedDataEncoder.hash(
       payload.domain,
@@ -543,8 +461,8 @@ export function validateApprovedCallAction(
       payload.message,
     );
   if (
-    serviceHash(expected) !== serviceHash(intent) ||
-    serviceHash(payload) !== serviceHash(action.payload) ||
+    canonicalHash(expected) !== canonicalHash(intent) ||
+    canonicalHash(payload) !== canonicalHash(action.payload) ||
     action.payload_hash !== digest ||
     action.plan_hash !== digest
   )

@@ -16,15 +16,10 @@
     'wallet:access:read': 'Read access request status',
     'wallet:account:read': 'Read wallet account details',
     'wallet:provision': 'Create an accepted account’s wallet',
-    'wallet:actions': 'Request transfer authorization',
-    'wallet:actions:read': 'Read transfer authorization status',
-    'wallet:events': 'Report unverified transaction events',
-    'wallet:events:read': 'Read reported transaction events',
-    'wallet:sign': 'Sign an authorized transfer',
-    'wallet:execute':
-      'Execute an approved transfer with an admitted gas sponsor',
-    'wallet:execute:read':
-      'Read independently verified transfer execution status',
+    'wallet:actions': 'Request approved Safe calls',
+    'wallet:sign': 'Authorize a Safe UserOperation',
+    'wallet:execute': 'Submit sponsored Safe calls',
+    'wallet:execute:read': 'Read verified Safe execution status',
   };
   const message = (text) => {
     panel.querySelector('[role="status"]').textContent = text;

@@ -36,7 +36,7 @@ export function explainIssue(issue: string) {
   const path = issue.slice(0, separator);
   const reason = issue.slice(separator + 2);
   if (path === '/safeWallet')
-    return 'Deployment — only per-user Safe accounts with the bundled bundler and application paymaster are supported. Reconcile retained legacy work before migrating an old export.';
+    return 'Deployment — only per-user Safe accounts with the bundled bundler and application paymaster are supported. Export a complete Safe configuration.';
   const area = issue.startsWith('/policy/provider')
     ? 'Provider'
     : /^\/identity\/(didit|sumsub)\/(importPrice|verificationPrice)(?:\/|$)/.test(
@@ -52,16 +52,12 @@ export function explainIssue(issue: string) {
           ? 'Services'
           : issue.startsWith('/policy') || issue.startsWith('/reviewers')
             ? 'Applications'
-            : issue.startsWith('/financial')
-              ? 'Applications'
-              : issue.startsWith('/runtimeConfiguration/executionPool') ||
-                  issue.startsWith('/execution') ||
-                  issue.startsWith('/activation') ||
-                  issue.startsWith('/apiExplorer') ||
-                  issue.startsWith('/http') ||
-                  issue.startsWith('/storage')
-                ? 'Deployment'
-                : 'Configuration';
+            : issue.startsWith('/activation') ||
+                issue.startsWith('/apiExplorer') ||
+                issue.startsWith('/http') ||
+                issue.startsWith('/storage')
+              ? 'Deployment'
+              : 'Configuration';
   const hints: Record<string, string> = {
     required: 'Complete this setting using the instructions beside the field.',
     uniqueItems: 'Remove duplicate entries.',
@@ -87,20 +83,8 @@ export function explainIssue(issue: string) {
       'Use the same token issuer for each application as in Services.',
     'documentation and enabled registered clients are required; duplicate clients are not allowed':
       'Enable the deployed API explorer, select enabled applications registered in Applications, and remove duplicate application entries.',
-    'backendAcceptance and recoveryAcceptance are required when enabled; financial setup also requires tokenAcceptance':
-      'Add the wallet backend and recovery test report references. Transfer signing also needs a token signing test report reference.',
     'transfer signing and separate execution acceptance are required':
       'Configure delegated transfer signing, then complete the separate execution/RPC/recovery report before enabling operations.',
-    'must be an HTTPS origin':
-      'Enter https:// and the Relayer hostname only, without a trailing slash or page path.',
-    'duplicate addresses, relayers or signers are not allowed':
-      'Use a different Relayer ID, signer ID and wallet address for each signer entry.',
-    'must not exceed lifetimeAmount':
-      'The maximum per transfer cannot exceed the total limit per account and token.',
-    'use an absolute local path or ./ relative path':
-      'Use an absolute local module path or a path starting with ./. Follow the advanced setup guide for custom wallet backends.',
-    'custom adapters use the advanced setup guide':
-      'Custom wallet backends cannot be configured in this wizard. Follow the advanced setup guide for custom adapters.',
     'invalid policy, integration or activation settings':
       'Review the service addresses, application trust agreements, identity/access policy and activation settings using their field instructions.',
   };
@@ -109,10 +93,6 @@ export function explainIssue(issue: string) {
 
 function fieldLabel(path: string): string {
   const labels: Record<string, string> = {
-    '/runtimeConfiguration/executionPool/safeCount':
-      'Execution Safes per application',
-    '/runtimeConfiguration/executionPool/sponsorCount':
-      'Gas sponsors per application',
     '/execution/safeQueue/maxDepthPerUser':
       'Maximum queued transactions per user',
     '/execution/safeQueue/maxDepthPerApplication':
@@ -137,16 +117,9 @@ function fieldLabel(path: string): string {
     '/reviewers': 'Reviewer account IDs',
     '/backend': 'Wallet backend',
     '/backend/kind': 'Wallet backend selection',
-    '/backend/module': 'Custom wallet backend module',
     '/backend/binding': 'Wallet environment name',
-    '/backend/apiKeyId': 'CDP API key ID variable name',
-    '/backend/apiKeySecret': 'CDP API key secret variable name',
-    '/backend/walletSecret': 'CDP wallet secret variable name',
     '/backend/vaultDirectory': 'OWS vault directory',
     '/backend/passphrase': 'OWS owner passphrase variable name',
-    '/backend/url': 'Relayer service address',
-    '/backend/apiKey': 'Relayer API key variable name',
-    '/backend/signers': 'Relayer signer entries',
     '/ownerLogin': 'Staff or hosted login',
     '/policy/identity/application': 'Application identity requirements',
     '/policy/identity/records/requiredFields': 'Required record fields',
@@ -162,20 +135,6 @@ function fieldLabel(path: string): string {
     '/oauth/jwksUrl': 'Token verification keys URL (JWKS)',
     '/identity': 'Identity verification services',
     '/execution': 'Transfer execution and RPC verification',
-    '/activation/executionAcceptance':
-      'Execution, RPC and submission recovery test report reference',
-    '/financial': 'Delegated transfer signing',
-    '/financial/token/address': 'Token contract address',
-    '/financial/token/name': 'Token signing-domain name',
-    '/financial/token/version': 'Token signing-domain version',
-    '/financial/token/symbol': 'Token symbol',
-    '/financial/token/decimals': 'Token decimals',
-    '/financial/maximumAmount': 'Maximum per transfer (base units)',
-    '/financial/lifetimeAmount':
-      'Total limit per account and token (base units)',
-    '/financial/maxValiditySeconds':
-      'Time to use a signed authorization (seconds)',
-    '/financial/recipients': 'Allowed recipients',
     '/storage/directory': 'Private data directory',
     '/http/host': 'Service listen address',
     '/http/port': 'Service port',
@@ -184,7 +143,6 @@ function fieldLabel(path: string): string {
     '/activation/enabled': 'Enable wallet operations in this configuration',
     '/activation/backendAcceptance': 'Wallet backend test report reference',
     '/activation/recoveryAcceptance': 'Recovery test report reference',
-    '/activation/tokenAcceptance': 'Token signing test report reference',
     '/apiExplorer': 'Application token controls for staff',
     '/apiExplorer/operators': 'Token operator account IDs (sub)',
     '/apiExplorer/clients': 'Applications available for staff tokens',
@@ -224,18 +182,6 @@ function fieldLabel(path: string): string {
     return `Token operator ${Number(operator[1]) + 1} account ID (sub)`;
   const reviewer = settingPath.match(/^\/reviewers\/(\d+)$/);
   if (reviewer) return `Reviewer ${Number(reviewer[1]) + 1} account ID (sub)`;
-  const recipient = settingPath.match(/^\/financial\/recipients\/(\d+)$/);
-  if (recipient) return `Recipient ${Number(recipient[1]) + 1} address`;
-  const signer = settingPath.match(/^\/backend\/signers\/(\d+)(?:\/(.*))?$/);
-  if (signer) {
-    const fields: Record<string, string> = {
-      relayerId: 'Relayer ID',
-      signerId: 'signer ID',
-      address: 'wallet address',
-      bindingRevision: 'binding revision',
-    };
-    return `Signer ${Number(signer[1]) + 1} ${fields[signer[2] ?? ''] ?? 'settings'}`;
-  }
   const vendor = settingPath.match(/^\/identity\/(didit|sumsub)(?:\/(.*))?$/);
   if (vendor) {
     const fields: Record<string, string> = {
@@ -260,11 +206,7 @@ function fieldLabel(path: string): string {
 export function fieldValidationMessages(guide: string): Record<string, string> {
   if (
     [
-      'cdpKeyId',
-      'cdpKeySecret',
-      'cdpWalletSecret',
       'passphrase',
-      'relayerKey',
       'loginSecret',
       'diditKey',
       'sumsubToken',
@@ -280,11 +222,6 @@ export function fieldValidationMessages(guide: string): Record<string, string> {
     return {
       matches:
         'Enter the complete address: 0x followed by 40 hexadecimal characters. Copy it from your verified configuration.',
-    };
-  if (['relayerId', 'signerId'].includes(guide))
-    return {
-      matches:
-        'Copy the registered ID. It must use 1–64 letters, digits, underscores or hyphens.',
     };
   if (guide === 'diditWorkflow')
     return {

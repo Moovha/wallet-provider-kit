@@ -22,19 +22,12 @@ export type {
   RuntimePolicyRevision,
   RuntimeReview,
 } from '../runtime-configuration/service.js';
-export type { WalletBackendAdapterV1 } from './backends.js';
 export {
   validateProviderConfiguration,
   loadProviderConfiguration,
   ConfigurationError,
 } from './config.js';
 export type { ProviderConfiguration, SecretReference } from './config.js';
-export type {
-  TransferPolicy,
-  TransferInput,
-  TransactionEventInput,
-  TransactionEventReport,
-} from './actions.js';
 
 export {
   buildApprovedCallIntent,
@@ -59,10 +52,6 @@ export type {
   AdapterInput,
 } from '../execution/operation-adapters.js';
 
-export type {
-  SafeProvisioningConfiguration,
-  SafeDeploymentDriver,
-  SafeDeploymentPlan,
-} from '../provisioning/safe.js';
+export type { SafeProvisioningConfiguration } from '../provisioning/safe.js';
 
 export { defaultSafeProvisioning } from '../provisioning/defaults.js';

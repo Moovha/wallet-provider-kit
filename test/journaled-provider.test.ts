@@ -32,7 +32,7 @@ function fixture(journal = new TestJournal()) {
     action_id: randomUUID(),
     operation_id: randomUUID(),
     kind: 'sign_typed_data',
-    profile: 'evm_eoa_v1',
+    profile: 'safe_owner_v1',
     profile_revision: '1',
     status: 'ready',
     chain_id: 'eip155:84532',
@@ -581,7 +581,7 @@ describe('journal-backed provider lifecycle', () => {
       if (change === 'chain') action.chain_id = 'eip155:8453';
       if (change === 'number') action.payload.message.amount = 1 as never;
       if (change === 'expired') action.expires_at = new Date(0).toISOString();
-      if (change === 'profile') action.profile = 'contract-profile';
+      if (change === 'profile') action.profile = 'unsupported' as never;
       await expect(
         provider.signTypedData(account, action, attemptId),
       ).rejects.toMatchObject({ code: 'wallet_provider_input' });
@@ -596,71 +596,5 @@ describe('journal-backed provider lifecycle', () => {
     expect(backend.findAccount).toHaveBeenCalledOnce();
     expect(backend.createAccount).not.toHaveBeenCalled();
     expect(journal.records.size).toBe(0);
-  });
-
-  it('maps journal conflicts to a sanitized HTTP 409 through the existing service', async () => {
-    const { provider, account, action, attemptId } = fixture();
-    const stored: SigningAuthority = {
-      sessionSubject: 'owner',
-      ownerSubject: 'owner',
-      currentUserStatus: 'ID VERIFIED',
-      accountId: account.accountId,
-      attemptId,
-      account,
-      chainAccountId: action.chain_account_id,
-      bindingRevision: '1',
-      capabilityRevision: '1',
-      action,
-    };
-    const service = new EmbeddedWalletService(
-      { provision: async () => stored, sign: async () => stored },
-      provider,
-    );
-    await service.sign(
-      {
-        principal: {
-          issuer: 'https://identity.example.test',
-          subject: 'owner',
-          clientId: 'client',
-          scopes: ['wallet:sign'],
-        },
-        idempotencyKey: randomUUID(),
-      },
-      action.action_id,
-    );
-    const app = await createServer({
-      authenticate: async () => ({
-        issuer: 'https://identity.example.test',
-        subject: 'owner',
-        clientId: 'client',
-        scopes: ['wallet:sign'],
-      }),
-      service: new EmbeddedWalletService(
-        {
-          provision: async () => stored,
-          sign: async () => ({ ...stored, attemptId: randomUUID() }),
-        },
-        provider,
-      ),
-      ready: async () => true,
-    });
-    try {
-      const response = await app.inject({
-        method: 'POST',
-        url: `/v1/actions/${action.action_id}/sign`,
-        headers: { 'idempotency-key': randomUUID() },
-        payload: {},
-      });
-      expect(response.statusCode).toBe(409);
-      expect(response.json()).toMatchObject({
-        code: 'wallet_attempt_conflict',
-        outcome: 'not_dispatched',
-      });
-      expect(response.headers['content-type']).toContain(
-        'application/problem+json',
-      );
-    } finally {
-      await app.close();
-    }
   });
 });

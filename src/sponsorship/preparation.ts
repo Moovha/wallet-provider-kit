@@ -1,7 +1,7 @@
 import { Interface } from 'ethers';
 import type { VerifiedPrincipal } from '../domain/principal.js';
 import { deny } from '../onboarding/policy.js';
-import { serviceHash } from '../executor/auth.js';
+import { canonicalHash } from '../domain/canonical.js';
 import { runtimeApplicationId } from '../runtime-configuration/service.js';
 import {
   runtimeCallPolicy,
@@ -9,7 +9,7 @@ import {
   type RuntimePolicySnapshot,
 } from '../runtime-configuration/authority.js';
 import {
-  approvedCallPayload,
+  approvedCallExecution,
   buildApprovedCallIntent,
   type ApprovedCallInput,
   type ApprovedCallPolicy,
@@ -32,9 +32,9 @@ import {
 const execution = new Interface([
   'function executeUserOp(address to,uint256 value,bytes data,uint8 operation)',
 ]);
-/** Encode the same ordered CALL-only intent used by the relayer's SafeTx path. */
+/** Encode the exact ordered calls for Safe4337Module execution. */
 export function safeUserOperationCallData(intent: ApprovedCallIntent): string {
-  const message = approvedCallPayload(intent).message;
+  const message = approvedCallExecution(intent);
   return execution
     .encodeFunctionData('executeUserOp', [
       message.to,
@@ -117,7 +117,7 @@ export function prepareRuntimeUserOperationV07(
     runtimePolicy: snapshot,
     expiresAt: options.expiresAt,
     userOperationHash: userOperationHashV07(operation, domain),
-    intentHash: serviceHash(intent),
+    intentHash: canonicalHash(intent),
     budget: {
       id: applicationGasBudgetId(
         options.providerOrigin,

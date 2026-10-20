@@ -27,11 +27,7 @@ export function configureSafeWalletRuntime(config: ProviderConfiguration) {
       vaults: [],
     },
   };
-  delete config.localExecution;
-  delete config.execution;
   if (config.runtimeConfiguration) {
-    delete config.runtimeConfiguration.sharedApplicationSafes;
-    delete config.runtimeConfiguration.executionPool;
     config.runtimeConfiguration.rpcVerification = 'single';
   }
   config.safeWallet = defaultSafeWallet(applicationGenesis(config.network));

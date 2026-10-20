@@ -1,5 +1,4 @@
-import type { RelayerBinding } from '../providers/openzeppelin-relayer.js';
-import type { TransferRecord } from '../deployment/actions.js';
+import type { ApprovedCallsRecord } from '../deployment/actions.js';
 import type { VerifiedPrincipal } from '../domain/principal.js';
 import type {
   WalletAttemptRequest,
@@ -11,10 +10,9 @@ export const accessType = 'https://moovha.com/wallet/account-access';
 export const permissions = [
   'account:read',
   'operations:request',
-  'transfers:request',
   'contracts:request',
 ] as const;
-/** Transfer delegation must be explicitly enabled; it is never a default permission. */
+/** Contract delegation must be explicitly enabled; it is never a default permission. */
 export const defaultPermissions: readonly Permission[] = [
   'account:read',
   'operations:request',
@@ -43,7 +41,6 @@ export interface ApplicationUserAssertion {
     granted_at: string;
     expires_at: string;
     policy_revision: string;
-    transfer_policy_revision?: string;
     action_policy_revision?: string;
   };
 }
@@ -131,7 +128,7 @@ export interface AccessRequest {
   ownerIdentity?: Pick<OwnerIdentity, 'issuer' | 'subject'>;
   consent?: { at: number; revision: string; privacyUrl: string };
   /** Financial-policy terms explicitly consented to for delegated transfers. */
-  transferPolicyRevision?: string;
+  actionPolicyRevision?: string;
   denied?: boolean;
   fundingRequired?: boolean;
   evidence?: IdentityEvidence;
@@ -164,7 +161,7 @@ export interface AccountRecord {
   identitySource?: 'application_record' | 'application_attestation';
 }
 export interface AccessGrant {
-  transferPolicyRevision?: string;
+  actionPolicyRevision?: string;
   id: string;
   requestId: string;
   accountId: string;
@@ -189,10 +186,7 @@ export interface StoredAttempt {
 export interface ProviderState {
   format: 'moovha-onboarding-1';
   assetReservations?: Record<string, { budgetId: string; units: string }>;
-  assetBudgetMigrations?: Record<
-    string,
-    { revision: string; profile: 'direct-token-transfers-v1' }
-  >;
+  assetBudgetBindings?: Record<string, { revision: string }>;
   userOperationExecutions?: Record<
     string,
     import('../sponsorship/execution-types.js').UserOperationExecution
@@ -209,18 +203,7 @@ export interface ProviderState {
     string,
     import('../sponsorship/admission.js').SponsorshipAdmission
   >;
-  operations?: Record<
-    string,
-    import('../execution/operations.js').OperationsState
-  >;
-  executionPools?: Record<string, number>;
-  sponsorQuarantines?: Record<string, string[]>;
-  safeRequests?: Record<
-    string,
-    import('../execution/queue.js').SafeQueueRecord
-  >;
-  supportedActions?: Record<string, TransferRecord>;
-  backendAccounts?: Record<string, { binding: string; signer: RelayerBinding }>;
+  supportedActions?: Record<string, ApprovedCallsRecord>;
   deploymentBindings?: Record<
     string,
     {
@@ -231,10 +214,6 @@ export interface ProviderState {
       activeRevision?: string;
       transportRevision?: string;
       accessMode?: 'application' | 'hosted';
-      safeAccounts?: Record<
-        string,
-        import('../provisioning/safe.js').SafeDeploymentRecord
-      >;
       runtimeConfiguration?: import('../runtime-configuration/service.js').RuntimeConfigurationState;
     }
   >;

@@ -7,7 +7,6 @@ import {
   newWalletBinding,
 } from '../src/deployment/setup-identifiers.js';
 export { newClientId } from '../src/deployment/setup-identifiers.js';
-import { defaultLocalExecution } from '../src/deployment/local-execution-contract.js';
 import {
   bundledOAuth,
   initialApplicationScopes,
@@ -26,58 +25,18 @@ export const backends = [
     kind: 'ows' as const,
     name: 'Open Wallet Standard',
     image: 'ows.png',
-    description:
-      'Run the included engine with a private vault created during setup.',
-    detail: 'Recommended · bundled wallet engine',
+    description: 'Private owner signing for Safe accounts.',
+    detail: 'Bundled wallet engine',
     url: 'https://docs.openwallet.sh/',
-    guide: `${docs}ows-adapter.html`,
-  },
-  {
-    kind: 'cdp' as const,
-    name: 'Coinbase CDP',
-    image: 'coinbase.png',
-    description: 'Connect an existing Coinbase Developer Platform project.',
-    detail: 'Managed wallet API',
-    url: 'https://docs.cdp.coinbase.com/',
-    guide: `${docs}setup.html#select-a-built-in-backend`,
-  },
-  {
-    kind: 'openzeppelin-relayer' as const,
-    name: 'OpenZeppelin Relayer',
-    image: 'openzeppelin.png',
-    description:
-      'Connect an existing Relayer and its preconfigured signer pool.',
-    detail: 'Self-hosted signing service',
-    url: 'https://docs.openzeppelin.com/relayer',
-    guide: `${docs}openzeppelin-relayer.html`,
+    guide: docs + 'ows-adapter.html',
   },
 ];
-
 export function newBackend(kind: BackendKind): Backend {
-  const binding = newWalletBinding();
-  if (kind === 'ows')
-    return {
-      kind,
-      binding,
-      vaultDirectory: '.provider-vault',
-      passphrase: { env: 'OWS_OWNER_PASSPHRASE' },
-    };
-  if (kind === 'openzeppelin-relayer')
-    return {
-      kind,
-      binding,
-      url: '',
-      apiKey: { env: 'RELAYER_API_KEY' },
-      signers: [
-        { relayerId: '', signerId: '', address: '', bindingRevision: '1' },
-      ],
-    };
   return {
     kind,
-    binding,
-    apiKeyId: { env: 'WALLET_CDP_API_KEY_ID' },
-    apiKeySecret: { env: 'WALLET_CDP_API_KEY_SECRET' },
-    walletSecret: { env: 'WALLET_CDP_WALLET_SECRET' },
+    binding: newWalletBinding(),
+    vaultDirectory: '.provider-vault',
+    passphrase: { env: 'OWS_OWNER_PASSPHRASE' },
   };
 }
 
@@ -110,15 +69,10 @@ export function emptyConfiguration(
     application: { requiredFields: ['country'], verificationLevel: 'verified' },
   };
   config.policy.access = { mode: 'application', maxAgeDays: 7 };
-  delete config.financial;
-  delete config.execution;
-  delete config.activation.executionAcceptance;
   config.backend = newBackend('ows');
-  config.localExecution = defaultLocalExecution();
   const operatorId = newClientId('operator');
   config.runtimeConfiguration = {
     authorizeContracts: true,
-    sharedApplicationSafes: true,
     credentialKey: { env: 'APPLICATION_CREDENTIAL_STORAGE_KEY' },
     operators: [{ issuer: '', clientId: operatorId, subject: operatorId }],
   };
@@ -132,8 +86,6 @@ export function emptyConfiguration(
 export function synchronizeBundledServices(config: ProviderConfiguration) {
   if (config.safeWallet)
     config.safeWallet.genesisHash = applicationGenesis(config.network);
-  if (config.runtimeConfiguration?.sharedApplicationSafes && config.execution)
-    config.execution.rpc.genesisHash = applicationGenesis(config.network);
   if (!config.authorizationServer) return;
   config.oauth = bundledOAuth(config.policy.provider.origin);
   for (const app of config.policy.applications)
@@ -170,8 +122,7 @@ export function synchronizeBundledServices(config: ProviderConfiguration) {
           },
           scopes: [
             ...initialApplicationScopes,
-            ...(config.safeWallet ||
-            config.runtimeConfiguration?.sharedApplicationSafes
+            ...(config.safeWallet
               ? [
                   'wallet:configuration:read',
                   'wallet:configuration:propose',

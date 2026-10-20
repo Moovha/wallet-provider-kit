@@ -1,6 +1,36 @@
-import type { components } from '../protocol/wallet-v1.generated.js';
-
-export type TypedDataAction = components['schemas']['TypedDataAction'];
+export type TypedValue =
+  string | boolean | TypedValue[] | { [key: string]: TypedValue };
+/** Internal owner-signer envelope for Safe intent approval, account bootstrap and immutable SafeOp signing. */
+export interface TypedDataAction {
+  action_id: string;
+  operation_id: string;
+  plan_revision: string;
+  plan_hash: string;
+  binding_revision: string;
+  capability_revision: string;
+  profile: 'safe_owner_v1';
+  profile_revision: string;
+  chain_id: string;
+  chain_account_id: string;
+  payload_hash: string;
+  dependencies: string[];
+  expires_at: string;
+  status:
+    | 'blocked'
+    | 'ready'
+    | 'pending'
+    | 'fulfilled'
+    | 'rejected'
+    | 'expired'
+    | 'unknown';
+  kind: 'sign_typed_data';
+  payload: {
+    domain: Record<string, TypedValue>;
+    types: Record<string, { name: string; type: string }[]>;
+    message: Record<string, TypedValue>;
+    primaryType: string;
+  };
+}
 
 export interface EmbeddedAccount {
   accountId: string;

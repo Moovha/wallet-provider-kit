@@ -9,18 +9,17 @@ try {
   assert.equal((await fetch(`${origin}/health/ready`)).status, 503);
   const schema = await (await fetch(`${origin}/openapi.json`)).json();
   assert.equal(schema.openapi, '3.0.3');
-  assert.ok(schema.paths['/v1/actions/{actionId}/sign']);
+  assert.ok(schema.paths['/v1/accounts/{accountId}/wallet']);
   assert.ok(
-    schema.paths['/v1/actions/{actionId}/sign'].post.responses['403'].content[
-      'application/problem+json'
-    ],
+    schema.paths['/v1/accounts/{accountId}/provision'].post.responses['403']
+      .content['application/problem+json'],
   );
   const docs = await fetch(`${origin}/docs/`);
   assert.equal(docs.status, 200);
   assert.ok(docs.headers.get('content-security-policy'));
   assert.match(await docs.text(), /swagger-ui/);
   const mutation = await fetch(
-    `${origin}/v1/actions/10000000-0000-4000-8000-000000000001/sign`,
+    `${origin}/v1/accounts/10000000-0000-4000-8000-000000000001/provision`,
     {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
