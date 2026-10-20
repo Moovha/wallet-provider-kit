@@ -75,6 +75,7 @@ export interface OnboardingPolicy {
   access?: { maxAgeDays?: number; mode?: 'application' | 'hosted' };
 }
 export interface ResolvedPolicy extends OnboardingPolicy {
+  currentApplication?: (principal: VerifiedPrincipal) => ApplicationPolicy;
   identity: {
     maxAgeDays: number;
     records?: ApplicationRecordPolicy;
@@ -184,6 +185,14 @@ export interface StoredAttempt {
   failure?: WalletAttemptFailure;
 }
 export interface ProviderState {
+  managementCommands?: Record<
+    string,
+    { hash: string; result: unknown; at: number }
+  >;
+  management?: Record<
+    string,
+    import('../management/service.js').ManagementState
+  >;
   format: 'moovha-onboarding-1';
   assetReservations?: Record<string, { budgetId: string; units: string }>;
   assetBudgetBindings?: Record<string, { revision: string }>;
@@ -213,6 +222,7 @@ export interface ProviderState {
       network?: import('../networks.js').ProviderNetwork;
       activeRevision?: string;
       transportRevision?: string;
+      managementInstallationId?: string;
       accessMode?: 'application' | 'hosted';
       runtimeConfiguration?: import('../runtime-configuration/service.js').RuntimeConfigurationState;
     }

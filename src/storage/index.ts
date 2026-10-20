@@ -45,6 +45,15 @@ export type { DatabaseEnrollmentOptions } from './enrollment.js';
 export function openProviderDatabase(options: ProviderDatabaseOptions) {
   const connection = new StorageConnection(options);
   return {
+    managementSnapshot():
+      import('../management/service.js').ManagementState | undefined {
+      const row = connection.get(
+        'SELECT record FROM onboarding_records WHERE collection=? AND id=?',
+        'management',
+        'provider',
+      );
+      return row ? JSON.parse(String(row.record)) : undefined;
+    },
     onboardingStore: sqliteOnboardingStore(connection),
     sponsorship: sqliteSponsorshipStore(connection),
     journal: sqliteJournal(connection),

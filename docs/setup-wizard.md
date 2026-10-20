@@ -1,4 +1,14 @@
-# Setup wizard
+# Graphical installation and advanced configuration
+
+The default installation flow is **Choose destination → Review deployment →
+Deploy and open administration**. It deploys a manageable provider with no
+applications. Claim its administrator privately, then configure applications in
+`/admin/` or through the API. See [installation](provider-installation.md).
+
+The **Advanced configuration** editor retains the following explicit static
+configuration screens for source integrations. Applications configured here are
+startup registrations; API-managed installations use durable registrations instead.
+Do not mix these authorities in one configuration.
 
 ## 1. Provider
 

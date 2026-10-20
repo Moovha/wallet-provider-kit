@@ -1,4 +1,5 @@
 export interface OperationGuide {
+  management?: boolean;
   title: string;
   group: string;
   scope?: string;
@@ -16,6 +17,63 @@ export interface OperationGuide {
 }
 // Shared operator guidance. Runtime authentication and authority remain authoritative.
 export const operationGuides: Record<string, OperationGuide> = {
+  rotateProviderIdentityCredential: {
+    title: 'Rotate a provider identity credential',
+    group: 'Provider administration',
+    management: true,
+    prerequisite:
+      'Use a dedicated provider operator, current revision and an idempotency key.',
+    success:
+      '200: a replacement secret shown once. Obsolete credentials and tokens are rejected.',
+    scope: 'provider:manage',
+  },
+  updateProviderIdentity: {
+    title: 'Update application trust or suspend an identity',
+    group: 'Provider administration',
+    management: true,
+    prerequisite:
+      'Supply the current revision and an idempotency key. Application identities cannot perform this operation.',
+    success:
+      '200: updated registration. Authority changes invalidate obsolete tokens; suspension, trust and owner-permission changes revoke related grants. Renaming preserves authority. Wallet activation is unchanged.',
+    scope: 'provider:manage',
+  },
+  createProviderIdentity: {
+    title: 'Register an application or automation identity',
+    group: 'Provider administration',
+    management: true,
+    prerequisite:
+      'Use a dedicated provider operator and a fresh idempotency key.',
+    success:
+      '200: registration metadata and a secret shown once. Replay returns metadata only; registration does not accept identity trust.',
+    scope: 'provider:manage',
+  },
+  listProviderIdentities: {
+    title: 'List provider identities',
+    group: 'Provider administration',
+    management: true,
+    prerequisite: 'Authenticate as a current dedicated provider operator.',
+    success:
+      '200: identity metadata without authentication verifiers or secrets.',
+    scope: 'provider:manage',
+  },
+  readProviderStatus: {
+    title: 'Read provider management status',
+    group: 'Provider administration',
+    management: true,
+    prerequisite: 'Authenticate as a current dedicated provider operator.',
+    success:
+      '200: management availability, application registrations and wallet activation status.',
+    scope: 'provider:manage',
+  },
+  claimProviderInstallation: {
+    title: 'Claim a provider installation',
+    group: 'Provider administration',
+    management: true,
+    prerequisite:
+      'Use the privately delivered, unexpired installation claim credential. This succeeds once.',
+    success:
+      '200: a provider administrator registration; wallet execution remains disabled.',
+  },
   getExecutionCapabilities: {
     title: 'Read the execution contract',
     group: 'Discovery',
@@ -410,6 +468,7 @@ export const operationGuides: Record<string, OperationGuide> = {
 };
 
 export interface ApiFeatures {
+  management?: boolean;
   onboarding: boolean;
   enrollment: boolean;
   walletCalls?: boolean;
@@ -436,6 +495,10 @@ export function operationUnavailableReason(
     ].includes(id)
   )
     return undefined;
+  if (guide.management)
+    return features.management
+      ? undefined
+      : 'Durable provider administration is not configured';
   if (guide.safeWallet && !features.safeWallet)
     return 'Safe wallet infrastructure is not configured';
   if (guide.walletCalls && !features.walletCalls)

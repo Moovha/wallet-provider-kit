@@ -3,6 +3,7 @@ export interface VerifiedPrincipal {
   readonly issuer: string;
   readonly subject: string;
   readonly clientId: string;
+  readonly credentialRevision?: number;
   readonly scopes: readonly string[];
 }
 

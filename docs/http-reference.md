@@ -12781,3 +12781,638 @@ Success response schema:
   }
 }
 ```
+
+## POST /v1/provider/claim
+
+Operation: `claimProviderInstallation`.
+
+Atomically claim a new installation using its privately delivered single-use credential. Expires 30 minutes after first initialization. Restart never reopens claiming. Establishes administration only.
+
+Request body (application/json):
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["claim", "username", "password"],
+  "properties": {
+    "claim": {
+      "type": "string",
+      "minLength": 43,
+      "maxLength": 128
+    },
+    "username": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{2,47}$"
+    },
+    "password": {
+      "type": "string",
+      "minLength": 14,
+      "maxLength": 256
+    }
+  }
+}
+```
+
+| Status | Content type             | Description      |
+| ------ | ------------------------ | ---------------- |
+| 200    | application/json         | Default Response |
+| 400    | application/problem+json | Problem response |
+| 401    | application/problem+json | Problem response |
+| 403    | application/problem+json | Problem response |
+| 409    | application/problem+json | Problem response |
+| 413    | application/problem+json | Problem response |
+| 415    | application/problem+json | Problem response |
+| 422    | application/problem+json | Problem response |
+| 429    | application/problem+json | Problem response |
+| 500    | application/problem+json | Problem response |
+| 503    | application/problem+json | Problem response |
+
+Success response schema:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "name",
+    "role",
+    "enabled",
+    "revision",
+    "credentialRevision",
+    "scopes"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "role": {
+      "enum": ["administrator", "automation", "application"]
+    },
+    "enabled": {
+      "type": "boolean"
+    },
+    "revision": {
+      "type": "integer"
+    },
+    "credentialRevision": {
+      "type": "integer"
+    },
+    "scopes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "client_secret": {
+      "type": "string"
+    },
+    "credential_replayed": {
+      "type": "boolean"
+    }
+  }
+}
+```
+
+## GET /v1/provider/status
+
+Operation: `readProviderStatus`.
+
+Protected installation and application administration. Management credentials do not activate wallet operations or authorize spending.
+
+| Status | Content type             | Description      |
+| ------ | ------------------------ | ---------------- |
+| 200    | application/json         | Default Response |
+| 400    | application/problem+json | Problem response |
+| 401    | application/problem+json | Problem response |
+| 403    | application/problem+json | Problem response |
+| 409    | application/problem+json | Problem response |
+| 413    | application/problem+json | Problem response |
+| 415    | application/problem+json | Problem response |
+| 422    | application/problem+json | Problem response |
+| 429    | application/problem+json | Problem response |
+| 500    | application/problem+json | Problem response |
+| 503    | application/problem+json | Problem response |
+
+Success response schema:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "installation_id",
+    "claimed",
+    "applications",
+    "management_available",
+    "wallet_operations_enabled"
+  ],
+  "properties": {
+    "installation_id": {
+      "type": "string"
+    },
+    "claimed": {
+      "enum": [true]
+    },
+    "applications": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name",
+          "role",
+          "enabled",
+          "revision",
+          "credentialRevision",
+          "scopes"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "role": {
+            "enum": ["administrator", "automation", "application"]
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "revision": {
+            "type": "integer"
+          },
+          "credentialRevision": {
+            "type": "integer"
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "policy": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "client_secret": {
+            "type": "string"
+          },
+          "credential_replayed": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "management_available": {
+      "enum": [true]
+    },
+    "wallet_operations_enabled": {
+      "type": "boolean"
+    }
+  }
+}
+```
+
+## GET /v1/provider/identities
+
+Operation: `listProviderIdentities`.
+
+Protected installation and application administration. Management credentials do not activate wallet operations or authorize spending.
+
+| Status | Content type             | Description      |
+| ------ | ------------------------ | ---------------- |
+| 200    | application/json         | Default Response |
+| 400    | application/problem+json | Problem response |
+| 401    | application/problem+json | Problem response |
+| 403    | application/problem+json | Problem response |
+| 409    | application/problem+json | Problem response |
+| 413    | application/problem+json | Problem response |
+| 415    | application/problem+json | Problem response |
+| 422    | application/problem+json | Problem response |
+| 429    | application/problem+json | Problem response |
+| 500    | application/problem+json | Problem response |
+| 503    | application/problem+json | Problem response |
+
+Success response schema:
+
+```json
+{
+  "type": "array",
+  "maxItems": 100,
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "id",
+      "name",
+      "role",
+      "enabled",
+      "revision",
+      "credentialRevision",
+      "scopes"
+    ],
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "name": {
+        "type": "string"
+      },
+      "role": {
+        "enum": ["administrator", "automation", "application"]
+      },
+      "enabled": {
+        "type": "boolean"
+      },
+      "revision": {
+        "type": "integer"
+      },
+      "credentialRevision": {
+        "type": "integer"
+      },
+      "scopes": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "policy": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "client_secret": {
+        "type": "string"
+      },
+      "credential_replayed": {
+        "type": "boolean"
+      }
+    }
+  }
+}
+```
+
+## POST /v1/provider/identities
+
+Operation: `createProviderIdentity`.
+
+Protected installation and application administration. Management credentials do not activate wallet operations or authorize spending.
+
+| Parameter         | Location | Required | Schema                                                                                                |
+| ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
+| `idempotency-key` | header   | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+
+Request body (application/json):
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "role"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100
+    },
+    "role": {
+      "enum": ["application", "automation"]
+    },
+    "scopes": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 50,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "wallet:configuration:read",
+          "wallet:configuration:propose",
+          "wallet:access",
+          "wallet:access:read",
+          "wallet:account:read",
+          "wallet:provision",
+          "wallet:actions",
+          "wallet:sign",
+          "wallet:execute",
+          "wallet:execute:read",
+          "provider:manage",
+          "wallet:configuration:write"
+        ]
+      }
+    }
+  }
+}
+```
+
+| Status | Content type             | Description      |
+| ------ | ------------------------ | ---------------- |
+| 200    | application/json         | Default Response |
+| 400    | application/problem+json | Problem response |
+| 401    | application/problem+json | Problem response |
+| 403    | application/problem+json | Problem response |
+| 409    | application/problem+json | Problem response |
+| 413    | application/problem+json | Problem response |
+| 415    | application/problem+json | Problem response |
+| 422    | application/problem+json | Problem response |
+| 429    | application/problem+json | Problem response |
+| 500    | application/problem+json | Problem response |
+| 503    | application/problem+json | Problem response |
+
+Success response schema:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "name",
+    "role",
+    "enabled",
+    "revision",
+    "credentialRevision",
+    "scopes"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "role": {
+      "enum": ["administrator", "automation", "application"]
+    },
+    "enabled": {
+      "type": "boolean"
+    },
+    "revision": {
+      "type": "integer"
+    },
+    "credentialRevision": {
+      "type": "integer"
+    },
+    "scopes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "client_secret": {
+      "type": "string"
+    },
+    "credential_replayed": {
+      "type": "boolean"
+    }
+  }
+}
+```
+
+## PATCH /v1/provider/identities/{id}
+
+Operation: `updateProviderIdentity`.
+
+Protected installation and application administration. Management credentials do not activate wallet operations or authorize spending.
+
+| Parameter         | Location | Required | Schema                                                                                                                 |
+| ----------------- | -------- | -------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `id`              | path     | yes      | `{"type":"string","maxLength":100,"pattern":"^(?:(?:app\|automation)-[a-f0-9-]{36}\|operator-[a-z][a-z0-9-]{2,47})$"}` |
+| `idempotency-key` | header   | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}`                  |
+
+Request body (application/json):
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["expected_revision"],
+  "properties": {
+    "expected_revision": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100
+    },
+    "scopes": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 50,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "wallet:configuration:read",
+          "wallet:configuration:propose",
+          "wallet:access",
+          "wallet:access:read",
+          "wallet:account:read",
+          "wallet:provision",
+          "wallet:actions",
+          "wallet:sign",
+          "wallet:execute",
+          "wallet:execute:read",
+          "provider:manage",
+          "wallet:configuration:write"
+        ]
+      }
+    },
+    "enabled": {
+      "type": "boolean"
+    },
+    "trust_agreement": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "nullable": true
+    },
+    "permissions": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 3,
+      "uniqueItems": true,
+      "items": {
+        "enum": ["account:read", "contracts:request", "operations:request"]
+      }
+    }
+  }
+}
+```
+
+| Status | Content type             | Description      |
+| ------ | ------------------------ | ---------------- |
+| 200    | application/json         | Default Response |
+| 400    | application/problem+json | Problem response |
+| 401    | application/problem+json | Problem response |
+| 403    | application/problem+json | Problem response |
+| 409    | application/problem+json | Problem response |
+| 413    | application/problem+json | Problem response |
+| 415    | application/problem+json | Problem response |
+| 422    | application/problem+json | Problem response |
+| 429    | application/problem+json | Problem response |
+| 500    | application/problem+json | Problem response |
+| 503    | application/problem+json | Problem response |
+
+Success response schema:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "name",
+    "role",
+    "enabled",
+    "revision",
+    "credentialRevision",
+    "scopes"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "role": {
+      "enum": ["administrator", "automation", "application"]
+    },
+    "enabled": {
+      "type": "boolean"
+    },
+    "revision": {
+      "type": "integer"
+    },
+    "credentialRevision": {
+      "type": "integer"
+    },
+    "scopes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "client_secret": {
+      "type": "string"
+    },
+    "credential_replayed": {
+      "type": "boolean"
+    }
+  }
+}
+```
+
+## POST /v1/provider/identities/{id}/credentials
+
+Operation: `rotateProviderIdentityCredential`.
+
+Protected installation and application administration. Management credentials do not activate wallet operations or authorize spending.
+
+| Parameter         | Location | Required | Schema                                                                                                                 |
+| ----------------- | -------- | -------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `id`              | path     | yes      | `{"type":"string","maxLength":100,"pattern":"^(?:(?:app\|automation)-[a-f0-9-]{36}\|operator-[a-z][a-z0-9-]{2,47})$"}` |
+| `idempotency-key` | header   | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}`                  |
+
+Request body (application/json):
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["expected_revision"],
+  "properties": {
+    "expected_revision": {
+      "type": "integer",
+      "minimum": 1
+    }
+  }
+}
+```
+
+| Status | Content type             | Description      |
+| ------ | ------------------------ | ---------------- |
+| 200    | application/json         | Default Response |
+| 400    | application/problem+json | Problem response |
+| 401    | application/problem+json | Problem response |
+| 403    | application/problem+json | Problem response |
+| 409    | application/problem+json | Problem response |
+| 413    | application/problem+json | Problem response |
+| 415    | application/problem+json | Problem response |
+| 422    | application/problem+json | Problem response |
+| 429    | application/problem+json | Problem response |
+| 500    | application/problem+json | Problem response |
+| 503    | application/problem+json | Problem response |
+
+Success response schema:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "name",
+    "role",
+    "enabled",
+    "revision",
+    "credentialRevision",
+    "scopes"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "role": {
+      "enum": ["administrator", "automation", "application"]
+    },
+    "enabled": {
+      "type": "boolean"
+    },
+    "revision": {
+      "type": "integer"
+    },
+    "credentialRevision": {
+      "type": "integer"
+    },
+    "scopes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "client_secret": {
+      "type": "string"
+    },
+    "credential_replayed": {
+      "type": "boolean"
+    }
+  }
+}
+```

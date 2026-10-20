@@ -447,6 +447,14 @@ export function createSetupExecutor(options: SetupExecutorOptions = {}) {
         port: config.http?.port ?? 8080,
         config: {
           ...config,
+          ...(config.management
+            ? {
+                management: {
+                  ...config.management,
+                  localOrigin: `http://127.0.0.1:${config.http?.port ?? 8080}`,
+                },
+              }
+            : {}),
           storage: { kind: 'sqlite', directory: '.provider-data/storage' },
           http: { ...config.http, host: '0.0.0.0', port: 8080 },
           ...(config.backend.kind === 'ows'
@@ -571,6 +579,11 @@ export function createSetupExecutor(options: SetupExecutorOptions = {}) {
             );
           }
           await save('provider.env', secretFile);
+          if (plan!.config.management)
+            await save(
+              'installation-claim',
+              parseEnv(secretFile)[plan!.config.management.claim.env]! + '\n',
+            );
           secretFile = '';
           await save(
             'compose.json',
@@ -618,15 +631,18 @@ export function createSetupExecutor(options: SetupExecutorOptions = {}) {
             'api',
             'node',
             '-e',
-            "Promise.all(['/health/live','/health/ready'].map(p=>fetch('http://127.0.0.1:8080'+p,{signal:AbortSignal.timeout(3000)}).then(r=>r.status))).then(([live,ready])=>process.exit(live===200&&ready===503?0:1)).catch(()=>process.exit(1))",
+            plan!.config.management
+              ? "Promise.all(['/health/live','/health/management'].map(p=>fetch('http://127.0.0.1:8080'+p,{signal:AbortSignal.timeout(3000)}).then(r=>r.status))).then(status=>process.exit(status.every(s=>s===200)?0:1)).catch(()=>process.exit(1))"
+              : "Promise.all(['/health/live','/health/ready'].map(p=>fetch('http://127.0.0.1:8080'+p,{signal:AbortSignal.timeout(3000)}).then(r=>r.status))).then(([live,ready])=>process.exit(live===200&&ready===503?0:1)).catch(()=>process.exit(1))",
           ]);
         }
         step.state = 'complete';
         await persistProgress();
       }
       job.state = 'complete';
-      job.message =
-        'Local service is running. Liveness passed; readiness is disabled as expected. Wallet operations remain disabled. Complete HTTPS and external acceptance before enabling them.';
+      job.message = plan!.config.management
+        ? 'Provider management is available. Open administration and use the private installation-claim file to create the first administrator. Wallet operations remain disabled.'
+        : 'Local service is running. Liveness passed; readiness is disabled as expected. Wallet operations remain disabled. Complete HTTPS and external acceptance before enabling them.';
       await persistProgress();
     } catch {
       if (current) current.state = 'failed';
@@ -708,8 +724,9 @@ export function createSetupExecutor(options: SetupExecutorOptions = {}) {
         ...(job.state === 'failed' ? ['down', '--remove-orphans'] : ['stop']),
       ]);
       job.state = 'stopped';
-      job.message =
-        'Local service stopped. Private configuration, secrets and persistent records are retained.';
+      job.message = plan!.config.management
+        ? 'Provider management is available. Open administration and use the private installation-claim file to create the first administrator. Wallet operations remain disabled.'
+        : 'Local service stopped. Private configuration, secrets and persistent records are retained.';
       job.cleanup = 'stopped';
       await persistProgress();
     } catch {

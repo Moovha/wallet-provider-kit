@@ -40,6 +40,7 @@ test.afterAll(async () => {
 test('deployed Swagger executes same-origin HTTP and displays real success/auth/authority responses', async ({
   page,
 }) => {
+  test.setTimeout(60000);
   const external: string[] = [];
   const errors: string[] = [];
   page.on('request', (request) => {
@@ -53,7 +54,7 @@ test('deployed Swagger executes same-origin HTTP and displays real success/auth/
   await expect(
     page.getByRole('heading', { name: /Provider API · Live testing/ }),
   ).toBeVisible();
-  await expect(page.locator('.opblock')).toHaveCount(40);
+  await expect(page.locator('.opblock')).toHaveCount(46);
   const discovery = page.locator('#operations-Discovery-getCapabilities');
   await discovery.locator('.opblock-summary-control').click();
   await discovery

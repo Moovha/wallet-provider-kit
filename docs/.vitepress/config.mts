@@ -63,15 +63,12 @@ export default defineConfig({
           { text: 'Open the setup wizard', link: '/docs/' },
           { text: 'Safe wallets', link: '/docs/self-hosted-sponsorship' },
           { text: 'Service setup', link: '/docs/setup' },
-          { text: '1. Provider', link: '/docs/setup-wizard#_1-provider' },
-          { text: '2. Backend', link: '/docs/setup-wizard#_2-backend' },
-          { text: '3. Services', link: '/docs/setup-wizard#_3-services' },
           {
-            text: '4. Applications',
-            link: '/docs/setup-wizard#_4-applications',
+            text: 'Install and administer',
+            link: '/docs/provider-installation',
           },
-          { text: '5. Deployment', link: '/docs/setup-wizard#_5-deployment' },
-          { text: '6. Export', link: '/docs/setup-wizard#_6-export' },
+          { text: 'Back up and maintain', link: '/docs/provider-maintenance' },
+          { text: 'Advanced configuration', link: '/docs/setup-wizard' },
         ],
       },
       {
@@ -108,7 +105,38 @@ export default defineConfig({
         ],
       },
       {
-        text: 'Operator setup',
+        text: 'Install and administer',
+        items: [
+          {
+            text: '1. Choose destination',
+            link: '/docs/provider-installation#choose-a-destination',
+          },
+          {
+            text: '2. Review and install',
+            link: '/docs/provider-installation#install-a-release-bundle',
+          },
+          {
+            text: '3. Open administration',
+            link: '/docs/provider-installation#claim-administrator-access',
+          },
+          {
+            text: 'Connect applications',
+            link: '/docs/provider-installation#connect-an-application-after-installation',
+          },
+          {
+            text: 'Automate administration',
+            link: '/docs/provider-installation#automate-provider-administration',
+          },
+          { text: 'Back up and maintain', link: '/docs/provider-maintenance' },
+          {
+            text: 'Design and acceptance record',
+            link: '/docs/provider-installation-design',
+          },
+        ],
+      },
+      {
+        text: 'Advanced configuration',
+        collapsed: true,
         items: [
           {
             text: '1. Provider',

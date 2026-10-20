@@ -64,7 +64,7 @@ const day = 86400000;
 
 /** Provider decisions are stored locally. Vendor results, OAuth scopes and share tokens cannot grant access. */
 export class OnboardingService {
-  readonly policy;
+  readonly policy: import('./types.js').ResolvedPolicy;
   private readonly adapters: Map<Vendor, IdentityAdapter>;
   constructor(
     input: OnboardingPolicy,
@@ -74,6 +74,12 @@ export class OnboardingService {
     private readonly actionPolicyRevision?: string,
     readonly runtimeContracts = false,
     readonly safeOnlyWallet = false,
+    liveApplications?: {
+      list(): import('./types.js').ApplicationPolicy[];
+      current(
+        principal: VerifiedPrincipal,
+      ): import('./types.js').ApplicationPolicy;
+    },
   ) {
     const resolved = defineOnboardingPolicy(input);
     if (
@@ -86,11 +92,22 @@ export class OnboardingService {
       throw new WalletProviderError('wallet_provider_configuration');
     this.policy = Object.freeze({
       ...resolved,
+      ...(liveApplications
+        ? { currentApplication: liveApplications.current }
+        : {}),
       revision: fingerprint([
         resolved.revision,
         adapters.map((a) => [a.vendor, a.policyFingerprint ?? a.vendor]).sort(),
       ]),
     });
+    if (liveApplications) {
+      const livePolicy = { ...this.policy };
+      Object.defineProperty(livePolicy, 'applications', {
+        enumerable: true,
+        get: liveApplications.list,
+      });
+      this.policy = Object.freeze(livePolicy);
+    }
     this.adapters = new Map(
       adapters.map((a) => [
         a.vendor,

@@ -1,3 +1,5 @@
+import { registerManagementRoutes } from '../management/http.js';
+import type { ManagementService } from '../management/service.js';
 import { setAuthenticatedResponseTimeout } from './response-timeout.js';
 import { registerWalletCallsRoutes } from '../wallet-calls/http.js';
 import type { WalletCallsService } from '../wallet-calls/service.js';
@@ -43,6 +45,10 @@ import {
 } from './schemas.js';
 
 export interface ServerOptions {
+  management?: ManagementService;
+  managementReady?: () => Promise<boolean>;
+  providerOrigin?: string;
+  localManagementOrigin?: string;
   requestsPerMinute?: number;
   safeWallet?: import('../sponsorship/safe-wallet.js').SafeWalletRuntime;
   authorizationServer?: {
@@ -145,6 +151,7 @@ export async function createServer(options: ServerOptions = {}) {
         : {}),
       transformSpecification: (document) =>
         liveApiSpecification(document, {
+          management: !!options.management,
           onboarding: !!options.onboarding,
           enrollment: !!options.enrollment,
           walletCalls: !!options.walletCalls,
@@ -188,7 +195,15 @@ export async function createServer(options: ServerOptions = {}) {
   });
   app.addHook('onResponse', async (request, reply) => {
     // Only registered templates and methods; unknown raw URLs/methods never enter telemetry.
-    const method = ['GET', 'POST', 'HEAD', 'OPTIONS'].includes(request.method)
+    const method = [
+      'GET',
+      'POST',
+      'PUT',
+      'PATCH',
+      'DELETE',
+      'HEAD',
+      'OPTIONS',
+    ].includes(request.method)
       ? request.method
       : 'OTHER';
     observeRequest(
@@ -250,6 +265,21 @@ export async function createServer(options: ServerOptions = {}) {
       code: 'not_found',
       request_id: request.id,
     }),
+  );
+  app.get(
+    '/health/management',
+    { schema: { hide: true } },
+    async (_request, reply) => {
+      let ready = false;
+      try {
+        ready = (await options.managementReady?.()) ?? false;
+      } catch {
+        /* A failed storage probe remains unavailable. */
+      }
+      return reply
+        .code(ready ? 200 : 503)
+        .send({ status: ready ? 'ready' : 'unavailable' });
+    },
   );
   app.get('/health/live', { schema: { hide: true } }, async () => ({
     status: 'live',
@@ -650,6 +680,14 @@ export async function createServer(options: ServerOptions = {}) {
   );
   if (options.documentation !== false && options.documentationTokens)
     await registerDocumentationTokens(app, options.documentationTokens);
+  await registerManagementRoutes(
+    app,
+    options.management,
+    options.authenticate,
+    options.ready,
+    options.providerOrigin,
+    options.localManagementOrigin,
+  );
   options.authorizationServer?.register(app);
   await app.ready();
   return app;

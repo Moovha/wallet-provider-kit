@@ -369,6 +369,20 @@ onMounted(() => {
         >
           Stop local service
         </button>
+        <div v-if="progress.state === 'complete' && plan.config.management">
+          <p>
+            Read the private
+            <code>{{ plan.directory }}/installation-claim</code> file on this
+            computer. Use it once to create the provider administrator; it
+            expires 30 minutes after the first service startup.
+          </p>
+          <a
+            :href="`http://127.0.0.1:${plan.port}/admin/`"
+            target="_blank"
+            rel="noreferrer"
+            >Open provider administration ↗</a
+          >
+        </div>
         <p v-if="progress.state === 'complete'">
           <a
             :href="`http://127.0.0.1:${plan.port}/health/live`"

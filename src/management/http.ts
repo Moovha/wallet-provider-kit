@@ -1,0 +1,308 @@
+import type { FastifyInstance, FastifyRequest } from 'fastify';
+import { AuthenticationError, type Authenticate } from '../service/auth.js';
+import { problemSchema, uuidSchema } from '../service/schemas.js';
+import {
+  managementScope,
+  managementScopes,
+  type ManagementService,
+} from './service.js';
+import { applicationScopes } from '../deployment/authorization-contract.js';
+import { readFile } from 'node:fs/promises';
+import { consoleHtml, consoleStyle } from './ui.js';
+
+const identity = {
+  type: 'object',
+  additionalProperties: false,
+  required: [
+    'id',
+    'name',
+    'role',
+    'enabled',
+    'revision',
+    'credentialRevision',
+    'scopes',
+  ],
+  properties: {
+    id: { type: 'string' },
+    name: { type: 'string' },
+    role: { enum: ['administrator', 'automation', 'application'] },
+    enabled: { type: 'boolean' },
+    revision: { type: 'integer' },
+    credentialRevision: { type: 'integer' },
+    scopes: { type: 'array', items: { type: 'string' } },
+    policy: { type: 'object', additionalProperties: true },
+    client_secret: { type: 'string' },
+    credential_replayed: { type: 'boolean' },
+  },
+};
+const errors = Object.fromEntries(
+  [400, 401, 403, 409, 413, 415, 422, 429, 500, 503].map((status) => [
+    status,
+    {
+      description: 'Problem response',
+      content: { 'application/problem+json': { schema: problemSchema } },
+    },
+  ]),
+);
+const schema = (operationId: string, result: object, extra = {}) => ({
+  operationId,
+  tags: ['Provider administration'],
+  security: [{ accessToken: [] }],
+  description:
+    'Protected installation and application administration. Management credentials do not activate wallet operations or authorize spending.',
+  ...extra,
+  response: { 200: result, ...errors },
+});
+const keyHeaders = {
+  type: 'object',
+  required: ['idempotency-key'],
+  properties: { 'idempotency-key': uuidSchema },
+};
+const body = (required: string[], properties: object) => ({
+  type: 'object',
+  additionalProperties: false,
+  required,
+  properties,
+});
+const name = { type: 'string', minLength: 1, maxLength: 100 };
+const target = {
+  type: 'string',
+  maxLength: 100,
+  pattern:
+    '^(?:(?:app|automation)-[a-f0-9-]{36}|operator-[a-z][a-z0-9-]{2,47})$',
+};
+
+export async function registerManagementRoutes(
+  app: FastifyInstance,
+  service?: ManagementService,
+  authenticate?: Authenticate,
+  executionReady?: () => Promise<boolean>,
+  origin?: string,
+  localOrigin?: string,
+) {
+  const configured = () => {
+    if (!service)
+      throw Object.assign(new Error('Unavailable'), { statusCode: 503 });
+    return service;
+  };
+  async function operator(request: FastifyRequest) {
+    if (!authenticate)
+      throw Object.assign(new Error('Unavailable'), { statusCode: 503 });
+    const principal = await authenticate(
+      request.headers.authorization,
+      managementScope,
+    );
+    configured().assertOperator(principal);
+    return principal;
+  }
+  function sameOrigin(request: FastifyRequest) {
+    if (
+      request.headers.origin &&
+      request.headers.origin !== origin &&
+      request.headers.origin !== localOrigin
+    )
+      throw new AuthenticationError(403);
+  }
+  if (service) {
+    app.get(
+      '/admin/app.js',
+      { schema: { hide: true } },
+      async (_request, reply) =>
+        reply
+          .type('text/javascript')
+          .send(
+            await readFile(new URL('./console.mjs', import.meta.url), 'utf8'),
+          ),
+    );
+    app.get(
+      '/admin/style.css',
+      { schema: { hide: true } },
+      async (_request, reply) => reply.type('text/css').send(consoleStyle),
+    );
+    app.get('/admin', { schema: { hide: true } }, async (_request, reply) =>
+      reply.redirect('/admin/'),
+    );
+    app.get('/admin/', { schema: { hide: true } }, async (_request, reply) =>
+      reply.type('text/html').send(consoleHtml),
+    );
+  }
+  app.post<{ Body: { claim: string; username: string; password: string } }>(
+    '/v1/provider/claim',
+    {
+      bodyLimit: 4096,
+      config: { rateLimit: { max: 5, timeWindow: '1 minute' } },
+      schema: schema('claimProviderInstallation', identity, {
+        security: [],
+        description:
+          'Atomically claim a new installation using its privately delivered single-use credential. Expires 30 minutes after first initialization. Restart never reopens claiming. Establishes administration only.',
+        body: body(['claim', 'username', 'password'], {
+          claim: { type: 'string', minLength: 43, maxLength: 128 },
+          username: { type: 'string', pattern: '^[a-z][a-z0-9-]{2,47}$' },
+          password: { type: 'string', minLength: 14, maxLength: 256 },
+        }),
+      }),
+    },
+    async (request) => {
+      sameOrigin(request);
+      return configured().claim(request.body);
+    },
+  );
+  app.get(
+    '/v1/provider/status',
+    {
+      schema: schema('readProviderStatus', {
+        type: 'object',
+        additionalProperties: false,
+        required: [
+          'installation_id',
+          'claimed',
+          'applications',
+          'management_available',
+          'wallet_operations_enabled',
+        ],
+        properties: {
+          installation_id: { type: 'string' },
+          claimed: { const: true },
+          applications: { type: 'array', items: identity },
+          management_available: { const: true },
+          wallet_operations_enabled: { type: 'boolean' },
+        },
+      }),
+    },
+    async (request) => ({
+      ...(await configured().status(await operator(request))),
+      management_available: true,
+      wallet_operations_enabled: (await executionReady?.()) ?? false,
+    }),
+  );
+  app.get(
+    '/v1/provider/identities',
+    {
+      schema: schema('listProviderIdentities', {
+        type: 'array',
+        maxItems: 100,
+        items: identity,
+      }),
+    },
+    async (request) => configured().identities(await operator(request)),
+  );
+  app.post<{
+    Body: {
+      name: string;
+      role: 'application' | 'automation';
+      scopes?: string[];
+    };
+  }>(
+    '/v1/provider/identities',
+    {
+      bodyLimit: 8192,
+      schema: schema('createProviderIdentity', identity, {
+        headers: keyHeaders,
+        body: body(['name', 'role'], {
+          name,
+          role: { enum: ['application', 'automation'] },
+          scopes: {
+            type: 'array',
+            minItems: 1,
+            maxItems: 50,
+            uniqueItems: true,
+            items: {
+              enum: [...new Set([...applicationScopes, ...managementScopes])],
+            },
+          },
+        }),
+      }),
+    },
+    async (request) => {
+      sameOrigin(request);
+      return configured().mutate(
+        await operator(request),
+        String(request.headers['idempotency-key']),
+        'create',
+        request.body,
+      );
+    },
+  );
+  app.patch<{
+    Params: { id: string };
+    Body: {
+      expected_revision: number;
+      scopes?: string[];
+      name?: string;
+      enabled?: boolean;
+      trust_agreement?: string | null;
+      permissions?: (
+        'account:read' | 'contracts:request' | 'operations:request'
+      )[];
+    };
+  }>(
+    '/v1/provider/identities/:id',
+    {
+      bodyLimit: 8192,
+      schema: schema('updateProviderIdentity', identity, {
+        headers: keyHeaders,
+        params: body(['id'], { id: target }),
+        body: body(['expected_revision'], {
+          expected_revision: { type: 'integer', minimum: 1 },
+          name,
+          scopes: {
+            type: 'array',
+            minItems: 1,
+            maxItems: 50,
+            uniqueItems: true,
+            items: {
+              enum: [...new Set([...applicationScopes, ...managementScopes])],
+            },
+          },
+          enabled: { type: 'boolean' },
+          trust_agreement: {
+            anyOf: [
+              { type: 'string', minLength: 1, maxLength: 256 },
+              { type: 'null' },
+            ],
+          },
+          permissions: {
+            type: 'array',
+            minItems: 1,
+            maxItems: 3,
+            uniqueItems: true,
+            items: {
+              enum: ['account:read', 'contracts:request', 'operations:request'],
+            },
+          },
+        }),
+      }),
+    },
+    async (request) => {
+      sameOrigin(request);
+      return configured().mutate(
+        await operator(request),
+        String(request.headers['idempotency-key']),
+        'update',
+        { ...request.body, id: request.params.id },
+      );
+    },
+  );
+  app.post<{ Params: { id: string }; Body: { expected_revision: number } }>(
+    '/v1/provider/identities/:id/credentials',
+    {
+      bodyLimit: 1024,
+      schema: schema('rotateProviderIdentityCredential', identity, {
+        headers: keyHeaders,
+        params: body(['id'], { id: target }),
+        body: body(['expected_revision'], {
+          expected_revision: { type: 'integer', minimum: 1 },
+        }),
+      }),
+    },
+    async (request) => {
+      sameOrigin(request);
+      return configured().mutate(
+        await operator(request),
+        String(request.headers['idempotency-key']),
+        'rotate',
+        { ...request.body, id: request.params.id },
+      );
+    },
+  );
+}

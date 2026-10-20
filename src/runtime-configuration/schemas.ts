@@ -27,7 +27,7 @@ export const runtimeConfigurationSchema = {
     },
     operators: {
       type: 'array',
-      minItems: 1,
+      minItems: 0,
       maxItems: 16,
       items: {
         type: 'object',

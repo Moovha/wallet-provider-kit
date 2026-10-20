@@ -61,7 +61,7 @@
         },
         "applications": {
           "type": "array",
-          "minItems": 1,
+          "minItems": 0,
           "maxItems": 100,
           "items": {
             "type": "object",
@@ -1322,7 +1322,7 @@
         },
         "operators": {
           "type": "array",
-          "minItems": 1,
+          "minItems": 0,
           "maxItems": 16,
           "items": {
             "type": "object",
@@ -1373,7 +1373,7 @@
         },
         "clients": {
           "type": "array",
-          "minItems": 1,
+          "minItems": 0,
           "maxItems": 100,
           "items": {
             "type": "object",
@@ -1570,6 +1570,21 @@
         "genesisHash": {
           "type": "string",
           "pattern": "^0x[0-9a-f]{64}$"
+        }
+      }
+    },
+    "management": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["claim"],
+      "properties": {
+        "claim": {
+          "$ref": "#/$defs/secret"
+        },
+        "localOrigin": {
+          "type": "string",
+          "maxLength": 100,
+          "pattern": "^http://127\\.0\\.0\\.1(:[0-9]{1,5})?$"
         }
       }
     }

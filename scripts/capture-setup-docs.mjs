@@ -39,7 +39,7 @@ try {
   const page = await browser.newPage({
     viewport: { width: 1440, height: 1000 },
   });
-  await page.goto(`${url}/#${token}`);
+  await page.goto(`${url}/?advanced#${token}`);
   await page.getByLabel('Provider name', { exact: true }).waitFor();
   await page
     .getByLabel('Import provider configuration', { exact: true })
@@ -131,7 +131,7 @@ try {
     animations: 'disabled',
   });
   // Optional token configuration and issuance are demonstrated with offline fixtures only.
-  await page.goto(`${url}/#${token}`);
+  await page.goto(`${url}/?advanced#${token}`);
   await page.getByLabel('Provider name', { exact: true }).waitFor();
   await page
     .getByLabel('Import provider configuration', { exact: true })
@@ -227,7 +227,7 @@ try {
       'utf8',
     ),
   );
-  await page.goto(`${url}/#${token}`);
+  await page.goto(`${url}/?advanced#${token}`);
   await page.getByLabel('Provider name', { exact: true }).waitFor();
   await page
     .getByLabel('Import provider configuration', { exact: true })
@@ -273,7 +273,7 @@ try {
     },
   });
   const localUrl = await localApp.listen({ host: '127.0.0.1', port: 0 });
-  await page.goto(`${localUrl}/#${token}`);
+  await page.goto(`${localUrl}/?advanced#${token}`);
   await page.getByLabel('Provider name', { exact: true }).waitFor();
   await page
     .getByLabel('Import provider configuration', { exact: true })

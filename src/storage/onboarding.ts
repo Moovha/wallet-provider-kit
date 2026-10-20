@@ -2,6 +2,8 @@ import type { OnboardingStore, ProviderState } from '../onboarding/types.js';
 import type { StorageConnection } from './connection.js';
 
 const collections = [
+  'management',
+  'managementCommands',
   'supportedActions',
   'assetReservations',
   'assetBudgetBindings',
