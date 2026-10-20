@@ -511,24 +511,12 @@ function enableDocumentation() {
                   </dd>
                 </div>
                 <div>
-                  <dt>Transfer signing</dt>
-                  <dd>
-                    {{
-                      config.financial
-                        ? 'Delegated token transfer signing'
-                        : 'Not configured'
-                    }}
-                  </dd>
+                  <dt>User accounts</dt>
+                  <dd>One Safe wallet per user</dd>
                 </div>
                 <div>
-                  <dt>Transfer execution</dt>
-                  <dd>
-                    {{
-                      config.execution
-                        ? 'Dedicated application gas sponsors and RPC-quorum verification'
-                        : 'Not configured; applications submit separately'
-                    }}
-                  </dd>
+                  <dt>Execution</dt>
+                  <dd>Private ERC-4337 bundler and application paymaster</dd>
                 </div>
                 <div v-if="config.policy.access?.mode === 'application'">
                   <dt>Identity requirements</dt>
@@ -738,10 +726,10 @@ function enableDocumentation() {
               FormKit</a
             ></span
           ><a
-            :href="docs + 'custom-adapters.html'"
+            :href="docs + 'application-obligations.html'"
             target="_blank"
             rel="noopener noreferrer"
-            >Developer guide: custom wallet backends ↗</a
+            >Developer guide: application integration ↗</a
           >
         </footer>
       </div>

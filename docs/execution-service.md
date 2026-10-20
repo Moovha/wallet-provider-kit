@@ -1,5 +1,10 @@
 # Deploy a designated execution service
 
+> Historical integration reference. New configured deployments use
+> [per-user Safe wallets, ERC-4337 bundling and application paymasters](self-hosted-sponsorship.md).
+> The legacy execution exports and separate executor CLI are unavailable in the
+> configured service. Retain existing journals and reconcile uncertain work before migration.
+
 A designated executor separates transaction submission and sponsor credentials
 from wallet signing. Choose it under [Deployment](setup-wizard.md#_5-deployment)
 when your service should dispatch approved actions through a separately operated

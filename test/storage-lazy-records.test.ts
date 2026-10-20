@@ -37,9 +37,11 @@ it('reads only requested JSON payloads as retained history grows, and detaches r
         );
     });
     let bytes = 0;
+    const queries: string[] = [];
     const all = connection.all.bind(connection);
     const get = connection.get.bind(connection);
     vi.spyOn(connection, 'all').mockImplementation((sql, ...params) => {
+      queries.push(sql);
       const result = all(sql, ...params);
       bytes += Buffer.byteLength(JSON.stringify(result));
       return result;
@@ -62,6 +64,7 @@ it('reads only requested JSON payloads as retained history grows, and detaches r
         }),
       );
     expect(bytes).toBeLessThan(100000);
+    expect(queries.some((sql) => sql.includes('onboarding_audit'))).toBe(false);
     const detached = await store.transaction((s) => {
       const previous = s.executionPools;
       s.executionPools = { replacement: 9 };

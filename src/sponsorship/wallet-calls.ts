@@ -1,3 +1,5 @@
+import { WalletProviderError } from '../domain/signing.js';
+import { NetworkFeeLimitError } from '../execution/network-fees.js';
 import { waitForObservation } from '../execution/read-observation.js';
 import { randomUUID } from 'node:crypto';
 import type {
@@ -68,6 +70,7 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
     private readonly estimateOperation?: (
       operation: UserOperationV07,
     ) => Promise<UserOperationV07>,
+    private readonly wake?: (delay: number) => void,
   ) {
     this.config = structuredClone(configuration);
     if (
@@ -483,11 +486,21 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
         authority.address !== entry.address
       )
         deny();
-      let operation = await this.execution.signing.prepareCalls(
-        context.principal,
-        entry.input,
-        { ...this.config.gas, ...(await this.networkFees?.()) },
-      );
+      const feeQuote = this.networkFees?.();
+      // After a fee-ceiling rejection, retry fees before any account or estimation reads.
+      const availableFees =
+        entry.lastFailure?.code === 'network_fee_limit'
+          ? await feeQuote
+          : feeQuote;
+      const [prepared, fees] = await Promise.all([
+        this.execution.signing.prepareCalls(
+          context.principal,
+          entry.input,
+          this.config.gas,
+        ),
+        availableFees,
+      ]);
+      let operation = { ...prepared, ...fees };
       if (this.estimateOperation)
         operation = await this.estimateOperation(operation);
       await this.timestamp(entry, 'prepared_at');
@@ -506,12 +519,14 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
       : null;
     await this.update(
       entry,
-      latest?.observation.state === 'finalized'
-        ? 'complete'
-        : latest?.observation.receipt &&
-            ['included', 'safe'].includes(latest.observation.state)
-          ? 'included'
-          : 'processing',
+      latest?.observation.state === 'expired'
+        ? 'expired'
+        : latest?.observation.state === 'finalized'
+          ? 'complete'
+          : latest?.observation.receipt &&
+              ['included', 'safe'].includes(latest.observation.state)
+            ? 'included'
+            : 'processing',
     );
   }
   private async update(
@@ -534,16 +549,19 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
         current.stage = stage;
     });
   }
-  async runOnce(): Promise<void> {
-    const entries = await this.actions.onboarding.store.transaction((s) =>
-      Object.values(s.userOperationBatches ?? {})
-        .filter(
-          (e) =>
-            e.configurationHash === this.configurationHash &&
-            !['complete', 'expired'].includes(e.stage),
-        )
-        .sort((a, b) => a.sequence - b.sequence || a.id.localeCompare(b.id)),
-    );
+  async runOnce(snapshot?: readonly UserOperationBatch[]): Promise<void> {
+    const entries = (
+      snapshot ??
+      (await this.actions.onboarding.store.transaction((s) =>
+        Object.values(s.userOperationBatches ?? {}),
+      ))
+    )
+      .filter(
+        (e) =>
+          e.configurationHash === this.configurationHash &&
+          !['complete', 'expired'].includes(e.stage),
+      )
+      .sort((a, b) => a.sequence - b.sequence || a.id.localeCompare(b.id));
     const retained = new Set(entries.map((e) => e.id));
     for (const id of this.retryAt.keys())
       if (!retained.has(id)) this.retryAt.delete(id);
@@ -585,12 +603,36 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
           if (this.prepareWork)
             await this.prepareWork(() => this.process(entry, predecessor));
           else await this.process(entry, predecessor);
-        } catch {
+        } catch (error) {
+          const code =
+            error instanceof NetworkFeeLimitError
+              ? error.reason
+              : error instanceof WalletProviderError
+                ? error.code
+                : 'wallet_execution_unavailable';
+          await this.actions.onboarding.store.transaction((state) => {
+            const current = state.userOperationBatches?.[entry.id] ?? deny();
+            if (
+              current.configurationHash !== this.configurationHash ||
+              state.deploymentBindings?.['service-v1']?.activeRevision !==
+                this.actions.revision
+            )
+              deny();
+            current.lastFailure = { code, at: new Date().toISOString() };
+            current.retryCount = (current.retryCount ?? 0) + 1;
+          });
           await this.update(entry, 'blocked');
+          this.retryAt.set(
+            entry.id,
+            Date.now() + (error instanceof NetworkFeeLimitError ? 2000 : 1000),
+          );
         }
       })().finally(() => {
         if (this.lanes.get(lane) === running) this.lanes.delete(lane);
-        this.retryAt.set(entry.id, Date.now() + 1000);
+        this.retryAt.set(
+          entry.id,
+          Math.max(this.retryAt.get(entry.id) ?? 0, Date.now() + 1000),
+        );
         this.schedule(0);
       });
       this.lanes.set(lane, running);
@@ -619,6 +661,10 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
   }
   private schedule(delay: number) {
     if (this.stopped) return;
+    if (this.wake) {
+      this.wake(delay);
+      return;
+    }
     const at = Date.now() + delay;
     if (this.timer && this.nextWakeAt <= at) return;
     if (this.timer) clearTimeout(this.timer);

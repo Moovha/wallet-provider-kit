@@ -1,5 +1,10 @@
 # Queue Safe operations and distribute sponsored execution
 
+> Historical integration reference. New configured deployments use
+> [per-user Safe wallets, ERC-4337 bundling and application paymasters](self-hosted-sponsorship.md).
+> The legacy execution exports and separate executor CLI are unavailable in the
+> configured service. Retain existing journals and reconcile uncertain work before migration.
+
 New Safe-only deployments use independent user Safes, a private bundler and an
 application-owned paymaster. See [self-hosted sponsorship](self-hosted-sponsorship.md)
 for that profile. This guide describes queue and sponsor-pool settings for the

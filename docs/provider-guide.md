@@ -1,5 +1,13 @@
 # Integrate your wallet service
 
+The configured service uses one Safe account per user, a private ERC-4337 bundler
+and an application-owned verifying paymaster. Start with
+[Safe wallets](self-hosted-sponsorship.md) and
+[execution latency](execution-latency.md). EOA/relayer/pool deployment exports and
+the separate executor CLI are retired. Low-level authorization and signing
+interfaces below remain reference material; they do not enable another supported
+configured execution flow.
+
 The configured Safe-only profile exposes the user's Safe as their sole asset
 address. Its OWS signing identity stays private, while an application-owned
 paymaster and private bundler cover submission. Provider authentication, current

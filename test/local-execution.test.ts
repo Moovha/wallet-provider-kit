@@ -224,93 +224,16 @@ it('retains current authority and uncertain-response behavior through the existi
   });
   expect(f.state.posts).toBe(1);
 });
-it('starts the engine with private credentials and persistent state and detects a stopped engine', async () => {
+it('rejects retired relayer and managed-pool deployment plans before effects', async () => {
   const config = await configuration();
-  const root = await mkdtemp(join(tmpdir(), 'wpk-local-engine-'));
+  const root = await mkdtemp(join(tmpdir(), 'wpk-retired-engine-'));
   folders.push(root);
-  let services = 'api\nlocal-execution\nexecution-store\n';
-  const calls: string[][] = [];
-  const run = createSetupExecutor({
-    root,
-    environment: {},
-    command: async (args) => {
-      calls.push(args);
-      if (args[0] === 'context') return 'unix:///offline/docker.sock\n';
-      if (args.includes('version')) return '2.40.0\n';
-      if (args.includes('info')) return 'linux\n';
-      if (args.includes('ps')) return services;
-      return '';
-    },
+  const command = vi.fn(async () => '');
+  const run = createSetupExecutor({ root, environment: {}, command });
+  await expect(run.prepare(config)).rejects.toMatchObject({
+    issues: [expect.stringContaining('only per-user Safe accounts')],
   });
-  const plan = await run.prepare(config);
-  run.start(plan.id, {});
-  await run.settled();
-  expect(run.status().state).toBe('complete');
-  const api = parseEnv(
-    await readFile(join(plan.directory, 'provider.env'), 'utf8'),
-  );
-  const engine = parseEnv(
-    await readFile(join(plan.directory, 'execution.env'), 'utf8'),
-  );
-  expect(engine.API_KEY).toBe(api.LOCAL_EXECUTION_API_KEY);
-  expect(api.LOCAL_EXECUTION_STORAGE_KEY).toBeUndefined();
-  expect(api.LOCAL_EXECUTION_KEYSTORE_PASSPHRASE).toBeUndefined();
-  expect(JSON.stringify(run.status())).not.toContain(engine.API_KEY);
-  expect(JSON.stringify(calls)).not.toContain(engine.STORAGE_ENCRYPTION_KEY);
-  for (const path of ['execution.env', '.local-execution/config.json'])
-    expect((await lstat(join(plan.directory, path))).mode & 0o777).toBe(0o600);
-  const compose = localCompose(plan, root);
-  expect(compose.services['local-execution']!.depends_on).toHaveProperty(
-    'execution-store',
-  );
-  expect(compose.services.api.depends_on).toHaveProperty('local-execution');
-  expect(compose.networks!['execution-store']!.internal).toBe(true);
-  expect(compose.services['local-execution']).not.toHaveProperty('ports');
-  expect(compose.services['execution-store']).not.toHaveProperty('ports');
-  services = 'api\nexecution-store\n';
-  expect((await run.liveStatus()).state).toBe('failed');
-});
-
-it('persists managed sponsor keys before publishing their resolved configuration', async () => {
-  const config = await managed();
-  const root = await mkdtemp(join(tmpdir(), 'wpk-managed-engine-'));
-  folders.push(root);
-  const run = createSetupExecutor({
-    root,
-    environment: {
-      EXECUTION_RPC_PRIMARY_URL: 'https://rpc-one.example.test',
-      EXECUTION_RPC_SECONDARY_URL: 'https://rpc-two.example.test',
-    },
-    command: async (args) => {
-      if (args[0] === 'context') return 'unix:///offline/docker.sock\n';
-      if (args.includes('version')) return '2.40.0\n';
-      if (args.includes('info')) return 'linux\n';
-      return '';
-    },
-  });
-  const plan = await run.prepare(config);
-  expect(plan.config.execution!.sponsors[0].binding.address).toBe('managed');
-  run.start(plan.id, {});
-  await run.settled();
-  expect(run.status().state).toBe('complete');
-  const saved = JSON.parse(
-    await readFile(join(plan.directory, 'provider.config.json'), 'utf8'),
-  ) as ProviderConfiguration;
-  const sponsor = saved.execution!.sponsors[0];
-  const keyFile = await readFile(
-    join(plan.directory, '.local-execution/keys', sponsor.accountId + '.json'),
-    'utf8',
-  );
-  const credentials = parseEnv(
-    await readFile(join(plan.directory, 'execution.env'), 'utf8'),
-  );
-  const wallet = await Wallet.fromEncryptedJson(
-    keyFile,
-    credentials.KEYSTORE_PASSPHRASE!,
-  );
-  expect(wallet.address).toBe(sponsor.binding.address);
-  expect(run.status().plan!.config).toEqual(saved);
-  expect(JSON.stringify(run.status())).not.toContain(wallet.privateKey);
+  expect(command).not.toHaveBeenCalled();
 });
 
 it('renders mainnet Relayer identity without testnet metadata or financial activation', async () => {

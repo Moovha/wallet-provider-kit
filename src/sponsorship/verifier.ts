@@ -101,6 +101,38 @@ export class Safe4337Verifier {
       throw new WalletProviderError('wallet_provider_configuration');
     }
   }
+  /** Advisory nonce preparation only. Admission must still verify the complete account proof. */
+  async prepareNonce(account: string): Promise<string> {
+    operationAddress(account);
+    const read = async (reader: RpcReader) => {
+      const value = await reader.call('eth_call', [
+        {
+          to: this.config.entryPoint.address,
+          data: entryInterface.encodeFunctionData('getNonce', [account, 0]),
+        },
+        'latest',
+      ]);
+      try {
+        const nonce = entryInterface.decodeFunctionResult(
+          'getNonce',
+          String(value),
+        )[0];
+        if (nonce < 0n || nonce >= 2n ** 64n) throw new Error();
+        return nonce.toString();
+      } catch {
+        throw new WalletProviderError('wallet_provider_response');
+      }
+    };
+    if (this.pool)
+      return this.pool.run((endpoint) =>
+        read(this.readers[this.config.rpcUrls.indexOf(endpoint)]),
+      );
+    const nonces = await Promise.all(this.readers.map(read));
+    if (nonces.some((nonce) => nonce !== nonces[0]))
+      throw new WalletProviderError('wallet_authorization_denied');
+    return nonces[0];
+  }
+
   async verify(
     intent: Pick<
       ApprovedCallIntent,

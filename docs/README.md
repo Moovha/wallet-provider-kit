@@ -1,30 +1,17 @@
 # Set up your wallet service
 
-Your wallet service connects applications to accounts while retaining control over
-which requests reach the signing backend. The setup wizard brings those choices
-into six steps: **Provider → Backend → Services → Applications → Deployment → Export**.
-Follow them in order. Each section below introduces the decision and links to its
-fields and supporting information.
+Run a wallet service with one Safe account per user. The bundled OWS engine
+holds private signing identities; a private ERC-4337 bundler submits approved
+operations and an application-owned paymaster covers gas. Users receive their
+Safe address for deposits and transactions.
 
-Users sign in, complete identity checks and approve wallet access within the
-connected application. Your service checks its attestations against your policy
-and stores limited, revocable access. You configure that relationship in Applications
-as part of the same setup.
-
-The current service is experimental and supports one active POSIX host with selectable Base
-mainnet or Base Sepolia. Production custody and funded mainnet acceptance remain pending. You
-can explore the wizard without external credentials. The recommended setup supplies
-the wallet engine, application token service, private execution engine, durable
-storage and HTTPS gateway. Record your provider domain and trusted application
-identities in the wizard. Applications supply policies, gas sponsorship and service
-credentials after connection.
-
-<span id="install-and-open-the-local-wizard"></span>
+The service is experimental and single-host. Applications retain responsibility
+for current identity evidence, consent, action requests and sponsorship funding.
+Offline checks do not establish production custody or latency acceptance.
 
 ## Open the wizard
 
-Install Node **24.22.0**, npm **11.11.1** and Git on your workstation. Check
-`node --version` and `npm --version`, then run:
+Use Node 24.22.0, npm 11.11.1 and Git:
 
 ```sh
 git clone https://github.com/Moovha/wallet-provider-kit.git
@@ -34,114 +21,59 @@ npm run build
 npm start -- setup
 ```
 
-The command opens a private local browser session or prints its complete URL.
-Keep the terminal running; Ctrl+C ends the session. FormKit is bundled and needs
-no Pro subscription. The kit is available from source, not npm. The
-[package guide](package.md) covers installing a reviewed tarball instead.
-
-Expand **Why do I need this? Where do I get it?** beside a setting for field help.
-Keep the supplied internal IDs, storage paths and credential variable names;
-advanced controls expose their overrides. Supply external-service secret values
-privately during local deployment or through your deployment's secret store. Import a saved
-`provider.config.json` to resume. Incomplete drafts cannot be saved, and refreshing
-or closing the browser loses unsaved edits.
+Keep the terminal open. The temporary local wizard creates configuration and
+can prepare an isolated local container deployment. Start with operations disabled.
+See [local setup](local-setup.md) for runtime installation and recovery.
 
 ## 1. Provider
 
-Applications need a stable address for your API, and users need to know who
-operates their wallets. Enter your provider name, public HTTPS origin and privacy
-notice. The origin becomes part of the stored account binding, so choose the
-address you intend to retain.
-
-Follow [Provider fields](setup-wizard.md#_1-provider) and
-[domain preparation](operator-services.md#provider-domain-and-privacy-notice).
-[Roles and terms](concepts.md) explains provider, application, account and owner.
+Enter your service name, intended HTTPS origin and privacy notice. Application
+registrations and public discovery use this origin. Prepare the domain and gateway
+before public deployment. See [domain preparation](operator-services.md#provider-domain-and-privacy-notice).
 
 ## 2. Backend
 
-Choose the service or engine that creates accounts and signs permitted actions.
-This choice determines who controls keys, how credentials are protected and what
-you must preserve to recover an account.
-
-Keep the recommended bundled OWS engine or select an existing service in
-[Backend fields](setup-wizard.md#_2-backend). See
-[backend choices](operator-services.md#choose-one-wallet-backend). Each profile
-has its own recovery and operating requirements. Keep its environment binding
-stable across restarts and credential rotations.
+Review the bundled OWS vault and stable wallet environment ID. Setup generates
+missing local credentials privately. Keep the environment, vault and database
+backups together. See [Safe wallets](self-hosted-sponsorship.md).
 
 ## 3. Services
 
-Your API needs to identify each calling application. Keep the bundled OAuth token
-service: setup registers enabled applications and generates credentials privately.
-The provider origin determines the issuer, audience and public-key URL.
-Keep the bundled **OpenZeppelin Relayer and Valkey** local execution engine
-selected too. Local setup starts it automatically on private networks, with
-persistent queues and generated credentials. Configure approved-action policies,
-RPC verification and gas budgets before enabling spending. Setup creates encrypted
-local sponsor keys when those policies are configured. Existing authorization
-servers and execution services are optional. See [bundled setup](bundled-setup.md).
-
-Follow [Services fields](setup-wizard.md#_3-services) and the
-[token registration requirements](operator-services.md#register-the-application-api-and-clients).
-For an existing issuer, the [Auth0 recipe](auth0-setup.md) demonstrates a compatible registration. Optional
-staff login is needed only if you later enable staff token controls in Deployment.
-
-<span id="_4-policies"></span>
+Configure application authentication. The bundled issuer supplies application
+tokens and has no second user login. The private bundler and durable Valkey queue
+start with the API. RPC credentials, contract methods and funding agreements are
+registered per application after connection.
 
 ## 4. Applications
 
-Authentication identifies an application; your policy determines what it may do
-for a user. Register each application's client ID and reviewed identity/consent
-trust agreement. Choose required evidence, freshness, access duration and allowed
-permissions. The default shared Safe profile keeps action policy and gas setup
-out of the wizard.
-
-Follow [Application fields](setup-wizard.md#_4-applications). The
-[access contract](application-access.md) connects those settings to the application's
-requests, user binding, consent and revocation. For contract registrations and
-policy publication after deployment, use the
-[application configuration APIs](runtime-workspace.md) enabled by the default profile.
+Register each calling application, its identity/consent trust agreement and allowed
+API permissions. Retain its generated client ID and secret reference across restarts.
+Configure provider operators separately from application clients. See
+[application-led access](application-access.md) and [application management](runtime-workspace.md).
 
 ## 5. Deployment
 
-Your service must retain ownership, grants and attempts across restarts. Choose
-private persistent storage and HTTP listen settings. Decide whether to enable API
-testing tools. The default profile includes an idle private execution engine.
-
-Follow [Deployment fields](setup-wizard.md#_5-deployment). Its supporting guides
-cover [storage and backups](storage.md), [staff token controls](operator-tokens.md),
-[transfer execution](execution.md) and [approved contract calls](approved-contract-calls.md).
-[Assets and gas](assets-and-gas.md) explains the connected application's funding
-responsibility. Keep wallet operations disabled for the first deployment.
+Review private storage, the local port, HTTPS and optional API explorer controls.
+Leave wallet operations disabled until backend, recovery, authorization, bundler
+and paymaster acceptance is complete. The service has one execution flow;
+EOA transfers, relayer execution and shared Safe/sponsor pools are retired choices.
 
 ## 6. Export
 
-Validation checks that the settings fit together. Choose **Set up and run locally**
-for CDP or Relayer, or download the configuration, secret-name template and checklist
-for manual deployment. Neither validation nor a successful startup tests your
-external services or proves wallet recovery.
+Validate the configuration, then choose **Set up and run locally** or download
+configuration and secret-reference templates for manual deployment. Validation
+contacts no providers and establishes no funded readiness. See
+[the wizard reference](setup-wizard.md) and [deployment](operator-deployment.md).
 
-Follow [Export fields](setup-wizard.md#_6-export), then use
-[local setup](local-setup.md) or [manual deployment](operator-deployment.md).
-Complete the [staging walkthrough](staging-walkthrough.md) and relevant
-[acceptance checks](conformance.md) before activation. Retain the tested settings,
-recovery evidence and saved operating commands.
-
-After deployment, your application developer follows the
-[access contract](application-access.md) and [HTTP guide](http-api.md).
-Use the [application configuration APIs](runtime-workspace.md) for enabled contract/policy
-management, and [operations](operations.md) for monitoring. When changing a
-running service, import its saved configuration and follow the
-[deployment maintenance process](operator-deployment.md); preserve its database,
-bindings and original attempt identities.
+After deployment, accept the application's services and policy, fund its gas
+address, prepare sponsorship infrastructure and provision its user Safes.
+Applications use the account-scoped EIP-5792 endpoint and verified status stream.
+[Execution latency](execution-latency.md) explains the execution sequence and
+same-user burst measurement.
 
 ## When you need a custom integration
 
-The wizard configures the supplied service. If you need a different backend,
-storage system or financial rule, the [developer API guide](api.md),
-[custom adapters](custom-adapters.md) and [offline tutorial](integration-example.md)
-explain the extension interfaces. The [configuration reference](setup.md) describes
-the JSON produced by the wizard. Contributor workflows are in
-[Contributing](../CONTRIBUTING.md).
-
-For an isolated native Base evaluation, follow the [local preview and acceptance guide](local-preview.md).
+Low-level signing, authority and storage interfaces are available for reviewed
+host integrations. They do not select another supported configured execution
+flow. Historical deployment exports are rejected before startup or setup effects;
+retain and reconcile their journals before a separately reviewed migration.

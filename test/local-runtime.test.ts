@@ -206,7 +206,7 @@ it('the terminal continues from runtime installation through ordered local setup
   const fixture = runtimeFixture(home);
   const config: ProviderConfiguration = JSON.parse(
     await readFile(
-      new URL('../docs/provider.config.example.json', import.meta.url),
+      new URL('../docs/provider.config.safe.example.json', import.meta.url),
       'utf8',
     ),
   );
@@ -411,7 +411,7 @@ it('accepts the bundled OWS terminal setup with generated credentials', async ()
   });
   const config: ProviderConfiguration = JSON.parse(
     await readFile(
-      new URL('../docs/provider.config.bundled.example.json', import.meta.url),
+      new URL('../docs/provider.config.safe.example.json', import.meta.url),
       'utf8',
     ),
   );

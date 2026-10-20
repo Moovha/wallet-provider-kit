@@ -119,8 +119,10 @@ export class UserOperationExecutionCoordinator {
       return this.refresh(id);
     }
     if (!existing) {
-      await this.client.ready();
-      const anchor = await this.observer.anchor();
+      const [, anchor] = await Promise.all([
+        this.client.ready(),
+        this.observer.anchor(),
+      ]);
       await this.timestamp(id, 'sponsorship_started_at');
       await this.signing.sponsor(context, id);
       await this.timestamp(id, 'paymaster_signed_at');

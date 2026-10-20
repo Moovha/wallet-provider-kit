@@ -1,3 +1,4 @@
+import { NetworkFeeLimitError } from '../src/execution/network-fees.js';
 import { describe, it, expect, vi } from 'vitest';
 import { Wallet, toQuantity, ZeroAddress } from 'ethers';
 import { fixture } from './helpers/safe-4337.js';
@@ -27,6 +28,10 @@ async function setup(
   lifetimeBudgetWei = '10000000',
   native = false,
   single = false,
+  networkFees?: () => Promise<{
+    maxFeePerGas: string;
+    maxPriorityFeePerGas: string;
+  }>,
 ) {
   const nativeRecipient = native ? Wallet.createRandom().address : undefined;
   const f = await fixture((c) => {
@@ -54,6 +59,7 @@ async function setup(
     hint: false,
     aggregated: false,
     noEvent: false,
+    recoveryRequest: undefined as typeof fetch | undefined,
     operation: undefined as SignedUserOperationV07 | undefined,
   };
   const from = Wallet.createRandom().address,
@@ -162,7 +168,8 @@ async function setup(
           ? { userOpHash: params[0], receipt: { transactionHash: txHash } }
           : null;
       else throw new Error('Unexpected bundler method');
-    } else if (
+    } else if (s.recoveryRequest) return s.recoveryRequest(url, options);
+    else if (
       method === 'eth_getBlockByNumber' &&
       ['safe', 'finalized'].includes(params[0])
     )
@@ -222,6 +229,7 @@ async function setup(
         maxWaitSeconds: 60,
         pollIntervalSeconds: 5,
       },
+      networkFees,
     );
     return {
       execution,
@@ -649,4 +657,124 @@ it('keeps aggregate receipt proofs independent across quorum sources', async () 
   await expect(
     observer.observe(plans[0], '10000000', txHash),
   ).rejects.toThrow();
+});
+
+it.each([
+  'complete',
+  'not-finalized',
+  'event-in-later-page',
+  'reorg',
+  'outage',
+])(
+  'retains uncertain dispatch and reservations while expiry recovery is %s',
+  async (outcome) => {
+    const t = await setup();
+    t.s.lost = true;
+    await t.submit();
+    await t.ports.driver.runOnce();
+    const plans = await t.f.onboarding.store.transaction((s) =>
+      Object.values(s.userOperationExecutions!),
+    );
+    const plan = plans[0];
+    expect(plan.dispatch?.state).toBe('unknown');
+    const sponsorship = t.f.db.sponsorship.load(plan.operationId)!;
+    const budget = await t.f.db.budget(sponsorship.gasBudgetId);
+    const until = BigInt('0x' + plan.operation.signature.slice(14, 26));
+    const ranges: [bigint, bigint][] = [];
+    let expiryAnchorReads = 0;
+    t.s.recoveryRequest = async (url, options) => {
+      const body = JSON.parse(String(options?.body));
+      const { method, params } = body;
+      let result: unknown;
+      if (method === 'eth_getBlockByNumber' && params[0] !== '0x0') {
+        const number =
+          params[0] === 'latest' || params[0] === 'safe'
+            ? '0x164'
+            : params[0] === 'finalized'
+              ? '0x163'
+              : params[0];
+        if (params[0] === '0x163') expiryAnchorReads++;
+        result = {
+          number,
+          hash:
+            outcome === 'reorg' && expiryAnchorReads > 1
+              ? '0x' + 'f'.repeat(64)
+              : blockHash,
+          timestamp: toQuantity(
+            until + (outcome === 'not-finalized' ? 0n : 1n),
+          ),
+        };
+      } else if (method === 'eth_getLogs') {
+        const from = BigInt(params[0].fromBlock),
+          to = BigInt(params[0].toBlock);
+        ranges.push([from, to]);
+        if (outcome === 'outage') throw Error('Offline recovery outage');
+        result =
+          outcome === 'event-in-later-page' && from >= 300n
+            ? [{ transactionHash: txHash }]
+            : [];
+      } else return t.f.request(url, options);
+      return Response.json({ jsonrpc: '2.0', id: body.id, result });
+    };
+    const now = vi
+      .spyOn(Date, 'now')
+      .mockReturnValue(Number(until + 10n) * 1000);
+    try {
+      await t.ports.driver.runOnce();
+      const latest = await t.ports.execution.load(plan.operationId);
+      expect(latest?.dispatch).toEqual(plan.dispatch);
+      expect(await t.f.db.budget(sponsorship.gasBudgetId)).toEqual(budget);
+      expect(t.s.sends).toBe(1);
+      expect(t.f.state.signs).toBe(1);
+      if (outcome === 'complete') {
+        expect(latest?.observation).toMatchObject({
+          state: 'expired',
+          expiry: {
+            validUntil: until.toString(),
+            finalizedBlock: '355',
+            blockHash,
+          },
+        });
+        expect(ranges).toContainEqual([100n, 199n]);
+        expect(ranges).toContainEqual([200n, 299n]);
+        expect(ranges).toContainEqual([300n, 355n]);
+        expect(await t.status()).toMatchObject({ status: 400 });
+      } else expect(latest?.observation.state).not.toBe('expired');
+    } finally {
+      now.mockRestore();
+    }
+  },
+);
+
+it('retries a known fee-ceiling wait before account reads and retains only a stable failure code', async () => {
+  const fees = vi
+    .fn<() => Promise<{ maxFeePerGas: string; maxPriorityFeePerGas: string }>>()
+    .mockRejectedValue(new NetworkFeeLimitError());
+  const t = await setup('10000000', false, false, fees);
+  let nonceReads = 0;
+  t.f.state.mutate = (method, result) => {
+    if (method === 'eth_call') nonceReads++;
+    return result;
+  };
+  await t.submit();
+  await t.ports.driver.runOnce();
+  const first = nonceReads;
+  expect(first).toBeGreaterThan(0);
+  await t.ports.driver.runOnce();
+  expect(nonceReads).toBe(first);
+  const batches = await t.f.onboarding.store.transaction((s) =>
+    Object.values(s.userOperationBatches!),
+  );
+  expect(batches[0]).toMatchObject({
+    stage: 'blocked',
+    retryCount: 2,
+    lastFailure: { code: 'network_fee_limit' },
+  });
+  expect(t.s.sends + t.f.state.posts + t.f.state.signs).toBe(0);
+  fees.mockResolvedValue({
+    maxFeePerGas: t.f.operation.maxFeePerGas,
+    maxPriorityFeePerGas: t.f.operation.maxPriorityFeePerGas,
+  });
+  await t.ports.driver.runOnce();
+  expect(t.s.sends).toBe(1);
 });

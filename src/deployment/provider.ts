@@ -1,35 +1,14 @@
 import { SafeWalletRuntime } from '../sponsorship/safe-wallet.js';
-import { createOwsSigningBackend } from '../providers/ows.js';
-import { ApplicationExecutionCoordinator } from '../execution/application-coordinator.js';
-import { ApplicationSponsorService } from '../provisioning/application-sponsor.js';
 import {
-  ApplicationSafeService,
-  applicationAccountNamespace,
-} from '../provisioning/application.js';
-import { ApplicationExecutionObserver } from '../runtime-configuration/observer.js';
+  createOwsWalletProvider,
+  createOwsSigningBackend,
+} from '../providers/ows.js';
 import { ApplicationCredentialCipher } from '../runtime-configuration/credentials.js';
-import {
-  SafeProvisioningService,
-  createSafeDeploymentDriver,
-} from '../provisioning/safe.js';
 import { providerNetwork } from '../networks.js';
-import { localExecutionFetch } from './local-execution.js';
 import { createBundledAuthorizationServer } from './authorization-server.js';
 import { WalletCallsService } from '../wallet-calls/service.js';
-import {
-  PayerOperations,
-  emptyOperationsState,
-} from '../execution/operations.js';
-import { SafeExecutionQueue } from '../execution/queue.js';
-import {
-  runtimeApplicationId,
-  RuntimeConfigurationService,
-} from '../runtime-configuration/service.js';
-import { executionConfigurationIdentity } from '../executor/protocol.js';
-import { createServiceIdentity } from '../executor/auth.js';
-import { createRemoteExecutionProvider } from '../execution/remote.js';
+import { RuntimeConfigurationService } from '../runtime-configuration/service.js';
 import { createExplorerTokenIssuer } from './explorer-tokens.js';
-import { createConfiguredBackend } from './backends.js';
 import { resolve } from 'node:path';
 import { EmbeddedWalletService } from '../domain/embedded-wallet.js';
 import { createOnboardingJournal } from '../onboarding/journal.js';
@@ -47,10 +26,8 @@ import {
   ConfigurationError,
   resolveSecret,
   validateProviderConfiguration,
+  assertSafeWalletConfiguration,
 } from './config.js';
-import { TransferExecutionCoordinator } from '../execution/coordinator.js';
-import { QuorumTransferObserver } from '../execution/chain.js';
-import { createTransferExecutionProvider } from '../execution/relayer.js';
 import { SupportedActions } from './actions.js';
 
 /** Compose the supported configured service with built-in authority and journals; activation remains explicit. */
@@ -65,17 +42,7 @@ export async function createConfiguredProvider(
     throw new ConfigurationError(['/: unsafe environment']);
   const config = validateProviderConfiguration(input);
   const network = providerNetwork(config.network);
-  if (config.execution && !network.testnet)
-    config.execution.network = network.name;
-  if (
-    config.execution?.local &&
-    config.execution.sponsors.some(
-      (sponsor) => sponsor.binding.address === 'managed',
-    )
-  )
-    throw new ConfigurationError([
-      '/execution/sponsors: run local setup to create and retain managed sponsor credentials before starting',
-    ]);
+  assertSafeWalletConfiguration(config);
   const authorizationServer = config.authorizationServer
     ? createBundledAuthorizationServer(config)
     : undefined;
@@ -91,39 +58,47 @@ export async function createConfiguredProvider(
     let onboarding: OnboardingService | undefined;
     let financial: ReturnType<typeof database.financialAuthority> | undefined;
     let activeRevision: string | undefined;
-    const backend = await createConfiguredBackend(
-      config.backend,
-      directory,
-      database,
-      {
-        namespace:
-          'onboarding-' +
-          fingerprint(config.policy.provider.origin).slice(0, 32),
-        journal: createOnboardingJournal(database.onboardingStore),
-        authorizeAttempt: async (request) =>
-          request.kind === 'provision' &&
-          !!onboarding &&
-          !!activeRevision &&
-          (await database.onboardingStore.transaction(
-            (state) =>
-              state.deploymentBindings?.['service-v1']?.activeRevision ===
-                activeRevision &&
-              state.deploymentBindings?.['service-v1']?.transportRevision ===
-                transportRevision,
-          )) &&
-          (await onboarding.canDispatchProvision(
-            request.attemptId,
-            request.accountId,
-          )),
-      },
-      {
-        namespace: 'configured-transfers-v1',
-        journal: database.journal,
-        authorizeAttempt: (request) =>
-          financial?.authorizeAttempt(request) ?? Promise.resolve(false),
-      },
-      config.network,
-    );
+    const passphrase = resolveSecret(config.backend.passphrase);
+    if (
+      passphrase.length < 16 ||
+      passphrase.length > 4096 ||
+      passphrase.startsWith('ows_key_')
+    )
+      throw new ConfigurationError([
+        '/backend/passphrase: invalid owner credential',
+      ]);
+    const backendOptions = {
+      vaultPath: resolve(directory, config.backend.vaultDirectory),
+      passphrase: async () => passphrase,
+      network: config.network,
+    };
+    const provision = createOwsWalletProvider(backendOptions, {
+      namespace:
+        'onboarding-' + fingerprint(config.policy.provider.origin).slice(0, 32),
+      journal: createOnboardingJournal(database.onboardingStore),
+      authorizeAttempt: async (request) =>
+        request.kind === 'provision' &&
+        !!onboarding &&
+        !!activeRevision &&
+        (await database.onboardingStore.transaction(
+          (state) =>
+            state.deploymentBindings?.['service-v1']?.activeRevision ===
+              activeRevision &&
+            state.deploymentBindings?.['service-v1']?.transportRevision ===
+              transportRevision,
+        )) &&
+        (await onboarding.canDispatchProvision(
+          request.attemptId,
+          request.accountId,
+        )),
+    });
+    const signing = createOwsWalletProvider(backendOptions, {
+      namespace: 'configured-transfers-v1',
+      journal: database.journal,
+      authorizeAttempt: (request) =>
+        financial?.authorizeAttempt(request) ?? Promise.resolve(false),
+    });
+    const backend = { ...provision, signTypedData: signing.signTypedData };
     const occupied = await database.hasStoredRecords();
     const bound = await database.onboardingStore.transaction((state) => {
       const expected = {
@@ -205,12 +180,7 @@ export async function createConfiguredProvider(
           database.onboardingStore,
         )
       : undefined;
-    const transportRevision = config.execution?.service
-      ? fingerprint([
-          config.execution.service.signing,
-          config.execution.service.keys,
-        ])
-      : undefined;
+    const transportRevision = undefined;
     activeRevision = fingerprint([
       onboarding!.policy.revision,
       ...(network.testnet ? [] : [network.name]),
@@ -224,9 +194,6 @@ export async function createConfiguredProvider(
       config.ownerLogin?.clientId,
       config.activation.enabled,
       ...(config.runtimeConfiguration ? [config.runtimeConfiguration] : []),
-      ...(config.execution
-        ? [executionConfigurationIdentity(config.execution)]
-        : []),
       ...(config.authorizationServer
         ? [config.authorizationServer, config.oauth]
         : []),
@@ -268,10 +235,9 @@ export async function createConfiguredProvider(
             config.approvedCalls,
             config.network,
             config.safeProvisioning ?? false,
-            !!config.safeWallet ||
-              !!config.runtimeConfiguration?.sharedApplicationSafes,
-            config.runtimeConfiguration?.executionPool?.safeCount ?? 1,
-            !!config.safeWallet,
+            true,
+            1,
+            true,
           )
         : undefined;
     financial = actions
@@ -289,25 +255,12 @@ export async function createConfiguredProvider(
       {
         provision: async (context, accountId) => {
           const admitted = await authority.provision(context, accountId);
-          if (admitted) await backend.reserveAccount?.(accountId);
           return admitted;
         },
         sign: financial?.authority.sign ?? authority.sign,
       },
       backend,
     );
-    const executionIdentity = config.execution?.service
-      ? await createServiceIdentity(
-          config.policy.provider.origin,
-          config.execution.service.signing,
-          [
-            {
-              origin: config.execution.service.url,
-              keys: config.execution.service.keys,
-            },
-          ],
-        )
-      : undefined;
     const runtimeConfiguration = config.runtimeConfiguration
       ? new RuntimeConfigurationService(
           onboarding.policy,
@@ -354,191 +307,6 @@ export async function createConfiguredProvider(
             resolveSecret(config.safeWallet.bundlerAuthorization),
           )
         : undefined;
-    const applicationSponsors =
-      !safeWallet && config.runtimeConfiguration?.sharedApplicationSafes
-        ? new ApplicationSponsorService(
-            runtimeConfiguration!,
-            database,
-            new ApplicationCredentialCipher(
-              resolveSecret(config.runtimeConfiguration.credentialKey!),
-            ),
-            config.execution!,
-            activeRevision,
-            resolveSecret(config.execution!.relayer!.apiKey),
-            localExecutionFetch(),
-            config.network,
-          )
-        : undefined;
-    let applicationSafes: ApplicationSafeService | undefined;
-    if (!safeWallet && config.runtimeConfiguration?.sharedApplicationSafes) {
-      const applicationBackend = await createConfiguredBackend(
-        config.backend,
-        directory,
-        database,
-        {
-          namespace: applicationAccountNamespace,
-          journal: database.journal,
-          authorizeAttempt: (request) =>
-            applicationSafes?.authorizeProvision(request) ??
-            Promise.resolve(false),
-        },
-        {
-          namespace: 'configured-transfers-v1',
-          journal: database.journal,
-          authorizeAttempt: (request) =>
-            financial?.authorizeAttempt(request) ?? Promise.resolve(false),
-        },
-        config.network,
-      );
-      applicationSafes = new ApplicationSafeService(
-        runtimeConfiguration!,
-        onboarding,
-        database,
-        applicationBackend,
-        config.safeProvisioning!,
-        config.execution!,
-        createSafeDeploymentDriver(
-          config.execution!,
-          resolveSecret(config.execution!.relayer!.apiKey),
-          localExecutionFetch(),
-        ),
-        activeRevision,
-        config.activation.enabled,
-        config.network,
-        fetch,
-        applicationSponsors,
-        (execution) =>
-          createSafeDeploymentDriver(
-            execution,
-            resolveSecret(config.execution!.relayer!.apiKey),
-            applicationSponsors!.request(),
-          ),
-      );
-    }
-    const observer = config.execution
-      ? runtimeConfiguration && config.runtimeConfiguration?.credentialKey
-        ? new ApplicationExecutionObserver(
-            runtimeConfiguration,
-            database.onboardingStore,
-            config.execution,
-            config.network,
-            fetch,
-            !!config.runtimeConfiguration?.sharedApplicationSafes,
-          )
-        : new QuorumTransferObserver(
-            config.execution.rpc.endpoints.map((entry) => resolveSecret(entry)),
-            config.execution.rpc.genesisHash,
-            config.execution.maxLogRange,
-            fetch,
-            config.network,
-          )
-      : undefined;
-    let operationsBinding: string | undefined;
-    const operations =
-      config.operations && config.execution && observer
-        ? new PayerOperations(
-            config.operations,
-            {
-              transaction: (operation) =>
-                database.onboardingStore.transaction((state) => {
-                  if (
-                    state.deploymentBindings?.['service-v1']?.activeRevision !==
-                    activeRevision
-                  )
-                    throw new Error('Inactive configuration');
-                  const data = ((state.operations ??= {})['service-v1'] ??=
-                    emptyOperationsState());
-                  if (data.binding !== operationsBinding)
-                    throw new Error('Inactive operations configuration');
-                  return operation(data);
-                }),
-            },
-            config.execution.sponsors.map((sponsor) => ({
-              address: sponsor.binding.address,
-              balance: () => observer.payerBalance(sponsor.binding.address),
-            })),
-            config.policy.provider.origin,
-            resolveSecret,
-          )
-        : undefined;
-    if (operations) {
-      operationsBinding = operations.binding;
-      await database.onboardingStore.transaction((state) => {
-        ((state.operations ??= {})['service-v1'] ??=
-          emptyOperationsState()).binding = operationsBinding;
-      });
-    } else
-      await database.onboardingStore.transaction((state) => {
-        if (state.operations?.['service-v1'])
-          state.operations['service-v1'].binding = 'disabled';
-      });
-    const execution =
-      !safeWallet && config.execution && actions
-        ? applicationSponsors
-          ? new ApplicationExecutionCoordinator(
-              database,
-              activeRevision,
-              config.execution.pollIntervalSeconds,
-              async (applicationId) => {
-                const execution =
-                  await applicationSponsors.configuration(applicationId);
-                return new TransferExecutionCoordinator(
-                  actions,
-                  database,
-                  service,
-                  execution,
-                  createTransferExecutionProvider(
-                    execution,
-                    resolveSecret(execution.relayer!.apiKey),
-                    applicationSponsors.request(),
-                  ),
-                  observer!,
-                  undefined,
-                  async (id): Promise<void> => {
-                    await safeQueue?.included(id);
-                  },
-                );
-              },
-              !!config.execution.local,
-              async (applicationId) =>
-                fingerprint(
-                  await applicationSponsors.configuration(applicationId),
-                ),
-            )
-          : new TransferExecutionCoordinator(
-              actions,
-              database,
-              service,
-              config.execution,
-              config.execution.service
-                ? createRemoteExecutionProvider(
-                    config.execution,
-                    executionIdentity!,
-                  )
-                : createTransferExecutionProvider(
-                    config.execution,
-                    resolveSecret(config.execution.relayer!.apiKey),
-                    config.execution.local ? localExecutionFetch() : undefined,
-                  ),
-              observer!,
-              operations,
-              async (id): Promise<void> => {
-                await safeQueue?.included(id);
-              },
-            )
-        : undefined;
-    const safeQueue: SafeExecutionQueue | undefined =
-      config.execution?.safeQueue && execution && actions && observer
-        ? new SafeExecutionQueue(
-            actions,
-            database,
-            execution,
-            (binding, owner, principal) =>
-              observer.contractNonce(binding, owner, principal),
-            config.execution.safeQueue,
-            config.execution.pollIntervalSeconds,
-          )
-        : undefined;
     const currentConfiguration = () =>
       database.onboardingStore.transaction(
         (state) =>
@@ -547,50 +315,11 @@ export async function createConfiguredProvider(
           state.deploymentBindings?.['service-v1']?.transportRevision ===
             transportRevision,
       );
-    const safeProvisioning =
-      !safeWallet && config.safeProvisioning && config.execution
-        ? new SafeProvisioningService(
-            onboarding,
-            database,
-            config.safeProvisioning,
-            config.execution,
-            activeRevision,
-            createSafeDeploymentDriver(
-              config.execution,
-              resolveSecret(config.execution.relayer!.apiKey),
-              localExecutionFetch(),
-            ),
-            config.runtimeConfiguration?.credentialKey
-              ? []
-              : config.execution.rpc.endpoints.map((entry) =>
-                  resolveSecret(entry),
-                ),
-            config.network,
-            fetch,
-            config.runtimeConfiguration?.credentialKey
-              ? (context) =>
-                  runtimeConfiguration!.rpcEndpoints(
-                    runtimeApplicationId(
-                      context.principal.issuer,
-                      context.principal.clientId,
-                    ),
-                  )
-              : undefined,
-          )
-        : undefined;
     const app = await createServer({
       safeWallet,
-      safeProvisioning: applicationSafes ? undefined : safeProvisioning,
-      applicationSafes,
-      applicationSponsors,
       walletCalls: safeWallet
         ? new WalletCallsService(actions!, safeWallet.walletDriver())
-        : config.runtimeConfiguration?.authorizeContracts &&
-            actions &&
-            safeQueue &&
-            execution
-          ? new WalletCallsService(actions, safeQueue, execution)
-          : undefined,
+        : undefined,
       runtimeConfiguration,
       documentationTokens: config.apiExplorer
         ? {
@@ -611,10 +340,8 @@ export async function createConfiguredProvider(
         : undefined,
       authenticate,
       authorizationServer,
-      operationsHealth: operations ? () => operations.health() : undefined,
       configurationProfile: config.profile,
       actionProfiles: [
-        ...(config.financial ? [config.financial.profile] : []),
         ...(config.approvedCalls
           ? ['provider-approved-contracts-v1' as const]
           : []),
@@ -635,22 +362,9 @@ export async function createConfiguredProvider(
                 transportRevision,
           ),
         actions,
-        execution,
-        safeQueue,
-        rpcVerification: runtimeConfiguration?.rpcVerification,
-        executionIdentity,
-        contractNonce:
-          config.approvedCalls && observer
-            ? (binding, owner, principal) =>
-                observer.contractNonce(binding, owner, principal)
-            : undefined,
       },
       onClose: async () => {
         await safeWallet?.close();
-        await applicationSponsors?.funding.close();
-        await operations?.close();
-        await safeQueue?.close();
-        await execution?.close();
         database.close();
       },
       ready: async () =>
@@ -668,10 +382,6 @@ export async function createConfiguredProvider(
     });
     if (config.activation.enabled) {
       await safeWallet?.start();
-      applicationSponsors?.funding.start();
-      operations?.start();
-      execution?.start();
-      safeQueue?.start();
     }
     return app;
   } catch (error) {

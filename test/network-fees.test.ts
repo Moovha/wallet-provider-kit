@@ -155,13 +155,29 @@ it('pauses before signing when the accepted ceiling cannot cover the network min
     code: 'wallet_provider_unavailable',
     outcome: 'not_dispatched',
   });
-  await expect(
-    quoteNetworkFees(reader(), { ...limits, maxPriorityFeePerGas: '999999' }),
-  ).rejects.toMatchObject({ code: 'wallet_provider_unavailable' });
 });
 it('does not use malformed or negative RPC fee estimates', async () => {
   await expect(
     quoteNetworkFees(reader('0x1', '0x1', true), limits),
   ).rejects.toThrow();
   await expect(quoteNetworkFees(reader('-1'), limits)).rejects.toThrow();
+});
+
+it('bounds a recommended tip without treating it as a mandatory minimum', async () => {
+  expect(
+    await quoteNetworkFees(reader('0x4c4b40', '0x2faf080'), limits),
+  ).toMatchObject({
+    baseFeePerGas: '5000000',
+    maxFeePerGas: '20000000',
+    maxPriorityFeePerGas: '10000000',
+  });
+  await expect(
+    quoteNetworkFees(reader('0x4c4b40', '0x2faf080'), {
+      ...limits,
+      maxFeePerGas: '14999999',
+    }),
+  ).rejects.toMatchObject({
+    code: 'wallet_provider_unavailable',
+    outcome: 'not_dispatched',
+  });
 });

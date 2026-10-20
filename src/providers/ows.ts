@@ -148,13 +148,8 @@ export function createOwsSigningBackend(
         selected.name,
       );
       const secret = await credential();
-      const stored = await lookup(boundAccount.accountId);
-      if (
-        !stored ||
-        stored.account.address.toLowerCase() !==
-          boundAccount.address.toLowerCase()
-      )
-        throw new WalletProviderError('wallet_provider_input');
+      name(boundAccount.accountId);
+      checkVault();
       evmTypedDataPayload(boundAccount, boundAction, selected.name); // Recheck expiry after secret-store work.
       const { EIP712Domain: _domain, ...types } = boundAction.payload.types;
       // OWS 1.4.3 accepts full-width integer hex; its decimal parser is limited to u128.
@@ -184,11 +179,11 @@ export function createOwsSigningBackend(
         const result = (await owsCommand({
           command: 'sign',
           chainId: selected.caip,
-          walletId: stored.walletId,
+          walletName: name(boundAccount.accountId),
           payload: JSON.stringify(payload),
           secret,
           vaultPath,
-          address: stored.account.address,
+          address: getAddress(boundAccount.address),
         })) as { signature: string };
         signature = `0x${result.signature}`;
       } catch {
@@ -198,7 +193,7 @@ export function createOwsSigningBackend(
         if (
           !/^0x[0-9a-fA-F]{130}$/.test(signature) ||
           recoverAddress(boundAction.payload_hash, signature) !==
-            stored.account.address
+            getAddress(boundAccount.address)
         )
           throw new Error();
         return signature;

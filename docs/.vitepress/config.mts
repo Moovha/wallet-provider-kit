@@ -55,7 +55,8 @@ export default defineConfig({
         text: 'Get started',
         items: [
           { text: 'Open the setup wizard', link: '/docs/' },
-          { text: 'Safe-only wallets', link: '/docs/self-hosted-sponsorship' },
+          { text: 'Safe wallets', link: '/docs/self-hosted-sponsorship' },
+          { text: 'Execution latency', link: '/docs/execution-latency' },
           { text: 'Bundled profiles', link: '/docs/bundled-setup' },
           { text: '1. Provider', link: '/docs/setup-wizard#_1-provider' },
           { text: '2. Backend', link: '/docs/setup-wizard#_2-backend' },
@@ -100,7 +101,8 @@ export default defineConfig({
         items: [
           { text: 'What the kit does', link: '/' },
           { text: 'Open the setup wizard', link: '/docs/' },
-          { text: 'Safe-only wallets', link: '/docs/self-hosted-sponsorship' },
+          { text: 'Safe wallets', link: '/docs/self-hosted-sponsorship' },
+          { text: 'Execution latency', link: '/docs/execution-latency' },
           { text: 'Bundled profiles', link: '/docs/bundled-setup' },
           { text: 'Roles and terms', link: '/docs/concepts' },
         ],

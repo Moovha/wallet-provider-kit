@@ -29,9 +29,22 @@ async function run(): Promise<void> {
       createWallet(input.name, input.secret, 24, input.vaultPath);
       result = null;
       break;
-    case 'sign':
+    case 'sign': {
+      // Resolve the current vault binding in the same short-lived process as signing.
+      const matches = listWallets(input.vaultPath).filter(
+        (wallet) => wallet.name === input.walletName,
+      );
+      if (matches.length !== 1) throw new Error();
+      const accounts = matches[0].accounts.filter(
+        (account) => account.chainId === 'eip155:1',
+      );
+      if (
+        accounts.length !== 1 ||
+        accounts[0].address.toLowerCase() !== input.address.toLowerCase()
+      )
+        throw new Error();
       result = signTypedData(
-        input.walletId,
+        matches[0].id,
         input.chainId,
         input.payload,
         input.secret,
@@ -40,6 +53,7 @@ async function run(): Promise<void> {
         input.address,
       );
       break;
+    }
     default:
       throw new Error();
   }

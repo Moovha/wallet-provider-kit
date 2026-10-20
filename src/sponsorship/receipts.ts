@@ -457,6 +457,90 @@ export class UserOperationReceiptObserver {
       );
     return this.observeAt(plan, maximumCostWei, hint, this.readers);
   }
+  /** Exhaust the signed validity window at a stable finalized block; retain all reservations. */
+  private async expiryProof(
+    plan: UserOperationExecution,
+    validUntil: bigint,
+    finalized: bigint,
+    readers: RpcReader[],
+  ): Promise<UserOperationObservation | undefined> {
+    const tag = toQuantity(finalized);
+    const anchors = await Promise.all(
+      readers.map(async (reader) => {
+        const block = object(
+          await reader.call('eth_getBlockByNumber', [tag, false]),
+        );
+        if (quantity(block.number) !== finalized) unavailable();
+        return { hash: hash(block.hash), timestamp: quantity(block.timestamp) };
+      }),
+    );
+    if (
+      anchors.some(
+        (block) =>
+          block.hash !== anchors[0].hash ||
+          block.timestamp !== anchors[0].timestamp,
+      )
+    )
+      unavailable();
+    if (anchors[0].timestamp <= validUntil) return;
+    const from = BigInt(plan.scanFromBlock);
+    if (
+      finalized < from ||
+      finalized - from + 1n > 32n * BigInt(this.maxLogRange)
+    )
+      return;
+    for (
+      let start = from;
+      start <= finalized;
+      start += BigInt(this.maxLogRange)
+    ) {
+      const end = start + BigInt(this.maxLogRange) - 1n;
+      const results = await Promise.all(
+        readers.map((reader) =>
+          reader.call('eth_getLogs', [
+            {
+              address: this.acceptance.entryPoint.address,
+              fromBlock: toQuantity(start),
+              toBlock: toQuantity(end < finalized ? end : finalized),
+              topics: [
+                entryPointV07Interface.getEvent('UserOperationEvent')!
+                  .topicHash,
+                plan.userOperationHash,
+              ],
+            },
+          ]),
+        ),
+      );
+      if (results.some((logs) => !Array.isArray(logs))) unavailable();
+      // Any result must be reconciled as execution; it cannot be classified as absent.
+      if (results.some((logs) => (logs as unknown[]).length !== 0)) return;
+    }
+    const after = await Promise.all(
+      readers.map(async (reader) =>
+        object(await reader.call('eth_getBlockByNumber', [tag, false])),
+      ),
+    );
+    if (
+      after.some(
+        (block) =>
+          hash(block.hash) !== anchors[0].hash ||
+          quantity(block.number) !== finalized,
+      )
+    )
+      unavailable();
+    return {
+      state: 'expired',
+      expiry: {
+        validUntil: validUntil.toString(),
+        finalizedBlock: finalized.toString(),
+        blockHash: anchors[0].hash,
+        blockTimestamp: anchors[0].timestamp.toString(),
+      },
+      observedAt: new Date().toISOString(),
+      scanNextBlock: (finalized + 1n).toString(),
+    };
+  }
+
   private async observeAt(
     plan: UserOperationExecution,
     maximumCostWei: string,
@@ -465,11 +549,17 @@ export class UserOperationReceiptObserver {
     knownFirst = true,
   ): Promise<UserOperationObservation> {
     plan = structuredClone(plan);
+    // SafeOp signatures bind uint48 validAfter and validUntil before the owner signature.
+    const validUntil = BigInt('0x' + plan.operation.signature.slice(14, 26));
+    const expired =
+      validUntil !== 0n && validUntil * 1000n < BigInt(Date.now());
     const heads = await Promise.all(
         readers.map((r) =>
           this.heads(
             r,
-            !this.acceptance.aggregateReads || !!plan.observation.receipt,
+            expired ||
+              !this.acceptance.aggregateReads ||
+              !!plan.observation.receipt,
           ),
         ),
       ),
@@ -567,6 +657,15 @@ export class UserOperationReceiptObserver {
         observedAt: new Date().toISOString(),
         scanNextBlock: pending.scanNextBlock,
       };
+    }
+    if (expired && finalized > 0n && !plan.observation.receipt) {
+      const proof = await this.expiryProof(
+        plan,
+        validUntil,
+        finalized,
+        readers,
+      );
+      if (proof) return proof;
     }
     return pending;
   }

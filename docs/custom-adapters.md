@@ -1,5 +1,10 @@
 # Extend the configured service
 
+> Historical integration reference. New configured deployments use
+> [per-user Safe wallets, ERC-4337 bundling and application paymasters](self-hosted-sponsorship.md).
+> The legacy execution exports and separate executor CLI are unavailable in the
+> configured service. Retain existing journals and reconcile uncertain work before migration.
+
 Use a custom adapter when the built-in choices in
 [Backend](setup-wizard.md#_2-backend) cannot connect your wallet engine. The adapter
 replaces account creation and signing mechanics while the configured service

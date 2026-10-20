@@ -112,7 +112,7 @@ export async function createServer(options: ServerOptions = {}) {
         title: 'Moovha Wallet Provider Service',
         version: '0.1.0',
         description:
-          'Experimental wallet-provider API with application-led access and optional hosted compatibility. Signing returns an approved EIP-712 signature; it does not submit a transaction or pay gas. Optional approved-transfer execution coordinates signing, simulation and sponsored submission through a durable attempt; independent RPC checks verify transfer effects and finality. Application transaction-event reports remain unverified and do not establish settlement. General contract calls require a stored policy-approved action and the explicit Safe execution profile; no blind signing or direct arbitrary-submission endpoint is exposed. Optional bounded Safe request queues authorize delayed execution under fresh current authority; configurable sponsor pools retain one selected payer per execution. Not the Moovha operation orchestration API.',
+          'Experimental wallet-provider API. Configured deployments use one Safe account per user, private ERC-4337 v0.7 bundling and an application-owned verifying paymaster. Applications submit policy-approved calls through the account wallet endpoint and observe independently verified inclusion. Current owner, identity, consent, immutable calls and durable attempt authority precede effects. Acknowledgement, wallet inclusion and business settlement are distinct. Low-level signing and historical host interfaces are retained as reference contracts; they do not select another supported configured execution flow. Not the Moovha operation orchestration API.',
       },
       components: {
         securitySchemes: {

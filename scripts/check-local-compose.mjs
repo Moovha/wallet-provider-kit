@@ -1,12 +1,9 @@
 /** Verify bundled Compose with isolated offline fixtures; no wallet or provider effects. */
 import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { randomBytes } from 'node:crypto';
-import { prepareLocalExecution } from '../dist/deployment/local-execution.js';
 import { caddyConfiguration } from '../dist/deployment/https-ingress.js';
 import {
   localCompose,
@@ -14,7 +11,12 @@ import {
 } from '../dist/deployment/setup-executor.js';
 
 const execute = promisify(execFile);
-const directory = await mkdtemp(join(tmpdir(), 'wpk-compose-contract-'));
+// The fixture root must be writable and shared with the selected Docker daemon.
+const artifacts =
+  process.env.WPK_COMPOSE_CHECK_ROOT ??
+  fileURLToPath(new URL('../artifacts/', import.meta.url));
+await mkdir(artifacts, { recursive: true });
+const directory = await mkdtemp(join(artifacts, 'compose-contract-'));
 const project = `wpk-compose-check-${process.pid}`;
 const args = [
   'compose',
@@ -33,7 +35,7 @@ const docker = (extra, timeout = 180000) =>
 try {
   const config = JSON.parse(
     await readFile(
-      new URL('../docs/provider.config.bundled.example.json', import.meta.url),
+      new URL('../docs/provider.config.safe.example.json', import.meta.url),
       'utf8',
     ),
   );
@@ -57,23 +59,11 @@ try {
     setupEnvironment({ OFFLINE_COMPOSE_VALUE: fixture }),
     { mode: 0o600 },
   );
-  const prepared = prepareLocalExecution(config, {
-    LOCAL_EXECUTION_API_KEY: randomBytes(48).toString('base64url'),
-    LOCAL_EXECUTION_KEYSTORE_PASSPHRASE: randomBytes(48).toString('base64url'),
-    LOCAL_EXECUTION_STORAGE_KEY: randomBytes(32).toString('base64'),
+  await mkdir(join(directory, config.safeWallet.runtimeDirectory), {
+    recursive: true,
+    mode: 0o700,
   });
-  await mkdir(join(directory, '.local-execution'), { mode: 0o700 });
-  await mkdir(join(directory, '.execution-data'), { mode: 0o700 });
-  await writeFile(
-    join(directory, '.local-execution/config.json'),
-    JSON.stringify(prepared.relayer),
-    { mode: 0o600 },
-  );
-  await writeFile(
-    join(directory, 'execution.env'),
-    setupEnvironment(prepared.environment),
-    { mode: 0o600 },
-  );
+  await mkdir(join(directory, '.bundler-data'), { mode: 0o700 });
   const compose = localCompose(
     { directory, project, port: 18080, config },
     fileURLToPath(new URL('../', import.meta.url)),
@@ -82,7 +72,8 @@ try {
   compose.services.api.image = 'wallet-provider-kit:verify';
   delete compose.services.api.build;
   // Empty engine and isolated network prohibit provider effects in this check.
-  compose.networks.execution.internal = true;
+  compose.networks.default.internal = true;
+  compose.services['bundler-store'].logging = { driver: 'local' };
   await writeFile(join(directory, 'compose.json'), JSON.stringify(compose), {
     mode: 0o600,
   });
@@ -129,54 +120,45 @@ try {
     '--config',
     '/etc/caddy/provider.json',
   ]);
-  // Cold builds compile the pinned Rust provider; readiness keeps its shorter deadline.
-  await docker(['build', 'local-execution'], 30 * 60 * 1000);
+  await docker(['build', 'bundler'], 10 * 60 * 1000);
   await docker([
     'up',
     '--detach',
     '--wait',
     '--wait-timeout',
     '120',
-    'local-execution',
+    'bundler',
   ]);
   await docker([
     'exec',
     '-T',
-    'local-execution',
+    'bundler',
     'node',
-    '--input-type=module',
     '-e',
-    `
-    import { readFileSync } from 'node:fs';
-    import { parseEnv } from 'node:util';
-    const {API_KEY} = parseEnv(readFileSync('/secrets/execution.env', 'utf8'));
-    const r = await fetch('http://127.0.0.1:8080/api/v1/relayers', {headers:{authorization:'Bearer '+API_KEY}});
-    const data = await r.json();
-    if(!r.ok || !data.success || !Array.isArray(data.data) || data.data.length) process.exit(1);
-  `,
+    "fetch('http://127.0.0.1:3000/rpc/'+ 'a'.repeat(64)).then(r=>{if(r.status!==403)process.exit(1)}).catch(()=>process.exit(1))",
   ]);
   await docker([
     'exec',
     '-T',
-    'execution-store',
+    'bundler-store',
     'valkey-cli',
     'SET',
     'wpk-offline-retention',
     'retained',
   ]);
-  await docker(['restart', 'execution-store']);
+  await docker(['restart', 'bundler-store']);
   await docker([
     'up',
     '--detach',
     '--wait',
     '--wait-timeout',
     '120',
-    'local-execution',
+    'bundler',
   ]);
   const retained = await docker([
     'exec',
     '-T',
-    'execution-store',
+    'bundler-store',
     'valkey-cli',
     '--raw',
     'GET',
@@ -185,8 +167,14 @@ try {
   if (retained.stdout.trim() !== 'retained')
     throw new Error('Execution store did not retain the offline fixture');
   console.log(
-    'Compose parsing, unprivileged config validation, literal multiline secret loading, bundled OWS native import, Caddy configuration validation, and empty bundled Relayer/Valkey readiness with fixture retention across a store restart passed; no wallets, provider requests or certificate issuance.',
+    'Compose parsing, unprivileged config validation, literal multiline secret loading, bundled OWS native import, Caddy configuration validation, and empty bundled ERC-4337 gateway/Valkey readiness with fixture retention across a store restart passed; no wallets, provider requests or certificate issuance.',
   );
+} catch (error) {
+  const logs = await docker(['logs', '--no-color', 'bundler-store']).catch(
+    () => ({ stdout: '', stderr: '' }),
+  );
+  console.error(logs.stdout);
+  throw error;
 } finally {
   await docker(['down', '--remove-orphans']).catch(() => {});
   await rm(directory, { recursive: true, force: true });

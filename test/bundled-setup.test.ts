@@ -1,3 +1,4 @@
+import { configureSafeWalletRuntime } from '../src/deployment/application-defaults.js';
 import { readFile, mkdtemp, rm, lstat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -235,6 +236,11 @@ it('defaults to the bundled issuer and OWS, synchronizes registrations without r
 it('creates a private retained vault and generated secrets without returning secrets in plans, progress or command arguments', async () => {
   const root = await mkdtemp(join(tmpdir(), 'wpk-bundle-'));
   closers.push(() => rm(root, { recursive: true, force: true }));
+  const current = JSON.parse(
+    await readFile('docs/provider.config.safe.example.json', 'utf8'),
+  );
+  Object.assign(config, current);
+  configureSafeWalletRuntime(config);
   config.http = { ...config.http, ingress: 'caddy' };
   config.backend = {
     kind: 'ows',

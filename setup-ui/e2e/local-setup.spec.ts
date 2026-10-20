@@ -35,7 +35,7 @@ test('local setup reviews changes and secret privacy, shows progress, resumes th
         if (args.includes('version')) return '2.40.0';
         if (args.includes('info')) return 'linux';
         if (args.includes('build')) await build;
-        if (args.includes('ps')) return 'api';
+        if (args.includes('ps')) return 'api\nbundler\nbundler-store';
         return '';
       },
     },
@@ -45,7 +45,7 @@ test('local setup reviews changes and secret privacy, shows progress, resumes th
     await page.goto(`${url}/#${token}`);
     const file = join(directory, 'config.json');
     const config = await readFile(
-      new URL('../../docs/provider.config.example.json', import.meta.url),
+      new URL('../../docs/provider.config.safe.example.json', import.meta.url),
     );
     const { writeFile } = await import('node:fs/promises');
     await writeFile(file, config);
@@ -109,9 +109,7 @@ test('local setup reviews changes and secret privacy, shows progress, resumes th
       name: 'Start local setup',
       exact: true,
     });
-    await expect(start).toBeDisabled();
-    for (const field of await page.locator('.secret-value').all())
-      await field.fill('offline-browser-secret');
+    await expect(page.locator('.secret-value')).toHaveCount(0);
     await expect(start).toBeEnabled();
     await start.click();
     await expect(
@@ -163,12 +161,14 @@ test('local setup reviews changes and secret privacy, shows progress, resumes th
     expect(commands.at(-1)).toContain('stop');
     const setupPath = commands.find((args) => args.includes('--file'))!;
     const composeFile = setupPath[setupPath.indexOf('--file') + 1];
+    const retainedEnvironment = await readFile(
+      join(composeFile.slice(0, -'compose.json'.length), 'provider.env'),
+      'utf8',
+    );
+    expect(retainedEnvironment.includes('OWS_OWNER_PASSPHRASE=')).toBe(true);
     expect(
-      await readFile(
-        join(composeFile.slice(0, -'compose.json'.length), 'provider.env'),
-        'utf8',
-      ),
-    ).toContain('offline-browser-secret');
+      retainedEnvironment.includes('SAFE_WALLET_BUNDLER_AUTHORIZATION='),
+    ).toBe(true);
   } finally {
     resumeInstallation();
     release();
@@ -208,7 +208,10 @@ test('a failed runtime installation unlocks configuration and can be checked and
       name: 'provider.config.json',
       mimeType: 'application/json',
       buffer: await readFile(
-        new URL('../../docs/provider.config.example.json', import.meta.url),
+        new URL(
+          '../../docs/provider.config.safe.example.json',
+          import.meta.url,
+        ),
       ),
     });
     await expect(page.getByRole('status')).toContainText(

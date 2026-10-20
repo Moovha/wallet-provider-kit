@@ -1,5 +1,10 @@
 # Coordinate transfers and verify their status
 
+> Historical integration reference. New configured deployments use
+> [per-user Safe wallets, ERC-4337 bundling and application paymasters](self-hosted-sponsorship.md).
+> The legacy execution exports and separate executor CLI are unavailable in the
+> configured service. Retain existing journals and reconcile uncertain work before migration.
+
 Configure transfer execution in [Deployment](setup-wizard.md#_5-deployment) when
 your service should sign an approved transfer internally, submit it through an
 application-funded sponsor and verify its chain result. The application still

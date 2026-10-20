@@ -28,6 +28,31 @@ contract SafeStateReader {
         address entryPoint;
     }
 
+    struct Inspection {
+        Profile profile;
+        address[] targets;
+        bytes32[] hashes;
+        bool[] allowEmpty;
+    }
+
+    /// @notice Isolate each read: a rejected account never rejects another account's proof.
+    function inspect4337Batch(Inspection[] calldata items)
+        external view returns (bool[] memory valid, uint256[] memory nonces)
+    {
+        require(items.length > 0 && items.length <= 10, "batch count");
+        valid = new bool[](items.length);
+        nonces = new uint256[](items.length);
+        for (uint256 i; i < items.length; ++i) {
+            Inspection calldata item = items[i];
+            try this.inspect4337{gas: 2_000_000}(
+                item.profile, item.targets, item.hashes, item.allowEmpty
+            ) returns (uint256 nonce) {
+                valid[i] = true;
+                nonces[i] = nonce;
+            } catch {}
+        }
+    }
+
     function inspect4337(Profile calldata p, address[] calldata targets, bytes32[] calldata hashes, bool[] calldata allowEmpty)
         external view returns (uint256)
     {
