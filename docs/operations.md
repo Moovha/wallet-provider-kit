@@ -1,104 +1,109 @@
-# Run and monitor the service
+---
+prev: { 'text': 'Before welcoming users', 'link': '/docs/conformance' }
+next:
+  { 'text': 'Backups and maintenance', 'link': '/docs/provider-maintenance' }
+---
 
-Once [Export and acceptance](setup-wizard.md#_6-export) are complete, monitor the
-service and retain the evidence needed to investigate failures. This guide covers
-request traces, metrics and an optional local Grafana stack. Begin with the
-[deployment guide](operator-deployment.md) for service supervision and backups;
-telemetry supports operations while durable records preserve authority and
-attempt outcomes.
+# Keep an eye on your service
 
-You can send traces and metrics to your existing OpenTelemetry collector using
-OTLP/HTTP. For local development, the optional Grafana `otel-lgtm` image bundles
-a collector, metric and trace stores, and Grafana. You can explore the data in
-Grafana without a cloud subscription or a custom dashboard. Plan production
-availability and retention separately.
+Start with the administration overview. It shows whether management is available,
+which applications are connected and whether wallet operations are enabled. A new
+installation can be healthy with no applications and wallet operations disabled.
+See [health checks](provider-installation.md#interpret-health-correctly) for what
+each probe means.
 
-## Local Grafana
+## Decide who responds when something needs attention
 
-You'll need Docker Engine and Compose. Then run:
+Assign responsibility for unavailable services, expiring access, low network-fee
+balances and requests with uncertain outcomes. Keep private recovery records and
+original request IDs so the team can investigate without repeating effects.
+[Backups and maintenance](provider-maintenance.md) cover recovery planning.
 
-```sh
-cp .env.example .env
-# Edit .env locally and set a unique GRAFANA_ADMIN_PASSWORD.
-docker compose --env-file .env -f ops/compose.yaml up --build -d
-```
-
-Open Grafana at `http://127.0.0.1:3000`, user `admin`, using the password from your
-local file. Anonymous access and sign-up are disabled. Swagger is at
-`http://127.0.0.1:8080/docs/`. In Grafana Explore select the provisioned Prometheus
-source, find `http.server.requests` / `http.server.request.duration` (typically
-normalized with underscores), and filter `service_name="wallet-provider-kit"`.
-For traces select Tempo and search service `wallet-provider-kit`. Call
-`/v1/capabilities` or `/health/live` to produce signals. Metrics export every 15
-seconds. Default signing is unavailable; no wallet credentials are needed.
-
-All published ports bind loopback. The compose profile opts into insecure HTTP
-**only inside this development network**. The API is nonroot, drops capabilities,
-uses a read-only filesystem and a writable temporary mount. The all-in-one
-monitoring container needs writable internal storage. Its persistent volume can
-consume local disk: inspect usage and stop it when unused. Use
-`docker compose --env-file .env -f ops/compose.yaml down` to stop; adding `-v`
-deletes local observability history and is an explicit operator choice.
-
-For your deployment, test container startup, Grafana access, restart and volume
-behavior on a Docker host. CI's container build and local OTLP transport tests
-do not establish those runtime properties.
+Your developer should monitor RPC availability, finality lag, unknown dispatches,
+budget usage and integrity failures using the [verified wallet status](wallet-calls.md).
+A request accepted by the service is not yet a verified transaction. Background
+observation cannot clear an uncertain attempt without the required evidence.
 
 ## Use your existing monitoring
 
-For application reports of transaction submission, confirmation or failure, use
-the authenticated [transaction event API](http-api.md#report-transaction-submission-and-confirmation).
-These private, durable reports remain unverified and have no authority over
-signing, budgets or settlement. They are separate from request monitoring below.
+The service can send request traces and metrics to an OpenTelemetry collector.
+This helps find slow or failing requests; it does not replace transaction journals
+or establish permission to sign. Monitoring can drop data, so financial correctness
+must never depend on it.
 
-Set `OTEL_EXPORTER_OTLP_ENDPOINT` to a trusted HTTPS collector base URL; the SDK
-adds `/v1/traces` and `/v1/metrics`. Export is disabled when unset. Use a local
-sidecar/collector for authentication, tenant routing, TLS and retry/buffering; do
-not embed credentials in endpoint URLs. Do not use the development HTTP override
-in production. Do not set `NODE_TLS_REJECT_UNAUTHORIZED=0`.
+<details>
+<summary>Configure OpenTelemetry export</summary>
 
-Instrumented data is an allowlist: service name/version, registered route template,
-normalized method, status and duration. The kit does not auto-instrument request
-headers, queries, bodies, customer IDs, account addresses, signatures or process
-environment. Unmatched routes are labeled `unmatched`. Access-token contents and
-provider exceptions are not logged. Keep reverse-proxy and collector policies
-consistent; avoid adding request/body logging downstream. Traces are independent
-server spans, not an assertion of end-to-end parent context propagation.
+Set `OTEL_EXPORTER_OTLP_ENDPOINT` to a trusted HTTPS collector base URL. The SDK
+adds `/v1/traces` and `/v1/metrics`; export is disabled when unset. Use a local
+collector for authentication, tenant routing, TLS and buffering. Keep credentials
+out of endpoint URLs and do not disable TLS verification.
 
-Monitoring data can be dropped, so authorization and financial correctness must
-never depend on it. Export timeouts are bounded. Your host must keep business
-audit and attempt records separately, with access control, tamper evidence,
-retention and recovery rules. Grafana access must not grant signing permission.
+Exported fields are limited to service name/version, registered route template,
+normalised method, status and duration. Unmatched routes are `unmatched`. The kit
+does not automatically export request headers, queries, bodies, customer IDs,
+account addresses, signatures or process environment. Tokens and provider
+exceptions are not logged. Apply the same restrictions to proxies and collectors.
+Traces are independent server spans, not an end-to-end propagation guarantee.
 
-Terminate TLS at a trusted edge, restrict inbound clients, configure the IdP and
-current-grant policy, enforce deployment-specific timeouts/quotas and disable docs
-with `API_DOCUMENTATION=false` when appropriate. Fastify does not trust arbitrary
-forwarded client IP headers. The local in-process rate limiter is an abuse guard,
-not a distributed financial budget. Configure shared edge quotas for replicas;
-prove durable host admission independently.
+Export timeouts are bounded. SIGTERM drains HTTP and flushes telemetry within a
+bounded shutdown. Plan collector access, retention, capacity and egress costs for
+your workload. Keep business audit and attempt records separately with access,
+tamper-evidence and recovery controls.
 
-Readiness stays false until your integration supplies a service, authenticator
-and successful dependency check. Liveness tells you the process is running;
-it doesn't establish financial readiness. The default container lets you explore
-the API. Environment variables alone won't turn it into a production signer.
-SIGTERM drains HTTP and flushes telemetry within a bounded shutdown.
+</details>
 
-Plan collector retention, deployment capacity, vendor requests and egress for
-your own operating budget. Reuse existing observability capacity where suitable
-and measure costs under your expected workload.
+## Explore metrics locally
 
-[Official Grafana OTEL LGTM development image](https://github.com/grafana/docker-otel-lgtm)
-provides the local stack; operators own production authentication and retention.
+Developers can use the optional Grafana stack without a cloud subscription.
+It runs separately from the installation flow and needs Docker Engine and Compose.
 
-## Execution observation operations
+<details>
+<summary>Start and stop the development Grafana stack</summary>
 
-For configured transfer execution, use the [verified status and CloudEvents feed](user-operation-execution.md).
-Check RPC availability and independence, finality lag, unknown dispatches, retained
-budget usage and integrity failures. App-reported confirmation is unverified.
-Keep private RPC paths, sponsor credentials, signatures and action bodies out of
-logs. Background polling is read-only and cannot clear uncertain attempts.
+From the repository, copy the environment example and set a unique
+`GRAFANA_ADMIN_PASSWORD` privately before starting:
 
-Rehearse single-host recovery with external fencing and a SQLite-aware backup.
-Do not activate independent writable copies or infer that an attempt missing from
-a backup never dispatched. The [enterprise v1 gates](conformance.md) distinguish
-implemented contracts from deployment acceptance and future standards support.
+```sh
+cp .env.example .env
+docker compose --env-file .env -f ops/compose.yaml up --build -d
+```
+
+Open `http://127.0.0.1:3000` as `admin` with that password. Anonymous access and
+sign-up are disabled. The development API explorer is at
+`http://127.0.0.1:8080/docs/`. Call `/health/live` or `/v1/capabilities` to produce
+signals; default signing is unavailable and needs no wallet credentials.
+
+In Grafana Explore, choose Prometheus, find `http.server.requests` or
+`http.server.request.duration` (often normalised with underscores), and filter
+`service_name="wallet-provider-kit"`. Choose Tempo for traces of the same service.
+Metrics export every 15 seconds.
+
+All published ports bind loopback. Insecure HTTP is enabled only inside this
+development network. The API runs nonroot with dropped capabilities, a read-only
+filesystem and writable temporary storage. Monitoring has writable persistent
+storage; inspect its disk use and stop it when unused:
+
+```sh
+docker compose --env-file .env -f ops/compose.yaml down
+```
+
+Adding `-v` deletes observability history. Review that separately before doing it.
+Test startup, restart and storage on your Docker host; a CI image build alone does
+not establish those behaviours. The
+[Grafana development image](https://github.com/grafana/docker-otel-lgtm) bundles
+the collector and stores; production availability and retention need separate planning.
+
+</details>
+
+## Protect the operating environment
+
+Terminate TLS at a trusted edge, restrict access and set deployment-specific
+quotas and timeouts. Disable the API explorer when appropriate. The in-process
+rate limiter is an abuse guard, not a financial budget; forwarded client IPs are
+not trusted automatically. The supported runtime has one active writer, so
+independent writable replicas are not a scaling option.
+
+Rehearse recovery with the old writer stopped or fenced out. Missing evidence in
+a backup does not prove an operation never happened. Use [launch checks](conformance.md)
+to review the distinction between offline checks and deployment acceptance.

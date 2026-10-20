@@ -1,16 +1,15 @@
 # Register application API tokens with Auth0
 
-Your wallet API needs a trusted issuer that identifies each calling application.
-Use this recipe during [Services](setup-wizard.md#_3-services) if you choose Auth0
-as that issuer. Register the wallet API, register its calling applications, then
-copy the resulting values into Services and Policies. Users continue to sign in
-and consent within the connected application.
+Use this recipe only when your developer has chosen Auth0 as the token issuer
+for an advanced static deployment. A standard API-managed installation includes
+its own issuer; [adding an application](runtime-workspace.md) does not require Auth0.
 
-The recipe uses Auth0's RFC 9068 access-token profile and server-to-server client
-credentials. No Auth0 Action or custom token-mapping code is required. Verify your
-actual tenant's issued tokens before activation; dashboard settings alone do not
-establish compatibility. Staff token controls need an additional login registration,
-covered after the application setup below.
+For this integration, you will register the wallet API, register each calling
+application, then enter the values in [advanced setup](setup-wizard.md). Users
+continue to sign in and give permission inside the connected application.
+The recipe uses RFC 9068 access tokens and server-to-server client credentials.
+Check actual issued tokens before activation. Staff token controls need a separate
+optional login registration, described at the end.
 
 An Auth0 **tenant** is your isolated login configuration and user directory. Create
 a dedicated development tenant through the [Auth0 Dashboard](https://manage.auth0.com/)
@@ -37,8 +36,8 @@ The profile supplies `at+jwt`, `client_id` and `jti`; the default Auth0 profile 
 a different format and will fail the kit's validator. See
 [profile differences](https://auth0.com/docs/secure/tokens/access-tokens/access-token-profiles).
 
-In the API's **Permissions** tab, add the exact scope names in the
-[application scope table](operator-services.md#register-the-application-api-and-clients).
+In the API's **Permissions** tab, add the exact scope names required by your selected endpoints in the
+[HTTP reference](http-reference.md).
 Use descriptions meaningful to your administrators. These Auth0 API permissions
 become token scopes; the kit checks the space-separated `scope` claim, not a
 `permissions` array. See [Add API Permissions](https://auth0.com/docs/get-started/apis/add-api-permissions).
@@ -93,27 +92,27 @@ grant after its isolation test; update its GUI token settings to match.
 
 <span id="_5-copy-the-values-into-formkit"></span>
 
-## 3. Copy the values into FormKit
+## 3. Enter the connection settings
 
 For a tenant domain `your-tenant.us.auth0.com`, the mapping is:
 
-| Wizard field                       | Value                                                                |
-| ---------------------------------- | -------------------------------------------------------------------- |
-| Application token issuer           | Exact discovery issuer, normally `https://your-tenant.us.auth0.com/` |
-| Wallet API audience                | API **Identifier** from step 1, not Auth0's internal API ID          |
-| Token verification keys URL (JWKS) | `https://your-tenant.us.auth0.com/.well-known/jwks.json`             |
-| Application client ID in Policies  | Calling application's ID from step 2                                 |
+| Wizard field                          | Value                                                                |
+| ------------------------------------- | -------------------------------------------------------------------- |
+| Application token issuer              | Exact discovery issuer, normally `https://your-tenant.us.auth0.com/` |
+| Wallet API audience                   | API **Identifier** from step 1, not Auth0's internal API ID          |
+| Token verification keys URL (JWKS)    | `https://your-tenant.us.auth0.com/.well-known/jwks.json`             |
+| Application client ID in Applications | Calling application's ID from step 2                                 |
 
 If you enable staff token controls or hosted compatibility, also copy these
 values from the optional registrations below:
 
-| Optional wizard field                    | Value                                                     |
-| ---------------------------------------- | --------------------------------------------------------- |
-| Login service issuer URL                 | The same exact discovery issuer                           |
-| Wallet login client ID                   | Optional Regular Web Application Client ID                |
-| Wallet login client secret variable name | `PROVIDER_LOGIN_SECRET`                                   |
-| Login token signing algorithm            | `RS256`                                                   |
-| Hosted reviewer account ID (sub)         | Staff user `sub`/user_id; required only for hosted review |
+| Optional wizard field                      | Value                                                     |
+| ------------------------------------------ | --------------------------------------------------------- |
+| Login service issuer URL                   | The same exact discovery issuer                           |
+| Wallet login client ID                     | Optional Regular Web Application Client ID                |
+| Wallet login client secret (variable name) | `PROVIDER_LOGIN_SECRET`                                   |
+| Login token signing algorithm              | `RS256`                                                   |
+| Hosted reviewer account ID (sub)           | Staff user `sub`/user_id; required only for hosted review |
 
 Open `https://your-tenant.us.auth0.com/.well-known/openid-configuration` to confirm
 `issuer` and `jwks_uri`; these public metadata contain no client secrets. Auth0's
@@ -140,11 +139,14 @@ are configured, test their Auth0 callback and session boundaries separately.
 `doctor` does not remotely test Auth0. Token issuance alone does not establish user
 permission or production readiness.
 
-Return to [Services](setup-wizard.md#_3-services), then register these clients and
-their trust agreements in [Policies](setup-wizard.md#_4-policies).
+Return to [Services](setup-wizard.md#_3-services), then add the clients and their
+user-check agreements in [Applications](setup-wizard.md#_4-applications).
 <span id="_1-optional-staff-or-hosted-owner-login"></span>
 
 ## Optional staff or hosted owner login
+
+<details>
+<summary>Register the optional browser login and reviewer accounts</summary>
 
 In **Applications → Applications → Create Application**, create a **Regular Web
 Application**, named for example “Acme wallet owner login”. This is the wallet
@@ -188,6 +190,10 @@ In **User Management → Users**, create or locate each staff reviewer in the en
 connection. Auth0's [user creation guide](https://auth0.com/docs/manage-users/user-accounts/create-users)
 explains the dashboard flow. Copy the exact **user_id** from the user's profile
 (for example, `auth0|…`) as the reviewer login subject. Confirm it equals the `sub`
-from a verified login using this same tenant. Enter it under **Policies → Reviewer
-1 account ID (sub)**. An Auth0 Dashboard administrator is not automatically a wallet
+from a verified login using this same tenant. Enter it in the hosted-access reviewer allowlist in **Applications**. An Auth0 Dashboard administrator is not automatically a wallet
 reviewer; this explicit subject allowlist grants that role.
+
+</details>
+
+Continue with [application access](application-access.md) and test your selected
+issuer in isolation before enabling wallet use.

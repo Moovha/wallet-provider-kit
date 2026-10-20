@@ -1,4 +1,10 @@
-# Security boundaries
+# Understand how wallet access is protected
+
+A connected application must identify itself and have the person’s current
+permission. Your service checks those separately before allowing wallet effects.
+This reference is for developers and reviewers validating that protection.
+
+## Authority and recovery boundaries
 
 OAuth authenticates the application. Current owner identity, consent and grant authorize account access. Published immutable action policy and durable financial admission authorize spending. These responsibilities are checked separately; possession of a token or funded paymaster is insufficient.
 

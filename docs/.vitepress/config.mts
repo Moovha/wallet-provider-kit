@@ -57,30 +57,10 @@ export default defineConfig({
       alt: 'Moovha',
     },
     nav: [
-      {
-        text: 'Get started',
-        items: [
-          { text: 'Open the setup wizard', link: '/docs/' },
-          { text: 'Safe wallets', link: '/docs/self-hosted-sponsorship' },
-          { text: 'Service setup', link: '/docs/setup' },
-          {
-            text: 'Install and administer',
-            link: '/docs/provider-installation',
-          },
-          { text: 'Back up and maintain', link: '/docs/provider-maintenance' },
-          { text: 'Advanced configuration', link: '/docs/setup-wizard' },
-        ],
-      },
-      {
-        text: 'API',
-        items: [
-          { text: 'Application HTTP guide', link: '/docs/http-api' },
-          { text: 'Provider HTTP schemas', link: '/docs/http-reference' },
-          { text: 'Configuration reference', link: '/docs/setup' },
-          { text: 'TypeScript integration guide', link: '/docs/api' },
-          { text: 'TypeScript declarations', link: '/docs/api-reference' },
-        ],
-      },
+      { text: 'Get started', link: '/docs/' },
+      { text: 'Applications', link: '/docs/runtime-workspace' },
+      { text: 'Operations', link: '/docs/operations' },
+      { text: 'API reference', link: '/docs/http-api' },
       { text: 'Moovha', link: 'https://moovha.com/' },
     ],
     socialLinks: [
@@ -97,197 +77,240 @@ export default defineConfig({
       {
         text: 'Start here',
         items: [
-          { text: 'What the kit does', link: '/' },
-          { text: 'Open the setup wizard', link: '/docs/' },
-          { text: 'Safe wallets', link: '/docs/self-hosted-sponsorship' },
-          { text: 'Service setup', link: '/docs/setup' },
-          { text: 'Roles and terms', link: '/docs/concepts' },
+          {
+            text: 'Welcome',
+            link: '/docs/',
+          },
+          {
+            text: 'What the kit does',
+            link: '/',
+          },
+          {
+            text: 'People and services',
+            link: '/docs/concepts',
+          },
         ],
       },
       {
-        text: 'Install and administer',
+        text: 'Install your service',
         items: [
           {
-            text: '1. Choose where to run',
-            link: '/docs/provider-installation#choose-a-destination',
+            text: 'Choose, install and sign in',
+            link: '/docs/provider-installation',
           },
           {
-            text: '2. Review your setup',
-            link: '/docs/provider-installation#install-a-release-bundle',
-          },
-          {
-            text: '3. Start and sign in',
-            link: '/docs/provider-installation#claim-administrator-access',
-          },
-          {
-            text: 'Connect applications',
-            link: '/docs/provider-installation#connect-an-application-after-installation',
-          },
-          {
-            text: 'Automate administration',
-            link: '/docs/provider-installation#automate-provider-administration',
-          },
-          { text: 'Back up and maintain', link: '/docs/provider-maintenance' },
-          {
-            text: 'Design and acceptance record',
-            link: '/docs/provider-installation-design',
+            text: 'Run from source',
+            link: '/docs/local-setup',
           },
         ],
       },
       {
-        text: 'Advanced configuration',
+        text: 'Connect an application',
+        items: [
+          {
+            text: 'Add your first application',
+            link: '/docs/runtime-workspace',
+          },
+          {
+            text: 'User checks and permission',
+            link: '/docs/application-access',
+          },
+          {
+            text: 'Transactions and fee limits',
+            link: '/docs/application-obligations',
+          },
+          {
+            text: 'Application rules',
+            link: '/docs/runtime-configuration',
+          },
+          {
+            text: 'Service connections',
+            link: '/docs/operator-services',
+          },
+          {
+            text: 'Paying network fees',
+            link: '/docs/assets-and-gas',
+          },
+          {
+            text: 'Test the connection',
+            link: '/docs/staging-walkthrough',
+          },
+          {
+            text: 'Before welcoming users',
+            link: '/docs/conformance',
+          },
+        ],
+      },
+      {
+        text: 'Run your service',
         collapsed: true,
         items: [
           {
-            text: '1. Provider',
-            link: '/docs/setup-wizard#_1-provider',
-            collapsed: true,
-            items: [
-              {
-                text: 'Domain and privacy notice',
-                link: '/docs/operator-services',
-              },
-              {
-                text: 'Wallet control and responsibilities',
-                link: '/docs/architecture',
-              },
-              { text: 'Security boundaries', link: '/docs/security-model' },
-            ],
+            text: 'Monitoring',
+            link: '/docs/operations',
           },
           {
-            text: '2. Wallet storage',
-            link: '/docs/setup-wizard#_2-wallet-storage',
-            collapsed: true,
-            items: [
-              {
-                text: 'Prepare the OWS vault',
-                link: '/docs/ows-adapter',
-              },
-              { text: 'Open Wallet Standard', link: '/docs/ows-adapter' },
-            ],
+            text: 'Backups and maintenance',
+            link: '/docs/provider-maintenance',
           },
           {
-            text: '3. Services',
-            link: '/docs/setup-wizard#_3-services',
-            collapsed: true,
-            items: [
-              {
-                text: 'Application API tokens',
-                link: '/docs/operator-services',
-              },
-              { text: 'Auth0 registration recipe', link: '/docs/auth0-setup' },
-              {
-                text: 'Secret names and values',
-                link: '/docs/operator-services',
-              },
-            ],
-          },
-          {
-            text: '4. Applications',
-            link: '/docs/setup-wizard#_4-applications',
-            collapsed: true,
-            items: [
-              {
-                text: 'Application trust and access',
-                link: '/docs/application-access',
-              },
-              {
-                text: 'Safe call policy',
-                link: '/docs/approved-contract-calls',
-              },
-              {
-                text: 'Application management APIs',
-                link: '/docs/runtime-workspace',
-              },
-              {
-                text: 'Application obligations API',
-                link: '/docs/application-obligations',
-              },
-              {
-                text: 'Runtime policy API',
-                link: '/docs/runtime-configuration',
-              },
-            ],
-          },
-          {
-            text: '5. Deployment',
-            link: '/docs/setup-wizard#_5-deployment',
-            collapsed: true,
-            items: [
-              { text: 'Storage and recovery', link: '/docs/storage' },
-              {
-                text: 'Staff application token controls',
-                link: '/docs/operator-tokens',
-              },
-              { text: 'Assets and gas funding', link: '/docs/assets-and-gas' },
-              {
-                text: 'Call policies and adapters',
-                link: '/docs/approved-contract-calls',
-              },
-              { text: 'Standard wallet calls', link: '/docs/wallet-calls' },
-              {
-                text: 'Account abstraction helpers',
-                link: '/docs/account-abstraction-sponsorship',
-              },
-            ],
-          },
-          {
-            text: '6. Finish setup',
-            link: '/docs/setup-wizard#_6-finish-setup',
-            collapsed: true,
-            items: [
-              { text: 'Run locally with progress', link: '/docs/local-setup' },
-              {
-                text: 'Manual deployment and maintenance',
-                link: '/docs/operator-deployment',
-              },
-              {
-                text: 'Staging acceptance walkthrough',
-                link: '/docs/staging-walkthrough',
-              },
-              { text: 'Acceptance checklist', link: '/docs/conformance' },
-              { text: 'Monitoring and operations', link: '/docs/operations' },
-            ],
-          },
-        ],
-      },
-      {
-        text: 'API and configuration reference',
-        collapsed: true,
-        items: [
-          { text: 'HTTP integration guide', link: '/docs/http-api' },
-          { text: 'HTTP schemas', link: '/docs/http-reference' },
-          { text: 'Exported configuration', link: '/docs/setup' },
-          { text: 'TypeScript API guide', link: '/docs/api' },
-          { text: 'TypeScript declarations', link: '/docs/api-reference' },
-        ],
-      },
-      {
-        text: 'Integration interfaces',
-        collapsed: true,
-        items: [
-          { text: 'Package and imports', link: '/docs/package' },
-          { text: 'Embedded host authority', link: '/docs/provider-guide' },
-          {
-            text: 'Durable attempt interfaces',
+            text: 'Lost-response recovery',
             link: '/docs/durable-attempts',
           },
-          { text: 'OIDC enrollment', link: '/docs/enrollment' },
-          { text: 'Examples and fixtures', link: '/examples/' },
+          {
+            text: 'Provider responsibilities',
+            link: '/docs/provider-guide',
+          },
+          {
+            text: 'Security boundaries',
+            link: '/docs/security-model',
+          },
+          {
+            text: 'Deposits on another chain',
+            link: '/docs/safe-cross-chain-recovery',
+          },
         ],
       },
       {
-        text: 'Contribute',
+        text: 'Developer references',
         collapsed: true,
         items: [
-          { text: 'Contributor guide', link: '/CONTRIBUTING' },
-          { text: 'Public writing guide', link: '/docs/public-writing' },
-          { text: 'Report a vulnerability', link: '/SECURITY' },
-          { text: 'Governance', link: '/GOVERNANCE' },
-          { text: 'Code of conduct', link: '/CODE_OF_CONDUCT' },
-          { text: 'Branch workflow', link: '/docs/branch-workflow' },
-          { text: 'Release process', link: '/docs/releases' },
-          { text: 'Changelog', link: '/CHANGELOG' },
+          {
+            text: 'Application API guide',
+            link: '/docs/http-api',
+          },
+          {
+            text: 'HTTP schemas',
+            link: '/docs/http-reference',
+          },
+          {
+            text: 'Send and track transactions',
+            link: '/docs/wallet-calls',
+          },
+          {
+            text: 'Exact call restrictions',
+            link: '/docs/approved-contract-calls',
+          },
+          {
+            text: 'Architecture',
+            link: '/docs/architecture',
+          },
+          {
+            text: 'Transaction execution',
+            link: '/docs/user-operation-execution',
+          },
+          {
+            text: 'Signature boundaries',
+            link: '/docs/durable-safe-op-signing',
+          },
+          {
+            text: 'Fee-paying infrastructure',
+            link: '/docs/self-hosted-sponsorship',
+          },
+          {
+            text: 'Sponsorship contract',
+            link: '/docs/account-abstraction-sponsorship',
+          },
+          {
+            text: 'Signing-key storage',
+            link: '/docs/ows-adapter',
+          },
+          {
+            text: 'Persistent records',
+            link: '/docs/storage',
+          },
+          {
+            text: 'TypeScript integration',
+            link: '/docs/api',
+          },
+          {
+            text: 'Package imports',
+            link: '/docs/package',
+          },
+          {
+            text: 'TypeScript declarations',
+            link: '/docs/api-reference',
+          },
+          {
+            text: 'Examples and fixtures',
+            link: '/examples/',
+          },
+        ],
+      },
+      {
+        text: 'Optional integrations',
+        collapsed: true,
+        items: [
+          {
+            text: 'Advanced static setup',
+            link: '/docs/setup-wizard',
+          },
+          {
+            text: 'Configuration reference',
+            link: '/docs/setup',
+          },
+          {
+            text: 'Deploy a static configuration',
+            link: '/docs/operator-deployment',
+          },
+          {
+            text: 'External tokens with Auth0',
+            link: '/docs/auth0-setup',
+          },
+          {
+            text: 'Staff API token controls',
+            link: '/docs/operator-tokens',
+          },
+          {
+            text: 'Provider-hosted access',
+            link: '/docs/onboarding',
+          },
+          {
+            text: 'Custom OIDC enrollment',
+            link: '/docs/enrollment',
+          },
+        ],
+      },
+      {
+        text: 'Maintain the project',
+        collapsed: true,
+        items: [
+          {
+            text: 'Contributor guide',
+            link: '/CONTRIBUTING',
+          },
+          {
+            text: 'Writing for readers',
+            link: '/docs/public-writing',
+          },
+          {
+            text: 'Installation design rationale',
+            link: '/docs/provider-installation-design',
+          },
+          {
+            text: 'Branch workflow',
+            link: '/docs/branch-workflow',
+          },
+          {
+            text: 'Release process',
+            link: '/docs/releases',
+          },
+          {
+            text: 'Report a vulnerability',
+            link: '/SECURITY',
+          },
+          {
+            text: 'Governance',
+            link: '/GOVERNANCE',
+          },
+          {
+            text: 'Code of conduct',
+            link: '/CODE_OF_CONDUCT',
+          },
+          {
+            text: 'Changelog',
+            link: '/CHANGELOG',
+          },
         ],
       },
     ],

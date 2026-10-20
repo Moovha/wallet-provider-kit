@@ -1,5 +1,9 @@
 # Recover deposits on another EVM chain
 
+Use this guide with your developer and recovery operator if assets were sent on
+the wrong network. Begin with read-only inspection; recovery may require a
+separately authorised transaction and is not guaranteed.
+
 USDC sent to a Safe address remains on the network where the transfer occurred.
 A matching hexadecimal address does not establish ownership on another chain.
 The toolkit provides deployment recipes and read-only recovery inspection for
@@ -23,11 +27,16 @@ the recorded Safe address. Missing original evidence or a legacy two-step
 initializer requires separate operator investigation; the method fails closed.
 Do not substitute a new owner or current configuration for missing historical data.
 
+<details>
+<summary>Why the deployment recipe matters</summary>
+
 Safe uses CREATE2 for `createProxyWithNonce`. Its address depends on the factory,
 singleton, proxy creation code, initializer and salt, without a chain ID. Matching
 addresses require the same inputs and compatible dependencies at the same
 addresses on each network. Creating a new signer on another network produces a
 different initializer and generally a different Safe address.
+
+</details>
 
 ## Inspect before deploying
 

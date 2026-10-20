@@ -1,8 +1,8 @@
-# Enroll a user before creating their wallet
+# Add custom identity enrollment
 
 Use OIDC enrollment when embedding the toolkit in a host that must establish its
 own user acceptance before account creation. It is an advanced alternative to
-the access contract configured in [Policies](setup-wizard.md#_4-policies).
+the standard [application-led access flow](application-access.md).
 The standard service accepts identity and consent evidence from trusted
 applications; enrollment does not add a second sign-in to that journey.
 
@@ -68,7 +68,7 @@ limit and a 32 KiB compact-token limit; other mutations keep their 1 KiB limit.
 use a new provider-authorized enrollment, resolving the same customer/account
 where appropriate. No automatic background retries or issuer callbacks are added.
 
-## Compose it
+## Compose it in your host
 
 ```ts
 import {
@@ -102,7 +102,8 @@ journal's `authorizeAttempt` must recheck enrollment/consent alongside other
 current policy immediately before effects and on replay; an earlier check is not
 a durable permission to dispatch.
 
-## Identity profile and limits
+<details>
+<summary>Exact identity-token profile and limits</summary>
 
 - Explicit HTTPS issuer/JWKS and RP client configuration; no token-controlled
   discovery, key URLs, document URLs or evidence fetching.
@@ -135,6 +136,8 @@ The upstream standard supports more shapes; these restrictions are intentional.
 It specifies technical identity evidence, not permission to rely on another
 entity's KYC. Your provider must establish its applicable reliance and consent
 arrangements and remain able to request additional verification.
+
+</details>
 
 ## Durable host contract
 
@@ -171,7 +174,7 @@ token/challenge later expires; this does not bypass current provisioning policy.
 Once accepted, wallet creation uses the existing durable wallet journal, with
 read-only reconciliation for an uncertain provider response.
 
-## Evidence before enabling it
+## Test before enabling enrollment
 
 Offline tests use real ephemeral JWT signatures and a test-only transactional
 model. They cover subject/caller/nonce isolation, invalid proofs and claim sets,

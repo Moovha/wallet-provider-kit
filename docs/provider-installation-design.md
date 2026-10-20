@@ -1,9 +1,9 @@
 # Provider installation and administration design
 
-This design is for maintainers implementing deployment and administration, and
-operators evaluating the intended lifecycle. It distinguishes implemented
-contracts from acceptance criteria that still require implementation and evidence.
-The provider has no deployed installations requiring compatibility migration.
+This reference is for maintainers reviewing installation and management changes.
+Operators can follow [installation](provider-installation.md) without reading it.
+It records design rationale, authority contracts and the limits of available
+acceptance evidence. It is not a setup checklist.
 
 ## Objective
 
@@ -125,168 +125,61 @@ contain minimal information; protected diagnostics explain blocked capabilities.
   independently qualified capabilities. Do not present them as delivered merely
   because configuration examples exist.
 
-## Bottom-up implementation and evidence
+## Verify changes from storage to interface
 
-After each layer, reread the objective, authority contracts and this checklist.
-Record code references, focused verification, remaining limits and the next layer.
-Do not mark a layer complete from mocked UI behavior alone.
-
-| Layer | Deliverable and acceptance                                                                                                            | Status                                                              |
-| ----- | ------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| 0     | Research, scope, security boundaries and implementation record retained here.                                                         | Recorded                                                            |
-| 1     | Verified storage contract; durable management identities, atomic claim and application records with offline tests.                    | Implemented; offline storage and claim tests pass                   |
-| 2     | Current-state authentication, provider-only registration/rotation/suspension and runtime trust; existing financial denials preserved. | Implemented; current authority and isolation checks pass            |
-| 3     | Protected management API, distinct management health and actionable diagnostics; generated contracts agree.                           | Implemented; generated contracts reviewed                           |
-| 4     | Zero-application installation defaults, retained secret delivery and restart-safe deployment lifecycle.                               | Implemented; retained and interrupted setup tested                  |
-| 5     | Short destination/review/deploy flow and persistent console backed by real management APIs.                                           | Implemented; 15 browser scenarios pass                              |
-| 6     | Versioned inspectable Compose/release packaging, existing-server path and one qualified cloud template.                               | Release tooling and AWS template prepared; live acceptance separate |
-| 7     | Backup/restore/upgrade guidance and implemented operations with explicit financial uncertainty limits.                                | Backup and recovery tools; reviewed manual upgrade contract         |
-| 8     | End-to-end offline acceptance, generated references, public documentation, required checks and reviewed PR.                           | Local implementation verified; integration tracked in PR 73         |
+Review each layer against the authority contracts before proceeding upward:
+persistence and atomic claim; current-state authentication; protected management
+APIs; retained installation lifecycle; console and setup; release packaging;
+backup/recovery; then end-to-end acceptance. Keep failing cases and unresolved
+limits visible. A mocked interface alone cannot establish a layer’s correctness.
 
 ### Acceptance scenarios
 
-- Install without applications, RPC credentials, sponsorship or external SSO.
-- Claim once; reject expired/wrong/replayed claims and concurrent second claim.
-- Restart with the same installation identity; reject a reopened bootstrap.
-- Authenticate a dedicated provider identity and create bounded automation access.
-- Register an application through API and console without restarting the service.
-- Require separate trust configuration; untrusted registration cannot attest users.
-- Rotate credentials and suspend an application; existing obsolete access fails.
-- Reject ordinary application access to provider management operations.
-- Publish application configuration without resetting other applications' grants.
-- Explain unavailable execution without marking management unavailable.
-- Resume interrupted installation without replacing secrets or durable records.
+- Install with zero applications, RPC credentials, sponsorship or external SSO.
+- Claim once; reject expired, incorrect, replayed and concurrent claims.
+- Restart without reopening claim or changing installation identity.
+- Keep provider administrators, management tools and applications separate.
+- Add, pause and replace application secrets without restarting the service.
+- Require a separate user-check agreement and current owner consent.
+- Invalidate obsolete credentials and deny cross-application management/access.
+- Publish one application’s rules without resetting another’s approvals.
+- Report available management separately from disabled wallet execution.
+- Resume interrupted installation without replacing retained secrets or records.
 - Reject unsuitable hosts before starting deployment mutations.
-- Preserve pending/unknown attempts during restart and maintenance.
-- Verify packaging and documentation using offline fixtures; report Docker/cloud
-  acceptance separately and never infer certification from fixtures.
+- Preserve pending and unknown operations through maintenance.
 
-### Evidence checkpoints
+### Evidence and limits
 
-Layer 0: repository branch synchronized with main before edits. The current
-toolkit schema is version 2 and includes transactional JSON onboarding records.
-The current issuer and onboarding policy use static startup application lists;
-these must be replaced by current durable authority before the simplified UI can
-be considered functional. No compatibility migration is required by the intended
-deployment scope.
+| Evidence                                                  | What it establishes                                                                                                                                                    | What remains separate                                               |
+| --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| Offline management/storage tests                          | Claim races, expiry, replay, durable registration, authority isolation and restart behaviour                                                                           | Container, cloud and custody acceptance                             |
+| Browser fixtures                                          | Console claim, sign-in, connection settings, pause, replacement, sign-out and narrow-screen layout                                                                     | Live identity-service compatibility and financial effects           |
+| CI checks                                                 | Source contracts, generated references, package consumption, image builds and Compose structure                                                                        | Deployed service recovery and funded acceptance                     |
+| Clean source-built local deployment at revision `756caa0` | Fresh ARM64 VM, empty storage, claim once, API application registration, secret-once replay, token isolation and restart persistence; wallet execution stayed disabled | Published installer, public HTTPS, AWS and funded wallet operations |
+| AWS template structural checks                            | Template shape and retained-storage configuration                                                                                                                      | Live cloud acceptance, costs and performance sizing                 |
 
-Layer 1–3 checkpoint: `src/management/service.ts` uses the existing
-`onboarding_records` schema through the transactional store and a bounded
-management collection. Claim hashes, salted credential verifiers, revisions and
-idempotency metadata persist without raw authentication credentials in management
-records. Generated installation secrets remain in private retained files.
-`test/provider-management.test.ts` covers claim races, expiration, restart,
-registration replay, trust separation, grant revocation, rotation, suspension,
-HTTP scope denial and management availability while execution is disabled.
-The focused management, application-access, issuer and runtime-policy suites pass
-66 tests. This is offline evidence; no container or cloud acceptance is implied.
-The next layer connects zero-application defaults to installation and packages
-the same service for operator deployment.
+[PR 73](https://github.com/Moovha/wallet-provider-kit/pull/73) retains implementation
+verification and [PR 74](https://github.com/Moovha/wallet-provider-kit/pull/74)
+records clean local acceptance. Evidence from fixtures does not establish
+production custody readiness or provider certification. Release tooling exists
+independently of release publication; verify available artifacts before installation.
 
-Layer 4–5 checkpoint: `src/deployment/installation.ts` builds zero-application
-defaults and a private resumable preparation record. Exact retained-file matching
-prevents replacement of generated credentials. Immutable Compose removes build
-requirements from release installation. The default setup interface has three
-stages; the advanced editor remains explicit. Browser scenarios exercise the real
-management API through an offline transactional fixture, including claim, login,
-registration, trust, suspension, logout and narrow-screen layout. The complete
-browser suite passes 15 scenarios.
+## Keep the reader’s journey intact
 
-Layer 6–7 checkpoint: `packaging/install.sh`, `backup.sh` and the AWS template
-use the same retained deployment files. The manual main-only release workflow
-prepares pinned amd64/arm64 images, SBOM/provenance, attested archives and
-experimental artifacts. It has not been dispatched. The existing-server installer
-reuses a local Docker runtime; it does not install a package manager. Recovery
-commands are host-only and cannot reopen a claimed installation. Upgrade and
-restore remain reviewed host operations with financial uncertainty preserved.
-Cloud qualification, performance sizing, offline bundles and external SSO remain
-separate acceptance or future capabilities.
+The ordinary journey is installation, administrator access, application connection,
+application agreements, testing and operation. Ask for application settings when
+that application connects. Explain the operator’s decision before introducing
+configuration or protocol terms. Keep exact API fields in developer references.
 
-Verification checkpoint: the supported Node 24.22.0/npm 11.11.1 toolchain passes
-all 671 tests, including the managed-issuer DEBUG denial, generated contracts,
-formatting and the secret scan. The documentation builds, npm audit reports zero
-vulnerabilities and npm pack dry-run succeeds. Independent CI also passes the
-complete suite, 15 browser scenarios, isolated package consumption, Docker build
-and Compose checks. These checks do not establish cloud or custody acceptance.
+Use **Add application**, **connection details**, **Replace secret**, **Pause connection**
+and **management tool** in operator guidance. Explain the user-check agreement
+and what people still need to approve. Registration is not consent; an agreement
+reference is not verified identity. Changed trust/permissions and pauses revoke
+related approvals, while secret replacement preserves approvals and invalidates
+old credentials. Renaming affects display metadata. Existing admitted operations
+keep their original financial checks and identities.
 
-Earlier local package and Docker attempts were blocked by insufficient storage
-and container metadata input/output errors. They are not recorded as passing.
-The clean local deployment acceptance below uses a separate healthy VM and new
-deployment records; it does not reset or reuse an existing provider installation.
-
-Delivery review: [pull request 73](https://github.com/Moovha/wallet-provider-kit/pull/73)
-retains the audience/purpose review, exact runner results and publication status.
-Its required checks include isolated package consumption and Docker acceptance.
-The three-stage installation navigation is the default; six static configuration
-screens are grouped under Advanced configuration.
-
-Release distribution checkpoint: GHCR initially creates private packages. The
-release workflow labels image source ownership and checks anonymous manifest access
-for both digests before publishing an installer, so public operators are not
-unexpectedly required to supply registry credentials. Maintainers configure public
-package visibility once. [GitHub documents this registry behavior](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry).
-
-Authority/usability review: display-name changes preserve credentials and grants.
-Credential rotation invalidates old credentials/tokens while preserving current
-owner consent. Scope changes invalidate obsolete tokens. Suspension, identity
-trust changes and permitted-owner-action changes revoke related grants and deny
-old requests. Re-saving identical authority settings does not withdraw consent.
-Admitted operations retain their financial authority checks and durable attempt
-identities; rotating a token cannot undo an external effect.
-
-Managed authentication retains the bundled issuer's DEBUG logging prohibition,
-with an offline startup denial check before issuer secrets are read.
-
-Console lifecycle check: protected responses arriving after sign-out are discarded,
-including one-time credentials from an operation already committed by the API.
-The console instructs a newly authenticated operator to inspect that operation
-before retrying; it does not redisplay a late secret or replay the mutation.
-
-### Clean local deployment acceptance
-
-A fresh ARM64 Linux VM with two CPUs and 3 GiB memory built the API and bundler
-from main revision `756caa0`. The source setup executor created a new private
-deployment directory, generated installation secrets and initialized empty
-storage. No prior application registrations or database records were reused.
-
-Real HTTP requests verified management and liveness health at 200, disabled
-wallet readiness at 503, unauthenticated inventory denial, single-use claiming,
-administrator token issuance and an initially empty application inventory.
-Protected API registration returned a new application credential once. Repeating
-the same idempotent creation returned the same registration without its secret.
-The application obtained its permitted token and was denied provider management.
-Restarting the API preserved installation identity, administrator login,
-application registration and credential validity. Claiming remained closed and
-wallet execution remained disabled.
-
-Desktop and narrow-screen review covered destination selection, deployment
-review, deployment preparation, administrator sign-in, status, applications,
-access and sign-out. The review shortened deployment instructions, separated
-adjacent review actions and corrected the stopped-service confirmation.
-Browser checks found no script errors or horizontal overflow.
-
-This evidence covers a clean source-built local deployment. It does not exercise
-a published release installer, public HTTPS, AWS resources or funded wallet
-operations. Credentials and deployment records remain private; review images
-exclude credentials and obscure synthetic client identifiers.
-
-### Interface language review
-
-The interface addresses people setting up a wallet service without assuming they
-have read the technical guides. The default journey is **Choose where to run →
-Review your setup → Start and sign in**. Advanced settings retain exact technical
-names where needed, with a plain explanation of what to enter and why.
-
-The review covers installation, all six advanced setup steps, field guidance,
-application connection, first-time administration, sign-in, overview, management
-tools, owner consent and access management, staff review and API testing tools.
-Applications receive connection details, with an ID and a secret shown once.
-User-check agreements explain whose checks are accepted; they do not imply that
-saving a reference verifies identity. Permissions explain what a person can
-approve, rather than implying automatic wallet access. Replacing a secret and
-pausing a connection explain their distinct effects on tokens and wallet approvals.
-
-Friendly headings and short introductions lead with the person's task. API field
-names, authentication rules, consent terms and financial limits retain their
-technical meaning. The [public writing guide](public-writing.md#help-people-feel-at-home-in-the-interface)
-records the terminology and review rules for future screens.
+Put optional technical detail behind a clear summary or in a linked reference.
+Do not hide costs, irreversible consequences, uncertain outcomes or required
+permission checks. The [public writing guide](public-writing.md) describes the
+editorial review for both documentation and interface changes.

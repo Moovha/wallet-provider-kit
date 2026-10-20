@@ -1,6 +1,12 @@
-# Safe UserOperation execution
+# Follow a transaction through execution
 
-The configured service composes `Safe4337SigningService`, `UserOperationExecutionCoordinator`, `UserOperationWalletCallsDriver` and `WalletCallsService(actions, driver)`. There is one mandatory driver and one immutable execution mechanism.
+A saved request, submission to the chain and a verified result are different
+stages. Use [wallet status](wallet-calls.md) in your application. This reference
+helps developers investigate how the provider prepares, signs and verifies it.
+
+## Execution and reconciliation contract
+
+The configured service composes `Safe4337SigningService`, `UserOperationExecutionCoordinator`, `UserOperationWalletCallsDriver` and `WalletCallsService(actions, driver)`. Together they retain and execute the exact approved operation; retries cannot substitute another payload or account.
 
 Accepted deployments use Safe 1.4.1, Safe4337Module 0.3.0 and EntryPoint v0.7 on the configured Base or Base Sepolia domain. Verify the owner, threshold, module, handler, guard, nonce and runtime/code pins against canonical chain state. Offline fixtures do not establish deployment acceptance.
 

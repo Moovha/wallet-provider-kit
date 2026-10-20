@@ -1,93 +1,69 @@
-# Application-led wallet access
+---
+prev: { 'text': 'Connect an application', 'link': '/docs/runtime-workspace' }
+next:
+  {
+    'text': 'Transactions and fee limits',
+    'link': '/docs/application-obligations',
+  }
+---
 
-Your service needs to know which application may act for which user, and on what
-terms. Configure that trust in [Policies](setup-wizard.md#_4-policies): users sign
-in, complete identity checks and consent within the connected application. Your
-service evaluates its evidence and stores a limited, revocable grant. This guide
-connects those settings to the requests your application developer implements,
-from policy discovery through provisioning and withdrawal.
+# Help people connect their wallets
 
-The provider explicitly trusts each application's identity and consent attestations
-under a reviewed agreement. An OAuth token authenticates the calling application;
-it does not establish a user's identity or spending permission by itself. Required
-fields alone are not proof of KYC. The application must perform the checks represented
-by its attestation, retain supporting records and communicate withdrawals promptly.
-The toolkit checks the asserted level, dates, fields, policy revisions and authority;
-it does not independently contact an identity vendor in this flow.
+People sign in, complete user checks and give wallet permission inside the
+connected application. They do not need a second provider login in the standard
+flow. Your service checks the application’s evidence and saves a limited approval.
 
-```mermaid
-sequenceDiagram
-    participant User
-    participant Application
-    participant Provider
-    participant Backend
-    User->>Application: Sign in, complete identity checks and consent
-    Application->>Provider: Read current access policy
-    Application->>Provider: Request access with user identity and consent assertion
-    Provider->>Provider: Check application trust, evidence, user binding and policy
-    Provider-->>Application: Limited, revocable grant
-    Application->>Provider: Provision wallet using current grant
-    Provider->>Backend: Journaled account creation
-    Backend-->>Provider: Wallet address
-    Provider-->>Application: Permitted result
-```
+This page is for you and the developer implementing that experience. Start with
+[adding the application](runtime-workspace.md) if it does not yet have connection details.
 
-## Configure the trust policy
+## Agree the user checks first
 
-Use the wizard's **Policies → Access flow → Application-led access (standard)**.
-Set the required identity level and field names. In **Policies**, register each
-application's exact issuer/client ID, allowed permissions and reviewed identity
-and consent trust-agreement reference. Configure maximum identity age and access
-duration. The [standard example](provider.config.safe.example.json) uses `verified`,
-requires `country`, accepts identity evidence for at most 90 days and caps access
-at seven days. These are example requirements to review for your product.
+Record a reviewed agreement for the application’s identity checks and consent.
+Choose its permitted owner actions in **Applications**. The application must
+perform the checks it reports, retain supporting records and communicate withdrawals
+promptly. The toolkit validates submitted evidence; it does not contact an identity
+vendor to repeat these checks.
 
-The configuration uses:
+Review your service’s required verification level, identity field names, maximum
+age of checks and maximum access duration. These are policy requirements, not
+facts established by registering an application. The example configuration uses
+`verified`, requires `country`, allows evidence up to 90 days old and caps access
+at seven days. Choose requirements appropriate to your product.
 
-- `policy.access.mode: "application"`.
-- `policy.identity.application.verificationLevel` and `requiredFields`.
-- `policy.applications[].assertionTrust.agreement` for every registered application.
+<details>
+<summary>Policy settings for a developer maintaining configuration</summary>
 
-The GUI supports these built-in policy controls:
+The standard flow uses `policy.access.mode: "application"`,
+`policy.identity.application.verificationLevel` and `requiredFields`. The advanced
+[Applications screen](setup-wizard.md#_4-applications) exposes the shared identity
+and access limits. Static registrations use
+`policy.applications[].assertionTrust.agreement`; API-managed registrations use
+the application’s identity/consent agreement instead. Do not combine registration
+authorities in one deployment.
 
-| Wizard setting                                  | Scope and effect                                                                                                                                                                               |
-| ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Policies → Required identity level              | All applications must attest this exact agreed level. The provider does not rank levels or perform the underlying verification itself.                                                         |
-| Policies → Required identity fields             | All applications must submit nonempty values for these names. This checks presence, not country eligibility or other allowed-value rules.                                                      |
-| Policies → Maximum age of identity checks       | A shared limit of 1–365 days from the asserted verification time. Expired evidence cannot support access.                                                                                      |
-| Policies → Maximum access duration              | A shared limit of 1–365 days. Consent expiry must fit that period; identity expiry can shorten a grant further.                                                                                |
-| Policies → Connected applications               | Each exact issuer/client ID has its own reviewed trust-agreement reference, allowed permissions and enabled switch. Disabling an application denies its current access.                        |
-| Policies → Configure delegated transfer signing | Optional shared token, recipient allowlist, per-transfer and lifetime limits, and signature validity. Applications still need transfer permission and the user's consent to these exact terms. |
-| Policies → Policy version                       | Your label for a reviewed policy. The service also derives a revision from policy content; keeping the label does not preserve grants when rules change.                                       |
+Verification levels must match the agreed value exactly. Nonempty required fields
+check presence, not country eligibility or arbitrary risk rules. The built-in
+age and access controls accept 1–365 days. More complex acceptance rules require
+a reviewed [host integration](provider-guide.md). Changing policy invalidates old
+grants; applications must read the current terms and obtain fresh consent.
 
-These controls are configuration, not a general-purpose policy editor. Per-country
-eligibility, risk scoring, arbitrary conditions and separate identity-age rules
-per application require an advanced host integration. See the
-[host authority guide](provider-guide.md). Required field names and a trust-agreement
-reference do not implement or prove an application's KYC process.
+</details>
 
-Validate and export the configuration, then deploy it and restart the service to
-apply the rules. The wizard does not update a running server. Policy changes
-invalidate existing grants; applications must read `GET /v1/access-policy`,
-present the current terms and obtain consent before requesting fresh access.
+## Build the permission experience
 
-No `ownerLogin`, reviewers, identity-vendor credentials or vendor funding agreement
-is needed. Optional API token controls require a separate **staff** login configuration;
-that sign-in is not part of the user's wallet-access flow. Backend credentials,
-private storage, HTTPS and deployment acceptance remain required.
+1. Read `GET /v1/access-policy` using an application token with `wallet:access:read`.
+2. Show the person the requested actions, current terms and access duration.
+   Record their permission before sending an access request.
+3. Submit their stable private user reference, identity evidence and consent to
+   `POST /v1/access-requests` with `wallet:access` and a new UUIDv4 `Idempotency-Key`.
+4. Save the returned request, account and grant IDs. A granted response contains
+   permissions and expiry; the standard flow returns no provider consent URL.
 
-## Request access
+An application token identifies the application. It cannot establish who the
+person is or grant permission to use their wallet by itself.
 
-Authenticate with the application's short-lived RFC 9068 API token. First call
-`GET /v1/access-policy` with `wallet:access:read`. The response supplies `flow`,
-`policy_revision`, `verification_level`, `required_fields`, `max_identity_age_days`
-and `max_access_days`. It reports `provider_login_required: false` and
-`provider_review_required: false`. `owner_consent_required: true` means the application
-must already have the user's consent; it does not request a provider browser step.
-
-Obtain and record the user's permission in your application for the requested actions
-and current provider terms. Then call `POST /v1/access-requests` with `wallet:access`
-and a new UUIDv4 `Idempotency-Key`:
+<details>
+<summary>Request example and evidence rules</summary>
 
 ```json
 {
@@ -116,64 +92,59 @@ and a new UUIDv4 `Idempotency-Key`:
 }
 ```
 
-These are fictional values. Replace the revision with the returned policy revision,
-the timestamps with actual UTC records, and every reference with your own record.
-The identity field names must match the policy; omit other personal data. Neither
-verification nor consent may be dated in the future. Identity evidence must remain
-within the allowed age. Consent must be current and its expiry no later than its
-grant time plus `max_access_days`. The resulting grant expires at the earliest
-identity, consent or provider access limit.
+These are fictional values. Use the returned policy revision, actual UTC records
+and your own evidence references. Include only required identity fields. Neither
+identity verification nor consent may be dated in the future. Consent expiry must
+fit `max_access_days`; identity age must fit `max_identity_age_days`. The grant
+expires at the earliest identity, consent or provider limit.
 
-If policy passes, the response contains `status: "granted"`, `request_id`,
-`account_id`, `grant_id`, permissions and expiry. It contains no `consent_url`.
-Malformed evidence is rejected with 422; untrusted, stale or conflicting authority
-is denied with 403. A reused idempotency key with different input returns 409.
-Save the receipt and original key. Read the request with
-`GET /v1/access-requests/{requestId}` and `wallet:access:read`.
+The policy response also reports `verification_level`, `required_fields`,
+`provider_login_required: false`, `provider_review_required: false` and
+`owner_consent_required: true`. The last value means consent must already have
+been captured by the application.
 
-## User and wallet binding
+Malformed evidence returns 422; untrusted, stale or conflicting authority returns 403. Reusing a key with different input returns 409. Inspect the saved request
+with `GET /v1/access-requests/{requestId}` and `wallet:access:read`.
 
-The provider namespaces the stable user ID by application issuer and client ID.
-It never treats a machine-token subject as the user, and never merges users by
-name, email, document number or an application's claim about another client.
-Repeated create requests for the same application user resolve to one account;
-wallet creation is a separate journaled operation.
+</details>
 
-`mode: "connect"` requires `account_id` belonging to that same application-scoped
-user. A second application using the same user ID does not gain access to the
-first application's wallet. Cross-application wallet linking and migration require
-a separately verified ownership integration; the standard flow does not implement it.
-Identity evidence references cannot be reassigned to another user within the same
-application. Suspended accounts cannot be reactivated by another access request.
+## Keep each person’s account separate
 
-## Create and use the wallet
+Use a stable private user ID. The provider scopes it to the application’s issuer
+and client ID: matching names, emails or IDs in two applications never link wallets.
+Repeated create requests for the same application user resolve to one account.
+Creating the on-chain wallet is a separate step.
 
-Call `POST /v1/accounts/{accountId}/provision` with `wallet:provision`, an empty
-JSON body and an idempotency key. Read details through
-`GET /v1/accounts/{accountId}` with `wallet:account:read`. The same authenticated
-issuer, client and caller must hold the current grant. The provider rechecks
-policy, owner binding, identity age and revocation before wallet effects and
-before returning a saved operation result. Preserve original attempt identities
-when investigating timeouts; do not repeat an uncertain mutation with a new key.
+`mode: "connect"` requires an `account_id` belonging to that same application-scoped
+user. Cross-application linking requires a separately verified ownership integration.
+Evidence references cannot be reassigned to another person, and a suspended account
+cannot be reactivated by sending a new access request.
 
-Safe calls require current `contracts:request` consent bound to `action_policy_revision`. Use the [wallet API](wallet-calls.md) for approved batches.
+## Create the wallet and request transactions
 
-## Withdrawal, renewal and recovery
+With a current approval, call `POST /v1/accounts/{accountId}/provision` using
+`wallet:provision`, an empty JSON body and an idempotency key. Read the result with
+`GET /v1/accounts/{accountId}` and `wallet:account:read`. Keep the original key if a
+response is lost; a new key must not be used to bypass an uncertain attempt.
 
-Your application must provide the user's access-management controls. On withdrawal,
-call `POST /v1/access-grants/{grantId}/revoke` with `wallet:access`, the same caller,
-an empty body and an idempotency key. Repeating revocation is safe. Grants superseded by another request are distinct from withdrawn consent. Revoking a grant also revokes any superseding grant based on that same consent record. Revocation
-blocks current access and future signing; signatures already issued can remain
-usable until their on-chain expiry. It does not erase the account or journal.
+Transaction access additionally requires `contracts:request` consent for the exact
+`action_policy_revision`. Show the permitted calls and limits before obtaining
+that consent, then use the [wallet API](wallet-calls.md). The provider rechecks
+current owner, identity, consent, policy and grant before effects and saved results.
 
-Renew through a new access request with current identity evidence, a new consent
-reference and a consent grant time after the recorded withdrawal. Old consent cannot restore revoked
-access. Replaying the original access request cannot create a fresh grant and may be denied once its evidence expires. Use the request-status endpoint to inspect the saved outcome.
-Disable an application in provider policy to deny all of its current access.
-Changing policy invalidates previous grants; users must consent to the new terms
-in the application before requesting new access.
+## Let people change their minds
 
-Keep stable application and user identifiers, backend bindings, storage and attempt
-records across restarts. A changed application identity is not an automatic account
-migration. Restore and reconcile using the [deployment guide](operator-deployment.md)
-and [durable attempt guide](durable-attempts.md).
+Provide a clear way to withdraw access in the application. Call
+`POST /v1/access-grants/{grantId}/revoke` using `wallet:access`, the same caller,
+an empty body and an idempotency key. Repeating revocation is safe. It blocks
+future access and signing, including superseding grants based on the same consent.
+Already-issued signatures can remain usable until their on-chain expiry.
+
+To reconnect, obtain new consent with a new reference and a grant time after the
+withdrawal, then request access again. Old consent and replayed requests cannot
+restore revoked access. A policy change also requires fresh consent to its terms.
+Use request-status reads to investigate the earlier outcome.
+
+Keep application/user IDs, vault bindings and recovery records across restarts.
+Changing the application identity is not an account migration. Next,
+[test the connection](staging-walkthrough.md), including withdrawal and retry cases.

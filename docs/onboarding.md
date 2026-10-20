@@ -1,24 +1,18 @@
 # Provider-hosted access (compatibility)
 
-Use this guide for an existing deployment that explicitly needs provider-hosted
-login, consent pages and staff identity review. Select that compatibility mode in
-[Policies](setup-wizard.md#_4-policies); omitted mode in legacy configurations also
-retains it. The usual wallet setup keeps identity and consent in the connected
-application, as described in the [access contract](application-access.md).
-Do not switch an occupied store between these ownership models without a reviewed migration.
+Use this optional reference only if you are building a provider-hosted login,
+consent and staff-review experience. In the standard journey, people stay in the
+[connected application](application-access.md); you can skip this page.
 
-For this compatibility deployment, [configure the service](setup.md) with hosted access explicitly selected.
-The programmatic onboarding-only profile below remains available for advanced
-composition and deliberately denies signing; the configured service can add the
-provider-authorized transfer profile with explicit onboarding delegation.
+This integration is experimental and single-host. Your developer must explicitly
+select hosted access in [advanced Applications](setup-wizard.md#_4-applications).
+Omitted access mode in legacy configurations also selects hosted access. An active
+store needs a reviewed ownership migration before changing modes.
 
-Give users one clear path to open a wallet, share identity evidence and choose
-which applications can use their account. Your provider keeps acceptance,
-authorization, signing and recovery under its control.
-
-This is an experimental single-host reference integration. It has offline
-conformance evidence; real vendor accounts, identity-service setup and backend
-recovery still need acceptance testing before you enable it.
+The onboarding-only composition handles identity and access but denies signing.
+Transaction integration must preserve the [provider authority contract](provider-guide.md)
+and use the supported Safe wallet-call flow. Real identity-service connections,
+vendor terms and backend recovery need acceptance before enabling use.
 
 ## Applications, clients and owner login
 
@@ -58,7 +52,7 @@ Registering an application client doesn't register or approve a user. See
    file store's private persistent directory, and configure your wallet backend.
    Keep `ready()` false until its unfunded lifecycle and recovery checks pass.
 
-## Defaults you can understand
+## Review the default access rules
 
 | Rule               | Default                                                                                                                          |
 | ------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
@@ -150,8 +144,7 @@ is granted. No name, document, evidence reference or login subject is returned.
 Safe calls require current `contracts:request` consent bound to `action_policy_revision`. Use the [wallet API](wallet-calls.md) for approved batches.
 
 `operations:request` means an application may ask the financial host to prepare
-an operation. It is never unrestricted signing permission. The ready-made
-profile denies `/v1/actions/{id}/sign`. A financial integration must supply the
+an operation. It is never unrestricted signing permission. A financial integration must supply the
 exact stored action, approvals, limits and dispatch-time checks described in the
 [provider guide](provider-guide.md).
 
@@ -161,7 +154,10 @@ Request states explain the next step: `consent_required`, `verification_required
 or `policy_changed`. Policy changes and expiry require a new request. Receipts
 are identifiers and decisions, not bearer credentials or OAuth tokens.
 
-## Identity reuse and cost
+## Arrange identity-check costs
+
+<details>
+<summary>Vendor evidence and pricing contract</summary>
 
 **Didit:** recipient-bound Share Session import uses `trust_review:false` and your
 configured workflow. Provider review reads the recipient session with its own
@@ -198,6 +194,8 @@ billing cap. Recipient credentials can cause vendor charges to the provider;
 the requester's agreement covers reimbursement. Your commercial arrangement
 must cover that distinction. Review vendor-side workflow and price changes
 before enabling them; the kit cannot discover an undeclared vendor charge.
+
+</details>
 
 ## Storage and recovery
 
@@ -248,8 +246,9 @@ separately configured OAuth resource-server audience.
 
 The access-detail vocabulary follows
 [OAuth Rich Authorization Requests](https://www.rfc-editor.org/rfc/rfc9396.html).
-The request routes and wallet detail type are toolkit-specific; this package does
-not implement an OAuth authorization server or the complete RAR protocol.
+The request routes and wallet detail type are toolkit-specific; this access profile does
+not implement the complete RAR protocol. The standard managed provider has a
+separate bundled application-token issuer.
 Identity reuse and hosted flows use the supported recipient-vendor interfaces:
 [Didit import](https://docs.didit.me/sessions-api/share-session/import),
 [Didit session](https://docs.didit.me/sessions-api/retrieve-session),
@@ -260,3 +259,6 @@ Check vendor compatibility and agreed terms before activation.
 The [OIDC Identity Assurance enrollment](enrollment.md) guide covers the alternative
 lower-level profile. Choose one profile per server; neither identity evidence nor
 access consent replaces financial-action authority.
+
+After composing this flow, rehearse [access, revocation and recovery](staging-walkthrough.md)
+with the additional hosted login and review steps.

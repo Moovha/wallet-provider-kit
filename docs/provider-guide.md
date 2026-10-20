@@ -1,4 +1,10 @@
-# Provider responsibilities
+# Understand your provider responsibilities
+
+Running the service means looking after wallet keys, user permissions and recovery.
+Use this page with the developer or security reviewer responsible for those controls.
+For the installation steps, start with [the installation guide](provider-installation.md).
+
+## Wallet control and recovery
 
 Each user owns a distinct Safe account bound to their current application and owner identity. The provider verifies identity, consent, grant, action policy, immutable calls and current chain authority before signing. The private OWS account signs SafeOps; applications receive batch identifiers and verified outcomes through the wallet API.
 
