@@ -16,10 +16,15 @@ provider account creation or database DDL in routine tests. Database-backed
 adapters require verified current schema evidence before implementation. Do not
 log request bodies, signatures, raw URLs, authorization headers or identifiers.
 
-Run npm run verify, npm run build, npm audit and npm pack --dry-run before delivery.
-Generated contracts must match npm run generate:spec. Review generated diffs;
-never label the orchestration reference as implemented or claim provider
-certification from mocks. Docker/live-provider checks must be reported separately.
+For application, configuration, tooling, package or dependency changes, run
+npm run verify, npm run build, npm audit and npm pack --dry-run before delivery.
+For documentation/presentation-only changes, run npm run check:docs,
+npm run docs:build, npm run format:check and the secret scan; inspect affected
+links and rendered pages. Do not rerun application, browser, package or container
+suites for docs-only work. CI uses the corresponding scoped verification path.
+Generated contracts must match npm run generate:spec when their sources change.
+Review generated diffs and never claim provider certification from mocks.
+Docker/live-provider checks must be reported separately.
 
 Use codex/toolkit for the owner's ongoing work. Fetch and merge origin/main before
 starting changes; preserve unrelated work and never force-push. Push this branch

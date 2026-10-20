@@ -19,7 +19,8 @@ See [SECURITY.md](SECURITY.md) for private vulnerability reports.
 
 ## Development
 
-Use the Node/npm versions in [README.md](README.md):
+Use the Node/npm versions in [README.md](README.md). For application, configuration,
+tooling, package or dependency changes:
 
 ```sh
 npm ci
@@ -29,6 +30,20 @@ npm run check:package
 npm audit
 npm pack --dry-run
 ```
+
+For documentation or presentation changes, use focused checks instead:
+
+```sh
+npm run check:docs
+npm run docs:build
+npm run format:check
+npm run check:secrets
+```
+
+Inspect affected links and rendered pages. Docs-only changes do not require the
+application, browser, package or container suites. CI selects the documentation
+path for prose, presentation assets and CI wiring; application source, tooling,
+package and provider-configuration changes retain release verification.
 
 Write readable TypeScript with explicit validation and failure paths. Run
 `npm run format`; after schema changes, run `npm run generate:spec` and review
