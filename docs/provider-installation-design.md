@@ -243,3 +243,8 @@ identities; rotating a token cannot undo an external effect.
 
 Managed authentication retains the bundled issuer's DEBUG logging prohibition,
 with an offline startup denial check before issuer secrets are read.
+
+Console lifecycle check: protected responses arriving after sign-out are discarded,
+including one-time credentials from an operation already committed by the API.
+The console instructs a newly authenticated operator to inspect that operation
+before retrying; it does not redisplay a late secret or replay the mutation.

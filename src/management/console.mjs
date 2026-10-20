@@ -1,10 +1,12 @@
 let token = '',
-  expiresAt = 0;
+  expiresAt = 0,
+  generation = 0;
 const el = (id) => document.getElementById(id);
 function message(value) {
   el('message').textContent = value;
 }
 async function api(path, method = 'GET', data, authorized = true) {
+  const started = generation;
   const headers = { 'content-type': 'application/json' };
   if (authorized) {
     if (!token || Date.now() >= expiresAt) {
@@ -37,9 +39,15 @@ async function api(path, method = 'GET', data, authorized = true) {
         'The request failed. Refresh status before retrying.',
     );
   }
-  return response.json();
+  const result = await response.json();
+  if (authorized && started !== generation)
+    throw new Error(
+      'The session ended before the response arrived. Sign in and inspect the operation before retrying.',
+    );
+  return result;
 }
 function logout() {
+  generation++;
   el('login').hidden = false;
   el('claim').hidden = true;
   el('show-login').setAttribute('aria-pressed', 'true');

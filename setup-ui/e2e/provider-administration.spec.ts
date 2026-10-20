@@ -122,10 +122,39 @@ test('claims, registers and manages applications through the real protected mana
       await page.evaluate(() => localStorage.length + sessionStorage.length),
     ).toBe(0);
     expect(errors).toEqual([]);
+    let releaseResponse!: () => void, operationCreated!: () => void;
+    const responseGate = new Promise<void>((resolve) => {
+      releaseResponse = resolve;
+    });
+    const created = new Promise<void>((resolve) => {
+      operationCreated = resolve;
+    });
+    await page.route('**/v1/provider/identities', async (route) => {
+      if (route.request().method() !== 'POST') return route.continue();
+      const response = await route.fetch();
+      operationCreated();
+      await responseGate;
+      await route.fulfill({ response });
+    });
+    await page.getByRole('button', { name: 'Access', exact: true }).click();
+    await page.getByLabel('Automation name').fill('Delayed offline automation');
+    await page
+      .getByRole('button', { name: 'Create automation identity', exact: true })
+      .click();
+    await created;
+    const arriving = page.waitForResponse(
+      (response) =>
+        response.url().endsWith('/v1/provider/identities') &&
+        response.request().method() === 'POST',
+    );
     await page.getByRole('button', { name: 'Sign out', exact: true }).click();
     await expect(
       page.getByRole('heading', { name: 'Sign in', exact: true }),
     ).toBeVisible();
+    releaseResponse();
+    await arriving;
+    await expect(page.getByRole('status')).toContainText('The session ended');
+    await expect(page.locator('#credential-value')).toHaveText('');
   } finally {
     await app.close();
     if (previous === undefined) delete process.env.WALLET_OAUTH_SIGNING_KEY;

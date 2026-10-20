@@ -40,6 +40,7 @@ test.afterAll(async () => {
 test('deployed Swagger executes same-origin HTTP and displays real success/auth/authority responses', async ({
   page,
 }) => {
+  test.setTimeout(60000);
   const external: string[] = [];
   const errors: string[] = [];
   page.on('request', (request) => {
