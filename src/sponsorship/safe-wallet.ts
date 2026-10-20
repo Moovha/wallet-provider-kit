@@ -1,3 +1,7 @@
+import {
+  atomicSafeInitializer,
+  safeModuleSetup,
+} from '../provisioning/atomic-safe.js';
 import { moduleSetupAction, moduleSetupCallData } from './account-setup.js';
 import { bindRpcTransport } from '../execution/rpc-capacity.js';
 import { createWalletAttemptRequest } from '../providers/attempt-lifecycle.js';
@@ -90,6 +94,7 @@ export interface SafeWalletAccount {
   signer: EmbeddedAccount;
   binding: SafeAccountBinding;
   status: 'prepared' | 'ready';
+  initialization?: { profile: 'atomic-4337-v1'; initializer: string };
 }
 interface SetupTransaction {
   id: string;
@@ -103,6 +108,7 @@ interface SetupTransaction {
   raw?: ApplicationCredential;
   maximumCostWei: string;
   included?: boolean;
+  settled?: boolean;
 }
 export interface SafeWalletInfrastructure {
   applicationId: string;
@@ -317,7 +323,7 @@ export class SafeWalletRuntime {
             'endpoint-failover',
           );
           const [chain, fees] = await Promise.all([
-            reader.call('eth_chainId', []),
+            reader.feed('eth_chainId', []),
             quoteNetworkFees(reader, sponsorshipGas(agreement)),
             reader.verifyGenesis(
               this.config.safeWallet!.genesisHash,
@@ -539,7 +545,6 @@ export class SafeWalletRuntime {
     if (retained && retained.requestHash !== requestHash) deny();
     if (!retained) {
       const agreement = await this.agreement(applicationId);
-      const fees = await this.networkFees(applicationId);
       const wallet = new Wallet(this.cipher.open(infra.fundingKey));
       if (wallet.address.toLowerCase() !== infra.fundingAddress.toLowerCase())
         deny();
@@ -549,16 +554,13 @@ export class SafeWalletRuntime {
         data: transaction.data ?? '0x',
         value: toQuantity(BigInt(transaction.value)),
       };
-      const gas =
-        (BigInt(
-          String(
-            await this.infrastructureRpc(applicationId, 'eth_estimateGas', [
-              base,
-            ]),
-          ),
-        ) *
-          12n) /
-        10n;
+      const [fees, estimate, balance, pendingNonce] = await Promise.all([
+        this.networkFees(applicationId),
+        this.infrastructureRpc(applicationId, 'eth_estimateGas', [base]),
+        reader.call('eth_getBalance', [wallet.address, 'pending']),
+        reader.call('eth_getTransactionCount', [wallet.address, 'pending']),
+      ]);
+      const gas = (BigInt(String(estimate)) * 12n) / 10n;
       const reserved =
         gas * BigInt(fees.maxFeePerGas) +
         BigInt(transaction.value) +
@@ -572,24 +574,9 @@ export class SafeWalletRuntime {
         BigInt(this.config.safeWallet!.maximumSetupCostWei)
       )
         deny();
-      if (
-        BigInt(
-          String(
-            await reader.call('eth_getBalance', [wallet.address, 'pending']),
-          ),
-        ) < reserved
-      )
+      if (BigInt(String(balance)) < reserved)
         throw new WalletProviderError('wallet_provider_unavailable');
-      const nonce = Number(
-        BigInt(
-          String(
-            await reader.call('eth_getTransactionCount', [
-              wallet.address,
-              'pending',
-            ]),
-          ),
-        ),
-      );
+      const nonce = Number(BigInt(String(pendingNonce)));
       if (infra.transactions.some((t) => !t.included)) throw pending();
       const unsigned = {
         ...transaction,
@@ -668,6 +655,7 @@ export class SafeWalletRuntime {
     });
     const claim = await this.database.journal.claim(saved.request);
     if (claim.state === 'conflict') deny();
+    let newlySigned = false;
     if (!saved.raw || !saved.hash) {
       if (claim.state !== 'dispatch') throw pending();
       await beforeEffect?.();
@@ -679,6 +667,7 @@ export class SafeWalletRuntime {
       const raw = await wallet.signTransaction(unsigned);
       saved.hash = keccak256(raw);
       saved.raw = this.seal(applicationId, 'setup-' + purpose, raw);
+      newlySigned = true;
       await this.transaction((r) => {
         const current =
           r.safeWalletInfrastructure![applicationId].transactions.find(
@@ -695,33 +684,18 @@ export class SafeWalletRuntime {
     }
     if (keccak256(this.cipher.open(saved.raw)) !== saved.hash) deny();
     for (let attempt = 0; attempt < 60; attempt++) {
-      const receipt = (await reader.call('eth_getTransactionReceipt', [
-        saved.hash,
-      ])) as { status: string; blockNumber: string; blockHash: string } | null;
-      if (receipt) {
-        const block = (await reader.call('eth_getBlockByNumber', [
-          receipt.blockNumber,
-          false,
-        ])) as { hash: string };
-        if (receipt.status !== '0x1') deny();
-        if (block?.hash !== receipt.blockHash) {
-          await new Promise((resolve) => setTimeout(resolve, 500));
-          continue;
+      if (attempt > 0 || !newlySigned) {
+        try {
+          if (await this.observeSetup(applicationId, saved, reader, claim))
+            return saved;
+        } catch (error) {
+          if (
+            !(error instanceof WalletProviderError) ||
+            error.code !== 'wallet_provider_unavailable'
+          )
+            throw error;
+          // Observation failures retain the exact signed payload and its reservation.
         }
-        await this.transaction((r) => {
-          const t = r.safeWalletInfrastructure![
-            applicationId
-          ].transactions.find((t) => t.purpose === purpose)!;
-          if (t.hash !== saved.hash) deny();
-          t.included = true;
-        });
-        if (claim.state === 'dispatch')
-          await this.database.journal.complete(
-            saved.request,
-            claim.leaseToken,
-            { kind: 'infrastructure_transaction', transactionId: saved.id },
-          );
-        return saved;
       }
       if (attempt === 0) {
         await this.agreement(applicationId);
@@ -741,7 +715,124 @@ export class SafeWalletRuntime {
     }
     throw pending();
   }
+  private async observeSetup(
+    applicationId: string,
+    saved: SetupTransaction,
+    reader: RpcReader,
+    claim?: import('../domain/attempt-journal.js').WalletAttemptClaim,
+  ): Promise<boolean> {
+    if (!saved.hash || !saved.raw) return false;
+    if (keccak256(this.cipher.open(saved.raw)) !== saved.hash) deny();
+    const receipt = (await reader.call('eth_getTransactionReceipt', [
+      saved.hash,
+    ])) as { status: string; blockNumber: string; blockHash: string } | null;
+    if (!receipt) return false;
+    if (receipt.status !== '0x1') deny();
+    const block = (await reader.call('eth_getBlockByNumber', [
+      receipt.blockNumber,
+      false,
+    ])) as { hash: string } | null;
+    if (!block || block.hash !== receipt.blockHash) return false;
+    const currentClaim =
+      claim ?? (await this.database.journal.read(saved.request));
+    const result = {
+      kind: 'infrastructure_transaction' as const,
+      transactionId: saved.id,
+    };
+    let settled = false;
+    if (
+      currentClaim?.state === 'dispatch' &&
+      Date.parse(currentClaim.leaseExpiresAt) > Date.now()
+    ) {
+      await this.database.journal.complete(
+        saved.request,
+        currentClaim.leaseToken,
+        result,
+      );
+      settled = true;
+    } else if (
+      currentClaim?.state === 'unknown' ||
+      (currentClaim?.state === 'dispatch' &&
+        Date.parse(currentClaim.leaseExpiresAt) <= Date.now())
+    ) {
+      await this.database.reconcileAttempt(
+        saved.request,
+        result,
+        saved.hash,
+        async (request, value, evidence) =>
+          fingerprint(request) === fingerprint(saved.request) &&
+          value.kind === 'infrastructure_transaction' &&
+          value.transactionId === saved.id &&
+          evidence === saved.hash &&
+          receipt.status === '0x1' &&
+          block.hash === receipt.blockHash,
+      );
+      settled = true;
+    } else if (currentClaim?.state === 'succeeded') {
+      if (fingerprint(currentClaim.result) !== fingerprint(result)) deny();
+      settled = true;
+    } else if (currentClaim?.state !== 'pending') deny();
+    await this.transaction((r) => {
+      const retained =
+        r.safeWalletInfrastructure![applicationId].transactions.find(
+          (t) => t.id === saved.id,
+        ) ?? deny();
+      if (
+        retained.hash !== saved.hash ||
+        retained.request.requestHash !== saved.request.requestHash
+      )
+        deny();
+      retained.included = true;
+      if (settled) retained.settled = true;
+    });
+    return true;
+  }
+
+  /** Observe other accounts without acquiring their signing authority or rebroadcasting. */
+  private async recoverSetup(applicationId: string) {
+    const infra = await this.current(applicationId);
+    const reader = await this.reader(applicationId);
+    for (const saved of infra.transactions.filter(
+      (t) => !t.settled && t.hash,
+    )) {
+      // Completed historical records may predate the current journal protocol.
+      if (saved.request.kind !== 'infrastructure_transaction') {
+        if (!saved.included) throw pending();
+        continue;
+      }
+      const claim = await this.database.journal.read(saved.request);
+      if (claim?.state === 'succeeded' && saved.included) {
+        if (
+          claim.result.kind !== 'infrastructure_transaction' ||
+          claim.result.transactionId !== saved.id
+        )
+          deny();
+        await this.transaction((r) => {
+          r.safeWalletInfrastructure![applicationId].transactions.find(
+            (t) => t.id === saved.id,
+          )!.settled = true;
+        });
+        continue;
+      }
+      try {
+        await this.observeSetup(
+          applicationId,
+          saved,
+          reader,
+          claim ?? undefined,
+        );
+      } catch (error) {
+        if (
+          !(error instanceof WalletProviderError) ||
+          error.code !== 'wallet_provider_unavailable'
+        )
+          throw error;
+      }
+    }
+  }
+
   private async replenish(applicationId: string) {
+    await this.recoverSetup(applicationId);
     let infrastructure = await this.current(applicationId);
     const reader = await this.reader(applicationId);
     if (!infrastructure.paymaster) deny();
@@ -848,6 +939,7 @@ export class SafeWalletRuntime {
           }),
         );
       const current = await authority();
+      await this.recoverSetup(applicationId);
       const infrastructure = await this.current(applicationId);
       for (const saved of infrastructure.transactions.filter(
         (t) =>
@@ -904,23 +996,54 @@ export class SafeWalletRuntime {
             singleton: this.config.safeProvisioning!.singleton,
           },
           status: 'prepared',
+          initialization: {
+            profile: 'atomic-4337-v1',
+            initializer: atomicSafeInitializer(
+              signer.address,
+              this.config.safeWallet!.module.address,
+            ),
+          },
         };
       });
       let wallet = await this.transaction(
         (r) => r.safeWalletAccounts![accountId],
       );
+      if (
+        wallet.initialization &&
+        wallet.initialization.initializer !==
+          atomicSafeInitializer(
+            wallet.signer.address,
+            this.config.safeWallet!.module.address,
+          )
+      )
+        deny();
+      if (wallet.status !== 'ready') {
+        const reader = await this.reader(applicationId);
+        await Promise.all([
+          this.pin(reader, this.config.safeProvisioning!.factory),
+          this.pin(reader, this.config.safeProvisioning!.singleton),
+          ...(wallet.initialization
+            ? [
+                this.pin(reader, safeModuleSetup),
+                this.pin(reader, this.config.safeWallet!.module),
+              ]
+            : []),
+        ]);
+      }
       if (wallet.binding.address === ZeroAddress) {
         const reader = await this.reader(applicationId);
-        const initializer = safeSetupInterface.encodeFunctionData('setup', [
-          [wallet.signer.address],
-          1,
-          ZeroAddress,
-          '0x',
-          ZeroAddress,
-          ZeroAddress,
-          0,
-          ZeroAddress,
-        ]);
+        const initializer =
+          wallet.initialization?.initializer ??
+          safeSetupInterface.encodeFunctionData('setup', [
+            [wallet.signer.address],
+            1,
+            ZeroAddress,
+            '0x',
+            ZeroAddress,
+            ZeroAddress,
+            0,
+            ZeroAddress,
+          ]);
         const salt = BigInt(
           fingerprint(['safe-wallet', applicationId, accountId]).replace(
             /^/,
@@ -960,8 +1083,38 @@ export class SafeWalletRuntime {
           (r) => r.safeWalletAccounts![accountId],
         );
       }
+      if (
+        wallet.initialization &&
+        !(await this.current(applicationId)).transactions.some(
+          (t) => t.purpose === 'safe-deployment-' + accountId && t.included,
+        )
+      ) {
+        await this.send(
+          applicationId,
+          'safe-deployment-' + accountId,
+          {
+            to: this.config.safeProvisioning!.factory.address,
+            data: safeFactoryInterface.encodeFunctionData(
+              'createProxyWithNonce',
+              [
+                this.config.safeProvisioning!.singleton.address,
+                wallet.initialization.initializer,
+                BigInt(
+                  '0x' + fingerprint(['safe-wallet', applicationId, accountId]),
+                ),
+              ],
+            ),
+            value: '0',
+          },
+          async () => {
+            await authority();
+          },
+        );
+      }
       const reader = await this.reader(applicationId);
       if (
+        !wallet.initialization &&
+        wallet.status !== 'ready' &&
         (await reader.call('eth_getCode', [
           wallet.binding.address,
           'latest',
@@ -1001,7 +1154,8 @@ export class SafeWalletRuntime {
           },
         );
       }
-      await this.configureAccount(applicationId, wallet, authority);
+      if (!wallet.initialization && wallet.status !== 'ready')
+        await this.configureAccount(applicationId, wallet, authority);
       const acceptance = await this.acceptance(applicationId);
       await new Safe4337Verifier(acceptance, this.request).verify(
         {
@@ -1070,26 +1224,27 @@ export class SafeWalletRuntime {
             this.config.safeWallet!.module.address.toLowerCase())
       )
         deny();
-      const handler = String(
-        await reader.call('eth_getStorageAt', [
+      const [rawHandler, guard] = await Promise.all([
+        reader.call('eth_getStorageAt', [
           wallet.binding.address,
           keccak256(
             new TextEncoder().encode('fallback_manager.handler.address'),
           ),
           'latest',
         ]),
-      );
+        reader.call('eth_getStorageAt', [
+          wallet.binding.address,
+          keccak256(new TextEncoder().encode('guard_manager.guard.address')),
+          'latest',
+        ]),
+      ]);
+      const handler = String(rawHandler);
       const expected =
         '0x' +
         '0'.repeat(24) +
         this.config.safeWallet!.module.address.slice(2).toLowerCase();
       const zero = '0x' + '0'.repeat(64);
       if (handler !== zero && handler !== expected) deny();
-      const guard = await reader.call('eth_getStorageAt', [
-        wallet.binding.address,
-        keccak256(new TextEncoder().encode('guard_manager.guard.address')),
-        'latest',
-      ]);
       if (guard !== zero) deny();
       if (
         (method === 'enableModule' && modules[0].length === 1) ||
@@ -1207,6 +1362,8 @@ export class SafeWalletRuntime {
         paymaster: infrastructure.paymaster!.address,
         accounts,
         executorKey: this.cipher.open(infrastructure.executor.key),
+        chainId: this.domain.chainId,
+        genesisHash: this.config.safeWallet!.genesisHash,
         rpcUrls: urls,
       }),
       { mode: 0o600 },

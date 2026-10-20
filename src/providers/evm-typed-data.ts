@@ -1,5 +1,9 @@
 import { providerNetwork, type ProviderNetwork } from '../networks.js';
 import { TypedDataEncoder } from 'ethers';
+import { canonicalHash } from '../domain/canonical.js';
+
+// Encoding reuse never carries owner, grant, revocation or expiry authority.
+const encodedPayloads = new Map<string, Record<string, unknown>>();
 import {
   WalletProviderError,
   type EmbeddedAccount,
@@ -53,6 +57,13 @@ export function evmTypedDataPayload(
     ) {
       throw new Error('invalid');
     }
+    const key = canonicalHash([
+      selected.name,
+      action.payload_hash,
+      action.payload,
+    ]);
+    const cached = encodedPayloads.get(key);
+    if (cached) return structuredClone(cached);
     const { EIP712Domain: declaredDomain, ...types } = action.payload.types;
     const domain = action.payload.domain;
     const canonical = TypedDataEncoder.getPayload(
@@ -71,10 +82,14 @@ export function evmTypedDataPayload(
       throw new Error('invalid');
     }
     // Typed-data domains use a JSON number for the selected safe chain ID.
-    return {
+    const payload = {
       ...canonical,
       domain: { ...canonical.domain, chainId: Number(selected.chainId) },
     };
+    if (encodedPayloads.size >= 128)
+      encodedPayloads.delete(encodedPayloads.keys().next().value!);
+    encodedPayloads.set(key, structuredClone(payload));
+    return payload;
   } catch {
     throw new WalletProviderError('wallet_provider_input');
   }

@@ -1,3 +1,6 @@
+import { currentRuntimePolicy } from '../src/runtime-configuration/authority.js';
+import { fingerprint } from '../src/onboarding/policy.js';
+import { Safe4337Verifier } from '../src/sponsorship/verifier.js';
 import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { Wallet, keccak256 } from 'ethers';
@@ -8,8 +11,16 @@ import { ApplicationCredentialCipher } from '../src/runtime-configuration/creden
 import { runtimeApplicationId } from '../src/runtime-configuration/service.js';
 import { applicationGasBudgetId } from '../src/sponsorship/budget.js';
 import type { ProviderConfiguration } from '../src/deployment/config.js';
-afterEach(() => vi.useRealTimers());
-async function bootstrap(maximum: string, invisibleBlocks = 0) {
+afterEach(() => {
+  vi.useRealTimers();
+  vi.restoreAllMocks();
+});
+async function bootstrap(
+  maximum: string,
+  invisibleBlocks = 0,
+  observationErrors = 0,
+  receiptStatus = '0x1',
+) {
   const f = await fixture();
   const applicationId = runtimeApplicationId(
     f.context.principal.issuer,
@@ -44,7 +55,8 @@ async function bootstrap(maximum: string, invisibleBlocks = 0) {
       },
     };
   });
-  f.runtime.rpcEndpoints = async () => ['https://rpc.example.test'];
+  f.runtime.rpcEndpoints = async (_id, kind) =>
+    kind === 'rpc-observation' ? [] : ['https://rpc.example.test'];
   f.runtime.withRpc = async (_id, work) => work(['https://rpc.example.test']);
   const config = JSON.parse(
     await readFile(
@@ -86,6 +98,14 @@ async function bootstrap(maximum: string, invisibleBlocks = 0) {
         result = '0x14a34';
         break;
       case 'eth_getBlockByNumber':
+        if (included && b.params[0] !== '0x0' && observationErrors > 0) {
+          observationErrors--;
+          return Response.json({
+            jsonrpc: '2.0',
+            id: b.id,
+            error: { code: -32603, message: 'Offline observation failure' },
+          });
+        }
         if (included && b.params[0] !== '0x0' && invisibleBlocks > 0) {
           invisibleBlocks--;
           result = null;
@@ -117,7 +137,7 @@ async function bootstrap(maximum: string, invisibleBlocks = 0) {
       case 'eth_getTransactionReceipt':
         result = included
           ? {
-              status: '0x1',
+              status: receiptStatus,
               blockNumber: '0x1',
               blockHash: '0x' + '34'.repeat(32),
             }
@@ -231,6 +251,10 @@ it('reserves setup gas once and recovers an included original transaction after 
   expect(after.transactions[0].hash).toBe(first.transactions[0].hash);
   expect(after.transactions[0].nonce).toBe(first.transactions[0].nonce);
   expect(after.transactions[0].included).toBe(true);
+  // Returning to the real clock leaves the original lease active; observation does not steal its fence.
+  expect(
+    await t.f.db.journal.read(after.transactions[0].request),
+  ).toMatchObject({ state: 'pending' });
   expect(t.broadcasts).toBe(1);
   expect((await t.budget())!.reserved).toBe(before!.reserved);
 });
@@ -245,8 +269,8 @@ it('rejects an application attempting provider bootstrap before creating infrast
   expect((await t.budget())?.reserved ?? '0').toBe('0');
 });
 
-it('waits through receipt-before-block visibility without rejecting or broadcasting a second setup transaction', async () => {
-  const t = await bootstrap('10000000', 2);
+it('waits through a transient canonical lookup failure and receipt-before-block visibility without another setup transaction', async () => {
+  const t = await bootstrap('10000000', 2, 1);
   vi.useFakeTimers();
   const running = t.runtime.ensure(t.f.operatorContext, t.applicationId);
   const result = running.then(
@@ -260,7 +284,7 @@ it('waits through receipt-before-block visibility without rejecting or broadcast
     }),
   ]);
   t.include();
-  await vi.advanceTimersByTimeAsync(2000);
+  await vi.advanceTimersByTimeAsync(3000);
   // The canonical receipt is reconciled, then the fixture's deliberately wrong runtime pin denies activation.
   expect(await result).toMatchObject({ code: 'wallet_authorization_denied' });
   expect((await t.stored())!.transactions[0].included).toBe(true);
@@ -294,4 +318,136 @@ it('shares one batch snapshot while a stalled account leaves other account worke
     release();
     await t.runtime.close();
   }
+});
+
+it('lets a queued account recover the included transaction after the preceding setup times out without signing or rebroadcasting', async () => {
+  const t = await bootstrap('10000000');
+  vi.useFakeTimers();
+  const running = t.runtime
+    .ensure(t.f.operatorContext, t.applicationId)
+    .catch((error) => error);
+  await t.didDispatch;
+  const original = (await t.stored())!.transactions[0];
+  const reserved = (await t.budget())!.reserved;
+  const observer = t.runtime as unknown as {
+    recoverSetup(applicationId: string): Promise<void>;
+    exclusive<T>(
+      applicationId: string,
+      operation: () => Promise<T>,
+    ): Promise<T>;
+  };
+  const queued = observer.exclusive(t.applicationId, async () => {
+    t.include();
+    await observer.recoverSetup(t.applicationId);
+  });
+  await vi.advanceTimersByTimeAsync(31000);
+  expect(await running).toMatchObject({ code: 'wallet_attempt_pending' });
+  await queued;
+  const current = (await t.stored())!.transactions[0];
+  expect(current.hash).toBe(original.hash);
+  expect(current.nonce).toBe(original.nonce);
+  expect(current.included).toBe(true);
+  expect(current.settled).toBe(true);
+  expect(await t.f.db.journal.read(current.request)).toMatchObject({
+    state: 'succeeded',
+  });
+  expect((await t.budget())!.reserved).toBe(reserved);
+  expect(t.broadcasts).toBe(1);
+  expect(t.f.state.signs).toBe(0);
+});
+
+it('revalidates a ready legacy Safe without repeating setup reads or signing, and checks authority after its proof', async () => {
+  const t = await bootstrap('1');
+  await t.runtime
+    .ensure(t.f.operatorContext, t.applicationId)
+    .catch(() => undefined);
+  await t.f.db.onboardingStore.transaction((s) => {
+    const infra =
+      s.deploymentBindings!['service-v1'].runtimeConfiguration!
+        .safeWalletInfrastructure![t.applicationId];
+    infra.transactions = [];
+    infra.paymaster = t.f.config.acceptance.paymaster;
+    const snapshot = currentRuntimePolicy(s, t.f.context.principal);
+    const revision = fingerprint(['financial-terms', snapshot]);
+    for (const grant of Object.values(s.grants)) {
+      grant.actionPolicyRevision = revision;
+      const request = s.requests[grant.requestId];
+      request.actionPolicyRevision = revision;
+      request.runtimePolicy = snapshot;
+    }
+  });
+  const internal = t.runtime as unknown as {
+    configureAccount(...args: unknown[]): Promise<void>;
+    publishBundler(applicationId: string): Promise<void>;
+  };
+  const configure = vi.spyOn(internal, 'configureAccount');
+  vi.spyOn(internal, 'publishBundler').mockResolvedValue();
+  const verify = vi
+    .spyOn(Safe4337Verifier.prototype, 'verify')
+    .mockResolvedValue('0');
+  const result = await t.runtime.provision(t.f.context, t.f.grant.account_id!);
+  expect(result.address).toBe(t.f.operation.sender);
+  expect(configure).not.toHaveBeenCalled();
+  expect(verify).toHaveBeenCalledOnce();
+  expect(t.broadcasts).toBe(0);
+  verify.mockImplementationOnce(async () => {
+    await t.f.db.onboardingStore.transaction((s) => {
+      s.grants[t.f.grant.grant_id!].state = 'revoked';
+    });
+    return '0';
+  });
+  await expect(
+    t.runtime.provision(t.f.context, t.f.grant.account_id!),
+  ).rejects.toMatchObject({ code: 'wallet_authorization_denied' });
+  expect(t.broadcasts).toBe(0);
+});
+
+it('preserves completed historical setup records without admitting their retired attempt kind', async () => {
+  const t = await bootstrap('1');
+  await t.runtime
+    .ensure(t.f.operatorContext, t.applicationId)
+    .catch(() => undefined);
+  await t.f.db.onboardingStore.transaction((s) => {
+    const tx =
+      s.deploymentBindings!['service-v1'].runtimeConfiguration!
+        .safeWalletInfrastructure![t.applicationId].transactions[0];
+    tx.included = true;
+    tx.hash = '0x' + '11'.repeat(32);
+    (tx.request as unknown as { kind: string }).kind = 'relay_transaction';
+  });
+  const before = await t.stored();
+  const observer = t.runtime as unknown as {
+    recoverSetup(applicationId: string): Promise<void>;
+  };
+  await observer.recoverSetup(t.applicationId);
+  expect(await t.stored()).toEqual(before);
+  expect(t.broadcasts).toBe(0);
+  await t.f.db.onboardingStore.transaction((s) => {
+    s.deploymentBindings![
+      'service-v1'
+    ].runtimeConfiguration!.safeWalletInfrastructure![
+      t.applicationId
+    ].transactions[0].included = false;
+  });
+  await expect(observer.recoverSetup(t.applicationId)).rejects.toMatchObject({
+    code: 'wallet_attempt_pending',
+  });
+});
+
+it('does not advance the funding queue or release gas reservations for a reverted setup receipt', async () => {
+  const t = await bootstrap('10000000', 0, 0, '0x0');
+  vi.useFakeTimers();
+  const running = t.runtime
+    .ensure(t.f.operatorContext, t.applicationId)
+    .catch((error) => error);
+  await t.didDispatch;
+  const reserved = (await t.budget())!.reserved;
+  t.include();
+  await vi.advanceTimersByTimeAsync(1000);
+  expect(await running).toMatchObject({ code: 'wallet_authorization_denied' });
+  const tx = (await t.stored())!.transactions[0];
+  expect(tx.included).not.toBe(true);
+  expect(tx.settled).not.toBe(true);
+  expect((await t.budget())!.reserved).toBe(reserved);
+  expect(t.broadcasts).toBe(1);
 });

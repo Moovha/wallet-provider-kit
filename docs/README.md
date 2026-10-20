@@ -68,8 +68,8 @@ contacts no providers and establishes no funded readiness. See
 After deployment, accept the application's services and policy, fund its gas
 address, prepare sponsorship infrastructure and provision its user Safes.
 Applications use the account-scoped EIP-5792 endpoint and verified status stream.
-[Execution latency](execution-latency.md) explains the execution sequence and
-same-user burst measurement.
+[UserOperation execution](user-operation-execution.md) explains verified outcomes
+and recovery of uncertain operations.
 
 ## When you need a custom integration
 
