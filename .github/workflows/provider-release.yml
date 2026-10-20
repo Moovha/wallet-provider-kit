@@ -53,8 +53,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           printf '%s' "$GH_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
-          docker buildx build --platform linux/amd64,linux/arm64 --provenance=mode=max --sbom=true --metadata-file api.json --push --tag "ghcr.io/moovha/wallet-provider-kit:provider-v$RELEASE_VERSION" .
-          docker buildx build --platform linux/amd64,linux/arm64 --provenance=mode=max --sbom=true --metadata-file bundler.json --push --file Dockerfile.bundler --tag "ghcr.io/moovha/wallet-provider-kit-bundler:provider-v$RELEASE_VERSION" .
+          docker buildx build --label org.opencontainers.image.source=https://github.com/Moovha/wallet-provider-kit --platform linux/amd64,linux/arm64 --provenance=mode=max --sbom=true --metadata-file api.json --push --tag "ghcr.io/moovha/wallet-provider-kit:provider-v$RELEASE_VERSION" .
+          docker buildx build --label org.opencontainers.image.source=https://github.com/Moovha/wallet-provider-kit --platform linux/amd64,linux/arm64 --provenance=mode=max --sbom=true --metadata-file bundler.json --push --file Dockerfile.bundler --tag "ghcr.io/moovha/wallet-provider-kit-bundler:provider-v$RELEASE_VERSION" .
           API_DIGEST=$(node -p "JSON.parse(require('fs').readFileSync('api.json'))['containerimage.digest']")
           BUNDLER_DIGEST=$(node -p "JSON.parse(require('fs').readFileSync('bundler.json'))['containerimage.digest']")
           node scripts/package-provider-release.mjs "$API_DIGEST" "$BUNDLER_DIGEST"
@@ -75,6 +75,16 @@ jobs:
       - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
           subject-path: artifacts/provider-release.tgz
+      - name: Verify anonymous image access before publishing the installer
+        env:
+          API_DIGEST: ${{ steps.build.outputs.api_digest }}
+          BUNDLER_DIGEST: ${{ steps.build.outputs.bundler_digest }}
+        run: |
+          for component in wallet-provider-kit wallet-provider-kit-bundler; do
+            REGISTRY_TOKEN=$(curl --fail --silent --show-error "https://ghcr.io/token?scope=repository:moovha/$component:pull" | node -e 'let data=""; process.stdin.on("data", chunk => data += chunk); process.stdin.on("end", () => process.stdout.write(JSON.parse(data).token));')
+            if [ "$component" = wallet-provider-kit ]; then DIGEST="$API_DIGEST"; else DIGEST="$BUNDLER_DIGEST"; fi
+            curl --fail --silent --show-error --head --header "Authorization: Bearer $REGISTRY_TOKEN" --header 'Accept: application/vnd.oci.image.index.v1+json' "https://ghcr.io/v2/moovha/$component/manifests/$DIGEST" >/dev/null
+          done
       - name: Publish experimental release artifacts
         env:
           GH_TOKEN: ${{ github.token }}

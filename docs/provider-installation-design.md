@@ -142,7 +142,7 @@ Do not mark a layer complete from mocked UI behavior alone.
 | 5     | Short destination/review/deploy flow and persistent console backed by real management APIs.                                           | Implemented; 15 browser scenarios pass                              |
 | 6     | Versioned inspectable Compose/release packaging, existing-server path and one qualified cloud template.                               | Release tooling and AWS template prepared; live acceptance separate |
 | 7     | Backup/restore/upgrade guidance and implemented operations with explicit financial uncertainty limits.                                | Backup and recovery tools; reviewed manual upgrade contract         |
-| 8     | End-to-end offline acceptance, generated references, public documentation, required checks and reviewed PR.                           | Final verification and PR publication in progress                   |
+| 8     | End-to-end offline acceptance, generated references, public documentation, required checks and reviewed PR.                           | Local implementation verified; integration tracked in PR 73         |
 
 ### Acceptance scenarios
 
@@ -216,3 +216,15 @@ its temporary dependencies because the workstation filesystem reported ENOSPC.
 It is not recorded as passing locally. Required CI runs the consumer and Docker
 checks on its separate runner before integration. No unrelated files or Docker
 volumes were removed to make those checks pass.
+
+Delivery review: [pull request 73](https://github.com/Moovha/wallet-provider-kit/pull/73)
+retains the audience/purpose review, exact runner results and publication status.
+Its required checks include isolated package consumption and Docker acceptance.
+The three-stage installation navigation is the default; six static configuration
+screens are grouped under Advanced configuration.
+
+Release distribution checkpoint: GHCR initially creates private packages. The
+release workflow labels image source ownership and checks anonymous manifest access
+for both digests before publishing an installer, so public operators are not
+unexpectedly required to supply registry credentials. Maintainers configure public
+package visibility once. [GitHub documents this registry behavior](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry).

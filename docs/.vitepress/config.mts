@@ -105,7 +105,38 @@ export default defineConfig({
         ],
       },
       {
-        text: 'Operator setup',
+        text: 'Install and administer',
+        items: [
+          {
+            text: '1. Choose destination',
+            link: '/docs/provider-installation#choose-a-destination',
+          },
+          {
+            text: '2. Review and install',
+            link: '/docs/provider-installation#install-a-release-bundle',
+          },
+          {
+            text: '3. Open administration',
+            link: '/docs/provider-installation#claim-administrator-access',
+          },
+          {
+            text: 'Connect applications',
+            link: '/docs/provider-installation#connect-an-application-after-installation',
+          },
+          {
+            text: 'Automate administration',
+            link: '/docs/provider-installation#automate-provider-administration',
+          },
+          { text: 'Back up and maintain', link: '/docs/provider-maintenance' },
+          {
+            text: 'Design and acceptance record',
+            link: '/docs/provider-installation-design',
+          },
+        ],
+      },
+      {
+        text: 'Advanced configuration',
+        collapsed: true,
         items: [
           {
             text: '1. Provider',

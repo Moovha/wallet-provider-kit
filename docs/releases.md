@@ -40,7 +40,12 @@ and arm64 service/bundler images, SBOM/provenance and an attested
 `provider-release.tgz`. The archive includes the installer, encrypted backup tool
 and AWS template. It creates an experimental GitHub release with a
 `provider-v` version tag after the release checks pass. Existing tags cannot be
-replaced. Review the public release notes before dispatching it.
+replaced. Review the public release notes before dispatching it. The workflow
+verifies anonymous access to both image digests before publishing the installer.
+GitHub Container Registry initially creates private packages; configure the
+packages as public for public installation. This is a maintainer registry setting,
+not an operator prerequisite or a request for application credentials. See
+[GitHub container visibility](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry).
 
 This workflow is separate from npm and documentation publication. Do not run it
 without release authority. It publishes artifacts without deploying a host or
