@@ -106,11 +106,7 @@ export function defineOnboardingPolicy(
     const origin = trustedHttpsUrl(policy.provider.origin);
     if (origin.origin !== policy.provider.origin) throw new Error();
     trustedHttpsUrl(policy.provider.privacyUrl);
-    if (
-      !Array.isArray(policy.applications) ||
-      policy.applications.length === 0 ||
-      policy.applications.length > 100
-    )
+    if (!Array.isArray(policy.applications) || policy.applications.length > 100)
       throw new Error();
     const seen = new Set<string>();
     for (const app of policy.applications) {
@@ -188,6 +184,7 @@ export function application(
   policy: ResolvedPolicy,
   principal: VerifiedPrincipal,
 ): ApplicationPolicy {
+  if (policy.currentApplication) return policy.currentApplication(principal);
   const app = policy.applications.find(
     (a) =>
       a.issuer === principal.issuer &&

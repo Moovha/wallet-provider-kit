@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- Deploy a provider with zero applications, claim its administrator privately and
+  manage application registrations, identity trust, suspension and credentials
+  through a persistent console and protected APIs.
+- Separate management availability from wallet execution readiness. Retain
+  installation identity and secrets across repeat and interrupted setup.
+- Add prebuilt-container release packaging, a Linux server installer, AWS template,
+  encrypted stopped-service backup tooling and explicit recovery/upgrade guidance.
+  Release publication, cloud acceptance and production custody remain separate.
+
+## Unreleased
+
 - Remove application-specific atomic vault/DEX helpers, concrete router adapters and generated deployment artifacts from the public package and exports. Generic approved Safe calls remain available.
 - Support Ethereum Sepolia domains in the low-level ERC-4337 helpers without enabling another supplied-service network.
 

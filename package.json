@@ -73,7 +73,7 @@
   ],
   "scripts": {
     "dev": "tsx src/main.ts",
-    "build": "node scripts/clean-build.mjs && tsc -p tsconfig.json && npm run build:setup",
+    "build": "node scripts/clean-build.mjs && tsc -p tsconfig.json && npm run build:setup && node scripts/copy-management-assets.mjs",
     "start": "node dist/main.js",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc -p tsconfig.test.json && vue-tsc -p setup-ui/tsconfig.json",
     "test": "vitest run",

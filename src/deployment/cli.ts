@@ -1,4 +1,5 @@
-import { newClientId, newWalletBinding } from './setup-identifiers.js';
+import { randomBytes } from 'node:crypto';
+import { ManagementService } from '../management/service.js';
 import { createBundledAuthorizationServer } from './authorization-server.js';
 import { generateDeploymentSecrets } from './deployment-secrets.js';
 import { setupEnvironment } from './setup-executor.js';
@@ -157,7 +158,7 @@ export async function setupCommand(args: string[]): Promise<boolean> {
   if (!args.length) return false;
   if (args.length === 1 && ['help', '--help', '-h'].includes(args[0])) {
     process.stdout.write(
-      'wallet-provider-kit setup [--port number] [--no-open]\nwallet-provider-kit runtime check\nwallet-provider-kit runtime install\nwallet-provider-kit local-setup --config file [--install-runtime]\nwallet-provider-kit init [file]\nwallet-provider-kit validate --config file\nwallet-provider-kit doctor --config file\nwallet-provider-kit init-secrets --config file\nwallet-provider-kit init-storage --config file\nwallet-provider-kit run --config file\n',
+      'wallet-provider-kit setup [--port number] [--no-open]\nwallet-provider-kit runtime check\nwallet-provider-kit runtime install\nwallet-provider-kit local-setup --config file [--install-runtime]\nwallet-provider-kit init [file]\nwallet-provider-kit validate --config file\nwallet-provider-kit doctor --config file\nwallet-provider-kit init-secrets --config file\nwallet-provider-kit init-storage --config file\nwallet-provider-kit renew-claim --config file\nwallet-provider-kit recover-admin --config file\nwallet-provider-kit run --config file\n',
     );
     return true;
   }
@@ -188,6 +189,87 @@ export async function setupCommand(args: string[]): Promise<boolean> {
     });
     return true;
   }
+  if (['renew-claim', 'recover-admin'].includes(args[0])) {
+    if (args.length !== 3 || args[1] !== '--config')
+      throw new ConfigurationError([
+        'Use renew-claim or recover-admin --config file with the API stopped.',
+      ]);
+    const { config, directory } = await loadProviderConfiguration(args[2]);
+    if (!config.management)
+      throw new ConfigurationError([
+        '/management: durable administration is not configured',
+      ]);
+    const database = openProviderDatabase({
+      directory: resolve(directory, config.storage.directory),
+    });
+    try {
+      const management = new ManagementService(
+        database.onboardingStore,
+        database.managementSnapshot,
+        config.oauth.issuer,
+        config.policy,
+      );
+      const secret = randomBytes(48).toString('base64url');
+      const path = join(
+        directory,
+        args[0] === 'renew-claim'
+          ? 'renewed-installation-claim'
+          : 'recovery-administrator',
+      );
+      // Reserve a private output before changing authority; never print authentication material.
+      await writeFile(
+        path,
+        args[0] === 'renew-claim'
+          ? secret + '\n'
+          : 'operator-recovery\n' + secret + '\n',
+        { flag: 'wx', mode: 0o600 },
+      );
+      if (args[0] === 'renew-claim')
+        await management.renewUnclaimedInstallation(secret);
+      else await management.recoverAdministrator(secret);
+      process.stdout.write(
+        'Recovery credential saved privately beside the configuration. Restart the API, then establish current administrator access.\n',
+      );
+    } finally {
+      database.close();
+    }
+    return true;
+  }
+  if (args[0] === 'install-init') {
+    if (args.length !== 1)
+      throw new ConfigurationError([
+        'Installation settings are supplied through non-secret environment variables.',
+      ]);
+    const selectedNetwork = process.env.WPK_NETWORK ?? 'base';
+    if (!['base', 'base-sepolia'].includes(selectedNetwork))
+      throw new ConfigurationError([
+        'WPK_NETWORK must be base or base-sepolia.',
+      ]);
+    const { initializeInstallation } = await import('./installation.js');
+    const { reused } = await initializeInstallation(
+      process.env.WPK_DIRECTORY ?? '/config',
+      process.env.WPK_HOST_DIRECTORY ?? '',
+      {
+        name: process.env.WPK_NAME ?? 'Wallet provider',
+        origin: process.env.WPK_ORIGIN ?? 'https://localhost',
+        privacyUrl: process.env.WPK_PRIVACY_URL ?? 'https://localhost/privacy',
+        network: selectedNetwork as 'base' | 'base-sepolia',
+        ...(process.env.WPK_LOCAL === 'true'
+          ? { localOrigin: 'http://127.0.0.1:8080' }
+          : {}),
+      },
+      {
+        api: process.env.WPK_API_IMAGE ?? '',
+        bundler: process.env.WPK_BUNDLER_IMAGE ?? '',
+      },
+    );
+    process.stdout.write(
+      reused
+        ? 'Retained installation reused; identity and secrets unchanged.\n'
+        : 'Installation prepared. Read the private installation-claim file to establish administrator access.\n',
+    );
+    return true;
+  }
   if (args[0] === 'setup') {
     const remaining = args.slice(1);
     const openBrowser = !remaining.includes('--no-open');
@@ -205,24 +287,12 @@ export async function setupCommand(args: string[]): Promise<boolean> {
     return true;
   }
   if (args[0] === 'init' && args.length <= 2) {
-    const example: ProviderConfiguration = JSON.parse(
-      await readFile(
-        new URL(
-          '../../docs/provider.config.safe.example.json',
-          import.meta.url,
-        ),
-        'utf8',
-      ),
-    );
-    example.network = 'base';
-    example.backend.binding = newWalletBinding();
-    for (const application of example.policy.applications) {
-      const registration = example.authorizationServer!.clients.find(
-        (client) => client.clientId === application.clientId,
-      )!;
-      application.clientId = newClientId('application');
-      registration.clientId = application.clientId;
-    }
+    const { installationConfiguration } = await import('./installation.js');
+    const example = installationConfiguration({
+      name: 'Wallet provider',
+      origin: 'https://wallet.example.com',
+      privacyUrl: 'https://wallet.example.com/privacy',
+    });
     await writeFile(
       resolve(args[1] ?? 'provider.config.json'),
       JSON.stringify(example, null, 2) + '\n',
@@ -232,7 +302,7 @@ export async function setupCommand(args: string[]): Promise<boolean> {
       },
     );
     process.stdout.write(
-      'Configuration created with generated internal IDs; configure provider identity and reviewed application trust, then validate\n',
+      'Zero-application configuration created; configure the final provider identity, then validate. Register applications after deployment\n',
     );
     return true;
   }
@@ -274,6 +344,12 @@ export async function setupCommand(args: string[]): Promise<boolean> {
       flag: 'wx',
       mode: 0o600,
     });
+    if (config.management)
+      await writeFile(
+        join(directory, 'installation-claim'),
+        values[config.management.claim.env] + '\n',
+        { flag: 'wx', mode: 0o600 },
+      );
     process.stdout.write(
       'Private provider.env created. Retain it across restarts and supply any external-service secrets before starting.\n',
     );

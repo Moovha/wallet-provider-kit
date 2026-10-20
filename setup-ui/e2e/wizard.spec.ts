@@ -20,7 +20,7 @@ test.afterAll(async () => {
 });
 test.beforeEach(async ({ page }) => {
   page.setDefaultTimeout(5000);
-  await page.goto(`${url}/#${token}`);
+  await page.goto(`${url}/?advanced#${token}`);
   await expect(page.getByLabel('Provider name', { exact: true })).toBeVisible();
 });
 async function step(page: Page, name: string) {

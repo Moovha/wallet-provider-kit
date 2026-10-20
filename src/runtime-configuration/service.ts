@@ -381,6 +381,7 @@ export class RuntimeConfigurationService {
     private readonly transportRevision?: string,
     private readonly network?: ProviderNetwork,
     private readonly credentialCipher?: ApplicationCredentialCipher,
+    private readonly currentOperator?: (principal: VerifiedPrincipal) => void,
   ) {
     if (!text(deploymentRevision))
       throw new WalletProviderError('wallet_provider_configuration');
@@ -393,6 +394,10 @@ export class RuntimeConfigurationService {
   }
   assertOperator(principal: VerifiedPrincipal) {
     if (!principal.scopes.includes('wallet:configuration:write')) deny();
+    if (this.currentOperator) {
+      this.currentOperator(principal);
+      return;
+    }
     if (
       !this.options.operators.some(
         (operator) =>
@@ -1033,14 +1038,19 @@ export class RuntimeConfigurationService {
   }
   async proposal(principal: VerifiedPrincipal, proposalId: string) {
     if (!uuid.test(proposalId)) invalid();
-    const isOperator =
-      principal.scopes.includes('wallet:configuration:write') &&
-      this.options.operators.some(
-        (operator) =>
-          operator.issuer === principal.issuer &&
-          operator.clientId === principal.clientId &&
-          operator.subject === principal.subject,
-      );
+    let isOperator = false;
+    if (principal.scopes.includes('wallet:configuration:write')) {
+      try {
+        this.assertOperator(principal);
+        isOperator = true;
+      } catch (error) {
+        if (
+          !(error instanceof WalletProviderError) ||
+          error.code !== 'wallet_authorization_denied'
+        )
+          throw error;
+      }
+    }
     if (!isOperator && !principal.scopes.includes('wallet:configuration:read'))
       deny();
     const applicationId = isOperator ? undefined : this.application(principal);

@@ -63,6 +63,7 @@ export function operationStatus(
     Object.entries(operationGuides).find(([, entry]) => entry === guide)?.[0] ??
     '';
   const unavailable = operationUnavailableReason(id, {
+    management: !!config.management,
     onboarding: true,
     enrollment: false,
     wallet: true,
@@ -73,6 +74,10 @@ export function operationStatus(
     records: !!config.policy.identity?.records,
     vendor: !!config.identity.didit || !!config.identity.sumsub,
   });
+  if (guide.management)
+    return unavailable
+      ? `Not enabled: ${unavailable}`
+      : 'Settings are present; claim or authenticate dedicated provider administration separately';
   if (!guide.scope && !guide.serviceAuthenticated)
     return 'No access token needed';
   if (unavailable) return `Not enabled: ${unavailable}`;
@@ -143,6 +148,18 @@ export function requestExample(
   config: ProviderConfiguration,
   applicationIndex: number,
 ): object | undefined {
+  if (id === 'claimProviderInstallation')
+    return {
+      claim: 'offline-claim-placeholder-' + 'x'.repeat(43),
+      username: 'offline-admin',
+      password: 'offline-password-placeholder',
+    };
+  if (id === 'createProviderIdentity')
+    return { name: 'Offline application', role: 'application' };
+  if (id === 'updateProviderIdentity')
+    return { expected_revision: 1, enabled: false };
+  if (id === 'rotateProviderIdentityCredential')
+    return { expected_revision: 1 };
   if (id === 'provisionSafeWalletInfrastructure') return {};
   if (id === 'writeApplicationCredential')
     return {
@@ -329,6 +346,38 @@ export function responseExample(
   config?: ProviderConfiguration,
   requestedPermissions?: string[],
 ): object | string {
+  const managedIdentity = {
+    id: 'app-10000000-0000-4000-8000-000000000001',
+    name: 'Offline application',
+    role: 'application',
+    enabled: true,
+    revision: 1,
+    credentialRevision: 1,
+    scopes: ['wallet:configuration:read'],
+  };
+  if (id === 'claimProviderInstallation')
+    return {
+      ...managedIdentity,
+      id: 'operator-offline-admin',
+      name: 'Offline administrator',
+      role: 'administrator',
+      scopes: ['provider:manage'],
+    };
+  if (id === 'readProviderStatus')
+    return {
+      installation_id: exampleId,
+      claimed: true,
+      applications: [],
+      management_available: true,
+      wallet_operations_enabled: false,
+    };
+  if (id === 'listProviderIdentities') return [managedIdentity];
+  if (
+    ['createProviderIdentity', 'rotateProviderIdentityCredential'].includes(id)
+  )
+    return { ...managedIdentity, client_secret: 'generated-once-placeholder' };
+  if (id === 'updateProviderIdentity')
+    return { ...managedIdentity, enabled: false, revision: 2 };
   const address = '0x1111111111111111111111111111111111111111';
   const consent_url =
     referenceOrigin(config?.policy.provider.origin ?? '') +
@@ -627,7 +676,11 @@ export function referenceSpec(
       op.description ?? '',
     ].join('\n\n');
     for (const parameter of op.parameters ?? []) {
-      if (parameter.in === 'path') parameter.example = exampleId;
+      if (parameter.in === 'path')
+        parameter.example =
+          item.guide.management && parameter.name === 'id'
+            ? 'app-' + exampleId
+            : exampleId;
       if (
         parameter.in === 'header' &&
         parameter.name.toLowerCase() === 'idempotency-key'
@@ -667,6 +720,7 @@ export function curlExample(item: ReferenceOperation, origin: string) {
     `curl --request ${item.method.toUpperCase()} ${shellQuote(
       referenceOrigin(origin) +
         item.path.replace(/\{([^}]+)\}/g, (_match, name: string) => {
+          if (item.guide.management && name === 'id') return 'app-' + exampleId;
           if (name === 'revision') return '1';
           if (name === 'applicationId') return 'a'.repeat(64);
           return exampleId;

@@ -206,6 +206,7 @@ export interface VerifiedPrincipal {
   readonly issuer: string;
   readonly subject: string;
   readonly clientId: string;
+  readonly credentialRevision?: number;
   readonly scopes: readonly string[];
 }
 ```
@@ -461,6 +462,10 @@ See the [HTTP reference](http-reference.md).
 
 ```ts
 export interface ServerOptions {
+  management?: ManagementService;
+  managementReady?: () => Promise<boolean>;
+  providerOrigin?: string;
+  localManagementOrigin?: string;
   requestsPerMinute?: number;
   safeWallet?: import('../sponsorship/safe-wallet.js').SafeWalletRuntime;
   authorizationServer?: {
@@ -879,28 +884,7 @@ export declare class OnboardingService {
   readonly store: OnboardingStore;
   readonly runtimeContracts: boolean;
   readonly safeOnlyWallet: boolean;
-  readonly policy: Readonly<{
-    revision: string;
-    identity: {
-      maxAgeDays: number;
-      records?: import('./types.js').ApplicationRecordPolicy;
-      application?: {
-        requiredFields: string[];
-        verificationLevel: string;
-      };
-    };
-    access: {
-      maxAgeDays: number;
-      mode: 'application' | 'hosted';
-    };
-    version: string;
-    provider: {
-      name: string;
-      origin: string;
-      privacyUrl: string;
-    };
-    applications: import('./types.js').ApplicationPolicy[];
-  }>;
+  readonly policy: import('./types.js').ResolvedPolicy;
   constructor(
     input: OnboardingPolicy,
     store: OnboardingStore,
@@ -909,6 +893,12 @@ export declare class OnboardingService {
     actionPolicyRevision?: string | undefined,
     runtimeContracts?: boolean,
     safeOnlyWallet?: boolean,
+    liveApplications?: {
+      list(): import('./types.js').ApplicationPolicy[];
+      current(
+        principal: VerifiedPrincipal,
+      ): import('./types.js').ApplicationPolicy;
+    },
   );
   applicationAccessPolicy(principal: VerifiedPrincipal): Promise<
     | {
@@ -1279,6 +1269,18 @@ export type Permission = (typeof permissions)[number];
 
 ```ts
 export interface ProviderState {
+  managementCommands?: Record<
+    string,
+    {
+      hash: string;
+      result: unknown;
+      at: number;
+    }
+  >;
+  management?: Record<
+    string,
+    import('../management/service.js').ManagementState
+  >;
   format: 'moovha-onboarding-1';
   assetReservations?: Record<
     string,
@@ -1321,6 +1323,7 @@ export interface ProviderState {
       network?: import('../networks.js').ProviderNetwork;
       activeRevision?: string;
       transportRevision?: string;
+      managementInstallationId?: string;
       accessMode?: 'application' | 'hosted';
       runtimeConfiguration?: import('../runtime-configuration/service.js').RuntimeConfigurationState;
     }
@@ -1843,6 +1846,8 @@ export interface FinancialAuthorization {
 export declare function openProviderDatabase(
   options: ProviderDatabaseOptions,
 ): {
+  managementSnapshot():
+    import('../management/service.js').ManagementState | undefined;
   onboardingStore: import('../index.js').OnboardingStore;
   sponsorship: {
     load: (
@@ -2424,6 +2429,10 @@ export declare function predictSafeAddress(
 
 ```ts
 export interface ProviderConfiguration {
+  management?: {
+    claim: SecretReference;
+    localOrigin?: string;
+  };
   safeWallet?: import('../sponsorship/safe-wallet.js').SafeWalletConfiguration;
   network?: ProviderNetwork;
   safeProvisioning?: import('../provisioning/safe.js').SafeProvisioningConfiguration;
@@ -2540,6 +2549,7 @@ export declare class RuntimeConfigurationService {
     transportRevision?: string | undefined,
     network?: ProviderNetwork | undefined,
     credentialCipher?: ApplicationCredentialCipher | undefined,
+    currentOperator?: ((principal: VerifiedPrincipal) => void) | undefined,
   );
   assertOperator(principal: VerifiedPrincipal): void;
   assertOperatorState(principal: VerifiedPrincipal, state: ProviderState): void;

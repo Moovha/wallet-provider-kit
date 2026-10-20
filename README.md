@@ -46,13 +46,21 @@ rail, the application's obligations and the current implementation boundary.
 [Services and credentials](docs/operator-services.md) ·
 [Run locally](docs/local-setup.md) · [Deploy the export](docs/operator-deployment.md)
 
-## Start with the graphical setup
+## Deploy first, connect applications afterward
 
-Supported setups need **configuration, deployment and API consumption**. Operators
-configure the supplied service through FormKit; they do not write policies in
-code, authority callbacks, database adapters or signing journals. Embedding the TypeScript library is an advanced developer path.
+Install a wallet provider with **zero connected applications**. Establish
+administrator access, then register applications and configure their trust,
+action policies, services and sponsorship through the console or protected APIs.
+Installation needs no application RPC credentials, gas funding or external login
+provider. Wallet operations start disabled.
 
-Use Node **24.22.0**, npm **11.11.1** and Git. From your operator workstation:
+The [installation guide](docs/provider-installation.md) describes local, Linux
+server and AWS template paths. Reviewed release bundles use prebuilt containers
+and Docker Compose; operators do not need Node, npm, Git or a source build.
+Check [available releases](https://github.com/Moovha/wallet-provider-kit/releases)
+for published artifacts. The package remains experimental and unpublished to npm.
+
+For contributor evaluation from source, use Node **24.22.0**, npm **11.11.1** and Git:
 
 ```sh
 git clone https://github.com/Moovha/wallet-provider-kit.git
@@ -62,70 +70,34 @@ npm run build
 npm start -- setup
 ```
 
-The command opens a temporary local wizard, or prints its private session URL.
-Keep the terminal open. The wizard is bundled; it needs no FormKit Pro subscription.
-The package is experimental and not published to npm; a registry install by name
-is not available. See [getting started](docs/README.md) for installation help.
+The bundled graphical setup follows three stages:
 
-The bundle includes an OAuth application token service, the OWS wallet
-engine, SQLite and a saved Caddy automatic-HTTPS configuration. The wallet service starts a private Alto bundler and durable Valkey queues alongside OWS. Each user receives one Safe address; an application-owned paymaster covers gas through one application funding address. Configure application RPCs, action policies and funding before provisioning. See [self-hosted sponsorship](docs/self-hosted-sponsorship.md). Safe/bundler/paymaster is the only execution flow. See [service setup](docs/setup.md).
-After validation, choose **Set up and run locally**: review the plan, supply missing
-secrets privately and watch setup save files, build the Docker image, initialize
-new storage, diagnose and start the service. It uses the single-host container
-security pattern and starts with wallet operations disabled. The wizard checks
-Docker, Compose and the image builder, offers **Install local runtime and continue**
-for missing components, then resumes setup. A working local Docker installation is
-reused; otherwise setup uses Homebrew and a dedicated Colima VM on macOS or Linux.
-Administrator prompts, when needed for Homebrew, stay in a terminal. See [local setup](docs/local-setup.md).
+1. **Choose destination:** this computer, an existing Linux server or the AWS template.
+2. **Review deployment:** provider identity, retained storage, network exposure and
+   defaults. Application configuration waits until connection.
+3. **Deploy and open administration:** source setup can build an isolated local
+   container service; release installers use pinned prebuilt images. Read the
+   private installation claim file to establish the administrator.
 
-You can instead download `provider.config.json` (settings and policy),
-`provider.env.example` (secret variable names) and `provider-setup.md` (deployment
-checklist) for [manual deployment](docs/operator-deployment.md), including native deployments.
-Existing deployments are updated through the reviewed maintenance process.
-The [policy controls table](docs/application-access.md#configure-the-trust-policy)
-explains which access rules you can customize in the GUI and how they are enforced.
+Claiming is protected, expires after 30 minutes and succeeds once. Restart does
+not reopen registration. The persistent `/admin/` console and provider API manage
+application registrations, identity trust, suspension, credential rotation and
+automation identities. Management availability is separate from wallet execution
+readiness. See [installation and administration](docs/provider-installation.md),
+[application obligations](docs/application-obligations.md) and
+[maintenance and recovery](docs/provider-maintenance.md).
 
-![FormKit review and export screen using offline example settings](docs/public/screenshots/export-safe.png)
+The bundle includes the OWS owner-signer engine, SQLite, the private Alto bundler,
+durable Valkey queues and Caddy HTTPS configuration. Each user receives a Safe;
+accepted application sponsorship funds its execution. Registration does not grant
+identity trust or spending authority. Provider acceptance and current owner,
+grant, KYC, consent, immutable action and durable attempt checks remain required.
 
-[Open full-size screenshot](docs/public/screenshots/export-safe.png)
-
-_Example configuration only. Validation checks the configuration; it does not test
-vendor services or certify readiness. Initial activation remains disabled._
-
-1. **[Choose your settings](docs/setup.md):** provider domain, bundled
-   wallet engine and application registrations. Review which applications may attest user identity
-   and consent, and the evidence your policy requires.
-2. **[Configure the six screens](docs/setup-wizard.md):** Provider, Backend, Services,
-   Applications, Deployment and Export. Application-led access is selected by default.
-   Record application trust agreements and enter secret variable names, not values.
-3. **[Run locally and accept](docs/local-setup.md):** let setup save private files,
-   initialize new storage once and start a disabled container. Start the supplied HTTPS profile on the final host, test
-   authority, backend and recovery behavior, then explicitly activate. Manual
-   deployments follow the [deployment guide](docs/operator-deployment.md).
-4. **[Connect your product](docs/application-access.md):** read access policy,
-   submit current identity and consent evidence, receive a grant, create the wallet
-   and revoke access when the user withdraws. Register
-   [approved calls and optional operation adapters](docs/approved-contract-calls.md)
-   for the [Safe execution flow](docs/self-hosted-sponsorship.md).
-   [Execution status and recovery](docs/user-operation-execution.md) explains account lanes,
-   verified status and expired uncertain operations.
-   Applications arrange sponsor funding; verified chain status is separate from
-   business settlement.
-
-The GUI's **API reference** uses bundled Swagger UI to show each supported endpoint,
-required scope, configuration prerequisites, request/response schemas and illustrative
-examples. Select an application, copy a cURL request or download the displayed OpenAPI.
-Its **Try it out** controls enable the deployed Swagger explorer and open it on
-your provider's HTTPS domain. [Test live API responses](docs/http-api.md#try-deployed-apis)
-with public discovery or a short-lived application token after deployment.
-Optional [operator token controls](docs/operator-tokens.md) obtain and renew tokens
-in that GUI using server-held secrets and an explicit operator allowlist.
-The wizard’s API reference preview sends no API calls; deployed requests have real effects and permission checks.
-
-The [getting-started guide](docs/README.md) links every stage. The service uses
-per-user Safe 1.4.1 accounts, ERC-4337 bundling and application-owned paymasters
-on Base or Base Sepolia. Deployment remains single-host and production custody
-acceptance is pending.
+The **Advanced configuration** editor retains the explicit static configuration
+path. Its [six configuration screens](docs/setup-wizard.md) and bundled API
+reference are available for reviewed source integrations. The default installation
+flow does not require registering a first application. Container/cloud acceptance
+and production custody acceptance remain separate from offline checks.
 
 ## Who takes part
 
@@ -155,8 +127,8 @@ through the [FormKit setup wizard](docs/setup-wizard.md), then run automated loc
 container setup or export configuration and a deployment checklist. No application
 code is needed for this setup path.
 
-The standard path is **configure, deploy and consume the API**. Use one validated
-JSON configuration for application trust, identity requirements, OWS owner signing and SQLite storage.
+The standard path is **configure, deploy and consume the API**. Use validated installation settings for OWS owner signing and SQLite storage,
+then manage application trust and policy through durable runtime APIs.
 The kit supplies consent, grants, account recovery, approved Safe calls
 and durable signing coordination. Start with [service setup](docs/setup.md).
 Embedded host composition uses the same Safe execution contract.
@@ -277,7 +249,7 @@ execution flow. Each user receives their own Safe address for deposits and calls
 The current version, **0.1.0**, is experimental and available from source rather
 than npm. You can configure account access and provisioning, and execute approved
 Safe contract calls, swaps and vault deposits on **Base mainnet or Base Sepolia**.
-Start with the [setup guide](docs/README.md); it follows the same six steps as the wizard.
+Start with the [setup guide](docs/README.md); application connection follows deployment.
 
 Your first deployment stays disabled while you test your backend, application
 permissions and recovery. The supported runtime uses one active POSIX host with
@@ -288,33 +260,18 @@ configuring transfers.
 
 ## Configure your wallet service
 
-The wizard brings the provider's setup decisions together in the order you make
-them. Users authenticate, complete identity checks and consent within the
-connected application. You decide which applications to trust and what their
-requests must satisfy.
+Separate installation settings from application runtime policy. Choose the
+provider's final HTTPS identity and retained storage during deployment. Claim
+administration, then register applications when they connect. Use the console or
+API to accept identity/consent trust and configure permitted owner actions.
 
-1. **[Provider](docs/setup-wizard.md#_1-provider)** — identify your service with its
-   name, public HTTPS origin and privacy notice.
-2. **[Backend](docs/setup-wizard.md#_2-backend)** — configure the OWS owner-signer vault
-   and prepare its retained credentials and recovery arrangements.
-3. **[Services](docs/setup-wizard.md#_3-services)** — connect the token issuer that
-   authenticates applications to your API.
-4. **[Applications](docs/setup-wizard.md#_4-applications)** — register trusted applications,
-   record identity and consent trust agreements and separate provider operators.
-5. **[Deployment](docs/setup-wizard.md#_5-deployment)** — choose persistent storage,
-   API tools and the prebundled execution engine. Keep initial activation off.
-6. **[Export](docs/setup-wizard.md#_6-export)** — validate your settings, run a local
-   deployment or download its files, then test and activate the service.
+Applications register action payloads, service credentials and bounded gas
+sponsorship through protected APIs. Provider operators accept the resources and
+prepare funding and bundler/paymaster infrastructure separately. User assets stay
+in individual Safes. Follow the [application setup sequence](docs/application-obligations.md).
 
-After connection, applications register their action payloads, billable service
-credentials and gas sponsorship terms through protected APIs. The provider reviews
-each application's resources, exposes its funding address and prepares its
-bundler/paymaster infrastructure once gas is available. User assets remain in their
-individual Safes. Follow the [application setup sequence](docs/application-obligations.md).
-
-The [setup guide](docs/README.md) explains how to open the wizard. Each step links
-to the relevant preparation, API and operating details. You can configure the
-supplied service without writing policy callbacks, storage adapters or signing code.
+The [getting-started guide](docs/README.md) covers installation. The [advanced
+configuration reference](docs/setup-wizard.md) documents static source setup.
 
 ## Connect and operate
 

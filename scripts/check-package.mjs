@@ -37,6 +37,7 @@ try {
   );
   const paths = candidate.files.map(({ path }) => path);
   assert.ok(paths.includes('dist/providers/ows-worker.js'));
+  assert.ok(paths.includes('dist/management/console.mjs'));
   assert.ok(paths.includes('dist/service/documentation-token-ui.mjs'));
   assert.ok(paths.includes('examples/inspect-api.mjs'));
   assert.ok(paths.includes('spec/provider-config.schema.json'));
@@ -138,8 +139,13 @@ try {
   const executable = join(installed, 'dist/main.js');
   assert.match(
     run(process.execPath, [executable, 'init']),
-    /Configuration created/,
+    /Zero-application configuration created/,
   );
+  const initialConfiguration = JSON.parse(
+    await readFile(join(temporary, 'provider.config.json'), 'utf8'),
+  );
+  assert.deepEqual(initialConfiguration.policy.applications, []);
+  assert.ok(initialConfiguration.management);
   assert.match(
     run(process.execPath, [
       executable,

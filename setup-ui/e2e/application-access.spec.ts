@@ -13,7 +13,7 @@ test('a new operator configures application-led access without user login, vendo
   const server = await createSetupServer({ token });
   const url = await server.listen({ host: '127.0.0.1', port: 0 });
   try {
-    await page.goto(`${url}/#${token}`);
+    await page.goto(`${url}/?advanced#${token}`);
     await page
       .getByLabel('Provider name', { exact: true })
       .fill('Example Wallets');
@@ -227,7 +227,7 @@ test('a new operator configures application-led access without user login, vendo
       .getByRole('button', { name: 'API reference', exact: true })
       .click();
     await page.locator('.swagger-ui .opblock').first().waitFor();
-    await expect(page.locator('.swagger-ui .opblock')).toHaveCount(40);
+    await expect(page.locator('.swagger-ui .opblock')).toHaveCount(46);
     await page
       .getByLabel('Example endpoint', { exact: true })
       .selectOption('requestAccountAccess');

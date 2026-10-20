@@ -26,6 +26,7 @@ export interface SecretReference {
   env: string;
 }
 export interface ProviderConfiguration {
+  management?: { claim: SecretReference; localOrigin?: string };
   safeWallet?: import('../sponsorship/safe-wallet.js').SafeWalletConfiguration;
   network?: ProviderNetwork;
   safeProvisioning?: import('../provisioning/safe.js').SafeProvisioningConfiguration;
@@ -127,6 +128,29 @@ export function validateProviderConfiguration(
   const config = structuredClone(input) as unknown as ProviderConfiguration;
   try {
     assertSafeWalletConfiguration(config);
+    if (
+      config.management &&
+      (!config.authorizationServer ||
+        config.policy.applications.length ||
+        config.authorizationServer.clients.length ||
+        config.runtimeConfiguration?.operators.length ||
+        config.authorizationServer.operatorClients?.length ||
+        config.apiExplorer)
+    )
+      throw new ConfigurationError([
+        '/management: use bundled authentication and durable registrations without startup application or operator clients',
+      ]);
+    if (config.management?.localOrigin) {
+      const local = new URL(config.management.localOrigin);
+      if (
+        local.protocol !== 'http:' ||
+        local.hostname !== '127.0.0.1' ||
+        local.origin !== config.management.localOrigin
+      )
+        throw new ConfigurationError([
+          '/management/localOrigin: use an exact loopback HTTP origin',
+        ]);
+    }
     const resolvedPolicy = defineOnboardingPolicy(config.policy);
     if (config.policy.access?.mode !== 'application')
       throw new ConfigurationError([
@@ -333,6 +357,7 @@ export function secretReferences(
   config: ProviderConfiguration,
 ): SecretReference[] {
   return [
+    ...(config.management ? [config.management.claim] : []),
     ...(config.runtimeConfiguration?.credentialKey
       ? [config.runtimeConfiguration.credentialKey]
       : []),

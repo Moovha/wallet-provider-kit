@@ -24,10 +24,11 @@ describe the maintainer's next development session.
 
 ## Follow the provider's setup journey
 
-Organize operator setup around the FormKit steps in their actual order:
-**Provider → Backend → Services → Applications → Deployment → Export**. Keep the
-navigation, getting-started guide and wizard walkthrough consistent with those
-steps. Link a concept where the operator encounters its setting, with deeper
+Organize default installation around **Choose destination → Review deployment →
+Deploy and open administration**. Explain application registration and trust after
+installation. Keep the six explicit static configuration screens documented as
+the Advanced configuration path. Keep navigation and walkthroughs consistent
+with their selected path. Link a concept where the operator encounters its setting, with deeper
 reference material available from that point.
 
 Treat application-led identity and consent as the normal setup throughout this

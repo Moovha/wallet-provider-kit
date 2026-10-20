@@ -1,0 +1,161 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "Experimental single-host wallet provider. Zero applications; execution disabled. DNS, custody acceptance and cloud validation are separate.",
+  "Parameters": {
+    "VpcId": {
+      "Type": "AWS::EC2::VPC::Id"
+    },
+    "SubnetId": {
+      "Type": "AWS::EC2::Subnet::Id"
+    },
+    "KeyName": {
+      "Type": "AWS::EC2::KeyPair::KeyName"
+    },
+    "AdminCIDR": {
+      "Type": "String",
+      "Description": "Trusted operator IPv4 CIDR for SSH. Do not use a public catch-all range.",
+      "AllowedPattern": "^(\\d{1,3}\\.){3}\\d{1,3}/(1[6-9]|2[0-9]|3[0-2])$"
+    },
+    "DomainName": {
+      "Type": "String",
+      "AllowedPattern": "^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$"
+    },
+    "PrivacyURL": {
+      "Type": "String",
+      "AllowedPattern": "^https://[A-Za-z0-9./:_?&=%-]+$"
+    },
+    "ReleaseVersion": {
+      "Type": "String",
+      "AllowedPattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(-[A-Za-z0-9.-]+)?$"
+    },
+    "ReleaseArchiveSHA256": {
+      "Type": "String",
+      "AllowedPattern": "^[a-f0-9]{64}$",
+      "Description": "Verified SHA-256 of provider-release.tgz from the selected release."
+    },
+    "ImageId": {
+      "Type": "AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>",
+      "Default": "/aws/service/canonical/ubuntu/server/24.04/stable/current/amd64/hvm/ebs-gp3/ami-id"
+    },
+    "InstanceType": {
+      "Type": "String",
+      "Default": "t3.medium",
+      "AllowedValues": ["t3.medium", "t3.large"]
+    },
+    "DiskGiB": {
+      "Type": "Number",
+      "Default": 40,
+      "MinValue": 30,
+      "MaxValue": 1024
+    }
+  },
+  "Resources": {
+    "Firewall": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupDescription": "Wallet provider HTTPS and restricted operator SSH",
+        "VpcId": {
+          "Ref": "VpcId"
+        },
+        "SecurityGroupIngress": [
+          {
+            "IpProtocol": "tcp",
+            "FromPort": 443,
+            "ToPort": 443,
+            "CidrIp": "0.0.0.0/0"
+          },
+          {
+            "IpProtocol": "tcp",
+            "FromPort": 80,
+            "ToPort": 80,
+            "CidrIp": "0.0.0.0/0"
+          },
+          {
+            "IpProtocol": "tcp",
+            "FromPort": 22,
+            "ToPort": 22,
+            "CidrIp": {
+              "Ref": "AdminCIDR"
+            }
+          }
+        ]
+      }
+    },
+    "Provider": {
+      "Type": "AWS::EC2::Instance",
+      "Properties": {
+        "ImageId": {
+          "Ref": "ImageId"
+        },
+        "InstanceType": {
+          "Ref": "InstanceType"
+        },
+        "KeyName": {
+          "Ref": "KeyName"
+        },
+        "MetadataOptions": {
+          "HttpTokens": "required",
+          "HttpPutResponseHopLimit": 1
+        },
+        "NetworkInterfaces": [
+          {
+            "DeviceIndex": "0",
+            "SubnetId": {
+              "Ref": "SubnetId"
+            },
+            "AssociatePublicIpAddress": true,
+            "GroupSet": [
+              {
+                "Ref": "Firewall"
+              }
+            ]
+          }
+        ],
+        "BlockDeviceMappings": [
+          {
+            "DeviceName": "/dev/sda1",
+            "Ebs": {
+              "VolumeSize": {
+                "Ref": "DiskGiB"
+              },
+              "VolumeType": "gp3",
+              "Encrypted": true,
+              "DeleteOnTermination": false
+            }
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "wallet-provider"
+          }
+        ],
+        "UserData": {
+          "Fn::Base64": {
+            "Fn::Sub": "#!/bin/bash\nset -eu\nexport DEBIAN_FRONTEND=noninteractive\napt-get update\napt-get install -y docker.io docker-compose-v2 curl ca-certificates\nsystemctl enable --now docker\nuseradd --create-home --shell /bin/bash wallet-provider\nusermod -aG docker wallet-provider\ninstall -d -m 700 -o wallet-provider -g wallet-provider /home/wallet-provider/.wallet-provider\ninstall -d -m 700 -o wallet-provider -g wallet-provider /home/wallet-provider/release\ncurl --fail --location --proto '=https' --tlsv1.2 'https://github.com/Moovha/wallet-provider-kit/releases/download/provider-v${ReleaseVersion}/provider-release.tgz' -o /home/wallet-provider/release.tgz\nprintf '%s  %s\\n' '${ReleaseArchiveSHA256}' /home/wallet-provider/release.tgz | sha256sum --check\ntar --extract --gzip --file /home/wallet-provider/release.tgz --directory /home/wallet-provider/release\nchown -R wallet-provider:wallet-provider /home/wallet-provider/release\nsudo -u wallet-provider env WPK_LOCAL=false WPK_ORIGIN='https://${DomainName}' WPK_PRIVACY_URL='${PrivacyURL}' WPK_ACCEPT_PLAN=true bash /home/wallet-provider/release/install.sh\n"
+          }
+        }
+      }
+    }
+  },
+  "Outputs": {
+    "PublicIP": {
+      "Value": {
+        "Fn::GetAtt": ["Provider", "PublicIp"]
+      },
+      "Description": "Point the selected domain to this address; stack creation alone does not prove service readiness."
+    },
+    "Administration": {
+      "Value": {
+        "Fn::Sub": "https://${DomainName}/admin/"
+      }
+    },
+    "ClaimLocation": {
+      "Value": "/home/wallet-provider/.wallet-provider/installation-claim",
+      "Description": "Read privately over SSH. Never put the claim into stack outputs or logs."
+    },
+    "Persistence": {
+      "Value": "Encrypted root EBS is retained when the instance is deleted. Retained volumes continue to incur charges. Backups and tested restore are still required."
+    }
+  }
+}

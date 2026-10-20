@@ -42,7 +42,7 @@ test('local setup reviews changes and secret privacy, shows progress, resumes th
   });
   const url = await server.listen({ host: '127.0.0.1', port: 0 });
   try {
-    await page.goto(`${url}/#${token}`);
+    await page.goto(`${url}/?advanced#${token}`);
     const file = join(directory, 'config.json');
     const config = await readFile(
       new URL('../../docs/provider.config.safe.example.json', import.meta.url),
@@ -86,7 +86,7 @@ test('local setup reviews changes and secret privacy, shows progress, resumes th
     await expect(
       page.getByRole('button', { name: 'Import configuration', exact: true }),
     ).toBeDisabled();
-    await page.goto(`${url}/?runtime-resume#${token}`);
+    await page.goto(`${url}/?advanced&runtime-resume#${token}`);
     await expect(
       page.getByText('In progress · Install missing runtime packages', {
         exact: false,
@@ -122,7 +122,7 @@ test('local setup reviews changes and secret privacy, shows progress, resumes th
     await expect(
       page.getByRole('button', { name: 'Import configuration', exact: true }),
     ).toBeDisabled();
-    await page.goto(`${url}/?resume#${token}`);
+    await page.goto(`${url}/?advanced&resume#${token}`);
     await expect(
       page.getByText('Setup in progress', { exact: true }),
     ).toBeVisible();
@@ -203,7 +203,7 @@ test('a failed runtime installation unlocks configuration and can be checked and
   });
   const url = await server.listen({ host: '127.0.0.1', port: 0 });
   try {
-    await page.goto(`${url}/#offline-runtime-recovery`);
+    await page.goto(`${url}/?advanced#offline-runtime-recovery`);
     await page.getByLabel('Import provider configuration').setInputFiles({
       name: 'provider.config.json',
       mimeType: 'application/json',

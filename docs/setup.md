@@ -1,5 +1,10 @@
 # Configure the Safe service
 
+New installations can use [durable provider administration](provider-installation.md)
+and start without applications. Installation settings and runtime registrations
+have separate ownership. The reference below also supports explicit static
+configuration for advanced source integrations.
+
 Use [provider.config.safe.example.json](provider.config.safe.example.json) as the configuration reference. The only backend kind is `ows`; `safeWallet`, `safeProvisioning`, `approvedCalls` and `runtimeConfiguration` are required. Unknown properties and missing required sections are rejected before service startup.
 
 Configure the provider HTTPS identity, application clients and trusted application identity assertions. Retain separate provider operator credentials. Set pinned Safe, module, handler, EntryPoint and contract addresses for the chosen chain. Accepted runtime policy defines actions, services and bounded sponsorship.

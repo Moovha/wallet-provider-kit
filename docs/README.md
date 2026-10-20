@@ -9,9 +9,14 @@ The service is experimental and single-host. Applications retain responsibility
 for current identity evidence, consent, action requests and sponsorship funding.
 Offline checks do not establish production custody or latency acceptance.
 
-## Open the wizard
+## Deploy and establish administration
 
-Use Node 24.22.0, npm 11.11.1 and Git:
+Follow [installation and administration](provider-installation.md) for a reviewed
+release bundle on your computer or Linux server, or the AWS deployment template.
+Release bundles use pinned prebuilt images with Docker Compose. Verify that the
+selected release actually exists before attempting a registry installation.
+
+For contributor evaluation, the source setup command remains available:
 
 ```sh
 git clone https://github.com/Moovha/wallet-provider-kit.git
@@ -21,55 +26,28 @@ npm run build
 npm start -- setup
 ```
 
-Keep the terminal open. The temporary local wizard creates configuration and
-can prepare an isolated local container deployment. Start with operations disabled.
-See [local setup](local-setup.md) for runtime installation and recovery.
+Source builds require Node 24.22.0 and npm 11.11.1. The graphical flow has three
+stages: choose a destination, review deployment and open administration. The
+private installation claim establishes the first administrator. No connected
+application, RPC credentials or sponsor funding is required to finish installation.
 
-## 1. Provider
+## Connect applications afterward
 
-Enter your service name, intended HTTPS origin and privacy notice. Application
-registrations and public discovery use this origin. Prepare the domain and gateway
-before public deployment. See [domain preparation](operator-services.md).
+Use `/admin/` or the protected provider API to register an application. Save its
+credential once, accept identity/consent trust and choose permitted owner actions.
+Then configure action policies, service credentials and sponsorship through
+[application management](runtime-workspace.md). Registration, trust, funding,
+activation and owner authority are separate decisions.
 
-## 2. Backend
+An available management service with disabled wallet operations is a successful
+installation. Complete [provider acceptance](conformance.md), backups and tested
+recovery before admitting wallet use. See [maintenance](provider-maintenance.md).
 
-Review the bundled OWS vault and stable wallet environment ID. Setup generates
-missing local credentials privately. Keep the environment, vault and database
-backups together. See [Safe wallets](self-hosted-sponsorship.md).
+## Advanced configuration
 
-## 3. Services
-
-Configure application authentication. The bundled issuer supplies application
-tokens and has no second user login. The private bundler and durable Valkey queue
-start with the API. RPC credentials, contract methods and funding agreements are
-registered per application after connection.
-
-## 4. Applications
-
-Register each calling application, its identity/consent trust agreement and allowed
-API permissions. Retain its generated client ID and secret reference across restarts.
-Configure provider operators separately from application clients. See
-[application-led access](application-access.md) and [application management](runtime-workspace.md).
-
-## 5. Deployment
-
-Review private storage, the local port, HTTPS and optional API explorer controls.
-Leave wallet operations disabled until backend, recovery, authorization, bundler
-and paymaster acceptance is complete. The service has one execution flow: each user Safe submits through the private
-bundler and application verifying paymaster.
-
-## 6. Export
-
-Validate the configuration, then choose **Set up and run locally** or download
-configuration and secret-reference templates for manual deployment. Validation
-contacts no providers and establishes no funded readiness. See
-[the wizard reference](setup-wizard.md) and [deployment](operator-deployment.md).
-
-After deployment, accept the application's services and policy, fund its gas
-address, prepare sponsorship infrastructure and provision its user Safes.
-Applications use the account-scoped EIP-5792 endpoint and verified status stream.
-[UserOperation execution](user-operation-execution.md) explains verified outcomes
-and recovery of uncertain operations.
+The setup tool's **Advanced configuration** editor retains six explicit screens
+for static source integrations. Follow the [configuration reference](setup-wizard.md)
+for that path. It is not a prerequisite for API-managed installations.
 
 ## When you need a custom integration
 

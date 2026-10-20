@@ -1,3 +1,5 @@
+import { ManagementService } from '../management/service.js';
+import { createManagementAuthorizationServer } from '../management/authorization.js';
 import { SafeWalletRuntime } from '../sponsorship/safe-wallet.js';
 import {
   createOwsWalletProvider,
@@ -43,18 +45,23 @@ export async function createConfiguredProvider(
   const config = validateProviderConfiguration(input);
   const network = providerNetwork(config.network);
   assertSafeWalletConfiguration(config);
-  const authorizationServer = config.authorizationServer
-    ? createBundledAuthorizationServer(config)
-    : undefined;
-  const authenticate =
-    authorizationServer?.authenticate ?? createAuthenticator(config.oauth);
-  const issueExplorerToken = config.apiExplorer
-    ? createExplorerTokenIssuer(config, authenticate)
-    : undefined;
   const database = openProviderDatabase({
     directory: resolve(directory, config.storage.directory),
   });
   try {
+    const management = config.management
+      ? new ManagementService(
+          database.onboardingStore,
+          database.managementSnapshot,
+          config.oauth.issuer,
+          config.policy,
+        )
+      : undefined;
+    // Binding checks precede initialization so an existing foreign store cannot be claimed.
+    let authorizationServer:
+      | ReturnType<typeof createBundledAuthorizationServer>
+      | Awaited<ReturnType<typeof createManagementAuthorizationServer>>
+      | undefined;
     let onboarding: OnboardingService | undefined;
     let activeRevision: string | undefined;
     const passphrase = resolveSecret(config.backend.passphrase);
@@ -124,6 +131,25 @@ export async function createConfiguredProvider(
       throw new ConfigurationError([
         '/storage: provider binding changed or existing host requires reviewed migration',
       ]);
+    if (management) {
+      await management.initialize(resolveSecret(config.management!.claim));
+      authorizationServer = await createManagementAuthorizationServer(
+        config,
+        management,
+      );
+      Object.defineProperty(config.policy, 'applications', {
+        enumerable: true,
+        get: () => management.applications(),
+      });
+    } else
+      authorizationServer = config.authorizationServer
+        ? createBundledAuthorizationServer(config)
+        : undefined;
+    const authenticate =
+      authorizationServer?.authenticate ?? createAuthenticator(config.oauth);
+    const issueExplorerToken = config.apiExplorer
+      ? createExplorerTokenIssuer(config, authenticate)
+      : undefined;
     const identity = [
       ...(config.identity.didit
         ? [
@@ -151,13 +177,19 @@ export async function createConfiguredProvider(
       ? actionPolicyRevisionBase
       : fingerprint([network.name, actionPolicyRevisionBase]);
     onboarding = new OnboardingService(
-      config.policy,
+      management ? { ...config.policy, applications: [] } : config.policy,
       database.onboardingStore,
       identity,
       backend,
       actionPolicyRevision,
       config.runtimeConfiguration?.authorizeContracts,
       !!config.safeWallet,
+      management
+        ? {
+            list: () => management.applications(),
+            current: (principal) => management.application(principal),
+          }
+        : undefined,
     );
     const login = config.ownerLogin
       ? await createOwnerLogin(
@@ -246,6 +278,9 @@ export async function createConfiguredProvider(
                 resolveSecret(config.runtimeConfiguration.credentialKey),
               )
             : undefined,
+          management
+            ? (principal) => management.assertOperator(principal)
+            : undefined,
         )
       : undefined;
     const safeWallet =
@@ -288,6 +323,12 @@ export async function createConfiguredProvider(
             transportRevision,
       );
     const app = await createServer({
+      management,
+      managementReady: management
+        ? async () => (await database.ready()) && (await currentConfiguration())
+        : undefined,
+      providerOrigin: config.policy.provider.origin,
+      localManagementOrigin: config.management?.localOrigin,
       safeWallet,
       walletCalls: safeWallet
         ? new WalletCallsService(actions!, safeWallet.walletDriver())
