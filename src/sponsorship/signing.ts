@@ -80,6 +80,7 @@ export interface Safe4337SigningOptions {
 }
 /** Advanced embedded-host AS2 adapter. Signs only admitted exact SafeOps; never broadcasts or installs modules. */
 export class Safe4337SigningService {
+  private readonly preparedTerms = new Map<string, SponsorshipConsentTerms>();
   private readonly config: Safe4337SigningConfiguration;
   private readonly configurationHash: string;
   private readonly verifier: Safe4337Verifier;
@@ -305,7 +306,31 @@ export class Safe4337SigningService {
     );
   }
   private terms(record: SponsorshipAdmission): SponsorshipConsentTerms {
-    return {
+    const key = fingerprint([
+      record.id,
+      record.source,
+      record.configurationHash,
+      record.preparation,
+      record.validAfter,
+      record.validUntil,
+      record.maximumCostWei,
+    ]);
+    const until = Date.parse(record.preparation.expiresAt);
+    if (
+      !Number.isFinite(until) ||
+      until <= Date.now() ||
+      until >
+        Date.now() +
+          Math.min(
+            record.preparation.maxValiditySeconds,
+            record.preparation.runtimePolicy.policy.max_validity_seconds,
+          ) *
+            1000
+    )
+      deny();
+    const cached = this.preparedTerms.get(key);
+    if (cached) return structuredClone(cached);
+    const terms = {
       operationId: record.id,
       sourceApprovalHash: fingerprint(record.source),
       configurationHash: record.configurationHash,
@@ -314,6 +339,10 @@ export class Safe4337SigningService {
       validUntil: record.validUntil,
       maximumCostWei: record.maximumCostWei,
     };
+    if (this.preparedTerms.size >= 128)
+      this.preparedTerms.delete(this.preparedTerms.keys().next().value!);
+    this.preparedTerms.set(key, structuredClone(terms));
+    return terms;
   }
   private async current(
     context: AuthorityContext,

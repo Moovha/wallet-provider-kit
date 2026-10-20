@@ -8,7 +8,7 @@ import {
   TypedDataEncoder,
   recoverAddress,
 } from 'ethers';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { openProviderDatabase } from '../src/storage/index.js';
 import { fingerprint } from '../src/onboarding/policy.js';
 import {
@@ -186,6 +186,54 @@ describe('durable SafeOp sponsorship and immutable operation admission', () => {
         )
       )?.reserved,
     ).toBe('1');
+  });
+  it('checks grant revocation in the final transaction after the approval read, even with a warmed immutable plan', async () => {
+    const f = await fixture(),
+      source = await f.source();
+    await f.actions.withAuthorizedCalls(
+      f.context.principal,
+      source.action_id,
+      () => true,
+    );
+    const original = f.db.isApprovedAction.bind(f.db);
+    const check = vi
+      .spyOn(f.db, 'isApprovedAction')
+      .mockImplementation(async (...args) => {
+        const approved = await original(...args);
+        await f.db.onboardingStore.transaction((s) => {
+          s.grants[f.grant.grant_id!].state = 'revoked';
+        });
+        return approved;
+      });
+    try {
+      await expect(
+        f.actions.withAuthorizedCalls(
+          f.context.principal,
+          source.action_id,
+          () => {
+            throw Error('effect reached');
+          },
+        ),
+      ).rejects.toMatchObject(denied);
+    } finally {
+      check.mockRestore();
+    }
+    expect(f.state.signs).toBe(0);
+  });
+  it('invalidates prepared-term reuse when the retained gas quote changes', async () => {
+    const f = await fixture(),
+      source = await f.source();
+    f.state.finalStub = true;
+    await f.service.admit(f.context, source.action_id, f.operation);
+    await f.service.sponsor(f.context, source.action_id);
+    await f.db.onboardingStore.transaction((s) => {
+      s.sponsorships![source.action_id].preparation.operation.maxFeePerGas =
+        '0x99';
+    });
+    await expect(
+      f.service.sign(f.context, source.action_id),
+    ).rejects.toMatchObject(denied);
+    expect(f.state.signs).toBe(0);
   });
   it('checks fresh grant revocation between stub and final before another paymaster effect', async () => {
     const f = await fixture(),

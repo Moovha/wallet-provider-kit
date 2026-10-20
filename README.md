@@ -107,7 +107,7 @@ vendor services or certify readiness. Initial activation remains disabled._
    and revoke access when the user withdraws. Register
    [approved calls and optional operation adapters](docs/approved-contract-calls.md)
    for the [Safe execution flow](docs/self-hosted-sponsorship.md).
-   [Execution latency and recovery](docs/execution-latency.md) explains account lanes,
+   [Execution status and recovery](docs/user-operation-execution.md) explains account lanes,
    verified status and expired uncertain operations.
    Applications arrange sponsor funding; verified chain status is separate from
    business settlement.
@@ -125,7 +125,7 @@ The wizard’s API reference preview sends no API calls; deployed requests have 
 The [getting-started guide](docs/README.md) links every stage. The service uses
 per-user Safe 1.4.1 accounts, ERC-4337 bundling and application-owned paymasters
 on Base or Base Sepolia. Deployment remains single-host and production custody
-acceptance is pending. See [execution latency](docs/execution-latency.md).
+acceptance is pending.
 
 ## Who takes part
 

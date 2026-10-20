@@ -70,6 +70,7 @@ function sameCaller(
 }
 /** Construct exact policy-approved transfers and contract actions under explicit owner delegation. HTTP never supplies signing payloads or authority records. */
 export class SupportedActions {
+  private readonly validatedPlans = new Set<string>();
   readonly revision: string;
   readonly network: ReturnType<typeof providerNetwork>;
   private readonly callConfiguration?: import('../execution/approved-calls.js').ApprovedCallsConfiguration;
@@ -212,16 +213,6 @@ export class SupportedActions {
     try {
       const { action, account, units } = record.approval;
       if (record.intent) {
-        const base = {
-          ...(this.callConfiguration?.policy ?? deny()),
-          accounts: [record.intent.account],
-        };
-        const policy = record.runtimePolicy
-          ? runtimeCallPolicy(base ?? deny(), record.runtimePolicy)
-          : base;
-        if (this.onboarding.runtimeContracts !== !!record.runtimePolicy) deny();
-        if (record.runtimePolicy)
-          validateRuntimeCalls(record.runtimePolicy, record.intent.input);
         if (
           !this.callConfiguration?.policy ||
           record.intent.account.accountId !==
@@ -249,6 +240,23 @@ export class SupportedActions {
           action.status !== 'ready'
         )
           deny();
+        if (this.onboarding.runtimeContracts !== !!record.runtimePolicy) deny();
+        const planKey = fingerprint([
+          record.approval,
+          record.intent,
+          record.runtimePolicy ?? null,
+          record.revision,
+        ]);
+        if (this.validatedPlans.has(planKey)) return;
+        const base = {
+          ...(this.callConfiguration?.policy ?? deny()),
+          accounts: [record.intent.account],
+        };
+        const policy = record.runtimePolicy
+          ? runtimeCallPolicy(base ?? deny(), record.runtimePolicy)
+          : base;
+        if (record.runtimePolicy)
+          validateRuntimeCalls(record.runtimePolicy, record.intent.input);
         validateApprovedCallAction(
           policy ?? deny(),
           record.intent,
@@ -260,6 +268,11 @@ export class SupportedActions {
           fingerprint(this.adapterCharges(record.intent))
         )
           deny();
+        if (this.validatedPlans.size >= 128)
+          this.validatedPlans.delete(
+            this.validatedPlans.values().next().value!,
+          );
+        this.validatedPlans.add(planKey);
         return;
       }
       deny();
@@ -673,7 +686,6 @@ export class SupportedActions {
   ): Promise<T> {
     principal = structuredClone(principal);
     const before = await this.load(id);
-    const grant = await this.permitted(principal, before, false, allowExpired);
     if (
       before.status !== 'authorized' ||
       !(await this.database.isApprovedAction(before.approval, allowExpired))
@@ -683,17 +695,26 @@ export class SupportedActions {
       principal,
       (before.approval.userAccount ?? before.approval.account).accountId,
       'contracts:request',
-      (state, currentGrant) => {
+      (state, grant) => {
         const latest = state.supportedActions?.[id];
+        const approval = before.approval;
+        const account = state.accounts[grant.accountId];
         if (
           !latest ||
           latest.status !== 'authorized' ||
-          fingerprint(latest.approval) !== fingerprint(before.approval) ||
-          fingerprint(grant) !== fingerprint(currentGrant) ||
-          state.accounts[grant.accountId]?.address?.toLowerCase() !==
-            (
-              before.approval.userAccount ?? before.approval.account
-            ).address.toLowerCase() ||
+          fingerprint(latest.approval) !== fingerprint(approval) ||
+          !sameCaller(principal, approval.caller) ||
+          grant.id !== approval.grantId ||
+          grant.owner !== approval.ownerSubject ||
+          grant.requestId !== approval.consentReference ||
+          approval.policyRevision !== this.revision ||
+          !account ||
+          account.owner !== grant.owner ||
+          account.status !== 'active' ||
+          account.acceptedUntil <= Date.now() ||
+          account.acceptanceRevision !== this.onboarding.policy.revision ||
+          account.address?.toLowerCase() !==
+            (approval.userAccount ?? approval.account).address.toLowerCase() ||
           state.deploymentBindings?.['service-v1']?.activeRevision !==
             this.revision
         )

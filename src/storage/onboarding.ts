@@ -67,31 +67,66 @@ export function sqliteOnboardingStore(
           format: 'moovha-onboarding-1',
           audit: [],
         } as unknown as ProviderState;
-        for (const collection of collections)
-          state[collection] = Object.create(null);
         const previous = new Set<string>();
         const encode = new Map<string, ReturnType<typeof lazyJson>>();
         for (const row of connection.all(
-          'SELECT collection,id FROM onboarding_records',
-        )) {
-          const collection = String(
-            row.collection,
-          ) as (typeof collections)[number];
-          if (!collections.includes(collection)) throw new Error();
-          const key = JSON.stringify([collection, row.id]);
-          encode.set(
-            key,
-            lazyJson(state[collection]!, String(row.id), () => {
-              const record = connection.get(
-                'SELECT record FROM onboarding_records WHERE collection=? AND id=?',
-                collection,
-                String(row.id),
+          'SELECT DISTINCT collection FROM onboarding_records',
+        ))
+          if (
+            !collections.includes(
+              String(row.collection) as (typeof collections)[number],
+            )
+          )
+            throw new Error();
+        const loaded = new Set<string>();
+        const loaders = new Map<string, () => void>();
+        for (const collection of collections) {
+          let value: object;
+          const load = () => {
+            if (loaded.has(collection)) return;
+            loaded.add(collection);
+            value = Object.create(null);
+            for (const row of connection.all(
+              'SELECT id FROM onboarding_records WHERE collection=?',
+              collection,
+            )) {
+              const key = JSON.stringify([collection, row.id]);
+              encode.set(
+                key,
+                lazyJson(value, String(row.id), () => {
+                  const record = connection.get(
+                    'SELECT record FROM onboarding_records WHERE collection=? AND id=?',
+                    collection,
+                    String(row.id),
+                  );
+                  if (typeof record?.record !== 'string') throw new Error();
+                  return record.record;
+                }),
               );
-              if (typeof record?.record !== 'string') throw new Error();
-              return record.record;
-            }),
-          );
-          previous.add(key);
+              previous.add(key);
+            }
+          };
+          const get = () => {
+            load();
+            return value;
+          };
+          const set = (replacement: object) => {
+            load();
+            value = replacement;
+          };
+          Object.defineProperty(state, collection, {
+            get,
+            set,
+            enumerable: true,
+            configurable: true,
+          });
+          loaders.set(collection, () => {
+            const descriptor = Object.getOwnPropertyDescriptor(
+              state,
+              collection,
+            );
+            if (descriptor?.get !== get || descriptor.set !== set) load();
+          });
         }
         let originalAudit: ReturnType<StorageConnection['all']> | undefined;
         let auditEncoders: ReturnType<typeof lazyJson>[] = [];
@@ -162,6 +197,8 @@ export function sqliteOnboardingStore(
         )
           throw new Error();
         for (const collection of collections) {
+          loaders.get(collection)!();
+          if (!loaded.has(collection)) continue;
           if (
             !state[collection] ||
             typeof state[collection] !== 'object' ||

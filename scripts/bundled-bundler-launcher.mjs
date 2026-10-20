@@ -1,3 +1,4 @@
+import { createBundlerRpc } from './wpk-bundler-rpc.mjs';
 import { createBundlerSimulations } from './wpk-bundler-simulations.mjs';
 import { createServer } from 'node:http';
 import { readFile, readdir, writeFile, rename } from 'node:fs/promises';
@@ -114,7 +115,10 @@ async function refreshApplications() {
         !/^0x[a-f0-9]{64}$/.test(config.executorKey) ||
         typeof config.authorization !== 'string' ||
         config.authorization.length < 32 ||
+        !/^0x[0-9a-f]+$/.test(config.chainId) ||
+        !/^0x[0-9a-f]{64}$/.test(config.genesisHash) ||
         !Array.isArray(config.rpcUrls) ||
+        config.rpcUrls.length > 3 ||
         !config.rpcUrls.length ||
         config.rpcUrls.some((u) => !u.startsWith('https://')) ||
         !Array.isArray(config.accounts) ||
@@ -127,7 +131,9 @@ async function refreshApplications() {
         if (
           previous.config.executorKey !== config.executorKey ||
           previous.config.entryPoint !== config.entryPoint ||
-          previous.config.paymaster !== config.paymaster
+          previous.config.paymaster !== config.paymaster ||
+          previous.config.chainId !== config.chainId ||
+          previous.config.genesisHash !== config.genesisHash
         )
           throw Error();
         previous.config = config;
@@ -139,6 +145,9 @@ async function refreshApplications() {
       const port = allocatedPorts.get(config.applicationId) ?? nextPort++;
       allocatedPorts.set(config.applicationId, port);
       const simulations = await createBundlerSimulations(config.entryPoint);
+      const rpc = createBundlerRpc(
+        () => applications.get(config.applicationId)?.config ?? config,
+      );
       const proxy = createServer(async (request, response) => {
         try {
           let body = '';
@@ -146,8 +155,6 @@ async function refreshApplications() {
             body += chunk;
             if (body.length > 1048576) throw Error();
           }
-          const current =
-            applications.get(config.applicationId)?.config ?? config;
           const parsed = JSON.parse(body);
           const temporary =
             parsed.method === 'eth_getCode' &&
@@ -163,33 +170,9 @@ async function refreshApplications() {
             );
             return;
           }
-          body = JSON.stringify(simulations.request(parsed));
-          let result;
-          for (const url of current.rpcUrls) {
-            try {
-              const reply = await fetch(url, {
-                method: 'POST',
-                headers: { 'content-type': 'application/json' },
-                body,
-                signal: AbortSignal.timeout(5000),
-              });
-              const text = await reply.text();
-              if (!reply.ok || text.length > 4194304) continue;
-              const parsed = JSON.parse(text);
-              if (
-                parsed.error &&
-                [-32603, -32005, -32016].includes(parsed.error.code)
-              )
-                continue;
-              result = text;
-              break;
-            } catch {
-              /* Availability failover preserves the exact RPC request. */
-            }
-          }
-          if (!result) throw Error();
+          const result = await rpc(simulations.request(parsed));
           response.setHeader('content-type', 'application/json');
-          response.end(result);
+          response.end(JSON.stringify(result));
         } catch {
           response.writeHead(503).end('{}');
         }
