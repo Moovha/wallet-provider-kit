@@ -1,0 +1,279 @@
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  width="1200"
+  height="820"
+  viewBox="0 0 1200 820"
+  role="img"
+  aria-labelledby="title description"
+>
+  <title id="title">Wallet service layers</title>
+  <desc id="description">
+    The connected application calls the HTTP API. The API authenticates the
+    caller and passes the request to policy checks for current owner, grant,
+    KYC, consent, permitted limits and the exact approved action. Policy uses
+    stored authority records. The wallet backend signs only admitted actions
+    after a durable claim and a current permission recheck; verified results are
+    persisted. Missing or stale authority denies the request. OAuth scopes alone
+    never authorize spending.
+  </desc>
+  <defs>
+    <marker
+      id="arrow"
+      viewBox="0 0 10 10"
+      refX="9"
+      refY="5"
+      markerWidth="7"
+      markerHeight="7"
+      orient="auto-start-reverse"
+    >
+      <path d="M0 0 10 5 0 10Z" fill="#12bfde" />
+    </marker>
+    <marker
+      id="back"
+      viewBox="0 0 10 10"
+      refX="9"
+      refY="5"
+      markerWidth="7"
+      markerHeight="7"
+      orient="auto-start-reverse"
+    >
+      <path d="M0 0 10 5 0 10Z" fill="#12bfde" />
+    </marker>
+  </defs>
+  <rect width="1200" height="820" rx="22" fill="white" />
+  <g font-family="Arial, Helvetica, sans-serif">
+    <text x="48" y="68" fill="#0f2338" font-size="40" font-weight="700">
+      <tspan x="48" dy="0">Inside your wallet service</tspan>
+    </text>
+    <text x="48" y="108" fill="#526c83" font-size="24" font-weight="400">
+      <tspan x="48" dy="0">
+        An authenticated request must pass current policy before signing.
+      </tspan>
+    </text>
+    <rect
+      x="48"
+      y="145"
+      width="380"
+      height="60"
+      rx="18"
+      fill="white"
+      stroke="#bfe5f1"
+      stroke-width="2"
+    />
+    <g
+      transform="translate(64 152)"
+      fill="none"
+      stroke="#0f2338"
+      stroke-width="3"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    >
+      <rect x="3" y="3" width="16" height="16" rx="3" />
+      <rect x="29" y="3" width="16" height="16" rx="3" />
+      <rect x="3" y="29" width="16" height="16" rx="3" />
+      <rect x="29" y="29" width="16" height="16" rx="3" />
+    </g>
+    <text x="130" y="183" fill="#0f2338" font-size="25" font-weight="700">
+      <tspan x="130" dy="0">Connected application</tspan>
+    </text>
+    <rect
+      x="24"
+      y="240"
+      width="1152"
+      height="502"
+      rx="18"
+      fill="#f0faff"
+      stroke="#bfe5f1"
+      stroke-width="2"
+    />
+    <text x="48" y="280" fill="#526c83" font-size="18" font-weight="700">
+      <tspan x="48" dy="0">PROVIDER SERVICE</tspan>
+    </text>
+    <rect
+      x="48"
+      y="308"
+      width="300"
+      height="220"
+      rx="18"
+      fill="white"
+      stroke="#bfe5f1"
+      stroke-width="2"
+    />
+    <path
+      d="M300 205V308"
+      fill="none"
+      stroke="#12bfde"
+      stroke-width="3"
+      stroke-linejoin="round"
+      marker-end="url(#arrow)"
+    />
+    <g
+      transform="translate(70 330)"
+      fill="none"
+      stroke="#0f2338"
+      stroke-width="3"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    >
+      <rect x="2" y="4" width="42" height="34" rx="6" />
+      <path d="M2 14h42M12 8h1m6 0h1M16 22l-5 5 5 5m14-10 5 5-5 5" />
+    </g>
+    <text x="70" y="414" fill="#0f2338" font-size="27" font-weight="700">
+      <tspan x="70" dy="0">HTTP API</tspan>
+    </text>
+    <text x="70" y="454" fill="#526c83" font-size="22" font-weight="400">
+      <tspan x="70" dy="0">Authenticate the caller</tspan>
+      <tspan x="70" dy="30.8">Validate the request</tspan>
+      <tspan x="70" dy="30.8">Admit required scopes</tspan>
+    </text>
+    <rect
+      x="450"
+      y="308"
+      width="300"
+      height="220"
+      rx="18"
+      fill="white"
+      stroke="#bfe5f1"
+      stroke-width="2"
+    />
+    <g
+      transform="translate(472 330)"
+      fill="none"
+      stroke="#0f2338"
+      stroke-width="3"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    >
+      <path d="M24 2 43 10v14c0 12-10 19-19 23C15 43 5 36 5 24V10Z" />
+      <path d="m14 24 7 7 13-15" stroke="#12bfde" />
+    </g>
+    <text x="472" y="414" fill="#0f2338" font-size="27" font-weight="700">
+      <tspan x="472" dy="0">Policy layer</tspan>
+    </text>
+    <text x="472" y="454" fill="#526c83" font-size="22" font-weight="400">
+      <tspan x="472" dy="0">Check owner, grant, KYC</tspan>
+      <tspan x="472" dy="30.8">Consent + permitted limits</tspan>
+      <tspan x="472" dy="30.8">Load exact approved action</tspan>
+    </text>
+    <rect
+      x="852"
+      y="308"
+      width="300"
+      height="220"
+      rx="18"
+      fill="white"
+      stroke="#bfe5f1"
+      stroke-width="2"
+    />
+    <g
+      transform="translate(874 330)"
+      fill="none"
+      stroke="#0f2338"
+      stroke-width="3"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    >
+      <circle cx="31" cy="15" r="12" />
+      <path d="m22 24-19 19v5h10v-7h7v-7l9-9" />
+      <circle cx="34" cy="12" r="2" stroke="#12bfde" />
+    </g>
+    <text x="874" y="414" fill="#0f2338" font-size="27" font-weight="700">
+      <tspan x="874" dy="0">Signing layer</tspan>
+    </text>
+    <text x="874" y="454" fill="#526c83" font-size="22" font-weight="400">
+      <tspan x="874" dy="0">Use the chosen backend</tspan>
+      <tspan x="874" dy="30.8">Sign admitted actions only</tspan>
+      <tspan x="874" dy="30.8">Verify digest + signer</tspan>
+    </text>
+    <path
+      d="M348 410H450"
+      fill="none"
+      stroke="#12bfde"
+      stroke-width="3"
+      stroke-linejoin="round"
+      marker-end="url(#arrow)"
+    />
+    <path
+      d="M750 410H852"
+      fill="none"
+      stroke="#12bfde"
+      stroke-width="3"
+      stroke-linejoin="round"
+      marker-end="url(#arrow)"
+    />
+    <text x="367" y="391" fill="#526c83" font-size="20" font-weight="400">
+      <tspan x="367" dy="0">Check</tspan>
+    </text>
+    <text x="768" y="391" fill="#526c83" font-size="20" font-weight="400">
+      <tspan x="768" dy="0">Allow</tspan>
+    </text>
+    <path
+      d="M560 528V613"
+      fill="none"
+      stroke="#12bfde"
+      stroke-width="3"
+      stroke-linejoin="round"
+      marker-end="url(#arrow)"
+      marker-start="url(#back)"
+    />
+    <text x="580" y="574" fill="#526c83" font-size="21" font-weight="400">
+      <tspan x="580" dy="0">Read + enforce</tspan>
+    </text>
+    <path
+      d="M1002 528V613"
+      fill="none"
+      stroke="#12bfde"
+      stroke-width="3"
+      stroke-linejoin="round"
+      marker-end="url(#arrow)"
+      marker-start="url(#back)"
+    />
+    <text x="1018" y="567" fill="#526c83" font-size="20" font-weight="400">
+      <tspan x="1018" dy="0">Claim +</tspan>
+      <tspan x="1018" dy="28">save result</tspan>
+    </text>
+    <rect
+      x="450"
+      y="616"
+      width="702"
+      height="104"
+      rx="18"
+      fill="white"
+      stroke="#bfe5f1"
+      stroke-width="2"
+    />
+    <g
+      transform="translate(470 643)"
+      fill="none"
+      stroke="#0f2338"
+      stroke-width="3"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    >
+      <ellipse cx="24" cy="9" rx="21" ry="7" />
+      <path d="M3 9v29c0 10 42 10 42 0V9M3 23c0 10 42 10 42 0" />
+    </g>
+    <text x="538" y="653" fill="#0f2338" font-size="27" font-weight="700">
+      <tspan x="538" dy="0">Storage layer</tspan>
+    </text>
+    <text x="538" y="689" fill="#526c83" font-size="22" font-weight="400">
+      <tspan x="538" dy="0">
+        Grants · approvals · budgets · attempts · results
+      </tspan>
+    </text>
+    <text x="48" y="594" fill="#0f2338" font-size="25" font-weight="700">
+      <tspan x="48" dy="0">Missing or stale</tspan>
+      <tspan x="48" dy="35">authority → deny</tspan>
+    </text>
+    <text x="48" y="668" fill="#526c83" font-size="22" font-weight="400">
+      <tspan x="48" dy="0">Record the durable claim.</tspan>
+      <tspan x="48" dy="30.8">Recheck before dispatch.</tspan>
+    </text>
+    <text x="48" y="782" fill="#526c83" font-size="23" font-weight="400">
+      <tspan x="48" dy="0">
+        OAuth scopes alone never authorize spending. Keys stay within the wallet
+        backend.
+      </tspan>
+    </text>
+  </g>
+</svg>

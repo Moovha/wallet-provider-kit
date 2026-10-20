@@ -17,27 +17,67 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .node-version
           cache: npm
+      - name: Select documentation or release checks
+        id: scope
+        run: |
+          node --input-type=module <<'JS'
+          import { execFileSync } from 'node:child_process';
+          import { readFileSync, appendFileSync } from 'node:fs';
+          const event = JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8'));
+          let base = event.pull_request?.base.sha ?? event.before;
+          if (!base) {
+            try { base = execFileSync('git', ['rev-parse', 'HEAD^'], {encoding:'utf8'}).trim(); }
+            catch { base = ''; }
+          }
+          const documentation = path => path === 'README.md' ||
+            (!path.includes('/') && path.endsWith('.md')) ||
+            /^docs\/.*\.md$/.test(path) || path.startsWith('docs/public/') ||
+            path.startsWith('docs/.vitepress/') || path === '.github/workflows/ci.yml';
+          const validBase = /^[a-f0-9]{40}$/.test(base) && !/^0+$/.test(base);
+          const files = validBase ? execFileSync('git', ['diff', '--name-only', '-z', base, 'HEAD'], {encoding:'utf8'}).split('\0').filter(Boolean) : [];
+          const full = files.length === 0 || !files.every(documentation);
+          appendFileSync(process.env.GITHUB_OUTPUT, `full=${full}\n`);
+          console.log(full ? 'Run release checks: application, tooling or configuration changed.' : 'Run documentation checks: prose, presentation assets or CI wiring only.');
+          JS
       - run: npm install --global npm@11.11.1 --ignore-scripts
       - run: npm ci
       - run: npm run verify
+        if: steps.scope.outputs.full == 'true'
       - run: npm run build
+        if: steps.scope.outputs.full == 'true'
       - run: npx --no-install playwright install --with-deps chromium
+        if: steps.scope.outputs.full == 'true'
       - run: npx --no-install playwright test --config setup-ui/playwright.config.ts
+        if: steps.scope.outputs.full == 'true'
+      - name: Check documentation sources
+        if: steps.scope.outputs.full == 'false'
+        run: npm run check:docs && npm run format:check && npm run check:secrets
       - run: npm run docs:build
       - run: npm run check:package
+        if: steps.scope.outputs.full == 'true'
       - run: node scripts/smoke-built.mjs
+        if: steps.scope.outputs.full == 'true'
       - run: node scripts/smoke-ows.mjs
+        if: steps.scope.outputs.full == 'true'
       - run: npm audit --audit-level=low
+        if: steps.scope.outputs.full == 'true'
       - run: mkdir -p artifacts
+        if: steps.scope.outputs.full == 'true'
       - run: npm run sbom --silent > artifacts/sbom.cdx.json
+        if: steps.scope.outputs.full == 'true'
       - run: npm pack --pack-destination artifacts
+        if: steps.scope.outputs.full == 'true'
       - run: docker build -t wallet-provider-kit:verify .
+        if: steps.scope.outputs.full == 'true'
       - run: node scripts/check-local-compose.mjs
+        if: steps.scope.outputs.full == 'true'
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: steps.scope.outputs.full == 'true'
         with:
           name: release-candidate
           path: artifacts/
