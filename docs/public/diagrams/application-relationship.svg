@@ -1,0 +1,273 @@
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  width="1200"
+  height="830"
+  viewBox="0 0 1200 830"
+  role="img"
+  aria-labelledby="title description"
+>
+  <title id="title">Account owner, application and wallet provider</title>
+  <desc id="description">
+    The account owner signs in, completes identity checks and approves access
+    within the connected application. The application submits authenticated
+    requests and user evidence to the wallet service. Provider policy checks
+    current grants, consent, identity and exact-action limits against private
+    durable records. The chosen wallet backend creates accounts and signs only
+    approved actions. Only permitted results return to the application; private
+    keys remain in the backend.
+  </desc>
+  <defs>
+    <marker
+      id="arrow"
+      viewBox="0 0 10 10"
+      refX="9"
+      refY="5"
+      markerWidth="7"
+      markerHeight="7"
+      orient="auto-start-reverse"
+    >
+      <path d="M0 0 10 5 0 10Z" fill="#12bfde" />
+    </marker>
+    <marker
+      id="back"
+      viewBox="0 0 10 10"
+      refX="9"
+      refY="5"
+      markerWidth="7"
+      markerHeight="7"
+      orient="auto-start-reverse"
+    >
+      <path d="M0 0 10 5 0 10Z" fill="#12bfde" />
+    </marker>
+  </defs>
+  <rect width="1200" height="830" rx="22" fill="white" />
+  <g font-family="Arial, Helvetica, sans-serif">
+    <text x="48" y="68" fill="#0f2338" font-size="40" font-weight="700">
+      <tspan x="48" dy="0">Your product. Your wallet service.</tspan>
+    </text>
+    <text x="48" y="110" fill="#526c83" font-size="24" font-weight="400">
+      <tspan x="48" dy="0">
+        Users stay in the application. The provider controls wallet access.
+      </tspan>
+    </text>
+    <rect
+      x="420"
+      y="160"
+      width="756"
+      height="590"
+      rx="18"
+      fill="#f0faff"
+      stroke="#bfe5f1"
+      stroke-width="2"
+    />
+    <text x="448" y="204" fill="#526c83" font-size="20" font-weight="700">
+      <tspan x="448" dy="0">YOUR WALLET SERVICE</tspan>
+    </text>
+    <rect
+      x="48"
+      y="160"
+      width="300"
+      height="160"
+      rx="18"
+      fill="white"
+      stroke="#bfe5f1"
+      stroke-width="2"
+    />
+    <g
+      transform="translate(70 184)"
+      fill="none"
+      stroke="#0f2338"
+      stroke-width="3"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    >
+      <circle cx="24" cy="12" r="10" />
+      <path d="M5 45v-3a19 19 0 0 1 38 0v3Z" />
+    </g>
+    <text x="70" y="265" fill="#0f2338" font-size="28" font-weight="700">
+      <tspan x="70" dy="0">Account owner</tspan>
+    </text>
+    <text x="70" y="300" fill="#526c83" font-size="20" font-weight="400">
+      <tspan x="70" dy="0">Approves access in the app</tspan>
+    </text>
+    <path
+      d="M318 320V428"
+      fill="none"
+      stroke="#12bfde"
+      stroke-width="3"
+      stroke-linejoin="round"
+      marker-end="url(#arrow)"
+    />
+    <text x="48" y="363" fill="#526c83" font-size="22" font-weight="400">
+      <tspan x="48" dy="0">Login, identity checks</tspan>
+      <tspan x="48" dy="30.8">and access consent</tspan>
+    </text>
+    <rect
+      x="48"
+      y="430"
+      width="300"
+      height="200"
+      rx="18"
+      fill="white"
+      stroke="#bfe5f1"
+      stroke-width="2"
+    />
+    <g
+      transform="translate(70 452)"
+      fill="none"
+      stroke="#0f2338"
+      stroke-width="3"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    >
+      <rect x="3" y="3" width="16" height="16" rx="3" />
+      <rect x="29" y="3" width="16" height="16" rx="3" />
+      <rect x="3" y="29" width="16" height="16" rx="3" />
+      <rect x="29" y="29" width="16" height="16" rx="3" />
+    </g>
+    <text x="70" y="534" fill="#0f2338" font-size="25" font-weight="700">
+      <tspan x="70" dy="0">Connected application</tspan>
+    </text>
+    <text x="70" y="573" fill="#526c83" font-size="21" font-weight="400">
+      <tspan x="70" dy="0">Attests identity + consent</tspan>
+      <tspan x="70" dy="29.4">Requests permitted actions</tspan>
+    </text>
+    <rect
+      x="448"
+      y="254"
+      width="326"
+      height="220"
+      rx="18"
+      fill="white"
+      stroke="#bfe5f1"
+      stroke-width="2"
+    />
+    <g
+      transform="translate(470 276)"
+      fill="none"
+      stroke="#0f2338"
+      stroke-width="3"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    >
+      <path d="M24 2 43 10v14c0 12-10 19-19 23C15 43 5 36 5 24V10Z" />
+      <path d="m14 24 7 7 13-15" stroke="#12bfde" />
+    </g>
+    <text x="470" y="360" fill="#0f2338" font-size="28" font-weight="700">
+      <tspan x="470" dy="0">Policy + authority</tspan>
+    </text>
+    <text x="470" y="400" fill="#526c83" font-size="22" font-weight="400">
+      <tspan x="470" dy="0">Current grants and consent</tspan>
+      <tspan x="470" dy="30.8">Identity + exact-action limits</tspan>
+    </text>
+    <rect
+      x="836"
+      y="254"
+      width="312"
+      height="220"
+      rx="18"
+      fill="white"
+      stroke="#bfe5f1"
+      stroke-width="2"
+    />
+    <g
+      transform="translate(858 276)"
+      fill="none"
+      stroke="#0f2338"
+      stroke-width="3"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    >
+      <circle cx="31" cy="15" r="12" />
+      <path d="m22 24-19 19v5h10v-7h7v-7l9-9" />
+      <circle cx="34" cy="12" r="2" stroke="#12bfde" />
+    </g>
+    <text x="858" y="360" fill="#0f2338" font-size="28" font-weight="700">
+      <tspan x="858" dy="0">Wallet backend</tspan>
+    </text>
+    <text x="858" y="400" fill="#526c83" font-size="22" font-weight="400">
+      <tspan x="858" dy="0">Creates wallet accounts</tspan>
+      <tspan x="858" dy="30.8">Signs approved actions</tspan>
+    </text>
+    <path
+      d="M774 330H836"
+      fill="none"
+      stroke="#12bfde"
+      stroke-width="3"
+      stroke-linejoin="round"
+      marker-end="url(#arrow)"
+    />
+    <text x="779" y="306" fill="#526c83" font-size="19" font-weight="400">
+      <tspan x="779" dy="0">Allow</tspan>
+    </text>
+    <path
+      d="M348 487H396V364H448"
+      fill="none"
+      stroke="#12bfde"
+      stroke-width="3"
+      stroke-linejoin="round"
+      marker-end="url(#arrow)"
+    />
+    <path
+      d="M448 421H418V588H348"
+      fill="none"
+      stroke="#12bfde"
+      stroke-width="3"
+      stroke-linejoin="round"
+      marker-end="url(#arrow)"
+    />
+    <rect
+      x="448"
+      y="592"
+      width="700"
+      height="130"
+      rx="18"
+      fill="white"
+      stroke="#bfe5f1"
+      stroke-width="2"
+    />
+    <g
+      transform="translate(470 626)"
+      fill="none"
+      stroke="#0f2338"
+      stroke-width="3"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    >
+      <ellipse cx="24" cy="9" rx="21" ry="7" />
+      <path d="M3 9v29c0 10 42 10 42 0V9M3 23c0 10 42 10 42 0" />
+    </g>
+    <text x="538" y="633" fill="#0f2338" font-size="27" font-weight="700">
+      <tspan x="538" dy="0">Private durable records</tspan>
+    </text>
+    <text x="538" y="673" fill="#526c83" font-size="22" font-weight="400">
+      <tspan x="538" dy="0">Owner binding · grants · immutable actions</tspan>
+      <tspan x="538" dy="30.8">Attempts and verified results</tspan>
+    </text>
+    <text x="48" y="796" fill="#526c83" font-size="23" font-weight="400">
+      <tspan x="48" dy="0">
+        The backend determines key control and recovery. Applications never
+        receive private keys.
+      </tspan>
+    </text>
+    <path
+      d="M570 474V592"
+      fill="none"
+      stroke="#12bfde"
+      stroke-width="3"
+      marker-start="url(#back)"
+      marker-end="url(#arrow)"
+    />
+    <path
+      d="M1002 474V592"
+      fill="none"
+      stroke="#12bfde"
+      stroke-width="3"
+      marker-start="url(#back)"
+      marker-end="url(#arrow)"
+    />
+    <text x="610" y="539" fill="#526c83" font-size="22">
+      Read authority · record attempts
+    </text>
+  </g>
+</svg>

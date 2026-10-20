@@ -1,0 +1,294 @@
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  width="1200"
+  height="962"
+  viewBox="0 0 1200 962"
+  role="img"
+  aria-labelledby="title description"
+>
+  <title id="title">A successful approved signing attempt</title>
+  <desc id="description">
+    Authenticate the application and resolve the owner. Check current grant, KYC
+    and consent and load the exact approved action. Persist the attempt identity
+    and claim exclusive dispatch. Recheck current permission immediately before
+    signing. Call the backend, verify the exact digest and signer, persist the
+    verified result, then return the permitted result. Authorized retries use
+    the saved result. Pending or unknown attempts require reconciliation and
+    preserve the original attempt.
+  </desc>
+  <defs>
+    <marker
+      id="arrow"
+      viewBox="0 0 10 10"
+      refX="9"
+      refY="5"
+      markerWidth="7"
+      markerHeight="7"
+      orient="auto-start-reverse"
+    >
+      <path d="M0 0 10 5 0 10Z" fill="#12bfde" />
+    </marker>
+    <marker
+      id="back"
+      viewBox="0 0 10 10"
+      refX="9"
+      refY="5"
+      markerWidth="7"
+      markerHeight="7"
+      orient="auto-start-reverse"
+    >
+      <path d="M0 0 10 5 0 10Z" fill="#12bfde" />
+    </marker>
+  </defs>
+  <rect width="1200" height="962" rx="22" fill="white" />
+  <g font-family="Arial, Helvetica, sans-serif">
+    <text x="48" y="68" fill="#0f2338" font-size="40" font-weight="700">
+      <tspan x="48" dy="0">From approved action to verified result</tspan>
+    </text>
+    <text x="48" y="110" fill="#526c83" font-size="24" font-weight="400">
+      <tspan x="48" dy="0">
+        A new successful signing attempt, with current authority at each
+        boundary.
+      </tspan>
+    </text>
+    <rect
+      x="48"
+      y="158"
+      width="300"
+      height="230"
+      rx="18"
+      fill="#f0faff"
+      stroke="#bfe5f1"
+      stroke-width="2"
+    />
+    <g
+      transform="translate(70 180)"
+      fill="none"
+      stroke="#0f2338"
+      stroke-width="3"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    >
+      <rect x="2" y="4" width="42" height="34" rx="6" />
+      <path d="M2 14h42M12 8h1m6 0h1M16 22l-5 5 5 5m14-10 5 5-5 5" />
+    </g>
+    <text x="70" y="272" fill="#0f2338" font-size="28" font-weight="700">
+      <tspan x="70" dy="0">1 Authenticate</tspan>
+    </text>
+    <text x="70" y="315" fill="#526c83" font-size="21" font-weight="400">
+      <tspan x="70" dy="0">Verify the application token</tspan>
+      <tspan x="70" dy="29.4">Resolve the account owner</tspan>
+    </text>
+    <rect
+      x="450"
+      y="158"
+      width="300"
+      height="230"
+      rx="18"
+      fill="#f0faff"
+      stroke="#bfe5f1"
+      stroke-width="2"
+    />
+    <g
+      transform="translate(472 180)"
+      fill="none"
+      stroke="#0f2338"
+      stroke-width="3"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    >
+      <path d="M24 2 43 10v14c0 12-10 19-19 23C15 43 5 36 5 24V10Z" />
+      <path d="m14 24 7 7 13-15" stroke="#12bfde" />
+    </g>
+    <text x="472" y="272" fill="#0f2338" font-size="28" font-weight="700">
+      <tspan x="472" dy="0">2 Authorize</tspan>
+    </text>
+    <text x="472" y="315" fill="#526c83" font-size="21" font-weight="400">
+      <tspan x="472" dy="0">Check grant, KYC + consent</tspan>
+      <tspan x="472" dy="29.4">Load exact approved action</tspan>
+    </text>
+    <rect
+      x="852"
+      y="158"
+      width="300"
+      height="230"
+      rx="18"
+      fill="#f0faff"
+      stroke="#bfe5f1"
+      stroke-width="2"
+    />
+    <g
+      transform="translate(874 180)"
+      fill="none"
+      stroke="#0f2338"
+      stroke-width="3"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    >
+      <circle cx="24" cy="24" r="21" />
+      <path d="M24 10v15h12" />
+    </g>
+    <text x="874" y="272" fill="#0f2338" font-size="28" font-weight="700">
+      <tspan x="874" dy="0">3 Claim attempt</tspan>
+    </text>
+    <text x="874" y="315" fill="#526c83" font-size="21" font-weight="400">
+      <tspan x="874" dy="0">Persist immutable identity</tspan>
+      <tspan x="874" dy="29.4">Claim exclusive dispatch</tspan>
+    </text>
+    <rect
+      x="852"
+      y="485"
+      width="300"
+      height="230"
+      rx="18"
+      fill="#f0faff"
+      stroke="#bfe5f1"
+      stroke-width="2"
+    />
+    <g
+      transform="translate(874 507)"
+      fill="none"
+      stroke="#0f2338"
+      stroke-width="3"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    >
+      <path d="M24 2 43 10v14c0 12-10 19-19 23C15 43 5 36 5 24V10Z" />
+      <path d="m14 24 7 7 13-15" stroke="#12bfde" />
+    </g>
+    <text x="874" y="599" fill="#0f2338" font-size="28" font-weight="700">
+      <tspan x="874" dy="0">4 Recheck</tspan>
+    </text>
+    <text x="874" y="642" fill="#526c83" font-size="21" font-weight="400">
+      <tspan x="874" dy="0">Check current permission</tspan>
+      <tspan x="874" dy="29.4">Immediately before signing</tspan>
+    </text>
+    <rect
+      x="450"
+      y="485"
+      width="300"
+      height="230"
+      rx="18"
+      fill="#f0faff"
+      stroke="#bfe5f1"
+      stroke-width="2"
+    />
+    <g
+      transform="translate(472 507)"
+      fill="none"
+      stroke="#0f2338"
+      stroke-width="3"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    >
+      <circle cx="31" cy="15" r="12" />
+      <path d="m22 24-19 19v5h10v-7h7v-7l9-9" />
+      <circle cx="34" cy="12" r="2" stroke="#12bfde" />
+    </g>
+    <text x="472" y="599" fill="#0f2338" font-size="28" font-weight="700">
+      <tspan x="472" dy="0">5 Sign + verify</tspan>
+    </text>
+    <text x="472" y="642" fill="#526c83" font-size="21" font-weight="400">
+      <tspan x="472" dy="0">Call the selected backend</tspan>
+      <tspan x="472" dy="29.4">Verify exact digest + signer</tspan>
+    </text>
+    <rect
+      x="48"
+      y="485"
+      width="300"
+      height="230"
+      rx="18"
+      fill="#f0faff"
+      stroke="#bfe5f1"
+      stroke-width="2"
+    />
+    <g
+      transform="translate(70 507)"
+      fill="none"
+      stroke="#0f2338"
+      stroke-width="3"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    >
+      <ellipse cx="24" cy="9" rx="21" ry="7" />
+      <path d="M3 9v29c0 10 42 10 42 0V9M3 23c0 10 42 10 42 0" />
+    </g>
+    <text x="70" y="599" fill="#0f2338" font-size="28" font-weight="700">
+      <tspan x="70" dy="0">6 Persist + return</tspan>
+    </text>
+    <text x="70" y="642" fill="#526c83" font-size="21" font-weight="400">
+      <tspan x="70" dy="0">Save the verified result</tspan>
+      <tspan x="70" dy="29.4">Return only if permitted</tspan>
+    </text>
+    <path
+      d="M348 275H450"
+      fill="none"
+      stroke="#12bfde"
+      stroke-width="3"
+      stroke-linejoin="round"
+      marker-end="url(#arrow)"
+    />
+    <path
+      d="M750 275H852"
+      fill="none"
+      stroke="#12bfde"
+      stroke-width="3"
+      stroke-linejoin="round"
+      marker-end="url(#arrow)"
+    />
+    <path
+      d="M1002 388V485"
+      fill="none"
+      stroke="#12bfde"
+      stroke-width="3"
+      stroke-linejoin="round"
+      marker-end="url(#arrow)"
+    />
+    <text x="48" y="443" fill="#0f2338" font-size="25" font-weight="700">
+      <tspan x="48" dy="0">
+        All authority and durable-attempt checks must pass before the backend
+        effect.
+      </tspan>
+    </text>
+    <path
+      d="M852 600H750"
+      fill="none"
+      stroke="#12bfde"
+      stroke-width="3"
+      stroke-linejoin="round"
+      marker-end="url(#arrow)"
+    />
+    <path
+      d="M450 600H348"
+      fill="none"
+      stroke="#12bfde"
+      stroke-width="3"
+      stroke-linejoin="round"
+      marker-end="url(#arrow)"
+    />
+    <rect
+      x="48"
+      y="756"
+      width="1104"
+      height="120"
+      rx="18"
+      fill="white"
+      stroke="#bfe5f1"
+      stroke-width="2"
+    />
+    <text x="72" y="799" fill="#0f2338" font-size="27" font-weight="700">
+      <tspan x="72" dy="0">Retries preserve the original attempt</tspan>
+    </text>
+    <text x="72" y="839" fill="#526c83" font-size="22" font-weight="400">
+      <tspan x="72" dy="0">
+        Authorized success → replay saved result. Pending / unknown → reconcile
+        before any retry.
+      </tspan>
+    </text>
+    <text x="48" y="927" fill="#526c83" font-size="23" font-weight="400">
+      <tspan x="48" dy="0">
+        A timeout never authorizes a fresh signing attempt.
+      </tspan>
+    </text>
+  </g>
+</svg>

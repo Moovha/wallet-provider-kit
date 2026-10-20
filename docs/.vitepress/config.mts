@@ -2,7 +2,6 @@ import { existsSync } from 'node:fs';
 import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitepress';
-
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const repository = 'https://github.com/Moovha/wallet-provider-kit';
 const rewrites: Record<string, string> = {
@@ -10,7 +9,6 @@ const rewrites: Record<string, string> = {
   'docs/README.md': 'docs/index.md',
   'examples/README.md': 'examples/index.md',
 };
-
 export default defineConfig({
   title: 'Moovha Wallet Provider Kit',
   description:
@@ -50,28 +48,211 @@ export default defineConfig({
       alt: 'Moovha',
     },
     nav: [
-      { text: 'Get started', link: '/docs/' },
-      { text: 'HTTP API', link: '/docs/http-api' },
-      { text: 'GitHub', link: repository },
+      {
+        text: 'Get started',
+        items: [
+          { text: 'Open the setup wizard', link: '/docs/' },
+          { text: 'Safe wallets', link: '/docs/self-hosted-sponsorship' },
+          { text: 'Execution latency', link: '/docs/execution-latency' },
+          { text: 'Service setup', link: '/docs/setup' },
+          { text: '1. Provider', link: '/docs/setup-wizard#_1-provider' },
+          { text: '2. Backend', link: '/docs/setup-wizard#_2-backend' },
+          { text: '3. Services', link: '/docs/setup-wizard#_3-services' },
+          {
+            text: '4. Applications',
+            link: '/docs/setup-wizard#_4-applications',
+          },
+          { text: '5. Deployment', link: '/docs/setup-wizard#_5-deployment' },
+          { text: '6. Export', link: '/docs/setup-wizard#_6-export' },
+        ],
+      },
+      {
+        text: 'API',
+        items: [
+          { text: 'Application HTTP guide', link: '/docs/http-api' },
+          { text: 'Provider HTTP schemas', link: '/docs/http-reference' },
+          { text: 'Configuration reference', link: '/docs/setup' },
+          { text: 'TypeScript integration guide', link: '/docs/api' },
+          { text: 'TypeScript declarations', link: '/docs/api-reference' },
+        ],
+      },
+      { text: 'Moovha', link: 'https://moovha.com/' },
+    ],
+    socialLinks: [
+      {
+        icon: 'github',
+        link: repository,
+        ariaLabel: 'Wallet Provider Kit on GitHub',
+      },
     ],
     search: { provider: 'local' },
     outline: [2, 3],
+    editLink: { pattern: `${repository}/edit/main/:path` },
     sidebar: [
       {
-        text: 'Safe service',
+        text: 'Start here',
         items: [
-          { text: 'Setup', link: '/docs/setup' },
-          { text: 'Wizard', link: '/docs/setup-wizard' },
-          { text: 'Architecture', link: '/docs/architecture' },
-          { text: 'Wallet calls', link: '/docs/wallet-calls' },
-          { text: 'Sponsorship', link: '/docs/self-hosted-sponsorship' },
+          { text: 'What the kit does', link: '/' },
+          { text: 'Open the setup wizard', link: '/docs/' },
+          { text: 'Safe wallets', link: '/docs/self-hosted-sponsorship' },
           { text: 'Execution latency', link: '/docs/execution-latency' },
-          { text: 'HTTP API', link: '/docs/http-api' },
+          { text: 'Service setup', link: '/docs/setup' },
+          { text: 'Roles and terms', link: '/docs/concepts' },
+        ],
+      },
+      {
+        text: 'Operator setup',
+        items: [
+          {
+            text: '1. Provider',
+            link: '/docs/setup-wizard#_1-provider',
+            collapsed: true,
+            items: [
+              {
+                text: 'Domain and privacy notice',
+                link: '/docs/operator-services',
+              },
+              {
+                text: 'Wallet control and responsibilities',
+                link: '/docs/architecture',
+              },
+              { text: 'Security boundaries', link: '/docs/security-model' },
+            ],
+          },
+          {
+            text: '2. Backend',
+            link: '/docs/setup-wizard#_2-backend',
+            collapsed: true,
+            items: [
+              {
+                text: 'Prepare the OWS vault',
+                link: '/docs/ows-adapter',
+              },
+              { text: 'Open Wallet Standard', link: '/docs/ows-adapter' },
+            ],
+          },
+          {
+            text: '3. Services',
+            link: '/docs/setup-wizard#_3-services',
+            collapsed: true,
+            items: [
+              {
+                text: 'Application API tokens',
+                link: '/docs/operator-services',
+              },
+              { text: 'Auth0 registration recipe', link: '/docs/auth0-setup' },
+              {
+                text: 'Secret names and values',
+                link: '/docs/operator-services',
+              },
+            ],
+          },
+          {
+            text: '4. Applications',
+            link: '/docs/setup-wizard#_4-applications',
+            collapsed: true,
+            items: [
+              {
+                text: 'Application trust and access',
+                link: '/docs/application-access',
+              },
+              {
+                text: 'Safe call policy',
+                link: '/docs/approved-contract-calls',
+              },
+              {
+                text: 'Application management APIs',
+                link: '/docs/runtime-workspace',
+              },
+              {
+                text: 'Application obligations API',
+                link: '/docs/application-obligations',
+              },
+              {
+                text: 'Runtime policy API',
+                link: '/docs/runtime-configuration',
+              },
+            ],
+          },
+          {
+            text: '5. Deployment',
+            link: '/docs/setup-wizard#_5-deployment',
+            collapsed: true,
+            items: [
+              { text: 'Storage and recovery', link: '/docs/storage' },
+              {
+                text: 'Staff application token controls',
+                link: '/docs/operator-tokens',
+              },
+              { text: 'Assets and gas funding', link: '/docs/assets-and-gas' },
+              {
+                text: 'Call policies and adapters',
+                link: '/docs/approved-contract-calls',
+              },
+              { text: 'Standard wallet calls', link: '/docs/wallet-calls' },
+              {
+                text: 'Account abstraction helpers',
+                link: '/docs/account-abstraction-sponsorship',
+              },
+            ],
+          },
+          {
+            text: '6. Export',
+            link: '/docs/setup-wizard#_6-export',
+            collapsed: true,
+            items: [
+              { text: 'Run locally with progress', link: '/docs/local-setup' },
+              {
+                text: 'Manual deployment and maintenance',
+                link: '/docs/operator-deployment',
+              },
+              {
+                text: 'Staging acceptance walkthrough',
+                link: '/docs/staging-walkthrough',
+              },
+              { text: 'Acceptance checklist', link: '/docs/conformance' },
+              { text: 'Monitoring and operations', link: '/docs/operations' },
+            ],
+          },
+        ],
+      },
+      {
+        text: 'API and configuration reference',
+        collapsed: true,
+        items: [
+          { text: 'HTTP integration guide', link: '/docs/http-api' },
           { text: 'HTTP schemas', link: '/docs/http-reference' },
-          { text: 'TypeScript API', link: '/docs/api-reference' },
-          { text: 'Storage', link: '/docs/storage' },
-          { text: 'Deployment acceptance', link: '/docs/conformance' },
-          { text: 'Contribute', link: '/CONTRIBUTING' },
+          { text: 'Exported configuration', link: '/docs/setup' },
+          { text: 'TypeScript API guide', link: '/docs/api' },
+          { text: 'TypeScript declarations', link: '/docs/api-reference' },
+        ],
+      },
+      {
+        text: 'Integration interfaces',
+        collapsed: true,
+        items: [
+          { text: 'Package and imports', link: '/docs/package' },
+          { text: 'Embedded host authority', link: '/docs/provider-guide' },
+          {
+            text: 'Durable attempt interfaces',
+            link: '/docs/durable-attempts',
+          },
+          { text: 'OIDC enrollment', link: '/docs/enrollment' },
+          { text: 'Examples and fixtures', link: '/examples/' },
+        ],
+      },
+      {
+        text: 'Contribute',
+        collapsed: true,
+        items: [
+          { text: 'Contributor guide', link: '/CONTRIBUTING' },
+          { text: 'Public writing guide', link: '/docs/public-writing' },
+          { text: 'Report a vulnerability', link: '/SECURITY' },
+          { text: 'Governance', link: '/GOVERNANCE' },
+          { text: 'Code of conduct', link: '/CODE_OF_CONDUCT' },
+          { text: 'Branch workflow', link: '/docs/branch-workflow' },
+          { text: 'Release process', link: '/docs/releases' },
+          { text: 'Changelog', link: '/CHANGELOG' },
         ],
       },
     ],
