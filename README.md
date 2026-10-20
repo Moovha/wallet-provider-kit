@@ -72,10 +72,10 @@ npm start -- setup
 
 The bundled graphical setup follows three stages:
 
-1. **Choose destination:** this computer, an existing Linux server or the AWS template.
-2. **Review deployment:** provider identity, retained storage, network exposure and
+1. **Choose where to run:** this computer, an existing Linux server or the AWS template.
+2. **Review your setup:** provider identity, retained storage, network exposure and
    defaults. Application configuration waits until connection.
-3. **Deploy and open administration:** source setup can build an isolated local
+3. **Start and sign in:** source setup can build an isolated local
    container service; release installers use pinned prebuilt images. Read the
    private installation claim file to establish the administrator.
 

@@ -16,23 +16,24 @@ const requiredFields = computed({
 });
 </script>
 <template>
-  <h3>Application identity requirements</h3>
+  <h3>Decide which user checks you’ll accept</h3>
   <div class="callout">
     <strong>Users stay in the application</strong>
     <p>
-      The application attests identity and consent under its trust agreement.
-      The provider checks current evidence, ownership and policy before granting
-      access to the user's Safe.
+      The application checks each person’s identity and records their permission
+      under your reviewed agreement. Your service checks that information and
+      your current rules before allowing wallet access.
     </p>
     <p>
-      User IDs are private to each application. Linking users across
-      applications requires a separately verified integration.
+      A person’s account in one application is kept separate from their accounts
+      in other applications. Connecting those accounts requires a separate,
+      verified arrangement.
     </p>
     <a
       :href="docs + 'application-access.html'"
       target="_blank"
       rel="noopener noreferrer"
-      >Application-led access contract ↗</a
+      >How applications request wallet access ↗</a
     >
     <SetupField
       guide="identityLevel"
@@ -49,8 +50,9 @@ const requiredFields = computed({
       validation="identity_fields"
     />
     <p>
-      Use lowercase field names such as country. Required fields alone do not
-      establish KYC; only trusted applications may attest completed checks.
+      Use lowercase names such as country. A filled-in field is not proof that
+      someone’s identity was checked. Accept completed checks only from
+      applications covered by your reviewed agreement.
     </p>
   </div>
 </template>

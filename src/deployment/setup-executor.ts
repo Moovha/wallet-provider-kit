@@ -24,13 +24,13 @@ const source = fileURLToPath(new URL('../../', import.meta.url));
 const reserved =
   /^(?:NODE_|LD_|DYLD_|OTEL_|DOCKER_|COMPOSE_|GAE_|OPENSSL_|SSL_|PATH$|HOME$|USER$|SHELL$|TMPDIR$|PWD$|(?:HTTP|HTTPS|ALL|NO)_PROXY$)/;
 const steps = [
-  ['files', 'Save private deployment files'],
-  ['image', 'Build the service image'],
-  ['validate', 'Validate configuration in the container'],
-  ['storage', 'Initialize new persistent storage'],
-  ['doctor', 'Check secrets, storage and service binding'],
+  ['files', 'Save your private settings'],
+  ['image', 'Prepare the service software'],
+  ['validate', 'Check your settings'],
+  ['storage', 'Prepare new service storage'],
+  ['doctor', 'Check private settings and storage'],
   ['start', 'Start the service'],
-  ['health', 'Check liveness and disabled readiness'],
+  ['health', 'Check that your service is available'],
 ] as const;
 
 export interface SetupPlan {
@@ -641,8 +641,8 @@ export function createSetupExecutor(options: SetupExecutorOptions = {}) {
       }
       job.state = 'complete';
       job.message = plan!.config.management
-        ? 'Provider management is available. Open administration and use the private installation-claim file to create the first administrator. Wallet operations remain disabled.'
-        : 'Local service is running. Liveness passed; readiness is disabled as expected. Wallet operations remain disabled. Complete HTTPS and external acceptance before enabling them.';
+        ? 'Your service is ready to manage. Open it and use the setup code in the private installation-claim file to create your administrator account. Wallet operations are still off.'
+        : 'Your service is running. Wallet operations are still off. Complete secure access, application testing and recovery before enabling them.';
       await persistProgress();
     } catch {
       if (current) current.state = 'failed';
@@ -725,7 +725,7 @@ export function createSetupExecutor(options: SetupExecutorOptions = {}) {
       ]);
       job.state = 'stopped';
       job.message =
-        'Local service stopped. Private configuration, secrets and persistent records are retained.';
+        'Your service has stopped. Your private settings, secrets and records are saved for the next start.';
       job.cleanup = 'stopped';
       await persistProgress();
     } catch {

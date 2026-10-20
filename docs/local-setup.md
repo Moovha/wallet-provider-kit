@@ -1,6 +1,6 @@
 # Local setup
 
-From a source checkout, run `npm ci` with the supported Node 24 runtime, then `npm run build`. Run `node dist/main.js setup` to open the local wizard. Follow Choose destination, Review deployment and Deploy and open administration.
+From a source checkout, run `npm ci` with the supported Node 24 runtime, then `npm run build`. Run `node dist/main.js setup` to open the local wizard. Follow Choose where to run, Review your setup and Start and sign in.
 Application registration is deferred until the provider runs. Select Advanced
 configuration only for the explicit static configuration editor.
 

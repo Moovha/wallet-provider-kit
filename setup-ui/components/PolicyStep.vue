@@ -38,15 +38,16 @@ function addApplication() {
 <template>
   <div class="step-heading">
     <span class="eyebrow">Access and limits</span>
-    <h2>Connect trusted applications</h2>
+    <h2>Choose the applications you’ll work with</h2>
     <p>
-      Applications submit identity and consent, then register their action
-      policies, RPC credentials and gas sponsorship through authenticated APIs.
-      Each user receives one Safe account.
+      Add the applications that will use your service. Agree how each one checks
+      people’s identity and asks for wallet permission. Your developer can set
+      up transaction rules, network connections and payment of network fees
+      through the API afterward.
     </p>
   </div>
   <details>
-    <summary>Provider identity baseline and access duration</summary>
+    <summary>User checks and how long access lasts</summary>
     <AccessPolicyFields v-model="model" />
     <AdvancedSettings label="Advanced policy metadata"
       ><SetupField
@@ -110,19 +111,19 @@ function addApplication() {
       guide="assertionTrust"
       v-model="application.assertionTrust!.agreement"
       type="text"
-      label="Identity and consent trust agreement reference"
+      label="Agreement reference"
       validation="required|length:1,256"
     />
     <SetupField
       guide="permissions"
       v-model="application.permissions"
       type="checkbox"
-      label="Allowed permissions"
+      label="What people can allow this application to do"
       :options="[
         { value: 'account:read', label: 'Read wallet accounts' },
         {
           value: 'contracts:request',
-          label: 'Request user-authorized application calls',
+          label: 'Request transactions people have approved',
         },
       ]"
       validation="required"
@@ -130,7 +131,7 @@ function addApplication() {
     <SetupField
       guide="applicationEnabled"
       type="checkbox"
-      label="Application enabled"
+      label="Allow this application to connect"
       :modelValue="application.enabled !== false"
       @update:modelValue="application.enabled = !!$event"
     />

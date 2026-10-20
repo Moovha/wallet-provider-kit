@@ -217,8 +217,8 @@ test('browser consent, verification handoff, review and revocation preserve Orig
     );
     await session(ownerSession);
     await page.goto(origin + '/onboarding/access');
-    await page.getByRole('button', { name: 'Revoke access' }).click();
-    await expect(page.getByText(/revoked/)).toBeVisible();
+    await page.getByRole('button', { name: 'Remove access' }).click();
+    await expect(page.getByText(/Access removed/)).toBeVisible();
     expect(forms).toEqual(
       Array.from({ length: 3 }, () => ({ origin, status: 302 })),
     );
@@ -387,7 +387,9 @@ test('application records require browser owner consent and a separate provider 
     await session(ownerSession);
     await page.goto(origin + '/onboarding/' + receipt.request_id);
     await expect(
-      page.getByText(/record is not externally verified KYC/),
+      page.getByText(
+        /has not been independently verified as an identity check/,
+      ),
     ).toBeVisible();
     await page.getByRole('button', { name: 'Allow requested access' }).click();
     await expect(
@@ -435,7 +437,7 @@ test('application records require browser owner consent and a separate provider 
     });
     await session(ownerSession);
     await page.goto(origin + '/onboarding/access');
-    await page.getByRole('button', { name: 'Revoke access' }).click();
+    await page.getByRole('button', { name: 'Remove access' }).click();
     await expect(
       onboarding.account(principal, granted.account_id!),
     ).rejects.toThrow();

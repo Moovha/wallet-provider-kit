@@ -51,17 +51,18 @@ const flow = computed(() => model.value.policy.access?.mode ?? 'hosted');
 <template>
   <div class="step-heading">
     <span class="eyebrow">Connected services</span>
-    <h2>Configure your services</h2>
+    <h2>Bring your services together</h2>
     <p>
-      Use the bundled application token service, or connect an existing issuer.
-      Optional staff and hosted features have separate connection settings.
+      Use the included tools that let applications sign in to your service, or
+      connect tools your team already uses. Staff sign-in and optional hosted
+      user pages have separate settings.
     </p>
   </div>
   <div class="callout step-orientation">
-    <strong>Connect the services your provider will use</strong>
+    <strong>Start with what you need</strong>
     <p>
-      Configure application tokens here. Set the access flow, identity evidence,
-      application trust and limits together in Applications.
+      Set up application sign-in here. In Applications, decide which user checks
+      and permissions your service will accept.
     </p>
     <p v-if="flow === 'application'">
       Users stay in the application. It authenticates them, completes identity
@@ -69,16 +70,15 @@ const flow = computed(() => model.value.policy.access?.mode ?? 'hosted');
       required.
     </p>
     <p v-else>
-      Hosted compatibility requires login and either an identity-vendor
-      connection or application-record evaluation selected in Applications.
+      If your service hosts the user sign-in pages, also set up user login and
+      the identity checks selected in Applications.
     </p>
   </div>
   <p v-if="model.safeWallet" class="callout">
-    Local setup starts the private bundler and its persistent queue
-    automatically. Each user receives one Safe address. After connection, the
-    application supplies RPC services and action policies, then funds one
-    application gas address for its paymaster and bundler. The signing engine
-    remains private behind the Safe.
+    Setup includes the private tools that send approved wallet transactions.
+    Each person gets one Safe wallet address. After connection, the
+    application’s team sets up network access, transaction rules and funding for
+    network fees. Wallet signing keys stay private.
   </p>
   <template v-if="model.ownerLogin">
     <h3>
@@ -145,7 +145,7 @@ const flow = computed(() => model.value.policy.access?.mode ?? 'hosted');
       </details>
     </div>
   </template>
-  <h3>Access tokens for connected applications</h3>
+  <h3>How applications sign in</h3>
   <SetupField
     guide="authorizationMode"
     type="select"
@@ -161,11 +161,11 @@ const flow = computed(() => model.value.policy.access?.mode ?? 'hosted');
     <div class="callout">
       <strong>Application authentication is included</strong>
       <p>
-        The bundled OAuth service uses oidc-provider. Setup registers the
-        enabled applications from Applications and generates missing credentials
-        privately. No separate token-service installation is required. Server
-        applications obtain five-minute tokens using client_credentials; users
-        stay in the connected application.
+        Your service includes application sign-in. Setup creates missing
+        connection secrets privately for the applications you enable.
+        Applications use these details to get short-lived access tokens: proofs
+        of which application is calling. People continue signing in through
+        their application.
       </p>
       <p>
         Issuer:
@@ -207,9 +207,9 @@ const flow = computed(() => model.value.policy.access?.mode ?? 'hosted');
         />
       </AdvancedSettings>
       <p class="help-text">
-        {{ client.scopes.length }} API scopes configured. New registrations
-        allow wallet access, account reading and provisioning. Review advanced
-        permissions before enabling additional API routes.
+        {{ client.scopes.length }} API permissions selected. New applications
+        can request wallet access, read wallet details and create accepted
+        wallets. Review additional permissions before enabling them.
       </p>
       <AdvancedSettings label="Advanced application API permissions">
         <SetupField
@@ -224,9 +224,9 @@ const flow = computed(() => model.value.policy.access?.mode ?? 'hosted');
         />
       </AdvancedSettings>
       <p class="help-text">
-        Give each server application only its own secret. OAuth scopes allow API
-        admission; wallet grants, identity, consent and action authority are
-        checked separately. Financial scopes are off initially.
+        Share only this application’s secret with its team. API permissions let
+        it make requests; your service still checks identity, wallet approvals
+        and the exact requested action. Transaction permissions start off.
       </p>
     </fieldset>
     <fieldset
@@ -246,9 +246,9 @@ const flow = computed(() => model.value.policy.access?.mode ?? 'hosted');
         />
       </AdvancedSettings>
       <p class="help-text">
-        This separate service client can administer runtime policies. Its token
-        subject equals its client ID. Keep its credentials with the provider;
-        application registrations cannot request these administrative scopes.
+        This management connection can update application rules. Keep its ID and
+        secret with your administration team. An ordinary application cannot use
+        these management permissions.
       </p>
     </fieldset>
   </template>
@@ -297,7 +297,7 @@ const flow = computed(() => model.value.policy.access?.mode ?? 'hosted');
     </details>
   </template>
   <template v-if="flow === 'hosted'">
-    <h3>Hosted identity-vendor connections</h3>
+    <h3>Identity checks on your service’s pages</h3>
     <p v-if="model.policy.identity?.records" class="help-text">
       Application-record evaluation is selected in Applications. It uses no
       identity-vendor connection. To use a vendor, turn off record evaluation in
@@ -406,8 +406,8 @@ const flow = computed(() => model.value.policy.access?.mode ?? 'hosted');
         role="alert"
         class="error-text"
       >
-        Configure an identity vendor here or select application-record
-        evaluation in Applications before exporting.
+        Choose an identity-checking service here, or select test records in
+        Applications, before saving these settings.
       </p>
     </template>
   </template>

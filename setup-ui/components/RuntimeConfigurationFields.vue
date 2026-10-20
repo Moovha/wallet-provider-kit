@@ -11,18 +11,17 @@ const model = defineModel<ProviderConfiguration>({ required: true });
 </script>
 <template>
   <section class="form-section">
-    <h3>Application policy APIs</h3>
+    <h3>Manage application rules after setup</h3>
     <p>
-      Let applications register contracts and methods after deployment.
-      Providers publish policies and choose automatic or manual registration
-      review through the protected application configuration APIs.
+      Your developer can use the protected API to submit the transactions an
+      application needs. You decide which rules to approve and how future
+      submissions are reviewed.
     </p>
     <template v-if="model.runtimeConfiguration">
       <p v-if="model.authorizationServer">
-        The bundled issuer registers separate provider service operators and
-        generates their credentials during setup. The token subject equals the
-        operator client ID. Keep these credentials with the provider; connected
-        applications cannot obtain operator tokens.
+        Setup creates separate management connections and saves their secrets
+        privately. Keep those details with your administration team. Connected
+        applications cannot use management access.
       </p>
       <p v-else>
         Use a separate provider operator OAuth client. The API explorer's
@@ -102,10 +101,9 @@ const model = defineModel<ProviderConfiguration>({ required: true });
         Add runtime operator
       </button>
       <p>
-        Application action policies, services and sponsorship are reviewed
-        through the protected APIs after deployment. Registration does not grant
-        wallet access. Each user still needs current identity evidence and
-        consent.
+        After setup, your team can review transaction rules, service connections
+        and payment of network fees through the API. People must still pass the
+        required user checks and approve access to their wallets.
       </p>
     </template>
   </section>

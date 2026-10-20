@@ -24,8 +24,8 @@ describe the maintainer's next development session.
 
 ## Follow the provider's setup journey
 
-Organize default installation around **Choose destination → Review deployment →
-Deploy and open administration**. Explain application registration and trust after
+Organize default installation around **Choose where to run → Review your setup →
+Start and sign in**. Explain application registration and trust after
 installation. Keep the six explicit static configuration screens documented as
 the Advanced configuration path. Keep navigation and walkthroughs consistent
 with their selected path. Link a concept where the operator encounters its setting, with deeper
@@ -103,3 +103,26 @@ comments, UI text or commit/PR wording:
 
 This is a required editorial review. Prettier, link checks, tests and generated
 reference checks support it, but cannot establish that prose suits its reader.
+
+## Help people feel at home in the interface
+
+Write for someone opening the screen for the first time. Lead with their task,
+then explain what happens next. Use a welcoming heading and a short, concrete
+introduction. Keep exact API field names and specialist setup details available
+where developers need them, with plain-language explanations alongside them.
+
+| Technical term           | User-facing wording and explanation                                                                      |
+| ------------------------ | -------------------------------------------------------------------------------------------------------- |
+| Register an application  | Add an application; explain that it receives connection details, not automatic wallet access.            |
+| Credentials              | Connection details: an ID and a secret. Explain where to save them and that the secret is shown once.    |
+| Rotate credential        | Replace secret; explain that the old secret and access tokens stop working.                              |
+| Identity assertion trust | Agreement for user checks and consent; explain who checks identity and records each person’s permission. |
+| Automation identity      | Management tool; explain its administrative access and that it cannot bypass wallet permissions.         |
+| Grant                    | Wallet approval or permission; keep the exact API term in developer references.                          |
+| Sponsorship              | Paying network fees; introduce the technical term only where it helps integration.                       |
+
+Warm language must remain precise. Adding an application is not consent, a saved
+agreement is not verified identity, and configuration checks do not establish
+production readiness. Explain meaningful consequences next to the action that
+causes them. Errors should tell people what they can do next without exposing
+private request details or implying that an uncertain action failed safely.

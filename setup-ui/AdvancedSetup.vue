@@ -79,11 +79,11 @@ const selectedBackend = computed(() =>
 );
 const stepNames: Record<string, string> = {
   provider: 'Provider details',
-  backend: 'Wallet backend',
+  backend: 'Wallet storage',
   connections: 'Connected services',
   policies: 'Applications',
   deployment: 'Deployment',
-  review: 'Review & export',
+  review: 'Finish setup',
 };
 const activeStep = ref('provider');
 const stepNumber = computed(
@@ -173,7 +173,7 @@ async function check() {
     if (JSON.stringify(config.value) === snapshot) {
       validated.value = result;
       notice.value =
-        'Configuration valid. Set up a local container deployment below, or download the files for manual deployment. Wallet operations remain disabled until acceptance and explicit activation.';
+        'Settings checked. You can start your service below or save the files for another server. Wallet operations stay off until you complete the required tests and enable them.';
     }
   } catch (error) {
     showError(error);
@@ -206,7 +206,7 @@ async function importFile(event: Event) {
     connectionsReturnStep.value = undefined;
     await nextTick();
     notice.value =
-      'Configuration imported. Review the settings, then validate again before exporting.';
+      'Settings imported. Review them, then run the settings check before saving or starting your service.';
   } catch (error) {
     if (error instanceof SyntaxError)
       issues.value = [
@@ -294,8 +294,8 @@ function enableDocumentation() {
         ></a
       >
       <div class="sidebar-copy">
-        <span class="eyebrow">Operator setup</span>
-        <h1>Configure your service.<br />Run it locally.</h1>
+        <span class="eyebrow">Your service setup</span>
+        <h1>Set up your service.<br />Make it your own.</h1>
         <p>
           Choose settings and access rules, then let local setup prepare
           storage, start the service and show its progress. You can also export
@@ -323,12 +323,12 @@ function enableDocumentation() {
         >
       </p>
       <div class="sidebar-bottom">
-        <span class="status-dot"></span> Local configuration session
+        <span class="status-dot"></span> Your setup draft
         <p>
-          Keep this session open while completing the fields. Downloads become
-          available after validation in Export; incomplete drafts cannot be
-          saved. Refreshing or closing this page discards unsaved edits. Import
-          a previously exported configuration to resume.
+          Keep this page open while choosing your settings. At Finish setup,
+          check them before saving the files. Refreshing or closing this page
+          discards unsaved edits. Open a previously saved settings file to pick
+          up where you left off.
         </p>
         <a
           :href="docs + 'setup-wizard.html'"
@@ -421,7 +421,7 @@ function enableDocumentation() {
               ><fieldset class="configuration-fields" :disabled="setupLocked">
                 <ProviderStep v-model="config" /></fieldset
             ></FormKit>
-            <FormKit type="step" name="backend" label="Backend"
+            <FormKit type="step" name="backend" label="Wallet storage"
               ><fieldset class="configuration-fields" :disabled="setupLocked">
                 <BackendStep v-model="config" /></fieldset
             ></FormKit>
@@ -453,16 +453,15 @@ function enableDocumentation() {
                   @configure-services="configureServices('deployment')"
                 /></fieldset
             ></FormKit>
-            <FormKit type="step" name="review" label="Export">
+            <FormKit type="step" name="review" label="Finish setup">
               <div ref="review" tabindex="-1" class="step-heading">
-                <span class="eyebrow">Review & export</span>
-                <h2>Review your configuration</h2>
+                <span class="eyebrow">Ready for the next step</span>
+                <h2>Let’s check your settings</h2>
                 <p>
-                  You’ve prepared a configuration draft. Check it for
-                  completeness and consistency, then start a local container
-                  deployment below or download files for your server. Validation
-                  does not test credentials, connect external services or deploy
-                  your wallet service.
+                  Your draft is ready for a settings check. Then you can start
+                  the service here or save the files for another server.
+                  Checking settings does not sign in to external services, test
+                  passwords or start anything.
                 </p>
               </div>
               <dl class="summary">
@@ -475,7 +474,7 @@ function enableDocumentation() {
                   <dd>{{ config.policy.provider.origin || 'Not set' }}</dd>
                 </div>
                 <div>
-                  <dt>Wallet backend</dt>
+                  <dt>Wallet storage</dt>
                   <dd>{{ selectedBackend?.name }}</dd>
                 </div>
                 <div>
@@ -484,7 +483,7 @@ function enableDocumentation() {
                     {{
                       [
                         config.policy.access?.mode === 'application'
-                          ? 'Trusted application identity attestations'
+                          ? 'User checks from agreed applications'
                           : '',
                         config.identity.didit ? 'Didit' : '',
                         config.policy.identity?.records
@@ -503,7 +502,7 @@ function enableDocumentation() {
                     {{ config.policy.applications.length }} application(s) ·
                     {{
                       config.policy.access?.mode === 'application'
-                        ? 'Application-led · no provider user login or review'
+                        ? 'People sign in through their application'
                         : (config.reviewers?.length ?? 0) +
                           ' reviewer(s) · hosted compatibility'
                     }}
@@ -515,7 +514,9 @@ function enableDocumentation() {
                 </div>
                 <div>
                   <dt>Execution</dt>
-                  <dd>Private ERC-4337 bundler and application paymaster</dd>
+                  <dd>
+                    Private transaction tools · application-funded network fees
+                  </dd>
                 </div>
                 <div v-if="config.policy.access?.mode === 'application'">
                   <dt>Identity requirements</dt>
@@ -591,7 +592,7 @@ function enableDocumentation() {
                 :disabled="busy || setupLocked"
                 @click="check"
               >
-                {{ busy ? 'Checking…' : 'Validate configuration' }}
+                {{ busy ? 'Checking…' : 'Check settings' }}
               </button>
               <LocalSetup
                 :config="validated?.config"
@@ -607,11 +608,12 @@ function enableDocumentation() {
                     </li>
                   </ul>
                   <p>
-                    These checks use your settings only. Test external services
-                    on your deployment before allowing users to connect.
+                    These checks review your settings. They do not test your
+                    external services. Test those connections on the running
+                    service before inviting users.
                   </p>
                 </div>
-                <h3>Or download for manual deployment</h3>
+                <h3>Taking this to another server?</h3>
                 <ul class="export-file-guide">
                   <li>
                     <strong>provider.config.json:</strong> your service settings
@@ -647,7 +649,7 @@ function enableDocumentation() {
                     Download variable template
                   </button>
                 </div>
-                <h3>What to do after downloading</h3>
+                <h3>Your next steps</h3>
                 <ol class="setup-journey">
                   <li>
                     Build the same toolkit revision on your deployment host.

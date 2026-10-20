@@ -81,8 +81,7 @@ Adopting these patterns does not establish production custody readiness.
 
 ## Operator experience
 
-Installation has three stages: **Choose destination → Review deployment → Deploy
-and open administration**. Destinations are this computer, an existing Linux
+Installation has three stages: **Choose where to run → Review your setup → Start and sign in**. Destinations are this computer, an existing Linux
 server and an explicitly supported cloud template. Detect/reuse an existing
 runtime; explain privileged host changes before running them. Advanced ingress,
 storage and secret-store settings appear in their relevant context.
@@ -270,3 +269,24 @@ This evidence covers a clean source-built local deployment. It does not exercise
 a published release installer, public HTTPS, AWS resources or funded wallet
 operations. Credentials and deployment records remain private; review images
 exclude credentials and obscure synthetic client identifiers.
+
+### Interface language review
+
+The interface addresses people setting up a wallet service without assuming they
+have read the technical guides. The default journey is **Choose where to run →
+Review your setup → Start and sign in**. Advanced settings retain exact technical
+names where needed, with a plain explanation of what to enter and why.
+
+The review covers installation, all six advanced setup steps, field guidance,
+application connection, first-time administration, sign-in, overview, management
+tools, owner consent and access management, staff review and API testing tools.
+Applications receive connection details, with an ID and a secret shown once.
+User-check agreements explain whose checks are accepted; they do not imply that
+saving a reference verifies identity. Permissions explain what a person can
+approve, rather than implying automatic wallet access. Replacing a secret and
+pausing a connection explain their distinct effects on tokens and wallet approvals.
+
+Friendly headings and short introductions lead with the person's task. API field
+names, authentication rules, consent terms and financial limits retain their
+technical meaning. The [public writing guide](public-writing.md#help-people-feel-at-home-in-the-interface)
+records the terminology and review rules for future screens.

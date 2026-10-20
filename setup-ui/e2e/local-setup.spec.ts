@@ -51,15 +51,15 @@ test('local setup reviews changes and secret privacy, shows progress, resumes th
     await writeFile(file, config);
     await page.getByLabel('Import provider configuration').setInputFiles(file);
     await expect(
-      page.getByText('Configuration imported.', { exact: false }),
+      page.getByText('Settings imported.', { exact: false }),
     ).toBeVisible();
-    await page.getByRole('tab', { name: 'Export', exact: true }).click();
+    await page.getByRole('tab', { name: 'Finish setup', exact: true }).click();
     await page
-      .getByRole('button', { name: 'Validate configuration', exact: true })
+      .getByRole('button', { name: 'Check settings', exact: true })
       .click();
     await page
       .getByRole('button', {
-        name: 'Check local setup prerequisites',
+        name: 'Check this computer',
         exact: true,
       })
       .click();
@@ -95,7 +95,7 @@ test('local setup reviews changes and secret privacy, shows progress, resumes th
     resumeInstallation();
     await expect(
       page.getByRole('heading', {
-        name: 'Supply deployment secrets',
+        name: 'Passwords and secrets for setup',
         exact: true,
       }),
     ).toBeVisible();
@@ -106,7 +106,7 @@ test('local setup reviews changes and secret privacy, shows progress, resumes th
       page.getByText('Container HTTP listen address:', { exact: false }),
     ).toBeVisible();
     const start = page.getByRole('button', {
-      name: 'Start local setup',
+      name: 'Start my service',
       exact: true,
     });
     await expect(page.locator('.secret-value')).toHaveCount(0);
@@ -116,7 +116,9 @@ test('local setup reviews changes and secret privacy, shows progress, resumes th
       page.getByText('Setup in progress', { exact: true }),
     ).toBeVisible();
     await expect(
-      page.getByText('In progress · Build the service image', { exact: false }),
+      page.getByText('In progress · Prepare the service software', {
+        exact: false,
+      }),
     ).toBeVisible();
     await expect(page.locator('.secret-value')).toHaveCount(0);
     await expect(
@@ -128,7 +130,7 @@ test('local setup reviews changes and secret privacy, shows progress, resumes th
     ).toBeVisible();
     release();
     await expect(
-      page.getByText('Local service running · wallet operations disabled', {
+      page.getByText('Your service is running · wallet operations off', {
         exact: true,
       }),
     ).toBeVisible();
@@ -152,11 +154,17 @@ test('local setup reviews changes and secret privacy, shows progress, resumes th
       path: 'artifacts/setup-docs/local-setup-mobile.png',
       fullPage: true,
     });
+    const stopped = page.waitForResponse(
+      (response) =>
+        response.url().endsWith('/api/setup/stop') &&
+        response.request().method() === 'POST',
+    );
     await page
       .getByRole('button', { name: 'Stop local service', exact: true })
       .click();
+    expect((await stopped).status()).toBe(200);
     await expect(
-      page.getByText('Local service stopped', { exact: true }),
+      page.getByText('Your service is stopped', { exact: true }),
     ).toBeVisible();
     expect(commands.at(-1)).toContain('stop');
     const setupPath = commands.find((args) => args.includes('--file'))!;
@@ -214,16 +222,14 @@ test('a failed runtime installation unlocks configuration and can be checked and
         ),
       ),
     });
-    await expect(page.getByRole('status')).toContainText(
-      'Configuration imported',
-    );
-    await page.getByRole('tab', { name: 'Export', exact: true }).click();
+    await expect(page.getByRole('status')).toContainText('Settings imported');
+    await page.getByRole('tab', { name: 'Finish setup', exact: true }).click();
     await page
-      .getByRole('button', { name: 'Validate configuration', exact: true })
+      .getByRole('button', { name: 'Check settings', exact: true })
       .click();
     await page
       .getByRole('button', {
-        name: 'Check local setup prerequisites',
+        name: 'Check this computer',
         exact: true,
       })
       .click();
@@ -245,7 +251,7 @@ test('a failed runtime installation unlocks configuration and can be checked and
     runtime.beforeInstall(async () => {});
     await page
       .getByRole('button', {
-        name: 'Check local setup prerequisites',
+        name: 'Check this computer',
         exact: true,
       })
       .click();
@@ -257,7 +263,7 @@ test('a failed runtime installation unlocks configuration and can be checked and
       .click();
     await expect(
       page.getByRole('heading', {
-        name: 'Supply deployment secrets',
+        name: 'Passwords and secrets for setup',
         exact: true,
       }),
     ).toBeVisible();

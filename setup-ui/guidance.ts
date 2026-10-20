@@ -4,7 +4,7 @@ function setting(summary: string, why: string, source: string, guide: string) {
 }
 export const settings = {
   httpRequestLimit: setting(
-    'Maximum HTTP requests per minute from one connecting peer.',
+    'How many requests one connecting address can send each minute.',
     'Application backends can share one peer address across many users, including status-poll traffic. Durable queue caps enforce separate financial admission limits.',
     'Keep a bounded rate and measure expected backend traffic. HTTP throttling returns 429. Configure from 1 to 6,000 requests per minute; the default is 60.',
     'wallet-calls.html',
@@ -22,8 +22,8 @@ export const settings = {
     'application-access.html#configure-the-trust-policy',
   ),
   assertionTrust: setting(
-    'Your reference to the reviewed identity and consent agreement with this application.',
-    'The agreement authorizes this application to attest completed identity checks and user consent. A token scope or populated field cannot replace it.',
+    'The reference for the agreement you reviewed with the application’s team about user checks and permission.',
+    'This agreement sets out which identity checks the application completes, how it records people’s permission and what happens if they withdraw it. Adding an application or filling in fields does not create this agreement.',
     'Agree verification duties, retained evidence, consent terms and withdrawal handling with the application operator. Enter the reference to your reviewed contract or approval record, such as app-trust-2026-01. You maintain this reference; no vendor issues a special toolkit code. Enter a reference, not private agreement contents.',
     'application-access.html#configure-the-trust-policy',
   ),
@@ -76,7 +76,7 @@ export const settings = {
     'bundled-setup.html#connect-a-server-application',
   ),
   bundledClientSecret: setting(
-    'The private deployment variable holding this server application’s client secret.',
+    'The saved setting name for this application’s private connection secret. Enter the name, not the secret itself.',
     'The bundled issuer checks this credential before issuing the application’s allowed API tokens.',
     'Keep the supplied variable name. Setup generates a missing secret once. Deliver only this application’s secret to its server through a private channel; retain all other credentials with the provider.',
     'bundled-setup.html#connect-a-server-application',
@@ -94,7 +94,7 @@ export const settings = {
     'operator-deployment.html#prepare-the-optional-ows-vault',
   ),
   passphrase: setting(
-    'The variable that will hold the password protecting your OWS vault.',
+    'The saved setting name for the password that protects your wallet storage. Enter the name, not the password itself.',
     'The local engine needs the owner passphrase to open the vault. Losing it can prevent recovery.',
     'Local setup generates a missing passphrase and saves it privately. For native setup, run init-secrets once and retain the resulting environment file. It must be 16–4096 characters; an OWS agent token cannot replace it.',
     'operator-services.html#open-wallet-standard-ows',
@@ -215,7 +215,7 @@ export const settings = {
   ),
   accessAge: setting(
     'How many days application access may last before renewal, from 1 to 365.',
-    'A grant is the stored permission an owner gives an application. It expires and can be paused or revoked earlier.',
+    'This is how long someone’s wallet approval can last. They can pause or withdraw it earlier.',
     'Choose a period suitable for your product. Renewal requires a new access request and owner consent; review the supplied period against your access policy.',
     'concepts.html',
   ),
@@ -238,9 +238,9 @@ export const settings = {
     'operator-services.html#register-the-application-api-and-clients',
   ),
   permissions: setting(
-    'Choose what this application may ask owners to allow. The starting policy allows account reads and approved Safe calls.',
+    'Choose what people can allow this application to do. The starting choices are viewing wallet details and requesting approved transactions.',
     'Owners consent to these permissions. Safe calls also require current contract policy, authority and an exact approved intent. OAuth token scopes alone do not grant spending authority.',
-    'Agree the needed tasks with the application developer. Transfer requests need the optional signing configuration below. Request wallet operations is for advanced hosts and does not enable transfer delegation.',
+    'Agree the needed tasks with the application’s team. Transaction requests also need approved transaction rules and network fee funding through the API. These permissions alone do not turn on wallet operations.',
     'operator-services.html#register-the-application-api-and-clients',
   ),
   applicationEnabled: setting(

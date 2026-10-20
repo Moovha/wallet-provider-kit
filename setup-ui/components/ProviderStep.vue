@@ -8,34 +8,32 @@ const model = defineModel<ProviderConfiguration>({ required: true });
 <template>
   <div class="step-heading">
     <span class="eyebrow">Before you start</span>
-    <h2>Prepare your wallet service configuration</h2>
+    <h2>Make your wallet service yours</h2>
     <p>
-      Choose your service settings and access rules, then start an isolated
-      local deployment with Docker Compose and follow its progress. You can also
-      download files for manual deployment on another host.
+      Choose a name, connect the services you need and decide which applications
+      can ask for wallet access. You can run the service here or save the
+      settings for another server.
     </p>
   </div>
   <div class="callout step-orientation">
-    <strong>What you’ll do and take away</strong>
+    <strong>A few steps to get you started</strong>
     <ol class="setup-journey">
       <li>
-        <strong>Choose your settings.</strong> Name the service, keep the
-        bundled wallet engine, token service and local execution engine, then
-        define application trust, permissions and limits. Setup supplies
-        internal IDs, private storage paths and credential variable names
-        automatically. Existing services remain optional.
+        <strong>Choose your settings.</strong> Name your service, keep the
+        included wallet tools and choose how applications can connect. Setup
+        fills in the internal details for you. You can connect existing services
+        if you need them.
       </li>
       <li>
-        <strong>Validate and start.</strong> In Export, check your settings and
-        review the local setup plan. Supply missing secrets, then let setup
-        build the image, prepare private files and storage, start the service
-        and check health.
+        <strong>Validate and start.</strong> At the final step, review your
+        settings and the setup plan. Add any missing passwords or secrets, then
+        let setup start and check your service.
       </li>
       <li>
-        <strong>Test and enable.</strong> Your local service starts with wallet
-        operations disabled. Complete HTTPS, application, backend and recovery
-        acceptance before enabling them. Downloads remain available for manual
-        setup.
+        <strong>Test and enable.</strong> Wallet operations start disabled. Test
+        secure access, application permissions, wallet behavior and recovery
+        before enabling them. You can also download the settings for a separate
+        server.
       </li>
     </ol>
     <p>
@@ -57,9 +55,9 @@ const model = defineModel<ProviderConfiguration>({ required: true });
     <option value="base-sepolia">Base Sepolia testnet (84532)</option>
   </select>
   <p class="help-text">
-    Use separate storage and wallet bindings for each network. Mainnet
-    transactions use real assets and network fees. Configuration validation does
-    not certify execution.
+    Keep test and live networks in separate installations. Mainnet uses real
+    assets and charges real network fees. Checking these settings does not test
+    a transaction.
   </p>
   <div class="section-heading"><h3>Name your wallet service</h3></div>
   <p class="help-text">
@@ -87,7 +85,7 @@ const model = defineModel<ProviderConfiguration>({ required: true });
       guide="privacy"
       v-model="model.policy.provider.privacyUrl"
       type="url"
-      label="Privacy notice URL"
+      label="Privacy notice address"
       placeholder="https://acme.com/privacy"
       validation="required|https_url"
     />
@@ -115,11 +113,10 @@ const model = defineModel<ProviderConfiguration>({ required: true });
   <div class="callout">
     <strong>What you’ll connect next</strong>
     <p>
-      A wallet backend creates accounts and signs approved actions. Connected
-      applications authenticate users, complete identity checks and record
-      wallet-access consent. Your provider evaluates their evidence under the
-      trust agreements and policy you configure. Users remain in the
-      application.
+      The wallet service keeps wallet signing details private. Connected
+      applications sign people in, check their identity and ask for permission
+      to use their wallets. Your service accepts those checks only under an
+      agreement you have reviewed with the application’s team.
     </p>
     <a
       :href="docs + 'operator-services.html'"

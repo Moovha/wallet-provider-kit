@@ -300,9 +300,7 @@ it('serves protected management with execution disabled and rejects application 
       },
     });
     expect(registered.statusCode).toBe(200);
-    expect((await app.inject('/admin/')).body).toContain(
-      'Set up administrator',
-    );
+    expect((await app.inject('/admin/')).body).toContain('First-time setup');
     const identity = registered.json();
     const token = await app.inject({
       method: 'POST',

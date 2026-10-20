@@ -44,7 +44,7 @@ export function explainIssue(issue: string) {
         )
       ? 'Applications'
       : issue.startsWith('/backend')
-        ? 'Backend'
+        ? 'Wallet storage'
         : issue.startsWith('/ownerLogin') ||
             issue.startsWith('/oauth') ||
             issue.startsWith('/authorizationServer') ||
@@ -84,7 +84,7 @@ export function explainIssue(issue: string) {
     'documentation and enabled registered clients are required; duplicate clients are not allowed':
       'Enable the deployed API explorer, select enabled applications registered in Applications, and remove duplicate application entries.',
     'transfer signing and separate execution acceptance are required':
-      'Configure delegated transfer signing, then complete the separate execution/RPC/recovery report before enabling operations.',
+      'Check the wallet settings and application transaction rules, then complete the required service and recovery tests before enabling wallet operations.',
     'invalid policy, integration or activation settings':
       'Review the service addresses, application trust agreements, identity/access policy and activation settings using their field instructions.',
   };
@@ -106,7 +106,7 @@ function fieldLabel(path: string): string {
     '/policy/provider': 'Provider details',
     '/policy/provider/name': 'Provider name',
     '/policy/provider/origin': 'Public wallet service address',
-    '/policy/provider/privacyUrl': 'Privacy notice URL',
+    '/policy/provider/privacyUrl': 'Privacy notice address',
     '/policy/version': 'Policy version',
     '/policy/identity/maxAgeDays': 'Maximum age of identity checks (days)',
     '/policy/access/mode': 'Access flow',
