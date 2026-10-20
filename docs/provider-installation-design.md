@@ -203,8 +203,12 @@ restore remain reviewed host operations with financial uncertainty preserved.
 Cloud qualification, performance sizing, offline bundles and external SSO remain
 separate acceptance or future capabilities.
 
-Verification checkpoint: the supported Node 24.22.0/npm 11.11.1 toolchain passes
-670 unit/integration tests, generated contracts, formatting and the secret scan.
+Verification checkpoint: the supported Node 24.22.0/npm 11.11.1 toolchain passed
+the complete 670-test suite, generated contracts, formatting and the secret scan.
+The additional managed-issuer DEBUG denial brings the suite to 671 tests. Its
+focused management checks pass; the latest full rerun encountered SQLite fixture
+write failures while the workstation filesystem was full. Final complete-suite
+evidence is required from the independent CI runner.
 The documentation builds, npm audit reports zero vulnerabilities and npm pack
 dry-run succeeds. The local Docker build could not start because containerd
 reported a metadata-store input/output error. No daemon reset, data deletion or
@@ -236,3 +240,6 @@ trust changes and permitted-owner-action changes revoke related grants and deny
 old requests. Re-saving identical authority settings does not withdraw consent.
 Admitted operations retain their financial authority checks and durable attempt
 identities; rotating a token cannot undo an external effect.
+
+Managed authentication retains the bundled issuer's DEBUG logging prohibition,
+with an offline startup denial check before issuer secrets are read.

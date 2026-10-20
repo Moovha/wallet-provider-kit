@@ -476,3 +476,22 @@ it('fails closed when management records disappear from a bound installation', a
   });
   await expect(f.service.initialize(f.claim)).rejects.toThrow();
 });
+
+it('rejects debug logging before reading issuer secrets for a managed installation', async () => {
+  const f = await fixture(),
+    previous = process.env.DEBUG;
+  const privateValue = randomBytes(32).toString('hex');
+  process.env.DEBUG = privateValue;
+  try {
+    await expect(
+      createManagementAuthorizationServer(f.config, f.service),
+    ).rejects.toMatchObject({
+      issues: [
+        '/authorizationServer: disable DEBUG logging before running the bundled issuer',
+      ],
+    });
+  } finally {
+    if (previous === undefined) delete process.env.DEBUG;
+    else process.env.DEBUG = previous;
+  }
+});

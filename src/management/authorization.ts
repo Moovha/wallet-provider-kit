@@ -22,6 +22,10 @@ export async function createManagementAuthorizationServer(
   config: ProviderConfiguration,
   service: ManagementService,
 ) {
+  if (process.env.DEBUG)
+    throw new ConfigurationError([
+      '/authorizationServer: disable DEBUG logging before running the bundled issuer',
+    ]);
   let key: JWK, publicKey: JWK;
   try {
     key = JSON.parse(resolveSecret(config.authorizationServer!.signingKey));
