@@ -111,6 +111,9 @@ export default defineConfig({
             text: 'Add your first application',
             link: '/docs/runtime-workspace',
           },
+          { text: 'Create a first wallet', link: '/docs/create-wallet' },
+          { text: 'Use an existing wallet', link: '/docs/connect-wallet' },
+          { text: 'Send a small transfer', link: '/docs/send-transfer' },
           {
             text: 'User checks and permission',
             link: '/docs/application-access',

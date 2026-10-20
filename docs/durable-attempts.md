@@ -12,7 +12,9 @@ another registration. For access requests, read
 `wallet_getCallsStatus` with the saved batch ID through the account’s
 [wallet endpoint](wallet-calls.md). These reads still require current permission.
 
-Retry an identical mutation only with its original idempotency key. If the
+Retry an identical REST mutation only with its original idempotency key. For
+`wallet_sendCalls`, keep the explicit inner `params[0].id` saved before sending;
+that batch ID, rather than the HTTP header, identifies its replay. If the
 result remains pending or unknown, keep the original records and ask the operator
 to investigate. Do not clear records, reset budgets or invent another operation
 to get past the uncertainty.

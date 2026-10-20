@@ -36,8 +36,13 @@ A batch ID acknowledges a retained request; it is not proof of successful execut
 
 ## 4. Handle retries without repeating effects
 
-Give each mutation an `Idempotency-Key` and retain it with the original request.
-Retry identical input using the same key. After a timeout, inspect the original
+For REST mutations such as access requests and provisioning, save an
+`Idempotency-Key` with the original request and reuse it for identical retries.
+For `wallet_sendCalls`, set and save `params[0].id` before sending: this retained
+batch ID identifies the wallet request. The outer JSON-RPC ID only correlates
+responses, and an HTTP idempotency header alone does not deduplicate wallet calls. A known
+batch ID returns JSON-RPC error `5720`; inspect its saved status instead of
+creating a fresh request. After a timeout, inspect the original
 request or batch; the action may already have reached the network.
 
 | Response       | What to check next                                                                     |
@@ -49,6 +54,13 @@ request or batch; the action may already have reached the network.
 
 Use the [HTTP schema reference](http-reference.md) for exact request bodies,
 responses and route-specific requirements. Then [test the connection](staging-walkthrough.md).
+
+## Follow a worked example
+
+Start with [Create a first wallet](create-wallet.md), then
+[reconnect to an existing wallet](connect-wallet.md) and
+[send a small transfer](send-transfer.md). The examples keep user permission,
+provider acceptance and application tokens separate.
 
 ## Try deployed APIs
 

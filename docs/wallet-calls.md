@@ -15,6 +15,8 @@ The sender is the current user Safe. An explicit `from` must match it. Submit an
 
 ## Show progress honestly
 
-Poll using the same batch ID or consume account-scoped events. A `200` wallet status indicates independently verified success, while finality and business settlement remain separate. Keep the original mutation idempotency key on retries. See [HTTP schemas](http-reference.md) for transport details and [Safe execution](user-operation-execution.md) for reconciliation.
+Poll using the same batch ID or consume account-scoped events. A `200` wallet status indicates independently verified success, while finality and business settlement remain separate. Set and save `params[0].id` before sending `wallet_sendCalls`, then reuse that batch ID with identical input on retries. The outer JSON-RPC ID and HTTP `Idempotency-Key` do not replace this retained batch identity. A previously admitted ID returns JSON-RPC error `5720`; read the original batch status rather than submitting with a fresh ID. See [HTTP schemas](http-reference.md) for transport details and [Safe execution](user-operation-execution.md) for reconciliation.
 
 Next, [test the connection](staging-walkthrough.md), including retries and revoked access.
+
+For a complete request example, follow [Send a small transfer](send-transfer.md).

@@ -1,5 +1,5 @@
 ---
-prev: { 'text': 'Paying network fees', 'link': '/docs/assets-and-gas' }
+prev: { 'text': 'Send a small transfer', 'link': '/docs/send-transfer' }
 next: { 'text': 'Before welcoming users', 'link': '/docs/conformance' }
 ---
 
@@ -30,13 +30,16 @@ amount. Keep administrator and application credentials separate.
 3. Save its request, account and grant IDs. Provision the person’s Safe with an
    idempotency key and retain the returned address.
 4. Submit an approved zero-value atomic call using the [wallet API](wallet-calls.md).
-   Keep its batch ID. Check status until independently verified inclusion is
+   Set and save its inner `params[0].id` before sending. Check status until independently verified inclusion is
    reported; check finality separately.
 5. Withdraw permission in the application. Confirm that access and new signing
    are denied. Obtain fresh consent before testing reconnection.
 
 A granted access request, a saved batch and an executed transaction are different
 results. Record which one each step establishes.
+
+For the full wallet and transfer requests, use [Create a first wallet](create-wallet.md),
+[Use an existing wallet](connect-wallet.md) and [Send a small transfer](send-transfer.md).
 
 ## Check the difficult cases too
 

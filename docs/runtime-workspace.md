@@ -1,7 +1,6 @@
 ---
 prev: { 'text': 'Install and sign in', 'link': '/docs/provider-installation' }
-next:
-  { 'text': 'User checks and permission', 'link': '/docs/application-access' }
+next: { 'text': 'Create a first wallet', 'link': '/docs/create-wallet' }
 ---
 
 # Connect your first application
@@ -54,6 +53,18 @@ credentials separate. Application credentials cannot manage the provider.
 The developer first obtains an application token and reads your access policy.
 For transaction access, continue with [Choose transactions and network-fee limits](application-obligations.md).
 Registration alone does not enable transactions or grant access to anyone’s wallet.
+
+## Try the everyday wallet tasks
+
+With the application connected and its agreements ready, build the experience
+people will use:
+
+- [Create someone’s first wallet](create-wallet.md) and show their receiving address.
+- [Help someone return to their wallet](connect-wallet.md) with current permission.
+- [Send a small transfer](send-transfer.md) between two test wallets and verify it arrived.
+
+Each walkthrough explains what the person sees, what the provider needs and the
+requests your developer implements. You can open the technical steps as needed.
 
 ## 4. Test before inviting people
 

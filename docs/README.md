@@ -33,6 +33,13 @@ to complete the connection.
 Transaction rules and who pays network fees come next, when you know what the
 application needs. The connection guide introduces those decisions in order.
 
+## Build the experience people will use
+
+Once the application is connected, walk through [creating a first wallet](create-wallet.md),
+[returning to an existing wallet](connect-wallet.md) and
+[sending a small transfer](send-transfer.md). Each guide starts with the person’s
+experience and keeps developer requests available in expandable sections.
+
 ## Before welcoming users
 
 [Test the connection](staging-walkthrough.md), arrange [backups](provider-maintenance.md)
