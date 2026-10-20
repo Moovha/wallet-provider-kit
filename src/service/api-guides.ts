@@ -34,7 +34,7 @@ export const operationGuides: Record<string, OperationGuide> = {
     prerequisite:
       'Supply the current revision and an idempotency key. Application identities cannot perform this operation.',
     success:
-      '200: updated registration. Existing tokens and related grants are invalidated; wallet activation is unchanged.',
+      '200: updated registration. Authority changes invalidate obsolete tokens; suspension, trust and owner-permission changes revoke related grants. Renaming preserves authority. Wallet activation is unchanged.',
     scope: 'provider:manage',
   },
   createProviderIdentity: {

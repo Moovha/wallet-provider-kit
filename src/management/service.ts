@@ -390,6 +390,18 @@ export class ManagementService {
           )
             conflict();
         }
+        const grantAuthority = () =>
+          hash(
+            JSON.stringify([
+              identity.enabled,
+              identity.policy?.assertionTrust,
+              [...(identity.policy?.permissions ?? [])].sort(),
+            ]),
+          );
+        const tokenAuthority = () =>
+          hash(JSON.stringify([grantAuthority(), [...identity.scopes].sort()]));
+        const previousGrantAuthority = grantAuthority(),
+          previousTokenAuthority = tokenAuthority();
         if (operation === 'rotate') {
           Object.assign(identity, credential);
           identity.credentialRevision++;
@@ -430,12 +442,16 @@ export class ManagementService {
                 identity.policy?.permissions ?? ['account:read'],
               ...(agreement ? { assertionTrust: { agreement } } : {}),
             };
-            if (agreement !== null && agreement !== undefined)
-              defineOnboardingPolicy({
-                ...this.basePolicy,
-                applications: [policy],
-              });
-            else if (
+            if (agreement !== null && agreement !== undefined) {
+              try {
+                defineOnboardingPolicy({
+                  ...this.basePolicy,
+                  applications: [policy],
+                });
+              } catch {
+                invalid();
+              }
+            } else if (
               input.permissions !== undefined &&
               (!input.permissions.length ||
                 input.permissions.some(
@@ -451,10 +467,13 @@ export class ManagementService {
             identity.policy = policy;
           }
           if (identity.policy) identity.policy.name = identity.name;
-          identity.credentialRevision++;
+          if (tokenAuthority() !== previousTokenAuthority)
+            identity.credentialRevision++;
         }
+        const invalidatesGrants = grantAuthority() !== previousGrantAuthority;
         for (const request of Object.values(s.requests ?? {})) {
           if (
+            invalidatesGrants &&
             request.caller.clientId === identity.id &&
             request.caller.issuer === this.issuer
           )
@@ -463,6 +482,7 @@ export class ManagementService {
         identity.revision++;
         for (const grant of Object.values(s.grants))
           if (
+            invalidatesGrants &&
             grant.caller.clientId === identity.id &&
             grant.caller.issuer === this.issuer
           )

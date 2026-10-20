@@ -228,3 +228,11 @@ release workflow labels image source ownership and checks anonymous manifest acc
 for both digests before publishing an installer, so public operators are not
 unexpectedly required to supply registry credentials. Maintainers configure public
 package visibility once. [GitHub documents this registry behavior](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry).
+
+Authority/usability review: display-name changes preserve credentials and grants.
+Credential rotation invalidates old credentials/tokens while preserving current
+owner consent. Scope changes invalidate obsolete tokens. Suspension, identity
+trust changes and permitted-owner-action changes revoke related grants and deny
+old requests. Re-saving identical authority settings does not withdraw consent.
+Admitted operations retain their financial authority checks and durable attempt
+identities; rotating a token cannot undo an external effect.

@@ -165,9 +165,19 @@ it('fences stale credentials, revokes grants and does not expose secret verifier
   await f.store.transaction((state) => {
     state.grants.offline = { caller: fresh, state: 'active' } as never;
   });
-  const rotated = (await f.service.mutate(operator, randomUUID(), 'rotate', {
+  const renamed = (await f.service.mutate(operator, randomUUID(), 'update', {
     id: created.id,
     expected_revision: trusted.revision,
+    name: 'Renamed application',
+  })) as { revision: number };
+  expect(() => f.service.currentPrincipal(fresh)).not.toThrow();
+  expect(await f.store.transaction((state) => state.grants.offline.state)).toBe(
+    'active',
+  );
+
+  const rotated = (await f.service.mutate(operator, randomUUID(), 'rotate', {
+    id: created.id,
+    expected_revision: renamed.revision,
   })) as { client_secret: string; revision: number };
   expect(() => f.service.currentPrincipal(fresh)).toThrow();
   await expect(
@@ -176,7 +186,7 @@ it('fences stale credentials, revokes grants and does not expose secret verifier
     ]),
   ).rejects.toThrow();
   expect(await f.store.transaction((s) => s.grants.offline.state)).toBe(
-    'revoked',
+    'active',
   );
   const current = await f.service.verifyCredentials(
     created.id,
@@ -189,6 +199,9 @@ it('fences stale credentials, revokes grants and does not expose secret verifier
     enabled: false,
   });
   expect(() => f.service.application(current)).toThrow();
+  expect(await f.store.transaction((s) => s.grants.offline.state)).toBe(
+    'revoked',
+  );
   expect(f.service.applications()).toEqual([]);
   expect(runtimeApplicationId(f.config.oauth.issuer, created.id)).toHaveLength(
     64,

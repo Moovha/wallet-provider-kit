@@ -118,8 +118,12 @@ identity/consent agreement and permitted owner actions separately through its
 trust form or `PATCH /v1/provider/identities/{id}`. The update API also changes
 the allowed OAuth scopes for application and automation identities within their
 role limits. Trust, suspension and credential
-changes require the current registration revision. Changes invalidate obsolete
-tokens, revoke related grants and deny old access requests. Other applications'
+changes require the current registration revision. Rotation invalidates obsolete
+credentials and tokens while preserving owner grants. Renaming is a metadata
+change. Suspension, trust changes and owner-permission changes revoke related
+grants and deny old access requests; scope changes invalidate obsolete tokens.
+Admitted operations retain their original identities and financial checks; token
+rotation does not erase an external effect. Other applications'
 registrations and policy revisions remain independent.
 
 Then use the [application configuration APIs](runtime-configuration.md) for

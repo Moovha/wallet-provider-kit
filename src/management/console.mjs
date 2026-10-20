@@ -213,7 +213,7 @@ async function refresh() {
         action(actions, 'Rotate credential', async () => {
           if (
             !confirm(
-              'Replace this identity’s credential and invalidate its existing tokens and application grants?',
+              'Replace this identity’s credential and invalidate its existing tokens? Owner grants remain subject to current policy.',
             )
           )
             return;
