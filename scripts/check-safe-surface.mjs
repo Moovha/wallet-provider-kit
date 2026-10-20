@@ -19,6 +19,9 @@ assert.deepEqual(Object.keys(manifest.exports), [
 ]);
 for (const path of [
   'src/executor',
+  'src/execution/atomic-vault-swap.ts',
+  'contracts/DexAdapters.sol',
+  'contracts/AtomicVaultSwap.sol',
   'src/backend.ts',
   'src/providers/cdp.ts',
   'src/providers/openzeppelin-relayer.ts',
@@ -48,3 +51,9 @@ for (const path of Object.keys(api.paths))
   );
 assert.ok(api.paths['/v1/accounts/{accountId}/wallet']);
 console.log('Safe/bundler/paymaster is the sole execution surface');
+
+assert.match(await readFile('.gitignore', 'utf8'), /^\/local-adapters\/$/m);
+assert.match(
+  await readFile('docs/.vitepress/config.mts', 'utf8'),
+  /local-adapters\/\*\*/,
+);

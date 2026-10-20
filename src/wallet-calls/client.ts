@@ -208,26 +208,3 @@ export function createWalletCallsProvider(options: WalletCallsClientOptions) {
   }
   return { request, watchCallsStatus };
 }
-
-export {
-  atomicVaultSwapCalls,
-  encodeDexSwapRoute,
-  encodeV3AdapterData,
-  encodeV4AdapterData,
-  encodeSlipstreamAdapterData,
-  encodeAerodromeAdapterData,
-  dexAdapterArtifacts,
-  atomicSwapQuote,
-  atomicSwapMinimum,
-  encodeV3SwapPath,
-  encodeV4SwapPath,
-  atomicVaultSwapAbi,
-  atomicVaultSwapCreationCode,
-} from '../execution/atomic-vault-swap.js';
-
-export type {
-  AtomicDexStep,
-  AtomicSwapQuote,
-  AtomicSwapRequest,
-  AtomicV4Pool,
-} from '../execution/atomic-vault-swap.js';

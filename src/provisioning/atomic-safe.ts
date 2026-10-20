@@ -1,7 +1,7 @@
 import { Interface, ZeroAddress } from 'ethers';
 import { safeSetupInterface } from './safe.js';
 
-/** SafeModuleSetup from @safe-global/safe-4337 0.3.0, canonical Base and Base Sepolia deployment. */
+/** SafeModuleSetup from @safe-global/safe-4337 0.3.0, canonical deployment; verify its runtime on each target network. */
 export const safeModuleSetup = {
   address: '0x2dd68b007B46fBe91B9A7c3EDa5A7a1063cB5b47',
   codeHash:

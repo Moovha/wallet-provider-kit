@@ -1,19 +1,6 @@
 export { WalletCallsService } from '../wallet-calls/service.js';
 export {
   createWalletCallsProvider,
-  atomicVaultSwapCalls,
-  encodeDexSwapRoute,
-  encodeV3AdapterData,
-  encodeV4AdapterData,
-  encodeSlipstreamAdapterData,
-  encodeAerodromeAdapterData,
-  dexAdapterArtifacts,
-  atomicSwapQuote,
-  atomicSwapMinimum,
-  encodeV3SwapPath,
-  encodeV4SwapPath,
-  atomicVaultSwapAbi,
-  atomicVaultSwapCreationCode,
   WalletCallsRpcError,
 } from '../wallet-calls/client.js';
 export type { WalletCallsClientOptions } from '../wallet-calls/client.js';
@@ -69,9 +56,10 @@ export type { SafeProvisioningConfiguration } from '../provisioning/safe.js';
 
 export { defaultSafeProvisioning } from '../provisioning/defaults.js';
 
-export type {
-  AtomicDexStep,
-  AtomicSwapQuote,
-  AtomicSwapRequest,
-  AtomicV4Pool,
-} from '../execution/atomic-vault-swap.js';
+export {
+  createSafeRecoveryManifest,
+  predictSafeAddress,
+  inspectSafeRecovery,
+  type SafeRecoveryManifest,
+  type SafeRecoveryReader,
+} from '../provisioning/recovery.js';

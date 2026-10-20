@@ -23,3 +23,16 @@
 
 !docs/provider.config.safe.example.json
 !scripts/clean-build.mjs
+
+# Keep local instructions and editor state out of allowed source directories.
+**/AGENTS.md
+**/agents.md
+**/CLAUDE.md
+**/.codex
+**/.claude
+**/.idea
+**/.vscode
+**/*.code-workspace
+**/*.swp
+**/*.swo
+**/*~
