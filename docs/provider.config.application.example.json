@@ -107,6 +107,7 @@
   "runtimeConfiguration": {
     "authorizeContracts": true,
     "sharedApplicationSafes": true,
+    "executionPool": { "safeCount": 5, "sponsorCount": 5 },
     "credentialKey": {
       "env": "APPLICATION_CREDENTIAL_STORAGE_KEY"
     },

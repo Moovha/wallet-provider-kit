@@ -98,7 +98,7 @@
     "generate:spec": "node --import tsx scripts/check-spec.mjs --write",
     "check:secrets": "secretlint \"**/*\"",
     "sbom": "npm sbom --sbom-format cyclonedx --omit=dev",
-    "verify": "npm run typecheck && npm run test && npm run check:spec && npm run check:docs && npm run format:check && npm run check:secrets",
+    "verify": "npm run typecheck && npm run test && npm run check:read-helper && npm run check:paymaster && npm run check:spec && npm run check:docs && npm run format:check && npm run check:secrets",
     "pack:local": "npm run build && npm pack --ignore-scripts",
     "check:package": "npm run build && node scripts/check-package.mjs",
     "generate:docs": "node scripts/api-docs.mjs --write",
@@ -109,7 +109,11 @@
     "docs:preview": "vitepress preview docs --host 127.0.0.1",
     "build:setup": "vite build --config setup-ui/vite.config.ts && node scripts/setup-notices.mjs",
     "test:setup": "npm run build && playwright test --config setup-ui/playwright.config.ts",
-    "preview:local": "node examples/local-preview/run.mjs"
+    "preview:local": "node examples/local-preview/run.mjs",
+    "check:paymaster": "node scripts/local-paymaster-contract.mjs",
+    "generate:paymaster": "node scripts/local-paymaster-contract.mjs --write",
+    "check:read-helper": "node scripts/safe-state-reader.mjs",
+    "generate:read-helper": "node scripts/safe-state-reader.mjs --write"
   },
   "dependencies": {
     "@coinbase/cdp-sdk": "1.58.0",
@@ -136,6 +140,7 @@
     "@formkit/icons": "2.1.2",
     "@formkit/themes": "2.1.2",
     "@formkit/vue": "2.1.2",
+    "@foundry-rs/anvil": "1.5.0",
     "@playwright/test": "1.64.1",
     "@secretlint/secretlint-rule-preset-recommend": "13.0.7",
     "@types/node": "24.19.2",
@@ -146,6 +151,7 @@
     "openapi-typescript": "7.13.0",
     "prettier": "3.9.10",
     "secretlint": "13.0.7",
+    "solc": "0.8.37",
     "swagger-ui-dist": "5.32.6",
     "tsx": "4.23.15",
     "typescript": "5.9.3",
@@ -179,6 +185,9 @@
   "overrides": {
     "vitepress": {
       "vite": "6.4.4"
+    },
+    "solc": {
+      "tmp": "0.2.7"
     }
   }
 }

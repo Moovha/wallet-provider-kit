@@ -70,7 +70,7 @@ The package is experimental and not published to npm; a registry install by name
 is not available. See [getting started](docs/README.md) for installation help.
 
 The recommended bundle includes an OAuth application token service, the OWS wallet
-engine, SQLite and a saved Caddy automatic-HTTPS profile. The local execution engine starts automatically alongside OWS, with private OpenZeppelin Relayer and durable Valkey queues. Configure action policies, RPC verification and gas funding to use it. Existing services and custom adapters are optional paths. See [the bundled setup](docs/bundled-setup.md).
+engine, SQLite and a saved Caddy automatic-HTTPS profile. The Safe-only wallet profile starts a private Alto bundler and durable Valkey queues alongside OWS. Each user receives one Safe address; an application-owned paymaster covers gas through one application funding address. Configure application RPCs, action policies and funding before provisioning. See [self-hosted sponsorship](docs/self-hosted-sponsorship.md). Existing services and custom adapters are optional paths. See [the bundled setup](docs/bundled-setup.md).
 After validation, choose **Set up and run locally**: review the plan, supply missing
 secrets privately and watch setup save files, build the Docker image, initialize
 new storage, diagnose and start the service. It uses the single-host container

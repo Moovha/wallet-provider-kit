@@ -123,10 +123,13 @@ authorizes another submission. During explicit nonce cancellation, background
 observation follows the cancellation; the fenced original remains available for
 explicit reconciliation.
 
-RPC reads are serialized per reader to limit bursts. HTTP 429 responses allow at
+Quorum verification uses at most four concurrent reads per reader, with a shared
+endpoint ceiling of eight in flight and 64 waiting reads across application
+observers. Waiting requests expire after three seconds. HTTP 429 responses allow at
 most three read attempts, honoring a server backoff of up to two seconds or using
 a 500 ms fallback. Longer server backoffs return unavailable immediately and
-prevent that reader from issuing requests until the backoff expires. This retry
+prevent readers sharing that endpoint and transport from issuing requests until
+the backoff expires. This retry
 policy applies only to the fixed read-method allowlist. Signing, provider
 submission and uncertain financial attempts are never retried by this transport.
 
@@ -135,8 +138,11 @@ submission and uncertain financial attempts are never retried by this transport.
 The outer payer nonce and Safe authorization nonce are separate. Service expiry
 and cancelling an outer transaction do not revoke a signed Safe transaction. In
 the supported zero-refund Safe profile, a reverted outer execution can also revert
-the Safe nonce increment. Keep a signed queue head until exact finalized success;
-never skip it based on age, an outer cancellation or an unexplained nonce change.
+the Safe nonce increment. Release a signed queue head only after independent
+quorum verifies inclusion and Safe nonce consumption; settlement still waits
+for finality. Recheck the released predecessor before advancing its lane. Never
+skip an unresolved head based on age, an outer cancellation or an unexplained
+nonce change. A reorg pauses the affected lane for reconciliation.
 
 ## Explicitly cancel an unsubmitted signed Safe action
 
@@ -200,3 +206,18 @@ provider replacement policy, power-loss durability or funded gas coverage.
   [cancellation](https://docs.openzeppelin.com/relayer/1.8.x/api/canceltransaction).
 - [Accepted-version research source: Relayer v1.8.0](https://github.com/OpenZeppelin/openzeppelin-relayer/tree/v1.8.0/src/domain/relayer/evm).
 - [Safe 1.4.1 execution and nonce behavior](https://github.com/safe-global/safe-smart-account/blob/v1.4.1/contracts/Safe.sol).
+
+## Lagging RPC heads and historical integrity fences
+
+A previously verified finalized result remains finalized when a fresh verified
+observation proves the same transaction, canonical block and execution outcome,
+even if the selected RPC reports an older finalized head. Head lag alone does not
+quarantine the payer or block another account's queue. Changed canonical blocks,
+transaction identities or outcomes still fence execution.
+
+An authorized explicit reconciliation can repair an existing integrity fence
+only after a fresh full chain proof, bypassing inclusion caches, restores the exact
+original immutable plan, transaction, block and outcome. Normal status reads
+retain the fence. The operation preserves the original financial admission and
+recorded audit history. Unsigned queue heads expire independently of a quarantined
+predecessor; signed or submitted attempts retain their recovery obligations.

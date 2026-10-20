@@ -1,4 +1,12 @@
+import { ObservationWorker } from './observation-worker.js';
+import { rpcVerified } from './inclusion.js';
 import { adapterInput } from './operation-adapters.js';
+import { waitForObservation } from './read-observation.js';
+import {
+  includedExecution,
+  consumedSafeNonce,
+  observationDue,
+} from './inclusion.js';
 import {
   applicationGasBudgetId,
   applicationGasBudgetLimit,
@@ -49,12 +57,36 @@ import {
 } from '../providers/attempt-lifecycle.js';
 import { transferInterface } from './chain.js';
 import {
+  type ChainObservation,
   type ExecutionConfiguration,
   type ExecutionObserver,
   type ExecutionProvider,
   type ExecutionReceipt,
   type TransferExecutionPlan,
 } from './types.js';
+
+function retainFinalized(
+  previous: ChainObservation | undefined,
+  current: ChainObservation,
+): ChainObservation {
+  if (
+    previous?.chain_status === 'finalized' &&
+    rpcVerified(current.verification) &&
+    ['included', 'safe', 'finalized'].includes(current.chain_status) &&
+    current.block_hash === previous.block_hash &&
+    current.block_number === previous.block_number &&
+    current.transaction_hash === previous.transaction_hash &&
+    current.outcome === previous.outcome &&
+    current.outcome !== 'unknown'
+  ) {
+    return {
+      ...current,
+      chain_status: 'finalized',
+      settlement: current.outcome,
+    };
+  }
+  return current;
+}
 
 function unknown(): never {
   throw new WalletProviderError('wallet_attempt_unavailable', 'unknown');
@@ -65,10 +97,22 @@ export class ApprovedExecutionCoordinator {
   readonly configurationHash: string;
   readonly profile: ExecutionConfiguration['profile'];
   private readonly config: ExecutionConfiguration;
-  private timer?: ReturnType<typeof setTimeout>;
-  private running?: Promise<void>;
-  private stopped = true;
-  private cursor = 0;
+  private worker?: ObservationWorker;
+  private signalStop?: Promise<() => void>;
+  private parentWake?: () => void;
+  setObservationWake(wake: () => void) {
+    this.parentWake = wake;
+  }
+
+  private readonly listeners = new Set<(id: string) => void>();
+  subscribe(listener: (id: string) => void): () => void {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+
+  private readonly observations = new Map<string, Promise<void>>();
   constructor(
     readonly actions: SupportedActions,
     private readonly database: ProviderDatabase,
@@ -77,6 +121,7 @@ export class ApprovedExecutionCoordinator {
     private readonly provider: ExecutionProvider,
     private readonly observer: ExecutionObserver,
     private readonly operations?: PayerOperations,
+    private readonly onInclusion?: (id: string) => Promise<void> | void,
   ) {
     this.config = structuredClone(configuration);
     this.profile = configuration.profile;
@@ -94,6 +139,7 @@ export class ApprovedExecutionCoordinator {
     signature: string,
     intent?: import('./approved-calls.js').ApprovedCallIntent,
     runtimePolicy?: import('../runtime-configuration/authority.js').RuntimePolicySnapshot,
+    networkFees?: TransferExecutionPlan['networkFees'],
   ): TransferExecutionPlan {
     const message = action.payload.message;
     const parsedSignature = Signature.from(signature);
@@ -106,6 +152,7 @@ export class ApprovedExecutionCoordinator {
       genesisHash: this.config.rpc.genesisHash,
       ...(!intent ? { tokenCodeHash: this.config.rpc.tokenCodeHash! } : {}),
       scanFromBlock,
+      ...(networkFees ? { networkFees: structuredClone(networkFees) } : {}),
       ...(this.config.replacement
         ? { replacement: pinReplacementPolicy(this.config.replacement) }
         : {}),
@@ -267,6 +314,23 @@ export class ApprovedExecutionCoordinator {
       ? this.database.journal.read(this.request(record))
       : null;
   }
+  private async timing(
+    id: string,
+    phase: keyof NonNullable<
+      import('./types.js').TransferExecutionRecord['timings']
+    >,
+  ) {
+    await this.actions.onboarding.store.transaction((state) => {
+      if (
+        state.deploymentBindings?.['service-v1']?.activeRevision !==
+        this.actions.revision
+      )
+        deny();
+      const execution = state.supportedActions?.[id]?.execution;
+      if (!execution || execution.integrityFailure) unknown();
+      (execution.timings ??= {})[phase] ??= new Date().toISOString();
+    });
+  }
   private async receipt(record: TransferRecord): Promise<ExecutionReceipt> {
     const execution = record.execution;
     if (!execution || execution.integrityFailure) unknown();
@@ -404,9 +468,11 @@ export class ApprovedExecutionCoordinator {
                 )
                   return false;
                 if (
-                  execution.observation?.chain_status === 'finalized' &&
-                  execution.observation.verification === 'rpc-quorum' &&
-                  !execution.integrityFailure
+                  (this.profile === 'approved-evm-executor-v1' &&
+                    includedExecution(execution)) ||
+                  (execution.observation?.chain_status === 'finalized' &&
+                    rpcVerified(execution.observation.verification) &&
+                    !execution.integrityFailure)
                 )
                   return false;
                 return (
@@ -500,11 +566,6 @@ export class ApprovedExecutionCoordinator {
     if (!record.execution) unknown();
     if (!record.execution.plan) {
       if (
-        this.config.replacement &&
-        !(await this.provider.supportsReplacement?.())
-      )
-        deny();
-      if (
         await this.actions.onboarding.store.transaction(
           (state) =>
             !!state.sponsorQuarantines?.[
@@ -514,21 +575,49 @@ export class ApprovedExecutionCoordinator {
       )
         deny();
       let scanFromBlock: string;
+      let networkFees: TransferExecutionPlan['networkFees'];
+      await this.timing(id, 'preparation_started_at');
       try {
-        scanFromBlock = await this.observer.anchor(context.principal);
+        if (this.config.local && this.observer.anchorWithFees) {
+          ({ scanFromBlock, networkFees } = await this.observer.anchorWithFees(
+            sponsor,
+            context.principal,
+          ));
+        } else {
+          [scanFromBlock, networkFees] = await Promise.all([
+            this.observer.anchor(context.principal),
+            this.config.local && this.observer.quoteFees
+              ? this.observer.quoteFees(sponsor, context.principal)
+              : undefined,
+          ]);
+        }
+        const capability = async () => {
+          if (!networkFees && !this.config.replacement) return;
+          const supported = await this.provider.supportsReplacement?.(sponsor);
+          if (networkFees && !supported)
+            throw new WalletProviderError(
+              'wallet_provider_configuration',
+              'not_dispatched',
+            );
+          if (this.config.replacement && !supported) deny();
+        };
         if (this.config.local && record.intent) {
           if (!this.observer.preflightUnsigned) deny();
-          await this.observer.preflightUnsigned(
-            this.buildPlan(
-              record.approval.action,
-              sponsor,
-              scanFromBlock,
-              '0x' + '1'.repeat(128) + '1b',
-              record.intent,
-              record.runtimePolicy,
+          await Promise.all([
+            capability(),
+            this.observer.preflightUnsigned(
+              this.buildPlan(
+                record.approval.action,
+                sponsor,
+                scanFromBlock,
+                '0x' + '1'.repeat(128) + '1b',
+                record.intent,
+                record.runtimePolicy,
+                networkFees,
+              ),
             ),
-          );
-        }
+          ]);
+        } else await capability();
       } catch (error) {
         if (
           error instanceof WalletProviderError &&
@@ -543,12 +632,14 @@ export class ApprovedExecutionCoordinator {
           );
         throw error;
       }
+      await this.timing(id, 'signing_started_at');
       const signature = Signature.from(
         await this.wallet.sign(
           { ...context, idempotencyKey: record.execution.signingKey },
           id,
         ),
       );
+      await this.timing(id, 'signed_at');
       if (
         recoverAddress(
           record.approval.action.payload_hash,
@@ -564,6 +655,7 @@ export class ApprovedExecutionCoordinator {
         record.intent,
         record.runtimePolicy,
       );
+      if (networkFees) plan.networkFees = networkFees;
       record = await this.actions.withAuthorizedTransfer(
         context.principal,
         id,
@@ -587,9 +679,17 @@ export class ApprovedExecutionCoordinator {
     }
     const execution = record.execution!;
     const plan = structuredClone(execution.plan!);
+    this.signalStop ??= this.observer
+      .subscribe?.(plan, () => {
+        this.worker?.hint();
+        this.parentWake?.();
+      })
+      .catch(() => () => {});
     const request = this.request(record);
-    await this.provider.prepare(plan);
-    await this.observer.preflight(plan);
+    await Promise.all([
+      this.provider.prepare(plan),
+      this.observer.preflight(plan),
+    ]);
     await this.authorize(context.principal, id, request);
     const budgetId = applicationGasBudgetId(
       this.actions.onboarding.policy.provider.origin,
@@ -618,6 +718,7 @@ export class ApprovedExecutionCoordinator {
         await this.authorize(context.principal, id, request);
         if (this.config.service)
           await this.openHandoff(context.principal, id, request);
+        await this.timing(id, 'submission_started_at');
         return {
           kind: 'relay_transaction',
           transactionId: await this.provider.submit(plan, {
@@ -638,6 +739,8 @@ export class ApprovedExecutionCoordinator {
         return result;
       },
     );
+    await this.timing(id, 'accepted_at');
+    this.parentWake?.();
     return this.receipt(await this.current(context.principal, id, true));
   }
   private async openHandoff(
@@ -849,7 +952,7 @@ export class ApprovedExecutionCoordinator {
     if (!principal.scopes.includes('wallet:execute:read')) deny();
     const record = await this.current(principal, id, true);
     if (!record.execution) deny();
-    if (record.execution.plan) await this.refresh(id);
+    if (record.execution.plan) await waitForObservation(this.refresh(id));
     return this.receipt(await this.current(principal, id, true));
   }
   async reconcile(
@@ -880,8 +983,68 @@ export class ApprovedExecutionCoordinator {
         state.idempotency[key] = { id, hash };
       },
     );
+    await this.reconcileIntegrity(context.principal, id);
     await this.refresh(id);
     return this.receipt(await this.current(context.principal, id, true));
+  }
+  private async reconcileIntegrity(principal: VerifiedPrincipal, id: string) {
+    const record = await this.current(principal, id, true);
+    const execution = record.execution;
+    if (!execution?.integrityFailure) return;
+    const prior = execution.observation;
+    if (
+      !execution.plan ||
+      executionPlanHash(execution.plan) !== execution.planHash ||
+      prior?.chain_status !== 'finalized' ||
+      !this.observer.observeFresh
+    )
+      unknown();
+    const fresh = await this.observer.observeFresh(
+      execution.plan,
+      execution.transactionHashes ?? [],
+      execution.transactionHashes?.[0],
+    );
+    const verified = retainFinalized(prior, fresh);
+    if (
+      verified.chain_status !== 'finalized' ||
+      !rpcVerified(verified.verification) ||
+      verified.block_hash !== prior.block_hash ||
+      verified.block_number !== prior.block_number ||
+      verified.transaction_hash !== prior.transaction_hash ||
+      verified.outcome !== prior.outcome
+    )
+      unknown();
+    await this.actions.withExecutionRead(principal, id, (state, latest) => {
+      const current = latest.execution;
+      if (
+        !current?.integrityFailure ||
+        current.planHash !== execution.planHash ||
+        fingerprint(current.observation) !== fingerprint(prior)
+      )
+        unknown();
+      current.integrityFailure = false;
+      current.observation = verified;
+      current.observationRevision++;
+      current.inclusionProof = {
+        version: '1',
+        planHash: current.planHash!,
+        observationHash: fingerprint(verified),
+      };
+      const payer = fingerprint([
+        'payer',
+        execution.plan!.sponsor.binding.address.toLowerCase(),
+      ]);
+      if (state.sponsorQuarantines?.[payer])
+        state.sponsorQuarantines[payer] = state.sponsorQuarantines[
+          payer
+        ].filter((value) => value !== current.executionId);
+      state.audit.push({
+        at: Date.now(),
+        event: 'execution_integrity_reconciled',
+        resource: id,
+        revision: this.actions.revision,
+      });
+    });
   }
   async events(principal: VerifiedPrincipal, id: string, after = '0') {
     if (!principal.scopes.includes('wallet:execute:read')) deny();
@@ -910,7 +1073,16 @@ export class ApprovedExecutionCoordinator {
     });
   }
   /** Trusted read-only observer entry point. It never signs, claims, submits or releases reservations. */
-  async refresh(id: string): Promise<void> {
+  refresh(id: string): Promise<void> {
+    const pending = this.observations.get(id);
+    if (pending) return pending;
+    const running = this.observe(id).finally(() => {
+      if (this.observations.get(id) === running) this.observations.delete(id);
+    });
+    this.observations.set(id, running);
+    return running;
+  }
+  private async observe(id: string): Promise<void> {
     const record = await this.actions.onboarding.store.transaction((state) => {
       if (
         state.deploymentBindings?.['service-v1']?.activeRevision !==
@@ -924,60 +1096,104 @@ export class ApprovedExecutionCoordinator {
     if (!record?.execution?.plan || record.execution.integrityFailure) return;
     const execution = record.execution;
     const plan = structuredClone(execution.plan!);
+    this.signalStop ??= this.observer
+      .subscribe?.(plan, () => {
+        this.worker?.hint();
+        this.parentWake?.();
+      })
+      .catch(() => () => {});
     const claim = await this.database.journal.read(this.request(record));
-    let ownHash: string | undefined;
-    if (this.provider.recover) {
-      try {
-        ownHash = await this.recover(record);
-      } catch {
-        /* Preserve transport uncertainty; independent observation can still recover exact effects. */
-      }
-    }
-    if (
-      claim?.state === 'succeeded' &&
-      claim.result.kind === 'relay_transaction' &&
-      execution.configurationHash === this.configurationHash
-    ) {
-      // Lost provider status does not prevent independent chain verification.
-      try {
-        ownHash = await this.provider.transactionHash(
-          plan,
-          claim.result.transactionId,
-        );
-      } catch {
-        /* Preserve uncertainty; never resubmit. */
-      }
-    }
-    let inspection: ProviderInspection | undefined;
-    if (
-      this.config.recovery &&
-      this.provider.inspect &&
-      claim?.state === 'succeeded' &&
-      claim.result.kind === 'relay_transaction'
-    ) {
-      try {
-        inspection = checkedInspection(
-          await this.provider.inspect(plan, claim.result.transactionId),
-        );
-      } catch {
-        /* Preserve unavailable provider evidence. */
-      }
-    }
     const candidates = [
       ...(execution.transactionHashes ?? []),
       ...(record.transactionEvents ?? [])
         .slice(-4)
         .map((event) => event.transaction_hash),
     ];
+    let ownHash = execution.transactionHashes?.[0];
+    let inspection: ProviderInspection | undefined;
+    let direct: Awaited<ReturnType<ExecutionObserver['observe']>> | undefined;
+    if (candidates.length) {
+      try {
+        const proof = execution.inclusionProof;
+        if (
+          proof?.version === '1' &&
+          proof.planHash === execution.planHash &&
+          executionPlanHash(plan) === proof.planHash &&
+          execution.observation &&
+          fingerprint(execution.observation) === proof.observationHash
+        ) {
+          direct = await this.observer.recheckInclusion?.(
+            plan,
+            execution.observation,
+            ownHash,
+          );
+        }
+        direct ??= await this.observer.observe(
+          plan,
+          candidates,
+          ownHash,
+          execution.scanNextBlock,
+        );
+      } catch {
+        // Provider recovery remains available when direct chain evidence is unavailable.
+      }
+    }
+    const verifiedInclusion = (value: typeof direct) =>
+      !!value &&
+      rpcVerified(value.verification) &&
+      ['included', 'safe', 'finalized'].includes(value.chain_status) &&
+      ['succeeded', 'reverted'].includes(value.outcome);
+    const diagnosticsDue =
+      !!this.config.recovery &&
+      Date.now() - execution.startedAt! >=
+        this.config.recovery.stuckAfterSeconds * 1000;
+    // Known hashes stay on the chain path; recovery is for missing identity or stalled execution.
+    if (!verifiedInclusion(direct) && (!candidates.length || diagnosticsDue)) {
+      if (this.provider.recover) {
+        try {
+          ownHash = (await this.recover(record)) ?? ownHash;
+        } catch {
+          /* Recover on a later read without resubmission. */
+        }
+      }
+      if (
+        !ownHash &&
+        claim?.state === 'succeeded' &&
+        claim.result.kind === 'relay_transaction' &&
+        execution.configurationHash === this.configurationHash
+      ) {
+        try {
+          ownHash = await this.provider.transactionHash(
+            plan,
+            claim.result.transactionId,
+          );
+        } catch {
+          /* The original admission remains authoritative. */
+        }
+      }
+    }
+    if (
+      !ownHash &&
+      !candidates.length &&
+      this.config.local &&
+      plan.intent &&
+      Date.now() - execution.startedAt! <
+        (this.config.recovery?.stuckAfterSeconds ?? 30) * 1000
+    )
+      return;
     let observedFresh = true;
     let observed: Awaited<ReturnType<ExecutionObserver['observe']>>;
     try {
-      observed = await this.observer.observe(
-        plan,
-        candidates,
-        ownHash,
-        execution.scanNextBlock,
-      );
+      observed = verifiedInclusion(direct)
+        ? direct!
+        : direct && (!ownHash || candidates.includes(ownHash))
+          ? direct
+          : await this.observer.observe(
+              plan,
+              candidates,
+              ownHash,
+              execution.scanNextBlock,
+            );
     } catch (error) {
       if (!this.config.recovery) throw error;
       observedFresh = false;
@@ -989,32 +1205,59 @@ export class ApprovedExecutionCoordinator {
         observed_at: new Date().toISOString(),
       };
     }
+    observed = {
+      ...observed,
+      ...retainFinalized(execution.observation, observed),
+    };
     const { scanNextBlock, ...observation } = observed;
     let snapshot: NonceSnapshot | undefined;
-    if (this.config.recovery && this.observer.nonceSnapshot) {
-      try {
-        snapshot = await this.observer.nonceSnapshot(
-          plan,
-          ownHash ?? inspection?.transactionHash,
-        );
-      } catch {
-        /* Diagnostic uncertainty never manufactures nonce or settlement evidence. */
-      }
+    if (
+      (diagnosticsDue && !verifiedInclusion(observed)) ||
+      observed.chain_status === 'finalized'
+    ) {
+      await Promise.all([
+        (async () => {
+          if (
+            !this.provider.inspect ||
+            claim?.state !== 'succeeded' ||
+            claim.result.kind !== 'relay_transaction'
+          )
+            return;
+          try {
+            inspection = checkedInspection(
+              await this.provider.inspect(plan, claim.result.transactionId),
+            );
+          } catch {
+            /* Diagnostic evidence is unavailable. */
+          }
+        })(),
+        (async () => {
+          if (!this.observer.nonceSnapshot || verifiedInclusion(observed))
+            return;
+          try {
+            snapshot = await this.observer.nonceSnapshot(plan, ownHash);
+          } catch {
+            /* Never manufacture nonce evidence. */
+          }
+        })(),
+      ]);
     }
-    const recovery = this.config.recovery
-      ? diagnoseExecution({
-          plan,
-          configuration: this.config.recovery,
-          startedAt: execution.startedAt!,
-          observation:
-            observedFresh || execution.observation?.chain_status === 'finalized'
-              ? observation
-              : undefined,
-          inspection,
-          knownNonce: execution.providerNonce,
-          snapshot,
-        })
-      : undefined;
+    const recovery =
+      this.config.recovery && (verifiedInclusion(observed) || diagnosticsDue)
+        ? diagnoseExecution({
+            plan,
+            configuration: this.config.recovery,
+            startedAt: execution.startedAt!,
+            observation:
+              observedFresh ||
+              execution.observation?.chain_status === 'finalized'
+                ? observation
+                : undefined,
+            inspection,
+            knownNonce: execution.providerNonce,
+            snapshot,
+          })
+        : undefined;
     const eventData = await this.receipt({
       ...record,
       execution: {
@@ -1027,6 +1270,8 @@ export class ApprovedExecutionCoordinator {
           : {}),
       },
     });
+    let newlyIncluded = false;
+    let statusChanged = false;
     const stored = await this.actions.onboarding.store.transaction((state) => {
       if (
         state.deploymentBindings?.['service-v1']?.activeRevision !==
@@ -1042,6 +1287,16 @@ export class ApprovedExecutionCoordinator {
       )
         throw new WalletProviderError('wallet_attempt_pending');
       const previous = latest.observation;
+      statusChanged =
+        !previous ||
+        previous.chain_status !== observation.chain_status ||
+        previous.block_hash !== observation.block_hash ||
+        previous.transaction_hash !== observation.transaction_hash ||
+        previous.outcome !== observation.outcome ||
+        previous.verification !== observation.verification ||
+        fingerprint(previous.preconfirmation ?? null) !==
+          fingerprint(observation.preconfirmation ?? null);
+      const wasIncluded = consumedSafeNonce(latest);
       const previousRecovery = latest.recovery;
       const previousReplacement = latest.replacementStatus;
       if (inspection?.replacement) {
@@ -1064,7 +1319,7 @@ export class ApprovedExecutionCoordinator {
       if (
         previous?.chain_status === 'finalized' &&
         (observation.chain_status !== 'finalized' ||
-          observation.verification !== 'rpc-quorum' ||
+          !rpcVerified(observation.verification) ||
           observation.block_hash !== previous.block_hash ||
           observation.transaction_hash !== previous.transaction_hash ||
           observation.outcome !== previous.outcome)
@@ -1166,9 +1421,30 @@ export class ApprovedExecutionCoordinator {
       }
       if (scanNextBlock) latest.scanNextBlock = scanNextBlock;
       latest.observation = observation;
+      if (
+        observedFresh &&
+        includedExecution(latest) &&
+        !includedExecution({ observation: previous })
+      )
+        (latest.timings ??= {}).included_at ??= new Date().toISOString();
+      if (observation.preconfirmation)
+        (latest.timings ??= {}).preconfirmed_at ??=
+          observation.preconfirmation.observed_at;
+      if (observedFresh) {
+        if (
+          verifiedInclusion(observation) &&
+          executionPlanHash(plan) === latest.planHash
+        )
+          latest.inclusionProof = {
+            version: '1',
+            planHash: latest.planHash!,
+            observationHash: fingerprint(observation),
+          };
+        else delete latest.inclusionProof;
+      }
       latest.observationRevision++;
       if (
-        observation.verification === 'rpc-quorum' &&
+        rpcVerified(observation.verification) &&
         observation.outcome === 'succeeded'
       )
         latest.effectObserved = true;
@@ -1222,7 +1498,7 @@ export class ApprovedExecutionCoordinator {
       if (
         plan.intent?.cancellation &&
         observation.chain_status === 'finalized' &&
-        observation.verification === 'rpc-quorum' &&
+        rpcVerified(observation.verification) &&
         observation.outcome === 'succeeded'
       ) {
         const originalId = plan.intent.cancellation.actionId;
@@ -1250,16 +1526,24 @@ export class ApprovedExecutionCoordinator {
         }
       }
       latest.lastDispatchStatus = eventData.dispatch_status;
+      newlyIncluded = !wasIncluded && consumedSafeNonce(latest);
       return true;
     });
     if (!stored) unknown();
+    for (const listener of statusChanged ? this.listeners : []) {
+      try {
+        listener(id);
+      } catch {
+        /* Observers cannot affect durable execution. */
+      }
+    }
+    if (newlyIncluded) await this.onInclusion?.(id);
   }
   start(): void {
-    if (!this.stopped) return;
-    this.stopped = false;
-    const tick = async () => {
-      try {
-        const ids = await this.actions.onboarding.store.transaction((state) => {
+    if (this.worker) return;
+    this.worker = new ObservationWorker(
+      async () =>
+        this.actions.onboarding.store.transaction((state) => {
           if (
             state.deploymentBindings?.['service-v1']?.activeRevision !==
             this.actions.revision
@@ -1271,42 +1555,22 @@ export class ApprovedExecutionCoordinator {
                 record.execution?.plan &&
                 !record.cancellationId &&
                 !record.execution.integrityFailure &&
-                record.execution.observation?.chain_status !== 'finalized',
+                observationDue(record.execution),
             )
-            .map(([id]) => id);
-        });
-        // Rotate a bounded batch so older pending actions cannot starve later attempts.
-        const selected = ids.length
-          ? Array.from(
-              { length: Math.min(4, ids.length) },
-              (_, index) => ids[(this.cursor + index) % ids.length],
-            )
-          : [];
-        this.cursor = ids.length
-          ? (this.cursor + selected.length) % ids.length
-          : 0;
-        await Promise.allSettled(selected.map((id) => this.refresh(id)));
-      } catch {
-        /* Read-only observation resumes on the next bounded poll. */
-      }
-      if (!this.stopped) {
-        this.timer = setTimeout(
-          schedule,
-          this.config.pollIntervalSeconds * 1000,
-        );
-        this.timer.unref();
-      }
-    };
-    const schedule = () => {
-      this.running = tick();
-    };
-    this.timer = setTimeout(schedule, this.config.pollIntervalSeconds * 1000);
-    this.timer.unref();
+            .map(([id, record]) => ({ id, execution: record.execution! }));
+        }),
+      (id) => this.refresh(id),
+      this.config.pollIntervalSeconds * 1000,
+    );
+    this.worker.start();
   }
   async close(): Promise<void> {
-    this.stopped = true;
-    clearTimeout(this.timer);
-    await this.running;
+    this.listeners.clear();
+    (await this.signalStop)?.();
+    this.signalStop = undefined;
+    await this.worker?.close();
+    this.worker = undefined;
+    await Promise.allSettled(this.observations.values());
   }
 }
 

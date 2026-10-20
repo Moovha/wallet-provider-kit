@@ -1,3 +1,4 @@
+import { rpcCapacity } from '../execution/rpc-capacity.js';
 import { randomUUID } from 'node:crypto';
 import { concat, toBeHex } from 'ethers';
 import { WalletProviderError } from '../domain/signing.js';
@@ -165,13 +166,14 @@ export function createBundlerClientV07(
         throw new Error();
       return value.result;
     } catch {
+      rpcCapacity(request, config.url).invalidateGenesis();
       throw new WalletProviderError(
         'wallet_provider_unavailable',
         mutation ? 'unknown' : 'not_dispatched',
       );
     }
   }
-  async function ready() {
+  async function checkReady() {
     const [chain, entries] = await Promise.all([
       call('eth_chainId', []),
       call('eth_supportedEntryPoints', []),
@@ -186,6 +188,12 @@ export function createBundlerClientV07(
       !entries.some((e) => e.toLowerCase() === domain.entryPoint.toLowerCase())
     )
       throw new WalletProviderError('wallet_provider_configuration');
+  }
+  async function ready() {
+    return rpcCapacity(request, config.url).verifyGenesis(
+      JSON.stringify(['bundler-v07', domain]),
+      checkReady,
+    );
   }
   return {
     ready,

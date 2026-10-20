@@ -35,6 +35,18 @@ function planHash(plan: UserOperationExecution) {
 /** One durable bundler dispatch per admitted operation. Recovery only reads independent chain evidence. */
 export class UserOperationExecutionCoordinator {
   readonly configurationHash: string;
+  private readonly listeners = new Set<(id: string) => void>();
+  private readonly refreshing = new Map<
+    string,
+    Promise<UserOperationExecution | null>
+  >();
+  subscribe(listener: (id: string) => void) {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+
   private readonly client: ReturnType<typeof createBundlerClientV07>;
   private readonly observer: UserOperationReceiptObserver;
   private readonly binding: ReturnType<
@@ -87,6 +99,17 @@ export class UserOperationExecutionCoordinator {
     if (plan) this.check(plan);
     return plan;
   }
+  private async timestamp(id: string, field: string) {
+    await this.actions.onboarding.store.transaction((state) => {
+      for (const batch of Object.values(state.userOperationBatches ?? {})) {
+        if (
+          batch.operationId === id &&
+          batch.revision === this.actions.revision
+        )
+          (batch.timings ??= {})[field] ??= new Date().toISOString();
+      }
+    });
+  }
   async execute(context: AuthorityContext, id: string) {
     context = structuredClone(context);
     if (!context.principal.scopes.includes('wallet:execute')) deny();
@@ -98,10 +121,14 @@ export class UserOperationExecutionCoordinator {
     if (!existing) {
       await this.client.ready();
       const anchor = await this.observer.anchor();
+      await this.timestamp(id, 'sponsorship_started_at');
       await this.signing.sponsor(context, id);
+      await this.timestamp(id, 'paymaster_signed_at');
+      await this.timestamp(id, 'signing_started_at');
       const operation = await this.signing.sign(context, id),
         record = this.database.sponsorship.load(id) ?? deny();
-      await this.signing.authorizeSubmission(context, id);
+      await this.timestamp(id, 'signed_at');
+      await this.signing.authorizeSubmission(context, id, false);
       await this.actions.withAuthorizedTransfer(
         context.principal,
         id,
@@ -132,49 +159,41 @@ export class UserOperationExecutionCoordinator {
         },
       );
     }
-    await this.signing.authorizeSubmission(context, id);
-    const claim = await this.actions.withAuthorizedTransfer(
-      context.principal,
-      id,
-      (state) => {
-        const plan = state.userOperationExecutions?.[id] ?? deny();
-        this.check(plan);
-        if (plan.dispatch) return null;
-        const dispatch = {
-          token: randomUUID(),
-          expiresAt: Date.now() + 30000,
-          state: 'dispatch' as const,
-        };
-        plan.dispatch = dispatch;
-        return { plan, dispatch };
-      },
-    );
-    if (!claim) return this.refresh(id);
+    await this.signing.authorizeSubmission(context, id, false);
+    const plan = (await this.load(id)) ?? deny();
+    let token: string | undefined;
     try {
-      await this.client.send(claim.plan.operation, async () => {
+      await this.timestamp(id, 'submission_started_at');
+      await this.client.send(plan.operation, async () => {
+        // Unavailable preflight reads leave no dispatch claim and can be retried.
         await this.signing.authorizeSubmission(context, id);
-        await this.actions.withAuthorizedTransfer(
+        token = await this.actions.withAuthorizedTransfer(
           context.principal,
           id,
           (state) => {
             const current = state.userOperationExecutions?.[id] ?? deny();
             this.check(current);
-            if (
-              current.dispatch?.state !== 'dispatch' ||
-              current.dispatch.token !== claim.dispatch.token ||
-              current.dispatch.expiresAt <= Date.now()
-            )
+            if (current.dispatch)
               throw new WalletProviderError(
                 'wallet_attempt_unavailable',
                 'unknown',
               );
+            const dispatch = {
+              token: randomUUID(),
+              expiresAt: Date.now() + 30000,
+              state: 'dispatch' as const,
+            };
+            current.dispatch = dispatch;
+            return dispatch.token;
           },
         );
       });
-      await this.finish(id, claim.dispatch.token, 'accepted');
-    } catch {
-      await this.finish(id, claim.dispatch.token, 'unknown');
-      // A rejected, malformed or lost response does not authorize another sender or a different path.
+      await this.timestamp(id, 'accepted_at');
+      await this.finish(id, token ?? deny(), 'accepted');
+    } catch (error) {
+      if (!token) throw error;
+      await this.finish(id, token, 'unknown');
+      // A rejected, malformed or lost response retains the dispatch claim.
     }
     return this.refresh(id);
   }
@@ -193,11 +212,20 @@ export class UserOperationExecutionCoordinator {
     });
   }
   async refresh(id: string) {
+    const existing = this.refreshing.get(id);
+    if (existing) return existing;
+    const running = this.observe(id).finally(() => {
+      if (this.refreshing.get(id) === running) this.refreshing.delete(id);
+    });
+    this.refreshing.set(id, running);
+    return running;
+  }
+  private async observe(id: string) {
     const before = await this.load(id);
     if (!before) return null;
-    let hint: string | undefined;
+    let hint: string | undefined = before.observation.receipt?.transactionHash;
     try {
-      hint = await this.client.transactionHint(before.userOperationHash);
+      hint ??= await this.client.transactionHint(before.userOperationHash);
     } catch {
       /* Bundler lookup is a hint; independent log scans remain available. */
     }
@@ -214,6 +242,18 @@ export class UserOperationExecutionCoordinator {
       current.observation = observation;
       current.observationRevision++;
     });
+    if (
+      observation.receipt &&
+      ['included', 'safe', 'finalized'].includes(observation.state)
+    )
+      await this.timestamp(id, 'included_at');
+    if (
+      serviceHash([
+        before.observation.state,
+        before.observation.receipt ?? null,
+      ]) !== serviceHash([observation.state, observation.receipt ?? null])
+    )
+      for (const listener of this.listeners) listener(id);
     return this.load(id);
   }
   async read(principal: VerifiedPrincipal, id: string) {

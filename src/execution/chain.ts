@@ -1,7 +1,10 @@
 import { providerNetwork, type ProviderNetwork } from '../networks.js';
+import { rpcCapacity, type RpcCapacity } from './rpc-capacity.js';
 import { verifyAdapterEffects } from './adapter-effects.js';
 import { adapterInput } from './operation-adapters.js';
 import { serviceHash } from '../executor/auth.js';
+import { initialFees } from './replacement.js';
+import { readSafeState } from './safe-state-reader.js';
 import type { WalletCallsReceipt } from '../wallet-calls/types.js';
 import type { NonceSnapshot } from './recovery.js';
 import {
@@ -49,9 +52,17 @@ const rpcReadMethods = [
   'eth_getLogs',
   'eth_getTransactionReceipt',
   'eth_getTransactionByHash',
+  'eth_feeHistory',
+  'eth_maxPriorityFeePerGas',
 ] as const;
 type RpcMethod = (typeof rpcReadMethods)[number];
 class RpcThrottled extends Error {}
+class RpcReadRetryable extends Error {}
+export class RpcStateOverrideUnsupported extends WalletProviderError {
+  constructor() {
+    super('wallet_provider_unavailable', 'not_dispatched');
+  }
+}
 
 function unavailable(): never {
   throw new WalletProviderError('wallet_provider_unavailable', 'unknown');
@@ -121,14 +132,26 @@ function callsReceipt(
   };
 }
 
-/** Read-only JSON-RPC transport with fixed methods, serialized requests and bounded throttling recovery. */
+/** Read-only JSON-RPC transport with fixed methods, bounded concurrency and throttling recovery. */
 export class RpcReader {
-  private pending: Promise<unknown> = Promise.resolve();
-  private retryAfter = 0;
+  verifyGenesis(key: string, work: () => Promise<void>) {
+    return this.capacity.verifyGenesis(key, work);
+  }
+  private readonly pending: Promise<unknown>[];
+  private cursor = 0;
+  private queued = 0;
+  private readonly capacity: RpcCapacity;
   constructor(
     private readonly endpoint: string,
     private readonly request: typeof fetch,
+    concurrency = 1,
+    private readonly coalesceReads = false,
+    private readonly retryMode: 'bounded' | 'endpoint-failover' = 'bounded',
   ) {
+    if (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > 4)
+      throw new WalletProviderError('wallet_provider_configuration');
+    this.pending = Array.from({ length: concurrency }, () => Promise.resolve());
+    this.capacity = rpcCapacity(request, endpoint);
     try {
       const url = new URL(endpoint);
       if (
@@ -144,6 +167,25 @@ export class RpcReader {
       throw new WalletProviderError('wallet_provider_configuration');
     }
   }
+  async feed(
+    method: 'eth_chainId' | 'eth_getBlockByNumber',
+    params: unknown[],
+  ) {
+    const tag = params[0];
+    if (method === 'eth_chainId' && params.length !== 0)
+      throw new WalletProviderError('wallet_provider_input');
+    if (
+      method === 'eth_getBlockByNumber' &&
+      (!['latest', 'safe', 'finalized'].includes(String(tag)) ||
+        params[1] !== false)
+    )
+      throw new WalletProviderError('wallet_provider_input');
+    const ttl =
+      method === 'eth_chainId' ? 60000 : tag === 'latest' ? 250 : 15000;
+    return this.capacity.feedRead(JSON.stringify([method, params]), ttl, () =>
+      this.call(method, params),
+    );
+  }
   async call(method: RpcMethod, params: unknown[]): Promise<unknown> {
     if (!rpcReadMethods.includes(method))
       throw new WalletProviderError('wallet_provider_input');
@@ -153,33 +195,87 @@ export class RpcReader {
     } catch {
       throw new WalletProviderError('wallet_provider_input');
     }
-    const result = this.pending.then(() =>
-      this.readWithRetry(method, captured),
-    );
-    this.pending = result.then(
-      () => undefined,
-      () => undefined,
-    );
-    return result;
+    if (this.queued >= 64) unavailable();
+    this.queued++;
+    const dispatch = () => {
+      const lane = this.cursor;
+      this.cursor = (this.cursor + 1) % this.pending.length;
+      const result = this.pending[lane].then(() =>
+        this.readWithRetry(method, captured),
+      );
+      this.pending[lane] = result.then(
+        () => undefined,
+        () => undefined,
+      );
+      return result;
+    };
+    try {
+      return await (this.coalesceReads
+        ? this.capacity.shareRead(JSON.stringify([method, captured]), dispatch)
+        : dispatch());
+    } finally {
+      this.queued--;
+    }
   }
   private async readWithRetry(
     method: RpcMethod,
     params: unknown[],
   ): Promise<unknown> {
     for (let attempt = 0; attempt < 3; attempt++) {
-      const delay = this.retryAfter - Date.now();
+      const delay = this.capacity.retryAfter - Date.now();
+      if (delay > 0 && this.retryMode === 'endpoint-failover') unavailable();
       // Long server backoffs fail closed without keeping a financial request open.
       if (delay > 2000) unavailable();
       if (delay > 0) await new Promise((resolve) => setTimeout(resolve, delay));
       try {
         return await this.read(method, params);
       } catch (error) {
-        if (!(error instanceof RpcThrottled) || attempt === 2) unavailable();
+        if (error instanceof RpcStateOverrideUnsupported) throw error;
+        if (this.retryMode === 'endpoint-failover') {
+          if (error instanceof RpcThrottled) {
+            this.capacity.retryAfter = Math.max(
+              this.capacity.retryAfter,
+              Date.now() + 500,
+            );
+            unavailable();
+          }
+          if (error instanceof RpcReadRetryable) {
+            this.capacity.recordReadFailure();
+            unavailable();
+          }
+        }
+        if (error instanceof RpcThrottled && attempt === 2)
+          this.capacity.retryAfter = Math.max(
+            this.capacity.retryAfter,
+            Date.now() + 500,
+          );
+        if (error instanceof RpcReadRetryable && attempt === 2)
+          this.capacity.recordReadFailure();
+        if (
+          !(
+            error instanceof RpcThrottled || error instanceof RpcReadRetryable
+          ) ||
+          attempt === 2
+        )
+          unavailable();
+        if (error instanceof RpcReadRetryable)
+          await new Promise((resolve) =>
+            setTimeout(resolve, 50 * (attempt + 1)),
+          );
       }
     }
     return unavailable();
   }
   private async read(method: RpcMethod, params: unknown[]): Promise<unknown> {
+    return this.capacity.run(() => this.readRequest(method, params));
+  }
+  private async readRequest(
+    method: RpcMethod,
+    params: unknown[],
+  ): Promise<unknown> {
+    // A different reader can receive a backoff while this request waits for capacity.
+    if (this.capacity.retryAfter > Date.now()) throw new RpcThrottled();
+    const started = performance.now();
     try {
       const response = await this.request(this.endpoint, {
         method: 'POST',
@@ -193,6 +289,7 @@ export class RpcReader {
         signal: AbortSignal.timeout(3000),
       });
       if (response.status === 429) {
+        this.capacity.invalidateGenesis();
         const header = response.headers.get('retry-after');
         const seconds =
           header && /^[0-9]+$/.test(header) ? Number(header) * 1000 : undefined;
@@ -200,12 +297,16 @@ export class RpcReader {
         const delay =
           seconds ??
           (Number.isFinite(date) ? Math.max(0, date - Date.now()) : 500);
-        this.retryAfter = Math.max(this.retryAfter, Date.now() + delay);
+        this.capacity.retryAfter = Math.max(
+          this.capacity.retryAfter,
+          Date.now() + delay,
+        );
         await response.body?.cancel();
         throw new RpcThrottled();
       }
-      if (!response.ok) {
+      if (!response.ok && response.status >= 500) {
         await response.body?.cancel();
+        this.capacity.recordReadFailure();
         unavailable();
       }
       const reader = response.body?.getReader();
@@ -227,18 +328,93 @@ export class RpcReader {
         JSON.parse(Buffer.concat(chunks).toString('utf8')),
       );
       if (
+        method === 'eth_call' &&
+        params.length === 3 &&
+        envelope.jsonrpc === '2.0' &&
+        envelope.id === 1 &&
+        record(envelope.error) &&
+        ([-32601, -32602, -32004].includes(envelope.error.code as number) ||
+          (envelope.error.code === 12 &&
+            typeof envelope.error.message === 'string' &&
+            /route your request to suitable provider/i.test(
+              envelope.error.message,
+            )))
+      ) {
+        this.capacity.unsupportedFor('state-overrides');
+        throw new RpcStateOverrideUnsupported();
+      }
+      if (!response.ok) unavailable();
+      if (
+        method === 'eth_getBlockByNumber' &&
+        params[0] === '0x0' &&
+        record(envelope.error) &&
+        envelope.error.code === 4444
+      )
+        this.capacity.unsupportedFor('genesis');
+      if (
+        envelope.jsonrpc === '2.0' &&
+        envelope.id === 1 &&
+        record(envelope.error) &&
+        (envelope.error.code === -32603 ||
+          (method === 'eth_getBlockByNumber' &&
+            envelope.error.code === 4444 &&
+            typeof envelope.error.message === 'string' &&
+            /pruned history unavailable/i.test(envelope.error.message)))
+      )
+        throw new RpcReadRetryable();
+      if (
+        envelope.jsonrpc === '2.0' &&
+        envelope.id === 1 &&
+        recordErrorLimit(envelope.error)
+      ) {
+        this.capacity.invalidateGenesis();
+        this.capacity.retryAfter = Math.max(
+          this.capacity.retryAfter,
+          Date.now() + 1000,
+        );
+        throw new RpcThrottled();
+      }
+      if (
         envelope.jsonrpc !== '2.0' ||
         envelope.id !== 1 ||
         'error' in envelope ||
         !('result' in envelope)
-      )
+      ) {
+        if (
+          method === 'eth_feeHistory' &&
+          envelope.error &&
+          typeof envelope.error === 'object' &&
+          [-32601, -32004].includes((envelope.error as { code: number }).code)
+        )
+          this.capacity.recordReadFailure();
         unavailable();
+      }
+      this.capacity.recordReadSuccess(performance.now() - started);
       return envelope.result;
     } catch (error) {
-      if (error instanceof RpcThrottled) throw error;
+      if (
+        error instanceof RpcThrottled ||
+        error instanceof RpcReadRetryable ||
+        error instanceof RpcStateOverrideUnsupported
+      )
+        throw error;
+      if (!(error instanceof WalletProviderError))
+        this.capacity.recordReadFailure();
       return unavailable();
     }
   }
+}
+
+function recordErrorLimit(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const value = error as { code?: unknown; message?: unknown };
+  return (
+    [15, -32005, -32016, 429].includes(value.code as number) &&
+    typeof value.message === 'string' &&
+    /rate.limit|too many requests|request.limit|throughput|capacity|compute units per second/i.test(
+      value.message,
+    )
+  );
 }
 
 interface Heads {
@@ -250,17 +426,37 @@ interface Heads {
 /** Agreement of configured RPC providers is trusted node evidence, not a light-client proof. */
 export class QuorumExecutionObserver implements ExecutionObserver {
   private readonly readers: RpcReader[];
+  private static readonly proofCaches = new WeakMap<
+    typeof fetch,
+    Map<string, { expiresAt: number; observation: ChainObservation }>
+  >();
+  private readonly inclusionProofs: Map<
+    string,
+    { expiresAt: number; observation: ChainObservation }
+  >;
+  private readonly overrideBackoff = new WeakMap<RpcReader, number>();
   constructor(
-    endpoints: string[],
+    private readonly endpoints: string[],
     private readonly genesisHash: string,
     private readonly maxLogRange: number,
-    request: typeof fetch = fetch,
+    private readonly request: typeof fetch = fetch,
     private readonly network?: ProviderNetwork,
+    private readonly verificationMode: 'single' | 'quorum' = 'quorum',
+    private readonly reuseInclusionProofs = false,
+    private readonly aggregateSafeReads = false,
   ) {
     providerNetwork(network);
+    this.endpoints = [...endpoints];
+    let proofs = QuorumExecutionObserver.proofCaches.get(request);
+    if (!proofs) {
+      proofs = new Map();
+      QuorumExecutionObserver.proofCaches.set(request, proofs);
+    }
+    this.inclusionProofs = proofs;
     try {
       if (
-        endpoints.length < 2 ||
+        endpoints.length < (verificationMode === 'single' ? 1 : 2) ||
+        (verificationMode === 'single' && endpoints.length !== 1) ||
         endpoints.length > 3 ||
         new Set(endpoints.map((endpoint) => new URL(endpoint).origin)).size !==
           endpoints.length ||
@@ -271,7 +467,16 @@ export class QuorumExecutionObserver implements ExecutionObserver {
       )
         throw new Error();
       this.readers = endpoints.map(
-        (endpoint) => new RpcReader(endpoint, request),
+        (endpoint) =>
+          new RpcReader(
+            endpoint,
+            request,
+            4,
+            reuseInclusionProofs,
+            verificationMode === 'single' && reuseInclusionProofs
+              ? 'endpoint-failover'
+              : 'bounded',
+          ),
       );
     } catch {
       throw new WalletProviderError('wallet_provider_configuration');
@@ -289,25 +494,36 @@ export class QuorumExecutionObserver implements ExecutionObserver {
   }
 
   private async identity(reader: RpcReader): Promise<void> {
-    const [chain, genesis] = await Promise.all([
+    const verifyGenesis = async () => {
+      const genesis = checked(
+        await reader.call('eth_getBlockByNumber', ['0x0', false]),
+      );
+      if (
+        hash(genesis.hash) !== this.genesisHash.toLowerCase() ||
+        quantity(genesis.number) !== 0n
+      )
+        unavailable();
+    };
+    const [chain] = await Promise.all([
       reader.call('eth_chainId', []),
-      reader.call('eth_getBlockByNumber', ['0x0', false]),
+      this.reuseInclusionProofs && this.verificationMode === 'single'
+        ? reader.verifyGenesis(this.genesisHash.toLowerCase(), verifyGenesis)
+        : verifyGenesis(),
     ]);
-    if (
-      quantity(chain) !== BigInt(providerNetwork(this.network).chainId) ||
-      hash(checked(genesis).hash) !== this.genesisHash.toLowerCase() ||
-      quantity(checked(genesis).number) !== 0n
-    )
+    if (quantity(chain) !== BigInt(providerNetwork(this.network).chainId))
       unavailable();
+  }
+  async verifyNetwork(): Promise<void> {
+    await Promise.all(this.readers.map((reader) => this.identity(reader)));
   }
   async anchor(): Promise<string> {
     const heights = await Promise.all(
       this.readers.map(async (reader) => {
-        await this.identity(reader);
-        return quantity(
-          checked(await reader.call('eth_getBlockByNumber', ['latest', false]))
-            .number,
-        );
+        const [, block] = await Promise.all([
+          this.identity(reader),
+          reader.call('eth_getBlockByNumber', ['latest', false]),
+        ]);
+        return quantity(checked(block).number);
       }),
     );
     return heights.reduce((a, b) => (a < b ? a : b)).toString();
@@ -404,8 +620,26 @@ export class QuorumExecutionObserver implements ExecutionObserver {
     binding: SafeAccountBinding,
     owner: string,
     tag = 'latest',
+    identityVerified = false,
   ) {
-    await this.identity(reader);
+    const identity = identityVerified
+      ? Promise.resolve()
+      : this.identity(reader);
+    if (
+      this.aggregateSafeReads &&
+      (this.overrideBackoff.get(reader) ?? 0) <= Date.now()
+    ) {
+      try {
+        const [, nonce] = await Promise.all([
+          identity,
+          readSafeState(reader, binding, owner, tag),
+        ]);
+        return nonce;
+      } catch (error) {
+        if (!(error instanceof RpcStateOverrideUnsupported)) throw error;
+        this.overrideBackoff.set(reader, Date.now() + 300000);
+      }
+    }
     const call = (name: string, args: unknown[] = []) =>
       reader.call('eth_call', [
         {
@@ -435,6 +669,7 @@ export class QuorumExecutionObserver implements ExecutionObserver {
         '0x0000000000000000000000000000000000000001',
         1,
       ]),
+      identity,
     ]);
     const modulePage = safeInterface.decodeFunctionResult(
       'getModulesPaginated',
@@ -467,9 +702,50 @@ export class QuorumExecutionObserver implements ExecutionObserver {
         '1.4.1'
     )
       unavailable();
+    if (this.aggregateSafeReads) {
+      const slots = [
+        'guard_manager.guard.address',
+        'fallback_manager.handler.address',
+      ].map((value) => keccak256(Buffer.from(value)));
+      const values = await Promise.all(
+        slots.map((slot) =>
+          reader.call('eth_getStorageAt', [binding.address, slot, tag]),
+        ),
+      );
+      if (
+        values.some(
+          (value) =>
+            typeof value !== 'string' ||
+            value.toLowerCase() !== '0x' + '0'.repeat(64),
+        )
+      )
+        unavailable();
+    }
     return safeInterface
       .decodeFunctionResult('nonce', String(nonce))[0]
       .toString() as string;
+  }
+  /** Read a nonce for unsigned intent construction; preflight verifies current account authority before signing. */
+  async actionNonce(binding: SafeAccountBinding): Promise<string> {
+    const values = await Promise.all(
+      this.readers.map(async (reader) => {
+        const [, nonce] = await Promise.all([
+          this.identity(reader),
+          reader.call('eth_call', [
+            {
+              to: binding.address,
+              data: safeInterface.encodeFunctionData('nonce'),
+            },
+            'latest',
+          ]),
+        ]);
+        return safeInterface
+          .decodeFunctionResult('nonce', String(nonce))[0]
+          .toString() as string;
+      }),
+    );
+    if (values.some((value) => value !== values[0])) unavailable();
+    return values[0];
   }
   /** Read-only verified account binding and common nonce before constructing an approved action. */
   async contractNonce(
@@ -492,33 +768,35 @@ export class QuorumExecutionObserver implements ExecutionObserver {
     intent: ApprovedCallIntent,
     tag: string,
   ) {
-    for (const contract of [...intent.contracts, intent.multiSend]) {
-      const code = await reader.call('eth_getCode', [contract.address, tag]);
-      if (
-        typeof code !== 'string' ||
-        (code === '0x' &&
-          !allowsEmptyRecipientCode(intent, contract.address)) ||
-        keccak256(code) !== contract.codeHash
-      )
-        unavailable();
-      if (contract.implementation) {
-        const [slot, implementation] = await Promise.all([
-          reader.call('eth_getStorageAt', [
-            contract.address,
-            implementationSlot,
-            tag,
-          ]),
-          reader.call('eth_getCode', [contract.implementation.address, tag]),
-        ]);
+    await Promise.all(
+      [...intent.contracts, intent.multiSend].map(async (contract) => {
+        const code = await reader.call('eth_getCode', [contract.address, tag]);
         if (
-          hash(slot) !==
-            zeroPadValue(contract.implementation.address.toLowerCase(), 32) ||
-          typeof implementation !== 'string' ||
-          keccak256(implementation) !== contract.implementation.codeHash
+          typeof code !== 'string' ||
+          (code === '0x' &&
+            !allowsEmptyRecipientCode(intent, contract.address)) ||
+          keccak256(code) !== contract.codeHash
         )
           unavailable();
-      }
-    }
+        if (contract.implementation) {
+          const [slot, implementation] = await Promise.all([
+            reader.call('eth_getStorageAt', [
+              contract.address,
+              implementationSlot,
+              tag,
+            ]),
+            reader.call('eth_getCode', [contract.implementation.address, tag]),
+          ]);
+          if (
+            hash(slot) !==
+              zeroPadValue(contract.implementation.address.toLowerCase(), 32) ||
+            typeof implementation !== 'string' ||
+            keccak256(implementation) !== contract.implementation.codeHash
+          )
+            unavailable();
+        }
+      }),
+    );
     if (adapterInput(intent).kind === 'vault-deposit') {
       const vault = intent.effects[1].token,
         asset = intent.effects[0].token;
@@ -539,21 +817,16 @@ export class QuorumExecutionObserver implements ExecutionObserver {
     unsignedOwner?: string,
   ) {
     const intent = plan.intent!;
+    const fees = plan.networkFees ? initialFees(plan) : plan.sponsor;
     // The full atomic simulation verifies solvency, including native funds received by earlier calls.
     await Promise.all(
       this.readers.map(async (reader) => {
         const owner = plan.action.chain_account_id.split(':')[2];
-        if (
-          (await this.safeAccount(reader, intent.account, owner)) !==
-          intent.nonce
-        )
-          unavailable();
-        await this.pinnedCalls(reader, intent, 'latest');
-        const [balance, simulation] = await Promise.all([
-          reader.call('eth_getBalance', [
-            plan.sponsor.binding.address,
-            'latest',
-          ]),
+        const tag = 'latest';
+        const [nonce, , balance, simulation] = await Promise.all([
+          this.safeAccount(reader, intent.account, owner, tag),
+          this.pinnedCalls(reader, intent, tag),
+          reader.call('eth_getBalance', [plan.sponsor.binding.address, tag]),
           reader.call('eth_call', [
             {
               from: unsignedOwner ?? plan.sponsor.binding.address,
@@ -564,18 +837,19 @@ export class QuorumExecutionObserver implements ExecutionObserver {
               ...(unsignedOwner
                 ? { gasPrice: '0x0' }
                 : {
-                    maxFeePerGas: toQuantity(BigInt(plan.sponsor.maxFeePerGas)),
+                    maxFeePerGas: toQuantity(BigInt(fees.maxFeePerGas)),
                     maxPriorityFeePerGas: toQuantity(
-                      BigInt(plan.sponsor.maxPriorityFeePerGas),
+                      BigInt(fees.maxPriorityFeePerGas),
                     ),
                   }),
             },
-            'latest',
+            tag,
           ]),
         ]);
         if (
+          nonce !== intent.nonce ||
           quantity(balance) <
-            BigInt(plan.sponsor.gasLimit) * BigInt(plan.sponsor.maxFeePerGas) +
+            BigInt(plan.sponsor.gasLimit) * BigInt(fees.maxFeePerGas) +
               BigInt(plan.sponsor.l1FeeReserveWei) ||
           safeInterface.decodeFunctionResult(
             'execTransaction',
@@ -620,17 +894,73 @@ export class QuorumExecutionObserver implements ExecutionObserver {
         : [];
     });
   }
+  private proofKey(
+    plan: TransferExecutionPlan,
+    candidate: string,
+    ownHash?: string,
+  ) {
+    return this.reuseInclusionProofs &&
+      this.verificationMode === 'single' &&
+      plan.runtimePolicy
+      ? serviceHash([
+          this.endpoints[0],
+          this.aggregateSafeReads,
+          plan,
+          candidate,
+          ownHash ?? null,
+        ])
+      : undefined;
+  }
   private async verifyCalls(
     reader: RpcReader,
     plan: TransferExecutionPlan,
     candidate: string,
     ownHash: string | undefined,
     heads: Heads,
+    prefetched?: { receipt?: [unknown, unknown]; block?: unknown },
   ): Promise<ChainObservation | null | 'reorged'> {
-    const [rawReceipt, rawTransaction] = await Promise.all([
-      reader.call('eth_getTransactionReceipt', [candidate]),
-      reader.call('eth_getTransactionByHash', [candidate]),
-    ]);
+    const proofKey = this.proofKey(plan, candidate, ownHash);
+    const proof = proofKey ? this.inclusionProofs.get(proofKey) : undefined;
+    if (proof && proof.expiresAt > Date.now()) {
+      const number = BigInt(proof.observation.block_number!);
+      const block =
+        prefetched && 'block' in prefetched
+          ? prefetched.block
+          : await reader.call('eth_getBlockByNumber', [
+              toQuantity(number),
+              false,
+            ]);
+      if (
+        !block ||
+        hash(checked(block).hash) !== proof.observation.block_hash
+      ) {
+        this.inclusionProofs.delete(proofKey!);
+        return 'reorged';
+      }
+      if (quantity(checked(block).number) !== number || heads.latest < number)
+        unavailable();
+      const chain_status =
+        heads.finalized >= number
+          ? 'finalized'
+          : heads.safe >= number
+            ? 'safe'
+            : 'included';
+      return {
+        ...structuredClone(proof.observation),
+        chain_status,
+        settlement:
+          chain_status === 'finalized'
+            ? (proof.observation.outcome as 'succeeded' | 'reverted')
+            : 'pending',
+        observed_at: new Date().toISOString(),
+      };
+    }
+    const [rawReceipt, rawTransaction] =
+      prefetched?.receipt ??
+      (await Promise.all([
+        reader.call('eth_getTransactionReceipt', [candidate]),
+        reader.call('eth_getTransactionByHash', [candidate]),
+      ]));
     if (!rawReceipt || !rawTransaction) return null;
     const receipt = checked(rawReceipt),
       transaction = checked(rawTransaction),
@@ -646,9 +976,6 @@ export class QuorumExecutionObserver implements ExecutionObserver {
       heads.latest < blockNumber
     )
       unavailable();
-    const block = await reader.call('eth_getBlockByNumber', [tag, false]);
-    if (!block || hash(checked(block).hash) !== blockHash) return 'reorged';
-    if (quantity(checked(block).number) !== blockNumber) unavailable();
     if (
       address(transaction.to) !== intent.account.address.toLowerCase() ||
       address(receipt.to) !== intent.account.address.toLowerCase() ||
@@ -660,28 +987,30 @@ export class QuorumExecutionObserver implements ExecutionObserver {
       return null;
     const sender = address(transaction.from);
     if (address(receipt.from) !== sender) unavailable();
-    const code = await reader.call('eth_getCode', [
-      intent.account.address,
-      tag,
-    ]);
-    const singleton = await reader.call('eth_getCode', [
-      intent.account.singleton.address,
-      tag,
-    ]);
     if (
-      typeof code !== 'string' ||
-      typeof singleton !== 'string' ||
-      keccak256(code) !== intent.account.codeHash ||
-      keccak256(singleton) !== intent.account.singleton.codeHash
+      sender === plan.sponsor.binding.address.toLowerCase() &&
+      (transaction.type !== '0x2' ||
+        quantity(transaction.gas) !== BigInt(plan.sponsor.gasLimit) ||
+        quantity(transaction.maxFeePerGas) >
+          BigInt(plan.sponsor.maxFeePerGas) ||
+        quantity(transaction.maxPriorityFeePerGas) >
+          BigInt(plan.sponsor.maxPriorityFeePerGas))
     )
       unavailable();
-    const verifiedNonce = await this.safeAccount(
-      reader,
-      intent.account,
-      plan.action.chain_account_id.split(':')[2],
-      tag,
-    );
-    await this.pinnedCalls(reader, intent, tag);
+    // safeAccount verifies proxy and singleton code as part of the complete binding.
+    const [block, verifiedNonce] = await Promise.all([
+      reader.call('eth_getBlockByNumber', [tag, false]),
+      this.safeAccount(
+        reader,
+        intent.account,
+        plan.action.chain_account_id.split(':')[2],
+        tag,
+        true,
+      ),
+      this.pinnedCalls(reader, intent, tag),
+    ]);
+    if (!block || hash(checked(block).hash) !== blockHash) return 'reorged';
+    if (quantity(checked(block).number) !== blockNumber) unavailable();
     const status = quantity(receipt.status);
     if (status === 1n && BigInt(verifiedNonce) <= BigInt(intent.nonce))
       unavailable();
@@ -776,10 +1105,12 @@ export class QuorumExecutionObserver implements ExecutionObserver {
           intent.account.address,
         )
       : undefined;
-    return {
+    const observation: ChainObservation = {
       ...(metadata ? { callsReceipt: metadata } : {}),
+      safe_nonce_consumed: status === 1n,
       chain_status: chainStatus,
-      verification: 'rpc-quorum',
+      verification:
+        this.verificationMode === 'single' ? 'rpc-single' : 'rpc-quorum',
       outcome,
       settlement: chainStatus === 'finalized' ? outcome : 'pending',
       observed_at: new Date(Date.now()).toISOString(),
@@ -791,14 +1122,75 @@ export class QuorumExecutionObserver implements ExecutionObserver {
           ? 'sponsor'
           : 'external',
     };
+    if (proofKey) {
+      for (const [key, value] of this.inclusionProofs)
+        if (value.expiresAt <= Date.now()) this.inclusionProofs.delete(key);
+      if (this.inclusionProofs.size >= 256)
+        this.inclusionProofs.delete(this.inclusionProofs.keys().next().value!);
+      this.inclusionProofs.set(proofKey, {
+        expiresAt: Date.now() + 60000,
+        observation: structuredClone(observation),
+      });
+    }
+    return observation;
+  }
+  /** Explicit reconciliation bypasses every inclusion-proof cache. */
+  observeFresh(
+    plan: TransferExecutionPlan,
+    candidates: string[],
+    ownHash?: string,
+  ) {
+    return new QuorumExecutionObserver(
+      this.endpoints,
+      this.genesisHash,
+      this.maxLogRange,
+      this.request,
+      this.network,
+      this.verificationMode,
+      false,
+      this.aggregateSafeReads,
+    ).observe(plan, candidates, ownHash);
+  }
+  /** Restore only a trusted local full proof, then use the ordinary fresh canonical guard. */
+  async recheckInclusion(
+    plan: TransferExecutionPlan,
+    observation: ChainObservation,
+    ownHash?: string,
+  ): Promise<ChainObservation | undefined> {
+    if (
+      observation.verification !== 'rpc-single' ||
+      !['included', 'safe', 'finalized'].includes(observation.chain_status) ||
+      !['succeeded', 'reverted'].includes(observation.outcome) ||
+      !observation.transaction_hash ||
+      !observation.block_hash ||
+      !observation.block_number
+    )
+      return undefined;
+    const key = this.proofKey(
+      plan,
+      hash(observation.transaction_hash),
+      ownHash,
+    );
+    if (!key) return undefined;
+    hash(observation.block_hash);
+    if (!/^(0|[1-9][0-9]{0,77})$/.test(observation.block_number)) unavailable();
+    if (this.inclusionProofs.size >= 256)
+      this.inclusionProofs.delete(this.inclusionProofs.keys().next().value!);
+    this.inclusionProofs.set(key, {
+      expiresAt: Date.now() + 60000,
+      observation: structuredClone(observation),
+    });
+    return this.observe(plan, [observation.transaction_hash], ownHash);
   }
   private async heads(reader: RpcReader): Promise<Heads> {
-    await this.identity(reader);
-    const values = await Promise.all(
-      ['latest', 'safe', 'finalized'].map((tag) =>
-        reader.call('eth_getBlockByNumber', [tag, false]),
+    const [, values] = await Promise.all([
+      this.identity(reader),
+      Promise.all(
+        ['latest', 'safe', 'finalized'].map((tag) =>
+          reader.call('eth_getBlockByNumber', [tag, false]),
+        ),
       ),
-    );
+    ]);
     const [latest, safe, finalized] = values.map((value) => {
       const block = checked(value);
       hash(block.hash);
@@ -843,9 +1235,17 @@ export class QuorumExecutionObserver implements ExecutionObserver {
     candidate: string,
     ownHash: string | undefined,
     heads: Heads,
+    prefetched?: { receipt?: [unknown, unknown]; block?: unknown },
   ): Promise<ChainObservation | null | 'reorged'> {
     if (plan.intent)
-      return this.verifyCalls(reader, plan, candidate, ownHash, heads);
+      return this.verifyCalls(
+        reader,
+        plan,
+        candidate,
+        ownHash,
+        heads,
+        prefetched,
+      );
     const [rawReceipt, rawTransaction] = await Promise.all([
       reader.call('eth_getTransactionReceipt', [candidate]),
       reader.call('eth_getTransactionByHash', [candidate]),
@@ -961,7 +1361,8 @@ export class QuorumExecutionObserver implements ExecutionObserver {
     const result = outcome === 1n ? 'succeeded' : 'reverted';
     return {
       chain_status: chainStatus,
-      verification: 'rpc-quorum',
+      verification:
+        this.verificationMode === 'single' ? 'rpc-single' : 'rpc-quorum',
       outcome: result,
       settlement: chainStatus === 'finalized' ? result : 'pending',
       observed_at: new Date(Date.now()).toISOString(),
@@ -1169,9 +1570,78 @@ export class QuorumExecutionObserver implements ExecutionObserver {
     this.validatePlanNetwork(plan);
     if (plan.genesisHash.toLowerCase() !== this.genesisHash.toLowerCase())
       unavailable();
-    const heads = await Promise.all(
-      this.readers.map((reader) => this.heads(reader)),
+    const known = [
+      ...new Set([...(ownHash ? [ownHash] : []), ...input].map(hash)),
+    ].slice(0, 8);
+    const first = known[0];
+    const key = first ? this.proofKey(plan, first, ownHash) : undefined;
+    const proof = key ? this.inclusionProofs.get(key) : undefined;
+    const quoteAge = plan.networkFees
+      ? Date.now() - Date.parse(plan.networkFees.quotedAt)
+      : Infinity;
+    let earlyReceipts: unknown[] | undefined;
+    if (
+      this.reuseInclusionProofs &&
+      this.verificationMode === 'single' &&
+      plan.intent &&
+      plan.runtimePolicy &&
+      ownHash &&
+      known.length === 1 &&
+      quoteAge >= 0 &&
+      quoteAge < 30000 &&
+      (!proof || proof.expiresAt <= Date.now())
+    ) {
+      earlyReceipts = await Promise.all(
+        this.readers.map((reader) =>
+          reader.call('eth_getTransactionReceipt', [first]),
+        ),
+      );
+      if (earlyReceipts.every((receipt) => receipt === null))
+        return {
+          scanNextBlock: scanFromBlock,
+          chain_status: 'pending',
+          verification: 'unverified',
+          outcome: 'unknown',
+          settlement: 'pending',
+          observed_at: new Date().toISOString(),
+        };
+    }
+    const reads = await Promise.all(
+      this.readers.map(async (reader, index) => {
+        const read = async (): Promise<
+          { receipt?: [unknown, unknown]; block?: unknown } | undefined
+        > => {
+          if (!first || !plan.intent || !this.reuseInclusionProofs)
+            return undefined;
+          if (proof && proof.expiresAt > Date.now())
+            return {
+              block: await reader.call('eth_getBlockByNumber', [
+                toQuantity(BigInt(proof.observation.block_number!)),
+                false,
+              ]),
+            };
+          if (earlyReceipts)
+            return {
+              receipt: [
+                earlyReceipts[index],
+                await reader.call('eth_getTransactionByHash', [first]),
+              ],
+            };
+          return {
+            receipt: await Promise.all([
+              reader.call('eth_getTransactionReceipt', [first]),
+              reader.call('eth_getTransactionByHash', [first]),
+            ]),
+          };
+        };
+        const [heads, prefetched] = await Promise.all([
+          this.heads(reader),
+          read(),
+        ]);
+        return { heads, prefetched };
+      }),
     );
+    const heads = reads.map((r) => r.heads);
     const from = BigInt(scanFromBlock);
     if (from < BigInt(plan.scanFromBlock)) unavailable();
     const end = from + BigInt(this.maxLogRange) - 1n;
@@ -1182,9 +1652,6 @@ export class QuorumExecutionObserver implements ExecutionObserver {
     // Advance only across finalized history; re-scan the unfinalized tail after reorgs.
     const next = (end < finalized ? end : finalized) + 1n;
     const scanNextBlock = (next > from ? next : from).toString();
-    const known = [
-      ...new Set([...(ownHash ? [ownHash] : []), ...input].map(hash)),
-    ].slice(0, 8);
     let reorged = false;
     let pending = false;
     const verifyCandidates = async (
@@ -1200,6 +1667,7 @@ export class QuorumExecutionObserver implements ExecutionObserver {
               candidate,
               ownHash?.toLowerCase(),
               heads[index],
+              candidate === first ? reads[index].prefetched : undefined,
             ),
           ),
         );
@@ -1219,6 +1687,7 @@ export class QuorumExecutionObserver implements ExecutionObserver {
               value.block_hash !== values[0].block_hash ||
               value.block_number !== values[0].block_number ||
               value.outcome !== values[0].outcome ||
+              value.safe_nonce_consumed !== values[0].safe_nonce_consumed ||
               value.execution_origin !== values[0].execution_origin ||
               serviceHash(value.callsReceipt ?? null) !==
                 serviceHash(values[0].callsReceipt ?? null),

@@ -357,6 +357,106 @@ Success response schema:
 }
 ```
 
+## GET /v1/configuration/applications/{applicationId}/safe-wallet
+
+Operation: `readSafeWalletInfrastructure`.
+
+| Parameter       | Location | Required | Schema                                         |
+| --------------- | -------- | -------- | ---------------------------------------------- |
+| `applicationId` | path     | yes      | `{"type":"string","pattern":"^[a-f0-9]{64}$"}` |
+
+| Status | Content type     | Description      |
+| ------ | ---------------- | ---------------- |
+| 200    | application/json | Default Response |
+| 403    | application/json | Default Response |
+| 503    | application/json | Default Response |
+
+Success response schema:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["application_id", "chain_id", "profile", "status"],
+  "properties": {
+    "application_id": {
+      "type": "string"
+    },
+    "chain_id": {
+      "type": "string"
+    },
+    "profile": {
+      "enum": ["safe-only-4337-v1"]
+    },
+    "status": {
+      "type": "string",
+      "enum": ["unprovisioned", "needs-funding", "provisioned"]
+    },
+    "funding_address": {
+      "type": "string"
+    },
+    "paymaster": {
+      "type": "string"
+    }
+  }
+}
+```
+
+## POST /v1/configuration/applications/{applicationId}/safe-wallet
+
+Operation: `provisionSafeWalletInfrastructure`.
+
+| Parameter         | Location | Required | Schema                                                                                                |
+| ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
+| `applicationId`   | path     | yes      | `{"type":"string","pattern":"^[a-f0-9]{64}$"}`                                                        |
+| `idempotency-key` | header   | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+
+Request body (application/json):
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false
+}
+```
+
+| Status | Content type     | Description      |
+| ------ | ---------------- | ---------------- |
+| 200    | application/json | Default Response |
+| 403    | application/json | Default Response |
+| 503    | application/json | Default Response |
+
+Success response schema:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["application_id", "chain_id", "profile", "status"],
+  "properties": {
+    "application_id": {
+      "type": "string"
+    },
+    "chain_id": {
+      "type": "string"
+    },
+    "profile": {
+      "enum": ["safe-only-4337-v1"]
+    },
+    "status": {
+      "type": "string",
+      "enum": ["unprovisioned", "needs-funding", "provisioned"]
+    },
+    "funding_address": {
+      "type": "string"
+    },
+    "paymaster": {
+      "type": "string"
+    }
+  }
+}
+```
+
 ## GET /v1/accounts/{accountId}/safe
 
 Operation: `readProvisionedSafe`.
@@ -2369,6 +2469,8 @@ Success response schema:
       "enum": [
         "queued",
         "executing",
+        "included",
+        "failed",
         "succeeded",
         "cancelled",
         "expired",
@@ -2431,6 +2533,8 @@ Success response schema:
       "enum": [
         "queued",
         "executing",
+        "included",
+        "failed",
         "succeeded",
         "cancelled",
         "expired",
@@ -2503,6 +2607,8 @@ Success response schema:
       "enum": [
         "queued",
         "executing",
+        "included",
+        "failed",
         "succeeded",
         "cancelled",
         "expired",
@@ -3631,7 +3737,7 @@ Success response schema:
           },
           "minimum_rpc_sources": {
             "type": "integer",
-            "minimum": 2
+            "minimum": 1
           },
           "execute_scopes": {
             "type": "array",
@@ -3697,6 +3803,33 @@ Success response schema:
     "observed_at"
   ],
   "properties": {
+    "preconfirmation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stage",
+        "transaction_hash",
+        "observed_at",
+        "rpc_source_origin"
+      ],
+      "properties": {
+        "stage": {
+          "type": "string",
+          "enum": ["preconfirmed"]
+        },
+        "transaction_hash": {
+          "type": "string",
+          "pattern": "^0x[0-9a-f]{64}$"
+        },
+        "observed_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "rpc_source_origin": {
+          "type": "string"
+        }
+      }
+    },
     "recovery": {
       "type": "object",
       "additionalProperties": false,
@@ -3873,10 +4006,15 @@ Success response schema:
         "reorged"
       ]
     },
+    "rpc_source_origin": {
+      "type": "string",
+      "pattern": "^https://[^/?#]+$",
+      "maxLength": 512
+    },
     "verification": {
       "type": "string",
-      "enum": ["unverified", "rpc-quorum"],
-      "description": "RPC quorum means agreement of all configured trusted RPC sources on exact receipt effects and canonical block evidence, not a cryptographic light-client proof."
+      "enum": ["unverified", "rpc-quorum", "rpc-single"],
+      "description": "RPC single means one configured trusted source verifies the complete observation. RPC quorum means agreement of all configured trusted RPC sources on exact receipt effects and canonical block evidence, not a cryptographic light-client proof."
     },
     "outcome": {
       "type": "string",
@@ -3890,6 +4028,9 @@ Success response schema:
     "observed_at": {
       "type": "string",
       "format": "date-time"
+    },
+    "safe_nonce_consumed": {
+      "type": "boolean"
     },
     "transaction_hash": {
       "type": "string",
@@ -3957,7 +4098,7 @@ Success response schema:
       ],
       "properties": {
         "verification": {
-          "enum": ["rpc-quorum"]
+          "enum": ["rpc-quorum", "rpc-single"]
         },
         "chain_status": {
           "enum": ["included", "safe"]
@@ -3980,7 +4121,7 @@ Success response schema:
       ],
       "properties": {
         "verification": {
-          "enum": ["rpc-quorum"]
+          "enum": ["rpc-quorum", "rpc-single"]
         },
         "chain_status": {
           "enum": ["finalized"]
@@ -4003,7 +4144,7 @@ Success response schema:
       ],
       "properties": {
         "verification": {
-          "enum": ["rpc-quorum"]
+          "enum": ["rpc-quorum", "rpc-single"]
         },
         "chain_status": {
           "enum": ["finalized"]
@@ -4077,6 +4218,33 @@ Success response schema:
     "observed_at"
   ],
   "properties": {
+    "preconfirmation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stage",
+        "transaction_hash",
+        "observed_at",
+        "rpc_source_origin"
+      ],
+      "properties": {
+        "stage": {
+          "type": "string",
+          "enum": ["preconfirmed"]
+        },
+        "transaction_hash": {
+          "type": "string",
+          "pattern": "^0x[0-9a-f]{64}$"
+        },
+        "observed_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "rpc_source_origin": {
+          "type": "string"
+        }
+      }
+    },
     "recovery": {
       "type": "object",
       "additionalProperties": false,
@@ -4253,10 +4421,15 @@ Success response schema:
         "reorged"
       ]
     },
+    "rpc_source_origin": {
+      "type": "string",
+      "pattern": "^https://[^/?#]+$",
+      "maxLength": 512
+    },
     "verification": {
       "type": "string",
-      "enum": ["unverified", "rpc-quorum"],
-      "description": "RPC quorum means agreement of all configured trusted RPC sources on exact receipt effects and canonical block evidence, not a cryptographic light-client proof."
+      "enum": ["unverified", "rpc-quorum", "rpc-single"],
+      "description": "RPC single means one configured trusted source verifies the complete observation. RPC quorum means agreement of all configured trusted RPC sources on exact receipt effects and canonical block evidence, not a cryptographic light-client proof."
     },
     "outcome": {
       "type": "string",
@@ -4270,6 +4443,9 @@ Success response schema:
     "observed_at": {
       "type": "string",
       "format": "date-time"
+    },
+    "safe_nonce_consumed": {
+      "type": "boolean"
     },
     "transaction_hash": {
       "type": "string",
@@ -4337,7 +4513,7 @@ Success response schema:
       ],
       "properties": {
         "verification": {
-          "enum": ["rpc-quorum"]
+          "enum": ["rpc-quorum", "rpc-single"]
         },
         "chain_status": {
           "enum": ["included", "safe"]
@@ -4360,7 +4536,7 @@ Success response schema:
       ],
       "properties": {
         "verification": {
-          "enum": ["rpc-quorum"]
+          "enum": ["rpc-quorum", "rpc-single"]
         },
         "chain_status": {
           "enum": ["finalized"]
@@ -4383,7 +4559,7 @@ Success response schema:
       ],
       "properties": {
         "verification": {
-          "enum": ["rpc-quorum"]
+          "enum": ["rpc-quorum", "rpc-single"]
         },
         "chain_status": {
           "enum": ["finalized"]
@@ -4447,6 +4623,33 @@ Success response schema:
     "observed_at"
   ],
   "properties": {
+    "preconfirmation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stage",
+        "transaction_hash",
+        "observed_at",
+        "rpc_source_origin"
+      ],
+      "properties": {
+        "stage": {
+          "type": "string",
+          "enum": ["preconfirmed"]
+        },
+        "transaction_hash": {
+          "type": "string",
+          "pattern": "^0x[0-9a-f]{64}$"
+        },
+        "observed_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "rpc_source_origin": {
+          "type": "string"
+        }
+      }
+    },
     "recovery": {
       "type": "object",
       "additionalProperties": false,
@@ -4623,10 +4826,15 @@ Success response schema:
         "reorged"
       ]
     },
+    "rpc_source_origin": {
+      "type": "string",
+      "pattern": "^https://[^/?#]+$",
+      "maxLength": 512
+    },
     "verification": {
       "type": "string",
-      "enum": ["unverified", "rpc-quorum"],
-      "description": "RPC quorum means agreement of all configured trusted RPC sources on exact receipt effects and canonical block evidence, not a cryptographic light-client proof."
+      "enum": ["unverified", "rpc-quorum", "rpc-single"],
+      "description": "RPC single means one configured trusted source verifies the complete observation. RPC quorum means agreement of all configured trusted RPC sources on exact receipt effects and canonical block evidence, not a cryptographic light-client proof."
     },
     "outcome": {
       "type": "string",
@@ -4640,6 +4848,9 @@ Success response schema:
     "observed_at": {
       "type": "string",
       "format": "date-time"
+    },
+    "safe_nonce_consumed": {
+      "type": "boolean"
     },
     "transaction_hash": {
       "type": "string",
@@ -4707,7 +4918,7 @@ Success response schema:
       ],
       "properties": {
         "verification": {
-          "enum": ["rpc-quorum"]
+          "enum": ["rpc-quorum", "rpc-single"]
         },
         "chain_status": {
           "enum": ["included", "safe"]
@@ -4730,7 +4941,7 @@ Success response schema:
       ],
       "properties": {
         "verification": {
-          "enum": ["rpc-quorum"]
+          "enum": ["rpc-quorum", "rpc-single"]
         },
         "chain_status": {
           "enum": ["finalized"]
@@ -4753,7 +4964,7 @@ Success response schema:
       ],
       "properties": {
         "verification": {
-          "enum": ["rpc-quorum"]
+          "enum": ["rpc-quorum", "rpc-single"]
         },
         "chain_status": {
           "enum": ["finalized"]
@@ -4909,6 +5120,33 @@ Success response schema:
               "observed_at"
             ],
             "properties": {
+              "preconfirmation": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "stage",
+                  "transaction_hash",
+                  "observed_at",
+                  "rpc_source_origin"
+                ],
+                "properties": {
+                  "stage": {
+                    "type": "string",
+                    "enum": ["preconfirmed"]
+                  },
+                  "transaction_hash": {
+                    "type": "string",
+                    "pattern": "^0x[0-9a-f]{64}$"
+                  },
+                  "observed_at": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "rpc_source_origin": {
+                    "type": "string"
+                  }
+                }
+              },
               "recovery": {
                 "type": "object",
                 "additionalProperties": false,
@@ -5091,10 +5329,15 @@ Success response schema:
                   "reorged"
                 ]
               },
+              "rpc_source_origin": {
+                "type": "string",
+                "pattern": "^https://[^/?#]+$",
+                "maxLength": 512
+              },
               "verification": {
                 "type": "string",
-                "enum": ["unverified", "rpc-quorum"],
-                "description": "RPC quorum means agreement of all configured trusted RPC sources on exact receipt effects and canonical block evidence, not a cryptographic light-client proof."
+                "enum": ["unverified", "rpc-quorum", "rpc-single"],
+                "description": "RPC single means one configured trusted source verifies the complete observation. RPC quorum means agreement of all configured trusted RPC sources on exact receipt effects and canonical block evidence, not a cryptographic light-client proof."
               },
               "outcome": {
                 "type": "string",
@@ -5108,6 +5351,9 @@ Success response schema:
               "observed_at": {
                 "type": "string",
                 "format": "date-time"
+              },
+              "safe_nonce_consumed": {
+                "type": "boolean"
               },
               "transaction_hash": {
                 "type": "string",
@@ -5175,7 +5421,7 @@ Success response schema:
                 ],
                 "properties": {
                   "verification": {
-                    "enum": ["rpc-quorum"]
+                    "enum": ["rpc-quorum", "rpc-single"]
                   },
                   "chain_status": {
                     "enum": ["included", "safe"]
@@ -5198,7 +5444,7 @@ Success response schema:
                 ],
                 "properties": {
                   "verification": {
-                    "enum": ["rpc-quorum"]
+                    "enum": ["rpc-quorum", "rpc-single"]
                   },
                   "chain_status": {
                     "enum": ["finalized"]
@@ -5221,7 +5467,7 @@ Success response schema:
                 ],
                 "properties": {
                   "verification": {
-                    "enum": ["rpc-quorum"]
+                    "enum": ["rpc-quorum", "rpc-single"]
                   },
                   "chain_status": {
                     "enum": ["finalized"]
@@ -7496,6 +7742,58 @@ Success response schema:
 }
 ```
 
+## GET /v1/accounts/{accountId}/wallet/calls/{batchId}/events
+
+Operation: `streamWalletCallsStatus`.
+
+Authenticated bounded SSE status stream. Sends current account-authorized EIP-5792 status after durable observation changes. Reconnect after 55 seconds; ordinary status reads remain available.
+
+| Parameter   | Location | Required | Schema                                                                                                |
+| ----------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
+| `accountId` | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+| `batchId`   | path     | yes      | `{"type":"string","maxLength":8194}`                                                                  |
+
+| Status | Content type      | Description                                    |
+| ------ | ----------------- | ---------------------------------------------- |
+| 200    | text/event-stream | Bounded SSE stream of authorized wallet status |
+| 401    | application/json  | Default Response                               |
+| 403    | application/json  | Default Response                               |
+| 429    | application/json  | Default Response                               |
+| 503    | application/json  | Default Response                               |
+
+## GET /v1/accounts/{accountId}/wallet
+
+Operation: `readWalletExecutionAccount`.
+
+| Parameter   | Location | Required | Schema                                                                                                |
+| ----------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
+| `accountId` | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+
+| Status | Content type     | Description      |
+| ------ | ---------------- | ---------------- |
+| 200    | application/json | Default Response |
+| 401    | application/json | Default Response |
+| 403    | application/json | Default Response |
+| 503    | application/json | Default Response |
+
+Success response schema:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["address", "chainId"],
+  "properties": {
+    "address": {
+      "type": "string"
+    },
+    "chainId": {
+      "type": "string"
+    }
+  }
+}
+```
+
 ## POST /v1/accounts/{accountId}/wallet
 
 Operation: `walletCallsRpc`.
@@ -7833,6 +8131,31 @@ Success response schema:
               "type": "boolean",
               "enum": [true]
             },
+            "capabilities": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "preconfirmation": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["stage", "transactionHash", "observedAt"],
+                  "properties": {
+                    "stage": {
+                      "type": "string",
+                      "enum": ["preconfirmed"]
+                    },
+                    "transactionHash": {
+                      "type": "string",
+                      "pattern": "^0x[0-9a-f]{64}$"
+                    },
+                    "observedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            },
             "receipts": {
               "type": "array",
               "items": {
@@ -7998,6 +8321,240 @@ Success response schema:
 }
 ```
 
+## GET /v1/application/gas-funding
+
+Operation: `readApplicationGasFunding`.
+
+Optional runtime configuration control plane. Application proposals and provider publications are configuration records, not wallet grants, signing authority or execution activation. Publications become readable immediately without restarting the service. Immutable historical revisions remain available. Requires the documented scope and configured application or operator identity.
+
+| Status | Content type             | Description      |
+| ------ | ------------------------ | ---------------- |
+| 200    | application/json         | Default Response |
+| 400    | application/problem+json | Problem response |
+| 401    | application/problem+json | Problem response |
+| 403    | application/problem+json | Problem response |
+| 409    | application/problem+json | Problem response |
+| 413    | application/problem+json | Problem response |
+| 415    | application/problem+json | Problem response |
+| 422    | application/problem+json | Problem response |
+| 429    | application/problem+json | Problem response |
+| 500    | application/problem+json | Problem response |
+| 503    | application/problem+json | Problem response |
+
+Success response schema:
+
+```json
+{
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["application_id", "chain_id", "profile", "status"],
+      "properties": {
+        "application_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "chain_id": {
+          "type": "string"
+        },
+        "profile": {
+          "enum": ["safe-only-4337-v1"]
+        },
+        "status": {
+          "type": "string",
+          "enum": ["unprovisioned", "needs-funding", "provisioned"]
+        },
+        "funding_address": {
+          "type": "string"
+        },
+        "paymaster": {
+          "type": "string"
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "application_id",
+        "chain_id",
+        "sponsor_count",
+        "ready_sponsors",
+        "minimum_initial_funding_wei",
+        "status"
+      ],
+      "properties": {
+        "application_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "chain_id": {
+          "type": "string"
+        },
+        "funding_address": {
+          "type": "string"
+        },
+        "funding_state": {
+          "type": "string",
+          "enum": ["healthy", "routing", "needs-funding", "paused"]
+        },
+        "checked_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "sponsor_count": {
+          "type": "integer"
+        },
+        "ready_sponsors": {
+          "type": "integer"
+        },
+        "minimum_initial_funding_wei": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["ready", "unprovisioned"]
+        }
+      }
+    }
+  ]
+}
+```
+
+## GET /v1/application/execution-pool
+
+Operation: `readApplicationExecutionPool`.
+
+Optional runtime configuration control plane. Application proposals and provider publications are configuration records, not wallet grants, signing authority or execution activation. Publications become readable immediately without restarting the service. Immutable historical revisions remain available. Requires the documented scope and configured application or operator identity.
+
+| Status | Content type             | Description      |
+| ------ | ------------------------ | ---------------- |
+| 200    | application/json         | Default Response |
+| 400    | application/problem+json | Problem response |
+| 401    | application/problem+json | Problem response |
+| 403    | application/problem+json | Problem response |
+| 409    | application/problem+json | Problem response |
+| 413    | application/problem+json | Problem response |
+| 415    | application/problem+json | Problem response |
+| 422    | application/problem+json | Problem response |
+| 429    | application/problem+json | Problem response |
+| 500    | application/problem+json | Problem response |
+| 503    | application/problem+json | Problem response |
+
+Success response schema:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["application_id", "safe_count", "sponsor_count"],
+  "properties": {
+    "application_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "safe_count": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 16
+    },
+    "sponsor_count": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 16
+    }
+  }
+}
+```
+
+## PUT /v1/application/execution-pool
+
+Operation: `configureApplicationExecutionPool`.
+
+Optional runtime configuration control plane. Application proposals and provider publications are configuration records, not wallet grants, signing authority or execution activation. Publications become readable immediately without restarting the service. Immutable historical revisions remain available. Requires the documented scope and configured application or operator identity.
+
+| Parameter         | Location | Required | Schema                                                                                                |
+| ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
+| `idempotency-key` | header   | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+
+Request body (application/json):
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "expected_safe_count",
+    "expected_sponsor_count",
+    "safe_count",
+    "sponsor_count"
+  ],
+  "properties": {
+    "expected_safe_count": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 16
+    },
+    "expected_sponsor_count": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 16
+    },
+    "safe_count": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 16
+    },
+    "sponsor_count": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 16
+    }
+  }
+}
+```
+
+| Status | Content type             | Description      |
+| ------ | ------------------------ | ---------------- |
+| 200    | application/json         | Default Response |
+| 400    | application/problem+json | Problem response |
+| 401    | application/problem+json | Problem response |
+| 403    | application/problem+json | Problem response |
+| 409    | application/problem+json | Problem response |
+| 413    | application/problem+json | Problem response |
+| 415    | application/problem+json | Problem response |
+| 422    | application/problem+json | Problem response |
+| 429    | application/problem+json | Problem response |
+| 500    | application/problem+json | Problem response |
+| 503    | application/problem+json | Problem response |
+
+Success response schema:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["application_id", "safe_count", "sponsor_count"],
+  "properties": {
+    "application_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "safe_count": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 16
+    },
+    "sponsor_count": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 16
+    }
+  }
+}
+```
+
 ## POST /v1/provider/applications/{applicationId}/sponsorship/provision
 
 Operation: `provisionApplicationSponsor`.
@@ -8015,7 +8572,13 @@ Request body (application/json):
 {
   "type": "object",
   "additionalProperties": false,
-  "properties": {}
+  "properties": {
+    "pool_index": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 15
+    }
+  }
 }
 ```
 
@@ -8047,6 +8610,9 @@ Success response schema:
     },
     "funding_address": {
       "type": "string"
+    },
+    "pool_index": {
+      "type": "integer"
     },
     "status": {
       "type": "string",
@@ -8094,6 +8660,44 @@ Success response schema:
       "type": "string",
       "pattern": "^[0-9a-f]{64}$"
     },
+    "user_account_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "execution_account_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "maximum_execution_accounts": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "maximum_in_flight_per_sponsor": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "pool_size": {
+      "type": "integer"
+    },
+    "safes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["pool_index", "status"],
+        "properties": {
+          "pool_index": {
+            "type": "integer"
+          },
+          "status": {
+            "type": "string"
+          },
+          "address": {
+            "type": "string"
+          }
+        }
+      }
+    },
     "funding_addresses": {
       "type": "array",
       "items": {
@@ -8177,7 +8781,10 @@ Success response schema:
     },
     "account_model": {
       "type": "string",
-      "enum": ["provider-controlled-application-safe"]
+      "enum": [
+        "provider-controlled-application-safe",
+        "provider-controlled-user-safe"
+      ]
     }
   }
 }
@@ -8225,6 +8832,44 @@ Success response schema:
       "type": "string",
       "pattern": "^[0-9a-f]{64}$"
     },
+    "user_account_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "execution_account_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "maximum_execution_accounts": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "maximum_in_flight_per_sponsor": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "pool_size": {
+      "type": "integer"
+    },
+    "safes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["pool_index", "status"],
+        "properties": {
+          "pool_index": {
+            "type": "integer"
+          },
+          "status": {
+            "type": "string"
+          },
+          "address": {
+            "type": "string"
+          }
+        }
+      }
+    },
     "funding_addresses": {
       "type": "array",
       "items": {
@@ -8308,7 +8953,10 @@ Success response schema:
     },
     "account_model": {
       "type": "string",
-      "enum": ["provider-controlled-application-safe"]
+      "enum": [
+        "provider-controlled-application-safe",
+        "provider-controlled-user-safe"
+      ]
     }
   }
 }
@@ -8331,7 +8979,17 @@ Request body (application/json):
 {
   "type": "object",
   "additionalProperties": false,
-  "properties": {}
+  "properties": {
+    "user_account_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "pool_index": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 15
+    }
+  }
 }
 ```
 
@@ -8367,6 +9025,44 @@ Success response schema:
       "type": "string",
       "pattern": "^[0-9a-f]{64}$"
     },
+    "user_account_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "execution_account_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "maximum_execution_accounts": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "maximum_in_flight_per_sponsor": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "pool_size": {
+      "type": "integer"
+    },
+    "safes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["pool_index", "status"],
+        "properties": {
+          "pool_index": {
+            "type": "integer"
+          },
+          "status": {
+            "type": "string"
+          },
+          "address": {
+            "type": "string"
+          }
+        }
+      }
+    },
     "funding_addresses": {
       "type": "array",
       "items": {
@@ -8450,7 +9146,10 @@ Success response schema:
     },
     "account_model": {
       "type": "string",
-      "enum": ["provider-controlled-application-safe"]
+      "enum": [
+        "provider-controlled-application-safe",
+        "provider-controlled-user-safe"
+      ]
     }
   }
 }
@@ -8784,7 +9483,12 @@ Success response schema:
                     },
                     "kind": {
                       "type": "string",
-                      "enum": ["rpc-verification", "rpc-submission", "other"]
+                      "enum": [
+                        "rpc-verification",
+                        "rpc-submission",
+                        "rpc-observation",
+                        "other"
+                      ]
                     },
                     "vendor": {
                       "type": "string",
@@ -8828,11 +9532,24 @@ Success response schema:
                   },
                   "account_model": {
                     "type": "string",
-                    "enum": ["provider-controlled-application-safe"]
+                    "enum": [
+                      "provider-controlled-application-safe",
+                      "provider-controlled-user-safe"
+                    ]
                   },
                   "asset_model": {
                     "type": "string",
                     "enum": ["individual-user-wallets"]
+                  },
+                  "maximum_execution_accounts": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 100000
+                  },
+                  "maximum_in_flight_per_sponsor": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 16
                   },
                   "gas_limits": {
                     "type": "object",
@@ -9037,7 +9754,12 @@ Success response schema:
                     },
                     "kind": {
                       "type": "string",
-                      "enum": ["rpc-verification", "rpc-submission", "other"]
+                      "enum": [
+                        "rpc-verification",
+                        "rpc-submission",
+                        "rpc-observation",
+                        "other"
+                      ]
                     },
                     "vendor": {
                       "type": "string",
@@ -9081,11 +9803,24 @@ Success response schema:
                   },
                   "account_model": {
                     "type": "string",
-                    "enum": ["provider-controlled-application-safe"]
+                    "enum": [
+                      "provider-controlled-application-safe",
+                      "provider-controlled-user-safe"
+                    ]
                   },
                   "asset_model": {
                     "type": "string",
                     "enum": ["individual-user-wallets"]
+                  },
+                  "maximum_execution_accounts": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 100000
+                  },
+                  "maximum_in_flight_per_sponsor": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 16
                   },
                   "gas_limits": {
                     "type": "object",
@@ -9338,7 +10073,12 @@ Success response schema:
               },
               "kind": {
                 "type": "string",
-                "enum": ["rpc-verification", "rpc-submission", "other"]
+                "enum": [
+                  "rpc-verification",
+                  "rpc-submission",
+                  "rpc-observation",
+                  "other"
+                ]
               },
               "vendor": {
                 "type": "string",
@@ -9382,11 +10122,24 @@ Success response schema:
             },
             "account_model": {
               "type": "string",
-              "enum": ["provider-controlled-application-safe"]
+              "enum": [
+                "provider-controlled-application-safe",
+                "provider-controlled-user-safe"
+              ]
             },
             "asset_model": {
               "type": "string",
               "enum": ["individual-user-wallets"]
+            },
+            "maximum_execution_accounts": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100000
+            },
+            "maximum_in_flight_per_sponsor": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 16
             },
             "gas_limits": {
               "type": "object",
@@ -9588,7 +10341,12 @@ Success response schema:
               },
               "kind": {
                 "type": "string",
-                "enum": ["rpc-verification", "rpc-submission", "other"]
+                "enum": [
+                  "rpc-verification",
+                  "rpc-submission",
+                  "rpc-observation",
+                  "other"
+                ]
               },
               "vendor": {
                 "type": "string",
@@ -9632,11 +10390,24 @@ Success response schema:
             },
             "account_model": {
               "type": "string",
-              "enum": ["provider-controlled-application-safe"]
+              "enum": [
+                "provider-controlled-application-safe",
+                "provider-controlled-user-safe"
+              ]
             },
             "asset_model": {
               "type": "string",
               "enum": ["individual-user-wallets"]
+            },
+            "maximum_execution_accounts": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100000
+            },
+            "maximum_in_flight_per_sponsor": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 16
             },
             "gas_limits": {
               "type": "object",
@@ -9732,7 +10503,12 @@ Request body (application/json):
           },
           "kind": {
             "type": "string",
-            "enum": ["rpc-verification", "rpc-submission", "other"]
+            "enum": [
+              "rpc-verification",
+              "rpc-submission",
+              "rpc-observation",
+              "other"
+            ]
           },
           "vendor": {
             "type": "string",
@@ -9867,7 +10643,12 @@ Success response schema:
               },
               "kind": {
                 "type": "string",
-                "enum": ["rpc-verification", "rpc-submission", "other"]
+                "enum": [
+                  "rpc-verification",
+                  "rpc-submission",
+                  "rpc-observation",
+                  "other"
+                ]
               },
               "vendor": {
                 "type": "string",
@@ -9911,11 +10692,24 @@ Success response schema:
             },
             "account_model": {
               "type": "string",
-              "enum": ["provider-controlled-application-safe"]
+              "enum": [
+                "provider-controlled-application-safe",
+                "provider-controlled-user-safe"
+              ]
             },
             "asset_model": {
               "type": "string",
               "enum": ["individual-user-wallets"]
+            },
+            "maximum_execution_accounts": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100000
+            },
+            "maximum_in_flight_per_sponsor": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 16
             },
             "gas_limits": {
               "type": "object",
@@ -10117,7 +10911,12 @@ Success response schema:
               },
               "kind": {
                 "type": "string",
-                "enum": ["rpc-verification", "rpc-submission", "other"]
+                "enum": [
+                  "rpc-verification",
+                  "rpc-submission",
+                  "rpc-observation",
+                  "other"
+                ]
               },
               "vendor": {
                 "type": "string",
@@ -10161,11 +10960,24 @@ Success response schema:
             },
             "account_model": {
               "type": "string",
-              "enum": ["provider-controlled-application-safe"]
+              "enum": [
+                "provider-controlled-application-safe",
+                "provider-controlled-user-safe"
+              ]
             },
             "asset_model": {
               "type": "string",
               "enum": ["individual-user-wallets"]
+            },
+            "maximum_execution_accounts": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100000
+            },
+            "maximum_in_flight_per_sponsor": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 16
             },
             "gas_limits": {
               "type": "object",
@@ -10267,11 +11079,24 @@ Request body (application/json):
         },
         "account_model": {
           "type": "string",
-          "enum": ["provider-controlled-application-safe"]
+          "enum": [
+            "provider-controlled-application-safe",
+            "provider-controlled-user-safe"
+          ]
         },
         "asset_model": {
           "type": "string",
           "enum": ["individual-user-wallets"]
+        },
+        "maximum_execution_accounts": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100000
+        },
+        "maximum_in_flight_per_sponsor": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16
         },
         "gas_limits": {
           "type": "object",
@@ -10420,7 +11245,12 @@ Success response schema:
               },
               "kind": {
                 "type": "string",
-                "enum": ["rpc-verification", "rpc-submission", "other"]
+                "enum": [
+                  "rpc-verification",
+                  "rpc-submission",
+                  "rpc-observation",
+                  "other"
+                ]
               },
               "vendor": {
                 "type": "string",
@@ -10464,11 +11294,24 @@ Success response schema:
             },
             "account_model": {
               "type": "string",
-              "enum": ["provider-controlled-application-safe"]
+              "enum": [
+                "provider-controlled-application-safe",
+                "provider-controlled-user-safe"
+              ]
             },
             "asset_model": {
               "type": "string",
               "enum": ["individual-user-wallets"]
+            },
+            "maximum_execution_accounts": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100000
+            },
+            "maximum_in_flight_per_sponsor": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 16
             },
             "gas_limits": {
               "type": "object",
@@ -10670,7 +11513,12 @@ Success response schema:
               },
               "kind": {
                 "type": "string",
-                "enum": ["rpc-verification", "rpc-submission", "other"]
+                "enum": [
+                  "rpc-verification",
+                  "rpc-submission",
+                  "rpc-observation",
+                  "other"
+                ]
               },
               "vendor": {
                 "type": "string",
@@ -10714,11 +11562,24 @@ Success response schema:
             },
             "account_model": {
               "type": "string",
-              "enum": ["provider-controlled-application-safe"]
+              "enum": [
+                "provider-controlled-application-safe",
+                "provider-controlled-user-safe"
+              ]
             },
             "asset_model": {
               "type": "string",
               "enum": ["individual-user-wallets"]
+            },
+            "maximum_execution_accounts": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100000
+            },
+            "maximum_in_flight_per_sponsor": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 16
             },
             "gas_limits": {
               "type": "object",
@@ -12643,6 +13504,8 @@ Success response schema:
             "enum": [
               "queued",
               "executing",
+              "included",
+              "failed",
               "succeeded",
               "cancelled",
               "expired",

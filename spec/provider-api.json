@@ -1286,6 +1286,201 @@
         }
       }
     },
+    "/v1/configuration/applications/{applicationId}/safe-wallet": {
+      "get": {
+        "operationId": "readSafeWalletInfrastructure",
+        "parameters": [
+          {
+            "schema": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+            "in": "path",
+            "name": "applicationId",
+            "required": true
+          }
+        ],
+        "security": [{ "accessToken": [] }],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "application_id",
+                    "chain_id",
+                    "profile",
+                    "status"
+                  ],
+                  "properties": {
+                    "application_id": { "type": "string" },
+                    "chain_id": { "type": "string" },
+                    "profile": { "enum": ["safe-only-4337-v1"] },
+                    "status": {
+                      "type": "string",
+                      "enum": ["unprovisioned", "needs-funding", "provisioned"]
+                    },
+                    "funding_address": { "type": "string" },
+                    "paymaster": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "provisionSafeWalletInfrastructure",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "type": "object", "additionalProperties": false }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+            "in": "path",
+            "name": "applicationId",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            },
+            "in": "header",
+            "name": "idempotency-key",
+            "required": true
+          }
+        ],
+        "security": [{ "accessToken": [] }],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "application_id",
+                    "chain_id",
+                    "profile",
+                    "status"
+                  ],
+                  "properties": {
+                    "application_id": { "type": "string" },
+                    "chain_id": { "type": "string" },
+                    "profile": { "enum": ["safe-only-4337-v1"] },
+                    "status": {
+                      "type": "string",
+                      "enum": ["unprovisioned", "needs-funding", "provisioned"]
+                    },
+                    "funding_address": { "type": "string" },
+                    "paymaster": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/accounts/{accountId}/safe": {
       "get": {
         "operationId": "readProvisionedSafe",
@@ -4105,6 +4300,8 @@
                       "enum": [
                         "queued",
                         "executing",
+                        "included",
+                        "failed",
                         "succeeded",
                         "cancelled",
                         "expired",
@@ -4173,6 +4370,8 @@
                       "enum": [
                         "queued",
                         "executing",
+                        "included",
+                        "failed",
                         "succeeded",
                         "cancelled",
                         "expired",
@@ -4258,6 +4457,8 @@
                       "enum": [
                         "queued",
                         "executing",
+                        "included",
+                        "failed",
                         "succeeded",
                         "cancelled",
                         "expired",
@@ -5348,7 +5549,7 @@
                           "finality": { "type": "string" },
                           "minimum_rpc_sources": {
                             "type": "integer",
-                            "minimum": 2
+                            "minimum": 1
                           },
                           "execute_scopes": {
                             "type": "array",
@@ -5445,6 +5646,28 @@
                     "observed_at"
                   ],
                   "properties": {
+                    "preconfirmation": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "stage",
+                        "transaction_hash",
+                        "observed_at",
+                        "rpc_source_origin"
+                      ],
+                      "properties": {
+                        "stage": { "type": "string", "enum": ["preconfirmed"] },
+                        "transaction_hash": {
+                          "type": "string",
+                          "pattern": "^0x[0-9a-f]{64}$"
+                        },
+                        "observed_at": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "rpc_source_origin": { "type": "string" }
+                      }
+                    },
                     "recovery": {
                       "type": "object",
                       "additionalProperties": false,
@@ -5619,10 +5842,15 @@
                         "reorged"
                       ]
                     },
+                    "rpc_source_origin": {
+                      "type": "string",
+                      "pattern": "^https://[^/?#]+$",
+                      "maxLength": 512
+                    },
                     "verification": {
                       "type": "string",
-                      "enum": ["unverified", "rpc-quorum"],
-                      "description": "RPC quorum means agreement of all configured trusted RPC sources on exact receipt effects and canonical block evidence, not a cryptographic light-client proof."
+                      "enum": ["unverified", "rpc-quorum", "rpc-single"],
+                      "description": "RPC single means one configured trusted source verifies the complete observation. RPC quorum means agreement of all configured trusted RPC sources on exact receipt effects and canonical block evidence, not a cryptographic light-client proof."
                     },
                     "outcome": {
                       "type": "string",
@@ -5634,6 +5862,7 @@
                       "description": "The supported token transfer reaches succeeded/reverted settlement only after matching finalized chain evidence. This is not a claim of general business-operation completion."
                     },
                     "observed_at": { "type": "string", "format": "date-time" },
+                    "safe_nonce_consumed": { "type": "boolean" },
                     "transaction_hash": {
                       "type": "string",
                       "pattern": "^0x[0-9a-f]{64}$"
@@ -5684,7 +5913,9 @@
                         "execution_origin"
                       ],
                       "properties": {
-                        "verification": { "enum": ["rpc-quorum"] },
+                        "verification": {
+                          "enum": ["rpc-quorum", "rpc-single"]
+                        },
                         "chain_status": { "enum": ["included", "safe"] },
                         "outcome": { "enum": ["succeeded", "reverted"] },
                         "settlement": { "enum": ["pending"] }
@@ -5699,7 +5930,9 @@
                         "execution_origin"
                       ],
                       "properties": {
-                        "verification": { "enum": ["rpc-quorum"] },
+                        "verification": {
+                          "enum": ["rpc-quorum", "rpc-single"]
+                        },
                         "chain_status": { "enum": ["finalized"] },
                         "outcome": { "enum": ["succeeded"] },
                         "settlement": { "enum": ["succeeded"] }
@@ -5714,7 +5947,9 @@
                         "execution_origin"
                       ],
                       "properties": {
-                        "verification": { "enum": ["rpc-quorum"] },
+                        "verification": {
+                          "enum": ["rpc-quorum", "rpc-single"]
+                        },
                         "chain_status": { "enum": ["finalized"] },
                         "outcome": { "enum": ["reverted"] },
                         "settlement": { "enum": ["reverted"] }
@@ -5805,6 +6040,28 @@
                     "observed_at"
                   ],
                   "properties": {
+                    "preconfirmation": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "stage",
+                        "transaction_hash",
+                        "observed_at",
+                        "rpc_source_origin"
+                      ],
+                      "properties": {
+                        "stage": { "type": "string", "enum": ["preconfirmed"] },
+                        "transaction_hash": {
+                          "type": "string",
+                          "pattern": "^0x[0-9a-f]{64}$"
+                        },
+                        "observed_at": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "rpc_source_origin": { "type": "string" }
+                      }
+                    },
                     "recovery": {
                       "type": "object",
                       "additionalProperties": false,
@@ -5979,10 +6236,15 @@
                         "reorged"
                       ]
                     },
+                    "rpc_source_origin": {
+                      "type": "string",
+                      "pattern": "^https://[^/?#]+$",
+                      "maxLength": 512
+                    },
                     "verification": {
                       "type": "string",
-                      "enum": ["unverified", "rpc-quorum"],
-                      "description": "RPC quorum means agreement of all configured trusted RPC sources on exact receipt effects and canonical block evidence, not a cryptographic light-client proof."
+                      "enum": ["unverified", "rpc-quorum", "rpc-single"],
+                      "description": "RPC single means one configured trusted source verifies the complete observation. RPC quorum means agreement of all configured trusted RPC sources on exact receipt effects and canonical block evidence, not a cryptographic light-client proof."
                     },
                     "outcome": {
                       "type": "string",
@@ -5994,6 +6256,7 @@
                       "description": "The supported token transfer reaches succeeded/reverted settlement only after matching finalized chain evidence. This is not a claim of general business-operation completion."
                     },
                     "observed_at": { "type": "string", "format": "date-time" },
+                    "safe_nonce_consumed": { "type": "boolean" },
                     "transaction_hash": {
                       "type": "string",
                       "pattern": "^0x[0-9a-f]{64}$"
@@ -6044,7 +6307,9 @@
                         "execution_origin"
                       ],
                       "properties": {
-                        "verification": { "enum": ["rpc-quorum"] },
+                        "verification": {
+                          "enum": ["rpc-quorum", "rpc-single"]
+                        },
                         "chain_status": { "enum": ["included", "safe"] },
                         "outcome": { "enum": ["succeeded", "reverted"] },
                         "settlement": { "enum": ["pending"] }
@@ -6059,7 +6324,9 @@
                         "execution_origin"
                       ],
                       "properties": {
-                        "verification": { "enum": ["rpc-quorum"] },
+                        "verification": {
+                          "enum": ["rpc-quorum", "rpc-single"]
+                        },
                         "chain_status": { "enum": ["finalized"] },
                         "outcome": { "enum": ["succeeded"] },
                         "settlement": { "enum": ["succeeded"] }
@@ -6074,7 +6341,9 @@
                         "execution_origin"
                       ],
                       "properties": {
-                        "verification": { "enum": ["rpc-quorum"] },
+                        "verification": {
+                          "enum": ["rpc-quorum", "rpc-single"]
+                        },
                         "chain_status": { "enum": ["finalized"] },
                         "outcome": { "enum": ["reverted"] },
                         "settlement": { "enum": ["reverted"] }
@@ -6378,6 +6647,28 @@
                     "observed_at"
                   ],
                   "properties": {
+                    "preconfirmation": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "stage",
+                        "transaction_hash",
+                        "observed_at",
+                        "rpc_source_origin"
+                      ],
+                      "properties": {
+                        "stage": { "type": "string", "enum": ["preconfirmed"] },
+                        "transaction_hash": {
+                          "type": "string",
+                          "pattern": "^0x[0-9a-f]{64}$"
+                        },
+                        "observed_at": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "rpc_source_origin": { "type": "string" }
+                      }
+                    },
                     "recovery": {
                       "type": "object",
                       "additionalProperties": false,
@@ -6552,10 +6843,15 @@
                         "reorged"
                       ]
                     },
+                    "rpc_source_origin": {
+                      "type": "string",
+                      "pattern": "^https://[^/?#]+$",
+                      "maxLength": 512
+                    },
                     "verification": {
                       "type": "string",
-                      "enum": ["unverified", "rpc-quorum"],
-                      "description": "RPC quorum means agreement of all configured trusted RPC sources on exact receipt effects and canonical block evidence, not a cryptographic light-client proof."
+                      "enum": ["unverified", "rpc-quorum", "rpc-single"],
+                      "description": "RPC single means one configured trusted source verifies the complete observation. RPC quorum means agreement of all configured trusted RPC sources on exact receipt effects and canonical block evidence, not a cryptographic light-client proof."
                     },
                     "outcome": {
                       "type": "string",
@@ -6567,6 +6863,7 @@
                       "description": "The supported token transfer reaches succeeded/reverted settlement only after matching finalized chain evidence. This is not a claim of general business-operation completion."
                     },
                     "observed_at": { "type": "string", "format": "date-time" },
+                    "safe_nonce_consumed": { "type": "boolean" },
                     "transaction_hash": {
                       "type": "string",
                       "pattern": "^0x[0-9a-f]{64}$"
@@ -6617,7 +6914,9 @@
                         "execution_origin"
                       ],
                       "properties": {
-                        "verification": { "enum": ["rpc-quorum"] },
+                        "verification": {
+                          "enum": ["rpc-quorum", "rpc-single"]
+                        },
                         "chain_status": { "enum": ["included", "safe"] },
                         "outcome": { "enum": ["succeeded", "reverted"] },
                         "settlement": { "enum": ["pending"] }
@@ -6632,7 +6931,9 @@
                         "execution_origin"
                       ],
                       "properties": {
-                        "verification": { "enum": ["rpc-quorum"] },
+                        "verification": {
+                          "enum": ["rpc-quorum", "rpc-single"]
+                        },
                         "chain_status": { "enum": ["finalized"] },
                         "outcome": { "enum": ["succeeded"] },
                         "settlement": { "enum": ["succeeded"] }
@@ -6647,7 +6948,9 @@
                         "execution_origin"
                       ],
                       "properties": {
-                        "verification": { "enum": ["rpc-quorum"] },
+                        "verification": {
+                          "enum": ["rpc-quorum", "rpc-single"]
+                        },
                         "chain_status": { "enum": ["finalized"] },
                         "outcome": { "enum": ["reverted"] },
                         "settlement": { "enum": ["reverted"] }
@@ -7029,6 +7332,31 @@
                               "observed_at"
                             ],
                             "properties": {
+                              "preconfirmation": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                  "stage",
+                                  "transaction_hash",
+                                  "observed_at",
+                                  "rpc_source_origin"
+                                ],
+                                "properties": {
+                                  "stage": {
+                                    "type": "string",
+                                    "enum": ["preconfirmed"]
+                                  },
+                                  "transaction_hash": {
+                                    "type": "string",
+                                    "pattern": "^0x[0-9a-f]{64}$"
+                                  },
+                                  "observed_at": {
+                                    "type": "string",
+                                    "format": "date-time"
+                                  },
+                                  "rpc_source_origin": { "type": "string" }
+                                }
+                              },
                               "recovery": {
                                 "type": "object",
                                 "additionalProperties": false,
@@ -7209,10 +7537,19 @@
                                   "reorged"
                                 ]
                               },
+                              "rpc_source_origin": {
+                                "type": "string",
+                                "pattern": "^https://[^/?#]+$",
+                                "maxLength": 512
+                              },
                               "verification": {
                                 "type": "string",
-                                "enum": ["unverified", "rpc-quorum"],
-                                "description": "RPC quorum means agreement of all configured trusted RPC sources on exact receipt effects and canonical block evidence, not a cryptographic light-client proof."
+                                "enum": [
+                                  "unverified",
+                                  "rpc-quorum",
+                                  "rpc-single"
+                                ],
+                                "description": "RPC single means one configured trusted source verifies the complete observation. RPC quorum means agreement of all configured trusted RPC sources on exact receipt effects and canonical block evidence, not a cryptographic light-client proof."
                               },
                               "outcome": {
                                 "type": "string",
@@ -7227,6 +7564,7 @@
                                 "type": "string",
                                 "format": "date-time"
                               },
+                              "safe_nonce_consumed": { "type": "boolean" },
                               "transaction_hash": {
                                 "type": "string",
                                 "pattern": "^0x[0-9a-f]{64}$"
@@ -7286,7 +7624,9 @@
                                   "execution_origin"
                                 ],
                                 "properties": {
-                                  "verification": { "enum": ["rpc-quorum"] },
+                                  "verification": {
+                                    "enum": ["rpc-quorum", "rpc-single"]
+                                  },
                                   "chain_status": {
                                     "enum": ["included", "safe"]
                                   },
@@ -7305,7 +7645,9 @@
                                   "execution_origin"
                                 ],
                                 "properties": {
-                                  "verification": { "enum": ["rpc-quorum"] },
+                                  "verification": {
+                                    "enum": ["rpc-quorum", "rpc-single"]
+                                  },
                                   "chain_status": { "enum": ["finalized"] },
                                   "outcome": { "enum": ["succeeded"] },
                                   "settlement": { "enum": ["succeeded"] }
@@ -7320,7 +7662,9 @@
                                   "execution_origin"
                                 ],
                                 "properties": {
-                                  "verification": { "enum": ["rpc-quorum"] },
+                                  "verification": {
+                                    "enum": ["rpc-quorum", "rpc-single"]
+                                  },
                                   "chain_status": { "enum": ["finalized"] },
                                   "outcome": { "enum": ["reverted"] },
                                   "settlement": { "enum": ["reverted"] }
@@ -11766,7 +12110,233 @@
         }
       }
     },
+    "/v1/accounts/{accountId}/wallet/calls/{batchId}/events": {
+      "get": {
+        "operationId": "streamWalletCallsStatus",
+        "description": "Authenticated bounded SSE status stream. Sends current account-authorized EIP-5792 status after durable observation changes. Reconnect after 55 seconds; ordinary status reads remain available.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            },
+            "in": "path",
+            "name": "accountId",
+            "required": true
+          },
+          {
+            "schema": { "type": "string", "maxLength": 8194 },
+            "in": "path",
+            "name": "batchId",
+            "required": true
+          }
+        ],
+        "security": [{ "accessToken": [] }],
+        "responses": {
+          "200": {
+            "description": "Bounded SSE stream of authorized wallet status",
+            "content": {
+              "text/event-stream": { "schema": { "type": "string" } }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/accounts/{accountId}/wallet": {
+      "get": {
+        "operationId": "readWalletExecutionAccount",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            },
+            "in": "path",
+            "name": "accountId",
+            "required": true
+          }
+        ],
+        "security": [{ "accessToken": [] }],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["address", "chainId"],
+                  "properties": {
+                    "address": { "type": "string" },
+                    "chainId": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
       "post": {
         "operationId": "walletCallsRpc",
         "description": "Optional account-scoped EIP-5792 2.0.0 JSON-RPC transport. Runtime financial authority, an explicitly bound Safe relayer or ERC-4337 driver, current owner consent and method-specific scopes remain required. wallet_sendCalls admits a durable atomic batch without waiting for chain inclusion. Headless wallet_showCallsStatus returns unsupported method; the client adapter can present status through an explicit host callback.",
@@ -12037,6 +12607,35 @@
                               "enum": [100, 200, 400, 500]
                             },
                             "atomic": { "type": "boolean", "enum": [true] },
+                            "capabilities": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "properties": {
+                                "preconfirmation": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "required": [
+                                    "stage",
+                                    "transactionHash",
+                                    "observedAt"
+                                  ],
+                                  "properties": {
+                                    "stage": {
+                                      "type": "string",
+                                      "enum": ["preconfirmed"]
+                                    },
+                                    "transactionHash": {
+                                      "type": "string",
+                                      "pattern": "^0x[0-9a-f]{64}$"
+                                    },
+                                    "observedAt": {
+                                      "type": "string",
+                                      "format": "date-time"
+                                    }
+                                  }
+                                }
+                              }
+                            },
                             "receipts": {
                               "type": "array",
                               "items": {
@@ -12263,6 +12862,909 @@
         }
       }
     },
+    "/v1/application/gas-funding": {
+      "get": {
+        "operationId": "readApplicationGasFunding",
+        "tags": ["Application configuration"],
+        "description": "Optional runtime configuration control plane. Application proposals and provider publications are configuration records, not wallet grants, signing authority or execution activation. Publications become readable immediately without restarting the service. Immutable historical revisions remain available. Requires the documented scope and configured application or operator identity.",
+        "security": [{ "accessToken": [] }],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "application_id",
+                        "chain_id",
+                        "profile",
+                        "status"
+                      ],
+                      "properties": {
+                        "application_id": {
+                          "type": "string",
+                          "pattern": "^[0-9a-f]{64}$"
+                        },
+                        "chain_id": { "type": "string" },
+                        "profile": { "enum": ["safe-only-4337-v1"] },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "unprovisioned",
+                            "needs-funding",
+                            "provisioned"
+                          ]
+                        },
+                        "funding_address": { "type": "string" },
+                        "paymaster": { "type": "string" }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "application_id",
+                        "chain_id",
+                        "sponsor_count",
+                        "ready_sponsors",
+                        "minimum_initial_funding_wei",
+                        "status"
+                      ],
+                      "properties": {
+                        "application_id": {
+                          "type": "string",
+                          "pattern": "^[0-9a-f]{64}$"
+                        },
+                        "chain_id": { "type": "string" },
+                        "funding_address": { "type": "string" },
+                        "funding_state": {
+                          "type": "string",
+                          "enum": [
+                            "healthy",
+                            "routing",
+                            "needs-funding",
+                            "paused"
+                          ]
+                        },
+                        "checked_at": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "sponsor_count": { "type": "integer" },
+                        "ready_sponsors": { "type": "integer" },
+                        "minimum_initial_funding_wei": { "type": "string" },
+                        "status": {
+                          "type": "string",
+                          "enum": ["ready", "unprovisioned"]
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/application/execution-pool": {
+      "get": {
+        "operationId": "readApplicationExecutionPool",
+        "tags": ["Application configuration"],
+        "description": "Optional runtime configuration control plane. Application proposals and provider publications are configuration records, not wallet grants, signing authority or execution activation. Publications become readable immediately without restarting the service. Immutable historical revisions remain available. Requires the documented scope and configured application or operator identity.",
+        "security": [{ "accessToken": [] }],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["application_id", "safe_count", "sponsor_count"],
+                  "properties": {
+                    "application_id": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    },
+                    "safe_count": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 16
+                    },
+                    "sponsor_count": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 16
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "operationId": "configureApplicationExecutionPool",
+        "tags": ["Application configuration"],
+        "description": "Optional runtime configuration control plane. Application proposals and provider publications are configuration records, not wallet grants, signing authority or execution activation. Publications become readable immediately without restarting the service. Immutable historical revisions remain available. Requires the documented scope and configured application or operator identity.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "expected_safe_count",
+                  "expected_sponsor_count",
+                  "safe_count",
+                  "sponsor_count"
+                ],
+                "properties": {
+                  "expected_safe_count": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 16
+                  },
+                  "expected_sponsor_count": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 16
+                  },
+                  "safe_count": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 16
+                  },
+                  "sponsor_count": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 16
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            },
+            "in": "header",
+            "name": "idempotency-key",
+            "required": true
+          }
+        ],
+        "security": [{ "accessToken": [] }],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["application_id", "safe_count", "sponsor_count"],
+                  "properties": {
+                    "application_id": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    },
+                    "safe_count": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 16
+                    },
+                    "sponsor_count": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 16
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/provider/applications/{applicationId}/sponsorship/provision": {
       "post": {
         "operationId": "provisionApplicationSponsor",
@@ -12275,7 +13777,13 @@
               "schema": {
                 "type": "object",
                 "additionalProperties": false,
-                "properties": {}
+                "properties": {
+                  "pool_index": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 15
+                  }
+                }
               }
             }
           }
@@ -12313,6 +13821,7 @@
                       "pattern": "^[0-9a-f]{64}$"
                     },
                     "funding_address": { "type": "string" },
+                    "pool_index": { "type": "integer" },
                     "status": { "type": "string", "enum": ["ready"] }
                   }
                 }
@@ -12578,6 +14087,36 @@
                       "type": "string",
                       "pattern": "^[0-9a-f]{64}$"
                     },
+                    "user_account_id": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                    },
+                    "execution_account_count": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "maximum_execution_accounts": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "maximum_in_flight_per_sponsor": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "pool_size": { "type": "integer" },
+                    "safes": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["pool_index", "status"],
+                        "properties": {
+                          "pool_index": { "type": "integer" },
+                          "status": { "type": "string" },
+                          "address": { "type": "string" }
+                        }
+                      }
+                    },
                     "funding_addresses": {
                       "type": "array",
                       "items": { "type": "string" }
@@ -12651,7 +14190,10 @@
                     },
                     "account_model": {
                       "type": "string",
-                      "enum": ["provider-controlled-application-safe"]
+                      "enum": [
+                        "provider-controlled-application-safe",
+                        "provider-controlled-user-safe"
+                      ]
                     }
                   }
                 }
@@ -12925,6 +14467,36 @@
                       "type": "string",
                       "pattern": "^[0-9a-f]{64}$"
                     },
+                    "user_account_id": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                    },
+                    "execution_account_count": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "maximum_execution_accounts": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "maximum_in_flight_per_sponsor": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "pool_size": { "type": "integer" },
+                    "safes": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["pool_index", "status"],
+                        "properties": {
+                          "pool_index": { "type": "integer" },
+                          "status": { "type": "string" },
+                          "address": { "type": "string" }
+                        }
+                      }
+                    },
                     "funding_addresses": {
                       "type": "array",
                       "items": { "type": "string" }
@@ -12998,7 +14570,10 @@
                     },
                     "account_model": {
                       "type": "string",
-                      "enum": ["provider-controlled-application-safe"]
+                      "enum": [
+                        "provider-controlled-application-safe",
+                        "provider-controlled-user-safe"
+                      ]
                     }
                   }
                 }
@@ -13248,7 +14823,17 @@
               "schema": {
                 "type": "object",
                 "additionalProperties": false,
-                "properties": {}
+                "properties": {
+                  "user_account_id": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                  },
+                  "pool_index": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 15
+                  }
+                }
               }
             }
           }
@@ -13290,6 +14875,36 @@
                     "application_id": {
                       "type": "string",
                       "pattern": "^[0-9a-f]{64}$"
+                    },
+                    "user_account_id": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                    },
+                    "execution_account_count": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "maximum_execution_accounts": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "maximum_in_flight_per_sponsor": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "pool_size": { "type": "integer" },
+                    "safes": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["pool_index", "status"],
+                        "properties": {
+                          "pool_index": { "type": "integer" },
+                          "status": { "type": "string" },
+                          "address": { "type": "string" }
+                        }
+                      }
                     },
                     "funding_addresses": {
                       "type": "array",
@@ -13364,7 +14979,10 @@
                     },
                     "account_model": {
                       "type": "string",
-                      "enum": ["provider-controlled-application-safe"]
+                      "enum": [
+                        "provider-controlled-application-safe",
+                        "provider-controlled-user-safe"
+                      ]
                     }
                   }
                 }
@@ -14621,6 +16239,7 @@
                                       "enum": [
                                         "rpc-verification",
                                         "rpc-submission",
+                                        "rpc-observation",
                                         "other"
                                       ]
                                     },
@@ -14667,12 +16286,23 @@
                                   "account_model": {
                                     "type": "string",
                                     "enum": [
-                                      "provider-controlled-application-safe"
+                                      "provider-controlled-application-safe",
+                                      "provider-controlled-user-safe"
                                     ]
                                   },
                                   "asset_model": {
                                     "type": "string",
                                     "enum": ["individual-user-wallets"]
+                                  },
+                                  "maximum_execution_accounts": {
+                                    "type": "integer",
+                                    "minimum": 1,
+                                    "maximum": 100000
+                                  },
+                                  "maximum_in_flight_per_sponsor": {
+                                    "type": "integer",
+                                    "minimum": 1,
+                                    "maximum": 16
                                   },
                                   "gas_limits": {
                                     "type": "object",
@@ -15108,6 +16738,7 @@
                                       "enum": [
                                         "rpc-verification",
                                         "rpc-submission",
+                                        "rpc-observation",
                                         "other"
                                       ]
                                     },
@@ -15154,12 +16785,23 @@
                                   "account_model": {
                                     "type": "string",
                                     "enum": [
-                                      "provider-controlled-application-safe"
+                                      "provider-controlled-application-safe",
+                                      "provider-controlled-user-safe"
                                     ]
                                   },
                                   "asset_model": {
                                     "type": "string",
                                     "enum": ["individual-user-wallets"]
+                                  },
+                                  "maximum_execution_accounts": {
+                                    "type": "integer",
+                                    "minimum": 1,
+                                    "maximum": 100000
+                                  },
+                                  "maximum_in_flight_per_sponsor": {
+                                    "type": "integer",
+                                    "minimum": 1,
+                                    "maximum": 16
                                   },
                                   "gas_limits": {
                                     "type": "object",
@@ -15646,6 +17288,7 @@
                                 "enum": [
                                   "rpc-verification",
                                   "rpc-submission",
+                                  "rpc-observation",
                                   "other"
                                 ]
                               },
@@ -15691,11 +17334,24 @@
                             },
                             "account_model": {
                               "type": "string",
-                              "enum": ["provider-controlled-application-safe"]
+                              "enum": [
+                                "provider-controlled-application-safe",
+                                "provider-controlled-user-safe"
+                              ]
                             },
                             "asset_model": {
                               "type": "string",
                               "enum": ["individual-user-wallets"]
+                            },
+                            "maximum_execution_accounts": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 100000
+                            },
+                            "maximum_in_flight_per_sponsor": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 16
                             },
                             "gas_limits": {
                               "type": "object",
@@ -16136,6 +17792,7 @@
                                 "enum": [
                                   "rpc-verification",
                                   "rpc-submission",
+                                  "rpc-observation",
                                   "other"
                                 ]
                               },
@@ -16181,11 +17838,24 @@
                             },
                             "account_model": {
                               "type": "string",
-                              "enum": ["provider-controlled-application-safe"]
+                              "enum": [
+                                "provider-controlled-application-safe",
+                                "provider-controlled-user-safe"
+                              ]
                             },
                             "asset_model": {
                               "type": "string",
                               "enum": ["individual-user-wallets"]
+                            },
+                            "maximum_execution_accounts": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 100000
+                            },
+                            "maximum_in_flight_per_sponsor": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 16
                             },
                             "gas_limits": {
                               "type": "object",
@@ -16508,6 +18178,7 @@
                           "enum": [
                             "rpc-verification",
                             "rpc-submission",
+                            "rpc-observation",
                             "other"
                           ]
                         },
@@ -16650,6 +18321,7 @@
                                 "enum": [
                                   "rpc-verification",
                                   "rpc-submission",
+                                  "rpc-observation",
                                   "other"
                                 ]
                               },
@@ -16695,11 +18367,24 @@
                             },
                             "account_model": {
                               "type": "string",
-                              "enum": ["provider-controlled-application-safe"]
+                              "enum": [
+                                "provider-controlled-application-safe",
+                                "provider-controlled-user-safe"
+                              ]
                             },
                             "asset_model": {
                               "type": "string",
                               "enum": ["individual-user-wallets"]
+                            },
+                            "maximum_execution_accounts": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 100000
+                            },
+                            "maximum_in_flight_per_sponsor": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 16
                             },
                             "gas_limits": {
                               "type": "object",
@@ -17140,6 +18825,7 @@
                                 "enum": [
                                   "rpc-verification",
                                   "rpc-submission",
+                                  "rpc-observation",
                                   "other"
                                 ]
                               },
@@ -17185,11 +18871,24 @@
                             },
                             "account_model": {
                               "type": "string",
-                              "enum": ["provider-controlled-application-safe"]
+                              "enum": [
+                                "provider-controlled-application-safe",
+                                "provider-controlled-user-safe"
+                              ]
                             },
                             "asset_model": {
                               "type": "string",
                               "enum": ["individual-user-wallets"]
+                            },
+                            "maximum_execution_accounts": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 100000
+                            },
+                            "maximum_in_flight_per_sponsor": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 16
                             },
                             "gas_limits": {
                               "type": "object",
@@ -17515,11 +19214,24 @@
                       },
                       "account_model": {
                         "type": "string",
-                        "enum": ["provider-controlled-application-safe"]
+                        "enum": [
+                          "provider-controlled-application-safe",
+                          "provider-controlled-user-safe"
+                        ]
                       },
                       "asset_model": {
                         "type": "string",
                         "enum": ["individual-user-wallets"]
+                      },
+                      "maximum_execution_accounts": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 100000
+                      },
+                      "maximum_in_flight_per_sponsor": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 16
                       },
                       "gas_limits": {
                         "type": "object",
@@ -17674,6 +19386,7 @@
                                 "enum": [
                                   "rpc-verification",
                                   "rpc-submission",
+                                  "rpc-observation",
                                   "other"
                                 ]
                               },
@@ -17719,11 +19432,24 @@
                             },
                             "account_model": {
                               "type": "string",
-                              "enum": ["provider-controlled-application-safe"]
+                              "enum": [
+                                "provider-controlled-application-safe",
+                                "provider-controlled-user-safe"
+                              ]
                             },
                             "asset_model": {
                               "type": "string",
                               "enum": ["individual-user-wallets"]
+                            },
+                            "maximum_execution_accounts": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 100000
+                            },
+                            "maximum_in_flight_per_sponsor": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 16
                             },
                             "gas_limits": {
                               "type": "object",
@@ -18164,6 +19890,7 @@
                                 "enum": [
                                   "rpc-verification",
                                   "rpc-submission",
+                                  "rpc-observation",
                                   "other"
                                 ]
                               },
@@ -18209,11 +19936,24 @@
                             },
                             "account_model": {
                               "type": "string",
-                              "enum": ["provider-controlled-application-safe"]
+                              "enum": [
+                                "provider-controlled-application-safe",
+                                "provider-controlled-user-safe"
+                              ]
                             },
                             "asset_model": {
                               "type": "string",
                               "enum": ["individual-user-wallets"]
+                            },
+                            "maximum_execution_accounts": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 100000
+                            },
+                            "maximum_in_flight_per_sponsor": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 16
                             },
                             "gas_limits": {
                               "type": "object",
@@ -20742,6 +22482,8 @@
                             "enum": [
                               "queued",
                               "executing",
+                              "included",
+                              "failed",
                               "succeeded",
                               "cancelled",
                               "expired",

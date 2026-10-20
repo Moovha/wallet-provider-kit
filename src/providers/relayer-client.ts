@@ -53,8 +53,26 @@ export function createRelayerClient(
   }
   const apiKey = options.apiKey;
   const resolveAccount = options.resolveAccount;
+  const reads = new Map<string, Promise<Record<string, unknown> | null>>();
 
   async function call(
+    method: 'GET' | 'POST' | 'PUT' | 'PATCH',
+    path: string,
+    body?: string,
+  ): Promise<Record<string, unknown> | null> {
+    if (method !== 'GET' || body !== undefined || reads.size >= 128)
+      return send(method, path, body);
+    let pending = reads.get(path);
+    if (!pending) {
+      pending = send(method, path).finally(() => {
+        if (reads.get(path) === pending) reads.delete(path);
+      });
+      reads.set(path, pending);
+    }
+    return structuredClone(await pending);
+  }
+
+  async function send(
     method: 'GET' | 'POST' | 'PUT' | 'PATCH',
     path: string,
     body?: string,
@@ -150,11 +168,10 @@ export function createRelayerClient(
   } | null> {
     const selected = await resolve(accountId);
     if (!selected) return null;
-    const metadata = await call('GET', `/relayers/${selected.relayerId}`);
-    const network = await call(
-      'GET',
-      '/networks/evm%3A' + selectedNetwork.name,
-    );
+    const [metadata, network] = await Promise.all([
+      call('GET', `/relayers/${selected.relayerId}`),
+      call('GET', '/networks/evm%3A' + selectedNetwork.name),
+    ]);
     if (
       !metadata ||
       metadata.id !== selected.relayerId ||

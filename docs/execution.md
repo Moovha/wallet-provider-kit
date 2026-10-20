@@ -122,6 +122,14 @@ expiry. An observed successful effect permanently prevents another dispatch.
 A contradiction to recorded finalized evidence fences that execution and returns 503. Investigate node identity, token behavior and canonicality using operator
 evidence; there is no public reset or reconciliation mutation.
 
+An execution status read waits up to 250 ms for observation, then returns the
+retained receipt under current access checks while observation continues. Check
+`observed_at` for evidence age and `next_poll_after_ms` before polling again.
+Concurrent reads share an observation task per action within a coordinator;
+explicit reconciliation still waits for its full observation. See the
+[wallet application wait states](wallet-calls.md#design-the-applications-wait-states)
+for inclusion, finality and Safe queue throughput limits.
+
 ## Configure and accept execution
 
 In the wizard's **Deployment** screen, enable **Configure transfer execution and

@@ -1,3 +1,4 @@
+import { waitForObservation } from '../execution/read-observation.js';
 import { randomUUID } from 'node:crypto';
 import type {
   AuthorityContext,
@@ -39,6 +40,8 @@ export interface UserOperationWalletCallsConfiguration {
   maxDepthPerSafe: number;
   maxWaitSeconds: number;
   pollIntervalSeconds: number;
+  maxConcurrentAccounts?: number;
+  maxDepthTotal?: number;
 }
 /** Durable, explicitly selected ERC-4337 batch lane. It never delegates an uncertain batch to a relayer. */
 export class UserOperationWalletCallsDriver implements WalletCallsDriver {
@@ -47,11 +50,24 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
   private timer?: ReturnType<typeof setTimeout>;
   private running?: Promise<void>;
   private stopped = true;
+  private readonly lanes = new Map<string, Promise<void>>();
+  private nextWakeAt = 0;
+  private readonly retryAt = new Map<string, number>();
+  private cursor = 0;
+  private settlementCursor = 0;
+  private nextSettlementAt = 0;
   constructor(
     private readonly actions: SupportedActions,
     private readonly database: ProviderDatabase,
     private readonly execution: UserOperationExecutionCoordinator,
     configuration: UserOperationWalletCallsConfiguration,
+    private readonly networkFees?: () => Promise<
+      Pick<UserOperationV07, 'maxFeePerGas' | 'maxPriorityFeePerGas'>
+    >,
+    private readonly prepareWork?: (work: () => Promise<void>) => Promise<void>,
+    private readonly estimateOperation?: (
+      operation: UserOperationV07,
+    ) => Promise<UserOperationV07>,
   ) {
     this.config = structuredClone(configuration);
     if (
@@ -62,8 +78,14 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
       configuration.maxWaitSeconds < 30 ||
       configuration.maxWaitSeconds > 3600 ||
       !Number.isInteger(configuration.pollIntervalSeconds) ||
-      configuration.pollIntervalSeconds < 5 ||
-      configuration.pollIntervalSeconds > 300
+      configuration.pollIntervalSeconds < 1 ||
+      configuration.pollIntervalSeconds > 300 ||
+      !Number.isInteger(configuration.maxConcurrentAccounts ?? 10) ||
+      (configuration.maxConcurrentAccounts ?? 10) < 1 ||
+      (configuration.maxConcurrentAccounts ?? 10) > 32 ||
+      !Number.isInteger(configuration.maxDepthTotal ?? 512) ||
+      (configuration.maxDepthTotal ?? 512) < 1 ||
+      (configuration.maxDepthTotal ?? 512) > 10000
     )
       throw new WalletCallsError(-32602);
     const gas = normalizeUserOperationV07({
@@ -86,6 +108,18 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
       execution.configurationHash,
       execution.signing.executionBinding().configurationHash,
     ]);
+  }
+  subscribe(listener: (batchId: string) => void) {
+    return this.execution.subscribe((id) => {
+      void this.actions.onboarding.store
+        .transaction((state) =>
+          Object.values(state.userOperationBatches ?? {})
+            .filter((b) => b.operationId === id)
+            .map((b) => b.metadata.id),
+        )
+        .then((ids) => ids.forEach(listener))
+        .catch(() => undefined);
+    });
   }
   handles(accountId: string) {
     return this.execution.signing
@@ -189,8 +223,15 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
           (e) => e.metadata.sender.toLowerCase() === authority.safeAddress,
         );
         if (
-          lane.filter((e) => !['complete', 'expired'].includes(e.stage))
-            .length >= this.config.maxDepthPerSafe
+          lane.filter(
+            (e) => !['included', 'complete', 'expired'].includes(e.stage),
+          ).length >= this.config.maxDepthPerSafe
+        )
+          return 5740;
+        if (
+          Object.values(entries).filter(
+            (e) => !['included', 'complete', 'expired'].includes(e.stage),
+          ).length >= (this.config.maxDepthTotal ?? 512)
         )
           return 5740;
         const sequence =
@@ -214,6 +255,7 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
           expiresAt,
           sequence,
           stage: 'queued',
+          timings: { queued_at: new Date().toISOString() },
         };
         state.audit.push({
           at: Date.now(),
@@ -224,6 +266,7 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
       },
     );
     if (result) throw new WalletCallsError(result);
+    this.schedule(0);
   }
   private async load(
     principal: VerifiedPrincipal,
@@ -279,23 +322,37 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
       ...(receipt ? { receipts: [receipt] } : {}),
     };
   }
-  async status(principal: VerifiedPrincipal, accountId: string, id: string) {
+  async status(
+    principal: VerifiedPrincipal,
+    accountId: string,
+    id: string,
+    refresh = true,
+  ) {
     const entry = await this.load(principal, accountId, id);
-    const storedPlan = entry.operationId
+    const stored = entry.operationId
       ? await this.execution.load(entry.operationId)
       : null;
-    let plan = storedPlan
-        ? await this.execution.read(principal, storedPlan.operationId)
-        : null,
-      fresh = true;
-    if (plan) {
+    let plan = stored
+      ? await this.execution.read(principal, stored.operationId)
+      : null;
+    if (plan && refresh) {
       try {
-        plan = await this.execution.refresh(plan.operationId);
+        await waitForObservation(
+          this.execution.refresh(plan.operationId).then(() => undefined),
+        );
       } catch {
-        fresh = false;
+        return this.projection(entry, plan, false);
       }
+      plan = await this.execution.read(principal, plan.operationId);
     }
-    return this.projection(entry, plan, fresh);
+    const age = plan
+      ? Date.now() - Date.parse(plan.observation.observedAt)
+      : Infinity;
+    return this.projection(
+      entry,
+      plan,
+      Number.isFinite(age) && age >= 0 && age <= 3000,
+    );
   }
   async list(
     principal: VerifiedPrincipal,
@@ -337,7 +394,7 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
         queue_stage:
           entry.stage === 'processing'
             ? 'executing'
-            : entry.stage === 'complete'
+            : entry.stage === 'included' || entry.stage === 'complete'
               ? 'succeeded'
               : entry.stage,
         policy_revision: entry.metadata.policyRevision,
@@ -349,13 +406,34 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
         ...this.projection(
           entry,
           plan,
-          plan?.observation.state === 'finalized',
+          !!plan?.observation.receipt &&
+            ['included', 'safe', 'finalized'].includes(plan.observation.state),
         ),
       });
     }
     return { truncated: entries.length > 100, batches };
   }
-  private async process(entry: UserOperationBatch) {
+  private async timestamp(entry: UserOperationBatch, field: string) {
+    await this.actions.onboarding.store.transaction((s) => {
+      const current = s.userOperationBatches?.[entry.id];
+      if (!current || current.configurationHash !== this.configurationHash)
+        deny();
+      (current.timings ??= {})[field] ??= new Date().toISOString();
+    });
+  }
+  private async process(
+    entry: UserOperationBatch,
+    predecessor?: UserOperationBatch,
+  ) {
+    if (predecessor) {
+      if (!predecessor.operationId) deny();
+      const previous = await this.execution.refresh(predecessor.operationId);
+      if (
+        !previous?.observation.receipt ||
+        !['included', 'safe', 'finalized'].includes(previous.observation.state)
+      )
+        deny();
+    }
     const context = entry.context;
     if (!entry.operationId) {
       const key = fingerprint([
@@ -376,13 +454,23 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
     if (plan?.dispatch) {
       await this.execution.refresh(plan.operationId);
     } else if (Date.parse(entry.expiresAt) <= Date.now()) {
+      const sponsorship =
+        entry.operationId && this.database.sponsorship.load(entry.operationId);
       const exposed =
         entry.operationId &&
-        (this.database.sponsorship.load(entry.operationId) ||
-          this.database.hasActionAttempts(entry.operationId));
+        (this.database.hasActionAttempts(entry.operationId) ||
+          (sponsorship &&
+            (BigInt(sponsorship.validUntil) * 1000n > BigInt(Date.now()) ||
+              this.database.hasActionAttempts(sponsorship.signingActionId))));
       await this.update(entry, exposed ? 'blocked' : 'expired');
       return;
+    } else if (
+      entry.operationId &&
+      this.database.sponsorship.load(entry.operationId)
+    ) {
+      await this.execution.execute(context, entry.operationId);
     } else {
+      await this.timestamp(entry, 'preparation_started_at');
       const authority = await this.actions.queueAuthority(
         context.principal,
         entry.input,
@@ -395,11 +483,14 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
         authority.address !== entry.address
       )
         deny();
-      const operation = await this.execution.signing.prepareCalls(
+      let operation = await this.execution.signing.prepareCalls(
         context.principal,
         entry.input,
-        this.config.gas,
+        { ...this.config.gas, ...(await this.networkFees?.()) },
       );
+      if (this.estimateOperation)
+        operation = await this.estimateOperation(operation);
+      await this.timestamp(entry, 'prepared_at');
       const admitted = await this.execution.signing.requestCalls(
         context,
         entry.input,
@@ -415,7 +506,12 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
       : null;
     await this.update(
       entry,
-      latest?.observation.state === 'finalized' ? 'complete' : 'processing',
+      latest?.observation.state === 'finalized'
+        ? 'complete'
+        : latest?.observation.receipt &&
+            ['included', 'safe'].includes(latest.observation.state)
+          ? 'included'
+          : 'processing',
     );
   }
   private async update(
@@ -438,7 +534,7 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
         current.stage = stage;
     });
   }
-  async runOnce() {
+  async runOnce(): Promise<void> {
     const entries = await this.actions.onboarding.store.transaction((s) =>
       Object.values(s.userOperationBatches ?? {})
         .filter(
@@ -448,39 +544,108 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
         )
         .sort((a, b) => a.sequence - b.sequence || a.id.localeCompare(b.id)),
     );
-    const lanes = new Set<string>();
-    for (const entry of entries.slice(0, 100)) {
+    const retained = new Set(entries.map((e) => e.id));
+    for (const id of this.retryAt.keys())
+      if (!retained.has(id)) this.retryAt.delete(id);
+    const groups = new Map<string, UserOperationBatch[]>();
+    for (const entry of entries) {
       const lane = entry.metadata.sender.toLowerCase();
-      if (lanes.has(lane)) continue;
-      lanes.add(lane);
+      const group = groups.get(lane) ?? [];
+      group.push(entry);
+      groups.set(lane, group);
+    }
+    const heads = [...groups.values()].flatMap((group) => {
+      const index = group.findIndex((e) => e.stage !== 'included');
+      return index < 0
+        ? []
+        : [{ entry: group[index], predecessor: group.slice(0, index).at(-1) }];
+    });
+    const available = heads.filter(
+      (head) =>
+        !this.lanes.has(head.entry.metadata.sender.toLowerCase()) &&
+        (this.stopped || (this.retryAt.get(head.entry.id) ?? 0) <= Date.now()),
+    );
+    const limit = Math.max(
+      0,
+      (this.config.maxConcurrentAccounts ?? 10) - this.lanes.size,
+    );
+    const selected = Array.from(
+      { length: Math.min(limit, available.length) },
+      (_, i) => available[(this.cursor + i) % available.length],
+    );
+    this.cursor = available.length
+      ? (this.cursor + selected.length) % available.length
+      : 0;
+    const work = selected.map(({ entry, predecessor }) => {
+      const lane = entry.metadata.sender.toLowerCase();
+      const existing = this.lanes.get(lane);
+      if (existing) return existing;
+      const running = (async () => {
+        try {
+          if (this.prepareWork)
+            await this.prepareWork(() => this.process(entry, predecessor));
+          else await this.process(entry, predecessor);
+        } catch {
+          await this.update(entry, 'blocked');
+        }
+      })().finally(() => {
+        if (this.lanes.get(lane) === running) this.lanes.delete(lane);
+        this.retryAt.set(entry.id, Date.now() + 1000);
+        this.schedule(0);
+      });
+      this.lanes.set(lane, running);
+      return running;
+    });
+    await Promise.allSettled(work);
+    // Settlement is independent of account admission and receives one bounded rotating slot.
+    const included = entries.filter(
+      (e) =>
+        e.stage === 'included' &&
+        !selected.some(
+          (head) =>
+            head.entry.metadata.sender.toLowerCase() ===
+            e.metadata.sender.toLowerCase(),
+        ),
+    );
+    if (included.length && Date.now() >= this.nextSettlementAt) {
+      this.nextSettlementAt = Date.now() + 15000;
+      const entry = included[this.settlementCursor++ % included.length];
       try {
         await this.process(entry);
       } catch {
-        await this.update(entry, 'blocked');
+        /* A read failure retains the historical inclusion and reservations. */
       }
     }
+  }
+  private schedule(delay: number) {
+    if (this.stopped) return;
+    const at = Date.now() + delay;
+    if (this.timer && this.nextWakeAt <= at) return;
+    if (this.timer) clearTimeout(this.timer);
+    this.nextWakeAt = at;
+    this.timer = setTimeout(() => {
+      this.timer = undefined;
+      if (this.stopped) return;
+      const running = this.runOnce();
+      this.running = running;
+      void running
+        .catch(() => undefined)
+        .finally(() => {
+          if (this.running === running) this.running = undefined;
+          this.schedule(this.config.pollIntervalSeconds * 1000);
+        });
+    }, delay);
   }
   start() {
     if (!this.stopped) return;
     this.stopped = false;
-    const tick = async () => {
-      if (this.stopped) return;
-      this.running = this.runOnce();
-      try {
-        await this.running;
-      } catch {
-        /* Health/acceptance is owned by the embedding host. */
-      } finally {
-        this.running = undefined;
-        if (!this.stopped)
-          this.timer = setTimeout(tick, this.config.pollIntervalSeconds * 1000);
-      }
-    };
-    this.timer = setTimeout(tick, 0);
+    this.schedule(0);
   }
   async stop() {
     this.stopped = true;
     if (this.timer) clearTimeout(this.timer);
+    this.timer = undefined;
     await this.running;
+    await Promise.allSettled([...this.lanes.values()]);
   }
 }

@@ -1,10 +1,23 @@
 # Automatic Safe provisioning
 
-New wizard deployments use one provider-controlled Safe per application. Follow
+New Safe-only deployments use one Safe for deposits, balances and transactions,
+with a private signer and application paymaster. See [Safe-only provisioning](self-hosted-sponsorship.md).
+The separate signer-wallet and relayer instructions below apply to the explicit
+compatibility profiles.
+
+The explicit shared-application compatibility profile defaults to five
+provider-controlled Safes and five sponsors per application, with counts
+configurable before provisioning. Follow
 [application Safe provisioning](application-obligations.md#prepare-gas-sponsorship-and-the-shared-safe)
 for sponsor preparation, funding and protected provider commands. The per-user
-provisioning profile below remains available to existing configurations; it is not
-the default shared application flow.
+signer-wallet provisioning profile below remains available to existing
+configurations. Neither compatibility profile is the Safe-only wizard default.
+
+Shared application Safes become ready after canonical inclusion and matching proxy
+code, singleton, owner, threshold, modules, guard and fallback checks. Readiness is
+rechecked on-chain; a reorg or changed authority prevents execution. Deployment
+gas reservations remain charged and transaction settlement remains separate.
+The per-user provisioning profile below retains its finalized readiness gate.
 
 Use automatic Safe provisioning when your application needs contract calls from a smart account. The wallet backend creates the signing wallet; the provider then deploys a Safe 1.4.1 account owned only by that wallet, with threshold one. The signing wallet address and Safe address are separate. Fund the Safe with the assets its approved calls will use.
 

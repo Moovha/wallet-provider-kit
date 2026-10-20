@@ -18,7 +18,7 @@ export interface ApplicationObligations {
   }[];
   services: {
     id: string;
-    kind: 'rpc-verification' | 'rpc-submission' | 'other';
+    kind: 'rpc-verification' | 'rpc-submission' | 'rpc-observation' | 'other';
     vendor: string;
     credential_reference: string;
     billing_owner: 'application';
@@ -33,7 +33,10 @@ export interface ApplicationObligations {
       max_priority_fee_per_gas: string;
       l1_fee_reserve_wei: string;
     };
-    account_model: 'provider-controlled-application-safe';
+    account_model:
+      'provider-controlled-application-safe' | 'provider-controlled-user-safe';
+    maximum_execution_accounts?: number;
+    maximum_in_flight_per_sponsor?: number;
     asset_model: 'individual-user-wallets';
   };
 }
@@ -72,7 +75,10 @@ const sponsorshipProperties = {
   },
   account_model: {
     type: 'string',
-    enum: ['provider-controlled-application-safe'],
+    enum: [
+      'provider-controlled-application-safe',
+      'provider-controlled-user-safe',
+    ],
   },
   asset_model: { type: 'string', enum: ['individual-user-wallets'] },
 };
@@ -107,7 +113,12 @@ export const obligationSchemas = {
       id: identifier,
       kind: {
         type: 'string',
-        enum: ['rpc-verification', 'rpc-submission', 'other'],
+        enum: [
+          'rpc-verification',
+          'rpc-submission',
+          'rpc-observation',
+          'other',
+        ],
       },
       vendor: identifier,
       credential_reference: {
@@ -123,6 +134,16 @@ export const obligationSchemas = {
     ...object(sponsorshipProperties),
     properties: {
       ...sponsorshipProperties,
+      maximum_execution_accounts: {
+        type: 'integer',
+        minimum: 1,
+        maximum: 100000,
+      },
+      maximum_in_flight_per_sponsor: {
+        type: 'integer',
+        minimum: 1,
+        maximum: 16,
+      },
       gas_limits: object(
         Object.fromEntries(
           [
@@ -180,6 +201,17 @@ export function normalizeObligation<K extends ObligationKind>(
   } else {
     const sponsorship = result as ApplicationObligations['sponsorship'];
     const gas = sponsorshipGas(sponsorship);
+    if (
+      sponsorship.account_model === 'provider-controlled-user-safe' &&
+      sponsorship.maximum_execution_accounts === undefined
+    )
+      invalid();
+    if (
+      sponsorship.account_model === 'provider-controlled-application-safe' &&
+      (sponsorship.maximum_execution_accounts !== undefined ||
+        (sponsorship.maximum_in_flight_per_sponsor ?? 1) !== 1)
+    )
+      invalid();
     if (
       BigInt(sponsorship.maximum_gas_budget_wei) >= 2n ** 256n ||
       BigInt(gas.gasLimit) < 21000n ||

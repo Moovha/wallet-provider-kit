@@ -264,7 +264,7 @@ it('starts the engine with private credentials and persistent state and detects 
     'execution-store',
   );
   expect(compose.services.api.depends_on).toHaveProperty('local-execution');
-  expect(compose.networks!['execution-store'].internal).toBe(true);
+  expect(compose.networks!['execution-store']!.internal).toBe(true);
   expect(compose.services['local-execution']).not.toHaveProperty('ports');
   expect(compose.services['execution-store']).not.toHaveProperty('ports');
   services = 'api\nexecution-store\n';

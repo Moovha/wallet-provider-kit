@@ -49,7 +49,13 @@ export interface ExecutionConfiguration {
   };
   sponsors: ExecutionSponsor[];
   sponsorPool?: { strategy: 'round-robin'; maxInFlightPerSponsor: number };
-  safeQueue?: { maxDepthPerSafe: number; maxWaitSeconds: number };
+  safeQueue?: {
+    maxDepthPerSafe: number;
+    maxWaitSeconds: number;
+    maxDepthPerUser?: number;
+    maxDepthPerApplication?: number;
+    maxDepthTotal?: number;
+  };
   recovery?: import('./recovery.js').RecoveryConfiguration;
   replacement?: import('./replacement.js').ReplacementPolicy;
   pollIntervalSeconds: number;
@@ -58,6 +64,7 @@ export interface ExecutionConfiguration {
 
 /** Immutable private plan. Requests may propose policy-controlled calls; execute uses only this stored envelope and server-selected sponsor. */
 export interface ApprovedExecutionPlan {
+  networkFees?: import('./network-fees.js').NetworkFeeQuote;
   runtimePolicy?: import('../runtime-configuration/authority.js').RuntimePolicySnapshot;
   profile: ExecutionProfile;
   revision: '1';
@@ -73,10 +80,19 @@ export interface ApprovedExecutionPlan {
 }
 
 export interface ChainObservation {
+  preconfirmation?: {
+    stage: 'preconfirmed';
+    transaction_hash: string;
+    observed_at: string;
+    rpc_source_origin: string;
+  };
+
+  safe_nonce_consumed?: boolean;
   callsReceipt?: import('../wallet-calls/types.js').WalletCallsReceipt;
   chain_status:
     'unobserved' | 'pending' | 'included' | 'safe' | 'finalized' | 'reorged';
-  verification: 'unverified' | 'rpc-quorum';
+  verification: 'unverified' | 'rpc-quorum' | 'rpc-single';
+  rpc_source_origin?: string;
   outcome: 'unknown' | 'succeeded' | 'reverted';
   settlement: 'pending' | 'succeeded' | 'reverted';
   observed_at: string;
@@ -98,6 +114,18 @@ export interface TransferExecutionRecord {
   sponsorAccountId?: string;
   sponsorAddress?: string;
   startedAt?: number;
+  timings?: Partial<
+    Record<
+      | 'preparation_started_at'
+      | 'signing_started_at'
+      | 'signed_at'
+      | 'submission_started_at'
+      | 'accepted_at'
+      | 'included_at'
+      | 'preconfirmed_at',
+      string
+    >
+  >;
   providerNonce?: string;
   recovery?: import('./recovery.js').RecoveryDiagnosis;
   replacementStatus?: import('./replacement.js').ReplacementStatus;
@@ -105,6 +133,7 @@ export interface TransferExecutionRecord {
   plan?: TransferExecutionPlan;
   planHash?: string;
   observation?: ChainObservation;
+  inclusionProof?: { version: '1'; planHash: string; observationHash: string };
   observationRevision: number;
   integrityFailure?: boolean;
   effectObserved?: boolean;
@@ -147,7 +176,7 @@ export interface ExecutionRecovery {
   transactionHash?: string;
 }
 export interface ExecutionProvider {
-  supportsReplacement?(): Promise<boolean>;
+  supportsReplacement?(sponsor?: ExecutionSponsor): Promise<boolean>;
   replace?(
     plan: TransferExecutionPlan,
     transactionId: string,
@@ -175,6 +204,35 @@ export interface ExecutionProvider {
 }
 
 export interface ExecutionObserver {
+  observeFresh?(
+    plan: TransferExecutionPlan,
+    candidates: string[],
+    ownHash?: string,
+  ): Promise<ChainObservation>;
+
+  /** Trusted, service-persisted full proof only; a fresh canonical check remains mandatory. */
+  recheckInclusion?(
+    plan: TransferExecutionPlan,
+    observation: ChainObservation,
+    ownHash?: string,
+  ): Promise<ChainObservation | undefined>;
+
+  subscribe?(
+    plan: TransferExecutionPlan,
+    wake: () => void,
+  ): Promise<() => void>;
+
+  quoteFees?(
+    sponsor: ExecutionSponsor,
+    principal: VerifiedPrincipal,
+  ): Promise<import('./network-fees.js').NetworkFeeQuote | undefined>;
+  anchorWithFees?(
+    sponsor: ExecutionSponsor,
+    principal: VerifiedPrincipal,
+  ): Promise<{
+    scanFromBlock: string;
+    networkFees: import('./network-fees.js').NetworkFeeQuote | undefined;
+  }>;
   nonceSnapshot?(
     plan: TransferExecutionPlan,
     ownHash?: string,

@@ -13,6 +13,13 @@ export interface WalletCallsStatus {
   chainId: '0x14a34' | '0x2105';
   status: 100 | 200 | 400 | 500;
   atomic: true;
+  capabilities?: {
+    preconfirmation?: {
+      stage: 'preconfirmed';
+      transactionHash: string;
+      observedAt: string;
+    };
+  };
   receipts?: WalletCallsReceipt[];
 }
 export interface WalletCallsMetadata {
@@ -27,7 +34,14 @@ export interface WalletCallsBatchSummary extends WalletCallsStatus {
   account_id: string;
   sender: string;
   queue_stage:
-    'cancelled' | 'expired' | 'blocked' | 'succeeded' | 'queued' | 'executing';
+    | 'cancelled'
+    | 'expired'
+    | 'blocked'
+    | 'succeeded'
+    | 'included'
+    | 'failed'
+    | 'queued'
+    | 'executing';
   policy_revision: string;
   expires_at: string;
   application_id: string;

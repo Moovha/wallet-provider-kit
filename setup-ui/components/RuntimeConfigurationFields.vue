@@ -24,7 +24,10 @@ function enable(enabled: boolean) {
       Providers publish policies and choose automatic or manual registration
       review through the protected application configuration APIs.
     </p>
-    <label v-if="!model.runtimeConfiguration?.sharedApplicationSafes"
+    <label
+      v-if="
+        !model.safeWallet && !model.runtimeConfiguration?.sharedApplicationSafes
+      "
       ><input
         type="checkbox"
         :checked="!!model.runtimeConfiguration"
@@ -117,7 +120,10 @@ function enable(enabled: boolean) {
         Add runtime operator
       </button>
       <FormKit
-        v-if="!model.runtimeConfiguration.sharedApplicationSafes"
+        v-if="
+          !model.safeWallet &&
+          !model.runtimeConfiguration.sharedApplicationSafes
+        "
         type="checkbox"
         label="Use runtime policies for contract authorization"
         v-model="model.runtimeConfiguration.authorizeContracts"

@@ -11,8 +11,12 @@ uses oidc-provider (MIT); the bundled local engine uses Open Wallet Standard cor
 (MIT). The default local dispatcher uses the separate official OpenZeppelin Relayer
 1.8.0 container image (AGPL-3.0-only) and Valkey 9.1.2 (BSD-3-Clause).
 The generated HTTPS profile references the official Caddy container image
-(Apache-2.0), operated separately from the Node service. No contract implementation,
-customer data, production secret or source repository history was imported.
+(Apache-2.0), operated separately from the Node service. No customer data, production secret or source repository history was imported.
+The optional local paymaster build includes pinned MIT-licensed Pimlico
+SingletonPaymaster, eth-infinitism account-abstraction, OpenZeppelin Contracts
+and Solady source material. Their source revisions and licenses are recorded in
+contracts/vendor/README.md and docs/licenses. Generated paymaster bytecode retains
+those upstream licenses.
 
 The bundled FormKit/Vue operator interface includes MIT-licensed components;
 see dist/setup-ui/THIRD_PARTY_NOTICES.txt in built packages. Provider marks
@@ -23,3 +27,11 @@ The optional provider patch under docs/public/patches modifies OpenZeppelin
 Relayer v1.8.0 (OpenZeppelin and contributors) and is AGPL-3.0-only, with license
 text in that directory. Its modifications are Copyright 2026 Moovha and
 contributors. The external provider build is separate from the Apache-2.0 toolkit.
+
+The optional private bundler runtime uses Pimlico Alto v1.2.8, source revision
+37cade5d2804a60ab30362ea27054514e1d7a7c8, under GPL-3.0. Its pinned container
+retains upstream sources, contract artifacts and license material. It operates
+as a separate process. The scheduler modification is Copyright 2026 Moovha and
+contributors and is distributed under GPL-3.0 with the modified Alto source
+and reproducible patch script in the bundler image.
+See https://github.com/pimlicolabs/alto/tree/37cade5d2804a60ab30362ea27054514e1d7a7c8.

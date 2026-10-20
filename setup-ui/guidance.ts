@@ -37,14 +37,32 @@ export const settings = {
   ),
   safeQueue: setting(
     'Bounded FIFO requests for each Safe, with signing deferred until the head.',
-    'Independent Safe heads can progress concurrently. Current original owner, grant, identity, consent and policy are checked before effects. Signed or uncertain heads retain their position; service expiry cannot recall a Safe signature.',
-    'Enable the approved EVM execution profile and contract policy. Set the maximum unfinished requests per Safe and total queue validity; contract-policy validity also applies. Applications use the contract-call-requests API with signing and execution scopes. Status reads never dispatch. Test concurrent admission, unsigned cancellation and recovery before activation.',
+    'Independent Safe heads can progress concurrently. Current original owner, grant, identity, consent and policy are checked before effects. Signed heads without verified nonce consumption retain their position; service expiry cannot recall a Safe signature.',
+    'Enable the approved EVM execution profile and contract policy. Set Safe and sponsor pool sizes for shared applications, per-user/application/service admission limits and total queue validity; contract-policy validity also applies. Applications use the contract-call-requests API with signing and execution scopes. Status reads never dispatch. Test concurrent admission, unsigned cancellation and recovery before activation.',
     'safe-queue-and-sponsor-pools.html',
   ),
   sponsorPool: setting(
     'Durable round-robin payer selection with an unfinished-execution limit per address.',
     'Distinct funded addresses can serve the same application. Retrying an execution retains its selected payer. Unknown attempts hold capacity, while the application lifetime gas budget remains shared.',
     'Enable pools and add gas sponsors for the application. Bundled setup creates distinct encrypted keys and managed bindings for those entries. Existing designated execution services need matching independent pool limits. Set capacity from accepted provider tests. Full pools leave unsigned queue heads waiting. Enable recovery quarantine to exclude affected payers from new admission. Nonce repair remains a separately reviewed provider operation.',
+    'safe-queue-and-sponsor-pools.html',
+  ),
+  executionPools: setting(
+    'Independent Safe and sponsor lanes for concurrent application users.',
+    'Each user keeps a stable execution Safe. Sponsors share one application gas allowance; separate lanes contain nonce stalls without moving user assets.',
+    'New shared applications default to five Safes and five sponsors. Choose counts before provisioning, create each indexed member and fund the single application gas address. Read each user’s assigned sender from the wallet API. Existing pool resizing requires migration review.',
+    'safe-queue-and-sponsor-pools.html',
+  ),
+  queueOverload: setting(
+    'Reject excess queued work before signing or gas admission.',
+    'Per-user, per-application and service-wide caps bound pending work. Queued requests retain their original expiry and authority checks.',
+    'Set limits from measured service capacity and acceptable queue delay. Preserve request IDs and back off on busy responses; do not create duplicate batches automatically.',
+    'safe-queue-and-sponsor-pools.html',
+  ),
+  httpRequestLimit: setting(
+    'Maximum HTTP requests per minute from one connecting peer.',
+    'Application backends can share one peer address across many users, including status-poll traffic. Durable queue caps enforce separate financial admission limits.',
+    'Keep a bounded rate and measure expected backend traffic. HTTP throttling returns 429. Configure from 1 to 6,000 requests per minute; the default is 60.',
     'safe-queue-and-sponsor-pools.html',
   ),
   executionRpc: setting(

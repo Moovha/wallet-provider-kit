@@ -69,6 +69,16 @@ that uses it; a host that supplies the store owns its lifetime.
 
 ## Use it for onboarding
 
+Each transaction reads the current record keys and audit sequence keys in its
+SQLite snapshot. Record and audit JSON payloads are fetched through their existing
+primary keys and parsed only when accessed. Untouched payloads are neither fetched
+nor rewritten. Accessed
+and replaced records are checked for changes before commit, including nested
+changes. Audit history remains append-only. No authority value is cached across
+transactions. Returned snapshots are detached before replacements and deletions
+are saved. The adapter still scans the record index and uses one synchronous
+writer, so history size and transaction duration remain capacity considerations.
+
 Configured transaction event reports are stored as additive JSON fields in the
 existing `supportedActions` entries of `onboarding_records`. The version 1 table
 and catalog definitions stay unchanged. Reports are bounded to 32 per action,
@@ -89,8 +99,8 @@ journal remains provisioning-only. Choosing SQLite does not enable signing in
 
 Onboarding retains its existing synchronous whole-state transaction interface.
 SQLite stores individual collection entries and append-only audit records rather
-than rewriting one JSON file. The adapter still loads onboarding state for each
-transaction; it is not a promise of high-volume indexed onboarding queries.
+than rewriting one JSON file. The adapter still enumerates onboarding keys for each
+transaction; this is not a replacement for purpose-built high-volume queries.
 Existing `state.json` files are not imported automatically. Back up existing
 state and arrange a reviewed import before switching an active file-store host;
 do not initialize empty state as a shortcut for a migration.

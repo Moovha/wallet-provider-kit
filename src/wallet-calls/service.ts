@@ -1,4 +1,6 @@
+import { rpcVerified } from '../execution/inclusion.js';
 import type { WalletCallsDriver } from '../sponsorship/execution-types.js';
+import { waitForObservation } from '../execution/read-observation.js';
 import type { ProviderState } from '../onboarding/types.js';
 import { runtimeApplicationId } from '../runtime-configuration/service.js';
 import { randomBytes, randomUUID } from 'node:crypto';
@@ -66,6 +68,12 @@ function capabilities(
 }
 /** Account-scoped EIP-5792 adapter. The server selects the durable execution driver for each account. */
 export class WalletCallsService {
+  async account(principal: VerifiedPrincipal, accountId: string) {
+    if (!principal.scopes.includes('wallet:execute:read'))
+      throw new WalletCallsError(4100);
+    const binding = await this.actions.walletCallsAccount(principal, accountId);
+    return { address: binding.address, chainId: this.actions.network.hex };
+  }
   private readonly queue?: SafeExecutionQueue;
   private readonly execution?: ExecutionCoordinatorPort;
   private readonly driver?: WalletCallsDriver;
@@ -89,6 +97,60 @@ export class WalletCallsService {
       this.execution = execution;
       this.driver = driver;
     } else this.driver = queueOrDriver as WalletCallsDriver;
+  }
+  /** Streams current authorized status; notifications contain no account data. */
+  async *watch(
+    principal: VerifiedPrincipal,
+    accountId: string,
+    batchId: string,
+    signal: AbortSignal,
+  ) {
+    let wake: (() => void) | undefined;
+    let actionId: string | undefined;
+    const unsubscribe = this.execution?.subscribe?.((changed) => {
+      if (changed === actionId) wake?.();
+    });
+    const unsubscribeDriver = this.driver?.subscribe?.((changed) => {
+      if (changed === batchId) wake?.();
+    });
+    let previous = '';
+    try {
+      while (!signal.aborted) {
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const ready = new Promise<void>((resolve) => {
+          wake = resolve;
+          timer = setTimeout(resolve, 2000);
+          timer.unref();
+        });
+        const abort = () => wake?.();
+        signal.addEventListener('abort', abort, { once: true });
+        try {
+          const status = await this.getCallsStatus(
+            principal,
+            accountId,
+            [batchId],
+            false,
+            (id) => {
+              actionId = id;
+            },
+          );
+          const encoded = JSON.stringify(status);
+          if (encoded !== previous) {
+            previous = encoded;
+            yield status;
+          } else yield undefined;
+          if (status.status !== 100 || signal.aborted) return;
+          await ready;
+        } finally {
+          clearTimeout(timer);
+          signal.removeEventListener('abort', abort);
+          wake = undefined;
+        }
+      }
+    } finally {
+      unsubscribe?.();
+      unsubscribeDriver?.();
+    }
   }
   private selected(accountId: string) {
     if (this.driver?.handles(accountId)) return this.driver;
@@ -324,24 +386,40 @@ export class WalletCallsService {
     principal: VerifiedPrincipal,
     accountId: string,
     params: unknown[],
+    refresh = true,
+    action?: (id: string | undefined) => void,
   ): Promise<WalletCallsStatus> {
     if (params.length !== 1 || !walletCallsId(params[0])) invalid();
     if (!principal.scopes.includes('wallet:execute:read'))
       throw new WalletCallsError(4100);
     const id = params[0];
     const driver = this.selected(accountId);
-    if (driver) return driver.status(principal, accountId, id);
+    if (driver) return driver.status(principal, accountId, id, refresh);
     let stored = await this.queue!.walletCallsRecord(principal, accountId, id);
-    let fresh = true;
-    if (stored.actionId && !['cancelled', 'expired'].includes(stored.status)) {
+    let fresh = refresh;
+    let refreshFailed = false;
+    if (
+      refresh &&
+      stored.actionId &&
+      !['cancelled', 'expired'].includes(stored.status)
+    ) {
       try {
-        await this.execution!.refresh(stored.actionId);
+        fresh = await waitForObservation(
+          this.execution!.refresh(stored.actionId),
+        );
       } catch {
         fresh = false;
+        refreshFailed = true;
       }
       stored = await this.queue!.walletCallsRecord(principal, accountId, id);
     }
-    return this.status(stored, fresh);
+    action?.(stored.actionId);
+    const age =
+      Date.now() - Date.parse(stored.execution?.observation?.observed_at ?? '');
+    return this.status(
+      stored,
+      fresh || (!refreshFailed && age >= 0 && age <= 5000),
+    );
   }
   private status(
     stored: Awaited<ReturnType<SafeExecutionQueue['walletCallsRecord']>>,
@@ -352,7 +430,8 @@ export class WalletCallsService {
     const confirmed =
       (fresh || observation?.chain_status === 'finalized') &&
       !stored.execution?.integrityFailure &&
-      observation?.verification === 'rpc-quorum' &&
+      observation &&
+      rpcVerified(observation.verification) &&
       ['included', 'safe', 'finalized'].includes(observation.chain_status);
     const receipts =
       confirmed && observation?.callsReceipt
@@ -372,6 +451,17 @@ export class WalletCallsService {
       chainId: this.actions.network.hex,
       status,
       atomic: true,
+      ...(observation?.preconfirmation && !confirmed
+        ? {
+            capabilities: {
+              preconfirmation: {
+                stage: 'preconfirmed' as const,
+                transactionHash: observation.preconfirmation.transaction_hash,
+                observedAt: observation.preconfirmation.observed_at,
+              },
+            },
+          }
+        : {}),
       ...(receipts ? { receipts } : {}),
     };
   }

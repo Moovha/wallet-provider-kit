@@ -140,5 +140,71 @@ export function createWalletCallsProvider(options: WalletCallsClientOptions) {
     }
     return result;
   }
-  return { request };
+  async function* watchCallsStatus(
+    batchId: string,
+    signal?: AbortSignal,
+  ): AsyncGenerator<WalletCallsStatus> {
+    if (typeof batchId !== 'string' || !batchId || batchId.length > 8194)
+      throw new WalletCallsRpcError(-32602, 'Invalid batch');
+    const response = await send(
+      url.href + '/calls/' + encodeURIComponent(batchId) + '/events',
+      {
+        headers: {
+          authorization: await options.authorization(),
+          accept: 'text/event-stream',
+        },
+        redirect: 'error',
+        credentials: 'omit',
+        signal: signal ?? AbortSignal.timeout(60000),
+      },
+    );
+    if (
+      !response.ok ||
+      !response.body ||
+      !response.headers.get('content-type')?.startsWith('text/event-stream')
+    )
+      throw new WalletCallsRpcError(
+        response.status === 401 || response.status === 403 ? 4100 : 4900,
+        'Status stream unavailable',
+      );
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    try {
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) return;
+        buffer += decoder.decode(value, { stream: true });
+        if (buffer.length > 262144)
+          throw new WalletCallsRpcError(-32603, 'Invalid wallet response');
+        let index: number;
+        while ((index = buffer.indexOf('\n\n')) >= 0) {
+          const frame = buffer.slice(0, index);
+          buffer = buffer.slice(index + 2);
+          if (!frame.startsWith('event: status\n')) continue;
+          const data = frame
+            .split('\n')
+            .find((line) => line.startsWith('data: '));
+          if (!data) continue;
+          const status = JSON.parse(data.slice(6)) as WalletCallsStatus;
+          if (
+            status.id !== batchId ||
+            status.version !== '2.0.0' ||
+            status.chainId !== network.hex ||
+            status.atomic !== true ||
+            ![100, 200, 400, 500].includes(status.status) ||
+            (status.status === 200 &&
+              (!Array.isArray(status.receipts) || status.receipts.length !== 1))
+          )
+            throw new WalletCallsRpcError(-32603, 'Invalid wallet response');
+          yield status;
+          if (status.status !== 100) return;
+        }
+      }
+    } finally {
+      await reader.cancel().catch(() => {});
+      reader.releaseLock();
+    }
+  }
+  return { request, watchCallsStatus };
 }

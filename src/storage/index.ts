@@ -125,6 +125,15 @@ export function openProviderDatabase(options: ProviderDatabaseOptions) {
       const current = loadApproval(connection, id, !allowExpired);
       return current !== null && fingerprint(current) === fingerprint(approval);
     },
+    hasAttemptAdmission(request: WalletAttemptRequest): boolean {
+      return !!connection.get(
+        'SELECT 1 FROM admissions WHERE namespace=? AND provider=? AND (attempt_id=? OR resource_key=?) LIMIT 1',
+        request.namespace,
+        request.provider,
+        request.attemptId,
+        request.resourceKey,
+      );
+    },
     /** Synchronous inside the shared storage transaction; any admission retains possible signing exposure. */
     hasActionAttempts(id: string): boolean {
       return !!connection.get(

@@ -38,6 +38,7 @@ export interface SecretReference {
   env: string;
 }
 export interface ProviderConfiguration {
+  safeWallet?: import('../sponsorship/safe-wallet.js').SafeWalletConfiguration;
   network?: ProviderNetwork;
   safeProvisioning?: import('../provisioning/safe.js').SafeProvisioningConfiguration;
   runtimeConfiguration?: RuntimeConfigurationOptions;
@@ -112,6 +113,7 @@ export interface ProviderConfiguration {
   execution?: ExecutionConfiguration;
   operations?: import('../execution/operations.js').OperationsConfiguration;
   http?: {
+    requestsPerMinute?: number;
     host?: '127.0.0.1' | '0.0.0.0' | '::1' | '::';
     port?: number;
     documentation?: boolean;
@@ -140,6 +142,24 @@ export function validateProviderConfiguration(
     );
   const config = structuredClone(input) as unknown as ProviderConfiguration;
   try {
+    if (
+      config.safeWallet &&
+      (config.backend.kind !== 'ows' ||
+        !config.runtimeConfiguration?.authorizeContracts ||
+        !config.runtimeConfiguration.credentialKey ||
+        !config.approvedCalls ||
+        config.financial ||
+        config.execution ||
+        config.localExecution ||
+        config.operations ||
+        !config.safeProvisioning ||
+        config.runtimeConfiguration.sharedApplicationSafes ||
+        config.runtimeConfiguration.rpcVerification !== 'single' ||
+        config.runtimeConfiguration.executionPool)
+    )
+      throw new ConfigurationError([
+        '/safeWallet: requires OWS, application contracts, credential encryption and activation; EOA transfers are unavailable',
+      ]);
     if (config.localExecution) {
       const names = [
         config.localExecution.apiKey.env,
@@ -169,7 +189,8 @@ export function validateProviderConfiguration(
       config.runtimeConfiguration?.authorizeContracts &&
       (config.policy.access?.mode !== 'application' ||
         !config.approvedCalls ||
-        config.execution?.profile !== 'approved-evm-executor-v1')
+        (!config.safeWallet &&
+          config.execution?.profile !== 'approved-evm-executor-v1'))
     )
       throw new Error();
     if (
@@ -364,6 +385,13 @@ export function validateProviderConfiguration(
       for (const signer of signers)
         if (/^0x0{40}$/i.test(getAddress(signer.address))) throw new Error();
     }
+    if (
+      config.runtimeConfiguration?.executionPool &&
+      !config.runtimeConfiguration.sharedApplicationSafes
+    )
+      throw new ConfigurationError([
+        '/runtimeConfiguration/executionPool: shared application Safes are required',
+      ]);
     if (config.execution) {
       const execution = config.execution;
       if (
@@ -529,13 +557,14 @@ export function validateProviderConfiguration(
       const p = config.safeProvisioning;
       if (
         !config.approvedCalls ||
-        config.execution?.profile !== 'approved-evm-executor-v1' ||
-        !config.execution.local ||
-        !config.localExecution ||
-        config.execution.service ||
-        (config.activation.enabled &&
-          !config.runtimeConfiguration?.sharedApplicationSafes &&
-          !config.activation.safeProvisioningAcceptance)
+        (!config.safeWallet &&
+          (config.execution?.profile !== 'approved-evm-executor-v1' ||
+            !config.execution.local ||
+            !config.localExecution ||
+            config.execution.service ||
+            (config.activation.enabled &&
+              !config.runtimeConfiguration?.sharedApplicationSafes &&
+              !config.activation.safeProvisioningAcceptance)))
       )
         throw new ConfigurationError([
           '/safeProvisioning: requires approved EVM calls, the bundled local execution engine and explicit deployment acceptance',
@@ -561,8 +590,9 @@ export function validateProviderConfiguration(
         !!config.safeProvisioning,
       );
       if (
-        config.execution?.profile !== 'approved-evm-executor-v1' ||
-        (!config.execution.service && !config.execution.local)
+        !config.safeWallet &&
+        (config.execution?.profile !== 'approved-evm-executor-v1' ||
+          (!config.execution.service && !config.execution.local))
       )
         throw new Error();
     }
@@ -647,6 +677,7 @@ export function secretReferences(
           ...config.execution.rpc.endpoints,
         ]
       : []),
+    ...(config.safeWallet ? [config.safeWallet.bundlerAuthorization] : []),
     ...(config.ownerLogin ? [config.ownerLogin.clientSecret] : []),
     ...(config.apiExplorer?.clients.map((entry) => entry.clientSecret) ?? []),
     ...(config.identity.didit ? [config.identity.didit.apiKey] : []),

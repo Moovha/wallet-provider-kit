@@ -1,3 +1,4 @@
+import { defaultSafeWallet } from '../sponsorship/defaults.js';
 import type { ProviderConfiguration } from './config.js';
 import { defaultSafeProvisioning } from '../provisioning/defaults.js';
 import {
@@ -12,6 +13,11 @@ export function applicationGenesis(network: ProviderConfiguration['network']) {
 }
 /** Prebundle an idle execution engine. Application funding, credentials and actions are registered after connection. */
 export function configureApplicationRuntime(config: ProviderConfiguration) {
+  if (config.runtimeConfiguration)
+    config.runtimeConfiguration.executionPool ??= {
+      safeCount: 5,
+      sponsorCount: 5,
+    };
   config.localExecution ??= defaultLocalExecution();
   config.safeProvisioning = defaultSafeProvisioning();
   config.approvedCalls = {
@@ -44,4 +50,17 @@ export function configureApplicationRuntime(config: ProviderConfiguration) {
     pollIntervalSeconds: 15,
     maxLogRange: 10000,
   };
+}
+
+/** Default user asset account and application-owned ERC-4337 infrastructure. */
+export function configureSafeWalletRuntime(config: ProviderConfiguration) {
+  configureApplicationRuntime(config);
+  delete config.localExecution;
+  delete config.execution;
+  if (config.runtimeConfiguration) {
+    delete config.runtimeConfiguration.sharedApplicationSafes;
+    delete config.runtimeConfiguration.executionPool;
+    config.runtimeConfiguration.rpcVerification = 'single';
+  }
+  config.safeWallet = defaultSafeWallet(applicationGenesis(config.network));
 }

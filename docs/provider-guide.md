@@ -1,5 +1,11 @@
 # Integrate your wallet service
 
+The configured Safe-only profile exposes the user's Safe as their sole asset
+address. Its OWS signing identity stays private, while an application-owned
+paymaster and private bundler cover submission. Provider authentication, current
+user ownership, spending permission and gas sponsorship remain separate checks.
+See [Safe-only setup and recovery](self-hosted-sponsorship.md).
+
 Use this developer guide when your existing server must supply its own authority,
 storage or financial behavior. It explains how to connect those responsibilities
 to the toolkit's backend and HTTP interfaces. For the service configured through
@@ -266,9 +272,8 @@ service credentials and sponsorship terms; the provider reviews these per
 application through the [application management API](runtime-workspace.md).
 
 Follow [application obligations](application-obligations.md) for the complete
-credential, policy, sponsor funding and Safe provisioning sequence. A separate
-provider-controlled Safe signer is retained for each application outside the user
-account registry. Users retain individual wallets, grants and consent. Shared
+credential, policy, sponsor funding and Safe provisioning sequence. Provider-controlled Safe signers are retained outside the user account registry,
+with an optional bounded pool per application. Users retain individual wallets, grants and consent. Shared
 calls require zero native value and provider-reviewed `user_address_parameters`
 that bind calldata to the authorized user's wallet. This does not invent an asset
 approval: the target contract must implement the intended user authorization.

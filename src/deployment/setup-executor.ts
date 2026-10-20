@@ -157,6 +157,12 @@ export function localCompose(plan: SetupPlan, buildSource: string) {
               networks: ['default', 'execution'],
             }
           : {}),
+        ...(plan.config.safeWallet
+          ? {
+              depends_on: { bundler: { condition: 'service_started' } },
+              networks: ['default', 'bundler'],
+            }
+          : {}),
         stop_grace_period: '15s',
       },
       ...(plan.config.localExecution
@@ -246,6 +252,78 @@ export function localCompose(plan: SetupPlan, buildSource: string) {
             },
           }
         : {}),
+      ...(plan.config.safeWallet
+        ? {
+            bundler: {
+              image: `${plan.project}:bundler`,
+              build: {
+                context: path(buildSource),
+                dockerfile: 'Dockerfile.bundler',
+              },
+              user: `${process.getuid?.()}:${process.getgid?.()}`,
+              volumes: [
+                {
+                  type: 'bind',
+                  source: path(
+                    join(
+                      plan.directory,
+                      plan.config.safeWallet.runtimeDirectory,
+                    ),
+                  ),
+                  target: '/config/bundler',
+                  read_only: true,
+                },
+              ],
+              environment: {
+                SAFE_WALLET_RUNTIME_DIRECTORY: '/config/bundler',
+                BUNDLER_REDIS_URL: 'redis://bundler-store:6379',
+              },
+              networks: ['default', 'bundler', 'bundler-store'],
+              depends_on: { 'bundler-store': { condition: 'service_healthy' } },
+              read_only: true,
+              tmpfs: ['/tmp'],
+              cap_drop: ['ALL'],
+              security_opt: ['no-new-privileges:true'],
+              restart: 'unless-stopped',
+              logging: { driver: 'none' },
+              stop_grace_period: '30s',
+            },
+            'bundler-store': {
+              image: localExecutionImages.store,
+              user: `${process.getuid?.()}:${process.getgid?.()}`,
+              command: [
+                'valkey-server',
+                '--appendonly',
+                'yes',
+                '--appendfsync',
+                'always',
+                '--save',
+                '',
+              ],
+              volumes: [
+                {
+                  type: 'bind',
+                  source: path(join(plan.directory, '.bundler-data')),
+                  target: '/data',
+                },
+              ],
+              networks: ['bundler-store'],
+              read_only: true,
+              tmpfs: ['/tmp'],
+              cap_drop: ['ALL'],
+              security_opt: ['no-new-privileges:true'],
+              restart: 'unless-stopped',
+              logging: { driver: 'none' },
+              healthcheck: {
+                test: ['CMD', 'valkey-cli', 'ping'],
+                interval: '5s',
+                timeout: '3s',
+                retries: 12,
+              },
+              stop_grace_period: '30s',
+            },
+          }
+        : {}),
       ...(plan.config.http?.ingress === 'caddy'
         ? {
             https: {
@@ -280,6 +358,15 @@ export function localCompose(plan: SetupPlan, buildSource: string) {
           }
         : {}),
     },
+    ...(plan.config.safeWallet
+      ? {
+          networks: {
+            default: {},
+            bundler: { internal: true },
+            'bundler-store': { internal: true },
+          },
+        }
+      : {}),
     ...(plan.config.localExecution
       ? {
           networks: {
@@ -561,6 +648,15 @@ export function createSetupExecutor(options: SetupExecutorOptions = {}) {
           await mkdir(plan!.directory, { mode: 0o700 });
           await privateDirectory(plan!.directory);
           await mkdir(join(plan!.directory, '.provider-data'), { mode: 0o700 });
+          if (plan!.config.safeWallet) {
+            await mkdir(
+              join(plan!.directory, plan!.config.safeWallet.runtimeDirectory),
+              { recursive: true, mode: 0o700 },
+            );
+            await mkdir(join(plan!.directory, '.bundler-data'), {
+              mode: 0o700,
+            });
+          }
           if (plan!.config.backend.kind === 'ows')
             await mkdir(join(plan!.directory, '.provider-vault'), {
               mode: 0o700,
@@ -645,6 +741,7 @@ export function createSetupExecutor(options: SetupExecutorOptions = {}) {
               'build',
               'api',
               ...(plan!.config.localExecution ? ['local-execution'] : []),
+              ...(plan!.config.safeWallet ? ['bundler'] : []),
             ],
             15 * 60 * 1000,
           );
@@ -738,6 +835,7 @@ export function createSetupExecutor(options: SetupExecutorOptions = {}) {
           job.state === 'complete' &&
           ![
             'api',
+            ...(plan!.config.safeWallet ? ['bundler', 'bundler-store'] : []),
             ...(plan!.config.localExecution
               ? ['local-execution', 'execution-store']
               : []),

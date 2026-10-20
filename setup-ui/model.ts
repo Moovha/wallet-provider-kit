@@ -1,5 +1,5 @@
 import {
-  configureApplicationRuntime,
+  configureSafeWalletRuntime,
   applicationGenesis,
 } from '../src/deployment/application-defaults.js';
 import {
@@ -122,7 +122,7 @@ export function emptyConfiguration(
     credentialKey: { env: 'APPLICATION_CREDENTIAL_STORAGE_KEY' },
     operators: [{ issuer: '', clientId: operatorId, subject: operatorId }],
   };
-  configureApplicationRuntime(config);
+  configureSafeWalletRuntime(config);
   config.http = { ...config.http, ingress: 'caddy' };
   synchronizeBundledServices(config);
   return config;
@@ -130,6 +130,8 @@ export function emptyConfiguration(
 
 /** Keep generated service registrations aligned with the operator's admitted applications. */
 export function synchronizeBundledServices(config: ProviderConfiguration) {
+  if (config.safeWallet)
+    config.safeWallet.genesisHash = applicationGenesis(config.network);
   if (config.runtimeConfiguration?.sharedApplicationSafes && config.execution)
     config.execution.rpc.genesisHash = applicationGenesis(config.network);
   if (!config.authorizationServer) return;
@@ -168,7 +170,8 @@ export function synchronizeBundledServices(config: ProviderConfiguration) {
           },
           scopes: [
             ...initialApplicationScopes,
-            ...(config.runtimeConfiguration?.sharedApplicationSafes
+            ...(config.safeWallet ||
+            config.runtimeConfiguration?.sharedApplicationSafes
               ? [
                   'wallet:configuration:read',
                   'wallet:configuration:propose',

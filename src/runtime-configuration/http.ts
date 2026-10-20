@@ -1,3 +1,4 @@
+import { runtimeApplicationId } from './service.js';
 import { setAuthenticatedResponseTimeout } from '../service/response-timeout.js';
 import {
   obligationSchemas,
@@ -157,6 +158,8 @@ const batchesSchema = {
             enum: [
               'queued',
               'executing',
+              'included',
+              'failed',
               'succeeded',
               'cancelled',
               'expired',
@@ -225,6 +228,7 @@ export async function registerRuntimeConfigurationRoutes(
   walletCalls?: WalletCallsService,
   applicationSafes?: import('../provisioning/application.js').ApplicationSafeService,
   applicationSponsors?: import('../provisioning/application-sponsor.js').ApplicationSponsorService,
+  safeWallet?: import('../sponsorship/safe-wallet.js').SafeWalletRuntime,
 ) {
   function configured() {
     if (!service)
@@ -255,129 +259,291 @@ export async function registerRuntimeConfigurationRoutes(
     ...extra,
     response: { 200: response, ...errors },
   });
-  app.post<{ Params: { applicationId: string } }>(
-    '/v1/provider/applications/:applicationId/sponsorship/provision',
+  app.get(
+    '/v1/application/gas-funding',
     {
-      schema: schema(
-        'provisionApplicationSponsor',
-        {
-          type: 'object',
-          additionalProperties: false,
-          required: ['application_id', 'funding_address', 'status'],
-          properties: {
-            application_id: applicationIdSchema,
-            funding_address: { type: 'string' },
-            status: { type: 'string', enum: ['ready'] },
+      schema: schema('readApplicationGasFunding', {
+        oneOf: [
+          {
+            type: 'object',
+            additionalProperties: false,
+            required: ['application_id', 'chain_id', 'profile', 'status'],
+            properties: {
+              application_id: applicationIdSchema,
+              chain_id: { type: 'string' },
+              profile: { const: 'safe-only-4337-v1' },
+              status: {
+                type: 'string',
+                enum: ['unprovisioned', 'needs-funding', 'provisioned'],
+              },
+              funding_address: { type: 'string' },
+              paymaster: { type: 'string' },
+            },
           },
-        },
-        {
-          headers,
-          params: params('applicationId', applicationIdSchema),
-          body: { type: 'object', additionalProperties: false, properties: {} },
-        },
-      ),
+          {
+            type: 'object',
+            additionalProperties: false,
+            required: [
+              'application_id',
+              'chain_id',
+              'sponsor_count',
+              'ready_sponsors',
+              'minimum_initial_funding_wei',
+              'status',
+            ],
+            properties: {
+              application_id: applicationIdSchema,
+              chain_id: { type: 'string' },
+              funding_address: { type: 'string' },
+              funding_state: {
+                type: 'string',
+                enum: ['healthy', 'routing', 'needs-funding', 'paused'],
+              },
+              checked_at: { type: 'string', format: 'date-time' },
+              sponsor_count: { type: 'integer' },
+              ready_sponsors: { type: 'integer' },
+              minimum_initial_funding_wei: { type: 'string' },
+              status: { type: 'string', enum: ['ready', 'unprovisioned'] },
+            },
+          },
+        ],
+      }),
     },
     async (request) => {
+      const caller = await principal(request, 'wallet:configuration:read');
+      if (safeWallet)
+        return safeWallet.read(
+          caller,
+          runtimeApplicationId(caller.issuer, caller.clientId),
+        );
       if (!applicationSponsors)
         throw Object.assign(new Error('Unavailable'), { statusCode: 503 });
-      const authority = await context(request, 'wallet:configuration:write');
-      return applicationSponsors.provision(
-        authority,
-        request.params.applicationId,
-      );
+      return applicationSponsors.funding.read(caller);
     },
   );
-  const applicationSafeSchema = {
-    type: 'object',
-    additionalProperties: false,
-    required: [
-      'application_id',
-      'funding_addresses',
-      'status',
-      'asset_model',
-      'account_model',
-    ],
-    properties: {
-      application_id: applicationIdSchema,
-      funding_addresses: { type: 'array', items: { type: 'string' } },
-      chain_id: { type: 'string', enum: ['eip155:8453', 'eip155:84532'] },
-      funding_requirements: {
-        type: 'array',
-        items: {
-          type: 'object',
-          additionalProperties: false,
-          required: [
-            'address',
-            'minimum_balance_wei',
-            'maximum_gas_budget_wei',
-            'gas_limits',
-          ],
-          properties: {
-            address: { type: 'string' },
-            minimum_balance_wei: { type: 'string' },
-            maximum_gas_budget_wei: { type: 'string' },
-            gas_limits: obligationSchemas.sponsorship.properties.gas_limits,
+  if (!safeWallet) {
+    const poolSchema = {
+      type: 'object',
+      additionalProperties: false,
+      required: ['application_id', 'safe_count', 'sponsor_count'],
+      properties: {
+        application_id: applicationIdSchema,
+        safe_count: { type: 'integer', minimum: 1, maximum: 16 },
+        sponsor_count: { type: 'integer', minimum: 1, maximum: 16 },
+      },
+    };
+    app.get(
+      '/v1/application/execution-pool',
+      { schema: schema('readApplicationExecutionPool', poolSchema) },
+      async (request) =>
+        configured().readPool(
+          await principal(request, 'wallet:configuration:read'),
+        ),
+    );
+    app.put(
+      '/v1/application/execution-pool',
+      {
+        schema: schema('configureApplicationExecutionPool', poolSchema, {
+          headers,
+          body: {
+            type: 'object',
+            additionalProperties: false,
+            required: [
+              'expected_safe_count',
+              'expected_sponsor_count',
+              'safe_count',
+              'sponsor_count',
+            ],
+            properties: Object.fromEntries(
+              [
+                'expected_safe_count',
+                'expected_sponsor_count',
+                'safe_count',
+                'sponsor_count',
+              ].map((name) => [
+                name,
+                { type: 'integer', minimum: 1, maximum: 16 },
+              ]),
+            ),
+          },
+        }),
+      },
+      async (request) =>
+        configured().configurePool(
+          await context(request, 'wallet:configuration:propose'),
+          request.body as {
+            expected_safe_count: number;
+            expected_sponsor_count: number;
+            safe_count: number;
+            sponsor_count: number;
+          },
+        ),
+    );
+    app.post<{ Params: { applicationId: string } }>(
+      '/v1/provider/applications/:applicationId/sponsorship/provision',
+      {
+        schema: schema(
+          'provisionApplicationSponsor',
+          {
+            type: 'object',
+            additionalProperties: false,
+            required: ['application_id', 'funding_address', 'status'],
+            properties: {
+              application_id: applicationIdSchema,
+              funding_address: { type: 'string' },
+              pool_index: { type: 'integer' },
+              status: { type: 'string', enum: ['ready'] },
+            },
+          },
+          {
+            headers,
+            params: params('applicationId', applicationIdSchema),
+            body: {
+              type: 'object',
+              additionalProperties: false,
+              properties: {
+                pool_index: { type: 'integer', minimum: 0, maximum: 15 },
+              },
+            },
+          },
+        ),
+      },
+      async (request) => {
+        if (!applicationSponsors)
+          throw Object.assign(new Error('Unavailable'), { statusCode: 503 });
+        const authority = await context(request, 'wallet:configuration:write');
+        return applicationSponsors.provision(
+          authority,
+          request.params.applicationId,
+          (request.body as { pool_index?: number }).pool_index ?? 0,
+        );
+      },
+    );
+    const applicationSafeSchema = {
+      type: 'object',
+      additionalProperties: false,
+      required: [
+        'application_id',
+        'funding_addresses',
+        'status',
+        'asset_model',
+        'account_model',
+      ],
+      properties: {
+        application_id: applicationIdSchema,
+        user_account_id: uuidSchema,
+        execution_account_count: { type: 'integer', minimum: 0 },
+        maximum_execution_accounts: { type: 'integer', minimum: 1 },
+        maximum_in_flight_per_sponsor: { type: 'integer', minimum: 1 },
+        pool_size: { type: 'integer' },
+        safes: {
+          type: 'array',
+          items: {
+            type: 'object',
+            additionalProperties: false,
+            required: ['pool_index', 'status'],
+            properties: {
+              pool_index: { type: 'integer' },
+              status: { type: 'string' },
+              address: { type: 'string' },
+            },
           },
         },
+        funding_addresses: { type: 'array', items: { type: 'string' } },
+        chain_id: { type: 'string', enum: ['eip155:8453', 'eip155:84532'] },
+        funding_requirements: {
+          type: 'array',
+          items: {
+            type: 'object',
+            additionalProperties: false,
+            required: [
+              'address',
+              'minimum_balance_wei',
+              'maximum_gas_budget_wei',
+              'gas_limits',
+            ],
+            properties: {
+              address: { type: 'string' },
+              minimum_balance_wei: { type: 'string' },
+              maximum_gas_budget_wei: { type: 'string' },
+              gas_limits: obligationSchemas.sponsorship.properties.gas_limits,
+            },
+          },
+        },
+        status: {
+          type: 'string',
+          enum: [
+            'unprovisioned',
+            'signer_ready',
+            'signer_pending',
+            'prepared',
+            'pending',
+            'ready',
+            'unknown',
+          ],
+        },
+        address: { type: 'string' },
+        asset_model: { type: 'string', enum: ['individual-user-wallets'] },
+        account_model: {
+          type: 'string',
+          enum: [
+            'provider-controlled-application-safe',
+            'provider-controlled-user-safe',
+          ],
+        },
       },
-      status: {
-        type: 'string',
-        enum: [
-          'unprovisioned',
-          'signer_ready',
-          'signer_pending',
-          'prepared',
-          'pending',
-          'ready',
-          'unknown',
-        ],
+    };
+    function safes() {
+      if (!applicationSafes)
+        throw Object.assign(new Error('Unavailable'), { statusCode: 503 });
+      return applicationSafes;
+    }
+    app.get(
+      '/v1/application/safe',
+      { schema: schema('readApplicationSafe', applicationSafeSchema) },
+      async (request) =>
+        safes().read(await principal(request, 'wallet:configuration:read')),
+    );
+    app.get<{ Params: { applicationId: string } }>(
+      '/v1/provider/applications/:applicationId/safe',
+      {
+        schema: schema('readProviderApplicationSafe', applicationSafeSchema, {
+          params: params('applicationId', applicationIdSchema),
+        }),
       },
-      address: { type: 'string' },
-      asset_model: { type: 'string', enum: ['individual-user-wallets'] },
-      account_model: {
-        type: 'string',
-        enum: ['provider-controlled-application-safe'],
+      async (request) =>
+        safes().read(
+          await principal(request, 'wallet:configuration:write'),
+          request.params.applicationId,
+        ),
+    );
+    app.post<{ Params: { applicationId: string } }>(
+      '/v1/provider/applications/:applicationId/safe',
+      {
+        schema: schema('provisionApplicationSafe', applicationSafeSchema, {
+          headers,
+          params: params('applicationId', applicationIdSchema),
+          body: {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              user_account_id: uuidSchema,
+              pool_index: { type: 'integer', minimum: 0, maximum: 15 },
+            },
+          },
+        }),
       },
-    },
-  };
-  function safes() {
-    if (!applicationSafes)
-      throw Object.assign(new Error('Unavailable'), { statusCode: 503 });
-    return applicationSafes;
+      async (request) => {
+        const authority = await context(request, 'wallet:configuration:write');
+        return safes().provision(
+          authority,
+          request.params.applicationId,
+          (request.body as { pool_index?: number }).pool_index ?? 0,
+          (request.body as { user_account_id?: string }).user_account_id,
+        );
+      },
+    );
   }
-  app.get(
-    '/v1/application/safe',
-    { schema: schema('readApplicationSafe', applicationSafeSchema) },
-    async (request) =>
-      safes().read(await principal(request, 'wallet:configuration:read')),
-  );
-  app.get<{ Params: { applicationId: string } }>(
-    '/v1/provider/applications/:applicationId/safe',
-    {
-      schema: schema('readProviderApplicationSafe', applicationSafeSchema, {
-        params: params('applicationId', applicationIdSchema),
-      }),
-    },
-    async (request) =>
-      safes().read(
-        await principal(request, 'wallet:configuration:write'),
-        request.params.applicationId,
-      ),
-  );
-  app.post<{ Params: { applicationId: string } }>(
-    '/v1/provider/applications/:applicationId/safe',
-    {
-      schema: schema('provisionApplicationSafe', applicationSafeSchema, {
-        headers,
-        params: params('applicationId', applicationIdSchema),
-        body: { type: 'object', additionalProperties: false, properties: {} },
-      }),
-    },
-    async (request) => {
-      const authority = await context(request, 'wallet:configuration:write');
-      return safes().provision(authority, request.params.applicationId);
-    },
-  );
   const credentialSchema = {
     type: 'object',
     additionalProperties: false,

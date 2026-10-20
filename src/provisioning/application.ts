@@ -1,3 +1,6 @@
+import { quoteNetworkFees } from '../execution/network-fees.js';
+import { createRpcObserver } from '../execution/single-rpc.js';
+import { poolKey, poolMembers, retainPoolConfiguration } from './pools.js';
 import { randomUUID } from 'node:crypto';
 import type {
   AuthorityContext,
@@ -13,7 +16,7 @@ import { deny, fingerprint, uuid } from '../onboarding/policy.js';
 import type { OnboardingService } from '../onboarding/service.js';
 import { providerNetwork, type ProviderNetwork } from '../networks.js';
 import type { ExecutionConfiguration } from '../execution/types.js';
-import { QuorumExecutionObserver } from '../execution/chain.js';
+import { RpcReader } from '../execution/chain.js';
 import { createWalletAttemptRequest } from '../providers/attempt-lifecycle.js';
 import {
   RuntimeConfigurationService,
@@ -32,6 +35,9 @@ import {
 
 export interface ApplicationSafeAccount {
   applicationId: string;
+  poolIndex?: number;
+  userAccountId?: string;
+  userOwner?: string;
   accountId: string;
   attemptId: string;
   provider: string;
@@ -60,7 +66,11 @@ export class ApplicationSafeService {
       config: ExecutionConfiguration,
     ) => SafeDeploymentDriver,
   ) {}
-  private async terms(principal: VerifiedPrincipal, applicationId: string) {
+  private async terms(
+    principal: VerifiedPrincipal,
+    applicationId: string,
+    index = 0,
+  ) {
     const resources = await this.resources.readObligations(
       principal,
       applicationId,
@@ -79,8 +89,8 @@ export class ApplicationSafeService {
     const sponsors = execution.sponsors.filter(
       (s) => s.clientId === application.clientId,
     );
-    if (sponsors.length !== 1) deny();
-    const sponsor = sponsors[0],
+    if (!sponsors.length) deny();
+    const sponsor = sponsors[index % sponsors.length],
       agreement = sponsorship.value as ApplicationObligations['sponsorship'];
     if (
       sponsor.fundingAgreement !== agreement.funding_agreement ||
@@ -95,11 +105,18 @@ export class ApplicationSafeService {
     return {
       application,
       sponsor,
-      execution,
+      execution: {
+        ...execution,
+        sponsors: [sponsor, ...sponsors.filter((s) => s !== sponsor)],
+      },
       endpoints: await this.resources.rpcEndpoints(applicationId),
     };
   }
-  private async stored(applicationId: string) {
+  private async stored(
+    applicationId: string,
+    index = 0,
+    userAccountId?: string,
+  ) {
     return this.database.onboardingStore.transaction((state) => {
       if (
         state.deploymentBindings?.['service-v1']?.activeRevision !==
@@ -107,8 +124,40 @@ export class ApplicationSafeService {
       )
         deny();
       return state.deploymentBindings['service-v1'].runtimeConfiguration
-        ?.applicationSafes?.[applicationId];
+        ?.applicationSafes?.[this.key(applicationId, index, userAccountId)];
     });
+  }
+  private key(applicationId: string, index: number, userAccountId?: string) {
+    return userAccountId
+      ? fingerprint(['user-execution-safe-v1', applicationId, userAccountId])
+      : poolKey(applicationId, index);
+  }
+  private async userAuthority(
+    applicationId: string,
+    accountId: string,
+    expectedOwner?: string,
+  ) {
+    const caller = await this.onboarding.store.transaction((state) => {
+      const account = state.accounts[accountId];
+      if (!account || (expectedOwner && account.owner !== expectedOwner))
+        deny();
+      return (
+        Object.values(state.grants).find(
+          (g) =>
+            g.accountId === accountId &&
+            g.owner === account.owner &&
+            g.state === 'active' &&
+            g.expiresAt > Date.now() &&
+            runtimeApplicationId(g.caller.issuer, g.caller.clientId) ===
+              applicationId,
+        )?.caller ?? deny()
+      );
+    });
+    return this.onboarding.authorize(
+      { ...caller, scopes: [] },
+      accountId,
+      'contracts:request',
+    );
   }
   async authorizeProvision(request: WalletAttemptRequest): Promise<boolean> {
     try {
@@ -125,7 +174,25 @@ export class ApplicationSafeService {
         ).find((r) => r.accountId === request.accountId);
       });
       if (!saved || saved.provider !== this.backend.provider) return false;
-      await this.terms(saved.operator, saved.applicationId);
+      const agreement = (
+        await this.resources.acceptedSponsorship(saved.applicationId)
+      ).value as ApplicationObligations['sponsorship'];
+      if (
+        (agreement.account_model === 'provider-controlled-user-safe') !==
+        !!saved.userAccountId
+      )
+        return false;
+      if (saved.userAccountId)
+        await this.userAuthority(
+          saved.applicationId,
+          saved.userAccountId,
+          saved.userOwner,
+        );
+      await this.terms(
+        saved.operator,
+        saved.applicationId,
+        saved.poolIndex ?? 0,
+      );
       return (
         fingerprint(request) ===
         fingerprint(
@@ -149,19 +216,27 @@ export class ApplicationSafeService {
       principal,
       applicationId,
     );
+    const agreement = resources.resources.find((r) => r.kind === 'sponsorship')
+      ?.value as ApplicationObligations['sponsorship'] | undefined;
+    const perUser =
+      agreement?.account_model === 'provider-controlled-user-safe';
     const app =
       this.resources.onboardingPolicy.applications.find(
         (a) =>
           runtimeApplicationId(a.issuer, a.clientId) ===
           resources.application_id,
       ) ?? deny();
-    const dynamicSponsor = await this.sponsors?.read(resources.application_id);
+    const dynamicSponsors = await this.sponsors?.members(
+      resources.application_id,
+    );
     const sponsors = this.sponsors
-      ? dynamicSponsor?.status === 'ready'
-        ? [dynamicSponsor.sponsor]
-        : []
+      ? (dynamicSponsors ?? [])
+          .filter((r) => r.status === 'ready')
+          .map((r) => r.sponsor)
       : this.execution.sponsors.filter((s) => s.clientId === app.clientId);
-    const saved = await this.stored(resources.application_id);
+    const saved = perUser
+      ? undefined
+      : await this.stored(resources.application_id);
     const deployment = saved
       ? await this.database.onboardingStore.transaction(
           (state) =>
@@ -170,49 +245,201 @@ export class ApplicationSafeService {
             ],
         )
       : undefined;
+    const members = await this.database.onboardingStore.transaction((state) =>
+      poolMembers(
+        state.deploymentBindings?.['service-v1']?.runtimeConfiguration
+          ?.applicationSafes,
+        resources.application_id,
+      ).map((member) => {
+        const safe =
+          state.deploymentBindings?.['service-v1']?.safeAccounts?.[
+            member.accountId
+          ];
+        return {
+          pool_index: member.poolIndex ?? 0,
+          status:
+            safe?.state ?? (member.account ? 'signer_ready' : 'signer_pending'),
+          ...(safe ? { address: safe.plan.address } : {}),
+        };
+      }),
+    );
+    const funding = this.sponsors
+      ? await this.sponsors.funding.read(principal, applicationId)
+      : undefined;
+    const userAccounts = await this.database.onboardingStore.transaction(
+      (state) =>
+        Object.values(
+          state.deploymentBindings?.['service-v1']?.runtimeConfiguration
+            ?.applicationSafes ?? {},
+        )
+          .filter(
+            (r) =>
+              r.applicationId === resources.application_id && r.userAccountId,
+          )
+          .map(
+            (r) =>
+              state.deploymentBindings?.['service-v1']?.safeAccounts?.[
+                r.accountId
+              ]?.state,
+          ),
+    );
+    let userStatus = 'unprovisioned';
+    if (userAccounts.length) userStatus = 'pending';
+    if (userAccounts.includes('ready')) userStatus = 'ready';
     return {
+      safes: perUser ? [] : members,
+      ...(perUser
+        ? {
+            execution_account_count: userAccounts.length,
+            maximum_execution_accounts: agreement!.maximum_execution_accounts,
+            maximum_in_flight_per_sponsor:
+              agreement!.maximum_in_flight_per_sponsor ?? 2,
+          }
+        : {}),
+      pool_size: perUser
+        ? 0
+        : (await this.resources.poolConfiguration(resources.application_id))
+            .safeCount,
       application_id: resources.application_id,
-      funding_addresses: sponsors.map((s) => s.binding.address),
+      funding_addresses: funding
+        ? funding.funding_address
+          ? [funding.funding_address]
+          : []
+        : sponsors.map((s) => s.binding.address),
       chain_id: providerNetwork(this.network).caip,
-      funding_requirements: sponsors.map((sponsor) => ({
-        address: sponsor.binding.address,
-        minimum_balance_wei: minimumSponsorFunding(sponsor).toString(),
-        maximum_gas_budget_wei: sponsor.lifetimeBudgetWei,
-        gas_limits: {
-          gas_limit: sponsor.gasLimit,
-          max_fee_per_gas: sponsor.maxFeePerGas,
-          max_priority_fee_per_gas: sponsor.maxPriorityFeePerGas,
-          l1_fee_reserve_wei: sponsor.l1FeeReserveWei,
-        },
-      })),
-      status:
-        deployment?.state ??
-        (saved?.account
-          ? 'signer_ready'
-          : saved
-            ? 'signer_pending'
-            : 'unprovisioned'),
+      funding_requirements: funding
+        ? funding.funding_address && sponsors[0]
+          ? [
+              {
+                address: funding.funding_address,
+                minimum_balance_wei: funding.minimum_initial_funding_wei,
+                maximum_gas_budget_wei: sponsors[0].lifetimeBudgetWei,
+                gas_limits: {
+                  gas_limit: sponsors[0].gasLimit,
+                  max_fee_per_gas: sponsors[0].maxFeePerGas,
+                  max_priority_fee_per_gas: sponsors[0].maxPriorityFeePerGas,
+                  l1_fee_reserve_wei: sponsors[0].l1FeeReserveWei,
+                },
+              },
+            ]
+          : []
+        : sponsors.map((sponsor) => ({
+            address: sponsor.binding.address,
+            minimum_balance_wei: minimumSponsorFunding(sponsor).toString(),
+            maximum_gas_budget_wei: sponsor.lifetimeBudgetWei,
+            gas_limits: {
+              gas_limit: sponsor.gasLimit,
+              max_fee_per_gas: sponsor.maxFeePerGas,
+              max_priority_fee_per_gas: sponsor.maxPriorityFeePerGas,
+              l1_fee_reserve_wei: sponsor.l1FeeReserveWei,
+            },
+          })),
+      status: perUser
+        ? userStatus
+        : ((deployment?.state === 'ready' &&
+          (members.length !==
+            (await this.resources.poolConfiguration(resources.application_id))
+              .safeCount ||
+            members.some((r) => r.status !== 'ready'))
+            ? 'pending'
+            : deployment?.state) ??
+          (saved?.account
+            ? 'signer_ready'
+            : saved
+              ? 'signer_pending'
+              : 'unprovisioned')),
       ...(deployment ? { address: deployment.plan.address } : {}),
       asset_model: 'individual-user-wallets' as const,
-      account_model: 'provider-controlled-application-safe' as const,
+      account_model:
+        agreement?.account_model ?? 'provider-controlled-application-safe',
     };
   }
-  async provision(context: AuthorityContext, applicationId: string) {
+  async provision(
+    context: AuthorityContext,
+    applicationId: string,
+    index = 0,
+    userAccountId?: string,
+  ) {
+    return this.resources.withRpc(
+      applicationId,
+      (endpoints) =>
+        this.provisionAt(
+          context,
+          applicationId,
+          index,
+          endpoints,
+          userAccountId,
+        ),
+      this.request,
+    );
+  }
+  private async provisionAt(
+    context: AuthorityContext,
+    applicationId: string,
+    index: number,
+    endpoints: string[],
+    userAccountId?: string,
+  ) {
+    const pool = await this.resources.poolConfiguration(applicationId);
+    if (
+      (!userAccountId && index >= pool.safeCount) ||
+      (userAccountId && (!uuid.test(userAccountId) || index !== 0))
+    )
+      deny();
+    const key = this.key(applicationId, index, userAccountId);
     context = structuredClone(context);
     if (!this.enabled || !uuid.test(context.idempotencyKey)) deny();
     this.resources.assertOperator(context.principal);
-    const terms = await this.terms(context.principal, applicationId);
-    const retained = await this.stored(applicationId);
+    const agreement = (await this.resources.acceptedSponsorship(applicationId))
+      .value as ApplicationObligations['sponsorship'];
+    if (
+      (agreement.account_model === 'provider-controlled-user-safe') !==
+      !!userAccountId
+    )
+      deny();
+    const grant = userAccountId
+      ? await this.userAuthority(applicationId, userAccountId)
+      : undefined;
+    const selectedIndex = userAccountId
+      ? await this.database.onboardingStore.transaction((state) => {
+          const records = Object.values(
+            state.deploymentBindings?.['service-v1']?.runtimeConfiguration
+              ?.applicationSafes ?? {},
+          );
+          return (
+            records.find(
+              (r) =>
+                r.applicationId === applicationId &&
+                r.userAccountId === userAccountId,
+            )?.poolIndex ??
+            records.filter(
+              (r) => r.applicationId === applicationId && r.userAccountId,
+            ).length % pool.sponsorCount
+          );
+        })
+      : index;
+    const terms = await this.terms(
+      context.principal,
+      applicationId,
+      selectedIndex,
+    );
+    const retained = await this.stored(applicationId, index, userAccountId);
     if (!retained?.account) {
-      const observer = new QuorumExecutionObserver(
-        terms.endpoints,
+      const observer = createRpcObserver(
+        endpoints,
         terms.execution.rpc.genesisHash,
         terms.execution.maxLogRange,
         this.request,
         this.network,
+        this.resources.rpcVerification,
+      );
+      const fees = await quoteNetworkFees(
+        new RpcReader(endpoints[0], this.request, 4, true),
+        terms.sponsor,
       );
       const minimum =
-        BigInt(terms.sponsor.gasLimit) * BigInt(terms.sponsor.maxFeePerGas) +
+        BigInt(terms.sponsor.gasLimit) *
+          BigInt(fees?.maxFeePerGas ?? terms.sponsor.maxFeePerGas) +
         BigInt(terms.sponsor.l1FeeReserveWei);
       if (
         BigInt(await observer.payerBalance(terms.sponsor.binding.address)) <
@@ -229,13 +456,32 @@ export class ApplicationSafeService {
       const registry =
         state.deploymentBindings['service-v1'].runtimeConfiguration ?? deny();
       const accounts = (registry.applicationSafes ??= {});
-      const previous = accounts[applicationId];
+      retainPoolConfiguration(registry, applicationId, pool);
+      if (
+        userAccountId &&
+        (!grant || state.accounts[userAccountId]?.owner !== grant.owner)
+      )
+        deny();
+      const previous = accounts[key];
       if (previous) {
-        if (previous.provider !== this.backend.provider) deny();
+        if (
+          previous.provider !== this.backend.provider ||
+          (userAccountId && previous.userOwner !== grant?.owner)
+        )
+          deny();
         return previous;
       }
-      return (accounts[applicationId] = {
+      if (
+        userAccountId &&
+        Object.values(accounts).filter(
+          (r) => r.applicationId === applicationId && r.userAccountId,
+        ).length >= (agreement.maximum_execution_accounts ?? 0)
+      )
+        deny();
+      return (accounts[key] = {
         applicationId,
+        poolIndex: selectedIndex,
+        ...(userAccountId ? { userAccountId, userOwner: grant!.owner } : {}),
         accountId: randomUUID(),
         attemptId: randomUUID(),
         provider: this.backend.provider,
@@ -253,7 +499,7 @@ export class ApplicationSafeService {
         { accountId: saved.accountId },
       );
       if (!(await this.authorizeProvision(request))) deny();
-      const budgetId = fingerprint(['application-safe-signer', applicationId]);
+      const budgetId = fingerprint(['application-safe-signer', key]);
       await this.database.setBudget(budgetId, '1', this.revision);
       await this.database.admitAttempt({ request, budgetId, units: '1' });
       await this.backend.reserveAccount?.(saved.accountId);
@@ -263,8 +509,7 @@ export class ApplicationSafeService {
       );
       await this.database.onboardingStore.transaction((state) => {
         const registry = state.deploymentBindings?.['service-v1'];
-        const record =
-          registry?.runtimeConfiguration?.applicationSafes?.[applicationId];
+        const record = registry?.runtimeConfiguration?.applicationSafes?.[key];
         if (
           registry?.activeRevision !== this.revision ||
           !record ||
@@ -278,8 +523,22 @@ export class ApplicationSafeService {
       saved.account = account;
     }
     const current = async () => {
-      const latest = await this.terms(context.principal, applicationId);
-      const record = await this.stored(applicationId);
+      const latest = await this.terms(
+        context.principal,
+        applicationId,
+        selectedIndex,
+      );
+      const record = await this.stored(applicationId, index, userAccountId);
+      const currentAgreement = (
+        await this.resources.acceptedSponsorship(applicationId)
+      ).value as ApplicationObligations['sponsorship'];
+      if (
+        (currentAgreement.account_model === 'provider-controlled-user-safe') !==
+        !!userAccountId
+      )
+        deny();
+      if (userAccountId)
+        await this.userAuthority(applicationId, userAccountId, saved.userOwner);
       if (
         !record?.account ||
         fingerprint(record.account) !== fingerprint(saved.account) ||
@@ -304,12 +563,14 @@ export class ApplicationSafeService {
       this.executionDriver
         ? this.executionDriver(terms.execution)
         : this.driver,
-      terms.endpoints,
+      endpoints,
       this.network,
       this.request,
       undefined,
       undefined,
       current,
+      this.resources.rpcVerification,
+      'included',
     );
     await service.provision(
       {
@@ -323,6 +584,20 @@ export class ApplicationSafeService {
       },
       saved.accountId,
     );
+    if (userAccountId) {
+      const deployment = await this.database.onboardingStore.transaction(
+        (state) =>
+          state.deploymentBindings?.['service-v1']?.safeAccounts?.[
+            saved.accountId
+          ],
+      );
+      return {
+        ...(await this.read(context.principal, applicationId)),
+        user_account_id: userAccountId,
+        status: deployment?.state ?? 'signer_ready',
+        ...(deployment ? { address: deployment.plan.address } : {}),
+      };
+    }
     return this.read(context.principal, applicationId);
   }
 }

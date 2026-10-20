@@ -1,3 +1,4 @@
+import { etherscanEndpoint } from '../execution/etherscan.js';
 import {
   createCipheriv,
   createDecipheriv,
@@ -72,7 +73,7 @@ export class ApplicationCredentialCipher {
 export function credentialOrigin(endpoint: string): string {
   try {
     if (typeof endpoint !== 'string' || endpoint.length > 4096) invalid();
-    const url = trustedHttpsUrl(endpoint);
+    const url = etherscanEndpoint(endpoint) ?? trustedHttpsUrl(endpoint);
     if (
       !url.hostname.includes('.') ||
       url.hostname.endsWith('.localhost') ||

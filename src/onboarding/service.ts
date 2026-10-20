@@ -73,6 +73,7 @@ export class OnboardingService {
     private readonly walletReader?: Pick<WalletSigningProvider, 'findAccount'>,
     private readonly transferPolicyRevision?: string,
     readonly runtimeContracts = false,
+    readonly safeOnlyWallet = false,
   ) {
     const resolved = defineOnboardingPolicy(input);
     if (
@@ -1252,8 +1253,26 @@ export class OnboardingService {
               evaluation_only: account.identitySource === 'application_record',
             }
           : {}),
-        ...(account.address ? { address: account.address } : {}),
-        status: account.address ? 'provisioned' : 'accepted',
+        ...(this.safeOnlyWallet
+          ? state.deploymentBindings?.['service-v1']?.runtimeConfiguration
+              ?.safeWalletAccounts?.[accountId]?.status === 'ready'
+            ? {
+                address:
+                  state.deploymentBindings['service-v1'].runtimeConfiguration!
+                    .safeWalletAccounts![accountId].binding.address,
+              }
+            : {}
+          : account.address
+            ? { address: account.address }
+            : {}),
+        status: (
+          this.safeOnlyWallet
+            ? state.deploymentBindings?.['service-v1']?.runtimeConfiguration
+                ?.safeWalletAccounts?.[accountId]?.status === 'ready'
+            : !!account.address
+        )
+          ? 'provisioned'
+          : 'accepted',
       };
     });
   }

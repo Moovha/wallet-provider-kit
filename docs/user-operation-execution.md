@@ -3,16 +3,15 @@
 Advanced embedded hosts can connect EIP-5792 wallet calls to the durable
 ERC-4337 SafeOp adapter. Applications submit registered contract calls, retain
 the batch ID and poll the existing account-scoped wallet endpoint. The host
-selects the execution driver and sponsor. The configured CLI and setup wizard
-still expose the existing relayer profile; they do not activate this integration.
+selects the execution driver and sponsor. The configured Safe-only CLI and wizard profile compose these components with
+application-owned infrastructure; see [self-hosted sponsorship](self-hosted-sponsorship.md).
 
 ## Compose the host
 
 First configure [durable SafeOp signing](durable-safe-op-signing.md): accepted
 Safe 1.4.1 accounts, Safe4337Module 0.3.0, EntryPoint v0.7, one EOA owner,
-nonce key zero, two independent RPC operators, current runtime publications,
-shared SQLite storage and explicit persisted sponsorship consent. The supported
-chain is Base Sepolia. Use independently reviewed code pins and infrastructure;
+nonce key zero, explicitly selected RPC verification, current runtime publications,
+shared SQLite storage and explicit persisted sponsorship consent. The supported configuration domains are Base and Base Sepolia. Use independently reviewed code pins and infrastructure;
 offline fixtures do not establish real deployment acceptance.
 
 Bind the bundler configuration into the signing configuration **before** creating
@@ -62,7 +61,9 @@ const driver = new UserOperationWalletCallsDriver(
     gas: acceptedGasBounds,
     maxDepthPerSafe: 10,
     maxWaitSeconds: 120,
-    pollIntervalSeconds: 5,
+    pollIntervalSeconds: 1,
+    maxConcurrentAccounts: 10,
+    maxDepthTotal: 512,
   },
 );
 const walletCalls = new WalletCallsService(actions, driver);
@@ -119,7 +120,7 @@ reserves shared budgets, obtains sponsorship and signs the exact SafeOp. It then
 persists the complete signed operation, local EntryPoint hash and scan anchor
 before acquiring a single durable dispatch claim. Authority is checked again
 immediately before `eth_sendUserOperation`. The next batch for that Safe waits
-until the preceding operation has independently verified finality. A blocked or
+until the preceding operation has verified canonical inclusion. Before preparing a follower, the worker freshly verifies its predecessor again. Independent accounts use bounded concurrent lanes; stalled preparation on one account does not hold every other account. Included operations retain settlement tracking and their full financial reservations. A blocked or
 uncertain head retains its lane; it is not skipped on a timer.
 
 ## Recover the original operation
@@ -134,8 +135,7 @@ response is lost.
 
 Recovery uses `eth_getUserOperationReceipt` only as a transaction-hash hint.
 Independent RPCs also scan bounded EntryPoint log ranges using the local hash,
-so a missing bundler reply does not prevent recovery. Both operators must agree
-on the canonical transaction, receipt, block and exact packed operation,
+so a missing bundler reply does not prevent recovery. The configured verification mode checks the canonical transaction, receipt, block and exact packed operation,
 including its SafeOp signature. `handleOps` and zero-aggregator
 `handleAggregatedOps` bundles are supported. Receipt validation checks pinned
 EntryPoint bytecode, chain, sender, nonce, paymaster, operation event, gas bounds
@@ -148,6 +148,12 @@ preceding operation boundary (or `BeforeExecution`) and that operation's event;
 EntryPoint, account, module and paymaster bookkeeping emitters are omitted.
 Other UserOperations' logs and gas are excluded. This is execution evidence,
 not proof of a particular DeFi business result.
+
+Omitting `acceptance.rpcVerification` retains the two-operator quorum profile.
+An explicit `single` profile accepts one to three application-owned RPCs and
+selects one healthy source for each complete proof, with bounded availability
+failover. It does not combine partial evidence from different sources. Verification
+mode and endpoints are included in the signing configuration and consent identity.
 
 Inclusion, safe and finalized observations are retained internally. Reorgs,
 missing receipts or fresh RPC disagreement return `100` without additional

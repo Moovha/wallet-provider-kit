@@ -1,3 +1,6 @@
+import { RpcReadScheduler } from '../execution/rpc-read-scheduler.js';
+import { rpcTransportScope } from '../execution/rpc-capacity.js';
+import { RpcEndpointPool } from '../execution/rpc-pool.js';
 import { verifyAdapterEffects } from '../execution/adapter-effects.js';
 import {
   AbiCoder,
@@ -16,7 +19,7 @@ import { WalletProviderError } from '../domain/signing.js';
 import { serviceHash } from '../executor/auth.js';
 import { operationQuantity } from './user-operation.js';
 import { packedUserOperation } from './bundler.js';
-import type { Safe4337Acceptance } from './verifier.js';
+import { Safe4337Verifier, type Safe4337Acceptance } from './verifier.js';
 import type {
   UserOperationExecution,
   UserOperationObservation,
@@ -51,34 +54,83 @@ function address(value: unknown): string {
 function quantity(value: unknown): bigint {
   return BigInt(operationQuantity(value, 256));
 }
+type VerifiedReceipt = {
+  state: 'included' | 'safe' | 'finalized';
+  actualGasCost: string;
+  actualGasUsed: string;
+  receipt: NonNullable<UserOperationObservation['receipt']>;
+};
+const verifiedReceipts = new WeakMap<
+  typeof fetch,
+  Map<string, { value: VerifiedReceipt; expiresAt: number }>
+>();
 /** Independent canonical EntryPoint evidence, including per-operation log boundaries inside a shared bundle. */
 export class UserOperationReceiptObserver {
   private readonly readers: RpcReader[];
+  private readonly pool?: RpcEndpointPool;
   private readonly acceptance: Safe4337Acceptance;
+  private readonly proofs: Map<
+    string,
+    { value: VerifiedReceipt; expiresAt: number }
+  >;
+  private readonly reads: RpcReadScheduler;
   constructor(
     acceptance: Safe4337Acceptance,
     private readonly maxLogRange: number,
     request: typeof fetch = fetch,
   ) {
+    // Apply the same explicit source-count and network-profile validation as signing.
+    new Safe4337Verifier(acceptance, request);
     this.acceptance = structuredClone(acceptance);
-    this.readers = acceptance.rpcUrls.map((url) => new RpcReader(url, request));
+    const scope = rpcTransportScope(request);
+    this.proofs = verifiedReceipts.get(scope) ?? new Map();
+    verifiedReceipts.set(scope, this.proofs);
+    this.reads = new RpcReadScheduler(
+      [...acceptance.rpcUrls, ...(acceptance.observationRpcUrls ?? [])],
+      request,
+    );
+    this.readers = acceptance.rpcUrls.map(
+      (url) =>
+        new RpcReader(
+          url,
+          request,
+          acceptance.rpcVerification === 'single' ? 4 : 1,
+          acceptance.rpcVerification === 'single',
+          acceptance.rpcVerification === 'single'
+            ? 'endpoint-failover'
+            : 'bounded',
+        ),
+    );
+    if (acceptance.rpcVerification === 'single')
+      this.pool = new RpcEndpointPool(acceptance.rpcUrls, request, true);
   }
-  private async heads(reader: RpcReader) {
-    const chain = await reader.call('eth_chainId', []),
-      genesis = object(
+  private async heads(reader: RpcReader, includeFinality = true) {
+    const verifyGenesis = async () => {
+      const genesis = object(
         await reader.call('eth_getBlockByNumber', ['0x0', false]),
       );
-    if (
-      chain !== this.acceptance.domain.chainId ||
-      hash(genesis.hash) !== this.acceptance.genesisHash
-    )
-      unavailable();
-    const blocks = await Promise.all(
-      ['latest', 'safe', 'finalized'].map(async (tag) =>
-        object(await reader.call('eth_getBlockByNumber', [tag, false])),
+      if (hash(genesis.hash) !== this.acceptance.genesisHash) unavailable();
+    };
+    const [chain, blocks] = await Promise.all([
+      this.acceptance.aggregateReads
+        ? reader.feed('eth_chainId', [])
+        : reader.call('eth_chainId', []),
+      Promise.all(
+        (includeFinality ? ['latest', 'safe', 'finalized'] : ['latest']).map(
+          async (tag) =>
+            object(
+              await (this.acceptance.aggregateReads
+                ? reader.feed('eth_getBlockByNumber', [tag, false])
+                : reader.call('eth_getBlockByNumber', [tag, false])),
+            ),
+        ),
       ),
-    );
-    const [latest, safe, finalized] = blocks.map((block) => {
+      this.acceptance.rpcVerification === 'single'
+        ? reader.verifyGenesis(this.acceptance.genesisHash, verifyGenesis)
+        : verifyGenesis(),
+    ]);
+    if (chain !== this.acceptance.domain.chainId) unavailable();
+    const [latest, safe = 0n, finalized = 0n] = blocks.map((block) => {
       hash(block.hash);
       return quantity(block.number);
     });
@@ -86,7 +138,20 @@ export class UserOperationReceiptObserver {
     return { latest, safe, finalized };
   }
   async anchor(): Promise<string> {
-    const heads = await Promise.all(this.readers.map((r) => this.heads(r)));
+    if (this.pool)
+      return this.pool.run(
+        async (endpoint) =>
+          (
+            await this.heads(
+              this.readers[this.acceptance.rpcUrls.indexOf(endpoint)],
+              !this.acceptance.aggregateReads,
+            )
+          ).latest.toString(),
+        ['genesis'],
+      );
+    const heads = await Promise.all(
+      this.readers.map((r) => this.heads(r, !this.acceptance.aggregateReads)),
+    );
     return heads
       .reduce((min, h) => (min < h.latest ? min : h.latest), heads[0].latest)
       .toString();
@@ -126,6 +191,47 @@ export class UserOperationReceiptObserver {
     head: { latest: bigint; safe: bigint; finalized: bigint },
     maximumCostWei: string,
   ) {
+    const proofKey = serviceHash([
+      this.acceptance.profile,
+      this.acceptance.genesisHash,
+      this.acceptance.rpcVerification ?? 'quorum',
+      this.acceptance.domain,
+      this.acceptance.entryPoint,
+      this.acceptance.module,
+      this.acceptance.paymaster,
+      plan.planHash,
+      plan.userOperationHash,
+      plan.operation,
+      plan.intent,
+      maximumCostWei,
+      txHash,
+    ]);
+    const cached =
+      this.acceptance.aggregateReads &&
+      this.acceptance.rpcVerification === 'single' &&
+      this.proofs.get(proofKey);
+    if (cached && cached.expiresAt > Date.now()) {
+      const block = object(
+        await this.reads.block(cached.value.receipt.blockNumber),
+      );
+      if (hash(block.hash) !== cached.value.receipt.blockHash) {
+        this.proofs.delete(proofKey);
+        return 'reorged' as const;
+      }
+      if (quantity(block.number) !== quantity(cached.value.receipt.blockNumber))
+        unavailable();
+      const height = quantity(block.number);
+      if (height > head.latest) unavailable();
+      return {
+        ...structuredClone(cached.value),
+        state:
+          head.finalized >= height
+            ? ('finalized' as const)
+            : head.safe >= height
+              ? ('safe' as const)
+              : ('included' as const),
+      };
+    }
     const [rawReceipt, rawTx] = await Promise.all([
       reader.call('eth_getTransactionReceipt', [txHash]),
       reader.call('eth_getTransactionByHash', [txHash]),
@@ -155,7 +261,7 @@ export class UserOperationReceiptObserver {
     if (block === null || hash(object(block).hash) !== blockHash)
       return 'reorged' as const;
     if (quantity(object(block).number) !== height) unavailable();
-    await this.pin(reader, this.acceptance.entryPoint, tag);
+
     if (
       typeof tx.input !== 'string' ||
       !/^0x(?:[0-9a-fA-F]{2})+$/.test(tx.input) ||
@@ -181,13 +287,17 @@ export class UserOperationReceiptObserver {
       }
     } else unavailable();
     if (!operations.length || operations.length > 128) unavailable();
-    for (const contract of plan.intent.contracts)
-      await this.pin(
-        reader,
-        contract,
-        tag,
-        allowsEmptyRecipientCode(plan.intent, contract.address),
-      );
+    await Promise.all([
+      this.pin(reader, this.acceptance.entryPoint, tag),
+      ...plan.intent.contracts.map((contract) =>
+        this.pin(
+          reader,
+          contract,
+          tag,
+          allowsEmptyRecipientCode(plan.intent, contract.address),
+        ),
+      ),
+    ]);
     const coder = AbiCoder.defaultAbiCoder(),
       expected = coder.encode(
         [packedOperationTuple],
@@ -301,7 +411,7 @@ export class UserOperationReceiptObserver {
       await reader.call('eth_getBlockByNumber', [tag, false]),
     );
     if (hash(after.hash) !== blockHash) return 'reorged' as const;
-    return {
+    const verified = {
       state:
         head.finalized >= height
           ? ('finalized' as const)
@@ -319,14 +429,50 @@ export class UserOperationReceiptObserver {
         transactionHash: txHash,
       },
     };
+    if (
+      this.acceptance.aggregateReads &&
+      this.acceptance.rpcVerification === 'single'
+    ) {
+      if (this.proofs.size >= 1024)
+        this.proofs.delete(this.proofs.keys().next().value!);
+      this.proofs.set(proofKey, {
+        value: structuredClone(verified),
+        expiresAt: Date.now() + 120000,
+      });
+    }
+    return verified;
   }
   async observe(
     plan: UserOperationExecution,
     maximumCostWei: string,
     hint?: string,
   ): Promise<UserOperationObservation> {
+    if (this.pool)
+      return this.pool.run(
+        (endpoint) =>
+          this.observeAt(plan, maximumCostWei, hint, [
+            this.readers[this.acceptance.rpcUrls.indexOf(endpoint)],
+          ]),
+        ['genesis'],
+      );
+    return this.observeAt(plan, maximumCostWei, hint, this.readers);
+  }
+  private async observeAt(
+    plan: UserOperationExecution,
+    maximumCostWei: string,
+    hint: string | undefined,
+    readers: RpcReader[],
+    knownFirst = true,
+  ): Promise<UserOperationObservation> {
     plan = structuredClone(plan);
-    const heads = await Promise.all(this.readers.map((r) => this.heads(r))),
+    const heads = await Promise.all(
+        readers.map((r) =>
+          this.heads(
+            r,
+            !this.acceptance.aggregateReads || !!plan.observation.receipt,
+          ),
+        ),
+      ),
       from = BigInt(plan.observation.scanNextBlock);
     const latest = heads.reduce(
         (min, h) => (min < h.latest ? min : h.latest),
@@ -338,27 +484,34 @@ export class UserOperationReceiptObserver {
       );
     const end = from + BigInt(this.maxLogRange) - 1n,
       to = end < latest ? end : latest;
-    const groups = await Promise.all(
-      this.readers.map(async (r) => {
-        if (to < from) return [] as string[];
-        const logs = await r.call('eth_getLogs', [
-          {
-            address: this.acceptance.entryPoint.address,
-            fromBlock: toQuantity(from),
-            toBlock: toQuantity(to),
-            topics: [
-              entryPointV07Interface.getEvent('UserOperationEvent')!.topicHash,
-              plan.userOperationHash,
-            ],
-          },
-        ]);
-        if (!Array.isArray(logs) || logs.length > 8) unavailable();
-        return logs.map((l) => hash(object(l).transactionHash));
-      }),
-    );
+    const known =
+      knownFirst &&
+      this.acceptance.rpcVerification === 'single' &&
+      (hint ?? plan.observation.receipt?.transactionHash);
+    const groups = known
+      ? readers.map(() => [] as string[])
+      : await Promise.all(
+          readers.map(async (r) => {
+            if (to < from) return [] as string[];
+            const logs = await r.call('eth_getLogs', [
+              {
+                address: this.acceptance.entryPoint.address,
+                fromBlock: toQuantity(from),
+                toBlock: toQuantity(to),
+                topics: [
+                  entryPointV07Interface.getEvent('UserOperationEvent')!
+                    .topicHash,
+                  plan.userOperationHash,
+                ],
+              },
+            ]);
+            if (!Array.isArray(logs) || logs.length > 8) unavailable();
+            return logs.map((l) => hash(object(l).transactionHash));
+          }),
+        );
     const candidates = [
       ...new Set([
-        ...groups[0].filter((h) => groups[1].includes(h)),
+        ...groups[0].filter((h) => groups.every((group) => group.includes(h))),
         ...(hint ? [hash(hint)] : []),
         ...(plan.observation.receipt
           ? [plan.observation.receipt.transactionHash]
@@ -373,10 +526,12 @@ export class UserOperationReceiptObserver {
     };
     for (const candidate of candidates) {
       const results = await Promise.all(
-        this.readers.map((r, i) =>
+        readers.map((r, i) =>
           this.receipt(r, plan, candidate, heads[i], maximumCostWei),
         ),
       );
+      if (known && results.some((r) => r === 'reorged' || r === null))
+        return this.observeAt(plan, maximumCostWei, undefined, readers, false);
       if (results.some((r) => r === 'reorged' || r === null))
         return {
           ...pending,

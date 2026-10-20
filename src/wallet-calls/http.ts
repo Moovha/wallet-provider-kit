@@ -1,3 +1,4 @@
+import { Readable } from 'node:stream';
 import { setAuthenticatedResponseTimeout } from '../service/response-timeout.js';
 import { uuid } from '../onboarding/policy.js';
 import type { FastifyInstance } from 'fastify';
@@ -14,6 +15,168 @@ export async function registerWalletCallsRoutes(
   authenticate: Authenticate | undefined,
   ready: () => Promise<boolean>,
 ) {
+  const streams = new Map<string, number>();
+  let activeStreams = 0;
+  const accountStreams = new Map<string, number>();
+  app.get<{ Params: { accountId: string; batchId: string } }>(
+    '/v1/accounts/:accountId/wallet/calls/:batchId/events',
+    {
+      schema: {
+        operationId: 'streamWalletCallsStatus',
+        security: [{ accessToken: [] }],
+        description:
+          'Authenticated bounded SSE status stream. Sends current account-authorized EIP-5792 status after durable observation changes. Reconnect after 55 seconds; ordinary status reads remain available.',
+        params: {
+          type: 'object',
+          required: ['accountId', 'batchId'],
+          properties: {
+            accountId: uuidSchema,
+            batchId: { type: 'string', maxLength: 8194 },
+          },
+        },
+        response: {
+          200: {
+            description: 'Bounded SSE stream of authorized wallet status',
+            content: { 'text/event-stream': { schema: { type: 'string' } } },
+          },
+          401: problemSchema,
+          403: problemSchema,
+          429: problemSchema,
+          503: problemSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      if (!service || !authenticate || !(await ready()))
+        throw Object.assign(new Error('Unavailable'), { statusCode: 503 });
+      const principal = await authenticate(
+        request.headers.authorization,
+        'wallet:execute:read',
+      );
+      // Check current ownership and batch access before opening a stream.
+      await service.request(
+        principal,
+        request.params.accountId,
+        'wallet_getCallsStatus',
+        [request.params.batchId],
+      );
+      const key = JSON.stringify([principal.issuer, principal.clientId]);
+      const accountKey = JSON.stringify([
+        principal.issuer,
+        principal.clientId,
+        request.params.accountId,
+      ]);
+      if (
+        activeStreams >= 64 ||
+        (streams.get(key) ?? 0) >= 16 ||
+        (accountStreams.get(accountKey) ?? 0) >= 2
+      )
+        throw Object.assign(new Error('Too many status streams'), {
+          statusCode: 429,
+        });
+      activeStreams++;
+      streams.set(key, (streams.get(key) ?? 0) + 1);
+      accountStreams.set(accountKey, (accountStreams.get(accountKey) ?? 0) + 1);
+      let released = false;
+      const release = () => {
+        if (released) return;
+        released = true;
+        activeStreams--;
+        for (const [map, id] of [
+          [streams, key],
+          [accountStreams, accountKey],
+        ] as const) {
+          const count = (map.get(id) ?? 1) - 1;
+          if (count) map.set(id, count);
+          else map.delete(id);
+        }
+      };
+      const controller = new AbortController();
+      const timer = setTimeout(() => {
+        controller.abort();
+        source.destroy();
+        release();
+      }, 55000);
+      timer.unref();
+      const closed = () => {
+        controller.abort();
+        source.destroy();
+        release();
+      };
+      reply.raw.once('close', closed);
+      const source = Readable.from(
+        (async function* () {
+          try {
+            for await (const status of service.watch(
+              principal,
+              request.params.accountId,
+              request.params.batchId,
+              controller.signal,
+            )) {
+              await authenticate(
+                request.headers.authorization,
+                'wallet:execute:read',
+              );
+              if (!(await ready())) return;
+              yield status
+                ? 'event: status\ndata: ' + JSON.stringify(status) + '\n\n'
+                : ': keepalive\n\n';
+            }
+          } catch {
+            yield 'event: reconnect\ndata: {}\n\n';
+          } finally {
+            clearTimeout(timer);
+            reply.raw.removeListener('close', closed);
+            controller.abort();
+            release();
+          }
+        })(),
+        { objectMode: false, highWaterMark: 16384 },
+      );
+      return reply
+        .header('content-type', 'text/event-stream')
+        .header('cache-control', 'no-store')
+        .header('x-accel-buffering', 'no')
+        .send(source);
+    },
+  );
+  app.get<{ Params: { accountId: string } }>(
+    '/v1/accounts/:accountId/wallet',
+    {
+      schema: {
+        operationId: 'readWalletExecutionAccount',
+        security: [{ accessToken: [] }],
+        params: {
+          type: 'object',
+          required: ['accountId'],
+          properties: { accountId: uuidSchema },
+        },
+        response: {
+          200: {
+            type: 'object',
+            additionalProperties: false,
+            required: ['address', 'chainId'],
+            properties: {
+              address: { type: 'string' },
+              chainId: { type: 'string' },
+            },
+          },
+          401: problemSchema,
+          403: problemSchema,
+          503: problemSchema,
+        },
+      },
+    },
+    async (request) => {
+      if (!service || !authenticate || !(await ready()))
+        throw Object.assign(new Error('Unavailable'), { statusCode: 503 });
+      const principal = await authenticate(
+        request.headers.authorization,
+        'wallet:execute:read',
+      );
+      return service.account(principal, request.params.accountId);
+    },
+  );
   app.post<{ Params: { accountId: string }; Body: unknown }>(
     '/v1/accounts/:accountId/wallet',
     {

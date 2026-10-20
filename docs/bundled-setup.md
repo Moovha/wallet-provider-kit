@@ -1,26 +1,30 @@
-# Configure the bundled wallet service
+# Configure bundled wallet service profiles
 
-The recommended new-deployment path includes application authentication, a local
-wallet engine, a running local execution engine, durable storage, container supervision and an HTTPS gateway.
-Configure these in the wizard; you do not need to build an authorization server,
-register clients in another administration console or install wallet and execution engines.
-Existing services and custom backend adapters remain optional integration paths.
+New OWS wizard deployments use [Safe-only wallets and application-owned
+sponsorship](self-hosted-sponsorship.md): one Safe per user, a private signer,
+an application paymaster and a private bundler. Follow that guide for its
+application connection, funding and provisioning sequence.
+
+The relayer-specific execution instructions below describe the explicit
+compatibility profile. Application authentication, OWS, SQLite and HTTPS are shared
+components. Configure them in the wizard; existing services and custom backend
+adapters remain optional integration paths.
 
 ## What is included
 
-| Component                  | Default and purpose                                                                                                                                                         | Retained state                                                        |
-| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| Application authentication | Pinned `oidc-provider` 9.12.2, configured for server-to-server OAuth client credentials and RFC 9068 JWT access tokens.                                                     | Private RSA issuer key and per-application secrets in `provider.env`. |
-| Wallet engine              | Pinned Open Wallet Standard core 1.4.3, included with its native platform binding. Creates accounts and signs only admitted actions through the existing journaled adapter. | Private `.provider-vault`, owner passphrase and SQLite journals.      |
-| Local execution            | OpenZeppelin Relayer 1.8.0 with Valkey 9.1.2; both official images pinned by digest. Private dispatch, nonce workers and persistent queues.                                 | `.local-execution`, `execution.env` and `.execution-data`.            |
-| Authority and storage      | The supplied provider policy, grant and attempt services with single-host SQLite.                                                                                           | `.provider-data`, configuration and binding revisions.                |
-| HTTPS                      | Official Caddy 2.11.7 image pinned by digest; certificate issuance and renewal for your configured hostname.                                                                | Private `.provider-tls` certificate storage.                          |
-| Runtime                    | Docker Compose with restart supervision, unprivileged service processes and persistent private bind mounts.                                                                 | Saved Compose definition and operating instructions.                  |
+| Component                         | Default and purpose                                                                                                                                                         | Retained state                                                        |
+| --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| Application authentication        | Pinned `oidc-provider` 9.12.2, configured for server-to-server OAuth client credentials and RFC 9068 JWT access tokens.                                                     | Private RSA issuer key and per-application secrets in `provider.env`. |
+| Wallet engine                     | Pinned Open Wallet Standard core 1.4.3, included with its native platform binding. Creates accounts and signs only admitted actions through the existing journaled adapter. | Private `.provider-vault`, owner passphrase and SQLite journals.      |
+| Relayer execution (compatibility) | OpenZeppelin Relayer 1.8.0 with Valkey 9.1.2; both official images pinned by digest. Private dispatch, nonce workers and persistent queues.                                 | `.local-execution`, `execution.env` and `.execution-data`.            |
+| Authority and storage             | The supplied provider policy, grant and attempt services with single-host SQLite.                                                                                           | `.provider-data`, configuration and binding revisions.                |
+| HTTPS                             | Official Caddy 2.11.7 image pinned by digest; certificate issuance and renewal for your configured hostname.                                                                | Private `.provider-tls` certificate storage.                          |
+| Runtime                           | Docker Compose with restart supervision, unprivileged service processes and persistent private bind mounts.                                                                 | Saved Compose definition and operating instructions.                  |
 
 `oidc-provider` supplies a maintained OAuth implementation with native support for
 the required JWT profile. Caddy supplies automatic certificate management. OWS is
 the existing local backend that makes this setup independent of vendor account
-creation. These are defaults for this kit's supported single-host evaluation
+creation. These are components of the single-host relayer compatibility
 profile, not a claim of superior production custody or certification. See the
 [issuer project](https://github.com/panva/node-oidc-provider),
 [Caddy HTTPS documentation](https://caddyserver.com/docs/automatic-https) and

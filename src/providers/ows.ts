@@ -35,6 +35,16 @@ export function createOwsWalletProvider(
   options: OwsProviderOptions,
   attempts: JournaledProviderOptions,
 ): WalletSigningProvider {
+  return createJournaledWalletProvider(
+    createOwsSigningBackend(options),
+    attempts,
+  );
+}
+
+/** Internal backend; the caller must supply its durable financial journal. */
+export function createOwsSigningBackend(
+  options: OwsProviderOptions,
+): WalletSigningProvider {
   const selected = providerNetwork(options.network);
   const vaultPath = options.vaultPath;
   const passphrase = options.passphrase;
@@ -197,5 +207,5 @@ export function createOwsWalletProvider(
       }
     },
   };
-  return createJournaledWalletProvider(backend, attempts);
+  return backend;
 }

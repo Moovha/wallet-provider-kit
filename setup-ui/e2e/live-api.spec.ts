@@ -53,7 +53,7 @@ test('deployed Swagger executes same-origin HTTP and displays real success/auth/
   await expect(
     page.getByRole('heading', { name: /Provider API · Live testing/ }),
   ).toBeVisible();
-  await expect(page.locator('.opblock')).toHaveCount(55);
+  await expect(page.locator('.opblock')).toHaveCount(62);
   await expect(
     page.locator('.opblock').filter({
       hasText: 'Authorize cancellation of an unsubmitted signed Safe action',

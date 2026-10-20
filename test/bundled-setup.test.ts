@@ -219,14 +219,17 @@ it('requires exact issuer binding, unique credentials and an enabled application
 it('defaults to the bundled issuer and OWS, synchronizes registrations without replacing retained secret references', () => {
   const draft = emptyConfiguration(config);
   expect(draft.backend.kind).toBe('ows');
-  expect(draft.localExecution?.kind).toBe('openzeppelin-relayer');
+  expect(draft.safeWallet?.profile).toBe('safe-only-4337-v1');
+  expect(draft.localExecution).toBeUndefined();
   expect(draft.authorizationServer).toBeDefined();
   const secret = draft.authorizationServer!.clients[0].clientSecret;
   draft.policy.provider.origin = 'https://wallet.example.test';
   synchronizeBundledServices(draft);
   expect(draft.oauth).toEqual(bundledOAuth('https://wallet.example.test'));
   expect(draft.authorizationServer!.clients[0].clientSecret).toEqual(secret);
-  expect(draft.authorizationServer!.clients[0].scopes).toContain('wallet:sign');
+  expect(draft.authorizationServer!.clients[0].scopes).toContain(
+    'wallet:provision',
+  );
 });
 
 it('creates a private retained vault and generated secrets without returning secrets in plans, progress or command arguments', async () => {
@@ -445,32 +448,29 @@ it('supplies unique stable internal identities without granting financial author
     ),
   ).toBe(true);
   expect(first.financial).toBeUndefined();
-  expect(first.execution?.sponsors).toEqual([]);
-  expect(first.execution?.rpc.endpoints).toEqual([]);
+  expect(first.execution).toBeUndefined();
+  expect(first.safeWallet?.profile).toBe('safe-only-4337-v1');
   expect(first.approvedCalls?.policy.accounts).toEqual([]);
   expect(first.activation.enabled).toBe(false);
 });
 
-it('exports an idle shared-Safe deployment without sponsor keys, funded accounts or provider RPC subscriptions', async () => {
+it('exports an idle Safe-only deployment without executor keys, funded accounts or provider RPC subscriptions', async () => {
   const draft = emptyConfiguration(config);
   draft.policy.provider = { ...config.policy.provider };
   draft.policy.applications[0].name = 'Offline application';
   draft.policy.applications[0].assertionTrust!.agreement = 'offline-agreement';
   synchronizeBundledServices(draft);
   expect(validateProviderConfiguration(draft)).toEqual(draft);
-  const { prepareLocalExecution } =
-    await import('../src/deployment/local-execution.js');
-  const prepared = prepareLocalExecution(
-    draft,
-    generateDeploymentSecrets(draft, {}),
-  );
-  expect(prepared.keys).toEqual([]);
-  expect(prepared.relayer.signers).toEqual([]);
-  expect(prepared.relayer.relayers).toEqual([]);
-  expect(prepared.relayer.networks[0].rpc_urls).toEqual([
-    'https://unconfigured.invalid',
-  ]);
+  expect(draft.execution).toBeUndefined();
+  expect(draft.localExecution).toBeUndefined();
+  expect(draft.safeWallet?.profile).toBe('safe-only-4337-v1');
+  expect(draft.approvedCalls?.policy.accounts).toEqual([]);
+  expect(draft.runtimeConfiguration?.sharedApplicationSafes).toBeUndefined();
+  expect(draft.runtimeConfiguration?.executionPool).toBeUndefined();
   const mixed = structuredClone(draft);
-  mixed.execution!.rpc.endpoints = [{ env: 'PROVIDER_PAID_RPC' }];
+  mixed.execution = {
+    ...config.execution,
+    rpc: { endpoints: [{ env: 'PROVIDER_PAID_RPC' }] },
+  } as never;
   expect(() => validateProviderConfiguration(mixed)).toThrow();
 });

@@ -38,6 +38,7 @@ export interface UserOperationExecution {
   observationRevision: number;
 }
 export interface UserOperationBatch {
+  timings?: Record<string, string>;
   id: string;
   metadata: WalletCallsMetadata;
   context: AuthorityContext;
@@ -51,9 +52,11 @@ export interface UserOperationBatch {
   expiresAt: string;
   sequence: number;
   operationId?: string;
-  stage: 'queued' | 'processing' | 'blocked' | 'complete' | 'expired';
+  stage:
+    'queued' | 'processing' | 'blocked' | 'included' | 'complete' | 'expired';
 }
 export interface WalletCallsDriver {
+  subscribe?(listener: (batchId: string) => void): () => void;
   handles(accountId: string): boolean;
   capabilities(principal: VerifiedPrincipal, accountId: string): Promise<void>;
   acceptPaymaster(value: unknown): void;
@@ -70,6 +73,7 @@ export interface WalletCallsDriver {
     principal: VerifiedPrincipal,
     accountId: string,
     id: string,
+    refresh?: boolean,
   ): Promise<import('../wallet-calls/types.js').WalletCallsStatus>;
   list(
     principal: VerifiedPrincipal,

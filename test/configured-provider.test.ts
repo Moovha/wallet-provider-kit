@@ -1275,7 +1275,7 @@ describe('configured API and provider transfer authorization', () => {
     await f.api('/v1/actions/' + second.action_id + '/execute', {});
     expect(f.execution!.state.posts).toBe(1);
   });
-  it('continues authorized status recovery after signing expiry and fences a finalized-head regression', async () => {
+  it('continues authorized status recovery after signing expiry and retains matching finalized evidence when RPC heads lag', async () => {
     const f = await fixture(undefined, undefined, true);
     const first = (await f.request('1')).json();
     const unstarted = (await f.request('1')).json();
@@ -1299,7 +1299,12 @@ describe('configured API and provider transfer authorization', () => {
       'succeeded',
     );
     f.execution!.state.finality = 'included';
-    expect((await read()).statusCode).toBe(503);
+    const lagged = await read();
+    expect(lagged.statusCode, lagged.body).toBe(200);
+    expect(lagged.json()).toMatchObject({
+      chain_status: 'finalized',
+      settlement: 'succeeded',
+    });
     expect(f.execution!.state.posts).toBe(1);
   });
   it('serializes two coordinators against the same durable action and sponsor budget', async () => {
@@ -1438,6 +1443,18 @@ describe('configured API and provider transfer authorization', () => {
         },
       });
     const authorization = await f.token('wallet:execute:read');
+    const reconcile = () =>
+      f.app.inject({
+        method: 'POST',
+        url: '/v1/actions/' + action.action_id + '/reconcile',
+        headers: {
+          authorization,
+          'idempotency-key': randomUUID(),
+          'execution-profile': 'erc3009-relayer-v1',
+          'execution-profile-revision': '1',
+        },
+        payload: {},
+      });
     const status = () =>
       f.app.inject({
         url: '/v1/actions/' + action.action_id + '/execution',
@@ -1456,8 +1473,16 @@ describe('configured API and provider transfer authorization', () => {
         ? { ...(value as object), hash: '0x' + 'f'.repeat(64) }
         : value;
     expect((await status()).statusCode).toBe(503);
+    expect((await reconcile()).statusCode).toBe(503);
     f.execution!.state.mutate = undefined;
     expect((await status()).statusCode).toBe(503);
+    const reconciled = await reconcile();
+    expect(reconciled.statusCode, reconciled.body).toBe(200);
+    expect(reconciled.json()).toMatchObject({
+      chain_status: 'finalized',
+      settlement: 'succeeded',
+    });
+    expect((await status()).statusCode).toBe(200);
     expect(f.execution!.state.posts).toBe(1);
     expect((await read()).statusCode).toBe(401);
   });
@@ -2313,7 +2338,13 @@ async function generalFixture(
   contractOnly = false,
   queue = false,
   replacements = false,
+  automaticQueue = false,
 ) {
+  // Queue authority/race tests explicitly drive their independent workers.
+  if (queue && !automaticQueue)
+    vi.spyOn(SafeExecutionQueue.prototype, 'start').mockImplementation(
+      () => {},
+    );
   const t = await designatedFixture(),
     f = t.f;
   const calls = approvedCallsFixture(
@@ -2327,6 +2358,7 @@ async function generalFixture(
   if (queue)
     f.config.execution!.safeQueue = {
       maxDepthPerSafe: 20,
+      maxDepthPerUser: 20,
       maxWaitSeconds: 300,
     };
   f.config.policy.applications[0].permissions!.push('contracts:request');
@@ -2701,12 +2733,15 @@ async function queueWorker(t: Awaited<ReturnType<typeof generalFixture>>) {
   const execution = {
     async refresh(id: string) {
       const response = await t.f.app.inject({
-        url: '/v1/actions/' + id + '/execution',
+        method: 'POST',
+        url: '/v1/actions/' + id + '/reconcile',
         headers: {
           authorization: await t.f.token(),
+          'idempotency-key': randomUUID(),
           'execution-profile': 'approved-evm-executor-v1',
           'execution-profile-revision': '1',
         },
+        payload: {},
       });
       if (response.statusCode !== 200)
         throw new WalletProviderError(
@@ -3372,14 +3407,14 @@ it('rejects cancellation racing with an admitted signature without skipping the 
 });
 
 it('automatically executes a queued head in the configured service without a status read or application broadcast', async () => {
-  const t = await generalFixture(true, true);
-  t.f.config.execution!.pollIntervalSeconds = 5;
+  const t = await generalFixture(true, true, false, true);
+  t.f.config.execution!.pollIntervalSeconds = 300;
   await t.restart();
   recordQueueSignature(t);
   const response = await t.f.api('/v1/contract-call-requests', queueInput(t));
   expect(response.statusCode, response.body).toBe(202);
   await vi.waitFor(() => expect(t.calls.state.posts).toBe(1), {
-    timeout: 7500,
+    timeout: 2000,
     interval: 100,
   });
   expect((await queueRead(t, response.json().request_id)).json().status).toBe(
@@ -4195,7 +4230,7 @@ it('executes newly registered application methods without restarting either serv
     ),
   );
   db.close();
-  expect(snapshots).toEqual(['1', '2']);
+  expect(snapshots.sort()).toEqual(['1', '2']);
   await f.restart();
   expect(
     (
@@ -4366,6 +4401,166 @@ async function walletCallsFixture(local = false) {
 }
 
 describe('EIP-5792 runtime wallet calls', () => {
+  it('releases a verified queue head through the observer handoff without another queue poll or dispatching from a status read', async () => {
+    const f = await walletCallsFixture();
+    const first = await f.rpc('wallet_sendCalls', [f.batch()]);
+    await f.rpc('wallet_sendCalls', [f.batch()]);
+    await f.process();
+    expect(f.calls.state.posts).toBe(1);
+    f.calls.state.included = true;
+    f.calls.state.mutate = (method, result, _origin, params) =>
+      method === 'eth_getBlockByNumber' &&
+      ['safe', 'finalized'].includes(String(params[0]))
+        ? { ...(result as object), number: '0x64' }
+        : result;
+    expect(
+      (await f.rpc('wallet_getCallsStatus', [first.result.id])).result.status,
+    ).toBe(200);
+    const database = openProviderDatabase({
+      directory: f.config.storage.directory,
+    });
+    try {
+      const state = await database.onboardingStore.transaction((s) => ({
+        queue: Object.values(s.safeRequests ?? {}).find(
+          (r) => r.walletCalls?.id === first.result.id,
+        ),
+        events: s.audit.filter((r) => r.event === 'safe_request_included'),
+      }));
+      expect(state.queue?.status).toBe('included');
+      expect(state.events).toHaveLength(1);
+      expect(f.calls.state.posts).toBe(1);
+    } finally {
+      database.close();
+    }
+  });
+  it.each([true, false])(
+    'advances after verified inclusion with consumed Safe nonce (inner success=%s), preserves settlement and pauses on a reorg',
+    async (safeSuccess) => {
+      const f = await walletCallsFixture();
+      const first = await f.rpc('wallet_sendCalls', [f.batch()]);
+      const second = await f.rpc('wallet_sendCalls', [f.batch()]);
+      await f.process();
+      expect(f.calls.state.posts).toBe(1);
+      f.calls.state.included = true;
+      f.calls.state.safeSuccess = safeSuccess;
+      f.calls.state.mutate = (method, result, _origin, params) =>
+        method === 'eth_getBlockByNumber' &&
+        ['safe', 'finalized'].includes(String(params[0]))
+          ? { ...(result as object), number: '0x64' }
+          : result;
+      await f.process();
+      const database = openProviderDatabase({
+        directory: f.config.storage.directory,
+      });
+      const snapshot = await database.onboardingStore.transaction((state) => ({
+        queue: Object.values(state.safeRequests ?? {}).find(
+          (r) => r.walletCalls?.id === first.result.id,
+        ),
+        observation: Object.values(state.supportedActions ?? {})[0].execution
+          ?.observation,
+      }));
+      database.close();
+      expect(snapshot.queue?.status).toBe('included');
+      expect(snapshot.observation).toMatchObject({
+        chain_status: 'included',
+        settlement: 'pending',
+        safe_nonce_consumed: true,
+      });
+      f.calls.state.included = false;
+      await f.process();
+      expect(f.calls.state.posts).toBe(1);
+      expect(
+        (await f.rpc('wallet_getCallsStatus', [second.result.id])).result
+          .status,
+      ).toBe(100);
+      f.calls.state.included = true;
+      await f.process();
+      expect(f.calls.state.posts).toBe(2);
+    },
+  );
+
+  it('rejects a per-user admission burst without signing or consuming sponsor budget', async () => {
+    const f = await walletCallsFixture();
+    const reads = await Promise.all(
+      Array.from({ length: 16 }, () => f.rpc('wallet_sendCalls', [f.batch()])),
+    );
+    expect(reads.filter((r) => r.result?.id)).toHaveLength(8);
+    expect(reads.filter((r) => r.error?.code === 5740)).toHaveLength(8);
+    expect(f.calls.state.posts).toBe(0);
+    expect(injected.backend!.signTypedData).not.toHaveBeenCalled();
+  });
+  it.each([true, false])(
+    'bounds concurrent status waits, shares stalled observation and distinguishes recent from stale inclusion (stale=%s)',
+    async (stale) => {
+      const f = await walletCallsFixture();
+      const sent = await f.rpc('wallet_sendCalls', [f.batch()]);
+      await f.process();
+      expect(f.calls.state.posts).toBe(1);
+      f.calls.state.included = true;
+      f.calls.state.mutate = (method, result, _origin, params) =>
+        method === 'eth_getBlockByNumber' &&
+        ['safe', 'finalized'].includes(String(params[0]))
+          ? { ...(result as object), number: '0x64' }
+          : result;
+      expect(
+        (await f.rpc('wallet_getCallsStatus', [sent.result.id])).result?.status,
+      ).toBe(200);
+      if (stale) {
+        const db = openProviderDatabase({
+          directory: f.config.storage.directory,
+        });
+        await db.onboardingStore.transaction((state) => {
+          for (const record of Object.values(state.supportedActions ?? {}))
+            if (record.execution?.observation)
+              record.execution.observation.observed_at = new Date(
+                Date.now() - 6000,
+              ).toISOString();
+        });
+        db.close();
+      }
+      let release!: () => void;
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const request = f.t.f.execution!.request;
+      let chainReads = 0;
+      f.t.f.execution!.request = async (input, init) => {
+        if (String(input).includes('example.test') && init?.body) {
+          const method = JSON.parse(String(init.body)).method;
+          if (method === 'eth_chainId') {
+            chainReads++;
+            await gate;
+          }
+        }
+        return request(input, init);
+      };
+      try {
+        const reads = await Promise.all(
+          Array.from({ length: 3 }, () =>
+            f.rpc('wallet_getCallsStatus', [sent.result.id]),
+          ),
+        );
+        expect(
+          reads.every((read) =>
+            stale
+              ? read.result?.status === 100 && !read.result.receipts
+              : read.result?.status === 200 &&
+                read.result.receipts?.length === 1,
+          ),
+        ).toBe(true);
+        expect(chainReads).toBe(2);
+      } finally {
+        release();
+      }
+      await vi.waitFor(async () => {
+        expect(
+          (await f.rpc('wallet_getCallsStatus', [sent.result.id])).result
+            ?.status,
+        ).toBe(200);
+      });
+      expect(f.calls.state.posts).toBe(1);
+    },
+  );
   it('enforces off-chain action payloads before queue admission and fences policy changes before signing', async () => {
     const f = await walletCallsFixture();
     const action_requirements = [

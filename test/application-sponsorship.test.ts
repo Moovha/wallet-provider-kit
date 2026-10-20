@@ -50,3 +50,39 @@ it('rejects a budget below one bounded transaction reserve', () => {
     }),
   ).toThrow();
 });
+
+it('requires explicit bounded account creation and sponsor concurrency for the per-user model', () => {
+  const value = {
+    ...agreement,
+    account_model: 'provider-controlled-user-safe' as const,
+  };
+  expect(() => normalizeObligation('sponsorship', value)).toThrow();
+  expect(
+    normalizeObligation('sponsorship', {
+      ...value,
+      maximum_execution_accounts: 10,
+      maximum_in_flight_per_sponsor: 2,
+    }).account_model,
+  ).toBe('provider-controlled-user-safe');
+  for (const maximum_execution_accounts of [0, 100001, 1.5])
+    expect(() =>
+      normalizeObligation('sponsorship', {
+        ...value,
+        maximum_execution_accounts,
+      }),
+    ).toThrow();
+  for (const maximum_in_flight_per_sponsor of [0, 17, 1.5])
+    expect(() =>
+      normalizeObligation('sponsorship', {
+        ...value,
+        maximum_execution_accounts: 10,
+        maximum_in_flight_per_sponsor,
+      }),
+    ).toThrow();
+  expect(() =>
+    normalizeObligation('sponsorship', {
+      ...agreement,
+      maximum_in_flight_per_sponsor: 2,
+    }),
+  ).toThrow();
+});

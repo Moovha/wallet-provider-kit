@@ -1,3 +1,5 @@
+import { SafeWalletRuntime } from '../sponsorship/safe-wallet.js';
+import { createOwsSigningBackend } from '../providers/ows.js';
 import { ApplicationExecutionCoordinator } from '../execution/application-coordinator.js';
 import { ApplicationSponsorService } from '../provisioning/application-sponsor.js';
 import {
@@ -173,8 +175,11 @@ export async function createConfiguredProvider(
           ]
         : []),
     ];
+    const callPolicyBinding = config.safeWallet
+      ? [config.approvedCalls, config.safeWallet]
+      : config.approvedCalls;
     const actionPolicyRevisionBase = config.approvedCalls
-      ? fingerprint([config.financial ?? null, config.approvedCalls])
+      ? fingerprint([config.financial ?? null, callPolicyBinding])
       : config.financial
         ? fingerprint(config.financial)
         : undefined;
@@ -188,6 +193,7 @@ export async function createConfiguredProvider(
       backend,
       actionPolicyRevision,
       config.runtimeConfiguration?.authorizeContracts,
+      !!config.safeWallet,
     );
     const login = config.ownerLogin
       ? await createOwnerLogin(
@@ -209,6 +215,7 @@ export async function createConfiguredProvider(
       onboarding!.policy.revision,
       ...(network.testnet ? [] : [network.name]),
       config.financial ?? null,
+      ...(config.safeWallet ? [config.safeWallet] : []),
       ...(config.safeProvisioning ? [config.safeProvisioning] : []),
       ...(config.approvedCalls ? [config.approvedCalls] : []),
       config.backend,
@@ -261,7 +268,10 @@ export async function createConfiguredProvider(
             config.approvedCalls,
             config.network,
             config.safeProvisioning ?? false,
-            !!config.runtimeConfiguration?.sharedApplicationSafes,
+            !!config.safeWallet ||
+              !!config.runtimeConfiguration?.sharedApplicationSafes,
+            config.runtimeConfiguration?.executionPool?.safeCount ?? 1,
+            !!config.safeWallet,
           )
         : undefined;
     financial = actions
@@ -313,23 +323,54 @@ export async function createConfiguredProvider(
             : undefined,
         )
       : undefined;
-    const applicationSponsors = config.runtimeConfiguration
-      ?.sharedApplicationSafes
-      ? new ApplicationSponsorService(
-          runtimeConfiguration!,
-          database,
-          new ApplicationCredentialCipher(
-            resolveSecret(config.runtimeConfiguration.credentialKey!),
-          ),
-          config.execution!,
-          activeRevision,
-          resolveSecret(config.execution!.relayer!.apiKey),
-          localExecutionFetch(),
-          config.network,
-        )
-      : undefined;
+    const safeWallet =
+      config.safeWallet &&
+      actions &&
+      runtimeConfiguration &&
+      config.backend.kind === 'ows'
+        ? new SafeWalletRuntime(
+            config,
+            database,
+            runtimeConfiguration,
+            onboarding,
+            actions,
+            createOwsSigningBackend({
+              vaultPath: resolve(directory, config.backend.vaultDirectory),
+              passphrase: async () =>
+                resolveSecret(
+                  (
+                    config.backend as Extract<
+                      typeof config.backend,
+                      { kind: 'ows' }
+                    >
+                  ).passphrase,
+                ),
+              network: config.network,
+            }),
+            new ApplicationCredentialCipher(
+              resolveSecret(config.runtimeConfiguration!.credentialKey!),
+            ),
+            directory,
+            resolveSecret(config.safeWallet.bundlerAuthorization),
+          )
+        : undefined;
+    const applicationSponsors =
+      !safeWallet && config.runtimeConfiguration?.sharedApplicationSafes
+        ? new ApplicationSponsorService(
+            runtimeConfiguration!,
+            database,
+            new ApplicationCredentialCipher(
+              resolveSecret(config.runtimeConfiguration.credentialKey!),
+            ),
+            config.execution!,
+            activeRevision,
+            resolveSecret(config.execution!.relayer!.apiKey),
+            localExecutionFetch(),
+            config.network,
+          )
+        : undefined;
     let applicationSafes: ApplicationSafeService | undefined;
-    if (config.runtimeConfiguration?.sharedApplicationSafes) {
+    if (!safeWallet && config.runtimeConfiguration?.sharedApplicationSafes) {
       const applicationBackend = await createConfiguredBackend(
         config.backend,
         directory,
@@ -381,6 +422,8 @@ export async function createConfiguredProvider(
             database.onboardingStore,
             config.execution,
             config.network,
+            fetch,
+            !!config.runtimeConfiguration?.sharedApplicationSafes,
           )
         : new QuorumTransferObserver(
             config.execution.rpc.endpoints.map((entry) => resolveSecret(entry)),
@@ -430,7 +473,7 @@ export async function createConfiguredProvider(
           state.operations['service-v1'].binding = 'disabled';
       });
     const execution =
-      config.execution && actions
+      !safeWallet && config.execution && actions
         ? applicationSponsors
           ? new ApplicationExecutionCoordinator(
               database,
@@ -450,8 +493,17 @@ export async function createConfiguredProvider(
                     applicationSponsors.request(),
                   ),
                   observer!,
+                  undefined,
+                  async (id): Promise<void> => {
+                    await safeQueue?.included(id);
+                  },
                 );
               },
+              !!config.execution.local,
+              async (applicationId) =>
+                fingerprint(
+                  await applicationSponsors.configuration(applicationId),
+                ),
             )
           : new TransferExecutionCoordinator(
               actions,
@@ -470,9 +522,12 @@ export async function createConfiguredProvider(
                   ),
               observer!,
               operations,
+              async (id): Promise<void> => {
+                await safeQueue?.included(id);
+              },
             )
         : undefined;
-    const safeQueue =
+    const safeQueue: SafeExecutionQueue | undefined =
       config.execution?.safeQueue && execution && actions && observer
         ? new SafeExecutionQueue(
             actions,
@@ -493,7 +548,7 @@ export async function createConfiguredProvider(
             transportRevision,
       );
     const safeProvisioning =
-      config.safeProvisioning && config.execution
+      !safeWallet && config.safeProvisioning && config.execution
         ? new SafeProvisioningService(
             onboarding,
             database,
@@ -524,14 +579,16 @@ export async function createConfiguredProvider(
           )
         : undefined;
     const app = await createServer({
+      safeWallet,
       safeProvisioning: applicationSafes ? undefined : safeProvisioning,
       applicationSafes,
       applicationSponsors,
-      walletCalls:
-        config.runtimeConfiguration?.authorizeContracts &&
-        actions &&
-        safeQueue &&
-        execution
+      walletCalls: safeWallet
+        ? new WalletCallsService(actions!, safeWallet.walletDriver())
+        : config.runtimeConfiguration?.authorizeContracts &&
+            actions &&
+            safeQueue &&
+            execution
           ? new WalletCallsService(actions, safeQueue, execution)
           : undefined,
       runtimeConfiguration,
@@ -580,6 +637,7 @@ export async function createConfiguredProvider(
         actions,
         execution,
         safeQueue,
+        rpcVerification: runtimeConfiguration?.rpcVerification,
         executionIdentity,
         contractNonce:
           config.approvedCalls && observer
@@ -588,6 +646,8 @@ export async function createConfiguredProvider(
             : undefined,
       },
       onClose: async () => {
+        await safeWallet?.close();
+        await applicationSponsors?.funding.close();
         await operations?.close();
         await safeQueue?.close();
         await execution?.close();
@@ -604,8 +664,11 @@ export async function createConfiguredProvider(
               transportRevision,
         )),
       documentation: config.http?.documentation ?? false,
+      requestsPerMinute: config.http?.requestsPerMinute,
     });
     if (config.activation.enabled) {
+      await safeWallet?.start();
+      applicationSponsors?.funding.start();
       operations?.start();
       execution?.start();
       safeQueue?.start();
