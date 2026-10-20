@@ -12,7 +12,11 @@
     "identity",
     "backend",
     "storage",
-    "activation"
+    "activation",
+    "safeWallet",
+    "safeProvisioning",
+    "approvedCalls",
+    "runtimeConfiguration"
   ],
   "properties": {
     "configVersion": {
@@ -91,7 +95,6 @@
                   "enum": [
                     "account:read",
                     "operations:request",
-                    "transfers:request",
                     "contracts:request"
                   ]
                 }
@@ -402,179 +405,35 @@
       "minProperties": 0
     },
     "backend": {
-      "oneOf": [
-        {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "kind",
-            "apiKeyId",
-            "apiKeySecret",
-            "walletSecret",
-            "binding"
-          ],
-          "properties": {
-            "kind": {
-              "const": "cdp"
-            },
-            "apiKeyId": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": ["env"],
-              "properties": {
-                "env": {
-                  "type": "string",
-                  "pattern": "^[A-Z][A-Z0-9_]{0,127}$"
-                }
-              }
-            },
-            "apiKeySecret": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": ["env"],
-              "properties": {
-                "env": {
-                  "type": "string",
-                  "pattern": "^[A-Z][A-Z0-9_]{0,127}$"
-                }
-              }
-            },
-            "walletSecret": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": ["env"],
-              "properties": {
-                "env": {
-                  "type": "string",
-                  "pattern": "^[A-Z][A-Z0-9_]{0,127}$"
-                }
-              }
-            },
-            "binding": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 256
-            }
-          }
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "binding", "vaultDirectory", "passphrase"],
+      "properties": {
+        "kind": {
+          "const": "ows"
         },
-        {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["kind", "binding", "vaultDirectory", "passphrase"],
-          "properties": {
-            "kind": {
-              "const": "ows"
-            },
-            "binding": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 256
-            },
-            "vaultDirectory": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 256
-            },
-            "passphrase": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": ["env"],
-              "properties": {
-                "env": {
-                  "type": "string",
-                  "pattern": "^[A-Z][A-Z0-9_]{0,127}$"
-                }
-              }
-            }
-          }
+        "binding": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
         },
-        {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["kind", "binding", "url", "apiKey", "signers"],
-          "properties": {
-            "kind": {
-              "const": "openzeppelin-relayer"
-            },
-            "binding": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 256
-            },
-            "url": {
-              "type": "string",
-              "pattern": "^https://",
-              "maxLength": 2048
-            },
-            "apiKey": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": ["env"],
-              "properties": {
-                "env": {
-                  "type": "string",
-                  "pattern": "^[A-Z][A-Z0-9_]{0,127}$"
-                }
-              }
-            },
-            "signers": {
-              "type": "array",
-              "minItems": 1,
-              "maxItems": 100,
-              "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": [
-                  "relayerId",
-                  "signerId",
-                  "address",
-                  "bindingRevision"
-                ],
-                "properties": {
-                  "relayerId": {
-                    "type": "string",
-                    "pattern": "^[a-zA-Z0-9_-]{1,64}$"
-                  },
-                  "signerId": {
-                    "type": "string",
-                    "pattern": "^[a-zA-Z0-9_-]{1,64}$"
-                  },
-                  "address": {
-                    "type": "string",
-                    "pattern": "^0x[0-9a-fA-F]{40}$"
-                  },
-                  "bindingRevision": {
-                    "const": "1"
-                  }
-                }
-              }
-            }
-          }
+        "vaultDirectory": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
         },
-        {
+        "passphrase": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["kind", "module", "binding"],
+          "required": ["env"],
           "properties": {
-            "kind": {
-              "const": "custom"
-            },
-            "module": {
+            "env": {
               "type": "string",
-              "minLength": 1,
-              "maxLength": 256
-            },
-            "options": {
-              "type": "object"
-            },
-            "binding": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 256
+              "pattern": "^[A-Z][A-Z0-9_]{0,127}$"
             }
           }
         }
-      ]
+      }
     },
     "storage": {
       "type": "object",
@@ -608,91 +467,6 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 256
-        },
-        "tokenAcceptance": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 256
-        },
-        "executionAcceptance": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 256
-        },
-        "safeProvisioningAcceptance": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 256
-        }
-      }
-    },
-    "financial": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "profile",
-        "token",
-        "recipients",
-        "maximumAmount",
-        "lifetimeAmount",
-        "maxValiditySeconds"
-      ],
-      "properties": {
-        "profile": {
-          "const": "provider-authorized-erc3009-v1"
-        },
-        "token": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["address", "name", "version", "symbol", "decimals"],
-          "properties": {
-            "address": {
-              "type": "string",
-              "pattern": "^0x[0-9a-fA-F]{40}$"
-            },
-            "name": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 256
-            },
-            "version": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 256
-            },
-            "symbol": {
-              "type": "string",
-              "pattern": "^[A-Za-z0-9]{1,12}$"
-            },
-            "decimals": {
-              "type": "integer",
-              "minimum": 0,
-              "maximum": 36
-            }
-          }
-        },
-        "recipients": {
-          "type": "array",
-          "minItems": 1,
-          "maxItems": 100,
-          "uniqueItems": true,
-          "items": {
-            "type": "string",
-            "pattern": "^0x[0-9a-fA-F]{40}$"
-          }
-        },
-        "maximumAmount": {
-          "type": "string",
-          "pattern": "^[1-9][0-9]{0,77}$"
-        },
-        "lifetimeAmount": {
-          "type": "string",
-          "pattern": "^[1-9][0-9]{0,77}$"
-        },
-        "maxValiditySeconds": {
-          "type": "integer",
-          "minimum": 60,
-          "maximum": 3600
         }
       }
     },
@@ -779,9 +553,6 @@
                     "wallet:account:read",
                     "wallet:provision",
                     "wallet:actions",
-                    "wallet:actions:read",
-                    "wallet:events",
-                    "wallet:events:read",
                     "wallet:sign",
                     "wallet:execute",
                     "wallet:execute:read"
@@ -792,444 +563,6 @@
           }
         }
       }
-    },
-    "execution": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "profile",
-        "rpc",
-        "sponsors",
-        "pollIntervalSeconds",
-        "maxLogRange"
-      ],
-      "properties": {
-        "profile": {
-          "enum": [
-            "erc3009-relayer-v1",
-            "erc3009-executor-v1",
-            "approved-evm-executor-v1"
-          ]
-        },
-        "relayer": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["url", "apiKey"],
-          "properties": {
-            "url": {
-              "type": "string",
-              "pattern": "^https://",
-              "maxLength": 2048
-            },
-            "apiKey": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": ["env"],
-              "properties": {
-                "env": {
-                  "type": "string",
-                  "pattern": "^[A-Z][A-Z0-9_]{0,127}$"
-                }
-              }
-            }
-          }
-        },
-        "rpc": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["endpoints", "genesisHash"],
-          "properties": {
-            "endpoints": {
-              "type": "array",
-              "minItems": 0,
-              "maxItems": 3,
-              "uniqueItems": true,
-              "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": ["env"],
-                "properties": {
-                  "env": {
-                    "type": "string",
-                    "pattern": "^[A-Z][A-Z0-9_]{0,127}$"
-                  }
-                }
-              }
-            },
-            "genesisHash": {
-              "type": "string",
-              "pattern": "^0x[0-9a-f]{64}$"
-            },
-            "tokenCodeHash": {
-              "type": "string",
-              "pattern": "^0x[0-9a-f]{64}$"
-            }
-          }
-        },
-        "sponsors": {
-          "type": "array",
-          "minItems": 0,
-          "maxItems": 100,
-          "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": [
-              "clientId",
-              "accountId",
-              "binding",
-              "fundingAgreement",
-              "gasLimit",
-              "maxFeePerGas",
-              "maxPriorityFeePerGas",
-              "l1FeeReserveWei",
-              "lifetimeBudgetWei"
-            ],
-            "properties": {
-              "clientId": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 256
-              },
-              "accountId": {
-                "type": "string",
-                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
-              },
-              "binding": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": ["address", "bindingRevision"],
-                "properties": {
-                  "relayerId": {
-                    "type": "string",
-                    "pattern": "^[A-Za-z0-9_-]{1,64}$"
-                  },
-                  "signerId": {
-                    "type": "string",
-                    "pattern": "^[A-Za-z0-9_-]{1,64}$"
-                  },
-                  "address": {
-                    "type": "string",
-                    "pattern": "^(0x[0-9a-fA-F]{40}|managed)$"
-                  },
-                  "bindingRevision": {
-                    "type": "string",
-                    "pattern": "^[1-9][0-9]{0,19}$"
-                  }
-                }
-              },
-              "fundingAgreement": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 256
-              },
-              "gasLimit": {
-                "type": "string",
-                "pattern": "^(0|[1-9][0-9]{0,77})$"
-              },
-              "maxFeePerGas": {
-                "type": "string",
-                "pattern": "^(0|[1-9][0-9]{0,77})$"
-              },
-              "maxPriorityFeePerGas": {
-                "type": "string",
-                "pattern": "^(0|[1-9][0-9]{0,77})$"
-              },
-              "l1FeeReserveWei": {
-                "type": "string",
-                "pattern": "^(0|[1-9][0-9]{0,77})$"
-              },
-              "lifetimeBudgetWei": {
-                "type": "string",
-                "pattern": "^(0|[1-9][0-9]{0,77})$"
-              }
-            }
-          }
-        },
-        "pollIntervalSeconds": {
-          "type": "integer",
-          "minimum": 5,
-          "maximum": 300
-        },
-        "maxLogRange": {
-          "type": "integer",
-          "minimum": 100,
-          "maximum": 10000
-        },
-        "service": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "url",
-            "providerId",
-            "providerRevision",
-            "signing",
-            "keys"
-          ],
-          "properties": {
-            "url": {
-              "type": "string",
-              "pattern": "^https://",
-              "maxLength": 2048
-            },
-            "providerId": {
-              "type": "string",
-              "pattern": "^[A-Za-z0-9._-]{1,64}$"
-            },
-            "providerRevision": {
-              "type": "string",
-              "pattern": "^[1-9][0-9]{0,19}$"
-            },
-            "signing": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": ["id", "privateKey"],
-              "properties": {
-                "id": {
-                  "type": "string",
-                  "pattern": "^[A-Za-z0-9._-]{1,64}$"
-                },
-                "privateKey": {
-                  "type": "object",
-                  "additionalProperties": false,
-                  "required": ["env"],
-                  "properties": {
-                    "env": {
-                      "type": "string",
-                      "pattern": "^[A-Z][A-Z0-9_]{0,127}$"
-                    }
-                  }
-                }
-              }
-            },
-            "keys": {
-              "type": "array",
-              "minItems": 1,
-              "maxItems": 8,
-              "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": ["id", "publicKey"],
-                "properties": {
-                  "id": {
-                    "type": "string",
-                    "pattern": "^[A-Za-z0-9._-]{1,64}$"
-                  },
-                  "publicKey": {
-                    "type": "object",
-                    "additionalProperties": false,
-                    "required": ["env"],
-                    "properties": {
-                      "env": {
-                        "type": "string",
-                        "pattern": "^[A-Z][A-Z0-9_]{0,127}$"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "sponsorPool": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["strategy", "maxInFlightPerSponsor"],
-          "properties": {
-            "strategy": {
-              "type": "string",
-              "enum": ["round-robin"]
-            },
-            "maxInFlightPerSponsor": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 100
-            }
-          },
-          "description": "Optional durable application sponsor pool. Multiple distinct payers may share one client; selected payers remain pinned on retries, unknown attempts occupy capacity and lifetime budgets remain shared."
-        },
-        "safeQueue": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["maxDepthPerSafe", "maxWaitSeconds"],
-          "properties": {
-            "maxDepthPerSafe": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 100
-            },
-            "maxWaitSeconds": {
-              "type": "integer",
-              "minimum": 30,
-              "maximum": 3600
-            },
-            "maxDepthPerUser": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 100
-            },
-            "maxDepthPerApplication": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 1000
-            },
-            "maxDepthTotal": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 10000
-            }
-          },
-          "description": "Optional bounded per-Safe FIFO of exact unsigned requests for delayed execution. Only the head receives a verified current nonce and immutable action; all original authority checks remain mandatory."
-        },
-        "recovery": {
-          "type": "object",
-          "additionalProperties": false,
-          "description": "Optional read-only stuck-transaction diagnostics and durable payer quarantine. Nonce and pending visibility are operational evidence; repair mutations remain separately authorized provider procedures.",
-          "required": ["stuckAfterSeconds", "quarantineOnStuck"],
-          "properties": {
-            "stuckAfterSeconds": {
-              "type": "integer",
-              "minimum": 30,
-              "maximum": 86400
-            },
-            "quarantineOnStuck": {
-              "type": "boolean"
-            }
-          }
-        },
-        "replacement": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "initialFeeBasisPoints",
-            "bumpBasisPoints",
-            "maxAttempts",
-            "intervalSeconds"
-          ],
-          "properties": {
-            "initialFeeBasisPoints": {
-              "type": "integer",
-              "minimum": 1000,
-              "maximum": 9000
-            },
-            "bumpBasisPoints": {
-              "type": "integer",
-              "minimum": 1000,
-              "maximum": 10000
-            },
-            "maxAttempts": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 6
-            },
-            "intervalSeconds": {
-              "type": "integer",
-              "minimum": 30,
-              "maximum": 3600
-            }
-          }
-        },
-        "local": {
-          "const": true
-        }
-      },
-      "allOf": [
-        {
-          "if": {
-            "anyOf": [
-              {
-                "properties": {
-                  "profile": {
-                    "const": "erc3009-relayer-v1"
-                  }
-                },
-                "type": "object"
-              },
-              {
-                "type": "object",
-                "required": ["local"],
-                "properties": {
-                  "local": {
-                    "const": true
-                  }
-                }
-              }
-            ]
-          },
-          "then": {
-            "required": ["relayer"],
-            "not": {
-              "required": ["service"],
-              "properties": {
-                "service": {}
-              },
-              "type": "object"
-            },
-            "properties": {
-              "sponsors": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "binding": {
-                      "type": "object",
-                      "required": ["relayerId", "signerId"],
-                      "properties": {
-                        "relayerId": {},
-                        "signerId": {}
-                      }
-                    }
-                  }
-                }
-              },
-              "relayer": {}
-            },
-            "type": "object"
-          },
-          "else": {
-            "required": ["service"],
-            "not": {
-              "required": ["relayer"],
-              "properties": {
-                "relayer": {}
-              },
-              "type": "object"
-            },
-            "properties": {
-              "sponsors": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "binding": {
-                      "type": "object",
-                      "not": {
-                        "anyOf": [
-                          {
-                            "required": ["relayerId"],
-                            "properties": {
-                              "relayerId": {}
-                            },
-                            "type": "object"
-                          },
-                          {
-                            "required": ["signerId"],
-                            "properties": {
-                              "signerId": {}
-                            },
-                            "type": "object"
-                          }
-                        ]
-                      }
-                    }
-                  }
-                }
-              },
-              "service": {}
-            },
-            "type": "object"
-          }
-        }
-      ]
     },
     "approvedCalls": {
       "type": "object",
@@ -1978,65 +1311,6 @@
         }
       }
     },
-    "operations": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["pollIntervalSeconds", "lowBalanceWei", "webhooks"],
-      "properties": {
-        "pollIntervalSeconds": {
-          "type": "integer",
-          "minimum": 5,
-          "maximum": 300
-        },
-        "lowBalanceWei": {
-          "type": "string",
-          "pattern": "^(0|[1-9][0-9]{0,77})$"
-        },
-        "webhooks": {
-          "type": "array",
-          "maxItems": 8,
-          "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": ["id", "endpoint", "signingSecrets"],
-            "properties": {
-              "id": {
-                "type": "string",
-                "pattern": "^[a-z][a-z0-9-]{0,31}$"
-              },
-              "endpoint": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": ["env"],
-                "properties": {
-                  "env": {
-                    "type": "string",
-                    "pattern": "^[A-Z][A-Z0-9_]{0,127}$"
-                  }
-                }
-              },
-              "signingSecrets": {
-                "type": "array",
-                "minItems": 1,
-                "maxItems": 2,
-                "uniqueItems": true,
-                "items": {
-                  "type": "object",
-                  "additionalProperties": false,
-                  "required": ["env"],
-                  "properties": {
-                    "env": {
-                      "type": "string",
-                      "pattern": "^[A-Z][A-Z0-9_]{0,127}$"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "runtimeConfiguration": {
       "type": "object",
       "additionalProperties": false,
@@ -2086,26 +1360,6 @@
               "pattern": "^[A-Z][A-Z0-9_]{0,127}$"
             }
           }
-        },
-        "sharedApplicationSafes": {
-          "type": "boolean"
-        },
-        "executionPool": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["safeCount", "sponsorCount"],
-          "properties": {
-            "safeCount": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 16
-            },
-            "sponsorCount": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 16
-            }
-          }
         }
       }
     },
@@ -2148,9 +1402,6 @@
                     "wallet:account:read",
                     "wallet:provision",
                     "wallet:actions",
-                    "wallet:actions:read",
-                    "wallet:events",
-                    "wallet:events:read",
                     "wallet:sign",
                     "wallet:execute",
                     "wallet:execute:read"
@@ -2178,25 +1429,6 @@
               }
             }
           }
-        }
-      }
-    },
-    "localExecution": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["kind", "apiKey", "keystorePassphrase", "storageKey"],
-      "properties": {
-        "kind": {
-          "const": "openzeppelin-relayer"
-        },
-        "apiKey": {
-          "$ref": "#/$defs/secret"
-        },
-        "keystorePassphrase": {
-          "$ref": "#/$defs/secret"
-        },
-        "storageKey": {
-          "$ref": "#/$defs/secret"
         }
       }
     },

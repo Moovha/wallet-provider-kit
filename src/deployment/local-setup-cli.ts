@@ -62,12 +62,9 @@ export async function runLocalSetup(options: {
   const environment = options.executor?.environment ?? process.env;
   if (options.config) {
     const config = options.config;
-    if (
-      config.activation.enabled ||
-      !['ows', 'cdp', 'openzeppelin-relayer'].includes(config.backend.kind)
-    )
+    if (config.activation.enabled || config.backend.kind !== 'ows')
       fail(
-        'Local setup requires OWS, CDP or Relayer with wallet operations disabled.',
+        'Local setup requires the Safe wallet service with wallet operations disabled.',
       );
     const source =
       options.executor?.source ??

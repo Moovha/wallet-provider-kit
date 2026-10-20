@@ -94,19 +94,17 @@ test('a new operator configures application-led access without user login, vendo
     await page
       .getByLabel('Maximum age of identity checks (days)', { exact: true })
       .fill('30');
-    const rules = page.locator('.callout').filter({
-      hasText: 'How the provider uses these rules',
-    });
-    await expect(rules).toContainText('checked within 30 days');
-    await expect(rules).toContainText('Access lasts at most 3 days');
     await page
       .getByLabel('Application name', { exact: true })
       .fill('Example App');
     await page
+      .getByText('Advanced application identity', { exact: true })
+      .click();
+    await page
       .getByLabel('Application client ID', { exact: true })
       .fill('example-app');
     await page
-      .getByLabel('Application identity and consent trust agreement', {
+      .getByLabel('Identity and consent trust agreement reference', {
         exact: true,
       })
       .fill('reviewed-offline-agreement');
@@ -229,7 +227,7 @@ test('a new operator configures application-led access without user login, vendo
       .getByRole('button', { name: 'API reference', exact: true })
       .click();
     await page.locator('.swagger-ui .opblock').first().waitFor();
-    await expect(page.locator('.swagger-ui .opblock')).toHaveCount(62);
+    await expect(page.locator('.swagger-ui .opblock')).toHaveCount(40);
     await page
       .getByLabel('Example endpoint', { exact: true })
       .selectOption('requestAccountAccess');

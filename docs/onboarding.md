@@ -16,22 +16,9 @@ Give users one clear path to open a wallet, share identity evidence and choose
 which applications can use their account. Your provider keeps acceptance,
 authorization, signing and recovery under its control.
 
-After [installing the package](package.md), [choose a wallet backend](backend-guide.md)
-and start with [the single configuration example](provider.config.hosted.example.ts).
-`createOnboardingProvider` supplies hosted consent, provider review, persistent
-grants and journaled wallet creation. You configure your provider, approved
-applications, existing identity service and selected wallet backend. There is
-no policy scripting language or separate policy server to operate.
-
 This is an experimental single-host reference integration. It has offline
 conformance evidence; real vendor accounts, identity-service setup and backend
 recovery still need acceptance testing before you enable it.
-
-Hosted deployments can select [application-record evaluation](application-records.md):
-admitted applications submit required fields, owners consent and staff review
-each record before unfunded wallet access. That source does not establish
-externally verified KYC or permit financial signing. The vendor examples below
-remain available when your policy requires external verification.
 
 ## Applications, clients and owner login
 
@@ -71,11 +58,6 @@ Registering an application client doesn't register or approve a user. See
    file store's private persistent directory, and configure your wallet backend.
    Keep `ready()` false until its unfunded lifecycle and recovery checks pass.
 
-The example uses the CDP Base Sepolia adapter to show a concrete backend.
-You can select another supported adapter without changing the onboarding policy.
-The normal `npm start` preview remains unconfigured; it does not discover or load
-configuration modules from HTTP input.
-
 ## Defaults you can understand
 
 | Rule               | Default                                                                                                                          |
@@ -85,7 +67,7 @@ configuration modules from HTTP input.
 | Identity           | Provider review is required; importing an approved vendor profile never accepts a customer automatically.                        |
 | Freshness          | Identity evidence no older than 365 days; configure a shorter period for your product.                                           |
 | Access duration    | At most 30 days, also bounded by the provider's identity acceptance expiry.                                                      |
-| Permissions        | `account:read`, `operations:request` and optional `transfers:request`, separately requested and checked.                         |
+| Permissions        | `account:read`, `operations:request` and explicit `contracts:request`, separately requested and checked.                         |
 | Verification costs | Requester-funded under an agreed contract and monthly cap. Missing prices or agreements pause paid work.                         |
 | Wallet creation    | Separate authorized request after acceptance and consent, with one durable attempt per account.                                  |
 | Signing            | No signing in the ready-made onboarding profile. An exact-action authority and its financial journal are a separate integration. |
@@ -97,13 +79,6 @@ invalidates earlier decisions and grants. Credential rotation does not. Keep a
 readable `version` for your audit history; the kit also fingerprints configuration.
 
 ## What a user experiences
-
-<figure class="wallet-visual">
-  <img src="./public/diagrams/owner-access.webp" alt="Diagram: provider sign-in, owner consent and provider acceptance lead to an application grant; grants can be paused or revoked and provisioning is separate." width="1536" height="1024" loading="lazy" decoding="async">
-  <figcaption>New and already accepted customers take different identity paths. Access approval does not create a wallet or authorize spending.</figcaption>
-</figure>
-
-[View full-size diagram](public/diagrams/owner-access.webp)
 
 The requesting application starts a **create** or **connect** request and opens
 the returned provider consent URL. The user signs in with the provider and sees
@@ -172,14 +147,7 @@ is granted. No name, document, evidence reference or login subject is returned.
 | `GET /v1/accounts/{id}`                  | `wallet:account:read` | Read address/status through a current `account:read` grant.                                   |
 | `POST /v1/accounts/{id}/provision`       | `wallet:provision`    | Create the accepted account's wallet through current access and a durable journal.            |
 
-The configured transfer profile uses `transfers:request`: an explicit owner
-consent for the application to request transfers on their behalf under the
-provider's financial policy. The onboarding screen shows token/domain, recipients
-and limits. Consent is stored with the financial-policy revision and reused for
-subsequent requests. The provider authorises each exact immutable action and
-rechecks current access, KYC, consent, policy and budget before signing. There is
-no per-transfer owner prompt. Changed financial terms revoke the old delegation;
-new consent can reuse still-current accepted KYC.
+Safe calls require current `contracts:request` consent bound to `action_policy_revision`. Use the [wallet API](wallet-calls.md) for approved batches.
 
 `operations:request` means an application may ask the financial host to prepare
 an operation. It is never unrestricted signing permission. The ready-made

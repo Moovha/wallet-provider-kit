@@ -47,7 +47,7 @@ function validateAction(
       !uuid.test(action.action_id) ||
       !uuid.test(action.operation_id) ||
       action.kind !== 'sign_typed_data' ||
-      action.profile !== 'evm_eoa_v1' ||
+      action.profile !== 'safe_owner_v1' ||
       action.profile_revision !== '1' ||
       action.status !== 'ready' ||
       action.payload.domain.chainId !== chain[1] ||

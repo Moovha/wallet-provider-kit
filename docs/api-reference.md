@@ -6,8 +6,7 @@ The configured wizard service does not require library composition. For the API
 your connected applications call after deployment, use the [HTTP guide](http-api.md).
 For contributing or regeneration, see the [development guide](../CONTRIBUTING.md#development).
 
-Start with the [API guide](api.md) for composition, ownership and errors, or the
-[runnable integration tutorial](integration-example.md). These declaration excerpts
+Start with the [API guide](api.md) for composition, ownership and errors, and [wallet calls](wallet-calls.md). These declaration excerpts
 are a reference, not standalone programs. Read [roles and terms](concepts.md)
 for owners, application clients, host authority, wallet backends and journals.
 Supporting names and schema aliases
@@ -21,22 +20,12 @@ identity, telemetry, storage and deployment. Provider adapters require their exp
 Import from `@moovha/wallet-provider-kit/core`. [Integration guide](api.md#core-wallet-service).
 
 - [AuthorityContext](#authoritycontext)
-- [createDurableSigningService](#createdurablesigningservice)
 - [createJournaledWalletProvider](#createjournaledwalletprovider)
-- [createStoredWalletBackend](#createstoredwalletbackend)
 - [EmbeddedAccount](#embeddedaccount)
 - [EmbeddedWalletAuthority](#embeddedwalletauthority)
 - [EmbeddedWalletService](#embeddedwalletservice)
 - [JournaledProviderOptions](#journaledprovideroptions)
 - [SigningAuthority](#signingauthority)
-- [StoredAccountAuthority](#storedaccountauthority)
-- [StoredAccountRecord](#storedaccountrecord)
-- [StoredAccountResult](#storedaccountresult)
-- [StoredSigningAuthority](#storedsigningauthority)
-- [StoredSigningDispatch](#storedsigningdispatch)
-- [StoredSigningResult](#storedsigningresult)
-- [StoredTypedDataSigner](#storedtypeddatasigner)
-- [StoredWalletBackendConfiguration](#storedwalletbackendconfiguration)
 - [TypedDataAction](#typeddataaction)
 - [VerifiedPrincipal](#verifiedprincipal)
 - [WalletAttemptClaim](#walletattemptclaim)
@@ -59,21 +48,6 @@ export interface AuthorityContext {
 }
 ```
 
-### createDurableSigningService
-
-[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/backend.ts).
-
-```ts
-/** Supplied durable dispatch: admission and dispatch commits precede the only signing call. */
-export declare function createDurableSigningService<Context>(
-  authority: StoredSigningAuthority<Context>,
-  signer: StoredTypedDataSigner,
-  network?: ProviderNetwork,
-): {
-  sign(context: Context, actionId: string): Promise<StoredSigningResult>;
-};
-```
-
 ### createJournaledWalletProvider
 
 [Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/providers/journaled.ts).
@@ -84,32 +58,6 @@ export declare function createJournaledWalletProvider(
   provider: WalletSigningProvider,
   options: JournaledProviderOptions,
 ): WalletSigningProvider;
-```
-
-### createStoredWalletBackend
-
-[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/backend.ts).
-
-```ts
-/** Ready-made lifecycle around a selected provider and trusted host policy/storage adapters. */
-export declare function createStoredWalletBackend<
-  SigningContext,
-  AccountContext,
->(
-  configuration: StoredWalletBackendConfiguration<
-    SigningContext,
-    AccountContext
-  >,
-): {
-  sign: (
-    context: SigningContext,
-    actionId: string,
-  ) => Promise<StoredSigningResult>;
-  account(
-    context: AccountContext,
-    recover?: boolean,
-  ): Promise<StoredAccountResult>;
-};
 ```
 
 ### EmbeddedAccount
@@ -204,128 +152,48 @@ export interface SigningAuthority extends OwnerAuthority {
 }
 ```
 
-### StoredAccountAuthority
-
-[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/backend.ts).
-
-```ts
-export interface StoredAccountAuthority<Context> {
-  reserve(context: Context, recover: boolean): Promise<StoredAccountRecord>;
-  claim(
-    context: Context,
-    account: StoredAccountRecord,
-  ): Promise<StoredAccountRecord>;
-  finish(
-    account: StoredAccountRecord,
-    address: string | null,
-  ): Promise<StoredAccountResult>;
-}
-```
-
-### StoredAccountRecord
-
-[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/backend.ts).
-
-```ts
-export interface StoredAccountRecord {
-  accountId: string;
-  attemptId: string;
-  state: 'admitted' | 'dispatching' | 'bound' | 'unknown';
-  leaseToken: string;
-  address: string | null;
-}
-```
-
-### StoredAccountResult
-
-[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/backend.ts).
-
-```ts
-export interface StoredAccountResult {
-  accountId: string;
-  address: string | null;
-  state: StoredAccountRecord['state'];
-}
-```
-
-### StoredSigningAuthority
-
-[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/backend.ts).
-
-```ts
-/** Trusted host policy/storage, never records or callbacks supplied by an HTTP caller. */
-export interface StoredSigningAuthority<Context> {
-  admit(context: Context, actionId: string): Promise<StoredSigningResult>;
-  dispatch(context: Context, attemptId: string): Promise<StoredSigningDispatch>;
-  finish(
-    dispatch: StoredSigningDispatch,
-    state: 'succeeded' | 'rejected' | 'unknown',
-    signature?: string,
-  ): Promise<StoredSigningResult>;
-}
-```
-
-### StoredSigningDispatch
-
-[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/backend.ts).
-
-```ts
-export interface StoredSigningDispatch {
-  attemptId: string;
-  leaseToken: string;
-  accountId: string;
-  address: string;
-  action: TypedDataAction;
-}
-```
-
-### StoredSigningResult
-
-[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/backend.ts).
-
-```ts
-export interface StoredSigningResult {
-  attemptId: string;
-  state: 'admitted' | 'dispatching' | 'succeeded' | 'rejected' | 'unknown';
-  signature: string | null;
-}
-```
-
-### StoredTypedDataSigner
-
-[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/backend.ts).
-
-```ts
-export interface StoredTypedDataSigner {
-  readonly provider: string;
-  signTypedData(dispatch: StoredSigningDispatch): Promise<string>;
-}
-```
-
-### StoredWalletBackendConfiguration
-
-[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/backend.ts).
-
-```ts
-export interface StoredWalletBackendConfiguration<
-  SigningContext,
-  AccountContext,
-> {
-  /** Explicit host opt-in; credentials never activate this backend. */
-  enabled: boolean;
-  network?: ProviderNetwork;
-  provider: WalletSigningProvider;
-  signingAuthority: StoredSigningAuthority<SigningContext>;
-  accountAuthority: StoredAccountAuthority<AccountContext>;
-}
-```
-
 ### TypedDataAction
 
 [Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/domain/signing.ts).
 
 ```ts
-export type TypedDataAction = components['schemas']['TypedDataAction'];
+/** Internal owner-signer envelope for Safe intent approval, account bootstrap and immutable SafeOp signing. */
+export interface TypedDataAction {
+  action_id: string;
+  operation_id: string;
+  plan_revision: string;
+  plan_hash: string;
+  binding_revision: string;
+  capability_revision: string;
+  profile: 'safe_owner_v1';
+  profile_revision: string;
+  chain_id: string;
+  chain_account_id: string;
+  payload_hash: string;
+  dependencies: string[];
+  expires_at: string;
+  status:
+    | 'blocked'
+    | 'ready'
+    | 'pending'
+    | 'fulfilled'
+    | 'rejected'
+    | 'expired'
+    | 'unknown';
+  kind: 'sign_typed_data';
+  payload: {
+    domain: Record<string, TypedValue>;
+    types: Record<
+      string,
+      {
+        name: string;
+        type: string;
+      }[]
+    >;
+    message: Record<string, TypedValue>;
+    primaryType: string;
+  };
+}
 ```
 
 ### VerifiedPrincipal
@@ -425,7 +293,7 @@ export interface WalletAttemptRequest {
   readonly namespace: string;
   readonly provider: string;
   readonly attemptId: string;
-  readonly kind: 'provision' | 'sign_typed_data' | 'relay_transaction';
+  readonly kind: 'provision' | 'sign_typed_data' | 'infrastructure_transaction';
   readonly accountId: string;
   readonly resourceKey: string;
   readonly requestHash: string;
@@ -447,7 +315,7 @@ export type WalletAttemptResult =
       signature: string;
     }
   | {
-      kind: 'relay_transaction';
+      kind: 'infrastructure_transaction';
       transactionId: string;
     };
 ```
@@ -584,7 +452,7 @@ export interface OAuthConfiguration {
 [Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/protocol/provider-api.generated.ts).
 
 Generated OpenAPI path types from [the implemented provider contract](../spec/provider-api.json).
-Use `ProviderPaths["/v1/actions/{actionId}/sign"]["post"]` to select an operation.
+Use `ProviderPaths["/v1/accounts/{accountId}/wallet"]["post"]` to select an operation.
 See the [HTTP reference](http-reference.md).
 
 ### ServerOptions
@@ -594,10 +462,7 @@ See the [HTTP reference](http-reference.md).
 ```ts
 export interface ServerOptions {
   requestsPerMinute?: number;
-  safeProvisioning?: import('../provisioning/safe.js').SafeProvisioningService;
   safeWallet?: import('../sponsorship/safe-wallet.js').SafeWalletRuntime;
-  applicationSafes?: import('../provisioning/application.js').ApplicationSafeService;
-  applicationSponsors?: import('../provisioning/application-sponsor.js').ApplicationSponsorService;
   authorizationServer?: {
     register(app: import('fastify').FastifyInstance): void;
   };
@@ -611,16 +476,11 @@ export interface ServerOptions {
   onboarding?: OnboardingHttpOptions;
   /** Must check durable authority/recovery dependencies; never infer readiness from env keys. */
   ready?: () => Promise<boolean>;
-  operationsHealth?: () => Promise<
-    import('../execution/operations.js').OperationsHealth
-  >;
   documentation?: boolean;
   /** Optional operator-authenticated client-credentials broker for the deployed explorer. */
   documentationTokens?: DocumentationTokenOptions;
   configurationProfile?: 'provider-service-v1';
-  actionProfiles?: readonly (
-    'provider-authorized-erc3009-v1' | 'provider-approved-contracts-v1'
-  )[];
+  actionProfiles?: readonly 'provider-approved-contracts-v1'[];
   /** Release host-owned resources when the service closes. Registered before ready. */
   onClose?: () => Promise<void>;
 }
@@ -664,19 +524,6 @@ export declare class WalletCallsService {
     chainId: '0x2105' | '0x14a34';
   }>;
   constructor(actions: SupportedActions, driver: WalletCallsDriver);
-  constructor(
-    actions: SupportedActions,
-    queue: SafeExecutionQueue,
-    execution: ExecutionCoordinatorPort,
-    driver?: WalletCallsDriver,
-  );
-  /** Streams current authorized status; notifications contain no account data. */
-  watch(
-    principal: VerifiedPrincipal,
-    accountId: string,
-    batchId: string,
-    signal: AbortSignal,
-  ): AsyncGenerator<WalletCallsStatus | undefined, void, unknown>;
   list(
     principal: VerifiedPrincipal,
     authorizeOperator?: (state: ProviderState) => void,
@@ -684,6 +531,13 @@ export declare class WalletCallsService {
     truncated: boolean;
     batches: import('./types.js').WalletCallsBatchSummary[];
   }>;
+  /** Streams current authorized status; notifications contain no account data. */
+  watch(
+    principal: VerifiedPrincipal,
+    accountId: string,
+    batchId: string,
+    signal: AbortSignal,
+  ): AsyncGenerator<WalletCallsStatus | undefined, void, unknown>;
   request(
     principal: VerifiedPrincipal,
     accountId: string,
@@ -817,7 +671,6 @@ export interface ApplicationUserAssertion {
     granted_at: string;
     expires_at: string;
     policy_revision: string;
-    transfer_policy_revision?: string;
     action_policy_revision?: string;
   };
 }
@@ -1053,7 +906,7 @@ export declare class OnboardingService {
     store: OnboardingStore,
     adapters?: IdentityAdapter[],
     walletReader?: Pick<WalletSigningProvider, 'findAccount'> | undefined,
-    transferPolicyRevision?: string | undefined,
+    actionPolicyRevision?: string | undefined,
     runtimeContracts?: boolean,
     safeOnlyWallet?: boolean,
   );
@@ -1069,14 +922,12 @@ export declare class OnboardingService {
         verification_level?: string | undefined;
         max_identity_age_days: number;
         max_access_days: number;
-        transfer_policy_revision?: string | undefined;
         action_policy_revision?: string | undefined;
         flow: 'application' | 'hosted';
         policy_revision: string;
       }
     | {
         action_policy_revision: string | undefined;
-        transfer_policy_revision: string | undefined;
         required_fields: string[];
         runtime_contract_terms: import('../runtime-configuration/authority.js').RuntimePolicySnapshot;
         source: string;
@@ -1098,12 +949,7 @@ export declare class OnboardingService {
   ): Promise<{
     account_id?: string | undefined;
     permissions?:
-      | (
-          | 'account:read'
-          | 'operations:request'
-          | 'transfers:request'
-          | 'contracts:request'
-        )[]
+      | ('account:read' | 'operations:request' | 'contracts:request')[]
       | undefined;
     expires_at?: string | undefined;
     grant_id?: string | undefined;
@@ -1117,12 +963,7 @@ export declare class OnboardingService {
   ): Promise<{
     account_id?: string | undefined;
     permissions?:
-      | (
-          | 'account:read'
-          | 'operations:request'
-          | 'transfers:request'
-          | 'contracts:request'
-        )[]
+      | ('account:read' | 'operations:request' | 'contracts:request')[]
       | undefined;
     expires_at?: string | undefined;
     grant_id?: string | undefined;
@@ -1141,7 +982,6 @@ export declare class OnboardingService {
     verification_level?: string | undefined;
     max_identity_age_days: number;
     max_access_days: number;
-    transfer_policy_revision?: string | undefined;
     action_policy_revision?: string | undefined;
     flow: 'application' | 'hosted';
     policy_revision: string;
@@ -1173,10 +1013,7 @@ export declare class OnboardingService {
     provider: string;
     privacyUrl: string;
     permissions: (
-      | 'account:read'
-      | 'operations:request'
-      | 'transfers:request'
-      | 'contracts:request'
+      'account:read' | 'operations:request' | 'contracts:request'
     )[];
     mode: 'create' | 'connect';
     durationDays: number;
@@ -1189,12 +1026,7 @@ export declare class OnboardingService {
   ): Promise<{
     account_id?: string | undefined;
     permissions?:
-      | (
-          | 'account:read'
-          | 'operations:request'
-          | 'transfers:request'
-          | 'contracts:request'
-        )[]
+      | ('account:read' | 'operations:request' | 'contracts:request')[]
       | undefined;
     expires_at?: string | undefined;
     grant_id?: string | undefined;
@@ -1210,12 +1042,7 @@ export declare class OnboardingService {
   ): Promise<{
     account_id?: string | undefined;
     permissions?:
-      | (
-          | 'account:read'
-          | 'operations:request'
-          | 'transfers:request'
-          | 'contracts:request'
-        )[]
+      | ('account:read' | 'operations:request' | 'contracts:request')[]
       | undefined;
     expires_at?: string | undefined;
     grant_id?: string | undefined;
@@ -1255,7 +1082,7 @@ export declare class OnboardingService {
   providerAccounts(principal: VerifiedPrincipal): Promise<
     {
       id: string;
-      status: 'suspended' | 'active';
+      status: 'active' | 'suspended';
       provisioned: boolean;
     }[]
   >;
@@ -1279,12 +1106,7 @@ export declare class OnboardingService {
   ): Promise<{
     account_id?: string | undefined;
     permissions?:
-      | (
-          | 'account:read'
-          | 'operations:request'
-          | 'transfers:request'
-          | 'contracts:request'
-        )[]
+      | ('account:read' | 'operations:request' | 'contracts:request')[]
       | undefined;
     expires_at?: string | undefined;
     grant_id?: string | undefined;
@@ -1335,12 +1157,7 @@ export declare class OnboardingService {
   ): Promise<{
     account_id?: string | undefined;
     permissions?:
-      | (
-          | 'account:read'
-          | 'operations:request'
-          | 'transfers:request'
-          | 'contracts:request'
-        )[]
+      | ('account:read' | 'operations:request' | 'contracts:request')[]
       | undefined;
     expires_at?: string | undefined;
     grant_id?: string | undefined;
@@ -1353,12 +1170,9 @@ export declare class OnboardingService {
       id: string;
       application: string;
       permissions: (
-        | 'account:read'
-        | 'operations:request'
-        | 'transfers:request'
-        | 'contracts:request'
+        'account:read' | 'operations:request' | 'contracts:request'
       )[];
-      state: 'revoked' | 'suspended' | 'active';
+      state: 'active' | 'revoked' | 'suspended';
       expiresAt: number;
     }[]
   >;
@@ -1473,11 +1287,10 @@ export interface ProviderState {
       units: string;
     }
   >;
-  assetBudgetMigrations?: Record<
+  assetBudgetBindings?: Record<
     string,
     {
       revision: string;
-      profile: 'direct-token-transfers-v1';
     }
   >;
   userOperationExecutions?: Record<
@@ -1498,24 +1311,7 @@ export interface ProviderState {
     string,
     import('../sponsorship/admission.js').SponsorshipAdmission
   >;
-  operations?: Record<
-    string,
-    import('../execution/operations.js').OperationsState
-  >;
-  executionPools?: Record<string, number>;
-  sponsorQuarantines?: Record<string, string[]>;
-  safeRequests?: Record<
-    string,
-    import('../execution/queue.js').SafeQueueRecord
-  >;
-  supportedActions?: Record<string, TransferRecord>;
-  backendAccounts?: Record<
-    string,
-    {
-      binding: string;
-      signer: RelayerBinding;
-    }
-  >;
+  supportedActions?: Record<string, ApprovedCallsRecord>;
   deploymentBindings?: Record<
     string,
     {
@@ -1526,10 +1322,6 @@ export interface ProviderState {
       activeRevision?: string;
       transportRevision?: string;
       accessMode?: 'application' | 'hosted';
-      safeAccounts?: Record<
-        string,
-        import('../provisioning/safe.js').SafeDeploymentRecord
-      >;
       runtimeConfiguration?: import('../runtime-configuration/service.js').RuntimeConfigurationState;
     }
   >;
@@ -1861,30 +1653,6 @@ export declare function startTelemetry(
 };
 ```
 
-## Coinbase CDP adapter
-
-Import from `@moovha/wallet-provider-kit/cdp`. [Integration guide](provider-guide.md#current-adapter-profile).
-
-- [createCdpWalletProvider](#createcdpwalletprovider)
-
-### createCdpWalletProvider
-
-[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/providers/cdp.ts).
-
-```ts
-/**
- * No SDK singleton, telemetry, ambient credentials, redirects or automatic retries.
- * Auth uses the vendor's public SDK; HTTP lifecycle belongs to this adapter.
- * Import this factory explicitly when selecting CDP. Compose business policy and
- * durable attempts through the configured service or an embedded host before activation.
- */
-export declare function createCdpWalletProvider(
-  environment: NodeJS.ProcessEnv,
-  request?: typeof fetch,
-  network?: ProviderNetwork,
-): WalletSigningProvider;
-```
-
 ## Open Wallet Standard adapter
 
 Import from `@moovha/wallet-provider-kit/ows`. [Integration guide](ows-adapter.md).
@@ -1930,434 +1698,7 @@ export interface OwsProviderOptions {
 }
 ```
 
-## OpenZeppelin Relayer adapter and execution
-
-Import from `@moovha/wallet-provider-kit/openzeppelin-relayer`. [Integration guide](openzeppelin-relayer.md).
-
-- [createOpenZeppelinRelayerExecutor](#createopenzeppelinrelayerexecutor)
-- [createOpenZeppelinRelayerWalletProvider](#createopenzeppelinrelayerwalletprovider)
-- [hashRelayerTransaction](#hashrelayertransaction)
-- [RelayerAcceptance](#relayeracceptance)
-- [RelayerAttemptJournal](#relayerattemptjournal)
-- [RelayerAttemptOptions](#relayerattemptoptions)
-- [RelayerBinding](#relayerbinding)
-- [RelayerConnection](#relayerconnection)
-- [RelayerExecutionAction](#relayerexecutionaction)
-- [RelayerExecutionAuthority](#relayerexecutionauthority)
-- [RelayerExecutionAuthorityRecord](#relayerexecutionauthorityrecord)
-- [RelayerExecutionProvider](#relayerexecutionprovider)
-- [RelayerExecutionService](#relayerexecutionservice)
-- [RelayerTransaction](#relayertransaction)
-- [RelayerTransactionStatus](#relayertransactionstatus)
-
-### createOpenZeppelinRelayerExecutor
-
-[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/providers/openzeppelin-relayer.ts).
-
-```ts
-/** Relayer allocates nonces and owns its queue/broadcast workers. Host approval stays here. */
-export declare function createOpenZeppelinRelayerExecutor(
-  connection: RelayerConnection,
-  options: RelayerAttemptOptions,
-  request?: typeof fetch,
-): RelayerExecutionProvider;
-```
-
-### createOpenZeppelinRelayerWalletProvider
-
-[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/providers/openzeppelin-relayer.ts).
-
-```ts
-/** Binds preconfigured Relayer keys; never creates a signer or wallet through its admin API. */
-export declare function createOpenZeppelinRelayerWalletProvider(
-  connection: RelayerConnection,
-  attempts: JournaledProviderOptions,
-  request?: typeof fetch,
-): WalletSigningProvider;
-```
-
-### hashRelayerTransaction
-
-[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/domain/relayer-execution.ts).
-
-```ts
-/** Hash the approved call/initial fees, not an unsigned Ethereum transaction. */
-export declare function hashRelayerTransaction(
-  transaction: RelayerTransaction,
-): string;
-```
-
-### RelayerAcceptance
-
-[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/domain/relayer-execution.ts).
-
-```ts
-export interface RelayerAcceptance {
-  /** A provider record ID. Never a chain transaction hash or settlement proof. */
-  transactionId: string;
-}
-```
-
-### RelayerAttemptJournal
-
-[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/providers/openzeppelin-relayer.ts).
-
-```ts
-export interface RelayerAttemptJournal extends WalletAttemptJournal {
-  /** No claims, reservations, state transitions or writes during read. */
-  read(request: WalletAttemptRequest): Promise<WalletAttemptClaim | null>;
-}
-```
-
-### RelayerAttemptOptions
-
-[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/providers/openzeppelin-relayer.ts).
-
-```ts
-export interface RelayerAttemptOptions extends JournaledProviderOptions {
-  journal: RelayerAttemptJournal;
-  /** Current read permission for the original attempt; no new spending lease required. */
-  authorizeStatus(request: WalletAttemptRequest): Promise<boolean>;
-}
-```
-
-### RelayerBinding
-
-[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/providers/relayer-client.ts).
-
-```ts
-export interface RelayerBinding {
-  relayerId: string;
-  signerId: string;
-  address: string;
-  bindingRevision: string;
-}
-```
-
-### RelayerConnection
-
-[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/providers/relayer-client.ts).
-
-```ts
-export interface RelayerConnection {
-  network?: ProviderNetwork;
-  /** Operator-configured HTTPS origin, without path, query, credentials or fragment. */
-  url: string;
-  apiKey: string;
-  /** Server-owned binding. Never resolve from an HTTP transaction body. */
-  resolveAccount(accountId: string): Promise<RelayerBinding | null>;
-}
-```
-
-### RelayerExecutionAction
-
-[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/domain/relayer-execution.ts).
-
-```ts
-export interface RelayerExecutionAction {
-  actionId: string;
-  operationId: string;
-  kind: 'relay_transaction';
-  profile: 'oz_relayer_evm_v1';
-  profileRevision: '1';
-  status: 'ready';
-  chainId: ProviderChainId;
-  chainAccountId: string;
-  bindingRevision: string;
-  capabilityRevision: string;
-  planRevision: string;
-  planHash: string;
-  payloadHash: string;
-  expiresAt: string;
-  transaction: RelayerTransaction;
-}
-```
-
-### RelayerExecutionAuthority
-
-[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/domain/relayer-execution.ts).
-
-```ts
-export interface RelayerExecutionAuthority {
-  /** Load immutable action by ID, verify current owner/grant/KYC/consent and admit its budget durably. */
-  execution(
-    context: AuthorityContext,
-    actionId: string,
-    purpose: 'submit' | 'status',
-  ): Promise<RelayerExecutionAuthorityRecord | null>;
-}
-```
-
-### RelayerExecutionAuthorityRecord
-
-[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/domain/relayer-execution.ts).
-
-```ts
-export interface RelayerExecutionAuthorityRecord {
-  sessionSubject: string;
-  ownerSubject: string;
-  currentUserStatus: string | null;
-  accountId: string;
-  attemptId: string;
-  account: EmbeddedAccount;
-  bindingRevision: string;
-  capabilityRevision: string;
-  action: RelayerExecutionAction;
-}
-```
-
-### RelayerExecutionProvider
-
-[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/domain/relayer-execution.ts).
-
-```ts
-export interface RelayerExecutionProvider {
-  submit(
-    account: EmbeddedAccount,
-    action: RelayerExecutionAction,
-    attemptId: string,
-  ): Promise<RelayerAcceptance>;
-  /** Read-only; checks current host authority and the original stored request. */
-  status(
-    account: EmbeddedAccount,
-    action: RelayerExecutionAction,
-    attemptId: string,
-    transactionId: string,
-  ): Promise<RelayerTransactionStatus>;
-}
-```
-
-### RelayerExecutionService
-
-[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/domain/relayer-execution.ts).
-
-```ts
-/** Library-only stored-action service. No raw transaction HTTP endpoint is added. */
-export declare class RelayerExecutionService {
-  constructor(
-    authority: RelayerExecutionAuthority,
-    provider: RelayerExecutionProvider,
-  );
-  submit(
-    context: AuthorityContext,
-    actionId: string,
-  ): Promise<RelayerAcceptance>;
-  status(
-    context: AuthorityContext,
-    actionId: string,
-    transactionId: string,
-  ): Promise<RelayerTransactionStatus>;
-}
-```
-
-### RelayerTransaction
-
-[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/domain/relayer-execution.ts).
-
-```ts
-/** Relayer owns the nonce. This is NOT the draft's fully populated Transaction. */
-export interface RelayerTransaction {
-  to: string;
-  value: string;
-  data: string;
-  gasLimit: string;
-  maxFeePerGas: string;
-  maxPriorityFeePerGas: string;
-}
-```
-
-### RelayerTransactionStatus
-
-[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/domain/relayer-execution.ts).
-
-```ts
-export interface RelayerTransactionStatus extends RelayerAcceptance {
-  status:
-    | 'canceled'
-    | 'pending'
-    | 'sent'
-    | 'submitted'
-    | 'mined'
-    | 'confirmed'
-    | 'failed'
-    | 'expired';
-  hash?: string;
-}
-```
-
-## Supplied stored-action backend
-
-Import from `@moovha/wallet-provider-kit/backend`. [Integration guide](stored-backend.md).
-
-- [createDurableSigningService](#createdurablesigningservice)
-- [createStoredWalletBackend](#createstoredwalletbackend)
-- [StoredAccountAuthority](#storedaccountauthority)
-- [StoredAccountRecord](#storedaccountrecord)
-- [StoredAccountResult](#storedaccountresult)
-- [StoredSigningAuthority](#storedsigningauthority)
-- [StoredSigningDispatch](#storedsigningdispatch)
-- [StoredSigningResult](#storedsigningresult)
-- [StoredTypedDataSigner](#storedtypeddatasigner)
-- [StoredWalletBackendConfiguration](#storedwalletbackendconfiguration)
-
-### createDurableSigningService
-
-[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/backend.ts).
-
-```ts
-/** Supplied durable dispatch: admission and dispatch commits precede the only signing call. */
-export declare function createDurableSigningService<Context>(
-  authority: StoredSigningAuthority<Context>,
-  signer: StoredTypedDataSigner,
-  network?: ProviderNetwork,
-): {
-  sign(context: Context, actionId: string): Promise<StoredSigningResult>;
-};
-```
-
-### createStoredWalletBackend
-
-[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/backend.ts).
-
-```ts
-/** Ready-made lifecycle around a selected provider and trusted host policy/storage adapters. */
-export declare function createStoredWalletBackend<
-  SigningContext,
-  AccountContext,
->(
-  configuration: StoredWalletBackendConfiguration<
-    SigningContext,
-    AccountContext
-  >,
-): {
-  sign: (
-    context: SigningContext,
-    actionId: string,
-  ) => Promise<StoredSigningResult>;
-  account(
-    context: AccountContext,
-    recover?: boolean,
-  ): Promise<StoredAccountResult>;
-};
-```
-
-### StoredAccountAuthority
-
-[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/backend.ts).
-
-```ts
-export interface StoredAccountAuthority<Context> {
-  reserve(context: Context, recover: boolean): Promise<StoredAccountRecord>;
-  claim(
-    context: Context,
-    account: StoredAccountRecord,
-  ): Promise<StoredAccountRecord>;
-  finish(
-    account: StoredAccountRecord,
-    address: string | null,
-  ): Promise<StoredAccountResult>;
-}
-```
-
-### StoredAccountRecord
-
-[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/backend.ts).
-
-```ts
-export interface StoredAccountRecord {
-  accountId: string;
-  attemptId: string;
-  state: 'admitted' | 'dispatching' | 'bound' | 'unknown';
-  leaseToken: string;
-  address: string | null;
-}
-```
-
-### StoredAccountResult
-
-[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/backend.ts).
-
-```ts
-export interface StoredAccountResult {
-  accountId: string;
-  address: string | null;
-  state: StoredAccountRecord['state'];
-}
-```
-
-### StoredSigningAuthority
-
-[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/backend.ts).
-
-```ts
-/** Trusted host policy/storage, never records or callbacks supplied by an HTTP caller. */
-export interface StoredSigningAuthority<Context> {
-  admit(context: Context, actionId: string): Promise<StoredSigningResult>;
-  dispatch(context: Context, attemptId: string): Promise<StoredSigningDispatch>;
-  finish(
-    dispatch: StoredSigningDispatch,
-    state: 'succeeded' | 'rejected' | 'unknown',
-    signature?: string,
-  ): Promise<StoredSigningResult>;
-}
-```
-
-### StoredSigningDispatch
-
-[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/backend.ts).
-
-```ts
-export interface StoredSigningDispatch {
-  attemptId: string;
-  leaseToken: string;
-  accountId: string;
-  address: string;
-  action: TypedDataAction;
-}
-```
-
-### StoredSigningResult
-
-[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/backend.ts).
-
-```ts
-export interface StoredSigningResult {
-  attemptId: string;
-  state: 'admitted' | 'dispatching' | 'succeeded' | 'rejected' | 'unknown';
-  signature: string | null;
-}
-```
-
-### StoredTypedDataSigner
-
-[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/backend.ts).
-
-```ts
-export interface StoredTypedDataSigner {
-  readonly provider: string;
-  signTypedData(dispatch: StoredSigningDispatch): Promise<string>;
-}
-```
-
-### StoredWalletBackendConfiguration
-
-[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/backend.ts).
-
-```ts
-export interface StoredWalletBackendConfiguration<
-  SigningContext,
-  AccountContext,
-> {
-  /** Explicit host opt-in; credentials never activate this backend. */
-  enabled: boolean;
-  network?: ProviderNetwork;
-  provider: WalletSigningProvider;
-  signingAuthority: StoredSigningAuthority<SigningContext>;
-  accountAuthority: StoredAccountAuthority<AccountContext>;
-}
-```
-
-## Built-in SQLite storage and financial authority
+## Durable storage
 
 Import from `@moovha/wallet-provider-kit/storage`. [Integration guide](storage.md).
 
@@ -2387,7 +1728,6 @@ export interface AssetBudgetCharge extends PolicyBudgetCharge {}
 [Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/storage/asset-budgets.ts).
 
 ```ts
-/** Preserve the deployed ERC-3009 allowance identity on the supported Base Sepolia profile. */
 export declare function assetBudgetId(
   origin: string,
   accountId: string,
@@ -2447,7 +1787,7 @@ export interface FinancialApproval {
   account: EmbeddedAccount;
   /** Original user authority for provider-owned application Safe signing. */
   userAccount?: EmbeddedAccount;
-  action: TypedDataAction | RelayerExecutionAction;
+  action: TypedDataAction;
   budgetId: string;
   units: string;
   additionalBudgets?: PolicyBudgetCharge[];
@@ -2466,7 +1806,7 @@ export interface FinancialAuthorityOptions {
   authorize(
     context: AuthorityContext,
     approval: FinancialApproval,
-    purpose: 'sign' | 'submit' | 'status',
+    purpose: 'sign' | 'status',
   ): Promise<FinancialAuthorization | null>;
 }
 ```
@@ -2542,7 +1882,13 @@ export declare function openProviderDatabase(
       result: import('../index.js').PaymasterStubV07 | null,
     ): void;
   };
-  journal: import('../providers/openzeppelin-relayer.js').RelayerAttemptJournal;
+  journal: import('../domain/attempt-journal.js').WalletAttemptJournal & {
+    read(
+      request: WalletAttemptRequest,
+    ): Promise<
+      import('../domain/attempt-journal.js').WalletAttemptClaim | null
+    >;
+  };
   ready: () => Promise<boolean>;
   close: () => void;
   /** Read-only ownership guard before assigning an empty toolkit store to a configured service. */
@@ -2573,18 +1919,16 @@ export declare function openProviderDatabase(
   hasAttemptAdmission(request: WalletAttemptRequest): boolean;
   /** Synchronous inside the shared storage transaction; any admission retains possible signing exposure. */
   hasActionAttempts(id: string): boolean;
-  /** Synchronous with cancellation admission: a provider handoff, even before claim, prevents cancellation. */
-  hasExecutionAdmission(executionId: string): boolean;
-  /** Fence submission admission and cancellation intent in the same SQLite write transaction. */
-  admitExecutionAttempt(
-    input: AttemptAdmission,
-    actionId: string,
-  ): Promise<WalletAttemptRequest>;
   revokeAction(id: string): Promise<void>;
   financialAuthority: (configuration: FinancialAuthorityOptions) => {
     authority: import('../core.js').EmbeddedWalletAuthority;
-    executionAuthority: import('../domain/relayer-execution.js').RelayerExecutionAuthority;
-    journal: import('../providers/openzeppelin-relayer.js').RelayerAttemptJournal;
+    journal: import('../domain/attempt-journal.js').WalletAttemptJournal & {
+      read(
+        request: WalletAttemptRequest,
+      ): Promise<
+        import('../domain/attempt-journal.js').WalletAttemptClaim | null
+      >;
+    };
     authorizeAttempt: (request: WalletAttemptRequest) => Promise<boolean>;
     authorizeStatus: (request: WalletAttemptRequest) => Promise<boolean>;
   };
@@ -2675,18 +2019,11 @@ Import from `@moovha/wallet-provider-kit/deployment`. [Integration guide](setup.
 - [RuntimePolicySnapshot](#runtimepolicysnapshot)
 - [RuntimeReview](#runtimereview)
 - [SafeAccountBinding](#safeaccountbinding)
-- [SafeDeploymentDriver](#safedeploymentdriver)
-- [SafeDeploymentPlan](#safedeploymentplan)
 - [SafeProvisioningConfiguration](#safeprovisioningconfiguration)
 - [SecretReference](#secretreference)
 - [TokenTransferAdapter](#tokentransferadapter)
-- [TransactionEventInput](#transactioneventinput)
-- [TransactionEventReport](#transactioneventreport)
-- [TransferInput](#transferinput)
-- [TransferPolicy](#transferpolicy)
 - [validateApprovedCallPolicy](#validateapprovedcallpolicy)
 - [validateProviderConfiguration](#validateproviderconfiguration)
-- [WalletBackendAdapterV1](#walletbackendadapterv1)
 - [WalletCallsClientOptions](#walletcallsclientoptions)
 - [WalletCallsReceipt](#walletcallsreceipt)
 - [WalletCallsRpcError](#walletcallsrpcerror)
@@ -2751,10 +2088,6 @@ export type ApprovedCallInput =
 
 ```ts
 export interface ApprovedCallIntent extends OperationAdapterTerms {
-  cancellation?: {
-    actionId: string;
-    payloadHash: string;
-  };
   adapterInput?: AdapterInput;
   nativeRecipients?: string[];
   version: '1';
@@ -3033,7 +2366,6 @@ export interface ProviderConfiguration {
   network?: ProviderNetwork;
   safeProvisioning?: import('../provisioning/safe.js').SafeProvisioningConfiguration;
   runtimeConfiguration?: RuntimeConfigurationOptions;
-  localExecution?: LocalExecutionConfiguration;
   configVersion: 1;
   profile: 'provider-service-v1';
   policy: OnboardingPolicy;
@@ -3063,33 +2395,12 @@ export interface ProviderConfiguration {
       verificationPrice?: VendorPrice;
     };
   };
-  backend:
-    | {
-        kind: 'cdp';
-        binding: string;
-        apiKeyId: SecretReference;
-        apiKeySecret: SecretReference;
-        walletSecret: SecretReference;
-      }
-    | {
-        kind: 'ows';
-        binding: string;
-        vaultDirectory: string;
-        passphrase: SecretReference;
-      }
-    | {
-        kind: 'openzeppelin-relayer';
-        binding: string;
-        url: string;
-        apiKey: SecretReference;
-        signers: RelayerBinding[];
-      }
-    | {
-        kind: 'custom';
-        binding: string;
-        module: string;
-        options?: Record<string, unknown>;
-      };
+  backend: {
+    kind: 'ows';
+    binding: string;
+    vaultDirectory: string;
+    passphrase: SecretReference;
+  };
   storage: {
     kind: 'sqlite';
     directory: string;
@@ -3098,14 +2409,8 @@ export interface ProviderConfiguration {
     enabled: boolean;
     backendAcceptance?: string;
     recoveryAcceptance?: string;
-    tokenAcceptance?: string;
-    executionAcceptance?: string;
-    safeProvisioningAcceptance?: string;
   };
-  financial?: TransferPolicy;
   approvedCalls?: import('../execution/approved-calls.js').ApprovedCallsConfiguration;
-  execution?: ExecutionConfiguration;
-  operations?: import('../execution/operations.js').OperationsConfiguration;
   http?: {
     requestsPerMinute?: number;
     host?: '127.0.0.1' | '0.0.0.0' | '::1' | '::';
@@ -3138,11 +2443,6 @@ export interface RuntimeConfigurationOptions {
   credentialKey?: {
     env: string;
   };
-  sharedApplicationSafes?: boolean;
-  executionPool?: {
-    safeCount: number;
-    sponsorCount: number;
-  };
   operators: {
     issuer: string;
     clientId: string;
@@ -3170,11 +2470,6 @@ export declare class RuntimeConfigurationService {
     work: (endpoint: string, unavailable: () => void) => Promise<T>,
     transport?: typeof fetch,
   ): Promise<T>;
-  get executionPool(): {
-    safeCount: number;
-    sponsorCount: number;
-  };
-  get hasExecutionPool(): boolean;
   constructor(
     onboardingPolicy: ResolvedPolicy,
     store: OnboardingStore,
@@ -3203,28 +2498,6 @@ export declare class RuntimeConfigurationService {
     applicationId: string,
     kind?: 'rpc-verification' | 'rpc-submission' | 'rpc-observation',
   ): Promise<string[]>;
-  poolConfiguration(applicationId: string): Promise<{
-    safeCount: number;
-    sponsorCount: number;
-  }>;
-  readPool(principal: VerifiedPrincipal): Promise<{
-    application_id: string;
-    safe_count: number;
-    sponsor_count: number;
-  }>;
-  configurePool(
-    context: AuthorityContext,
-    input: {
-      expected_safe_count: number;
-      expected_sponsor_count: number;
-      safe_count: number;
-      sponsor_count: number;
-    },
-  ): Promise<{
-    application_id: string;
-    safe_count: number;
-    sponsor_count: number;
-  }>;
   acceptedSponsorship(applicationId: string): Promise<ObligationRecord>;
   readObligations(
     principal: VerifiedPrincipal,
@@ -3449,42 +2722,6 @@ export interface SafeAccountBinding extends PinnedContract {
 }
 ```
 
-### SafeDeploymentDriver
-
-[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/provisioning/safe.ts).
-
-```ts
-/** Trusted narrow deployment driver. Submit must recheck authorizeEffect immediately before a provider mutation. */
-export interface SafeDeploymentDriver {
-  prepare(plan: SafeDeploymentPlan): Promise<void>;
-  submit(
-    plan: SafeDeploymentPlan,
-    authorizeEffect: () => Promise<void>,
-  ): Promise<string>;
-}
-```
-
-### SafeDeploymentPlan
-
-[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/provisioning/safe.ts).
-
-```ts
-export interface SafeDeploymentPlan {
-  networkFees?: import('../execution/network-fees.js').NetworkFeeQuote;
-  accountId: string;
-  owner: string;
-  address: string;
-  saltNonce: string;
-  data: string;
-  chainId: string;
-  factory: PinnedContract;
-  singleton: PinnedContract;
-  proxyCodeHash: string;
-  sponsor: ExecutionSponsor;
-  expiresAt: string;
-}
-```
-
 ### SafeProvisioningConfiguration
 
 [Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/provisioning/safe.ts).
@@ -3522,65 +2759,6 @@ export interface TokenTransferAdapter {
 }
 ```
 
-### TransactionEventInput
-
-[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/deployment/actions.ts).
-
-```ts
-export interface TransactionEventInput {
-  event: 'submitted' | 'confirmed' | 'failed';
-  chain_id: ProviderChainId;
-  transaction_hash: string;
-  observed_at: string;
-}
-```
-
-### TransactionEventReport
-
-[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/deployment/actions.ts).
-
-```ts
-export interface TransactionEventReport extends TransactionEventInput {
-  report_id: string;
-  recorded_at: string;
-  verification: 'unverified';
-}
-```
-
-### TransferInput
-
-[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/deployment/actions.ts).
-
-```ts
-export interface TransferInput {
-  account_id: string;
-  recipient: string;
-  amount: string;
-}
-```
-
-### TransferPolicy
-
-[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/deployment/actions.ts).
-
-```ts
-export interface TransferPolicy {
-  profile: 'provider-authorized-erc3009-v1';
-  token: {
-    address: string;
-    name: string;
-    version: string;
-    symbol: string;
-    decimals: number;
-  };
-  recipients: string[];
-  maximumAmount: string;
-  /** Lifetime authorized atomic units per account/token; unknown effects retain usage. */
-  lifetimeAmount: string;
-  maxValiditySeconds: number;
-}
-```
-
 ### validateApprovedCallPolicy
 
 [Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/approved-calls.ts).
@@ -3602,21 +2780,6 @@ export declare function validateApprovedCallPolicy(
 export declare function validateProviderConfiguration(
   input: unknown,
 ): ProviderConfiguration;
-```
-
-### WalletBackendAdapterV1
-
-[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/deployment/backends.ts).
-
-```ts
-/** Trusted deployment extension. The returned raw backend receives toolkit-owned policy/journals. */
-export interface WalletBackendAdapterV1 {
-  adapterVersion: 1;
-  createWalletBackend(context: {
-    options: Record<string, unknown>;
-    secret(name: string): string;
-  }): Promise<WalletSigningProvider> | WalletSigningProvider;
-}
 ```
 
 ### WalletCallsClientOptions
@@ -3681,19 +2844,6 @@ export declare class WalletCallsService {
     chainId: '0x2105' | '0x14a34';
   }>;
   constructor(actions: SupportedActions, driver: WalletCallsDriver);
-  constructor(
-    actions: SupportedActions,
-    queue: SafeExecutionQueue,
-    execution: ExecutionCoordinatorPort,
-    driver?: WalletCallsDriver,
-  );
-  /** Streams current authorized status; notifications contain no account data. */
-  watch(
-    principal: VerifiedPrincipal,
-    accountId: string,
-    batchId: string,
-    signal: AbortSignal,
-  ): AsyncGenerator<WalletCallsStatus | undefined, void, unknown>;
   list(
     principal: VerifiedPrincipal,
     authorizeOperator?: (state: ProviderState) => void,
@@ -3701,6 +2851,13 @@ export declare class WalletCallsService {
     truncated: boolean;
     batches: import('./types.js').WalletCallsBatchSummary[];
   }>;
+  /** Streams current authorized status; notifications contain no account data. */
+  watch(
+    principal: VerifiedPrincipal,
+    accountId: string,
+    batchId: string,
+    signal: AbortSignal,
+  ): AsyncGenerator<WalletCallsStatus | undefined, void, unknown>;
   request(
     principal: VerifiedPrincipal,
     accountId: string,
@@ -4289,7 +3446,7 @@ export declare class Safe4337SigningService {
     options: Safe4337SigningOptions,
     request?: typeof fetch,
   );
-  /** Uses the common stored operation/action and idempotency identity used by the relayer. */
+  /** Bind the stored intent approval and exact UserOperation to one idempotency identity. */
   requestCalls(
     context: AuthorityContext,
     input: ApprovedCallInput,
@@ -4394,7 +3551,7 @@ export declare class Safe4337SigningService {
 [Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/sponsorship/verifier.ts).
 
 ```ts
-/** Independent chain reads at a common block. No module installation or relaxation of the SafeTx verifier. */
+/** Independent chain reads at a common block. Checks only the accepted ERC-4337 account configuration. */
 export declare class Safe4337Verifier {
   constructor(config: Safe4337Acceptance, request?: typeof fetch);
   /** Advisory nonce preparation only. Admission must still verify the complete account proof. */
@@ -4470,7 +3627,7 @@ export declare const safeOpTypes: {
 [Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/sponsorship/preparation.ts).
 
 ```ts
-/** Encode the same ordered CALL-only intent used by the relayer's SafeTx path. */
+/** Encode the exact ordered calls for Safe4337Module execution. */
 export declare function safeUserOperationCallData(
   intent: ApprovedCallIntent,
 ): string;
@@ -4703,7 +3860,7 @@ export interface UserOperationWalletCallsConfiguration {
 [Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/sponsorship/wallet-calls.ts).
 
 ```ts
-/** Durable, explicitly selected ERC-4337 batch lane. It never delegates an uncertain batch to a relayer. */
+/** Durable ERC-4337 batch lane. Uncertain batches retain their immutable operation identity. */
 export declare class UserOperationWalletCallsDriver implements WalletCallsDriver {
   constructor(
     actions: SupportedActions,

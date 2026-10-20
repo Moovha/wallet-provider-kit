@@ -28,28 +28,26 @@ async function current() {
   );
 }
 it.each([
-  'provider.config.example.json',
-  'provider.config.application.example.json',
-  'provider.config.bundled.example.json',
-  'provider.config.contracts.example.json',
-])(
-  'rejects retired configuration %s before storage, backend or network effects',
-  async (filename) => {
-    const directory = await mkdtemp(join(tmpdir(), 'wpk-retired-'));
-    folders.push(directory);
-    const network = vi
-      .spyOn(globalThis, 'fetch')
-      .mockRejectedValue(Error('No network'));
-    const config = JSON.parse(await readFile('docs/' + filename, 'utf8'));
-    await expect(
-      createConfiguredProvider(config, directory),
-    ).rejects.toMatchObject({
-      issues: [expect.stringContaining('only per-user Safe accounts')],
-    });
-    expect(await readdir(directory)).toEqual([]);
-    expect(network).not.toHaveBeenCalled();
-  },
-);
+  'safeWallet',
+  'safeProvisioning',
+  'approvedCalls',
+  'runtimeConfiguration',
+])('rejects a missing %s before storage or network effects', async (field) => {
+  const directory = await mkdtemp(join(tmpdir(), 'wpk-incomplete-'));
+  folders.push(directory);
+  const network = vi
+    .spyOn(globalThis, 'fetch')
+    .mockRejectedValue(Error('No network'));
+  const config = JSON.parse(
+    await readFile('docs/provider.config.safe.example.json', 'utf8'),
+  );
+  delete config[field];
+  await expect(
+    createConfiguredProvider(config, directory),
+  ).rejects.toMatchObject({ issues: expect.any(Array) });
+  expect(await readdir(directory)).toEqual([]);
+  expect(network).not.toHaveBeenCalled();
+});
 it('starts only the Safe runtime, advertises one execution choice and preserves its configuration identity after restart', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'wpk-safe-runtime-'));
   folders.push(directory);
@@ -75,14 +73,11 @@ it('starts only the Safe runtime, advertises one execution choice and preserves 
     apps.push(app);
     const response = await app.inject({ url: '/v1/execution-capabilities' });
     expect(response.statusCode).toBe(200);
-    expect(response.json().profiles).toEqual([
-      expect.objectContaining({
-        id: 'safe-only-4337-v1',
-        configured: true,
-        ready: false,
-        submission: 'erc-4337-v0.7-bundler',
-      }),
-    ]);
+    expect(response.json()).toEqual({
+      profile: 'safe-only-4337-v1',
+      revision: '1',
+      configured: false,
+    });
     await app.close();
     apps.pop();
   }

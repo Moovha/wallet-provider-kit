@@ -21,7 +21,7 @@ it('reads only requested JSON payloads as retained history grows, and detaches r
         );
       connection.run(
         'INSERT INTO onboarding_records(collection,id,record) VALUES(?,?,?)',
-        'executionPools',
+        'budgets',
         'selected',
         '7',
       );
@@ -52,7 +52,7 @@ it('reads only requested JSON payloads as retained history grows, and detaches r
       return result;
     });
     const started = performance.now();
-    expect(await store.transaction((s) => s.executionPools!.selected)).toBe(7);
+    expect(await store.transaction((s) => s.budgets!.selected)).toBe(7);
     if (process.env.WPK_RPC_DIAGNOSTICS === '1')
       console.info(
         JSON.stringify({
@@ -66,12 +66,12 @@ it('reads only requested JSON payloads as retained history grows, and detaches r
     expect(bytes).toBeLessThan(100000);
     expect(queries.some((sql) => sql.includes('onboarding_audit'))).toBe(false);
     const detached = await store.transaction((s) => {
-      const previous = s.executionPools;
-      s.executionPools = { replacement: 9 };
+      const previous = s.budgets;
+      s.budgets = { replacement: 9 };
       return previous;
     });
     expect(detached).toEqual({ selected: 7 });
-    expect(await store.transaction((s) => s.executionPools)).toEqual({
+    expect(await store.transaction((s) => s.budgets)).toEqual({
       replacement: 9,
     });
     expect(await store.transaction((s) => s.audit.length)).toBe(1000);
@@ -87,8 +87,11 @@ it('persists nested changes, replacement and deletion while retaining untouched 
     b = openProviderDatabase({ directory });
   try {
     await a.onboardingStore.transaction((s) => {
-      s.executionPools = { a: 1, b: 2 };
-      s.sponsorQuarantines = { one: ['first'], two: ['retained'] };
+      s.budgets = { a: 1, b: 2 };
+      s.assetBudgetBindings = {
+        one: { revision: 'first' },
+        two: { revision: 'retained' },
+      };
       s.audit.push({
         at: 1,
         event: 'created',
@@ -97,26 +100,24 @@ it('persists nested changes, replacement and deletion while retaining untouched 
       });
     });
     const detached = await a.onboardingStore.transaction(
-      (s) => s.sponsorQuarantines!.one,
+      (s) => s.assetBudgetBindings!.one,
     );
     await b.onboardingStore.transaction((s) => {
-      s.sponsorQuarantines!.one.push('revoked');
-      delete s.executionPools!.b;
-      s.executionPools!.c = 3;
+      s.assetBudgetBindings!.one.revision = 'revoked';
+      delete s.budgets!.b;
+      s.budgets!.c = 3;
     });
-    expect(detached).toEqual(['first']);
+    expect(detached).toEqual({ revision: 'first' });
     expect(
-      await a.onboardingStore.transaction((s) => s.sponsorQuarantines!.one),
-    ).toEqual(['first', 'revoked']);
+      await a.onboardingStore.transaction((s) => s.assetBudgetBindings!.one),
+    ).toEqual({ revision: 'revoked' });
     expect(
-      await a.onboardingStore.transaction((s) =>
-        structuredClone(s.executionPools),
-      ),
+      await a.onboardingStore.transaction((s) => structuredClone(s.budgets)),
     ).toEqual({ a: 1, c: 3 });
     await a.onboardingStore.transaction((s) => {
-      s.executionPools = { replacement: 9 };
-      Object.defineProperty(s.sponsorQuarantines!, 'one', {
-        value: ['replacement'],
+      s.budgets = { replacement: 9 };
+      Object.defineProperty(s.assetBudgetBindings!, 'one', {
+        value: { revision: 'replacement' },
         enumerable: true,
         configurable: true,
       });
@@ -126,13 +127,14 @@ it('persists nested changes, replacement and deletion while retaining untouched 
       ];
     });
     expect(
-      await b.onboardingStore.transaction((s) =>
-        structuredClone(s.executionPools),
-      ),
+      await b.onboardingStore.transaction((s) => structuredClone(s.budgets)),
     ).toEqual({ replacement: 9 });
     expect(
-      await b.onboardingStore.transaction((s) => s.sponsorQuarantines),
-    ).toEqual({ one: ['replacement'], two: ['retained'] });
+      await b.onboardingStore.transaction((s) => s.assetBudgetBindings),
+    ).toEqual({
+      one: { revision: 'replacement' },
+      two: { revision: 'retained' },
+    });
   } finally {
     a.close();
     b.close();

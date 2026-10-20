@@ -10,7 +10,7 @@ import {
 import { createAuthenticator } from '../src/service/auth.js';
 const sample = JSON.parse(
   await readFile(
-    new URL('../docs/provider.config.hosted.example.json', import.meta.url),
+    new URL('../docs/provider.config.safe.example.json', import.meta.url),
     'utf8',
   ),
 );
@@ -20,7 +20,15 @@ afterEach(() => {
 });
 function fixture() {
   const input = structuredClone(sample);
+  input.authorizationServer.clients[0].clientSecret = {
+    env: 'OFFLINE_EXPLORER_CLIENT_SECRET',
+  };
   input.http = { documentation: true };
+  input.ownerLogin = {
+    issuer: 'https://staff.example.test',
+    clientId: 'staff',
+    clientSecret: { env: 'STAFF_CLIENT_SECRET' },
+  };
   input.apiExplorer = {
     operators: ['operator-subject'],
     clients: [

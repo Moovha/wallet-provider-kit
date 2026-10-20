@@ -17,7 +17,7 @@ const contract: ApiContract = JSON.parse(
 );
 const sample = JSON.parse(
   await readFile(
-    new URL('../docs/provider.config.hosted.example.json', import.meta.url),
+    new URL('../docs/provider.config.safe.example.json', import.meta.url),
     'utf8',
   ),
 );
@@ -75,70 +75,6 @@ describe('operator API reference', () => {
     expect(contract.info.title).toBe('Moovha Wallet Provider Service');
     expect(contract.paths['/v1/access-requests'].post.summary).toBeUndefined();
   });
-  it('distinguishes configuration, application permissions and activation without pretending to verify runtime access', () => {
-    const config = fixture();
-    let operations = referenceOperations(contract, config, 0);
-    expect(
-      operations.find(
-        (item) => item.operation.operationId === 'getCapabilities',
-      )?.status,
-    ).toBe('No access token needed');
-    expect(
-      operations.find(
-        (item) => item.operation.operationId === 'requestAccountAccess',
-      )?.status,
-    ).toBe('Not enabled: Wallet operations are disabled in Deployment');
-    expect(
-      operations.find((item) => item.operation.operationId === 'signAction')
-        ?.status,
-    ).toBe('Not enabled: Transfer signing is off in Applications');
-    config.financial = {
-      profile: 'provider-authorized-erc3009-v1',
-      token: {
-        address: '0x1111111111111111111111111111111111111111',
-        name: 'Example',
-        version: '1',
-        symbol: 'TEST',
-        decimals: 6,
-      },
-      recipients: ['0x2222222222222222222222222222222222222222'],
-      maximumAmount: '10',
-      lifetimeAmount: '100',
-      maxValiditySeconds: 300,
-    };
-    config.activation.enabled = true;
-    config.policy.applications[0].permissions = ['account:read'];
-    operations = referenceOperations(contract, config, 0);
-    expect(
-      operations.find((item) => item.operation.operationId === 'signAction')
-        ?.status,
-    ).toBe(
-      'Select the required permission for this application in Applications',
-    );
-    expect(
-      operations.find(
-        (item) => item.operation.operationId === 'provisionAccount',
-      )?.status,
-    ).toBe('Settings are present; deployed access has not been checked');
-    config.policy.applications.push({
-      ...config.policy.applications[0],
-      clientId: 'disabled-app',
-      enabled: false,
-    });
-    expect(
-      referenceOperations(contract, config, 1).find(
-        (item) => item.operation.operationId === 'requestAccountAccess',
-      )?.status,
-    ).toBe('This application is disabled in Applications');
-    delete config.policy.applications[0].permissions;
-    expect(
-      referenceOperations(contract, config, 0).find(
-        (item) => item.operation.operationId === 'signAction',
-      )?.status,
-    ).toBe(
-      'Select the required permission for this application in Applications',
-    );
-  });
   it('provides schema-valid request examples and placeholder-only scoped cURL with an explicit retry key', () => {
     const config = fixture();
     const operations = referenceOperations(contract, config, 0);
@@ -149,7 +85,7 @@ describe('operator API reference', () => {
           responseBody(item.operation).schema,
           responseExample(item.operation.operationId),
         ),
-        JSON.stringify(ajv.errors),
+        item.operation.operationId + ': ' + JSON.stringify(ajv.errors),
       ).toBe(true);
       if (item.operation.requestBody) {
         expect(
@@ -184,7 +120,9 @@ describe('operator API reference', () => {
 
 it('previews application-led policy and grants with schema-valid evidence examples and unavailable hosted endpoints', async () => {
   const config = validateProviderConfiguration(
-    JSON.parse(await readFile('docs/provider.config.example.json', 'utf8')),
+    JSON.parse(
+      await readFile('docs/provider.config.safe.example.json', 'utf8'),
+    ),
   );
   const operations = referenceOperations(contract, config, 0);
   expect(

@@ -20,15 +20,7 @@ export async function inspectSetup(
   directory: string,
 ) {
   const checks: { check: string; status: 'pass' | 'fail' | 'pending' }[] = [];
-  const isolated = config.localExecution
-    ? [
-        config.localExecution.keystorePassphrase.env,
-        config.localExecution.storageKey.env,
-      ]
-    : [];
-  for (const ref of secretReferences(config).filter(
-    (entry) => !isolated.includes(entry.env),
-  )) {
+  for (const ref of secretReferences(config)) {
     try {
       resolveSecret(ref);
       checks.push({ check: 'secret:' + ref.env, status: 'pass' });
@@ -133,18 +125,13 @@ export async function inspectSetup(
           network?: import('../networks.js').ProviderNetwork;
         })
       : undefined;
-    const names = {
-      cdp: 'cdp-api-key-wallet-v2',
-      ows: 'ows-local-owner-v1',
-      'openzeppelin-relayer': 'openzeppelin-relayer-v1',
-    };
+
     const matches = saved
       ? saved.origin === config.policy.provider.origin &&
         saved.binding === config.backend.binding &&
         (saved.network ?? 'base-sepolia') ===
           (config.network ?? 'base-sepolia') &&
-        (config.backend.kind === 'custom' ||
-          saved.provider === names[config.backend.kind])
+        saved.provider === 'ows-local-owner-v1'
       : !database
           .prepare(
             'SELECT 1 FROM onboarding_records UNION ALL SELECT 1 FROM onboarding_audit UNION ALL SELECT 1 FROM budgets UNION ALL SELECT 1 FROM approvals UNION ALL SELECT 1 FROM admissions UNION ALL SELECT 1 FROM attempts UNION ALL SELECT 1 FROM financial_audit UNION ALL SELECT 1 FROM enrollments LIMIT 1',
@@ -163,11 +150,6 @@ export async function inspectSetup(
     check: 'activation:operator-acceptance',
     status: config.activation.enabled ? 'pass' : 'pending',
   });
-  if (config.backend.kind === 'custom')
-    checks.push({
-      check: 'backend:custom-adapter-conformance',
-      status: 'pending',
-    });
   return checks;
 }
 /** Returns false for the backward-compatible inspection executable with no arguments. */
@@ -175,7 +157,7 @@ export async function setupCommand(args: string[]): Promise<boolean> {
   if (!args.length) return false;
   if (args.length === 1 && ['help', '--help', '-h'].includes(args[0])) {
     process.stdout.write(
-      'wallet-provider-kit setup [--port number] [--no-open]\nwallet-provider-kit runtime check\nwallet-provider-kit runtime install\nwallet-provider-kit local-setup --config file [--install-runtime]\nwallet-provider-kit init [file]\nwallet-provider-kit validate --config file\nwallet-provider-kit doctor --config file\nwallet-provider-kit init-secrets --config file\nwallet-provider-kit init-storage --config file\nwallet-provider-kit run --config file\nwallet-provider-kit executor init [file]\nwallet-provider-kit executor validate|init-storage|run --config file\n',
+      'wallet-provider-kit setup [--port number] [--no-open]\nwallet-provider-kit runtime check\nwallet-provider-kit runtime install\nwallet-provider-kit local-setup --config file [--install-runtime]\nwallet-provider-kit init [file]\nwallet-provider-kit validate --config file\nwallet-provider-kit doctor --config file\nwallet-provider-kit init-secrets --config file\nwallet-provider-kit init-storage --config file\nwallet-provider-kit run --config file\n',
     );
     return true;
   }

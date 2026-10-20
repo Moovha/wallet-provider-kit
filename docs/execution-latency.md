@@ -2,11 +2,7 @@
 
 The configured service has one execution flow: a user Safe submits an ERC-4337
 v0.7 UserOperation through the private bundler, sponsored by the application's
-verifying paymaster. The OWS account is its private signer. EOA transfers,
-shared application Safes, sponsor pools and the separate executor are retired
-configured-service choices. Old configuration can be parsed for inspection;
-starting or exporting it requires a reviewed migration. Existing records do not
-change account meaning when configuration is loaded.
+verifying paymaster. The OWS account is its private signer.
 
 ## Request and execution sequence
 
@@ -88,6 +84,8 @@ startup and policy renewal separately. Testnet measurements do not establish a
 mainnet or production service objective.
 
 ## Base Sepolia burst evidence — 20 October 2026
+
+These measurements predate the implementation purge at revision `84c215a`. They have not been rerun against the purged code.
 
 Nine bursts each offered ten concurrent requests from the same ten retained user
 Safes, using USDC `balanceOf(Safe)` and `transfer(Safe, 0)` in one atomic operation.

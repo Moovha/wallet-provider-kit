@@ -1,3 +1,4 @@
+import { moduleSetupAction, moduleSetupCallData } from './account-setup.js';
 import { bindRpcTransport } from '../execution/rpc-capacity.js';
 import { createWalletAttemptRequest } from '../providers/attempt-lifecycle.js';
 import { applicationGasBudgetId } from './budget.js';
@@ -43,8 +44,6 @@ import {
 import { RpcReader } from '../execution/chain.js';
 import { quoteNetworkFees } from '../execution/network-fees.js';
 import {
-  buildApprovedCallAction,
-  approvedCallData,
   type SafeAccountBinding,
   type PinnedContract,
   type ApprovedCallIntent,
@@ -399,21 +398,21 @@ export class SafeWalletRuntime {
       await this.transaction((r) => {
         const records = (r.safeWalletInfrastructure ??= {});
         if (records[applicationId]) {
-          records[applicationId].fundingAccountId ??=
-            r.applicationFunding?.[applicationId]?.accountId ?? randomUUID();
+          if (!records[applicationId].fundingAccountId) deny();
           return;
         }
-        const previous = r.applicationFunding?.[applicationId];
         const funding = Wallet.createRandom(),
           executor = Wallet.createRandom(),
           signer = Wallet.createRandom();
         records[applicationId] = {
           applicationId,
-          fundingAddress: previous?.address ?? funding.address,
-          fundingAccountId: previous?.accountId ?? randomUUID(),
-          fundingKey:
-            previous?.key ??
-            this.seal(applicationId, 'safe-wallet-funding', funding.privateKey),
+          fundingAddress: funding.address,
+          fundingAccountId: randomUUID(),
+          fundingKey: this.seal(
+            applicationId,
+            'safe-wallet-funding',
+            funding.privateKey,
+          ),
           executor: {
             address: executor.address,
             key: this.seal(
@@ -606,7 +605,7 @@ export class SafeWalletRuntime {
       const effect = createWalletAttemptRequest(
         'safe-wallet-setup-v1',
         'safe-wallet-infrastructure-v1',
-        'relay_transaction',
+        'infrastructure_transaction',
         infra.fundingAccountId,
         id,
         infra.fundingAccountId + ':' + nonce,
@@ -720,7 +719,7 @@ export class SafeWalletRuntime {
           await this.database.journal.complete(
             saved.request,
             claim.leaseToken,
-            { kind: 'relay_transaction', transactionId: saved.id },
+            { kind: 'infrastructure_transaction', transactionId: saved.id },
           );
         return saved;
       }
@@ -889,13 +888,7 @@ export class SafeWalletRuntime {
           ).length >= (accepted.maximum_execution_accounts ?? 0)
         )
           deny();
-        const prior = Object.values(r.applicationSafes ?? {}).find(
-          (a) =>
-            a.userAccountId === accountId && a.applicationId === applicationId,
-        );
-        if (prior && (prior.userOwner !== current.owner || !prior.account))
-          deny();
-        const signer = prior?.account ?? {
+        const signer = {
           accountId,
           address: current.account.address ?? deny(),
         };
@@ -917,83 +910,52 @@ export class SafeWalletRuntime {
         (r) => r.safeWalletAccounts![accountId],
       );
       if (wallet.binding.address === ZeroAddress) {
-        const retained = await this.database.onboardingStore.transaction(
-          (s) => {
-            const old = Object.values(
-              s.deploymentBindings?.['service-v1']?.runtimeConfiguration
-                ?.applicationSafes ?? {},
-            ).find(
-              (a) =>
-                a.userAccountId === accountId &&
-                a.applicationId === applicationId,
-            );
-            return (
-              old &&
-              s.deploymentBindings!['service-v1'].safeAccounts?.[old.accountId]
-                ?.plan
-            );
+        const reader = await this.reader(applicationId);
+        const initializer = safeSetupInterface.encodeFunctionData('setup', [
+          [wallet.signer.address],
+          1,
+          ZeroAddress,
+          '0x',
+          ZeroAddress,
+          ZeroAddress,
+          0,
+          ZeroAddress,
+        ]);
+        const salt = BigInt(
+          fingerprint(['safe-wallet', applicationId, accountId]).replace(
+            /^/,
+            '0x',
+          ),
+        );
+        const data = safeFactoryInterface.encodeFunctionData(
+          'createProxyWithNonce',
+          [this.config.safeProvisioning!.singleton.address, initializer, salt],
+        );
+        const result = await reader.call('eth_call', [
+          { to: this.config.safeProvisioning!.factory.address, data },
+          'latest',
+        ]);
+        const address = String(
+          safeFactoryInterface.decodeFunctionResult(
+            'createProxyWithNonce',
+            String(result),
+          )[0],
+        );
+        await this.transaction((r) => {
+          r.safeWalletAccounts![accountId].binding.address = address;
+        });
+        await this.send(
+          applicationId,
+          'safe-deployment-' + accountId,
+          {
+            to: this.config.safeProvisioning!.factory.address,
+            data,
+            value: '0',
+          },
+          async () => {
+            await authority();
           },
         );
-        if (retained) {
-          if (
-            retained.owner.toLowerCase() !== wallet.signer.address.toLowerCase()
-          )
-            deny();
-          await this.transaction((r) => {
-            r.safeWalletAccounts![accountId].binding.address = retained.address;
-          });
-        } else {
-          const reader = await this.reader(applicationId);
-          const initializer = safeSetupInterface.encodeFunctionData('setup', [
-            [wallet.signer.address],
-            1,
-            ZeroAddress,
-            '0x',
-            ZeroAddress,
-            ZeroAddress,
-            0,
-            ZeroAddress,
-          ]);
-          const salt = BigInt(
-            fingerprint(['safe-wallet', applicationId, accountId]).replace(
-              /^/,
-              '0x',
-            ),
-          );
-          const data = safeFactoryInterface.encodeFunctionData(
-            'createProxyWithNonce',
-            [
-              this.config.safeProvisioning!.singleton.address,
-              initializer,
-              salt,
-            ],
-          );
-          const result = await reader.call('eth_call', [
-            { to: this.config.safeProvisioning!.factory.address, data },
-            'latest',
-          ]);
-          const address = String(
-            safeFactoryInterface.decodeFunctionResult(
-              'createProxyWithNonce',
-              String(result),
-            )[0],
-          );
-          await this.transaction((r) => {
-            r.safeWalletAccounts![accountId].binding.address = address;
-          });
-          await this.send(
-            applicationId,
-            'safe-deployment-' + accountId,
-            {
-              to: this.config.safeProvisioning!.factory.address,
-              data,
-              value: '0',
-            },
-            async () => {
-              await authority();
-            },
-          );
-        }
         wallet = await this.transaction(
           (r) => r.safeWalletAccounts![accountId],
         );
@@ -1138,15 +1100,12 @@ export class SafeWalletRuntime {
       const data = configAbi.encodeFunctionData(method, [
         this.config.safeWallet!.module.address,
       ]);
-      const intent = {
-        account: wallet.binding,
-        multiSend: this.config.approvedCalls!.policy.multiSend,
-        calls: [{ to: wallet.binding.address, value: '0', data }],
-        nonce,
-      } as ApprovedCallIntent;
-      const action = buildApprovedCallAction(
-        intent,
+      const action = moduleSetupAction(
+        wallet.binding.address,
         wallet.signer.address,
+        this.config.safeWallet!.module.address,
+        method,
+        nonce,
         new Date(Date.now() + 300000).toISOString(),
         randomUUID(),
         this.config.network,
@@ -1208,7 +1167,12 @@ export class SafeWalletRuntime {
         method + '-' + wallet.accountId,
         {
           to: wallet.binding.address,
-          data: approvedCallData(stored.action, signature),
+          data: moduleSetupCallData(
+            stored.action,
+            signature,
+            wallet.binding.address,
+            this.config.safeWallet!.module.address,
+          ),
           value: '0',
         },
         async () => {
@@ -1355,7 +1319,7 @@ export class SafeWalletRuntime {
             terms.preparation.runtimePolicy.application_id !== applicationId
           )
             return null;
-          return this.actions.withAuthorizedTransfer(
+          return this.actions.withAuthorizedCalls(
             context.principal,
             terms.operationId,
             (_state, record) => ({

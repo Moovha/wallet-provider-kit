@@ -10,8 +10,12 @@ import {
 } from '../../src/storage/index.js';
 import { OnboardingService } from '../../src/onboarding/service.js';
 import { SupportedActions } from '../../src/deployment/actions.js';
-import { RuntimeConfigurationService } from '../../src/runtime-configuration/service.js';
+import {
+  runtimeApplicationId,
+  RuntimeConfigurationService,
+} from '../../src/runtime-configuration/service.js';
 import { fingerprint } from '../../src/onboarding/policy.js';
+import { currentRuntimePolicy } from '../../src/runtime-configuration/authority.js';
 import {
   safeInterface,
   buildApprovedCallIntent,
@@ -314,6 +318,7 @@ export async function fixture(
   };
   configure?.(config);
   const input = {
+    application_action: { name: 'work', payload: {} },
     account_id: accountId,
     kind: 'contract-call' as const,
     calls: [
@@ -427,7 +432,55 @@ export async function fixture(
       }),
     );
   }) as typeof fetch;
-  let actions = new SupportedActions(onboarding, db, undefined, 'active-1', {
+  await db.onboardingStore.transaction((s) => {
+    const applicationId = runtimeApplicationId(
+      principal.issuer,
+      principal.clientId,
+    );
+    const r = s.deploymentBindings!['service-v1'].runtimeConfiguration!;
+    r.safeWalletAccounts = {
+      [accountId]: {
+        applicationId: applicationId,
+        accountId,
+        owner: s.accounts[accountId].owner,
+        signer: { accountId, address: wallet.address },
+        binding: basePolicy.accounts[0],
+        status: 'ready',
+      },
+    };
+    const registry = (r.obligations ??= { records: {}, receipts: {} });
+    for (const kind of ['actions', 'services', 'sponsorship'] as const)
+      registry.records[applicationId + ':' + kind] = {
+        application_id: applicationId,
+        kind,
+        revision: '1',
+        value:
+          kind === 'actions'
+            ? [{ name: 'work', description: 'Offline action', fields: [] }]
+            : kind === 'services'
+              ? []
+              : {
+                  chain_id: 'eip155:84532',
+                  funding_agreement: 'offline',
+                  maximum_gas_budget_wei: '10000000',
+                  account_model: 'provider-controlled-user-safe',
+                  maximum_execution_accounts: 10,
+                  asset_model: 'individual-user-wallets',
+                },
+        submitted_at: new Date().toISOString(),
+        decision: 'accepted',
+        decision_revision: '1',
+      };
+    const snapshot = currentRuntimePolicy(s, principal);
+    const revision = fingerprint(['financial-terms', snapshot]);
+    for (const grant of Object.values(s.grants)) {
+      grant.actionPolicyRevision = revision;
+      const request = s.requests[grant.requestId];
+      request.actionPolicyRevision = revision;
+      request.runtimePolicy = snapshot;
+    }
+  });
+  let actions = new SupportedActions(onboarding, db, 'active-1', {
     policy: basePolicy,
     maxValiditySeconds: 120,
   });
@@ -464,7 +517,7 @@ export async function fixture(
       'financial-terms',
       true,
     );
-    actions = new SupportedActions(onboarding, db, undefined, 'active-1', {
+    actions = new SupportedActions(onboarding, db, 'active-1', {
       policy: basePolicy,
       maxValiditySeconds: 120,
     });
@@ -477,12 +530,6 @@ export async function fixture(
     service = compose();
   }
   const source = () => actions.requestCalls(context, input, async () => '0');
-  const relay = (connection = db) =>
-    connection.financialAuthority({
-      namespace: 'relay-signing',
-      provider: 'offline',
-      authorize: (c, a) => actions.authorize(c, a),
-    });
   return {
     directory,
     get db() {
@@ -510,7 +557,6 @@ export async function fixture(
     wallet,
     backend,
     source,
-    relay,
     restart,
     request,
   };

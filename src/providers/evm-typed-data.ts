@@ -37,7 +37,7 @@ export function evmTypedDataPayload(
     requireAccountId(account.accountId);
     if (
       action.kind !== 'sign_typed_data' ||
-      action.profile !== 'evm_eoa_v1' ||
+      action.profile !== 'safe_owner_v1' ||
       action.profile_revision !== '1' ||
       action.status !== 'ready' ||
       action.chain_id !== selected.caip ||
@@ -70,7 +70,7 @@ export function evmTypedDataPayload(
     ) {
       throw new Error('invalid');
     }
-    // CDP's domain uses a JSON number; only the selected, safe chain ID is converted.
+    // Typed-data domains use a JSON number for the selected safe chain ID.
     return {
       ...canonical,
       domain: { ...canonical.domain, chainId: Number(selected.chainId) },

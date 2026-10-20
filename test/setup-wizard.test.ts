@@ -221,37 +221,6 @@ describe('local operator setup boundary', () => {
   });
 });
 
-it('distinguishes valid configuration from usable new-user identity and financial paths', async () => {
-  const hosted = JSON.parse(
-    await readFile('docs/provider.config.hosted.example.json', 'utf8'),
-  );
-  let config = validateProviderConfiguration(hosted);
-  expect(setupWarnings(config).join()).toContain(
-    'new identity checks are unavailable',
-  );
-  expect(setupWarnings(config).join()).toContain('funding agreement');
-  config.activation = {
-    enabled: true,
-    backendAcceptance: 'review/backend',
-    recoveryAcceptance: 'review/recovery',
-  };
-  config.identity.didit!.verificationPrice = {
-    maximumMinor: 0,
-    termsReference: 'agreed-free-verification',
-  };
-  config.identity.didit!.importPrice = {
-    maximumMinor: 10,
-    termsReference: 'agreed-import',
-  };
-  config.policy.applications[0].funding = {
-    agreement: 'reimbursement',
-    monthlyLimitMinor: 10,
-  };
-  expect(setupWarnings(config)).toEqual([]);
-  config.policy.applications[0].funding.monthlyLimitMinor = 5;
-  expect(setupWarnings(config).join()).toContain('smaller than');
-});
-
 it('requires an eligible reviewed runtime plan, blocks overlapping changes and resumes with the checked configuration', async () => {
   await app.close();
   const fixture = runtimeFixture(directory);

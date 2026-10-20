@@ -33,8 +33,7 @@ export interface ApplicationObligations {
       max_priority_fee_per_gas: string;
       l1_fee_reserve_wei: string;
     };
-    account_model:
-      'provider-controlled-application-safe' | 'provider-controlled-user-safe';
+    account_model: 'provider-controlled-user-safe';
     maximum_execution_accounts?: number;
     maximum_in_flight_per_sponsor?: number;
     asset_model: 'individual-user-wallets';
@@ -75,10 +74,7 @@ const sponsorshipProperties = {
   },
   account_model: {
     type: 'string',
-    enum: [
-      'provider-controlled-application-safe',
-      'provider-controlled-user-safe',
-    ],
+    enum: ['provider-controlled-user-safe'],
   },
   asset_model: { type: 'string', enum: ['individual-user-wallets'] },
 };
@@ -207,15 +203,9 @@ export function normalizeObligation<K extends ObligationKind>(
     )
       invalid();
     if (
-      sponsorship.account_model === 'provider-controlled-application-safe' &&
-      (sponsorship.maximum_execution_accounts !== undefined ||
-        (sponsorship.maximum_in_flight_per_sponsor ?? 1) !== 1)
-    )
-      invalid();
-    if (
       BigInt(sponsorship.maximum_gas_budget_wei) >= 2n ** 256n ||
       BigInt(gas.gasLimit) < 21000n ||
-      BigInt(gas.gasLimit) > maximumSponsorGasLimit(true) ||
+      BigInt(gas.gasLimit) > maximumSponsorGasLimit() ||
       BigInt(gas.maxFeePerGas) === 0n ||
       BigInt(gas.maxPriorityFeePerGas) > BigInt(gas.maxFeePerGas) ||
       [gas.maxFeePerGas, gas.maxPriorityFeePerGas].some(

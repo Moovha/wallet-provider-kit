@@ -15,7 +15,7 @@ try {
     namespace: 'offline-smoke',
     provider: 'offline',
     attemptId: randomUUID(),
-    kind: /** @type {const} */ ('relay_transaction'),
+    kind: /** @type {const} */ ('infrastructure_transaction'),
     accountId: randomUUID(),
     resourceKey: 'a'.repeat(64),
     requestHash: 'b'.repeat(64),
@@ -30,7 +30,7 @@ try {
   assert.equal(claim.state, 'dispatch');
   if (claim.state !== 'dispatch') throw new Error('Expected exclusive claim');
   const result = {
-    kind: /** @type {const} */ ('relay_transaction'),
+    kind: /** @type {const} */ ('infrastructure_transaction'),
     transactionId: randomUUID(),
   };
   await database.journal.complete(request, claim.leaseToken, result);

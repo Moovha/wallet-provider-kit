@@ -6,8 +6,8 @@ RUN npm ci --ignore-scripts
 COPY tsconfig.json ./
 COPY src ./src
 COPY setup-ui ./setup-ui
-COPY scripts/setup-notices.mjs ./scripts/setup-notices.mjs
-COPY spec/provider-config.schema.json spec/execution-service.config.schema.json ./spec/
+COPY scripts/setup-notices.mjs scripts/clean-build.mjs ./scripts/
+COPY spec/provider-config.schema.json ./spec/
 RUN npm run build
 RUN npm prune --omit=dev --ignore-scripts
 
@@ -17,13 +17,10 @@ WORKDIR /app
 COPY --from=build --chown=node:node /app/node_modules ./node_modules
 COPY --from=build --chown=node:node /app/dist ./dist
 COPY --chown=node:node package.json LICENSE NOTICE ./
-COPY --chown=node:node spec/provider-config.schema.json spec/execution-service.config.schema.json ./spec/
-COPY --chown=node:node docs/provider.config.example.json docs/executor.config.example.json ./docs/
-COPY --chown=node:node docs/provider.config.records.example.json ./docs/provider.config.records.example.json
+COPY --chown=node:node spec/provider-config.schema.json ./spec/
 USER node
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=3s CMD node -e "fetch('http://127.0.0.1:8080/health/live').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 CMD ["node", "dist/main.js"]
-COPY --chown=node:node docs/provider.config.bundled.example.json ./docs/provider.config.bundled.example.json
 
 COPY --chown=node:node docs/provider.config.safe.example.json ./docs/provider.config.safe.example.json

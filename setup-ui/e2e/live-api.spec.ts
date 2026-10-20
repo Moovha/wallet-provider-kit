@@ -27,7 +27,7 @@ test.beforeAll(async () => {
     },
     service: {
       provision: async () => {
-        throw new WalletProviderError('wallet_authorization_denied');
+        throw new WalletProviderError('service_unavailable');
       },
     } as unknown as EmbeddedWalletService,
   });
@@ -53,12 +53,7 @@ test('deployed Swagger executes same-origin HTTP and displays real success/auth/
   await expect(
     page.getByRole('heading', { name: /Provider API · Live testing/ }),
   ).toBeVisible();
-  await expect(page.locator('.opblock')).toHaveCount(62);
-  await expect(
-    page.locator('.opblock').filter({
-      hasText: 'Authorize cancellation of an unsubmitted signed Safe action',
-    }),
-  ).toContainText('Not enabled');
+  await expect(page.locator('.opblock')).toHaveCount(40);
   const discovery = page.locator('#operations-Discovery-getCapabilities');
   await discovery.locator('.opblock-summary-control').click();
   await discovery
@@ -118,9 +113,9 @@ test('deployed Swagger executes same-origin HTTP and displays real success/auth/
     `${url}/v1/accounts/10000000-0000-4000-8000-000000000001/provision`,
   );
   await provision.getByRole('button', { name: 'Execute', exact: true }).click();
-  expect((await denied).status()).toBe(403);
+  expect((await denied).status()).toBe(503);
   await expect(provision.locator('.responses-inner')).toContainText(
-    'wallet_authorization_denied',
+    'service_unavailable',
   );
   expect(calls.at(-1)).toEqual({
     authorization: 'Bearer offline-application-token',

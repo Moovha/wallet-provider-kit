@@ -1,9 +1,4 @@
-import { poolMembers } from '../provisioning/pools.js';
 import { runtimeApplicationId } from '../runtime-configuration/service.js';
-import {
-  safeProvisioningIdentity,
-  type SafeProvisioningConfiguration,
-} from '../provisioning/safe.js';
 import {
   providerNetwork,
   type ProviderNetwork,
@@ -18,20 +13,18 @@ import {
   currentRuntimePolicy,
   runtimeCallPolicy,
   validateRuntimeCalls,
-  validateRuntimeUserCalls,
+  validateSafeAddressParameters,
   type RuntimePolicySnapshot,
 } from '../runtime-configuration/authority.js';
-import { serviceHash } from '../executor/auth.js';
+import { canonicalHash } from '../domain/canonical.js';
 import {
   buildApprovedCallIntent,
-  buildNonceCancellationIntent,
   buildApprovedCallAction,
   validateApprovedCallAction,
   type ApprovedCallInput,
   type ApprovedCallIntent,
 } from '../execution/approved-calls.js';
 import { randomBytes, randomUUID } from 'node:crypto';
-import type { TransferExecutionRecord } from '../execution/types.js';
 import type { ProviderState } from '../onboarding/types.js';
 import { getAddress, TypedDataEncoder } from 'ethers';
 import type {
@@ -47,60 +40,15 @@ import type {
   FinancialAuthorization,
   ProviderDatabase,
 } from '../storage/index.js';
-
-export interface TransferPolicy {
-  profile: 'provider-authorized-erc3009-v1';
-  token: {
-    address: string;
-    name: string;
-    version: string;
-    symbol: string;
-    decimals: number;
-  };
-  recipients: string[];
-  maximumAmount: string;
-  /** Lifetime authorized atomic units per account/token; unknown effects retain usage. */
-  lifetimeAmount: string;
-  maxValiditySeconds: number;
-}
-export interface TransferInput {
-  account_id: string;
-  recipient: string;
-  amount: string;
-}
-export interface TransactionEventInput {
-  event: 'submitted' | 'confirmed' | 'failed';
-  chain_id: ProviderChainId;
-  transaction_hash: string;
-  observed_at: string;
-}
-export interface TransactionEventReport extends TransactionEventInput {
-  report_id: string;
-  recorded_at: string;
-  verification: 'unverified';
-}
-export interface TransferRecord {
+export interface ApprovedCallsRecord {
   nonceDomain?: 'safe-4337-v07';
   runtimePolicy?: RuntimePolicySnapshot;
   intent?: import('../execution/approved-calls.js').ApprovedCallIntent;
   nonceReleased?: boolean;
-  cancellationId?: string;
-  execution?: TransferExecutionRecord;
-  transactionEvents?: TransactionEventReport[];
   approval: FinancialApproval & { action: TypedDataAction };
   revision: string;
   status: 'authorizing' | 'authorized' | 'denied';
 }
-export const transferTypes = {
-  TransferWithAuthorization: [
-    { name: 'from', type: 'address' },
-    { name: 'to', type: 'address' },
-    { name: 'value', type: 'uint256' },
-    { name: 'validAfter', type: 'uint256' },
-    { name: 'validBefore', type: 'uint256' },
-    { name: 'nonce', type: 'bytes32' },
-  ],
-};
 export function amount(value: unknown): bigint {
   if (
     typeof value !== 'string' ||
@@ -124,47 +72,25 @@ function sameCaller(
 export class SupportedActions {
   readonly revision: string;
   readonly network: ReturnType<typeof providerNetwork>;
-  private readonly transferPolicy?: TransferPolicy;
   private readonly callConfiguration?: import('../execution/approved-calls.js').ApprovedCallsConfiguration;
-  private readonly configuredAccounts: import('../execution/approved-calls.js').SafeAccountBinding[];
-  private get policy(): TransferPolicy {
-    return this.transferPolicy ?? deny();
-  }
   constructor(
     readonly onboarding: OnboardingService,
     private readonly database: ProviderDatabase,
-    policy: TransferPolicy | undefined,
     revision?: string,
     callConfiguration?: import('../execution/approved-calls.js').ApprovedCallsConfiguration,
     network?: ProviderNetwork,
-    private readonly automaticSafes:
-      SafeProvisioningConfiguration | false = false,
-    private readonly sharedApplicationSafes = false,
-    private readonly sharedSafeCount = 1,
-    readonly safeOnlyWallet = false,
   ) {
     this.network = providerNetwork(network);
-    this.transferPolicy = policy ? structuredClone(policy) : undefined;
     this.callConfiguration = callConfiguration
       ? structuredClone(callConfiguration)
       : undefined;
-    this.configuredAccounts = structuredClone(
-      callConfiguration?.policy.accounts ?? [],
-    );
     this.revision =
       revision ??
       fingerprint([
         onboarding.policy.revision,
-        policy ?? null,
         callConfiguration ?? null,
         ...(this.network.testnet ? [] : [this.network.name]),
       ]);
-  }
-  /** Public terms shown when the owner delegates transfers during onboarding. */
-  consentTerms() {
-    return this.transferPolicy
-      ? structuredClone(this.transferPolicy)
-      : undefined;
   }
   callConsentTerms(snapshot?: RuntimePolicySnapshot) {
     if (snapshot && snapshot.policy.chain_id !== this.network.caip) deny();
@@ -174,11 +100,7 @@ export class SupportedActions {
     )
       return undefined;
     const effective = snapshot
-      ? runtimeCallPolicy(
-          this.callConfiguration.policy,
-          snapshot,
-          !!this.automaticSafes,
-        )
+      ? runtimeCallPolicy(this.callConfiguration.policy, snapshot, true)
       : this.callConfiguration.policy;
     const { accounts: _accounts, ...policy } = effective;
     return structuredClone({
@@ -190,51 +112,7 @@ export class SupportedActions {
       policy,
     });
   }
-  private async refreshAccounts() {
-    if (
-      this.sharedApplicationSafes ||
-      !this.automaticSafes ||
-      !this.callConfiguration
-    )
-      return;
-    const accounts = await this.onboarding.store.transaction((state) => {
-      const deployment = state.deploymentBindings?.['service-v1'];
-      if (deployment?.activeRevision !== this.revision) deny();
-      return Object.values(deployment.safeAccounts ?? {})
-        .filter(
-          (record) =>
-            record.state === 'ready' &&
-            record.configurationHash ===
-              safeProvisioningIdentity(
-                this.automaticSafes as SafeProvisioningConfiguration,
-                this.network.name,
-              ) &&
-            record.plan.chainId === this.network.chainId &&
-            state.accounts[record.plan.accountId]?.address?.toLowerCase() ===
-              record.plan.owner.toLowerCase(),
-        )
-        .map((record) => ({
-          accountId: record.plan.accountId,
-          address: record.plan.address,
-          codeHash: record.plan.proxyCodeHash,
-          singleton: record.plan.singleton,
-        }));
-    });
-    for (const account of accounts) {
-      const previous = this.configuredAccounts.find(
-        (a) => a.accountId === account.accountId,
-      );
-      if (previous && fingerprint(previous) !== fingerprint(account)) deny();
-    }
-    this.callConfiguration.policy.accounts = [
-      ...this.configuredAccounts,
-      ...accounts.filter(
-        (a) =>
-          !this.configuredAccounts.some((b) => b.accountId === a.accountId),
-      ),
-    ];
-  }
-  private shared(
+  private walletAuthority(
     state: ProviderState,
     principal: Pick<VerifiedPrincipal, 'issuer' | 'clientId'>,
     accountId?: string,
@@ -245,97 +123,17 @@ export class SupportedActions {
     );
     const deployment = state.deploymentBindings?.['service-v1'];
     const registry = deployment?.runtimeConfiguration;
-    const agreement =
-      registry?.obligations?.records[applicationId + ':sponsorship'];
-    if (this.safeOnlyWallet) {
-      const wallet = accountId
-        ? registry?.safeWalletAccounts?.[accountId]
-        : Object.values(registry?.safeWalletAccounts ?? {}).find(
-            (r) => r.applicationId === applicationId && r.status === 'ready',
-          );
-      if (
-        !wallet ||
-        wallet.applicationId !== applicationId ||
-        wallet.status !== 'ready' ||
-        wallet.owner !== state.accounts[wallet.accountId]?.owner ||
-        deployment?.activeRevision !== this.revision ||
-        ['actions', 'services', 'sponsorship'].some(
-          (kind) =>
-            registry?.obligations?.records[applicationId + ':' + kind]
-              ?.decision !== 'accepted',
-        )
-      )
-        deny();
-      return { signer: wallet.signer, binding: wallet.binding };
-    }
-
-    const perUser =
-      (
-        agreement?.value as
-          | import('../runtime-configuration/obligations.js').ApplicationObligations['sponsorship']
-          | undefined
-      )?.account_model === 'provider-controlled-user-safe';
-    const members = perUser
-      ? Object.values(registry?.applicationSafes ?? {}).filter(
-          (r) =>
-            r.applicationId === applicationId && r.userAccountId !== undefined,
-        )
-      : poolMembers(registry?.applicationSafes, applicationId);
-    if (!registry) deny();
-    let signer: (typeof members)[number] | undefined;
-    if (perUser) {
-      signer = members.find((r) =>
-        accountId
-          ? r.userAccountId === accountId &&
-            r.userOwner === state.accounts[accountId]?.owner
-          : deployment?.safeAccounts?.[r.accountId]?.state === 'ready',
-      );
-    } else {
-      if (
-        members.length !==
-          (registry.applicationPoolConfigurations?.[applicationId]?.safeCount ??
-            this.sharedSafeCount) ||
-        members.some(
-          (member) =>
-            deployment?.safeAccounts?.[member.accountId]?.state !== 'ready',
-        )
-      )
-        deny();
-      const assignments = (registry.applicationSafeAssignments ??= {});
-      const users = (assignments[applicationId] ??= {});
-      let selected = accountId ? users[accountId] : undefined;
-      if (accountId && !selected) {
-        const prior = Object.values(state.supportedActions ?? {}).find(
-          (r) =>
-            r.approval.userAccount?.accountId === accountId &&
-            r.approval.caller.issuer === principal.issuer &&
-            r.approval.caller.clientId === principal.clientId,
+    const wallet = accountId
+      ? registry?.safeWalletAccounts?.[accountId]
+      : Object.values(registry?.safeWalletAccounts ?? {}).find(
+          (r) => r.applicationId === applicationId && r.status === 'ready',
         );
-        selected =
-          prior?.approval.account.accountId ??
-          members[Object.keys(users).length % members.length]?.accountId;
-        if (!selected) deny();
-        users[accountId] = selected;
-      }
-      signer =
-        members.find((r) => r.accountId === selected) ??
-        (!accountId ? members[0] : undefined);
-    }
-    const safe = signer && deployment?.safeAccounts?.[signer.accountId];
     if (
+      !wallet ||
+      wallet.applicationId !== applicationId ||
+      wallet.status !== 'ready' ||
+      wallet.owner !== state.accounts[wallet.accountId]?.owner ||
       deployment?.activeRevision !== this.revision ||
-      !signer?.account ||
-      !safe ||
-      safe.state !== 'ready' ||
-      signer.provider !== deployment.provider ||
-      safe.plan.accountId !== signer.account.accountId ||
-      safe.plan.owner.toLowerCase() !== signer.account.address.toLowerCase() ||
-      safe.plan.chainId !== this.network.chainId ||
-      safe.configurationHash !==
-        safeProvisioningIdentity(
-          this.automaticSafes as SafeProvisioningConfiguration,
-          this.network.name,
-        ) ||
       ['actions', 'services', 'sponsorship'].some(
         (kind) =>
           registry?.obligations?.records[applicationId + ':' + kind]
@@ -343,126 +141,59 @@ export class SupportedActions {
       )
     )
       deny();
-    const sponsorship = registry!.obligations!.records[
-      applicationId + ':sponsorship'
-    ]
-      .value as import('../runtime-configuration/obligations.js').ApplicationObligations['sponsorship'];
-    if (
-      safe.plan.sponsor.fundingAgreement !== sponsorship.funding_agreement ||
-      BigInt(safe.plan.sponsor.lifetimeBudgetWei) >
-        BigInt(sponsorship.maximum_gas_budget_wei)
-    )
-      deny();
-    const sponsor = poolMembers(
-      registry?.applicationSponsors,
-      applicationId,
-    ).find((r) => r.sponsor.accountId === safe.plan.sponsor.accountId);
-    if (
-      sponsor &&
-      (sponsor.status !== 'ready' ||
-        fingerprint([
-          sponsor.sponsor.accountId,
-          sponsor.sponsor.clientId,
-          sponsor.sponsor.binding,
-          sponsor.sponsor.fundingAgreement,
-        ]) !==
-          fingerprint([
-            safe.plan.sponsor.accountId,
-            safe.plan.sponsor.clientId,
-            safe.plan.sponsor.binding,
-            safe.plan.sponsor.fundingAgreement,
-          ]))
-    )
-      deny();
-    return {
-      signer: signer.account,
-      binding: {
-        accountId: accountId ?? signer.accountId,
-        address: safe.plan.address,
-        codeHash: safe.plan.proxyCodeHash,
-        singleton: safe.plan.singleton,
-      },
-    };
+    return { signer: wallet.signer, binding: wallet.binding };
   }
   private async callAuthority(
     principal: VerifiedPrincipal,
     accountId?: string,
   ) {
-    await this.refreshAccounts();
-    if (!this.callConfiguration) deny();
-    const snapshot = this.onboarding.runtimeContracts
-      ? await this.onboarding.store.transaction((state) =>
-          currentRuntimePolicy(state, principal),
-        )
-      : undefined;
-    if (snapshot && snapshot.policy.chain_id !== this.network.caip) deny();
-    const shared = this.sharedApplicationSafes
-      ? await this.onboarding.store.transaction((state) =>
-          this.shared(state, principal, accountId),
-        )
-      : undefined;
-    const base = shared
-      ? { ...this.callConfiguration.policy, accounts: [shared.binding] }
-      : this.callConfiguration.policy;
+    const configuration = this.callConfiguration ?? deny();
+    const snapshot = await this.onboarding.store.transaction((state) =>
+      currentRuntimePolicy(state, principal),
+    );
+    if (snapshot.policy.chain_id !== this.network.caip) deny();
+    const wallet = await this.onboarding.store.transaction((state) =>
+      this.walletAuthority(state, principal, accountId),
+    );
     return {
       snapshot,
-      signer: shared?.signer,
-      policy: snapshot ? runtimeCallPolicy(base, snapshot) : base,
+      signer: wallet.signer,
+      policy: runtimeCallPolicy(
+        { ...configuration.policy, accounts: [wallet.binding] },
+        snapshot,
+      ),
       validity: Math.min(
-        this.callConfiguration.maxValiditySeconds,
-        snapshot?.policy.max_validity_seconds ??
-          this.callConfiguration.maxValiditySeconds,
+        configuration.maxValiditySeconds,
+        snapshot.policy.max_validity_seconds,
       ),
     };
   }
-  private currentRuntime(state: ProviderState, record: TransferRecord) {
-    if (this.sharedApplicationSafes && record.intent) {
-      const shared = this.shared(
+  private currentRuntime(state: ProviderState, record: ApprovedCallsRecord) {
+    if (record.intent) {
+      const wallet = this.walletAuthority(
         state,
         record.approval.caller,
         record.intent.input.account_id,
       );
       if (
         !record.approval.userAccount ||
-        fingerprint(shared.signer) !== fingerprint(record.approval.account) ||
-        fingerprint(shared.binding) !== fingerprint(record.intent.account)
+        fingerprint(wallet.signer) !== fingerprint(record.approval.account) ||
+        fingerprint(wallet.binding) !== fingerprint(record.intent.account)
       )
         deny();
-      if (!record.intent.cancellation)
-        validateRuntimeUserCalls(
-          record.runtimePolicy ?? deny(),
-          record.intent.input,
-          this.safeOnlyWallet
-            ? shared.binding.address
-            : record.approval.userAccount.address,
-        );
+      validateSafeAddressParameters(
+        record.runtimePolicy ?? deny(),
+        record.intent.input,
+        wallet.binding.address,
+      );
     } else if (record.approval.userAccount) deny();
-    if (record.intent?.cancellation) {
-      const reference = record.intent.cancellation;
-      const original = state.supportedActions?.[reference.actionId];
-      if (
-        !original?.intent ||
-        original.intent.cancellation ||
-        original.cancellationId !== record.approval.action.action_id ||
-        original.approval.action.payload_hash !== reference.payloadHash ||
-        original.intent.nonce !== record.intent.nonce ||
-        fingerprint(original.intent.account) !==
-          fingerprint(record.intent.account) ||
-        fingerprint(original.approval.caller) !==
-          fingerprint(record.approval.caller) ||
-        original.approval.ownerSubject !== record.approval.ownerSubject ||
-        !original.execution?.plan ||
-        this.database.hasExecutionAdmission(original.execution.executionId)
-      )
-        deny();
-    }
 
     if (
       record.intent &&
       this.onboarding.runtimeContracts &&
       (!record.runtimePolicy ||
-        serviceHash(currentRuntimePolicy(state, record.approval.caller)) !==
-          serviceHash(record.runtimePolicy))
+        canonicalHash(currentRuntimePolicy(state, record.approval.caller)) !==
+          canonicalHash(record.runtimePolicy))
     )
       deny();
     if (record.runtimePolicy && !this.onboarding.runtimeContracts) deny();
@@ -471,28 +202,25 @@ export class SupportedActions {
     return adapterAllowanceCharges(
       intent,
       this.onboarding.policy.provider.origin,
-      this.transferPolicy,
     );
   }
   private current(
-    record: TransferRecord,
+    record: ApprovedCallsRecord,
     includeDenied = false,
     allowExpired = false,
   ) {
     try {
       const { action, account, units } = record.approval;
       if (record.intent) {
-        const base = this.sharedApplicationSafes
-          ? {
-              ...(this.callConfiguration?.policy ?? deny()),
-              accounts: [record.intent.account],
-            }
-          : this.callConfiguration?.policy;
+        const base = {
+          ...(this.callConfiguration?.policy ?? deny()),
+          accounts: [record.intent.account],
+        };
         const policy = record.runtimePolicy
           ? runtimeCallPolicy(base ?? deny(), record.runtimePolicy)
           : base;
         if (this.onboarding.runtimeContracts !== !!record.runtimePolicy) deny();
-        if (record.runtimePolicy && !record.intent.cancellation)
+        if (record.runtimePolicy)
           validateRuntimeCalls(record.runtimePolicy, record.intent.input);
         if (
           !this.callConfiguration?.policy ||
@@ -517,7 +245,7 @@ export class SupportedActions {
           action.chain_id !== this.network.caip ||
           action.chain_account_id !==
             this.network.caip + ':' + account.address ||
-          action.profile !== 'evm_eoa_v1' ||
+          action.profile !== 'safe_owner_v1' ||
           action.status !== 'ready'
         )
           deny();
@@ -534,38 +262,7 @@ export class SupportedActions {
           deny();
         return;
       }
-      const { domain, message, types, primaryType } = action.payload;
-      const expiry = Date.parse(action.expires_at);
-      const expectedDomain = {
-        name: this.policy.token.name,
-        version: this.policy.token.version,
-        chainId: this.network.chainId,
-        verifyingContract: this.policy.token.address,
-      };
-      if (
-        record.revision !== this.revision ||
-        !Number.isFinite(expiry) ||
-        (!allowExpired && expiry <= Date.now()) ||
-        expiry > Date.now() + this.policy.maxValiditySeconds * 1000 ||
-        (record.status === 'denied' && !includeDenied) ||
-        primaryType !== 'TransferWithAuthorization' ||
-        fingerprint(domain) !== fingerprint(expectedDomain) ||
-        fingerprint(types) !== fingerprint(transferTypes) ||
-        message.from !== account.address ||
-        !this.policy.recipients.some(
-          (address) =>
-            address.toLowerCase() === String(message.to).toLowerCase(),
-        ) ||
-        message.value !== units ||
-        amount(units) > amount(this.policy.maximumAmount) ||
-        message.validAfter !== '0' ||
-        Number(message.validBefore) * 1000 !== expiry ||
-        !/^0x[0-9a-f]{64}$/.test(String(message.nonce)) ||
-        TypedDataEncoder.hash(domain, types, message) !== action.payload_hash ||
-        action.plan_hash !== action.payload_hash ||
-        action.operation_id !== action.action_id
-      )
-        deny();
+      deny();
     } catch {
       deny();
     }
@@ -573,7 +270,7 @@ export class SupportedActions {
   private async binding(
     principal: VerifiedPrincipal,
     accountId: string,
-    permission: 'transfers:request' | 'contracts:request' = 'transfers:request',
+    permission: 'contracts:request' = 'contracts:request',
   ) {
     const grant = await this.onboarding.authorize(
       principal,
@@ -603,12 +300,10 @@ export class SupportedActions {
   }
   private async permitted(
     principal: VerifiedPrincipal,
-    record: TransferRecord,
+    record: ApprovedCallsRecord,
     includeDenied = false,
     allowExpired = false,
   ) {
-    await this.refreshAccounts();
-    if (!allowExpired && record.cancellationId) deny();
     this.current(record, includeDenied, allowExpired);
     await this.onboarding.store.transaction((state) =>
       this.currentRuntime(state, record),
@@ -618,7 +313,7 @@ export class SupportedActions {
     const { grant, account } = await this.binding(
       principal,
       (approval.userAccount ?? approval.account).accountId,
-      record.intent ? 'contracts:request' : 'transfers:request',
+      'contracts:request',
     );
     if (
       grant.id !== approval.grantId ||
@@ -630,165 +325,6 @@ export class SupportedActions {
     )
       deny();
     return grant;
-  }
-  async request(inputContext: AuthorityContext, input: TransferInput) {
-    const context = structuredClone(inputContext);
-    input = structuredClone(input);
-    if (
-      !context.principal.scopes.includes('wallet:actions') ||
-      !uuid.test(context.idempotencyKey) ||
-      !uuid.test(input.account_id)
-    )
-      deny();
-    if (Object.keys(input).sort().join(',') !== 'account_id,amount,recipient')
-      invalid();
-    let recipient: string;
-    try {
-      recipient = getAddress(input.recipient);
-    } catch {
-      return invalid();
-    }
-    if (
-      !this.policy.recipients.some(
-        (a) => a.toLowerCase() === recipient.toLowerCase(),
-      ) ||
-      amount(input.amount) > amount(this.policy.maximumAmount)
-    )
-      deny();
-    const { grant, account } = await this.binding(
-      context.principal,
-      input.account_id,
-    );
-    if (!account.address) deny();
-    const key = fingerprint([
-      'supported-action',
-      context.principal.issuer,
-      context.principal.subject,
-      context.principal.clientId,
-      context.idempotencyKey,
-    ]);
-    const hash = fingerprint([
-      input.account_id,
-      recipient,
-      input.amount,
-      this.revision,
-    ]);
-    const record = await this.onboarding.store.transaction((state) => {
-      const records = (state.supportedActions ??= {});
-      const previous = state.idempotency[key];
-      if (previous) {
-        if (previous.hash !== hash || !records[previous.id])
-          throw new WalletProviderError('wallet_attempt_conflict');
-        return records[previous.id];
-      }
-      const id = randomUUID();
-      const expires =
-        Math.floor(Date.now() / 1000) + this.policy.maxValiditySeconds;
-      const domain = {
-        name: this.policy.token.name,
-        version: this.policy.token.version,
-        chainId: this.network.chainId,
-        verifyingContract: this.policy.token.address,
-      };
-      const message = {
-        from: account.address!,
-        to: recipient,
-        value: input.amount,
-        validAfter: '0',
-        validBefore: String(expires),
-        nonce: '0x' + randomBytes(32).toString('hex'),
-      };
-      const payload = {
-        types: transferTypes,
-        domain,
-        primaryType: 'TransferWithAuthorization',
-        message,
-      };
-      const digest = TypedDataEncoder.hash(domain, transferTypes, message);
-      const action: TypedDataAction = {
-        action_id: id,
-        operation_id: id,
-        kind: 'sign_typed_data',
-        profile: 'evm_eoa_v1',
-        profile_revision: '1',
-        status: 'ready',
-        chain_id: this.network.caip,
-        chain_account_id: `${this.network.caip}:${account.address}`,
-        binding_revision: '1',
-        capability_revision: '1',
-        plan_revision: '1',
-        plan_hash: digest,
-        payload_hash: digest,
-        expires_at: new Date(expires * 1000).toISOString(),
-        dependencies: [],
-        payload,
-      };
-      const record: TransferRecord = {
-        revision: this.revision,
-        status: 'authorizing',
-        approval: {
-          ownerSubject: grant.owner,
-          caller: {
-            issuer: context.principal.issuer,
-            subject: context.principal.subject,
-            clientId: context.principal.clientId,
-          },
-          grantId: grant.id,
-          consentReference: grant.requestId,
-          policyRevision: this.revision,
-          account: { accountId: input.account_id, address: account.address! },
-          action,
-          budgetId: fingerprint([
-            'transfer',
-            this.onboarding.policy.provider.origin,
-            input.account_id,
-            this.policy.token.address.toLowerCase(),
-          ]),
-          units: input.amount,
-        },
-      };
-      records[id] = record;
-      state.idempotency[key] = { hash, id };
-      state.audit.push({
-        at: Date.now(),
-        event: 'action_requested',
-        resource: id,
-        revision: this.revision,
-      });
-      return record;
-    });
-    await this.permitted(context.principal, record);
-    if (record.status === 'authorizing') {
-      // Both writes are idempotent. A crash leaves an unsigned action that the same
-      // request can resume, preserving its nonce, digest and action identity.
-      await this.database.setBudget(
-        record.approval.budgetId,
-        this.policy.lifetimeAmount,
-        this.revision,
-      );
-      await this.database.approveAction(record.approval);
-      await this.permitted(context.principal, record);
-      await this.onboarding.store.transaction((state) => {
-        const latest =
-          state.supportedActions?.[record.approval.action.action_id];
-        if (
-          !latest ||
-          fingerprint(latest.approval) !== fingerprint(record.approval)
-        )
-          deny();
-        this.current(latest);
-        if (latest.status === 'authorizing') {
-          latest.status = 'authorized';
-          state.audit.push({
-            at: Date.now(),
-            event: 'action_provider_authorized',
-            resource: latest.approval.action.action_id,
-            revision: this.revision,
-          });
-        }
-      });
-    }
-    return this.read(context.principal, record.approval.action.action_id);
   }
   /** Current delegation for an unsigned queued request; queue admission never authorizes signing by itself. */
   async queueAuthority(
@@ -805,16 +341,12 @@ export class SupportedActions {
     );
     const authority = await this.callAuthority(principal, input.account_id);
     if (authority.snapshot) validateRuntimeCalls(authority.snapshot, input);
-    if (this.sharedApplicationSafes)
-      validateRuntimeUserCalls(
-        authority.snapshot ?? deny(),
-        input,
-        this.safeOnlyWallet
-          ? authority.policy.accounts.find(
-              (a) => a.accountId === input.account_id,
-            )!.address
-          : account.address!,
-      );
+    validateSafeAddressParameters(
+      authority.snapshot ?? deny(),
+      input,
+      authority.policy.accounts.find((a) => a.accountId === input.account_id)!
+        .address,
+    );
     const intent = buildApprovedCallIntent(
       authority.policy,
       input,
@@ -866,16 +398,12 @@ export class SupportedActions {
     const authority = await this.callAuthority(principal, input.account_id);
     const snapshot = authority.snapshot ?? deny();
     validateRuntimeCalls(snapshot, input);
-    if (this.sharedApplicationSafes)
-      validateRuntimeUserCalls(
-        snapshot,
-        input,
-        this.safeOnlyWallet
-          ? authority.policy.accounts.find(
-              (a) => a.accountId === input.account_id,
-            )!.address
-          : account.address!,
-      );
+    validateSafeAddressParameters(
+      snapshot,
+      input,
+      authority.policy.accounts.find((a) => a.accountId === input.account_id)!
+        .address,
+    );
     const expiresAt = this.queueExpiry(authority.validity);
     const intent = buildApprovedCallIntent(
       authority.policy,
@@ -920,7 +448,6 @@ export class SupportedActions {
       owner: string,
       principal?: VerifiedPrincipal,
     ) => Promise<string>,
-    queued?: { id: string; expiresAt: string },
     requestedExpiresAt?: string,
   ) {
     const context = structuredClone(inputContext);
@@ -942,16 +469,12 @@ export class SupportedActions {
       input.account_id,
     );
     if (authority.snapshot) validateRuntimeCalls(authority.snapshot, input);
-    if (this.sharedApplicationSafes)
-      validateRuntimeUserCalls(
-        authority.snapshot ?? deny(),
-        input,
-        this.safeOnlyWallet
-          ? authority.policy.accounts.find(
-              (a) => a.accountId === input.account_id,
-            )!.address
-          : account.address!,
-      );
+    validateSafeAddressParameters(
+      authority.snapshot ?? deny(),
+      input,
+      authority.policy.accounts.find((a) => a.accountId === input.account_id)!
+        .address,
+    );
     const key = fingerprint([
       'supported-call',
       context.principal.issuer,
@@ -972,9 +495,7 @@ export class SupportedActions {
       return state.supportedActions[entry.id];
     });
     const expiresAt =
-      queued?.expiresAt ??
-      requestedExpiresAt ??
-      this.queueExpiry(authority.validity);
+      requestedExpiresAt ?? this.queueExpiry(authority.validity);
     if (
       Date.parse(expiresAt) <= Date.now() ||
       Date.parse(expiresAt) > Date.now() + authority.validity * 1000
@@ -1007,35 +528,10 @@ export class SupportedActions {
         return state.supportedActions[entry.id];
       }
       const records = (state.supportedActions ??= {});
-      const pending = Object.values(state.safeRequests ?? {})
-        .filter(
-          (entry) =>
-            entry.safeAddress === intent.account.address.toLowerCase() &&
-            ['queued', 'executing', 'blocked'].includes(entry.status),
-        )
-        .sort((a, b) => a.sequence - b.sequence);
-      if (pending.length && (!queued || pending[0].id !== queued.id))
-        throw new WalletProviderError('wallet_attempt_conflict');
-      if (
-        queued &&
-        (!pending.length ||
-          pending[0].id !== queued.id ||
-          pending[0].revision !== this.revision ||
-          pending[0].grantId !== grant.id ||
-          pending[0].owner !== grant.owner ||
-          pending[0].consentReference !== grant.requestId ||
-          !sameCaller(pending[0].principal, context.principal) ||
-          pending[0].address !== account.address ||
-          fingerprint(pending[0].input) !== fingerprint(input) ||
-          pending[0].expiresAt !== expiresAt)
-      )
-        deny();
       // Expired actions release a nonce only when the same transaction proves no signing admission ever existed.
       for (const record of Object.values(records)) {
         if (
-          (this.safeOnlyWallet
-            ? record.nonceDomain !== 'safe-4337-v07'
-            : record.nonceDomain === 'safe-4337-v07') ||
+          record.nonceDomain !== 'safe-4337-v07' ||
           record.nonceReleased ||
           record.intent?.account.address.toLowerCase() !==
             intent.account.address.toLowerCase() ||
@@ -1064,10 +560,8 @@ export class SupportedActions {
         id,
         this.network.name,
       );
-      const created: TransferRecord = {
-        ...(this.safeOnlyWallet
-          ? { nonceDomain: 'safe-4337-v07' as const }
-          : {}),
+      const created: ApprovedCallsRecord = {
+        nonceDomain: 'safe-4337-v07' as const,
         intent,
         ...(authority.snapshot ? { runtimePolicy: authority.snapshot } : {}),
         revision: this.revision,
@@ -1128,7 +622,6 @@ export class SupportedActions {
       record.intent!,
       this.onboarding.policy.provider.origin,
       this.revision,
-      this.transferPolicy,
     );
     await this.database.approveAction(record.approval);
     await this.permitted(context.principal, record);
@@ -1145,154 +638,7 @@ export class SupportedActions {
     });
     return this.read(context.principal, record.approval.action.action_id);
   }
-  /** Explicit recovery authority; callers can select only the stored action, never replacement calldata. */
-  async requestNonceCancellation(
-    context: AuthorityContext,
-    id: string,
-    input: {
-      expected_nonce: string;
-      expected_payload_hash: string;
-      authorization: 'invalidate-signed-action';
-    },
-    nonce: (
-      binding: import('../execution/approved-calls.js').SafeAccountBinding,
-      owner: string,
-      principal?: VerifiedPrincipal,
-    ) => Promise<string>,
-  ) {
-    if (
-      !context.principal.scopes.includes('wallet:actions') ||
-      !uuid.test(context.idempotencyKey) ||
-      input.authorization !== 'invalidate-signed-action'
-    )
-      deny();
-    const original = await this.load(id);
-    await this.permitted(context.principal, original, false, true);
-    if (
-      !original.intent ||
-      original.intent.cancellation ||
-      !original.execution?.plan ||
-      original.execution.integrityFailure ||
-      original.execution.effectObserved ||
-      original.intent.nonce !== input.expected_nonce ||
-      original.approval.action.payload_hash !== input.expected_payload_hash ||
-      !this.database.hasActionAttempts(id) ||
-      !(await this.database.isApprovedAction(original.approval, true))
-    )
-      deny();
-    const authority = await this.callAuthority(
-      context.principal,
-      (original.approval.userAccount ?? original.approval.account).accountId,
-    );
-    if (
-      (await nonce(
-        original.intent.account,
-        original.approval.account.address,
-        context.principal,
-      )) !== original.intent.nonce
-    )
-      deny();
-    const key = fingerprint([
-      'nonce-cancellation',
-      context.principal.issuer,
-      context.principal.subject,
-      context.principal.clientId,
-      context.idempotencyKey,
-    ]);
-    const hash = fingerprint([id, input, this.revision]);
-    const record = await this.onboarding.withAccountAccess(
-      context.principal,
-      (original.approval.userAccount ?? original.approval.account).accountId,
-      'contracts:request',
-      (state, grant) => {
-        const latest = state.supportedActions?.[id] ?? deny();
-        if (
-          state.deploymentBindings?.['service-v1']?.activeRevision !==
-            this.revision ||
-          latest.status !== 'authorized' ||
-          latest.execution?.integrityFailure ||
-          latest.execution?.effectObserved ||
-          fingerprint(latest.execution?.plan) !==
-            fingerprint(original.execution?.plan) ||
-          fingerprint(latest.approval) !== fingerprint(original.approval) ||
-          grant.id !== original.approval.grantId ||
-          grant.owner !== original.approval.ownerSubject ||
-          grant.requestId !== original.approval.consentReference ||
-          this.database.hasExecutionAdmission(original.execution!.executionId)
-        )
-          deny();
-        this.currentRuntime(state, latest);
-        const previous = state.idempotency[key];
-        if (previous) {
-          if (previous.hash !== hash || latest.cancellationId !== previous.id)
-            throw new WalletProviderError('wallet_attempt_conflict');
-          return state.supportedActions![previous.id] ?? deny();
-        }
-        if (latest.cancellationId)
-          throw new WalletProviderError('wallet_attempt_conflict');
-        const cancellationId = randomUUID();
-        const intent = buildNonceCancellationIntent(
-          authority.policy,
-          (original.approval.userAccount ?? original.approval.account)
-            .accountId,
-          original.intent!.nonce,
-          { actionId: id, payloadHash: original.approval.action.payload_hash },
-        );
-        if (
-          fingerprint(intent.account) !== fingerprint(original.intent!.account)
-        )
-          deny();
-        const action = buildApprovedCallAction(
-          intent,
-          original.approval.account.address,
-          this.queueExpiry(authority.validity),
-          cancellationId,
-          this.network.name,
-        );
-        const { additionalBudgets: _originalBudgets, ...baseApproval } =
-          structuredClone(original.approval);
-        const created: TransferRecord = {
-          intent,
-          ...(authority.snapshot ? { runtimePolicy: authority.snapshot } : {}),
-          revision: this.revision,
-          status: 'authorizing',
-          approval: {
-            ...baseApproval,
-            action,
-            units: '1',
-          },
-        };
-        latest.cancellationId = cancellationId;
-        state.supportedActions![cancellationId] = created;
-        state.idempotency[key] = { id: cancellationId, hash };
-        this.currentRuntime(state, created);
-        state.audit.push({
-          at: Date.now(),
-          event: 'safe_nonce_cancellation_authorized',
-          resource: id,
-          revision: this.revision,
-        });
-        return created;
-      },
-    );
-    await this.permitted(context.principal, record);
-    await this.database.approveAction(record.approval);
-    await this.onboarding.store.transaction((state) => {
-      const latest =
-        state.supportedActions?.[record.approval.action.action_id] ?? deny();
-      this.currentRuntime(state, latest);
-      this.current(latest);
-      latest.status = 'authorized';
-    });
-    return {
-      action_id: record.approval.action.action_id,
-      cancelled_action_id: id,
-      nonce: record.intent!.nonce,
-      payload_hash: record.approval.action.payload_hash,
-      expires_at: record.approval.action.expires_at,
-    };
-  }
-  private receipt(record: TransferRecord) {
+  private receipt(record: ApprovedCallsRecord) {
     const action = record.approval.action;
     return {
       action_id: action.action_id,
@@ -1318,44 +664,11 @@ export class SupportedActions {
       return record;
     });
   }
-  /** Read retained runtime execution evidence under current account-read access, without granting dispatch authority. */
-  async withExecutionRead<T>(
-    principal: VerifiedPrincipal,
-    id: string,
-    operation: (state: ProviderState, record: TransferRecord) => T,
-  ): Promise<T> {
-    await this.refreshAccounts();
-    const record = await this.load(id);
-    if (!record.runtimePolicy)
-      return this.withAuthorizedTransfer(principal, id, operation, true);
-    if (!sameCaller(principal, record.approval.caller)) deny();
-    return this.onboarding.withAccountAccess(
-      principal,
-      (record.approval.userAccount ?? record.approval.account).accountId,
-      'account:read',
-      (state, grant) => {
-        const latest = state.supportedActions?.[id];
-        if (
-          !latest?.runtimePolicy ||
-          !latest.execution?.plan ||
-          grant.owner !== latest.approval.ownerSubject ||
-          fingerprint(latest.approval) !== fingerprint(record.approval) ||
-          state.accounts[grant.accountId]?.address !==
-            (latest.approval.userAccount ?? latest.approval.account).address ||
-          state.deploymentBindings?.['service-v1']?.activeRevision !==
-            this.revision
-        )
-          deny();
-        this.current(latest, false, true);
-        return operation(state, latest);
-      },
-    );
-  }
   /** Current exact transfer authority, checked again inside the storage transaction. */
-  async withAuthorizedTransfer<T>(
+  async withAuthorizedCalls<T>(
     principal: VerifiedPrincipal,
     id: string,
-    operation: (state: ProviderState, record: TransferRecord) => T,
+    operation: (state: ProviderState, record: ApprovedCallsRecord) => T,
     allowExpired = false,
   ): Promise<T> {
     principal = structuredClone(principal);
@@ -1369,13 +682,12 @@ export class SupportedActions {
     return this.onboarding.withAccountAccess(
       principal,
       (before.approval.userAccount ?? before.approval.account).accountId,
-      before.intent ? 'contracts:request' : 'transfers:request',
+      'contracts:request',
       (state, currentGrant) => {
         const latest = state.supportedActions?.[id];
         if (
           !latest ||
           latest.status !== 'authorized' ||
-          (!allowExpired && !!latest.cancellationId) ||
           fingerprint(latest.approval) !== fingerprint(before.approval) ||
           fingerprint(grant) !== fingerprint(currentGrant) ||
           state.accounts[grant.accountId]?.address?.toLowerCase() !==
@@ -1391,129 +703,6 @@ export class SupportedActions {
         return operation(state, latest);
       },
     );
-  }
-  /** Store caller observations separately from signing authority and verified settlement. */
-  async reportTransactionEvent(
-    inputContext: AuthorityContext,
-    id: string,
-    input: TransactionEventInput,
-  ) {
-    const context = structuredClone(inputContext);
-    input = structuredClone(input);
-    if (
-      !context.principal.scopes.includes('wallet:events') ||
-      !uuid.test(context.idempotencyKey)
-    )
-      deny();
-    if (
-      Object.keys(input).sort().join(',') !==
-        'chain_id,event,observed_at,transaction_hash' ||
-      !['submitted', 'confirmed', 'failed'].includes(input.event) ||
-      input.chain_id !== this.network.caip ||
-      !/^0x[0-9a-f]{64}$/.test(input.transaction_hash) ||
-      typeof input.observed_at !== 'string' ||
-      !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/.test(
-        input.observed_at,
-      ) ||
-      !Number.isFinite(Date.parse(input.observed_at)) ||
-      new Date(input.observed_at).toISOString().replace('.000Z', 'Z') !==
-        input.observed_at.replace('.000Z', 'Z') ||
-      Date.parse(input.observed_at) > Date.now() + 60000
-    )
-      invalid();
-    const record = await this.load(id);
-    const grant = await this.permitted(context.principal, record, false, true);
-    const key = fingerprint([
-      'transaction-event',
-      context.principal.issuer,
-      context.principal.subject,
-      context.principal.clientId,
-      context.idempotencyKey,
-    ]);
-    const hash = fingerprint([id, input]);
-    return this.onboarding.withAccountAccess(
-      context.principal,
-      (record.approval.userAccount ?? record.approval.account).accountId,
-      record.intent ? 'contracts:request' : 'transfers:request',
-      (state, currentGrant) => {
-        const latest = state.supportedActions?.[id];
-        if (
-          !latest ||
-          latest.status !== 'authorized' ||
-          fingerprint(latest.approval) !== fingerprint(record.approval) ||
-          fingerprint(currentGrant) !== fingerprint(grant) ||
-          state.accounts[grant.accountId]?.owner !== grant.owner ||
-          state.accounts[grant.accountId]?.address?.toLowerCase() !==
-            (
-              record.approval.userAccount ?? record.approval.account
-            ).address.toLowerCase() ||
-          state.deploymentBindings?.['service-v1']?.activeRevision !==
-            this.revision
-        )
-          deny();
-        this.current(latest, false, true);
-        const events = (latest.transactionEvents ??= []);
-        const previous = state.idempotency[key];
-        if (previous) {
-          const report = events.find(
-            (event) => event.report_id === previous.id,
-          );
-          if (previous.hash !== hash || !report)
-            throw new WalletProviderError('wallet_attempt_conflict');
-          return { action_id: id, ...report };
-        }
-        if (events.length >= 32)
-          throw new WalletProviderError('wallet_attempt_conflict');
-        const report: TransactionEventReport = {
-          ...input,
-          report_id: randomUUID(),
-          recorded_at: new Date(Date.now()).toISOString(),
-          verification: 'unverified',
-        };
-        events.push(report);
-        state.idempotency[key] = { hash, id: report.report_id };
-        state.audit.push({
-          at: Date.now(),
-          event: 'transaction_event_reported',
-          resource: id,
-          revision: this.revision,
-        });
-        return { action_id: id, ...report };
-      },
-    );
-  }
-  async transactionEvents(principal: VerifiedPrincipal, id: string) {
-    principal = structuredClone(principal);
-    if (!principal.scopes.includes('wallet:events:read')) deny();
-    const record = await this.load(id);
-    const originalGrant = await this.permitted(principal, record, false, true);
-    if (record.status !== 'authorized') deny();
-    return this.onboarding.withAccountAccess(
-      principal,
-      (record.approval.userAccount ?? record.approval.account).accountId,
-      record.intent ? 'contracts:request' : 'transfers:request',
-      (state, grant) => {
-        const latest = state.supportedActions?.[id];
-        if (
-          !latest ||
-          latest.status !== 'authorized' ||
-          fingerprint(latest.approval) !== fingerprint(record.approval) ||
-          fingerprint(grant) !== fingerprint(originalGrant) ||
-          state.accounts[grant.accountId]?.address?.toLowerCase() !==
-            (
-              record.approval.userAccount ?? record.approval.account
-            ).address.toLowerCase() ||
-          state.deploymentBindings?.['service-v1']?.activeRevision !==
-            this.revision
-        )
-          deny();
-        this.current(latest, false, true);
-        return { action_id: id, events: latest.transactionEvents ?? [] };
-      },
-    );
-  }
-  async assertSignatureExport(id: string) {
-    if ((await this.load(id)).intent) deny();
   }
   async authorize(
     context: AuthorityContext,

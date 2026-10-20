@@ -7,7 +7,7 @@ import { createSetupServer } from '../dist/deployment/setup-server.js';
 
 const sample = JSON.parse(
   await readFile(
-    new URL('../docs/provider.config.bundled.example.json', import.meta.url),
+    new URL('../docs/provider.config.safe.example.json', import.meta.url),
     'utf8',
   ),
 );
@@ -223,7 +223,7 @@ try {
   });
   const hostedRecords = JSON.parse(
     await readFile(
-      new URL('../docs/provider.config.records.example.json', import.meta.url),
+      new URL('../docs/provider.config.safe.example.json', import.meta.url),
       'utf8',
     ),
   );

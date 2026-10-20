@@ -3,7 +3,6 @@ import type {
   VerifiedPrincipal,
 } from '../domain/principal.js';
 import type { EmbeddedAccount, TypedDataAction } from '../domain/signing.js';
-import type { RelayerExecutionAction } from '../domain/relayer-execution.js';
 
 /** Explicit optional policy charge; units and meaning are defined by the selecting adapter. */
 export interface PolicyBudgetCharge {
@@ -25,7 +24,7 @@ export interface FinancialApproval {
   account: EmbeddedAccount;
   /** Original user authority for provider-owned application Safe signing. */
   userAccount?: EmbeddedAccount;
-  action: TypedDataAction | RelayerExecutionAction;
+  action: TypedDataAction;
   budgetId: string;
   units: string;
   additionalBudgets?: PolicyBudgetCharge[];
@@ -55,6 +54,6 @@ export interface FinancialAuthorityOptions {
   authorize(
     context: AuthorityContext,
     approval: FinancialApproval,
-    purpose: 'sign' | 'submit' | 'status',
+    purpose: 'sign' | 'status',
   ): Promise<FinancialAuthorization | null>;
 }

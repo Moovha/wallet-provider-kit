@@ -210,11 +210,7 @@ it('the terminal continues from runtime installation through ordered local setup
       'utf8',
     ),
   );
-  const environment = {
-    WALLET_CDP_API_KEY_ID: 'offline-cli-secret',
-    WALLET_CDP_API_KEY_SECRET: 'offline-cli-secret',
-    WALLET_CDP_WALLET_SECRET: 'offline-cli-secret',
-  };
+  const environment = {};
   const commands: string[][] = [];
   const report: string[] = [];
   await runLocalSetup({
@@ -257,7 +253,7 @@ it('the terminal requires explicit installation and rejects incomplete credentia
   expect(await readdir(home)).toEqual([]);
   const config = JSON.parse(
     await readFile(
-      new URL('../docs/provider.config.example.json', import.meta.url),
+      new URL('../docs/provider.config.safe.example.json', import.meta.url),
       'utf8',
     ),
   );
@@ -270,9 +266,10 @@ it('the terminal requires explicit installation and rejects incomplete credentia
       report: () => {},
     }),
   ).rejects.toMatchObject({
-    issues: [expect.stringContaining('Supply these secrets')],
+    issues: [expect.stringContaining('Local Docker setup is unavailable')],
   });
-  expect(fixture.calls.some((call) => call.args[0] === 'install')).toBe(false);
+  // Runtime installation is explicitly authorized; an unavailable Docker context prevents setup.
+  expect(fixture.calls.some((call) => call.args[0] === 'up')).toBe(false);
 });
 it('rejects an altered Homebrew installer before executing it', async () => {
   const fixture = runtimeFixture(home, { brew: false });

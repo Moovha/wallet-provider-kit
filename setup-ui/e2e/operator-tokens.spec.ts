@@ -133,7 +133,7 @@ test('operator gets and renews tokens without paste, Execute renews near expiry,
     .fill('10000000-0000-4000-8000-000000000002');
   await provision.getByRole('button', { name: 'Execute', exact: true }).click();
   await expect(provision.locator('.responses-inner')).toContainText(
-    '0x1111111111111111111111111111111111111111',
+    'service_unavailable',
   );
   expect(apiCalls).toBe(1);
   await panel.getByRole('button', { name: 'Clear token', exact: true }).click();

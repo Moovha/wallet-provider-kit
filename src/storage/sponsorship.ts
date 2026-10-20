@@ -43,7 +43,7 @@ export function sqliteSponsorshipStore(connection: StorageConnection) {
   }
   return {
     load,
-    /** Invoke synchronously inside SupportedActions.withAuthorizedTransfer on this database. */
+    /** Invoke synchronously inside SupportedActions.withAuthorizedCalls on this database. */
     reserve(
       input: Omit<SponsorshipAdmission, 'phases' | 'signingActionId'>,
     ): SponsorshipAdmission {

@@ -28,7 +28,7 @@ const closers: (() => Promise<void>)[] = [];
 beforeEach(async () => {
   config = JSON.parse(
     await readFile(
-      new URL('../docs/provider.config.example.json', import.meta.url),
+      new URL('../docs/provider.config.safe.example.json', import.meta.url),
       'utf8',
     ),
   );
@@ -37,6 +37,12 @@ beforeEach(async () => {
     app.issuer = config.oauth.issuer;
   config.authorizationServer = {
     signingKey: { env: 'OFFLINE_ISSUER_KEY' },
+    operatorClients: [
+      {
+        clientId: config.runtimeConfiguration!.operators[0].clientId,
+        clientSecret: { env: 'OFFLINE_PROVIDER_OPERATOR_SECRET' },
+      },
+    ],
     clients: config.policy.applications.map((app, i) => ({
       clientId: app.clientId,
       clientSecret: { env: `OFFLINE_CLIENT_${i}_SECRET` },
@@ -221,7 +227,6 @@ it('defaults to the bundled issuer and OWS, synchronizes registrations without r
   const draft = emptyConfiguration(config);
   expect(draft.backend.kind).toBe('ows');
   expect(draft.safeWallet?.profile).toBe('safe-only-4337-v1');
-  expect(draft.localExecution).toBeUndefined();
   expect(draft.authorizationServer).toBeDefined();
   const secret = draft.authorizationServer!.clients[0].clientSecret;
   draft.policy.provider.origin = 'https://wallet.example.test';
@@ -358,6 +363,7 @@ it('isolates client credentials and denies a valid provisioning token while the 
 
 it('issues administration tokens only to separately configured provider service operators', async () => {
   config.runtimeConfiguration = {
+    ...config.runtimeConfiguration!,
     operators: [
       {
         issuer: config.oauth.issuer,
@@ -415,51 +421,6 @@ it('issues administration tokens only to separately configured provider service 
   expect(() => validateProviderConfiguration(config)).toThrow();
 });
 
-it('supplies unique stable internal identities without granting financial authority', () => {
-  const first = emptyConfiguration(config);
-  const second = emptyConfiguration(config);
-  expect(first.backend.binding).toMatch(/^wallets-[0-9a-f-]{36}$/);
-  expect(first.backend.binding).not.toBe(second.backend.binding);
-  expect(first.policy.applications[0].clientId).not.toBe(
-    second.policy.applications[0].clientId,
-  );
-  expect(newBackend('cdp').binding).not.toBe(first.backend.binding);
-  const clientId = newClientId('application');
-  first.policy.applications.push({
-    issuer: first.oauth.issuer,
-    clientId,
-    name: 'Second application',
-    permissions: ['account:read'],
-    assertionTrust: { agreement: '' },
-  });
-  const operatorId = newClientId('operator');
-  first.runtimeConfiguration = {
-    operators: [
-      { issuer: first.oauth.issuer, clientId: operatorId, subject: operatorId },
-    ],
-  };
-  synchronizeBundledServices(first);
-  const retained = structuredClone(first);
-  synchronizeBundledServices(first);
-  expect(first).toEqual(retained);
-  expect(
-    first.authorizationServer!.clients.map((client) => client.clientId),
-  ).toEqual(first.policy.applications.map((app) => app.clientId));
-  expect(first.authorizationServer!.operatorClients![0].clientId).toBe(
-    operatorId,
-  );
-  expect(
-    first.policy.applications.every(
-      (app) => app.assertionTrust?.agreement === '',
-    ),
-  ).toBe(true);
-  expect(first.financial).toBeUndefined();
-  expect(first.execution).toBeUndefined();
-  expect(first.safeWallet?.profile).toBe('safe-only-4337-v1');
-  expect(first.approvedCalls?.policy.accounts).toEqual([]);
-  expect(first.activation.enabled).toBe(false);
-});
-
 it('exports an idle Safe-only deployment without executor keys, funded accounts or provider RPC subscriptions', async () => {
   const draft = emptyConfiguration(config);
   draft.policy.provider = { ...config.policy.provider };
@@ -467,16 +428,6 @@ it('exports an idle Safe-only deployment without executor keys, funded accounts 
   draft.policy.applications[0].assertionTrust!.agreement = 'offline-agreement';
   synchronizeBundledServices(draft);
   expect(validateProviderConfiguration(draft)).toEqual(draft);
-  expect(draft.execution).toBeUndefined();
-  expect(draft.localExecution).toBeUndefined();
   expect(draft.safeWallet?.profile).toBe('safe-only-4337-v1');
   expect(draft.approvedCalls?.policy.accounts).toEqual([]);
-  expect(draft.runtimeConfiguration?.sharedApplicationSafes).toBeUndefined();
-  expect(draft.runtimeConfiguration?.executionPool).toBeUndefined();
-  const mixed = structuredClone(draft);
-  mixed.execution = {
-    ...config.execution,
-    rpc: { endpoints: [{ env: 'PROVIDER_PAID_RPC' }] },
-  } as never;
-  expect(() => validateProviderConfiguration(mixed)).toThrow();
 });

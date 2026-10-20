@@ -17,7 +17,7 @@ import type {
 import type { ProviderState } from '../onboarding/types.js';
 import { WalletCallsError } from '../wallet-calls/errors.js';
 import { fingerprint, deny } from '../onboarding/policy.js';
-import { serviceHash } from '../executor/auth.js';
+import { canonicalHash } from '../domain/canonical.js';
 import { runtimeApplicationId } from '../runtime-configuration/service.js';
 import {
   normalizeUserOperationV07,
@@ -45,7 +45,7 @@ export interface UserOperationWalletCallsConfiguration {
   maxConcurrentAccounts?: number;
   maxDepthTotal?: number;
 }
-/** Durable, explicitly selected ERC-4337 batch lane. It never delegates an uncertain batch to a relayer. */
+/** Durable ERC-4337 batch lane. Uncertain batches retain their immutable operation identity. */
 export class UserOperationWalletCallsDriver implements WalletCallsDriver {
   private readonly config: UserOperationWalletCallsConfiguration;
   private readonly configurationHash: string;
@@ -106,7 +106,7 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
       ].some((g) => BigInt(g) === 0n)
     )
       throw new WalletCallsError(-32602);
-    this.configurationHash = serviceHash([
+    this.configurationHash = canonicalHash([
       this.config,
       execution.configurationHash,
       execution.signing.executionBinding().configurationHash,
@@ -202,17 +202,7 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
         )
           deny();
         const entries = (state.userOperationBatches ??= {});
-        const duplicate = (entry: {
-          principal: VerifiedPrincipal;
-          safeAddress: string;
-          walletCalls?: WalletCallsMetadata;
-        }) =>
-          entry.walletCalls?.id === metadata.id &&
-          entry.safeAddress === authority.safeAddress &&
-          entry.principal.issuer === context.principal.issuer &&
-          entry.principal.clientId === context.principal.clientId;
         if (
-          Object.values(state.safeRequests ?? {}).some(duplicate) ||
           Object.values(entries).some(
             (e) =>
               e.metadata.id === metadata.id &&

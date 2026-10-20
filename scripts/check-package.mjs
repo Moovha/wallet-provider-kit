@@ -40,14 +40,16 @@ try {
   assert.ok(paths.includes('dist/service/documentation-token-ui.mjs'));
   assert.ok(paths.includes('examples/inspect-api.mjs'));
   assert.ok(paths.includes('spec/provider-config.schema.json'));
-  assert.ok(paths.includes('spec/execution-service.config.schema.json'));
-  assert.ok(paths.includes('spec/execution-api.json'));
-  assert.ok(paths.includes('docs/executor.config.example.json'));
-  assert.ok(paths.includes('dist/executor/service.js'));
-  assert.ok(paths.includes('docs/provider.config.example.json'));
-  assert.ok(paths.includes('docs/provider.config.bundled.example.json'));
+  assert.ok(paths.includes('docs/provider.config.safe.example.json'));
   assert.ok(paths.includes('dist/setup-ui/index.html'));
-  assert.ok(paths.includes('dist/setup-ui/providers/coinbase.png'));
+  assert.ok(paths.includes('docs/provider.config.safe.example.json'));
+  assert.ok(
+    !paths.some((p) =>
+      /(?:^dist\/executor\/|relayer|cdp|orchestration-draft|execution-service)/i.test(
+        p,
+      ),
+    ),
+  );
   assert.ok(paths.includes('dist/setup-ui/THIRD_PARTY_NOTICES.txt'));
   for (const asset of [
     'swagger-ui-bundle.js',
@@ -101,7 +103,7 @@ try {
     for (const name of ${JSON.stringify(imports)}) {
       const surface = await import(name);
       assert.ok(Object.keys(surface).length > 0);
-      if (!name.endsWith('/cdp') && !name.endsWith('/ows') && !name.endsWith('/openzeppelin-relayer')) {
+      if (!name.endsWith('/ows')) {
         for (const [key, value] of Object.entries(surface)) assert.equal(root[key], value);
       }
     }
@@ -110,11 +112,8 @@ try {
     assert.equal(typeof (await import('@moovha/wallet-provider-kit/http')).WalletCallsService, 'function');
     await assert.rejects(import('@moovha/wallet-provider-kit/dist/main.js'), { code: 'ERR_PACKAGE_PATH_NOT_EXPORTED' });
     const schema = JSON.parse(await readFile(new URL(import.meta.resolve('@moovha/wallet-provider-kit/spec/provider-api.json')), 'utf8'));
-    assert.ok(schema.paths['/v1/actions/{actionId}/sign']);
-    const executorSchema = JSON.parse(await readFile(new URL(import.meta.resolve('@moovha/wallet-provider-kit/spec/execution-api.json')), 'utf8'));
-    assert.ok(executorSchema.paths['/v1/dispatches']);
-    const draft = JSON.parse(await readFile(new URL(import.meta.resolve('@moovha/wallet-provider-kit/spec/orchestration-draft.json')), 'utf8'));
-    assert.equal(draft.openapi, '3.1.1');
+    assert.ok(schema.paths['/v1/accounts/{accountId}/wallet']);
+
   `,
   );
   run(process.execPath, ['exports.mjs']);
@@ -211,23 +210,7 @@ try {
         entry.status === 'pass',
     ),
   );
-  const walkthrough = run(process.execPath, [
-    join(installed, 'examples/provider-flow/run.mjs'),
-  ]);
-  assert.equal(walkthrough.trim().split('\n').length, 7);
-  assert.match(
-    walkthrough,
-    /PASS 7: unknown signing outcome retained; retry does not redispatch/,
-  );
-  await cp(
-    join(installed, 'examples/provider-flow'),
-    join(temporary, 'provider-flow'),
-    { recursive: true },
-  );
-  await copyFile(
-    join(installed, 'docs/provider.config.example.ts'),
-    join(temporary, 'provider.config.ts'),
-  );
+
   await writeFile(
     join(temporary, 'consumer.ts'),
     `
@@ -238,7 +221,7 @@ try {
     import { startTelemetry } from '@moovha/wallet-provider-kit/telemetry';
     ${imports.map((name, i) => `import * as surface${i} from '${name}';\ntype Surface${i} = typeof surface${i};`).join('\n')}
     const server: Promise<Awaited<ReturnType<typeof createServer>>> = createServer();
-    type SignRoute = ProviderPaths['/v1/actions/{actionId}/sign']['post'];
+    type SignRoute = ProviderPaths['/v1/accounts/{accountId}/wallet']['post'];
     type Backend = WalletSigningProvider;
     type Policy = OnboardingPolicy;
   `,
@@ -255,7 +238,7 @@ try {
         allowJs: true,
         checkJs: true,
       },
-      include: ['*.ts', 'provider-flow/**/*.mjs'],
+      include: ['*.ts'],
     }),
   );
   run(process.execPath, [
@@ -379,7 +362,7 @@ try {
     assert.equal(
       (
         await fetch(
-          `${origin}/v1/actions/10000000-0000-4000-8000-000000000001/sign`,
+          `${origin}/v1/accounts/10000000-0000-4000-8000-000000000001/provision`,
           {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
@@ -396,7 +379,7 @@ try {
     clearTimeout(timer);
   }
   console.log(
-    `Package consumer verified: ${candidate.files.length} files, ESM exports, TypeScript, inspection and provider-flow examples, OpenAPI and unconfigured CLI; bundled OWS engine installed`,
+    `Package consumer verified: ${candidate.files.length} files, ESM exports, TypeScript, API inspection, OpenAPI and unconfigured CLI; bundled OWS engine installed`,
   );
 } finally {
   await rm(temporary, { recursive: true, force: true });

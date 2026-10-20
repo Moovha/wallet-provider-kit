@@ -1,22 +1,16 @@
 import type { ApprovedCallIntent } from '../execution/approved-calls.js';
 import { assetBudgetId } from '../storage/asset-budgets.js';
 import type { ProviderDatabase, PolicyBudgetCharge } from '../storage/index.js';
-import type { TransferPolicy } from './actions.js';
 
 /** Resolve only allowance terms emitted by an explicitly selected policy adapter. */
 export function adapterAllowanceCharges(
   intent: ApprovedCallIntent,
   origin: string,
-  erc3009?: TransferPolicy,
 ): PolicyBudgetCharge[] {
   return (intent.assetBudgets ?? []).map((charge) => ({
     budgetId: assetBudgetId(origin, intent.account.accountId, charge.token),
     units: charge.units,
-    maximum:
-      erc3009?.token.address.toLowerCase() === charge.token.toLowerCase() &&
-      BigInt(erc3009.lifetimeAmount) < BigInt(charge.maximum)
-        ? erc3009.lifetimeAmount
-        : charge.maximum,
+    maximum: charge.maximum,
   }));
 }
 
@@ -26,9 +20,8 @@ export async function prepareAdapterAllowances(
   intent: ApprovedCallIntent,
   origin: string,
   revision: string,
-  erc3009?: TransferPolicy,
 ) {
-  const charges = adapterAllowanceCharges(intent, origin, erc3009);
+  const charges = adapterAllowanceCharges(intent, origin);
   for (const [index, term] of (intent.assetBudgets ?? []).entries()) {
     await database.ensureAssetBudget(
       origin,

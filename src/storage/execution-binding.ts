@@ -3,7 +3,7 @@ import { fingerprint } from '../onboarding/policy.js';
 import type { StorageConnection } from './connection.js';
 import type { FinancialApproval } from './types.js';
 
-export type OperationMechanism = 'relayer' | 'safe-4337-v07';
+export type OperationMechanism = 'safe-4337-v07';
 function identity(approval: FinancialApproval) {
   return fingerprint([
     'financial-operation-v1',
@@ -12,18 +12,17 @@ function identity(approval: FinancialApproval) {
     approval.caller.clientId,
     approval.ownerSubject,
     approval.account.accountId,
-    approval.action.kind === 'sign_typed_data'
-      ? approval.action.operation_id
-      : approval.action.operationId,
+    approval.action.operation_id,
   ]);
 }
 export function approvalMechanism(
   approval: FinancialApproval,
 ): OperationMechanism {
-  return approval.action.kind === 'sign_typed_data' &&
-    approval.action.payload.primaryType === 'SafeOp'
-    ? 'safe-4337-v07'
-    : 'relayer';
+  if (
+    !['SafeOp', 'SafeCallIntent'].includes(approval.action.payload.primaryType)
+  )
+    throw new WalletProviderError('wallet_attempt_conflict');
+  return 'safe-4337-v07';
 }
 /** Called inside the admission transaction. A financial operation never changes mechanisms. */
 export function bindExecutionMechanism(

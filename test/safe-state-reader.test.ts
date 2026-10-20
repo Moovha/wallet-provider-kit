@@ -15,10 +15,7 @@ import {
 } from 'ethers';
 import solc from 'solc';
 import { RpcReader } from '../src/execution/chain.js';
-import {
-  readSafeState,
-  readSafe4337State,
-} from '../src/execution/safe-state-reader.js';
+import { readSafe4337State } from '../src/execution/safe-state-reader.js';
 import type { SafeAccountBinding } from '../src/execution/approved-calls.js';
 let processHandle: ChildProcess,
   provider: JsonRpcProvider,
@@ -145,52 +142,6 @@ afterAll(async () => {
     await once(processHandle, 'exit');
   }
 });
-it('runs the generated reader in a real local EVM without deploying it or changing Safe state', async () => {
-  expect(await readSafeState(reader, binding, owner, 'latest')).toBe('42');
-  expect(await contract.getFunction('nonce')()).toBe(42n);
-});
-it.each([1, 2, 3, 4, 5, 6, 7, 8])(
-  'rejects Safe authority or code mismatch %s in the EVM',
-  async (fault) => {
-    const tx = await contract.getFunction('configure')(fault);
-    await tx.wait();
-    await expect(
-      readSafeState(reader, binding, owner, 'latest'),
-    ).rejects.toThrow();
-    const reset = await contract.getFunction('configure')(0);
-    await reset.wait();
-  },
-);
-it('rejects wrong expected owner and wrong pinned proxy or singleton code hashes', async () => {
-  await expect(
-    readSafeState(
-      reader,
-      binding,
-      '0x0000000000000000000000000000000000000010',
-      'latest',
-    ),
-  ).rejects.toThrow();
-  await expect(
-    readSafeState(
-      reader,
-      { ...binding, codeHash: '0x' + '1'.repeat(64) },
-      owner,
-      'latest',
-    ),
-  ).rejects.toThrow();
-  await expect(
-    readSafeState(
-      reader,
-      {
-        ...binding,
-        singleton: { ...binding.singleton, codeHash: '0x' + '1'.repeat(64) },
-      },
-      owner,
-      'latest',
-    ),
-  ).rejects.toThrow();
-});
-
 it('checks the complete ERC-4337 Safe authority and nonce in one read-only call and rejects each changed authority field', async () => {
   const pin = async (contract: BaseContract) => ({
     address: await contract.getAddress(),

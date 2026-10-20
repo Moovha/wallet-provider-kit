@@ -1,101 +1,14 @@
 import { docs } from './model';
-
 function setting(summary: string, why: string, source: string, guide: string) {
   return { summary, why, source, url: `${docs}${guide}` };
 }
-
 export const settings = {
-  replacementWorker: setting(
-    'A bounded background worker accelerates the same transaction using pre-approved fee headroom.',
-    'Only fee fields may change. Each mutation requires fresh wallet authority and a durable replacement record; responses lost after dispatch are reconciled without retrying the mutation. Gas units, fee ceilings, nonce, payer and action remain fixed.',
-    'Deploy and accept the pinned fee-only OpenZeppelin build on a dedicated provider. Match replacement policy in wallet and executor configurations. Initial 5000 basis points use half the fee ceilings; 1250 basis points increase fees by 12.5%. Defaults are editable for new plans and require deployment acceptance.',
-    'automatic-replacements.html',
-  ),
-  executionRecovery: setting(
-    'Read-only diagnosis of stuck transactions, sponsor nonces, fees and funding.',
-    'Optional durable quarantine stops new signing and dispatch through an affected payer. Missing receipts and pending nonce counts do not authorize another submission. Only fresh verified finality clears an execution quarantine.',
-    'Set a suspicion threshold from accepted network/provider latency, configure recovery on both services, and follow the stuck-transaction runbook. Reconciliation never changes fees, replaces a transaction or skips a signed Safe head.',
-    'stuck-transactions-and-recovery.html',
-  ),
-  payerOperations: setting(
-    'Independent payer balance checks, aggregate health and signed webhook delivery.',
-    'Balance evidence requires agreement from configured RPC sources. Durable retries use a stable webhook ID; receivers verify signatures and deduplicate that ID. Health contains counts without payer addresses or endpoint URLs.',
-    'Set the balance threshold in wei and a 5–300 second interval. Add trusted HTTPS destinations through environment references. Supply a unique whsec_ base64 signing secret per endpoint and test receiver and recovery behavior. Configure both services to observe their independent incidents.',
-    'payer-events-and-health.html',
-  ),
-  executionService: setting(
-    'The separately deployed dispatcher, selected provider revision and pinned service keys.',
-    'Signed requests bind the method, path, destination and exact body. The executor maintains its own durable journal and calls the wallet service for current authority before provider effects. An application OAuth token cannot authorize that callback.',
-    'Deploy the execution service with a separate local database and an accepted provider registry. Configure matching provider/sponsor policy on both services. Supply ES256 PKCS8 private and SPKI public PEM values only through the named environment variables; copy key IDs from the corresponding service configuration. Read the execution-service guide for authentication, recovery and key rotation.',
-    'execution-service.html',
-  ),
-  executionEnabled: setting(
-    'Coordinate stored approved actions and independently verify their execution.',
-    'The provider signs and dispatches stored approved transfers or explicitly configured Safe calls under current authority. An application-funded sponsor covers gas; observation does not confer spending authority.',
-    'Keep the bundled local engine selected in Services for automatic private Relayer and Valkey startup. Configure transfer or contract-call policy, gas budgets and two independent RPC sources. Setup generates encrypted sponsor keys and bindings. Existing execution services remain optional. Keep activation off until execution, chain checks and lost-response recovery have deployment-specific acceptance evidence.',
-    'execution.html',
-  ),
-  safeQueue: setting(
-    'Bounded FIFO requests for each Safe, with signing deferred until the head.',
-    'Independent Safe heads can progress concurrently. Current original owner, grant, identity, consent and policy are checked before effects. Signed heads without verified nonce consumption retain their position; service expiry cannot recall a Safe signature.',
-    'Enable the approved EVM execution profile and contract policy. Set Safe and sponsor pool sizes for shared applications, per-user/application/service admission limits and total queue validity; contract-policy validity also applies. Applications use the contract-call-requests API with signing and execution scopes. Status reads never dispatch. Test concurrent admission, unsigned cancellation and recovery before activation.',
-    'safe-queue-and-sponsor-pools.html',
-  ),
-  sponsorPool: setting(
-    'Durable round-robin payer selection with an unfinished-execution limit per address.',
-    'Distinct funded addresses can serve the same application. Retrying an execution retains its selected payer. Unknown attempts hold capacity, while the application lifetime gas budget remains shared.',
-    'Enable pools and add gas sponsors for the application. Bundled setup creates distinct encrypted keys and managed bindings for those entries. Existing designated execution services need matching independent pool limits. Set capacity from accepted provider tests. Full pools leave unsigned queue heads waiting. Enable recovery quarantine to exclude affected payers from new admission. Nonce repair remains a separately reviewed provider operation.',
-    'safe-queue-and-sponsor-pools.html',
-  ),
-  executionPools: setting(
-    'Independent Safe and sponsor lanes for concurrent application users.',
-    'Each user keeps a stable execution Safe. Sponsors share one application gas allowance; separate lanes contain nonce stalls without moving user assets.',
-    'New shared applications default to five Safes and five sponsors. Choose counts before provisioning, create each indexed member and fund the single application gas address. Read each user’s assigned sender from the wallet API. Existing pool resizing requires migration review.',
-    'safe-queue-and-sponsor-pools.html',
-  ),
-  queueOverload: setting(
-    'Reject excess queued work before signing or gas admission.',
-    'Per-user, per-application and service-wide caps bound pending work. Queued requests retain their original expiry and authority checks.',
-    'Set limits from measured service capacity and acceptable queue delay. Preserve request IDs and back off on busy responses; do not create duplicate batches automatically.',
-    'safe-queue-and-sponsor-pools.html',
-  ),
   httpRequestLimit: setting(
     'Maximum HTTP requests per minute from one connecting peer.',
     'Application backends can share one peer address across many users, including status-poll traffic. Durable queue caps enforce separate financial admission limits.',
     'Keep a bounded rate and measure expected backend traffic. HTTP throttling returns 429. Configure from 1 to 6,000 requests per minute; the default is 60.',
-    'safe-queue-and-sponsor-pools.html',
+    'wallet-calls.html',
   ),
-  executionRpc: setting(
-    'Trusted RPC sources and bounded read-only transaction observation.',
-    'The service checks chain ID and accepted genesis, requires agreement from all configured sources, and separates inclusion, safe blocks and finality. RPC agreement is trusted node evidence, not a cryptographic light-client proof.',
-    'Enter environment variable names for complete HTTPS RPC endpoints; never paste URLs or credentials into exported JSON. Use different origins operated independently. Obtain the genesis hash from trusted chain records. Choose a 5–300 second observation interval and a 100–10000 block search limit for recovery and provider quotas.',
-    'execution.html#configure-and-accept-execution',
-  ),
-  executionToken: setting(
-    'The keccak256 hash of the accepted token contract runtime bytecode.',
-    'Simulation and receipt verification check this hash. A proxy runtime hash alone does not pin its implementation or establish token behavior.',
-    'Obtain deployed runtime bytecode through independent trusted RPC sources and record its keccak256 hash in your token acceptance evidence. Verify the exact token, EIP-712 domain, ERC-3009 behavior and proxy upgrade controls before activation.',
-    'execution.html#configure-and-accept-execution',
-  ),
-  executionSponsor: setting(
-    'An application gas sponsor and explicit funding agreement.',
-    'Sponsors are selected by the authenticated application, never by an API body. Sponsor queues and signers must be separate from owner-wallet signing bindings.',
-    'Bundled setup creates and retains the encrypted sponsor key, public address and Relayer/signer bindings automatically. Record the application funding agreement, set gas limits and fund the saved public address before activation. With an existing service, match its retained address, account identity, gas policy and binding revision; direct Relayer connections also need that service’s Relayer and signer IDs, HTTPS origin and API key reference. API scopes and owner-wallet consent do not authorize sponsor funding.',
-    'execution.html#configure-and-accept-execution',
-  ),
-  executionGas: setting(
-    'Exact decimal gas and native-fee admission limits in wei.',
-    'A durable dispatch reserves gas limit × maximum fee per gas plus the L1 reserve against the application lifetime budget. Unknown and failed work retains reservations; a new policy does not reset them.',
-    'Set limits from measured staging transactions and your reviewed funding budget. Safe contract-call execution supports 21,000–5,000,000 gas; ERC-3009 transfer execution supports 21,000–1,000,000. Defaults remain unchanged. Bundled setup disables Relayer gas estimation and applies the configured fee cap automatically. Existing Relayer services must enforce gas_limit_estimation=false and a positive gas_price_cap no greater than the approved maximum. Account separately for actual L1 fees and recovery/cancellation costs; the admission reservation is not a hard bound on every upstream cost.',
-    'execution.html#configure-and-accept-execution',
-  ),
-  executionEvidence: setting(
-    'Reference to completed execution, RPC and recovery acceptance evidence.',
-    'Offline validation does not prove a deployed sponsor, RPC chain, token, durable queue or recovery path works.',
-    'Test the exact deployment, including lost submission responses, restart, revocation, RPC disagreement, wrong effects and finality/reorg handling. Record the reviewed report or ticket reference. The wizard does not verify the evidence.',
-    'execution.html#configure-and-accept-execution',
-  ),
-
   identityLevel: setting(
     'The exact label applications must use for accepted identity checks. The starting label is verified.',
     'The provider matches this label exactly; it does not rank verification levels or perform the application’s checks.',
@@ -113,18 +26,6 @@ export const settings = {
     'The agreement authorizes this application to attest completed identity checks and user consent. A token scope or populated field cannot replace it.',
     'Agree verification duties, retained evidence, consent terms and withdrawal handling with the application operator. Enter the reference to your reviewed contract or approval record, such as app-trust-2026-01. You maintain this reference; no vendor issues a special toolkit code. Enter a reference, not private agreement contents.',
     'application-access.html#configure-the-trust-policy',
-  ),
-  applicationRecords: setting(
-    'Let an admitted application submit records for your unfunded evaluation without an identity vendor.',
-    'You can test owner consent, account access and recovery without creating a KYC vendor account. Your staff must match each submitted record to the authenticated owner and explicitly accept it. Required fields do not prove externally verified identity.',
-    'Use this hosted compatibility option for fictional evaluation records. It permits account reads and unfunded provisioning only. Select a vendor instead when your policy needs external verification or transfer signing.',
-    'application-records.html',
-  ),
-  recordFields: setting(
-    'The exact field names every application record must contain, one per line.',
-    'Admitted applications can discover these names through GET /v1/access-policy. Complete records in a submitted batch receive consent requests; incomplete records are marked invalid. No vendor is called.',
-    'Choose 1–16 lower-case names using letters, digits and underscores, beginning with a letter. Use only fields needed for your evaluation, for example display_name and country. Each required value is a non-empty string of at most 512 characters. The service retains only these fields and discards other submitted attributes.',
-    'application-records.html#submit-records',
   ),
   providerName: setting(
     'The wallet service name shown in operator tools and shared with connected applications.',
@@ -149,24 +50,6 @@ export const settings = {
     'Stored accounts use it to stay attached to the same wallet backend through restarts and credential changes. Changing it is not a way to recover a failed operation.',
     'Keep the generated ID unchanged for this deployment. Import your saved configuration to retain it; use the advanced override only when establishing a reviewed environment binding.',
     'operator-services.html#stable-backend-binding',
-  ),
-  cdpKeyId: setting(
-    'The variable that will hold your CDP server API key ID. You can keep the supplied variable name.',
-    'CDP uses the ID together with its matching secret to identify your project’s server requests.',
-    'In your Coinbase Developer Platform project, create a Secret API Key under API Keys. Store its ID privately at deployment under this variable name. A public Client API Key or retail Coinbase key is not suitable.',
-    'operator-services.html#coinbase-cdp',
-  ),
-  cdpKeySecret: setting(
-    'The variable that will hold the secret paired with your CDP API key ID.',
-    'This credential authenticates your wallet service to CDP. Anyone holding it may gain the vendor permissions assigned to that key.',
-    'Retain the secret from the same CDP Secret API Key creation as the ID above. Supply it privately at deployment; keep the supplied variable name here.',
-    'operator-services.html#coinbase-cdp',
-  ),
-  cdpWalletSecret: setting(
-    'The variable that will hold your CDP project’s Wallet Secret, a separate credential from the API key.',
-    'CDP requires the Wallet Secret for wallet operations. The API key secret cannot replace it.',
-    'Obtain the Wallet Secret from your CDP project’s wallet security settings and retain it in your secret manager. Supply its value at deployment.',
-    'operator-services.html#coinbase-cdp',
   ),
   httpsGateway: setting(
     'The gateway that exposes your configured domain over HTTPS.',
@@ -215,36 +98,6 @@ export const settings = {
     'The local engine needs the owner passphrase to open the vault. Losing it can prevent recovery.',
     'Local setup generates a missing passphrase and saves it privately. For native setup, run init-secrets once and retain the resulting environment file. It must be 16–4096 characters; an OWS agent token cannot replace it.',
     'operator-services.html#open-wallet-standard-ows',
-  ),
-  relayerOrigin: setting(
-    'The HTTPS address of your separately running OpenZeppelin Relayer service.',
-    'The kit sends approved signing requests to that service. Choosing this backend does not install a Relayer.',
-    'Ask the person operating your Relayer for its base address. Enter https:// and its hostname only, without /api/v1 or a trailing slash. If you do not operate a Relayer, choose another backend.',
-    'operator-services.html#openzeppelin-relayer',
-  ),
-  relayerKey: setting(
-    'The variable that will hold the API key accepted by your Relayer service.',
-    'The Relayer uses this credential to authenticate requests from the wallet service.',
-    'Your Relayer administrator supplies the value configured as API_KEY in that deployment. Store the same value privately under this variable. It is not an OpenZeppelin website password or blockchain private key.',
-    'operator-services.html#openzeppelin-relayer',
-  ),
-  relayerId: setting(
-    'The ID of an existing Relayer entry that will be reserved for one wallet account.',
-    'The kit needs a verified, unique entry to allocate an account. An exhausted pool prevents new accounts.',
-    'Copy the exact ID from your Relayer administrator’s configuration inventory. Each row must have a distinct Relayer ID, signer and wallet address. Retain entries already assigned to accounts.',
-    'operator-services.html#openzeppelin-relayer',
-  ),
-  signerId: setting(
-    'The ID of the signing-key entry attached to this Relayer.',
-    'It binds the Relayer entry to the expected key. A mismatched signer must not be used for an account.',
-    'Copy the signer ID from the same verified Relayer inventory as this row’s Relayer ID and address.',
-    'operator-services.html#openzeppelin-relayer',
-  ),
-  signerAddress: setting(
-    'The existing 0x wallet address controlled by this signer on the selected Base network.',
-    'The kit checks that signing uses the address allocated to the account. This profile requires an externally owned account, meaning an account controlled by a signing key.',
-    'Copy the verified address from your Relayer inventory. Ask its administrator to confirm the signer ID, active status and the selected network and chain ID together. Use binding revision 1 for this profile.',
-    'operator-services.html#openzeppelin-relayer',
   ),
   loginIssuer: setting(
     'The address of the optional staff login service, or the wallet-owner login service in hosted compatibility mode. “Issuer” identifies the service that proves who signed in.',
@@ -385,100 +238,16 @@ export const settings = {
     'operator-services.html#register-the-application-api-and-clients',
   ),
   permissions: setting(
-    'Choose what this application may ask owners to allow. Read wallet accounts is the first-setup default.',
-    'Owners consent to these permissions. Transfer requests also need transfer policy, current authority and an exact approved action. OAuth token scopes alone do not grant spending authority.',
+    'Choose what this application may ask owners to allow. The starting policy allows account reads and approved Safe calls.',
+    'Owners consent to these permissions. Safe calls also require current contract policy, authority and an exact approved intent. OAuth token scopes alone do not grant spending authority.',
     'Agree the needed tasks with the application developer. Transfer requests need the optional signing configuration below. Request wallet operations is for advanced hosts and does not enable transfer delegation.',
     'operator-services.html#register-the-application-api-and-clients',
-  ),
-  fundingEnabled: setting(
-    'Record this application’s agreement to cover identity verification costs.',
-    'New verification and shared imports are blocked without both agreed vendor prices and an application funding agreement, including for free routes.',
-    'Agree responsibility and a monthly cap with the application operator. Enable this for applications that will request identity work. The kit tracks budgets; it does not create contracts or pay invoices.',
-    'operator-services.html#prices-terms-and-application-funding',
-  ),
-  fundingReference: setting(
-    'Your reference to the agreement with this application about identity costs.',
-    'It records which agreement authorizes budget reservations for the application.',
-    'Enter a real contract or internal approval reference you maintain. This is your record label, not a vendor-issued code. Free routes still need an agreement.',
-    'operator-services.html#prices-terms-and-application-funding',
-  ),
-  monthlyBudget: setting(
-    'The application’s monthly identity cost cap in USD cents. 10000 means USD 100.',
-    'The kit refuses new vendor work that exceeds the remaining budget. Uncertain vendor outcomes keep their reservations.',
-    'Use the cap agreed with the application operator. Use 0 only when the configured routes have explicitly agreed zero prices.',
-    'operator-services.html#prices-terms-and-application-funding',
   ),
   applicationEnabled: setting(
     'Allow this registered application to request access under your policy.',
     'Disabling an application blocks its access; enabling it still requires valid tokens, owner consent and current identity acceptance.',
     'Leave enabled for an application you intend to connect. Review the effect on existing users before changing a running service’s configuration.',
     'setup.html',
-  ),
-  reviewer: setting(
-    'The exact login account ID of a staff member allowed to accept identity evidence. The login system calls it sub, or subject.',
-    'Hosted compatibility requires provider review after vendor checks. This ID gives review authority to the intended staff account.',
-    'Create the staff account at the owner-login provider and copy its subject from the user record or ask that provider’s administrator. Do not enter an email, display name or application client ID. Keep at least one working reviewer.',
-    'operator-services.html#identify-reviewers',
-  ),
-  financialEnabled: setting(
-    'Optional. Leave off if you only need wallet creation and account access.',
-    'Enabling this allows signing of specific token transfer authorizations under owner delegation and provider limits. It does not send transactions, pay network fees or settle transfers.',
-    'Enable only with a verified ERC-3009 token on the selected Base network and reviewed recipients and limits. Have a token integration specialist verify the contract and signing details below.',
-    'operator-services.html#optional-token-signing-policy',
-  ),
-  tokenAddress: setting(
-    'The 0x address of the token contract on the selected Base network.',
-    'Signatures must bind to the exact supported ERC-3009 contract on the selected chain.',
-    'Have your token specialist verify the deployed contract against issuer documentation. A mainnet address, ticker or example address is insufficient.',
-    'operator-services.html#optional-token-signing-policy',
-  ),
-  tokenName: setting(
-    'The exact name the token contract uses in its EIP-712 signing domain.',
-    'A signing domain identifies what a signature is for. A different name can make the authorization invalid even if the token symbol looks right.',
-    'Copy the verified contract’s domain name with help from your token specialist. Do not assume it equals the marketing name or symbol.',
-    'operator-services.html#optional-token-signing-policy',
-  ),
-  tokenVersion: setting(
-    'The exact version in the token contract’s signing domain.',
-    'The domain version is part of the signed authorization and must match the contract.',
-    'Obtain it from the verified token contract and issuer documentation. Do not assume it is 1; have the exact domain independently tested.',
-    'operator-services.html#optional-token-signing-policy',
-  ),
-  tokenSymbol: setting(
-    'The short token label shown to owners, such as a token’s ticker.',
-    'It helps owners understand the asset covered by their delegation; the contract address remains the asset identity.',
-    'Copy the symbol from the verified contract and issuer documentation. A symbol alone does not establish token compatibility.',
-    'operator-services.html#optional-token-signing-policy',
-  ),
-  tokenDecimals: setting(
-    'The token’s decimal precision. With 6 decimals, 1000000 base units means 1 token.',
-    'The service uses this precision to explain integer signing limits to owners. A wrong value misrepresents those limits.',
-    'Copy decimals from the verified contract. Confirm it with your token specialist rather than keeping 6 without checking.',
-    'operator-services.html#optional-token-signing-policy',
-  ),
-  maximumAmount: setting(
-    'The most one authorization can spend, written as a whole number of the token’s smallest units.',
-    'This caps each exact action under the delegated transfer policy.',
-    'Choose the business limit, then convert using the verified decimals. With 6 decimals, 2500000 is 2.5 tokens. Enter digits only, with no decimal point.',
-    'operator-services.html#optional-token-signing-policy',
-  ),
-  lifetimeAmount: setting(
-    'The cumulative authorization cap for each account and token, in the same base units.',
-    'It limits total reservations across actions. Uncertain attempts retain reservations; this is not a monthly or current-balance limit.',
-    'Choose a cap at least as large as the per-action maximum. Convert using the verified token decimals and review the recovery implications.',
-    'operator-services.html#optional-token-signing-policy',
-  ),
-  validity: setting(
-    'How long a signed authorization may be used, from 60 to 3600 seconds. 300 is five minutes.',
-    'An issued signature can remain executable until its on-chain expiry, even if application access is revoked later.',
-    'Choose a short period that your application’s transaction submission can support. The kit does not cancel issued signatures or broadcast transactions.',
-    'operator-services.html#optional-token-signing-policy',
-  ),
-  recipient: setting(
-    'A 0x wallet address that delegated transfers may pay.',
-    'Only listed recipients are allowed by this transfer policy. Entering the wrong address can authorize payment to the wrong party.',
-    'Obtain and independently verify each intended recipient with your application operator for Base Sepolia. Do not copy sample addresses.',
-    'operator-services.html#optional-token-signing-policy',
   ),
   storage: setting(
     'The private folder on your server for wallet records, permissions and operation history.',
@@ -552,18 +321,5 @@ export const settings = {
     'Record this deployment’s recovery tests in a report or reviewed ticket, then enter its reference. Offline tests do not confirm that your server can restore its records and wallets.',
     'operator-deployment.html',
   ),
-  tokenEvidence: setting(
-    'Your reference to completed acceptance of the exact token contract and signing profile.',
-    'Transfer signing requires verified contract, domain, limits and recovery behavior in addition to backend acceptance.',
-    'Enter the reference to the reviewed report from your token specialist’s tests. The wizard does not issue this reference or verify the report.',
-    'operator-services.html#optional-token-signing-policy',
-  ),
-  approvedCalls: setting(
-    'Explicit smart-account bindings and permitted contract actions.',
-    'Contract-call delegation is separate from transfer delegation. Only reviewed targets, functions, swap routes and vault routes are admitted. Native value and operation limits do not bound every possible token effect of an arbitrary contract.',
-    'Select the approved EVM execution profile and verified runtime hashes. With the bundled local engine, enable automatic single-owner Safe 1.4.1 provisioning or configure existing bindings. Fund the sponsor before provisioning and review every target and consent term before activation. Deployment does not certify contracts.',
-    'approved-contract-calls.html',
-  ),
 } as const;
-
 export type SettingKey = keyof typeof settings;

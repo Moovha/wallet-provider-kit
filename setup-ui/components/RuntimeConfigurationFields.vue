@@ -8,13 +8,6 @@ function newOperator() {
   return { issuer: model.value.oauth.issuer, clientId, subject: clientId };
 }
 const model = defineModel<ProviderConfiguration>({ required: true });
-function enable(enabled: boolean) {
-  if (enabled && !model.value.runtimeConfiguration)
-    model.value.runtimeConfiguration = {
-      operators: [newOperator()],
-    };
-  else if (!enabled) delete model.value.runtimeConfiguration;
-}
 </script>
 <template>
   <section class="form-section">
@@ -24,17 +17,6 @@ function enable(enabled: boolean) {
       Providers publish policies and choose automatic or manual registration
       review through the protected application configuration APIs.
     </p>
-    <label
-      v-if="
-        !model.safeWallet && !model.runtimeConfiguration?.sharedApplicationSafes
-      "
-      ><input
-        type="checkbox"
-        :checked="!!model.runtimeConfiguration"
-        @change="enable(($event.target as HTMLInputElement).checked)"
-      />
-      Enable runtime configuration</label
-    >
     <template v-if="model.runtimeConfiguration">
       <p v-if="model.authorizationServer">
         The bundled issuer registers separate provider service operators and
@@ -119,15 +101,6 @@ function enable(enabled: boolean) {
       >
         Add runtime operator
       </button>
-      <FormKit
-        v-if="
-          !model.safeWallet &&
-          !model.runtimeConfiguration.sharedApplicationSafes
-        "
-        type="checkbox"
-        label="Use runtime policies for contract authorization"
-        v-model="model.runtimeConfiguration.authorizeContracts"
-      />
       <p>
         Application action policies, services and sponsorship are reviewed
         through the protected APIs after deployment. Registration does not grant

@@ -8,7 +8,7 @@ import type {
   WalletAttemptResult,
 } from '../domain/attempt-journal.js';
 import { WalletProviderError } from '../domain/signing.js';
-import type { RelayerAttemptJournal } from '../providers/openzeppelin-relayer.js';
+import type { WalletAttemptJournal } from '../domain/attempt-journal.js';
 import { failureCodes } from '../providers/attempt-lifecycle.js';
 import { fingerprint, text, uuid } from '../onboarding/policy.js';
 import { StorageConnection, unavailable } from './connection.js';
@@ -36,7 +36,7 @@ export function validateRequest(request: WalletAttemptRequest) {
     !/^[a-z][a-z0-9._-]{0,63}$/.test(request.provider) ||
     !uuid.test(request.attemptId) ||
     !uuid.test(request.accountId) ||
-    !['provision', 'sign_typed_data', 'relay_transaction'].includes(
+    !['provision', 'sign_typed_data', 'infrastructure_transaction'].includes(
       request.kind,
     ) ||
     !/^[a-f0-9]{64}$/.test(request.resourceKey) ||
@@ -186,7 +186,9 @@ function checkedResult(
 export function sqliteJournal(
   connection: StorageConnection,
   beforeClaim?: () => void,
-): RelayerAttemptJournal {
+): WalletAttemptJournal & {
+  read(request: WalletAttemptRequest): Promise<WalletAttemptClaim | null>;
+} {
   return {
     async claim(input) {
       const request = structuredClone(input);

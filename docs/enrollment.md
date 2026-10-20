@@ -6,13 +6,6 @@ the access contract configured in [Policies](setup-wizard.md#_4-policies).
 The standard service accepts identity and consent evidence from trusted
 applications; enrollment does not add a second sign-in to that journey.
 
-For a ready-made flow with hosted consent, provider review, Didit/Sumsub evidence
-and access grants, use [onboarding and application access](onboarding.md). This
-guide describes the separate OIDC Identity Assurance profile for existing hosts.
-Start with [installation](package.md) and [backend integration](backend-guide.md)
-before composing it with your wallet service.
-Do not submit vendor share tokens as OIDC ID tokens. A server chooses one profile.
-
 An orchestrator can request a wallet for a named user without deciding whether
 your provider should accept that user. Enrollment lets you check identity
 evidence, collect consent and apply your policy before provisioning. Your team
@@ -51,10 +44,6 @@ This is not an OIDC provider, KYC vendor or certified identity-assurance product
    With enrollment enabled, the HTTP route requires current accepted enrollment
    for the same caller/account and the same host-resolved owner. Existing owner,
    current local KYC, grant, quota and durable wallet-attempt checks still apply.
-
-Creation does not activate a spending account or authorize signatures. External
-wallet linking, migration and operation approval remain separate. CDP and OWS
-can create EOAs; the Relayer adapter binds an already configured signer.
 
 ## HTTP contract
 
@@ -105,16 +94,6 @@ const app = await createServer({
   ready: persistentDependenciesAreReady,
 });
 ```
-
-Configure both authorities and the wallet journal with persistent storage and
-current host policy. The [SQLite adapter](storage.md#relayer-execution-and-alternative-enrollment)
-supplies enrollment persistence with your authorization and acceptance callbacks;
-you can also implement those ports over your own accepted storage.
-When calling the library directly for newly enrolled users, use
-`enrollment.provision(wallets, context, accountId)` so acceptance is checked.
-Direct `wallets.provision` is the trusted/pre-enrolled integration path.
-Servers without `enrollment` use that path and return 503 for enrollment
-requests. The default CLI supplies neither authority and stays disabled.
 
 Enrollment never copies an upstream claim into `currentUserStatus`. Your wallet
 authority continues to resolve the owner and require current local `ID VERIFIED`.

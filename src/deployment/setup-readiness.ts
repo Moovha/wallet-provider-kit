@@ -42,16 +42,6 @@ export function setupWarnings(config: ProviderConfiguration): string[] {
         `Application ${index + 1}: its monthly identity budget is smaller than a vendor's per-request price limit. Review the agreed budget and route prices in Policies.`,
       );
   }
-  if (
-    config.financial &&
-    !config.policy.applications.some(
-      (app) =>
-        app.enabled !== false && app.permissions?.includes('transfers:request'),
-    )
-  )
-    warnings.push(
-      'Transfer signing is configured, but no enabled application can request transfers. In Policies, select Request transfers on behalf of users for the intended application, or turn off transfer signing.',
-    );
   if (config.backend.kind === 'ows')
     warnings.push(
       'OWS uses the bundled native engine and a private persistent vault. Back up the vault, database and retained owner passphrase together.',

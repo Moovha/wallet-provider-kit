@@ -35,9 +35,7 @@ export function budgetReservationId(
     'asset-reservation-v1',
     approval.ownerSubject,
     approval.account.accountId,
-    approval.action.kind === 'sign_typed_data'
-      ? approval.action.operation_id
-      : approval.action.operationId,
+    approval.action.operation_id,
     budgetId,
   ]);
 }

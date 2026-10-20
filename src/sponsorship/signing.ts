@@ -140,7 +140,7 @@ export class Safe4337SigningService {
       authorizeAttempt: this.financial.authorizeAttempt,
     });
   }
-  /** Uses the common stored operation/action and idempotency identity used by the relayer. */
+  /** Bind the stored intent approval and exact UserOperation to one idempotency identity. */
   async requestCalls(
     context: AuthorityContext,
     input: ApprovedCallInput,
@@ -153,7 +153,6 @@ export class Safe4337SigningService {
       context,
       input,
       async () => BigInt(operation.nonce).toString(),
-      undefined,
       expiresAt,
     );
     return this.admit(context, source.action_id, operation);
@@ -248,19 +247,15 @@ export class Safe4337SigningService {
     )
       deny();
     await this.current(record.context, record, false);
-    await this.actions.withAuthorizedTransfer(
-      record.context.principal,
-      id,
-      () => {
-        const phase = this.load(id).phases[stage] ?? deny();
-        return this.database.sponsorship.assertDispatch(
-          id,
-          stage,
-          phase.token,
-          fingerprint(normalizeUserOperationV07(request.operation)),
-        );
-      },
-    );
+    await this.actions.withAuthorizedCalls(record.context.principal, id, () => {
+      const phase = this.load(id).phases[stage] ?? deny();
+      return this.database.sponsorship.assertDispatch(
+        id,
+        stage,
+        phase.token,
+        fingerprint(normalizeUserOperationV07(request.operation)),
+      );
+    });
     return { validAfter: record.validAfter, validUntil: record.validUntil };
   }
   async withExecutionRead<T>(
@@ -303,7 +298,7 @@ export class Safe4337SigningService {
     return this.database.sponsorship.load(id) ?? deny();
   }
   private source(context: AuthorityContext, id: string) {
-    return this.actions.withAuthorizedTransfer(
+    return this.actions.withAuthorizedCalls(
       context.principal,
       id,
       (_state, record) => record,
@@ -486,7 +481,7 @@ export class Safe4337SigningService {
       principal.clientId,
     );
     await this.database.setBudget(gasBudgetId, maximum, this.actions.revision);
-    const record = await this.actions.withAuthorizedTransfer(
+    const record = await this.actions.withAuthorizedCalls(
       principal,
       id,
       (_state, latest) => {
@@ -523,7 +518,7 @@ export class Safe4337SigningService {
     const record = this.load(id);
     await this.current(context, record);
     const requestHash = fingerprint(operation);
-    const claim = await this.actions.withAuthorizedTransfer(
+    const claim = await this.actions.withAuthorizedCalls(
       context.principal,
       id,
       () => this.database.sponsorship.claim(id, stage, requestHash),
@@ -543,16 +538,13 @@ export class Safe4337SigningService {
           )
             deny();
           await this.current(context, this.load(id), false);
-          return this.actions.withAuthorizedTransfer(
-            context.principal,
-            id,
-            () =>
-              this.database.sponsorship.assertDispatch(
-                id,
-                stage,
-                claim.token,
-                requestHash,
-              ),
+          return this.actions.withAuthorizedCalls(context.principal, id, () =>
+            this.database.sponsorship.assertDispatch(
+              id,
+              stage,
+              claim.token,
+              requestHash,
+            ),
           );
         },
       },

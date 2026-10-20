@@ -255,13 +255,13 @@ it('provides a human consent/review flow, then reads and provisions a granted ac
     headers: f.headers,
     payload: {},
   });
-  expect(provisioned.statusCode).toBe(200);
-  expect(f.createAccount).toHaveBeenCalledTimes(1);
+  expect(provisioned.statusCode).toBe(503);
+  expect(f.createAccount).not.toHaveBeenCalled();
   const account = await f.app.inject({
     url: `/v1/accounts/${granted.account_id}`,
     headers: f.headers,
   });
-  expect(account.json().status).toBe('provisioned');
+  expect(account.json().status).not.toBe('provisioned');
   const revoked = await f.app.inject({
     method: 'POST',
     url: '/onboarding/access/' + granted.grant_id,

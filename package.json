@@ -34,24 +34,11 @@
       "types": "./dist/telemetry.d.ts",
       "import": "./dist/telemetry.js"
     },
-    "./cdp": {
-      "types": "./dist/providers/cdp.d.ts",
-      "import": "./dist/providers/cdp.js"
-    },
     "./ows": {
       "types": "./dist/providers/ows.d.ts",
       "import": "./dist/providers/ows.js"
     },
-    "./openzeppelin-relayer": {
-      "types": "./dist/providers/openzeppelin-relayer.d.ts",
-      "import": "./dist/providers/openzeppelin-relayer.js"
-    },
     "./spec/provider-api.json": "./spec/provider-api.json",
-    "./spec/orchestration-draft.json": "./spec/orchestration-draft.json",
-    "./backend": {
-      "types": "./dist/backend.d.ts",
-      "import": "./dist/backend.js"
-    },
     "./storage": {
       "types": "./dist/storage/index.d.ts",
       "import": "./dist/storage/index.js"
@@ -61,8 +48,6 @@
       "import": "./dist/deployment/index.js"
     },
     "./spec/provider-config.schema.json": "./spec/provider-config.schema.json",
-    "./spec/execution-api.json": "./spec/execution-api.json",
-    "./spec/execution-service.config.schema.json": "./spec/execution-service.config.schema.json",
     "./wallet-calls": {
       "types": "./dist/wallet-calls/client.d.ts",
       "import": "./dist/wallet-calls/client.js"
@@ -88,7 +73,7 @@
   ],
   "scripts": {
     "dev": "tsx src/main.ts",
-    "build": "tsc -p tsconfig.json && npm run build:setup",
+    "build": "node scripts/clean-build.mjs && tsc -p tsconfig.json && npm run build:setup",
     "start": "node dist/main.js",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc -p tsconfig.test.json && vue-tsc -p setup-ui/tsconfig.json",
     "test": "vitest run",
@@ -98,25 +83,23 @@
     "generate:spec": "node --import tsx scripts/check-spec.mjs --write",
     "check:secrets": "secretlint \"**/*\"",
     "sbom": "npm sbom --sbom-format cyclonedx --omit=dev",
-    "verify": "npm run typecheck && npm run test && npm run check:read-helper && npm run check:paymaster && npm run check:spec && npm run check:docs && npm run format:check && npm run check:secrets",
+    "verify": "npm run check:safe-surface && npm run typecheck && npm run test && npm run check:read-helper && npm run check:paymaster && npm run check:spec && npm run check:docs && npm run format:check && npm run check:secrets",
     "pack:local": "npm run build && npm pack --ignore-scripts",
     "check:package": "npm run build && node scripts/check-package.mjs",
     "generate:docs": "node scripts/api-docs.mjs --write",
     "check:docs": "node scripts/api-docs.mjs",
-    "example:provider": "npm run build && node examples/provider-flow/run.mjs",
     "docs:dev": "vitepress dev docs --host 127.0.0.1",
     "docs:build": "vitepress build docs",
     "docs:preview": "vitepress preview docs --host 127.0.0.1",
     "build:setup": "vite build --config setup-ui/vite.config.ts && node scripts/setup-notices.mjs",
     "test:setup": "npm run build && playwright test --config setup-ui/playwright.config.ts",
-    "preview:local": "node examples/local-preview/run.mjs",
     "check:paymaster": "node scripts/local-paymaster-contract.mjs",
     "generate:paymaster": "node scripts/local-paymaster-contract.mjs --write",
     "check:read-helper": "node scripts/safe-state-reader.mjs",
-    "generate:read-helper": "node scripts/safe-state-reader.mjs --write"
+    "generate:read-helper": "node scripts/safe-state-reader.mjs --write",
+    "check:safe-surface": "node scripts/check-safe-surface.mjs"
   },
   "dependencies": {
-    "@coinbase/cdp-sdk": "1.58.0",
     "@fastify/helmet": "13.2.0",
     "@fastify/rate-limit": "11.2.1",
     "@fastify/swagger": "9.9.2",
@@ -155,6 +138,7 @@
     "swagger-ui-dist": "5.32.6",
     "tsx": "4.23.15",
     "typescript": "5.9.3",
+    "viem": "2.57.7",
     "vite": "8.3.4",
     "vitepress": "1.6.4",
     "vitest": "5.0.4",

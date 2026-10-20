@@ -6,7 +6,7 @@ import {
   generateDeploymentSecrets,
 } from '../src/deployment/deployment-secrets.js';
 import { currentRuntimePolicy } from '../src/runtime-configuration/authority.js';
-import { serviceHash } from '../src/executor/auth.js';
+import { canonicalHash } from '../src/domain/canonical.js';
 import { safeUserOperationCallData } from '../src/sponsorship/preparation.js';
 import { buildApprovedCallIntent } from '../src/execution/approved-calls.js';
 import { randomUUID } from 'node:crypto';
@@ -74,13 +74,13 @@ async function safeOnlyFixture() {
     const publication =
       r.revisions[applicationId + ':' + r.heads[applicationId]];
     publication.policy.contracts[0].methods[0].user_address_parameters = [0];
-    publication.policy_hash = serviceHash(publication.policy);
+    publication.policy_hash = canonicalHash(publication.policy);
     const snapshot = currentRuntimePolicy(s, f.context.principal);
     const revision = fingerprint(['financial-terms', snapshot]);
     for (const grant of Object.values(s.grants)) {
-      grant.transferPolicyRevision = revision;
+      grant.actionPolicyRevision = revision;
       const request = s.requests[grant.requestId];
-      request.transferPolicyRevision = revision;
+      request.actionPolicyRevision = revision;
       request.runtimePolicy = snapshot;
     }
   });
@@ -100,18 +100,10 @@ async function safeOnlyFixture() {
     new Date(Date.now() + 60000).toISOString(),
   );
   f.operation.callData = safeUserOperationCallData(intent);
-  const actions = new SupportedActions(
-    f.onboarding,
-    f.db,
-    undefined,
-    f.actions.revision,
-    { policy: f.config.basePolicy, maxValiditySeconds: 120 },
-    undefined,
-    false,
-    true,
-    1,
-    true,
-  );
+  const actions = new SupportedActions(f.onboarding, f.db, f.actions.revision, {
+    policy: f.config.basePolicy,
+    maxValiditySeconds: 120,
+  });
   const service = new Safe4337SigningService(
     actions,
     f.db,
@@ -208,20 +200,11 @@ it('rejects revoked user consent after admission and before paymaster signing', 
 it('configures a Safe-only deployment without a relayer, user asset EOA or sponsor pool and isolates the bundler journal', async () => {
   const original = JSON.parse(
     await readFile(
-      new URL(
-        '../docs/provider.config.application.example.json',
-        import.meta.url,
-      ),
+      new URL('../docs/provider.config.safe.example.json', import.meta.url),
       'utf8',
     ),
   );
   const config = structuredClone(original);
-  delete config.execution;
-  delete config.localExecution;
-  delete config.operations;
-  delete config.financial;
-  delete config.runtimeConfiguration.sharedApplicationSafes;
-  delete config.runtimeConfiguration.executionPool;
   config.runtimeConfiguration.rpcVerification = 'single';
   config.safeWallet = {
     profile: 'safe-only-4337-v1',

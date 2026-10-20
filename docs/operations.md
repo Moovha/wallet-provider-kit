@@ -15,13 +15,6 @@ availability and retention separately.
 
 ## Local Grafana
 
-<figure class="wallet-visual">
-  <img src="./public/diagrams/operations-and-evidence.webp" alt="Diagram: the service exports allowlisted traces and metrics while keeping authoritative approvals, attempts and recovery records private." width="1536" height="1024" loading="lazy" decoding="async">
-  <figcaption>Telemetry can be dropped. Durable authority, financial journals and recovery records remain separate.</figcaption>
-</figure>
-
-[View full-size diagram](public/diagrams/operations-and-evidence.webp)
-
 You'll need Docker Engine and Compose. Then run:
 
 ```sh
@@ -99,7 +92,7 @@ provides the local stack; operators own production authentication and retention.
 
 ## Execution observation operations
 
-For configured transfer execution, use the [verified status and CloudEvents feed](execution.md).
+For configured transfer execution, use the [verified status and CloudEvents feed](user-operation-execution.md).
 Check RPC availability and independence, finality lag, unknown dispatches, retained
 budget usage and integrity failures. App-reported confirmation is unverified.
 Keep private RPC paths, sponsor credentials, signatures and action bodies out of
@@ -107,5 +100,5 @@ logs. Background polling is read-only and cannot clear uncertain attempts.
 
 Rehearse single-host recovery with external fencing and a SQLite-aware backup.
 Do not activate independent writable copies or infer that an attempt missing from
-a backup never dispatched. The [enterprise v1 gates](v1-standards.md) distinguish
+a backup never dispatched. The [enterprise v1 gates](conformance.md) distinguish
 implemented contracts from deployment acceptance and future standards support.

@@ -7,7 +7,7 @@ import type {
 import type { SupportedActions } from '../deployment/actions.js';
 import type { ProviderDatabase } from '../storage/index.js';
 import { deny } from '../onboarding/policy.js';
-import { serviceHash } from '../executor/auth.js';
+import { canonicalHash } from '../domain/canonical.js';
 import { Safe4337SigningService } from './signing.js';
 import {
   createBundlerClientV07,
@@ -20,7 +20,7 @@ import type { UserOperationExecution } from './execution-types.js';
 
 export function userOperationExecutionBinding(config: BundlerConfigurationV07) {
   validateBundlerConfiguration(config);
-  return serviceHash(config);
+  return canonicalHash(config);
 }
 function planHash(plan: UserOperationExecution) {
   const {
@@ -30,7 +30,7 @@ function planHash(plan: UserOperationExecution) {
     observationRevision: ____,
     ...identity
   } = plan;
-  return serviceHash(identity);
+  return canonicalHash(identity);
 }
 /** One durable bundler dispatch per admitted operation. Recovery only reads independent chain evidence. */
 export class UserOperationExecutionCoordinator {
@@ -131,7 +131,7 @@ export class UserOperationExecutionCoordinator {
         record = this.database.sponsorship.load(id) ?? deny();
       await this.timestamp(id, 'signed_at');
       await this.signing.authorizeSubmission(context, id, false);
-      await this.actions.withAuthorizedTransfer(
+      await this.actions.withAuthorizedCalls(
         context.principal,
         id,
         (state, source) => {
@@ -169,7 +169,7 @@ export class UserOperationExecutionCoordinator {
       await this.client.send(plan.operation, async () => {
         // Unavailable preflight reads leave no dispatch claim and can be retried.
         await this.signing.authorizeSubmission(context, id);
-        token = await this.actions.withAuthorizedTransfer(
+        token = await this.actions.withAuthorizedCalls(
           context.principal,
           id,
           (state) => {
@@ -250,10 +250,10 @@ export class UserOperationExecutionCoordinator {
     )
       await this.timestamp(id, 'included_at');
     if (
-      serviceHash([
+      canonicalHash([
         before.observation.state,
         before.observation.receipt ?? null,
-      ]) !== serviceHash([observation.state, observation.receipt ?? null])
+      ]) !== canonicalHash([observation.state, observation.receipt ?? null])
     )
       for (const listener of this.listeners) listener(id);
     return this.load(id);

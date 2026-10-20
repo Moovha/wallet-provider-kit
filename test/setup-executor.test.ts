@@ -259,7 +259,7 @@ describe('explicit local container executor with offline command fixtures', () =
         },
       }),
     ).rejects.toMatchObject({
-      issues: [expect.any(String)],
+      issues: expect.arrayContaining([expect.any(String)]),
     });
     const reservedConfig = structuredClone(config);
     if (reservedConfig.backend.kind === 'ows')

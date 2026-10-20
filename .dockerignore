@@ -10,19 +10,16 @@
 !spec/
 !spec/provider-config.schema.json
 !docs/
-!docs/provider.config.example.json
-!docs/provider.config.records.example.json
 !setup-ui/
 !setup-ui/**
 !scripts/
 !scripts/setup-notices.mjs
-!scripts/bundled-relayer-launcher.mjs
-!docs/provider.config.bundled.example.json
 !docs/public/
-!docs/public/patches/
-!docs/public/patches/openzeppelin-relayer-v1.8.0-fee-only.patch.txt
 
 !scripts/bundled-bundler-launcher.mjs
 !scripts/bundler-simulations.mjs
 
 !scripts/patch-bundler-scheduling.mjs
+
+!docs/provider.config.safe.example.json
+!scripts/clean-build.mjs

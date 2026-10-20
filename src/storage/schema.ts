@@ -1,5 +1,5 @@
 /** Versioned, toolkit-owned schema. Never applied to another application's database. */
-export const schemaVersion = 1;
+export const schemaVersion = 2;
 export const applicationId = 0x57504b54;
 export const schema = `
 CREATE TABLE onboarding_records (
@@ -20,7 +20,7 @@ CREATE TABLE budgets (
 CREATE TABLE approvals (
   id TEXT PRIMARY KEY NOT NULL,
   account_id TEXT NOT NULL,
-  kind TEXT NOT NULL CHECK(kind IN ('sign_typed_data','relay_transaction')),
+  kind TEXT NOT NULL CHECK(kind='sign_typed_data'),
   fingerprint TEXT NOT NULL,
   record TEXT NOT NULL CHECK(json_valid(record)),
   revoked INTEGER NOT NULL DEFAULT 0 CHECK(revoked IN (0,1))

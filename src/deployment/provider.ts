@@ -56,7 +56,6 @@ export async function createConfiguredProvider(
   });
   try {
     let onboarding: OnboardingService | undefined;
-    let financial: ReturnType<typeof database.financialAuthority> | undefined;
     let activeRevision: string | undefined;
     const passphrase = resolveSecret(config.backend.passphrase);
     if (
@@ -92,13 +91,7 @@ export async function createConfiguredProvider(
           request.accountId,
         )),
     });
-    const signing = createOwsWalletProvider(backendOptions, {
-      namespace: 'configured-transfers-v1',
-      journal: database.journal,
-      authorizeAttempt: (request) =>
-        financial?.authorizeAttempt(request) ?? Promise.resolve(false),
-    });
-    const backend = { ...provision, signTypedData: signing.signTypedData };
+    const backend = provision;
     const occupied = await database.hasStoredRecords();
     const bound = await database.onboardingStore.transaction((state) => {
       const expected = {
@@ -153,11 +146,7 @@ export async function createConfiguredProvider(
     const callPolicyBinding = config.safeWallet
       ? [config.approvedCalls, config.safeWallet]
       : config.approvedCalls;
-    const actionPolicyRevisionBase = config.approvedCalls
-      ? fingerprint([config.financial ?? null, callPolicyBinding])
-      : config.financial
-        ? fingerprint(config.financial)
-        : undefined;
+    const actionPolicyRevisionBase = fingerprint(callPolicyBinding);
     const actionPolicyRevision = network.testnet
       ? actionPolicyRevisionBase
       : fingerprint([network.name, actionPolicyRevisionBase]);
@@ -184,7 +173,6 @@ export async function createConfiguredProvider(
     activeRevision = fingerprint([
       onboarding!.policy.revision,
       ...(network.testnet ? [] : [network.name]),
-      config.financial ?? null,
       ...(config.safeWallet ? [config.safeWallet] : []),
       ...(config.safeProvisioning ? [config.safeProvisioning] : []),
       ...(config.approvedCalls ? [config.approvedCalls] : []),
@@ -209,9 +197,9 @@ export async function createConfiguredProvider(
           if (
             grant.revision !== onboarding!.policy.revision ||
             (grant.permissions.some((permission) =>
-              ['transfers:request', 'contracts:request'].includes(permission),
+              ['contracts:request'].includes(permission),
             ) &&
-              grant.transferPolicyRevision !== actionPolicyRevision)
+              grant.actionPolicyRevision !== actionPolicyRevision)
           )
             grant.state = 'revoked';
         }
@@ -225,30 +213,14 @@ export async function createConfiguredProvider(
       binding.activeRevision = activeRevision;
       binding.transportRevision = transportRevision;
     });
-    const actions =
-      config.financial || config.approvedCalls
-        ? new SupportedActions(
-            onboarding,
-            database,
-            config.financial,
-            activeRevision,
-            config.approvedCalls,
-            config.network,
-            config.safeProvisioning ?? false,
-            true,
-            1,
-            true,
-          )
-        : undefined;
-    financial = actions
-      ? database.financialAuthority({
-          namespace: 'configured-transfers-v1',
-          provider: backend.provider,
-          authorize: (context, approval, purpose) =>
-            purpose === 'sign'
-              ? actions.authorize(context, approval)
-              : Promise.resolve(null),
-        })
+    const actions = config.approvedCalls
+      ? new SupportedActions(
+          onboarding,
+          database,
+          activeRevision,
+          config.approvedCalls,
+          config.network,
+        )
       : undefined;
     const authority = onboarding.walletAuthority();
     const service = new EmbeddedWalletService(
@@ -257,7 +229,7 @@ export async function createConfiguredProvider(
           const admitted = await authority.provision(context, accountId);
           return admitted;
         },
-        sign: financial?.authority.sign ?? authority.sign,
+        sign: async () => null,
       },
       backend,
     );

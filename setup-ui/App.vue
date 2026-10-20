@@ -73,7 +73,6 @@ const permissionNames: Record<string, string> = {
   'operations:request': 'Request wallet operations (advanced hosts)',
   'contracts:request':
     'Request approved contract calls, swaps and vault deposits',
-  'transfers:request': 'Request transfers on behalf of users',
 };
 const selectedBackend = computed(() =>
   backends.find((b) => b.kind === config.value?.backend.kind),

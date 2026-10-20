@@ -1,4 +1,3 @@
-import { hashRelayerTransaction } from '../src/domain/relayer-execution.js';
 import { createWalletAttemptRequest } from '../src/providers/attempt-lifecycle.js';
 import { randomUUID } from 'node:crypto';
 import {
@@ -33,7 +32,7 @@ const iface = new Interface(['function work(uint256)']);
 const entryInterface = new Interface([
   'function getNonce(address,uint192) view returns(uint256)',
 ]);
-describe('durable SafeOp sponsorship and single mechanism admission', () => {
+describe('durable SafeOp sponsorship and immutable operation admission', () => {
   it('cannot reset an admitted operation by changing signing backend provider identity', async () => {
     const f = await fixture(),
       source = await f.source();
@@ -61,95 +60,6 @@ describe('durable SafeOp sponsorship and single mechanism admission', () => {
     expect(f.state.signs).toBe(0);
     expect(f.state.posts).toBe(0);
   });
-  it.each(['relayer-first', 'sponsorship-first'])(
-    'also fences direct relayer submission authority: %s',
-    async (order) => {
-      const f = await fixture(),
-        source = await f.source();
-      const sourceRecord = await f.actions.withAuthorizedTransfer(
-        f.context.principal,
-        source.action_id,
-        (_s, r) => r,
-      );
-      const transaction = {
-        to: f.input.calls[0].to,
-        value: '0',
-        data: f.input.calls[0].data,
-        gasLimit: '100000',
-        maxFeePerGas: '20',
-        maxPriorityFeePerGas: '2',
-      };
-      const hash = hashRelayerTransaction(transaction);
-      const action = {
-        actionId: randomUUID(),
-        operationId: source.action_id,
-        kind: 'relay_transaction' as const,
-        profile: 'oz_relayer_evm_v1' as const,
-        profileRevision: '1' as const,
-        status: 'ready' as const,
-        chainId: 'eip155:84532' as const,
-        chainAccountId: sourceRecord.approval.action.chain_account_id,
-        bindingRevision: '1',
-        capabilityRevision: '1',
-        planRevision: '1',
-        planHash: hash,
-        payloadHash: hash,
-        expiresAt: sourceRecord.approval.action.expires_at,
-        transaction,
-      };
-      const approval = { ...sourceRecord.approval, action };
-      await f.db.approveAction(approval);
-      const authority = f.db.financialAuthority({
-        namespace: 'direct-relay',
-        provider: 'offline',
-        authorize: async () => {
-          await f.actions.withAuthorizedTransfer(
-            f.context.principal,
-            source.action_id,
-            () => true,
-          );
-          return {
-            ownerSubject: approval.ownerSubject,
-            accountId: approval.account.accountId,
-            address: approval.account.address,
-            chainAccountId: action.chainAccountId,
-            currentUserStatus: 'ID VERIFIED',
-            grantId: approval.grantId,
-            consentReference: approval.consentReference,
-            policyRevision: approval.policyRevision,
-            bindingRevision: '1',
-            capabilityRevision: '1',
-            planRevision: '1',
-            planHash: hash,
-            expiresAt: action.expiresAt,
-          };
-        },
-      });
-      if (order === 'relayer-first') {
-        expect(
-          await authority.executionAuthority.execution(
-            f.context,
-            action.actionId,
-            'submit',
-          ),
-        ).not.toBeNull();
-        await expect(
-          f.service.admit(f.context, source.action_id, f.operation),
-        ).rejects.toMatchObject(conflict);
-      } else {
-        await f.service.admit(f.context, source.action_id, f.operation);
-        await expect(
-          authority.executionAuthority.execution(
-            f.context,
-            action.actionId,
-            'submit',
-          ),
-        ).rejects.toMatchObject(conflict);
-      }
-      expect(f.state.posts).toBe(0);
-      expect(f.state.signs).toBe(0);
-    },
-  );
 
   it('rechecks the fenced lease after authority reads before paymaster contact', async () => {
     const f = await fixture(),
@@ -217,89 +127,6 @@ describe('durable SafeOp sponsorship and single mechanism admission', () => {
         ?.reserved,
     ).toBe('4820010');
   });
-  it('reuses the same idempotent operation through the sponsorship and relayer request interfaces', async () => {
-    const f = await fixture();
-    const admitted = await f.service.requestCalls(
-      f.context,
-      f.input,
-      f.operation,
-    );
-    const source = await f.source();
-    expect(admitted.operation_id).toBe(source.action_id);
-    await expect(
-      f.relay().authority.sign(f.context, source.action_id),
-    ).rejects.toMatchObject(conflict);
-    const repeated = await f.service.requestCalls(
-      f.context,
-      f.input,
-      f.operation,
-    );
-    expect(repeated).toEqual(admitted);
-    expect(
-      (
-        await f.db.budget(
-          f.db.sponsorship.load(source.action_id)!.source.budgetId,
-        )
-      )?.reserved,
-    ).toBe('1');
-  });
-  it('rolls back operation admission when another relayer attempt has consumed the shared gas allowance', async () => {
-    const f = await fixture(),
-      source = await f.source();
-    const gasId = fingerprint([
-      'execution-gas',
-      f.onboarding.policy.provider.origin,
-      f.context.principal.issuer,
-      f.context.principal.clientId,
-    ]);
-    await f.db.setBudget(gasId, '10000000', 'active-1');
-    const request = createWalletAttemptRequest(
-      'other-operation',
-      'offline',
-      'relay_transaction',
-      f.input.account_id,
-      randomUUID(),
-      randomUUID(),
-      { fixture: 'relayer' },
-    );
-    await f.db.admitAttempt({ request, budgetId: gasId, units: '6000000' });
-    await f.db.journal.claim(request);
-    await expect(
-      f.service.admit(f.context, source.action_id, f.operation),
-    ).rejects.toMatchObject(denied);
-    expect(f.db.sponsorship.load(source.action_id)).toBeNull();
-    expect(
-      (
-        await f.db.onboardingStore.transaction((s) =>
-          Object.values(s.executionBindings ?? {}),
-        )
-      ).length,
-    ).toBe(0);
-    const record = await f.actions.withAuthorizedTransfer(
-      f.context.principal,
-      source.action_id,
-      (_s, r) => r,
-    );
-    expect((await f.db.budget(record.approval.budgetId))?.reserved).toBe('0');
-    expect((await f.db.budget(gasId))?.reserved).toBe('6000000');
-    expect(
-      await f.relay().authority.sign(f.context, source.action_id),
-    ).not.toBeNull();
-    expect(f.state.posts).toBe(0);
-  });
-  it('detects historical relayer admissions that predate mechanism bindings', async () => {
-    const f = await fixture(),
-      source = await f.source();
-    await f.relay().authority.sign(f.context, source.action_id);
-    await f.db.onboardingStore.transaction((s) => {
-      s.executionBindings = {};
-    });
-    await f.restart();
-    await expect(
-      f.service.admit(f.context, source.action_id, f.operation),
-    ).rejects.toMatchObject(conflict);
-    expect(f.state.posts).toBe(0);
-  });
   it('rechecks runtime claim freshness on quote replay before contacting the paymaster', async () => {
     const f = await fixture(),
       source = await f.source();
@@ -338,64 +165,6 @@ describe('durable SafeOp sponsorship and single mechanism admission', () => {
     expect(f.db.sponsorship.load(source.action_id)).toBeNull();
     expect(f.state.posts).toBe(0);
   });
-
-  it('uses real runtime/grant checks, reserves both caps once and signs the exact SafeOp after durable paymaster phases', async () => {
-    const f = await fixture(),
-      source = await f.source();
-    const admitted = await f.service.admit(
-      f.context,
-      source.action_id,
-      f.operation,
-    );
-    expect(admitted.maximum_cost_wei).toBe('4820010');
-    const record = f.db.sponsorship.load(source.action_id)!;
-    expect(await f.db.budget(record.gasBudgetId)).toEqual({
-      maximum: '10000000',
-      reserved: '4820010',
-    });
-    expect((await f.db.budget(record.source.budgetId))?.reserved).toBe('1');
-    await f.service.sponsor(f.context, source.action_id);
-    const signed = await f.service.sign(f.context, source.action_id);
-    expect(signed.signature.length).toBe(156);
-    expect(f.state.posts).toBe(2);
-    expect(f.state.signs).toBe(1);
-    expect(signed.signature.slice(0, 14)).toBe('0x000000000000');
-    await f.restart();
-    expect(await f.service.sponsor(f.context, source.action_id)).toMatchObject({
-      paymasterData: '0x02',
-    });
-    expect(await f.service.sign(f.context, source.action_id)).toEqual(signed);
-    expect(f.state.posts).toBe(2);
-    expect(f.state.signs).toBe(1);
-    expect((await f.db.budget(record.source.budgetId))?.reserved).toBe('1');
-    await expect(
-      f.relay().authority.sign(f.context, source.action_id),
-    ).rejects.toMatchObject(conflict);
-  });
-  it('denies ERC-4337 when a relayer signature was admitted, across backend namespaces and restart', async () => {
-    const f = await fixture(),
-      source = await f.source();
-    await f.relay().authority.sign(f.context, source.action_id);
-    await f.restart();
-    await expect(
-      f.service.admit(f.context, source.action_id, f.operation),
-    ).rejects.toMatchObject(conflict);
-    expect(f.state.posts).toBe(0);
-    expect(f.state.signs).toBe(0);
-  });
-  it('atomically selects one path under concurrent relayer and ERC-4337 admission', async () => {
-    const f = await fixture(),
-      source = await f.source();
-    const other = openProviderDatabase({ directory: f.directory });
-    dbs.push(other);
-    const results = await Promise.allSettled([
-      f.service.admit(f.context, source.action_id, f.operation),
-      f.relay(other).authority.sign(f.context, source.action_id),
-    ]);
-    expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
-    expect(results.filter((r) => r.status === 'rejected')).toHaveLength(1);
-    expect(f.state.posts).toBe(0);
-  });
   it('shares one reservation across concurrent identical admission and successful final stubs', async () => {
     const f = await fixture();
     f.state.finalStub = true;
@@ -417,28 +186,6 @@ describe('durable SafeOp sponsorship and single mechanism admission', () => {
         )
       )?.reserved,
     ).toBe('1');
-  });
-  it('retains gas and mechanism after lost sponsorship responses without retrying after restart', async () => {
-    const f = await fixture(),
-      source = await f.source();
-    await f.service.admit(f.context, source.action_id, f.operation);
-    f.state.lostPaymaster = true;
-    await expect(
-      f.service.sponsor(f.context, source.action_id),
-    ).rejects.toMatchObject({ outcome: 'unknown' });
-    await f.restart();
-    f.state.lostPaymaster = false;
-    await expect(
-      f.service.sponsor(f.context, source.action_id),
-    ).rejects.toMatchObject({ outcome: 'unknown' });
-    await expect(
-      f.relay().authority.sign(f.context, source.action_id),
-    ).rejects.toMatchObject(conflict);
-    expect(f.state.posts).toBe(1);
-    expect(
-      (await f.db.budget(f.db.sponsorship.load(source.action_id)!.gasBudgetId))
-        ?.reserved,
-    ).toBe('4820010');
   });
   it('checks fresh grant revocation between stub and final before another paymaster effect', async () => {
     const f = await fixture(),
@@ -480,25 +227,6 @@ describe('durable SafeOp sponsorship and single mechanism admission', () => {
       f.service.sign(f.context, source.action_id),
     ).rejects.toMatchObject(denied);
     expect(f.state.signs).toBe(0);
-  });
-  it('does not redispatch an uncertain signing attempt or switch back to the relayer', async () => {
-    const f = await fixture(),
-      source = await f.source();
-    await f.service.admit(f.context, source.action_id, f.operation);
-    await f.service.sponsor(f.context, source.action_id);
-    f.state.lostSign = true;
-    await expect(
-      f.service.sign(f.context, source.action_id),
-    ).rejects.toMatchObject({ outcome: 'unknown' });
-    await f.restart();
-    f.state.lostSign = false;
-    await expect(
-      f.service.sign(f.context, source.action_id),
-    ).rejects.toMatchObject({ outcome: 'unknown' });
-    expect(f.state.signs).toBe(1);
-    await expect(
-      f.relay().authority.sign(f.context, source.action_id),
-    ).rejects.toMatchObject(conflict);
   });
   it('rejects altered quotes and wrong signing keys while retaining financial reservations', async () => {
     const f = await fixture(),

@@ -6,7 +6,6 @@ interface IReadOnlySafe {
     function getOwners() external view returns (address[] memory);
     function getThreshold() external view returns (uint256);
     function VERSION() external view returns (string memory);
-    function nonce() external view returns (uint256);
     function getModulesPaginated(address start, uint256 pageSize) external view returns (address[] memory, address);
     function getStorageAt(uint256 offset, uint256 length) external view returns (bytes memory);
 }
@@ -82,24 +81,5 @@ contract SafeStateReader {
         uint256 nonce = IReadOnlyEntryPoint(p.entryPoint).getNonce(p.wallet, 0);
         require(nonce < 2 ** 64, "nonce domain");
         return nonce;
-    }
-    function inspect(address wallet, address singleton, bytes32 proxyHash, bytes32 singletonHash, address owner)
-        external view returns (uint256)
-    {
-        require(wallet != address(this) && singleton != address(this), "reader collision");
-        require(wallet.codehash == proxyHash && singleton.codehash == singletonHash, "code mismatch");
-        IReadOnlySafe safe = IReadOnlySafe(wallet);
-        require(safe.masterCopy() == singleton, "singleton mismatch");
-        address[] memory owners = safe.getOwners();
-        require(owners.length == 1 && owners[0] == owner, "owner mismatch");
-        require(safe.getThreshold() == 1, "threshold mismatch");
-        require(keccak256(bytes(safe.VERSION())) == keccak256("1.4.1"), "version mismatch");
-        (address[] memory modules, address next) = safe.getModulesPaginated(address(1), 1);
-        require(modules.length == 0 && next == address(1), "modules enabled");
-        bytes memory guard = safe.getStorageAt(uint256(keccak256("guard_manager.guard.address")), 1);
-        bytes memory handler = safe.getStorageAt(uint256(keccak256("fallback_manager.handler.address")), 1);
-        require(guard.length == 32 && abi.decode(guard, (uint256)) == 0, "guard enabled");
-        require(handler.length == 32 && abi.decode(handler, (uint256)) == 0, "handler enabled");
-        return safe.nonce();
     }
 }

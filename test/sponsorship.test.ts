@@ -11,7 +11,7 @@ import {
   runtimeApplicationId,
   normalizeRuntimePolicy,
 } from '../src/runtime-configuration/service.js';
-import { serviceHash } from '../src/executor/auth.js';
+import { canonicalHash } from '../src/domain/canonical.js';
 import {
   buildApprovedCallIntent,
   type ApprovedCallPolicy,
@@ -163,7 +163,7 @@ function fixture(): RuntimeUserOperationPreparationOptions {
         principal.clientId,
       ),
       revision: '1',
-      policy_hash: serviceHash(policy),
+      policy_hash: canonicalHash(policy),
       policy,
     },
     basePolicy: base,
@@ -220,7 +220,7 @@ describe('pinned ERC-4337 v0.7 preparation', () => {
       normalizeUserOperationV07({ ...operation(), ...change }),
     ).toThrow();
   });
-  it('reuses runtime methods, exact ordered calls and the relayer application budget without granting authority', () => {
+  it('reuses runtime methods, exact ordered calls and the application gas budget without granting authority', () => {
     const options = fixture(),
       prepared = prepareRuntimeUserOperationV07(options);
     expect(prepared).toMatchObject({
@@ -517,7 +517,7 @@ describe('one durable application gas budget', () => {
       }),
     ).toThrow();
   });
-  it('preserves the existing relayer budget identity and the lowest sponsor-pool ceiling', () => {
+  it('binds the application gas budget and its most restrictive accepted limit', () => {
     expect(
       applicationGasBudgetId(
         'https://wallet.example.test',
@@ -544,7 +544,7 @@ describe('one durable application gas budget', () => {
     ).toBe('90');
     expect(() => applicationGasBudgetLimit([], 'app')).toThrow();
   });
-  it('enforces one SQLite cap across relayer and user-operation attempts and retains a dispatched reservation after restart', async () => {
+  it('enforces one SQLite cap across concurrent infrastructure attempts and retains a dispatched reservation after restart', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'wpk-shared-gas-'));
     let db = openProviderDatabase({ directory, initialize: true });
     try {
@@ -555,28 +555,28 @@ describe('one durable application gas budget', () => {
       );
       await db.setBudget(budgetId, '100');
       const accountId = randomUUID();
-      const relayer = createWalletAttemptRequest(
+      const firstAttempt = createWalletAttemptRequest(
         'sponsorship-fixture',
-        'relayer',
-        'relay_transaction',
+        'first-attempt',
+        'infrastructure_transaction',
         accountId,
         randomUUID(),
-        'relayer-operation',
-        { mechanism: 'relayer' },
+        'firstAttempt-operation',
+        { mechanism: 'safe-infrastructure' },
       );
       const userOp = createWalletAttemptRequest(
         'sponsorship-fixture',
         'useroperation',
-        'relay_transaction',
+        'infrastructure_transaction',
         accountId,
         randomUUID(),
         'different-operation',
         { mechanism: '4337' },
       );
-      await db.admitAttempt({ request: relayer, budgetId, units: '60' });
+      await db.admitAttempt({ request: firstAttempt, budgetId, units: '60' });
       await db.admitAttempt({ request: userOp, budgetId, units: '50' });
       const results = await Promise.allSettled([
-        db.journal.claim(relayer),
+        db.journal.claim(firstAttempt),
         db.journal.claim(userOp),
       ]);
       expect(
@@ -588,7 +588,7 @@ describe('one durable application gas budget', () => {
       expect((await db.budget(budgetId))?.reserved).toBe('60');
       await db.close();
       db = openProviderDatabase({ directory });
-      expect((await db.journal.claim(relayer)).state).not.toBe('dispatch');
+      expect((await db.journal.claim(firstAttempt)).state).not.toBe('dispatch');
       expect((await db.budget(budgetId))?.reserved).toBe('60');
     } finally {
       await db.close();

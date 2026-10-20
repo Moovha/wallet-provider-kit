@@ -16,7 +16,7 @@ import {
   type PinnedContract,
 } from '../execution/approved-calls.js';
 import { WalletProviderError } from '../domain/signing.js';
-import { serviceHash } from '../executor/auth.js';
+import { canonicalHash } from '../domain/canonical.js';
 import { operationQuantity } from './user-operation.js';
 import { packedUserOperation } from './bundler.js';
 import { Safe4337Verifier, type Safe4337Acceptance } from './verifier.js';
@@ -191,7 +191,7 @@ export class UserOperationReceiptObserver {
     head: { latest: bigint; safe: bigint; finalized: bigint },
     maximumCostWei: string,
   ) {
-    const proofKey = serviceHash([
+    const proofKey = canonicalHash([
       this.acceptance.profile,
       this.acceptance.genesisHash,
       this.acceptance.rpcVerification ?? 'quorum',
@@ -634,12 +634,12 @@ export class UserOperationReceiptObserver {
       if (
         values.some(
           (v) =>
-            serviceHash({
+            canonicalHash({
               receipt: v.receipt,
               actualGasCost: v.actualGasCost,
               actualGasUsed: v.actualGasUsed,
             }) !==
-            serviceHash({
+            canonicalHash({
               receipt: values[0].receipt,
               actualGasCost: values[0].actualGasCost,
               actualGasUsed: values[0].actualGasUsed,
