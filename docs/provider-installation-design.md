@@ -203,23 +203,17 @@ restore remain reviewed host operations with financial uncertainty preserved.
 Cloud qualification, performance sizing, offline bundles and external SSO remain
 separate acceptance or future capabilities.
 
-Verification checkpoint: the supported Node 24.22.0/npm 11.11.1 toolchain passed
-the complete 670-test suite, generated contracts, formatting and the secret scan.
-The additional managed-issuer DEBUG denial brings the suite to 671 tests. Its
-focused management checks pass; the latest full rerun encountered SQLite fixture
-write failures while the workstation filesystem was full. Final complete-suite
-evidence is required from the independent CI runner.
-The documentation builds, npm audit reports zero vulnerabilities and npm pack
-dry-run succeeds. The local Docker build could not start because containerd
-reported a metadata-store input/output error. No daemon reset, data deletion or
-cloud resource creation was attempted. Container acceptance must be reported
-separately from offline and browser evidence.
+Verification checkpoint: the supported Node 24.22.0/npm 11.11.1 toolchain passes
+all 671 tests, including the managed-issuer DEBUG denial, generated contracts,
+formatting and the secret scan. The documentation builds, npm audit reports zero
+vulnerabilities and npm pack dry-run succeeds. Independent CI also passes the
+complete suite, 15 browser scenarios, isolated package consumption, Docker build
+and Compose checks. These checks do not establish cloud or custody acceptance.
 
-The isolated package consumer check was attempted but could not finish installing
-its temporary dependencies because the workstation filesystem reported ENOSPC.
-It is not recorded as passing locally. Required CI runs the consumer and Docker
-checks on its separate runner before integration. No unrelated files or Docker
-volumes were removed to make those checks pass.
+Earlier local package and Docker attempts were blocked by insufficient storage
+and container metadata input/output errors. They are not recorded as passing.
+The clean local deployment acceptance below uses a separate healthy VM and new
+deployment records; it does not reset or reuse an existing provider installation.
 
 Delivery review: [pull request 73](https://github.com/Moovha/wallet-provider-kit/pull/73)
 retains the audience/purpose review, exact runner results and publication status.
@@ -248,3 +242,31 @@ Console lifecycle check: protected responses arriving after sign-out are discard
 including one-time credentials from an operation already committed by the API.
 The console instructs a newly authenticated operator to inspect that operation
 before retrying; it does not redisplay a late secret or replay the mutation.
+
+### Clean local deployment acceptance
+
+A fresh ARM64 Linux VM with two CPUs and 3 GiB memory built the API and bundler
+from main revision `756caa0`. The source setup executor created a new private
+deployment directory, generated installation secrets and initialized empty
+storage. No prior application registrations or database records were reused.
+
+Real HTTP requests verified management and liveness health at 200, disabled
+wallet readiness at 503, unauthenticated inventory denial, single-use claiming,
+administrator token issuance and an initially empty application inventory.
+Protected API registration returned a new application credential once. Repeating
+the same idempotent creation returned the same registration without its secret.
+The application obtained its permitted token and was denied provider management.
+Restarting the API preserved installation identity, administrator login,
+application registration and credential validity. Claiming remained closed and
+wallet execution remained disabled.
+
+Desktop and narrow-screen review covered destination selection, deployment
+review, deployment preparation, administrator sign-in, status, applications,
+access and sign-out. The review shortened deployment instructions, separated
+adjacent review actions and corrected the stopped-service confirmation.
+Browser checks found no script errors or horizontal overflow.
+
+This evidence covers a clean source-built local deployment. It does not exercise
+a published release installer, public HTTPS, AWS resources or funded wallet
+operations. Credentials and deployment records remain private; review images
+exclude credentials and obscure synthetic client identifiers.
