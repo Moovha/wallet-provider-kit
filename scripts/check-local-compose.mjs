@@ -25,9 +25,9 @@ const args = [
   '--project-name',
   project,
 ];
-const docker = (extra) =>
+const docker = (extra, timeout = 180000) =>
   execute('docker', [...args, ...extra], {
-    timeout: 180000,
+    timeout,
     maxBuffer: 1024 * 1024,
   });
 try {
@@ -129,7 +129,8 @@ try {
     '--config',
     '/etc/caddy/provider.json',
   ]);
-  await docker(['build', 'local-execution']);
+  // Cold builds compile the pinned Rust provider; readiness keeps its shorter deadline.
+  await docker(['build', 'local-execution'], 30 * 60 * 1000);
   await docker([
     'up',
     '--detach',

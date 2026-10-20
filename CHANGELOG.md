@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased cold provider build verification
+
+- Allow the Compose smoke check up to thirty minutes to build the pinned Rust
+  Relayer from source. Keep runtime commands and readiness checks under their
+  existing shorter deadlines, and allow the CI job to finish the full build and
+  verification sequence. The previous three-minute command deadline interrupted
+  cold compilation before container readiness could be tested.
+
 ## Unreleased Safe-only wallets and self-hosted sponsorship
 
 - Give each user one Safe address for deposits, balances and transactions, with a
