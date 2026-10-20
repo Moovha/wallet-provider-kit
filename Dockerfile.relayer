@@ -1,3 +1,13 @@
+FROM rust:1.95.0-bookworm@sha256:6258907abe69656e41cd992e0b705cdcfabcbbe3db374f92ed2d47121282d4a1 AS bounded-provider
+RUN apt-get update && apt-get install --yes --no-install-recommends libsodium-dev pkg-config lld && rm -rf /var/lib/apt/lists/*
+WORKDIR /usr/app
+COPY docs/public/patches/openzeppelin-relayer-v1.8.0-fee-only.patch.txt /tmp/wpk-fee-only.patch
+RUN git clone --depth 1 --branch v1.8.0 https://github.com/OpenZeppelin/openzeppelin-relayer.git . && test "$(git rev-parse HEAD)" = b8cf360a49c5739e43491ca5d2f6bbc934b7438e && git apply --check /tmp/wpk-fee-only.patch && git apply /tmp/wpk-fee-only.patch
+ENV CARGO_INCREMENTAL=0 CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_BUILD_JOBS=2 RUSTFLAGS="-Clink-arg=-fuse-ld=lld"
+RUN --mount=type=cache,target=/usr/local/cargo/registry --mount=type=cache,target=/usr/local/cargo/git --mount=type=cache,target=/usr/app/target cargo +1.95.0 build --locked --release --bin openzeppelin-relayer && cp target/release/openzeppelin-relayer /opt/wpk-openzeppelin-relayer && mkdir /opt/wpk-libs && cp /usr/lib/*-linux-gnu/libsodium.so.23 /opt/wpk-libs/
+
 FROM openzeppelin/openzeppelin-relayer:1.8.0@sha256:a0d8751b065bb269977a91292df8759bc48ffaaecd0a162bda1f96c32c899e77
+COPY --from=bounded-provider /opt/wpk-openzeppelin-relayer /app/openzeppelin-relayer
+COPY --from=bounded-provider /opt/wpk-libs/ /usr/lib/
 COPY scripts/bundled-relayer-launcher.mjs /app/wpk-launcher.mjs
 ENTRYPOINT ["node", "/app/wpk-launcher.mjs"]

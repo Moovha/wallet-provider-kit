@@ -50,6 +50,22 @@ export const executionReceiptSchema = {
     'observed_at',
   ],
   properties: {
+    preconfirmation: {
+      type: 'object',
+      additionalProperties: false,
+      required: [
+        'stage',
+        'transaction_hash',
+        'observed_at',
+        'rpc_source_origin',
+      ],
+      properties: {
+        stage: { type: 'string', enum: ['preconfirmed'] },
+        transaction_hash: hash,
+        observed_at: { type: 'string', format: 'date-time' },
+        rpc_source_origin: { type: 'string' },
+      },
+    },
     recovery: recoveryDiagnosisSchema,
     replacement: replacementStatusSchema,
     profile: {
@@ -93,11 +109,16 @@ export const executionReceiptSchema = {
         'reorged',
       ],
     },
+    rpc_source_origin: {
+      type: 'string',
+      pattern: '^https://[^/?#]+$',
+      maxLength: 512,
+    },
     verification: {
       type: 'string',
-      enum: ['unverified', 'rpc-quorum'],
+      enum: ['unverified', 'rpc-quorum', 'rpc-single'],
       description:
-        'RPC quorum means agreement of all configured trusted RPC sources on exact receipt effects and canonical block evidence, not a cryptographic light-client proof.',
+        'RPC single means one configured trusted source verifies the complete observation. RPC quorum means agreement of all configured trusted RPC sources on exact receipt effects and canonical block evidence, not a cryptographic light-client proof.',
     },
     outcome: { type: 'string', enum: ['unknown', 'succeeded', 'reverted'] },
     settlement: {
@@ -107,6 +128,7 @@ export const executionReceiptSchema = {
         'The supported token transfer reaches succeeded/reverted settlement only after matching finalized chain evidence. This is not a claim of general business-operation completion.',
     },
     observed_at: { type: 'string', format: 'date-time' },
+    safe_nonce_consumed: { type: 'boolean' },
     transaction_hash: hash,
     block_hash: hash,
     block_number: number,
@@ -137,7 +159,7 @@ export const executionReceiptSchema = {
       type: 'object',
       required: proofFields,
       properties: {
-        verification: { enum: ['rpc-quorum'] },
+        verification: { enum: ['rpc-quorum', 'rpc-single'] },
         chain_status: { enum: ['included', 'safe'] },
         outcome: { enum: ['succeeded', 'reverted'] },
         settlement: { enum: ['pending'] },
@@ -147,7 +169,7 @@ export const executionReceiptSchema = {
       type: 'object',
       required: proofFields,
       properties: {
-        verification: { enum: ['rpc-quorum'] },
+        verification: { enum: ['rpc-quorum', 'rpc-single'] },
         chain_status: { enum: ['finalized'] },
         outcome: { enum: ['succeeded'] },
         settlement: { enum: ['succeeded'] },
@@ -157,7 +179,7 @@ export const executionReceiptSchema = {
       type: 'object',
       required: proofFields,
       properties: {
-        verification: { enum: ['rpc-quorum'] },
+        verification: { enum: ['rpc-quorum', 'rpc-single'] },
         chain_status: { enum: ['finalized'] },
         outcome: { enum: ['reverted'] },
         settlement: { enum: ['reverted'] },
@@ -209,7 +231,7 @@ export const executionCapabilitiesSchema = {
           submission: { type: 'string' },
           verification: { type: 'string' },
           finality: { type: 'string' },
-          minimum_rpc_sources: { type: 'integer', minimum: 2 },
+          minimum_rpc_sources: { type: 'integer', minimum: 1 },
           execute_scopes: { type: 'array', items: { type: 'string' } },
           read_scopes: { type: 'array', items: { type: 'string' } },
         },

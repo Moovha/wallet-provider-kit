@@ -15,8 +15,18 @@ export const runtimeConfigurationSchema = {
   additionalProperties: false,
   required: ['operators'],
   properties: {
+    rpcVerification: { type: 'string', enum: ['single', 'quorum'] },
     authorizeContracts: { type: 'boolean' },
     sharedApplicationSafes: { type: 'boolean' },
+    executionPool: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['safeCount', 'sponsorCount'],
+      properties: {
+        safeCount: { type: 'integer', minimum: 1, maximum: 16 },
+        sponsorCount: { type: 'integer', minimum: 1, maximum: 16 },
+      },
+    },
     credentialKey: {
       type: 'object',
       additionalProperties: false,

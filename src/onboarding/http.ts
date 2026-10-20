@@ -1,3 +1,4 @@
+import { setAuthenticatedResponseTimeout } from '../service/response-timeout.js';
 import type { VerifiedPrincipal } from '../domain/principal.js';
 import { runtimeSnapshotSchema } from '../runtime-configuration/schemas.js';
 import type { SafeExecutionQueue } from '../execution/queue.js';
@@ -80,6 +81,7 @@ export interface OnboardingHttpOptions {
   /** Configuration-first provider-authorized transfers; absent in the onboarding-only profile. */
   actions?: SupportedActions;
   execution?: import('../execution/application-coordinator.js').ExecutionCoordinatorPort;
+  rpcVerification?: 'single' | 'quorum';
   safeQueue?: SafeExecutionQueue;
   executionIdentity?: ServiceIdentity;
   contractNonce?: (
@@ -238,6 +240,7 @@ export async function registerOnboardingRoutes(
   async function context(request: FastifyRequest, scope: string) {
     if (!authenticate || !options || !(await ready())) return unavailable();
     const principal = await authenticate(request.headers.authorization, scope);
+    setAuthenticatedResponseTimeout(request);
     if (!(await ready())) return unavailable();
     return {
       principal,
@@ -345,6 +348,8 @@ export async function registerOnboardingRoutes(
         enum: [
           'queued',
           'executing',
+          'included',
+          'failed',
           'succeeded',
           'cancelled',
           'expired',
@@ -616,9 +621,10 @@ export async function registerOnboardingRoutes(
             profile === 'erc3009-relayer-v1'
               ? 'openzeppelin-relayer-1.8.0'
               : 'designated-execution-service-v1',
-          verification: 'rpc-quorum',
+          verification:
+            options?.rpcVerification === 'single' ? 'rpc-single' : 'rpc-quorum',
           finality: 'finalized',
-          minimum_rpc_sources: 2,
+          minimum_rpc_sources: options?.rpcVerification === 'single' ? 1 : 2,
           execute_scopes: ['wallet:execute', 'wallet:sign'],
           read_scopes: ['wallet:execute:read'],
         })),

@@ -146,6 +146,25 @@ export const rpcResponseSchema = {
             chainId: quantity,
             status: { type: 'integer', enum: [100, 200, 400, 500] },
             atomic: { type: 'boolean', enum: [true] },
+            capabilities: {
+              type: 'object',
+              additionalProperties: false,
+              properties: {
+                preconfirmation: {
+                  type: 'object',
+                  additionalProperties: false,
+                  required: ['stage', 'transactionHash', 'observedAt'],
+                  properties: {
+                    stage: { type: 'string', enum: ['preconfirmed'] },
+                    transactionHash: {
+                      type: 'string',
+                      pattern: '^0x[0-9a-f]{64}$',
+                    },
+                    observedAt: { type: 'string', format: 'date-time' },
+                  },
+                },
+              },
+            },
             receipts: { type: 'array', items: walletCallsReceiptSchema },
           },
         },

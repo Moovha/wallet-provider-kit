@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { quoteNetworkFees } from '../execution/network-fees.js';
 import {
   Interface,
   id as hashText,
@@ -70,6 +71,7 @@ export const safeSetupInterface = new Interface([
   'function setup(address[] owners,uint256 threshold,address to,bytes data,address fallbackHandler,address paymentToken,uint256 payment,address paymentReceiver)',
 ]);
 export interface SafeDeploymentPlan {
+  networkFees?: import('../execution/network-fees.js').NetworkFeeQuote;
   accountId: string;
   owner: string;
   address: string;
@@ -130,6 +132,9 @@ export function createSafeDeploymentDriver(
       const policies = binding?.metadata.policies;
       if (
         !binding ||
+        (plan.networkFees &&
+          binding.metadata.wpk_replacement_contract !==
+            'wpk-fee-only-replacement-v1') ||
         fingerprint(binding.binding) !== fingerprint(plan.sponsor.binding) ||
         !policies ||
         typeof policies !== 'object' ||
@@ -154,8 +159,13 @@ export function createSafeDeploymentDriver(
           value: '0x0',
           data: plan.data,
           gas_limit: Number(plan.sponsor.gasLimit),
-          max_fee_per_gas: Number(plan.sponsor.maxFeePerGas),
-          max_priority_fee_per_gas: Number(plan.sponsor.maxPriorityFeePerGas),
+          max_fee_per_gas: Number(
+            plan.networkFees?.maxFeePerGas ?? plan.sponsor.maxFeePerGas,
+          ),
+          max_priority_fee_per_gas: Number(
+            plan.networkFees?.maxPriorityFeePerGas ??
+              plan.sponsor.maxPriorityFeePerGas,
+          ),
           valid_until: plan.expiresAt,
         }),
       );
@@ -203,6 +213,8 @@ export class SafeProvisioningService {
       owner: string;
       caller: Pick<VerifiedPrincipal, 'issuer' | 'subject' | 'clientId'>;
     }>,
+    private readonly verificationMode: 'single' | 'quorum' = 'quorum',
+    private readonly readiness: 'included' | 'finalized' = 'finalized',
   ) {
     this.config = structuredClone(config);
     this.execution = structuredClone(execution);
@@ -216,6 +228,7 @@ export class SafeProvisioningService {
           execution.maxLogRange,
           request,
           network,
+          verificationMode,
         );
     this.configurationHash = safeProvisioningIdentity(this.config, network);
   }
@@ -309,7 +322,10 @@ export class SafeProvisioningService {
     await this.observer!.anchor();
     const heads = await Promise.all(
       this.readers.map((r) =>
-        r.call('eth_getBlockByNumber', ['finalized', false]),
+        r.call('eth_getBlockByNumber', [
+          this.readiness === 'included' ? 'latest' : 'finalized',
+          false,
+        ]),
       ),
     );
     if (
@@ -383,13 +399,16 @@ export class SafeProvisioningService {
             'latest',
           ]),
         ]);
-        const ceiling =
-          BigInt(plan.sponsor.gasLimit) * BigInt(plan.sponsor.maxFeePerGas) +
+        const requiredFunding =
+          BigInt(plan.sponsor.gasLimit) *
+            BigInt(
+              plan.networkFees?.maxFeePerGas ?? plan.sponsor.maxFeePerGas,
+            ) +
           BigInt(plan.sponsor.l1FeeReserveWei);
         if (
           typeof balance !== 'string' ||
           !/^0x[0-9a-f]+$/i.test(balance) ||
-          BigInt(balance) < ceiling ||
+          BigInt(balance) < requiredFunding ||
           getAddress(
             String(
               safeFactoryInterface.decodeFunctionResult(
@@ -424,6 +443,9 @@ export class SafeProvisioningService {
         )
           denied();
       },
+      this.applicationAuthority,
+      this.verificationMode,
+      this.readiness,
     );
   }
   async read(
@@ -492,6 +514,16 @@ export class SafeProvisioningService {
     const context = structuredClone(input),
       authority = await this.authority(context, id);
     const creation = await this.creationCode();
+    const retained = await this.database.onboardingStore.transaction(
+      (state) => !!state.deploymentBindings?.['service-v1']?.safeAccounts?.[id],
+    );
+    const pricingSponsor = this.execution.sponsors.find(
+      (s) => s.clientId === context.principal.clientId,
+    );
+    const networkFees =
+      !retained && this.readiness === 'included' && pricingSponsor
+        ? await quoteNetworkFees(this.readers[0], pricingSponsor)
+        : undefined;
     const initial = await this.database.onboardingStore.transaction((state) => {
       const deployment = state.deploymentBindings?.['service-v1'];
       if (deployment?.activeRevision !== this.revision) denied();
@@ -553,6 +585,7 @@ export class SafeProvisioningService {
         configurationHash: this.configurationHash,
         state: 'prepared',
         plan: {
+          ...(networkFees ? { networkFees } : {}),
           accountId: id,
           owner: authority.owner,
           address,
@@ -579,15 +612,17 @@ export class SafeProvisioningService {
       return this.saveReady(initial);
     }
     if (initial.state === 'ready') unavailable();
-    const request = createWalletAttemptRequest(
-      'safe-provisioning-v1',
-      'safe-factory-relayer-v1',
-      'relay_transaction',
-      id,
-      initial.attemptId,
-      id,
-      initial.plan,
-    );
+    const makeRequest = () =>
+      createWalletAttemptRequest(
+        'safe-provisioning-v1',
+        'safe-factory-relayer-v1',
+        'relay_transaction',
+        id,
+        initial.attemptId,
+        id,
+        initial.plan,
+      );
+    let request = makeRequest();
     const current = async () => {
       const authorityNow = await this.authority(context, id);
       const saved = await this.database.onboardingStore.transaction(
@@ -602,6 +637,37 @@ export class SafeProvisioningService {
       );
     };
     const prior = await this.database.journal.read(request);
+    if (
+      !prior &&
+      initial.state === 'prepared' &&
+      Date.parse(initial.plan.expiresAt) <= Date.now()
+    ) {
+      await this.database.onboardingStore.transaction((state) => {
+        const binding = state.deploymentBindings?.['service-v1'];
+        const saved = binding?.safeAccounts?.[id];
+        if (
+          binding?.activeRevision !== this.revision ||
+          !saved ||
+          fingerprint(saved.plan) !== fingerprint(initial.plan) ||
+          saved.attemptId !== initial.attemptId ||
+          this.database.hasAttemptAdmission(request)
+        )
+          denied();
+        // Only a never-admitted factory draft can renew. Uncertain dispatches retain their original plan.
+        saved.attemptId = randomUUID();
+        saved.plan.expiresAt = new Date(
+          Date.now() + this.config.maxValiditySeconds * 1000,
+        ).toISOString();
+        Object.assign(initial, structuredClone(saved));
+        state.audit.push({
+          at: Date.now(),
+          event: 'safe_unadmitted_draft_renewed',
+          resource: id,
+          revision: this.revision,
+        });
+      });
+      request = makeRequest();
+    }
     if (prior?.state === 'pending' || prior?.state === 'unknown')
       return this.receipt({ ...initial, state: 'unknown' });
     if (!prior) {

@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { Wallet, toQuantity, ZeroAddress } from 'ethers';
 import { fixture } from './helpers/safe-4337.js';
 import { WalletCallsService } from '../src/wallet-calls/service.js';
@@ -11,7 +11,10 @@ import {
   type SignedUserOperationV07,
   type BundlerConfigurationV07,
 } from '../src/sponsorship/index.js';
-import { entryPointV07Interface as ep } from '../src/sponsorship/receipts.js';
+import {
+  UserOperationReceiptObserver,
+  entryPointV07Interface as ep,
+} from '../src/sponsorship/receipts.js';
 
 const bundler: BundlerConfigurationV07 = {
   profile: 'safe4337-bundler-v07',
@@ -20,10 +23,18 @@ const bundler: BundlerConfigurationV07 = {
 };
 const txHash = '0x' + 'c'.repeat(64),
   blockHash = '0x' + 'b'.repeat(64);
-async function setup(lifetimeBudgetWei = '10000000', native = false) {
+async function setup(
+  lifetimeBudgetWei = '10000000',
+  native = false,
+  single = false,
+) {
   const nativeRecipient = native ? Wallet.createRandom().address : undefined;
   const f = await fixture((c) => {
     c.submissionBinding = userOperationExecutionBinding(bundler);
+    if (single) {
+      c.acceptance.rpcVerification = 'single';
+      c.acceptance.rpcUrls = [c.acceptance.rpcUrls[0]];
+    }
     c.sponsors[0].lifetimeBudgetWei = lifetimeBudgetWei;
   }, nativeRecipient);
   (f.context.principal.scopes as string[]).push(
@@ -250,6 +261,7 @@ async function setup(lifetimeBudgetWei = '10000000', native = false) {
   return {
     f,
     s,
+    request,
     get ports() {
       return ports;
     },
@@ -263,6 +275,17 @@ async function setup(lifetimeBudgetWei = '10000000', native = false) {
 }
 
 describe('ERC-4337 wallet calls durable submission and independent receipt recovery', () => {
+  it('verifies the complete operation with one explicitly configured RPC source', async () => {
+    const t = await setup('10000000', false, true);
+    t.s.mismatch = true;
+    await t.submit();
+    await t.ports.driver.runOnce();
+    t.s.included = true;
+    expect(await t.status()).toMatchObject({ status: 200 });
+    t.s.badCost = true;
+    expect(await t.status()).toMatchObject({ status: 100 });
+    expect(t.s.sends).toBe(1);
+  });
   it('advertises the accepted server paymaster and queues without financial effects', async () => {
     const t = await setup();
     expect(
@@ -368,7 +391,7 @@ describe('ERC-4337 wallet calls durable submission and independent receipt recov
     expect(t.f.state.signs).toBe(1);
     expect(t.f.state.posts).toBe(2);
   });
-  it('retains FIFO until finality and blocks status access from a different subject', async () => {
+  it('releases FIFO at canonical inclusion and blocks status access from a different subject', async () => {
     const t = await setup();
     await t.submit();
     await t.submit('second');
@@ -384,15 +407,19 @@ describe('ERC-4337 wallet calls durable submission and independent receipt recov
       ),
     ).rejects.toBeDefined();
     t.s.included = true;
-    t.s.finalized = true;
     await t.ports.driver.runOnce();
-    expect(
-      (
-        await t.f.onboarding.store.transaction((s) =>
-          Object.values(s.userOperationBatches ?? {}),
-        )
-      )[0].stage,
-    ).toBe('complete');
+    const first = await t.f.onboarding.store.transaction((s) =>
+      Object.values(s.userOperationBatches ?? {}).find(
+        (e) => e.metadata.id === 'batch',
+      ),
+    );
+    expect(first?.stage).toBe('included');
+    expect(t.s.finalized).toBe(false);
+    expect(await t.status()).toMatchObject({ status: 200 });
+    // Removing the predecessor's canonical receipt prevents the next account nonce from dispatching.
+    t.s.reorg = true;
+    await t.ports.driver.runOnce();
+    expect(t.s.sends).toBe(1);
   });
   it('accepts the exact operation inside handleAggregatedOps with no aggregator', async () => {
     const t = await setup();
@@ -458,6 +485,38 @@ describe('ERC-4337 wallet calls durable submission and independent receipt recov
     expect(t.s.sends + t.f.state.signs + t.f.state.posts).toBe(0);
     expect(await t.status()).toMatchObject({ status: 100 });
   });
+  it.each([false, true])(
+    'expires a lost paymaster quote only when no user-signing attempt exists (signing exposure: %s)',
+    async (signingExposure) => {
+      const t = await setup();
+      await t.submit();
+      t.f.state.lostPaymaster = !signingExposure;
+      t.f.state.lostSign = signingExposure;
+      await t.ports.driver.runOnce();
+      const entry = await t.f.onboarding.store.transaction(
+        (s) => Object.values(s.userOperationBatches!)[0],
+      );
+      const record = t.f.db.sponsorship.load(entry.operationId!)!;
+      const before = t.f.db.budget(record.gasBudgetId);
+      expect(t.f.db.hasActionAttempts(record.signingActionId)).toBe(
+        signingExposure,
+      );
+      vi.useFakeTimers();
+      try {
+        vi.setSystemTime(new Date(Number(record.validUntil) * 1000 + 5000));
+        await t.ports.driver.runOnce();
+        expect(
+          await t.f.onboarding.store.transaction(
+            (s) => Object.values(s.userOperationBatches!)[0].stage,
+          ),
+        ).toBe(signingExposure ? 'blocked' : 'expired');
+        expect(t.f.db.budget(record.gasBudgetId)).toEqual(before);
+        expect(t.s.sends).toBe(0);
+      } finally {
+        vi.useRealTimers();
+      }
+    },
+  );
   it('does not reclaim an expired dispatch after a crash or lose the source operation link', async () => {
     const t = await setup();
     await t.submit();
@@ -511,4 +570,83 @@ describe('ERC-4337 wallet calls durable submission and independent receipt recov
     await t.ports.driver.runOnce();
     expect(t.s.sends + t.f.state.posts + t.f.state.signs).toBe(0);
   });
+});
+
+it('reuses an exact receipt proof while checking canonicality and isolating changed budgets', async () => {
+  const t = await setup('10000000', false, true);
+  await t.submit();
+  await t.ports.driver.runOnce();
+  t.s.included = true;
+  const plans = await t.f.onboarding.store.transaction((s) =>
+    Object.values(s.userOperationExecutions ?? {}),
+  );
+  const plan = plans[0];
+  const methods: string[] = [];
+  const request: typeof fetch = async (input, init) => {
+    methods.push(JSON.parse(String(init?.body)).method);
+    return t.request(input, init);
+  };
+  const observer = new UserOperationReceiptObserver(
+    { ...t.f.config.acceptance, aggregateReads: true },
+    100,
+    request,
+  );
+  const first = await observer.observe(plan, '10000000', txHash);
+  expect(first.receipt).toBeDefined();
+  methods.length = 0;
+  expect((await observer.observe(plan, '10000000', txHash)).receipt).toEqual(
+    first.receipt,
+  );
+  expect(methods).not.toContain('eth_getTransactionReceipt');
+  expect(methods).not.toContain('eth_getTransactionByHash');
+  expect(methods).toContain('eth_getBlockByNumber');
+  await expect(observer.observe(plan, '1', txHash)).rejects.toThrow();
+  t.s.reorg = true;
+  expect(
+    (await observer.observe(plan, '10000000', txHash)).receipt,
+  ).toBeUndefined();
+});
+
+it('retries a failed final preflight without recording a dispatch or sending twice', async () => {
+  const t = await setup();
+  const original = t.f.service.authorizeSubmission.bind(t.f.service);
+  let unavailable = true;
+  vi.spyOn(t.f.service, 'authorizeSubmission').mockImplementation(
+    async (context, id, verifyChain = true) => {
+      if (verifyChain && unavailable) {
+        unavailable = false;
+        throw new Error('Offline preflight unavailable');
+      }
+      return original(context, id, verifyChain);
+    },
+  );
+  await t.submit();
+  await t.ports.driver.runOnce();
+  expect(t.s.sends).toBe(0);
+  const plans = await t.f.onboarding.store.transaction((s) =>
+    Object.values(s.userOperationExecutions ?? {}),
+  );
+  expect(plans).toHaveLength(1);
+  expect(plans[0].dispatch).toBeUndefined();
+  await t.ports.driver.runOnce();
+  expect(t.s.sends).toBe(1);
+});
+
+it('keeps aggregate receipt proofs independent across quorum sources', async () => {
+  const t = await setup();
+  await t.submit();
+  await t.ports.driver.runOnce();
+  t.s.included = true;
+  t.s.mismatch = true;
+  const plans = await t.f.onboarding.store.transaction((s) =>
+    Object.values(s.userOperationExecutions ?? {}),
+  );
+  const observer = new UserOperationReceiptObserver(
+    { ...t.f.config.acceptance, aggregateReads: true },
+    100,
+    t.request,
+  );
+  await expect(
+    observer.observe(plans[0], '10000000', txHash),
+  ).rejects.toThrow();
 });

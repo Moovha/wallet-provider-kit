@@ -715,6 +715,11 @@
         },
         "ingress": {
           "enum": ["caddy", "existing"]
+        },
+        "requestsPerMinute": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6000
         }
       }
     },
@@ -1056,6 +1061,21 @@
               "type": "integer",
               "minimum": 30,
               "maximum": 3600
+            },
+            "maxDepthPerUser": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "maxDepthPerApplication": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000
+            },
+            "maxDepthTotal": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10000
             }
           },
           "description": "Optional bounded per-Safe FIFO of exact unsigned requests for delayed execution. Only the head receives a verified current nonce and immutable action; all original authority checks remain mandatory."
@@ -2022,6 +2042,10 @@
       "additionalProperties": false,
       "required": ["operators"],
       "properties": {
+        "rpcVerification": {
+          "type": "string",
+          "enum": ["single", "quorum"]
+        },
         "operators": {
           "type": "array",
           "minItems": 1,
@@ -2065,6 +2089,23 @@
         },
         "sharedApplicationSafes": {
           "type": "boolean"
+        },
+        "executionPool": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["safeCount", "sponsorCount"],
+          "properties": {
+            "safeCount": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 16
+            },
+            "sponsorCount": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 16
+            }
+          }
         }
       }
     },
@@ -2216,6 +2257,87 @@
           "type": "integer",
           "minimum": 30,
           "maximum": 900
+        }
+      }
+    },
+    "safeWallet": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "entryPoint",
+        "module",
+        "bundlerAuthorization",
+        "runtimeDirectory",
+        "maximumSetupCostWei",
+        "executorBalanceWei",
+        "paymasterDepositWei",
+        "genesisHash"
+      ],
+      "properties": {
+        "profile": {
+          "const": "safe-only-4337-v1"
+        },
+        "entryPoint": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["address", "codeHash"],
+          "properties": {
+            "address": {
+              "type": "string",
+              "pattern": "^0x[0-9a-fA-F]{40}$"
+            },
+            "codeHash": {
+              "type": "string",
+              "pattern": "^0x[0-9a-f]{64}$"
+            }
+          }
+        },
+        "module": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["address", "codeHash"],
+          "properties": {
+            "address": {
+              "type": "string",
+              "pattern": "^0x[0-9a-fA-F]{40}$"
+            },
+            "codeHash": {
+              "type": "string",
+              "pattern": "^0x[0-9a-f]{64}$"
+            }
+          }
+        },
+        "bundlerAuthorization": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["env"],
+          "properties": {
+            "env": {
+              "type": "string",
+              "pattern": "^[A-Z][A-Z0-9_]{0,127}$"
+            }
+          }
+        },
+        "runtimeDirectory": {
+          "type": "string",
+          "pattern": "^\\.provider-data/[a-zA-Z0-9_-]{1,64}$"
+        },
+        "maximumSetupCostWei": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]{0,77}$"
+        },
+        "executorBalanceWei": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]{0,77}$"
+        },
+        "paymasterDepositWei": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]{0,77}$"
+        },
+        "genesisHash": {
+          "type": "string",
+          "pattern": "^0x[0-9a-f]{64}$"
         }
       }
     }

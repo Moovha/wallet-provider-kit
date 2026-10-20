@@ -973,6 +973,49 @@ describe('application obligations', () => {
 });
 
 describe('application credentials', () => {
+  it('accepts one application RPC in single mode while preserving the quorum minimum', async () => {
+    const { db } = await fixture();
+    const cipher = new ApplicationCredentialCipher(
+      Buffer.alloc(32, 7).toString('base64'),
+    );
+    const make = (rpcVerification: 'single' | 'quorum') =>
+      new RuntimeConfigurationService(
+        policy,
+        db.onboardingStore,
+        { ...options, rpcVerification },
+        'deployment-1',
+        undefined,
+        undefined,
+        cipher,
+      );
+    const service = make('single'),
+      appId = runtimeApplicationId(issuer, 'first');
+    await service.writeCredential(context(), 'primary', {
+      expected_revision: '0',
+      endpoint: 'https://rpc.first.test/private-token',
+    });
+    await service.submitObligation(context(), 'services', {
+      expected_revision: '0',
+      value: [
+        {
+          id: 'primary',
+          kind: 'rpc-verification',
+          vendor: 'primary',
+          credential_reference: 'primary',
+          billing_owner: 'application',
+        },
+      ],
+    });
+    await service.decideObligation(context(operator), appId, 'services', {
+      expected_revision: '1',
+      expected_decision_revision: '0',
+      decision: 'accepted',
+    });
+    expect(
+      await service.withRpc(appId, async (endpoints) => endpoints),
+    ).toEqual(['https://rpc.first.test/private-token']);
+    await expect(make('quorum').rpcEndpoints(appId)).rejects.toThrow();
+  });
   it('encrypts, isolates, fences rotations and retains idempotent receipts', async () => {
     const { db } = await fixture();
     const cipher = new ApplicationCredentialCipher(
@@ -1065,6 +1108,93 @@ describe('application credentials', () => {
       endpoint: null,
     });
     expect(revoked.status).toBe('revoked');
+  });
+  it('obtains one scan anchor with a fee quote, enforcing application RPC revocation', async () => {
+    const { db } = await fixture();
+    const service = new RuntimeConfigurationService(
+      policy,
+      db.onboardingStore,
+      { ...options, rpcVerification: 'single' },
+      'deployment-1',
+      undefined,
+      undefined,
+      new ApplicationCredentialCipher(Buffer.alloc(32, 9).toString('base64')),
+    );
+    const appId = runtimeApplicationId(issuer, 'first');
+    await service.writeCredential(context(), 'primary', {
+      expected_revision: '0',
+      endpoint: 'https://primary.example.test/app-key',
+    });
+    await service.submitObligation(context(), 'services', {
+      expected_revision: '0',
+      value: [
+        {
+          id: 'primary',
+          kind: 'rpc-verification',
+          vendor: 'offline',
+          credential_reference: 'primary',
+          billing_owner: 'application',
+        },
+      ],
+    });
+    await service.decideObligation(context(operator), appId, 'services', {
+      expected_revision: '1',
+      expected_decision_revision: '0',
+      decision: 'accepted',
+    });
+    const config = executionFixture().configuration;
+    const methods: string[] = [];
+    const observer = new ApplicationExecutionObserver(
+      service,
+      db.onboardingStore,
+      config,
+      undefined,
+      async (_url, init) => {
+        const request = JSON.parse(String(init?.body));
+        methods.push(request.method);
+        const result =
+          request.method === 'eth_chainId'
+            ? '0x14a34'
+            : request.method === 'eth_feeHistory'
+              ? {
+                  baseFeePerGas: Array(6).fill('0x1'),
+                  reward: Array(5).fill(['0x1']),
+                }
+              : {
+                  hash: config.rpc.genesisHash,
+                  number: request.params[0] === '0x0' ? '0x0' : '0x10',
+                };
+        return Response.json({ jsonrpc: '2.0', id: 1, result });
+      },
+      true,
+    );
+    expect(
+      await observer.anchorWithFees(config.sponsors[0], application()),
+    ).toMatchObject({
+      scanFromBlock: '16',
+      networkFees: { maxFeePerGas: '3', maxPriorityFeePerGas: '1' },
+    });
+    expect(methods.filter((method) => method === 'eth_chainId')).toHaveLength(
+      1,
+    );
+    expect(
+      methods.filter((method) => method === 'eth_getBlockByNumber'),
+    ).toHaveLength(2);
+    expect(
+      methods.filter((method) => method === 'eth_feeHistory'),
+    ).toHaveLength(1);
+    methods.length = 0;
+    await expect(
+      observer.anchorWithFees(config.sponsors[0], application('second')),
+    ).rejects.toThrow();
+    await service.writeCredential(context(), 'primary', {
+      expected_revision: '1',
+      endpoint: null,
+    });
+    await expect(
+      observer.anchorWithFees(config.sponsors[0], application()),
+    ).rejects.toThrow();
+    expect(methods).toHaveLength(0);
   });
   it('routes quorum reads only to the caller application and stops after revocation', async () => {
     const { db } = await fixture();
@@ -1250,4 +1380,116 @@ it('requires provider publication for shared-Safe methods and validates user-add
       })
     ).revision,
   ).toBe('1');
+});
+
+it('lets the bound application configure its pool with concurrency checks before provisioning', async () => {
+  const { service } = await fixture();
+  expect(await service.readPool(application())).toMatchObject({
+    safe_count: 1,
+    sponsor_count: 1,
+  });
+  const input = {
+    expected_safe_count: 1,
+    expected_sponsor_count: 1,
+    safe_count: 5,
+    sponsor_count: 5,
+  };
+  await expect(
+    service.configurePool(
+      context({ ...application(), scopes: ['wallet:configuration:read'] }),
+      input,
+    ),
+  ).rejects.toMatchObject(denied);
+  expect(await service.configurePool(context(), input)).toMatchObject({
+    safe_count: 5,
+    sponsor_count: 5,
+  });
+  expect(await service.readPool(application('second'))).toMatchObject({
+    safe_count: 1,
+    sponsor_count: 1,
+  });
+  await expect(
+    service.configurePool(context(), { ...input, safe_count: 4 }),
+  ).rejects.toMatchObject(conflicted);
+  await expect(
+    service.configurePool(context(), { ...input, safe_count: 17 }),
+  ).rejects.toThrow();
+});
+
+it('binds pool configuration idempotency to the exact request and refuses resizing retained infrastructure', async () => {
+  const { service, db } = await fixture();
+  const ctx = context();
+  const input = {
+    expected_safe_count: 1,
+    expected_sponsor_count: 1,
+    safe_count: 5,
+    sponsor_count: 5,
+  };
+  const saved = await service.configurePool(ctx, input);
+  expect(await service.configurePool(ctx, input)).toEqual(saved);
+  await expect(
+    service.configurePool(ctx, { ...input, safe_count: 4 }),
+  ).rejects.toMatchObject(conflicted);
+  const app = runtimeApplicationId(
+    application().issuer,
+    application().clientId,
+  );
+  await db.onboardingStore.transaction((s) => {
+    s.deploymentBindings![
+      'service-v1'
+    ].runtimeConfiguration!.applicationSponsors = {
+      [app]: { applicationId: app },
+    } as never;
+  });
+  await expect(
+    service.configurePool(context(), {
+      expected_safe_count: 5,
+      expected_sponsor_count: 5,
+      safe_count: 6,
+      sponsor_count: 5,
+    }),
+  ).rejects.toMatchObject(conflicted);
+  expect(await service.readPool(application())).toMatchObject({
+    safe_count: 5,
+    sponsor_count: 5,
+  });
+});
+
+it('defaults new shared applications to five members while preserving retained legacy single-member applications', async () => {
+  const { db } = await fixture();
+  const service = new RuntimeConfigurationService(
+    policy,
+    db.onboardingStore,
+    { ...options, sharedApplicationSafes: true },
+    'deployment-1',
+  );
+  expect(await service.readPool(application())).toMatchObject({
+    safe_count: 5,
+    sponsor_count: 5,
+  });
+  await service.configurePool(context(), {
+    expected_safe_count: 5,
+    expected_sponsor_count: 5,
+    safe_count: 3,
+    sponsor_count: 2,
+  });
+  expect(await service.readPool(application())).toMatchObject({
+    safe_count: 3,
+    sponsor_count: 2,
+  });
+  const legacy = runtimeApplicationId(
+    application('second').issuer,
+    application('second').clientId,
+  );
+  await db.onboardingStore.transaction((s) => {
+    s.deploymentBindings![
+      'service-v1'
+    ].runtimeConfiguration!.applicationSponsors = {
+      [legacy]: { applicationId: legacy },
+    } as never;
+  });
+  expect(await service.readPool(application('second'))).toMatchObject({
+    safe_count: 1,
+    sponsor_count: 1,
+  });
 });

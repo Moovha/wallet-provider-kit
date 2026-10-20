@@ -111,6 +111,22 @@ export function initialFees(plan: TransferExecutionPlan): {
   maxFeePerGas: string;
   maxPriorityFeePerGas: string;
 } {
+  if (plan.networkFees) {
+    const fees = plan.networkFees;
+    if (
+      !/^(0|[1-9][0-9]{0,77})$/.test(fees.maxFeePerGas) ||
+      !/^(0|[1-9][0-9]{0,77})$/.test(fees.maxPriorityFeePerGas) ||
+      BigInt(fees.maxFeePerGas) > BigInt(plan.sponsor.maxFeePerGas) ||
+      BigInt(fees.maxPriorityFeePerGas) >
+        BigInt(plan.sponsor.maxPriorityFeePerGas) ||
+      BigInt(fees.maxFeePerGas) < BigInt(fees.maxPriorityFeePerGas)
+    )
+      throw new WalletProviderError('wallet_authorization_denied');
+    return {
+      maxFeePerGas: fees.maxFeePerGas,
+      maxPriorityFeePerGas: fees.maxPriorityFeePerGas,
+    };
+  }
   if (!plan.replacement)
     return {
       maxFeePerGas: plan.sponsor.maxFeePerGas,

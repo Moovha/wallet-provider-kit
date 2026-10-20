@@ -24,6 +24,18 @@ const sample = JSON.parse(
 function fixture() {
   return validateProviderConfiguration(structuredClone(sample));
 }
+function responseBody(operation: {
+  responses: Record<
+    string,
+    { content?: Record<string, { schema: object; example?: unknown }> }
+  >;
+}) {
+  const response =
+    operation.responses[
+      Object.keys(operation.responses).find((code) => code.startsWith('2'))!
+    ];
+  return Object.values(response.content!)[0];
+}
 describe('operator API reference', () => {
   it('uses canonical request/response contracts, includes unavailable advanced profiles and does not mutate them', () => {
     const config = fixture();
@@ -44,18 +56,8 @@ describe('operator API reference', () => {
     const spec = referenceSpec(contract, config, operations);
     for (const item of operations) {
       const preview = spec.paths[item.path][item.method];
-      expect(
-        preview.responses[
-          Object.keys(item.operation.responses).find((code) =>
-            code.startsWith('2'),
-          )!
-        ].content?.['application/json'].schema,
-      ).toEqual(
-        item.operation.responses[
-          Object.keys(item.operation.responses).find((code) =>
-            code.startsWith('2'),
-          )!
-        ].content?.['application/json'].schema,
+      expect(responseBody(preview).schema).toEqual(
+        responseBody(item.operation).schema,
       );
       expect(preview.requestBody?.content['application/json'].schema).toEqual(
         item.operation.requestBody?.content['application/json'].schema,
@@ -144,11 +146,7 @@ describe('operator API reference', () => {
     for (const item of operations) {
       expect(
         ajv.validate(
-          item.operation.responses[
-            Object.keys(item.operation.responses).find((code) =>
-              code.startsWith('2'),
-            )!
-          ].content!['application/json'].schema,
+          responseBody(item.operation).schema,
           responseExample(item.operation.operationId),
         ),
         JSON.stringify(ajv.errors),
@@ -206,12 +204,7 @@ it('previews application-led policy and grants with schema-valid evidence exampl
   const ajv = new Ajv({ strict: false, formats: fullFormats });
   for (const item of operations) {
     const op = spec.paths[item.path][item.method];
-    const response =
-      op.responses[
-        Object.keys(item.operation.responses).find((code) =>
-          code.startsWith('2'),
-        )!
-      ].content!['application/json'];
+    const response = responseBody(op);
     expect(
       ajv.validate(response.schema, response.example),
       JSON.stringify(ajv.errors),

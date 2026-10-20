@@ -27,8 +27,9 @@ const child = spawn('/app/openzeppelin-relayer', [], {
     ACTIX_WORKERS: '1',
     TOKIO_WORKER_THREADS: '1',
     RPC_BLOCK_PRIVATE_IPS: 'true',
-    PROVIDER_MAX_RETRIES: '0',
-    PROVIDER_MAX_FAILOVERS: '0',
+    PROVIDER_MAX_RETRIES: '1',
+    PROVIDER_MAX_FAILOVERS: '2',
+    WPK_FEE_ONLY_REPLACEMENTS: '1',
   },
 });
 child.on('error', () => process.exit(1));

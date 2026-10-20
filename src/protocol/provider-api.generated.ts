@@ -83,6 +83,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/configuration/applications/{applicationId}/safe-wallet": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readSafeWalletInfrastructure"];
+        put?: never;
+        post: operations["provisionSafeWalletInfrastructure"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/accounts/{accountId}/safe": {
         parameters: {
             query?: never;
@@ -463,6 +479,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/accounts/{accountId}/wallet/calls/{batchId}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Authenticated bounded SSE status stream. Sends current account-authorized EIP-5792 status after durable observation changes. Reconnect after 55 seconds; ordinary status reads remain available. */
+        get: operations["streamWalletCallsStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/accounts/{accountId}/wallet": {
         parameters: {
             query?: never;
@@ -470,10 +503,45 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        get: operations["readWalletExecutionAccount"];
         put?: never;
         /** @description Optional account-scoped EIP-5792 2.0.0 JSON-RPC transport. Runtime financial authority, an explicitly bound Safe relayer or ERC-4337 driver, current owner consent and method-specific scopes remain required. wallet_sendCalls admits a durable atomic batch without waiting for chain inclusion. Headless wallet_showCallsStatus returns unsupported method; the client adapter can present status through an explicit host callback. */
         post: operations["walletCallsRpc"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/application/gas-funding": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Optional runtime configuration control plane. Application proposals and provider publications are configuration records, not wallet grants, signing authority or execution activation. Publications become readable immediately without restarting the service. Immutable historical revisions remain available. Requires the documented scope and configured application or operator identity. */
+        get: operations["readApplicationGasFunding"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/application/execution-pool": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Optional runtime configuration control plane. Application proposals and provider publications are configuration records, not wallet grants, signing authority or execution activation. Publications become readable immediately without restarting the service. Immutable historical revisions remain available. Requires the documented scope and configured application or operator identity. */
+        get: operations["readApplicationExecutionPool"];
+        /** @description Optional runtime configuration control plane. Application proposals and provider publications are configuration records, not wallet grants, signing authority or execution activation. Publications become readable immediately without restarting the service. Immutable historical revisions remain available. Requires the documented scope and configured application or operator identity. */
+        put: operations["configureApplicationExecutionPool"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1751,6 +1819,142 @@ export interface operations {
             };
         };
     };
+    readSafeWalletInfrastructure: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                applicationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        application_id: string;
+                        chain_id: string;
+                        /** @enum {unknown} */
+                        profile: "safe-only-4337-v1";
+                        /** @enum {string} */
+                        status: "unprovisioned" | "needs-funding" | "provisioned";
+                        funding_address?: string;
+                        paymaster?: string;
+                    };
+                };
+            };
+            /** @description Default Response */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+        };
+    };
+    provisionSafeWalletInfrastructure: {
+        parameters: {
+            query?: never;
+            header: {
+                "idempotency-key": string;
+            };
+            path: {
+                applicationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        application_id: string;
+                        chain_id: string;
+                        /** @enum {unknown} */
+                        profile: "safe-only-4337-v1";
+                        /** @enum {string} */
+                        status: "unprovisioned" | "needs-funding" | "provisioned";
+                        funding_address?: string;
+                        paymaster?: string;
+                    };
+                };
+            };
+            /** @description Default Response */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+        };
+    };
     readProvisionedSafe: {
         parameters: {
             query?: never;
@@ -2891,7 +3095,7 @@ export interface operations {
                         account_id: string;
                         action_id?: string;
                         /** @enum {string} */
-                        status: "queued" | "executing" | "succeeded" | "cancelled" | "expired" | "blocked";
+                        status: "queued" | "executing" | "included" | "failed" | "succeeded" | "cancelled" | "expired" | "blocked";
                         /** Format: date-time */
                         expires_at: string;
                         next_poll_after_ms: number;
@@ -2922,7 +3126,7 @@ export interface operations {
                         account_id: string;
                         action_id?: string;
                         /** @enum {string} */
-                        status: "queued" | "executing" | "succeeded" | "cancelled" | "expired" | "blocked";
+                        status: "queued" | "executing" | "included" | "failed" | "succeeded" | "cancelled" | "expired" | "blocked";
                         /** Format: date-time */
                         expires_at: string;
                         next_poll_after_ms: number;
@@ -2959,7 +3163,7 @@ export interface operations {
                         account_id: string;
                         action_id?: string;
                         /** @enum {string} */
-                        status: "queued" | "executing" | "succeeded" | "cancelled" | "expired" | "blocked";
+                        status: "queued" | "executing" | "included" | "failed" | "succeeded" | "cancelled" | "expired" | "blocked";
                         /** Format: date-time */
                         expires_at: string;
                         next_poll_after_ms: number;
@@ -3319,6 +3523,14 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
+                        preconfirmation?: {
+                            /** @enum {string} */
+                            stage: "preconfirmed";
+                            transaction_hash: string;
+                            /** Format: date-time */
+                            observed_at: string;
+                            rpc_source_origin: string;
+                        };
                         recovery?: {
                             /** @enum {string} */
                             state: "observing" | "suspected-stuck" | "awaiting-finality" | "finalized" | "unavailable" | "blocked";
@@ -3364,11 +3576,12 @@ export interface operations {
                         next_poll_after_ms: number;
                         /** @enum {string} */
                         chain_status: "unobserved" | "pending" | "included" | "safe" | "finalized" | "reorged";
+                        rpc_source_origin?: string;
                         /**
-                         * @description RPC quorum means agreement of all configured trusted RPC sources on exact receipt effects and canonical block evidence, not a cryptographic light-client proof.
+                         * @description RPC single means one configured trusted source verifies the complete observation. RPC quorum means agreement of all configured trusted RPC sources on exact receipt effects and canonical block evidence, not a cryptographic light-client proof.
                          * @enum {string}
                          */
-                        verification: "unverified" | "rpc-quorum";
+                        verification: "unverified" | "rpc-quorum" | "rpc-single";
                         /** @enum {string} */
                         outcome: "unknown" | "succeeded" | "reverted";
                         /**
@@ -3378,6 +3591,7 @@ export interface operations {
                         settlement: "pending" | "succeeded" | "reverted";
                         /** Format: date-time */
                         observed_at: string;
+                        safe_nonce_consumed?: boolean;
                         transaction_hash?: string;
                         block_hash?: string;
                         block_number?: string;
@@ -3397,7 +3611,7 @@ export interface operations {
                         settlement?: "pending";
                     } | {
                         /** @enum {unknown} */
-                        verification?: "rpc-quorum";
+                        verification?: "rpc-quorum" | "rpc-single";
                         /** @enum {unknown} */
                         chain_status?: "included" | "safe";
                         /** @enum {unknown} */
@@ -3406,7 +3620,7 @@ export interface operations {
                         settlement?: "pending";
                     } | {
                         /** @enum {unknown} */
-                        verification?: "rpc-quorum";
+                        verification?: "rpc-quorum" | "rpc-single";
                         /** @enum {unknown} */
                         chain_status?: "finalized";
                         /** @enum {unknown} */
@@ -3415,7 +3629,7 @@ export interface operations {
                         settlement?: "succeeded";
                     } | {
                         /** @enum {unknown} */
-                        verification?: "rpc-quorum";
+                        verification?: "rpc-quorum" | "rpc-single";
                         /** @enum {unknown} */
                         chain_status?: "finalized";
                         /** @enum {unknown} */
@@ -3455,6 +3669,14 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
+                        preconfirmation?: {
+                            /** @enum {string} */
+                            stage: "preconfirmed";
+                            transaction_hash: string;
+                            /** Format: date-time */
+                            observed_at: string;
+                            rpc_source_origin: string;
+                        };
                         recovery?: {
                             /** @enum {string} */
                             state: "observing" | "suspected-stuck" | "awaiting-finality" | "finalized" | "unavailable" | "blocked";
@@ -3500,11 +3722,12 @@ export interface operations {
                         next_poll_after_ms: number;
                         /** @enum {string} */
                         chain_status: "unobserved" | "pending" | "included" | "safe" | "finalized" | "reorged";
+                        rpc_source_origin?: string;
                         /**
-                         * @description RPC quorum means agreement of all configured trusted RPC sources on exact receipt effects and canonical block evidence, not a cryptographic light-client proof.
+                         * @description RPC single means one configured trusted source verifies the complete observation. RPC quorum means agreement of all configured trusted RPC sources on exact receipt effects and canonical block evidence, not a cryptographic light-client proof.
                          * @enum {string}
                          */
-                        verification: "unverified" | "rpc-quorum";
+                        verification: "unverified" | "rpc-quorum" | "rpc-single";
                         /** @enum {string} */
                         outcome: "unknown" | "succeeded" | "reverted";
                         /**
@@ -3514,6 +3737,7 @@ export interface operations {
                         settlement: "pending" | "succeeded" | "reverted";
                         /** Format: date-time */
                         observed_at: string;
+                        safe_nonce_consumed?: boolean;
                         transaction_hash?: string;
                         block_hash?: string;
                         block_number?: string;
@@ -3533,7 +3757,7 @@ export interface operations {
                         settlement?: "pending";
                     } | {
                         /** @enum {unknown} */
-                        verification?: "rpc-quorum";
+                        verification?: "rpc-quorum" | "rpc-single";
                         /** @enum {unknown} */
                         chain_status?: "included" | "safe";
                         /** @enum {unknown} */
@@ -3542,7 +3766,7 @@ export interface operations {
                         settlement?: "pending";
                     } | {
                         /** @enum {unknown} */
-                        verification?: "rpc-quorum";
+                        verification?: "rpc-quorum" | "rpc-single";
                         /** @enum {unknown} */
                         chain_status?: "finalized";
                         /** @enum {unknown} */
@@ -3551,7 +3775,7 @@ export interface operations {
                         settlement?: "succeeded";
                     } | {
                         /** @enum {unknown} */
-                        verification?: "rpc-quorum";
+                        verification?: "rpc-quorum" | "rpc-single";
                         /** @enum {unknown} */
                         chain_status?: "finalized";
                         /** @enum {unknown} */
@@ -3756,6 +3980,14 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
+                        preconfirmation?: {
+                            /** @enum {string} */
+                            stage: "preconfirmed";
+                            transaction_hash: string;
+                            /** Format: date-time */
+                            observed_at: string;
+                            rpc_source_origin: string;
+                        };
                         recovery?: {
                             /** @enum {string} */
                             state: "observing" | "suspected-stuck" | "awaiting-finality" | "finalized" | "unavailable" | "blocked";
@@ -3801,11 +4033,12 @@ export interface operations {
                         next_poll_after_ms: number;
                         /** @enum {string} */
                         chain_status: "unobserved" | "pending" | "included" | "safe" | "finalized" | "reorged";
+                        rpc_source_origin?: string;
                         /**
-                         * @description RPC quorum means agreement of all configured trusted RPC sources on exact receipt effects and canonical block evidence, not a cryptographic light-client proof.
+                         * @description RPC single means one configured trusted source verifies the complete observation. RPC quorum means agreement of all configured trusted RPC sources on exact receipt effects and canonical block evidence, not a cryptographic light-client proof.
                          * @enum {string}
                          */
-                        verification: "unverified" | "rpc-quorum";
+                        verification: "unverified" | "rpc-quorum" | "rpc-single";
                         /** @enum {string} */
                         outcome: "unknown" | "succeeded" | "reverted";
                         /**
@@ -3815,6 +4048,7 @@ export interface operations {
                         settlement: "pending" | "succeeded" | "reverted";
                         /** Format: date-time */
                         observed_at: string;
+                        safe_nonce_consumed?: boolean;
                         transaction_hash?: string;
                         block_hash?: string;
                         block_number?: string;
@@ -3834,7 +4068,7 @@ export interface operations {
                         settlement?: "pending";
                     } | {
                         /** @enum {unknown} */
-                        verification?: "rpc-quorum";
+                        verification?: "rpc-quorum" | "rpc-single";
                         /** @enum {unknown} */
                         chain_status?: "included" | "safe";
                         /** @enum {unknown} */
@@ -3843,7 +4077,7 @@ export interface operations {
                         settlement?: "pending";
                     } | {
                         /** @enum {unknown} */
-                        verification?: "rpc-quorum";
+                        verification?: "rpc-quorum" | "rpc-single";
                         /** @enum {unknown} */
                         chain_status?: "finalized";
                         /** @enum {unknown} */
@@ -3852,7 +4086,7 @@ export interface operations {
                         settlement?: "succeeded";
                     } | {
                         /** @enum {unknown} */
-                        verification?: "rpc-quorum";
+                        verification?: "rpc-quorum" | "rpc-single";
                         /** @enum {unknown} */
                         chain_status?: "finalized";
                         /** @enum {unknown} */
@@ -4083,6 +4317,14 @@ export interface operations {
                             datacontenttype: "application/json";
                             sequence: number;
                             data: {
+                                preconfirmation?: {
+                                    /** @enum {string} */
+                                    stage: "preconfirmed";
+                                    transaction_hash: string;
+                                    /** Format: date-time */
+                                    observed_at: string;
+                                    rpc_source_origin: string;
+                                };
                                 recovery?: {
                                     /** @enum {string} */
                                     state: "observing" | "suspected-stuck" | "awaiting-finality" | "finalized" | "unavailable" | "blocked";
@@ -4128,11 +4370,12 @@ export interface operations {
                                 next_poll_after_ms: number;
                                 /** @enum {string} */
                                 chain_status: "unobserved" | "pending" | "included" | "safe" | "finalized" | "reorged";
+                                rpc_source_origin?: string;
                                 /**
-                                 * @description RPC quorum means agreement of all configured trusted RPC sources on exact receipt effects and canonical block evidence, not a cryptographic light-client proof.
+                                 * @description RPC single means one configured trusted source verifies the complete observation. RPC quorum means agreement of all configured trusted RPC sources on exact receipt effects and canonical block evidence, not a cryptographic light-client proof.
                                  * @enum {string}
                                  */
-                                verification: "unverified" | "rpc-quorum";
+                                verification: "unverified" | "rpc-quorum" | "rpc-single";
                                 /** @enum {string} */
                                 outcome: "unknown" | "succeeded" | "reverted";
                                 /**
@@ -4142,6 +4385,7 @@ export interface operations {
                                 settlement: "pending" | "succeeded" | "reverted";
                                 /** Format: date-time */
                                 observed_at: string;
+                                safe_nonce_consumed?: boolean;
                                 transaction_hash?: string;
                                 block_hash?: string;
                                 block_number?: string;
@@ -4161,7 +4405,7 @@ export interface operations {
                                 settlement?: "pending";
                             } | {
                                 /** @enum {unknown} */
-                                verification?: "rpc-quorum";
+                                verification?: "rpc-quorum" | "rpc-single";
                                 /** @enum {unknown} */
                                 chain_status?: "included" | "safe";
                                 /** @enum {unknown} */
@@ -4170,7 +4414,7 @@ export interface operations {
                                 settlement?: "pending";
                             } | {
                                 /** @enum {unknown} */
-                                verification?: "rpc-quorum";
+                                verification?: "rpc-quorum" | "rpc-single";
                                 /** @enum {unknown} */
                                 chain_status?: "finalized";
                                 /** @enum {unknown} */
@@ -4179,7 +4423,7 @@ export interface operations {
                                 settlement?: "succeeded";
                             } | {
                                 /** @enum {unknown} */
-                                verification?: "rpc-quorum";
+                                verification?: "rpc-quorum" | "rpc-single";
                                 /** @enum {unknown} */
                                 chain_status?: "finalized";
                                 /** @enum {unknown} */
@@ -6509,6 +6753,173 @@ export interface operations {
             };
         };
     };
+    streamWalletCallsStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                accountId: string;
+                batchId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Bounded SSE stream of authorized wallet status */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": string;
+                };
+            };
+            /** @description Default Response */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+        };
+    };
+    readWalletExecutionAccount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                accountId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        address: string;
+                        chainId: string;
+                    };
+                };
+            };
+            /** @description Default Response */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+        };
+    };
     walletCallsRpc: {
         parameters: {
             query?: never;
@@ -6600,6 +7011,15 @@ export interface operations {
                             status: 100 | 200 | 400 | 500;
                             /** @enum {boolean} */
                             atomic: true;
+                            capabilities?: {
+                                preconfirmation?: {
+                                    /** @enum {string} */
+                                    stage: "preconfirmed";
+                                    transactionHash: string;
+                                    /** Format: date-time */
+                                    observedAt: string;
+                                };
+                            };
                             receipts?: {
                                 logs: {
                                     address: string;
@@ -6703,6 +7123,617 @@ export interface operations {
             };
         };
     };
+    readApplicationGasFunding: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        application_id: string;
+                        chain_id: string;
+                        /** @enum {unknown} */
+                        profile: "safe-only-4337-v1";
+                        /** @enum {string} */
+                        status: "unprovisioned" | "needs-funding" | "provisioned";
+                        funding_address?: string;
+                        paymaster?: string;
+                    } | {
+                        application_id: string;
+                        chain_id: string;
+                        funding_address?: string;
+                        /** @enum {string} */
+                        funding_state?: "healthy" | "routing" | "needs-funding" | "paused";
+                        /** Format: date-time */
+                        checked_at?: string;
+                        sponsor_count: number;
+                        ready_sponsors: number;
+                        minimum_initial_funding_wei: string;
+                        /** @enum {string} */
+                        status: "ready" | "unprovisioned";
+                    };
+                };
+            };
+            /** @description Problem response */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+        };
+    };
+    readApplicationExecutionPool: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        application_id: string;
+                        safe_count: number;
+                        sponsor_count: number;
+                    };
+                };
+            };
+            /** @description Problem response */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+        };
+    };
+    configureApplicationExecutionPool: {
+        parameters: {
+            query?: never;
+            header: {
+                "idempotency-key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    expected_safe_count: number;
+                    expected_sponsor_count: number;
+                    safe_count: number;
+                    sponsor_count: number;
+                };
+            };
+        };
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        application_id: string;
+                        safe_count: number;
+                        sponsor_count: number;
+                    };
+                };
+            };
+            /** @description Problem response */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+        };
+    };
     provisionApplicationSponsor: {
         parameters: {
             query?: never;
@@ -6716,7 +7747,9 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": Record<string, never>;
+                "application/json": {
+                    pool_index?: number;
+                };
             };
         };
         responses: {
@@ -6729,6 +7762,7 @@ export interface operations {
                     "application/json": {
                         application_id: string;
                         funding_address: string;
+                        pool_index?: number;
                         /** @enum {string} */
                         status: "ready";
                     };
@@ -6923,6 +7957,16 @@ export interface operations {
                 content: {
                     "application/json": {
                         application_id: string;
+                        user_account_id?: string;
+                        execution_account_count?: number;
+                        maximum_execution_accounts?: number;
+                        maximum_in_flight_per_sponsor?: number;
+                        pool_size?: number;
+                        safes?: {
+                            pool_index: number;
+                            status: string;
+                            address?: string;
+                        }[];
                         funding_addresses: string[];
                         /** @enum {string} */
                         chain_id?: "eip155:8453" | "eip155:84532";
@@ -6943,7 +7987,7 @@ export interface operations {
                         /** @enum {string} */
                         asset_model: "individual-user-wallets";
                         /** @enum {string} */
-                        account_model: "provider-controlled-application-safe";
+                        account_model: "provider-controlled-application-safe" | "provider-controlled-user-safe";
                     };
                 };
             };
@@ -7138,6 +8182,16 @@ export interface operations {
                 content: {
                     "application/json": {
                         application_id: string;
+                        user_account_id?: string;
+                        execution_account_count?: number;
+                        maximum_execution_accounts?: number;
+                        maximum_in_flight_per_sponsor?: number;
+                        pool_size?: number;
+                        safes?: {
+                            pool_index: number;
+                            status: string;
+                            address?: string;
+                        }[];
                         funding_addresses: string[];
                         /** @enum {string} */
                         chain_id?: "eip155:8453" | "eip155:84532";
@@ -7158,7 +8212,7 @@ export interface operations {
                         /** @enum {string} */
                         asset_model: "individual-user-wallets";
                         /** @enum {string} */
-                        account_model: "provider-controlled-application-safe";
+                        account_model: "provider-controlled-application-safe" | "provider-controlled-user-safe";
                     };
                 };
             };
@@ -7347,7 +8401,10 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": Record<string, never>;
+                "application/json": {
+                    user_account_id?: string;
+                    pool_index?: number;
+                };
             };
         };
         responses: {
@@ -7359,6 +8416,16 @@ export interface operations {
                 content: {
                     "application/json": {
                         application_id: string;
+                        user_account_id?: string;
+                        execution_account_count?: number;
+                        maximum_execution_accounts?: number;
+                        maximum_in_flight_per_sponsor?: number;
+                        pool_size?: number;
+                        safes?: {
+                            pool_index: number;
+                            status: string;
+                            address?: string;
+                        }[];
                         funding_addresses: string[];
                         /** @enum {string} */
                         chain_id?: "eip155:8453" | "eip155:84532";
@@ -7379,7 +8446,7 @@ export interface operations {
                         /** @enum {string} */
                         asset_model: "individual-user-wallets";
                         /** @enum {string} */
-                        account_model: "provider-controlled-application-safe";
+                        account_model: "provider-controlled-application-safe" | "provider-controlled-user-safe";
                     };
                 };
             };
@@ -8192,7 +9259,7 @@ export interface operations {
                             }[] | {
                                 id: string;
                                 /** @enum {string} */
-                                kind: "rpc-verification" | "rpc-submission" | "other";
+                                kind: "rpc-verification" | "rpc-submission" | "rpc-observation" | "other";
                                 vendor: string;
                                 /** @description Opaque application-local secret-store reference. Never a credential, URL, environment-variable lookup or authority to read another application’s secret. Runtime resolution is not enabled by registration. */
                                 credential_reference: string;
@@ -8204,9 +9271,11 @@ export interface operations {
                                 funding_agreement: string;
                                 maximum_gas_budget_wei: string;
                                 /** @enum {string} */
-                                account_model: "provider-controlled-application-safe";
+                                account_model: "provider-controlled-application-safe" | "provider-controlled-user-safe";
                                 /** @enum {string} */
                                 asset_model: "individual-user-wallets";
+                                maximum_execution_accounts?: number;
+                                maximum_in_flight_per_sponsor?: number;
                                 gas_limits?: {
                                     gas_limit: string;
                                     max_fee_per_gas: string;
@@ -8436,7 +9505,7 @@ export interface operations {
                             }[] | {
                                 id: string;
                                 /** @enum {string} */
-                                kind: "rpc-verification" | "rpc-submission" | "other";
+                                kind: "rpc-verification" | "rpc-submission" | "rpc-observation" | "other";
                                 vendor: string;
                                 /** @description Opaque application-local secret-store reference. Never a credential, URL, environment-variable lookup or authority to read another application’s secret. Runtime resolution is not enabled by registration. */
                                 credential_reference: string;
@@ -8448,9 +9517,11 @@ export interface operations {
                                 funding_agreement: string;
                                 maximum_gas_budget_wei: string;
                                 /** @enum {string} */
-                                account_model: "provider-controlled-application-safe";
+                                account_model: "provider-controlled-application-safe" | "provider-controlled-user-safe";
                                 /** @enum {string} */
                                 asset_model: "individual-user-wallets";
+                                maximum_execution_accounts?: number;
+                                maximum_in_flight_per_sponsor?: number;
                                 gas_limits?: {
                                     gas_limit: string;
                                     max_fee_per_gas: string;
@@ -8693,7 +9764,7 @@ export interface operations {
                         }[] | {
                             id: string;
                             /** @enum {string} */
-                            kind: "rpc-verification" | "rpc-submission" | "other";
+                            kind: "rpc-verification" | "rpc-submission" | "rpc-observation" | "other";
                             vendor: string;
                             /** @description Opaque application-local secret-store reference. Never a credential, URL, environment-variable lookup or authority to read another application’s secret. Runtime resolution is not enabled by registration. */
                             credential_reference: string;
@@ -8705,9 +9776,11 @@ export interface operations {
                             funding_agreement: string;
                             maximum_gas_budget_wei: string;
                             /** @enum {string} */
-                            account_model: "provider-controlled-application-safe";
+                            account_model: "provider-controlled-application-safe" | "provider-controlled-user-safe";
                             /** @enum {string} */
                             asset_model: "individual-user-wallets";
+                            maximum_execution_accounts?: number;
+                            maximum_in_flight_per_sponsor?: number;
                             gas_limits?: {
                                 gas_limit: string;
                                 max_fee_per_gas: string;
@@ -8941,7 +10014,7 @@ export interface operations {
                         }[] | {
                             id: string;
                             /** @enum {string} */
-                            kind: "rpc-verification" | "rpc-submission" | "other";
+                            kind: "rpc-verification" | "rpc-submission" | "rpc-observation" | "other";
                             vendor: string;
                             /** @description Opaque application-local secret-store reference. Never a credential, URL, environment-variable lookup or authority to read another application’s secret. Runtime resolution is not enabled by registration. */
                             credential_reference: string;
@@ -8953,9 +10026,11 @@ export interface operations {
                             funding_agreement: string;
                             maximum_gas_budget_wei: string;
                             /** @enum {string} */
-                            account_model: "provider-controlled-application-safe";
+                            account_model: "provider-controlled-application-safe" | "provider-controlled-user-safe";
                             /** @enum {string} */
                             asset_model: "individual-user-wallets";
+                            maximum_execution_accounts?: number;
+                            maximum_in_flight_per_sponsor?: number;
                             gas_limits?: {
                                 gas_limit: string;
                                 max_fee_per_gas: string;
@@ -9161,7 +10236,7 @@ export interface operations {
                     value: {
                         id: string;
                         /** @enum {string} */
-                        kind: "rpc-verification" | "rpc-submission" | "other";
+                        kind: "rpc-verification" | "rpc-submission" | "rpc-observation" | "other";
                         vendor: string;
                         /** @description Opaque application-local secret-store reference. Never a credential, URL, environment-variable lookup or authority to read another application’s secret. Runtime resolution is not enabled by registration. */
                         credential_reference: string;
@@ -9194,7 +10269,7 @@ export interface operations {
                         }[] | {
                             id: string;
                             /** @enum {string} */
-                            kind: "rpc-verification" | "rpc-submission" | "other";
+                            kind: "rpc-verification" | "rpc-submission" | "rpc-observation" | "other";
                             vendor: string;
                             /** @description Opaque application-local secret-store reference. Never a credential, URL, environment-variable lookup or authority to read another application’s secret. Runtime resolution is not enabled by registration. */
                             credential_reference: string;
@@ -9206,9 +10281,11 @@ export interface operations {
                             funding_agreement: string;
                             maximum_gas_budget_wei: string;
                             /** @enum {string} */
-                            account_model: "provider-controlled-application-safe";
+                            account_model: "provider-controlled-application-safe" | "provider-controlled-user-safe";
                             /** @enum {string} */
                             asset_model: "individual-user-wallets";
+                            maximum_execution_accounts?: number;
+                            maximum_in_flight_per_sponsor?: number;
                             gas_limits?: {
                                 gas_limit: string;
                                 max_fee_per_gas: string;
@@ -9442,7 +10519,7 @@ export interface operations {
                         }[] | {
                             id: string;
                             /** @enum {string} */
-                            kind: "rpc-verification" | "rpc-submission" | "other";
+                            kind: "rpc-verification" | "rpc-submission" | "rpc-observation" | "other";
                             vendor: string;
                             /** @description Opaque application-local secret-store reference. Never a credential, URL, environment-variable lookup or authority to read another application’s secret. Runtime resolution is not enabled by registration. */
                             credential_reference: string;
@@ -9454,9 +10531,11 @@ export interface operations {
                             funding_agreement: string;
                             maximum_gas_budget_wei: string;
                             /** @enum {string} */
-                            account_model: "provider-controlled-application-safe";
+                            account_model: "provider-controlled-application-safe" | "provider-controlled-user-safe";
                             /** @enum {string} */
                             asset_model: "individual-user-wallets";
+                            maximum_execution_accounts?: number;
+                            maximum_in_flight_per_sponsor?: number;
                             gas_limits?: {
                                 gas_limit: string;
                                 max_fee_per_gas: string;
@@ -9665,9 +10744,11 @@ export interface operations {
                         funding_agreement: string;
                         maximum_gas_budget_wei: string;
                         /** @enum {string} */
-                        account_model: "provider-controlled-application-safe";
+                        account_model: "provider-controlled-application-safe" | "provider-controlled-user-safe";
                         /** @enum {string} */
                         asset_model: "individual-user-wallets";
+                        maximum_execution_accounts?: number;
+                        maximum_in_flight_per_sponsor?: number;
                         gas_limits?: {
                             gas_limit: string;
                             max_fee_per_gas: string;
@@ -9701,7 +10782,7 @@ export interface operations {
                         }[] | {
                             id: string;
                             /** @enum {string} */
-                            kind: "rpc-verification" | "rpc-submission" | "other";
+                            kind: "rpc-verification" | "rpc-submission" | "rpc-observation" | "other";
                             vendor: string;
                             /** @description Opaque application-local secret-store reference. Never a credential, URL, environment-variable lookup or authority to read another application’s secret. Runtime resolution is not enabled by registration. */
                             credential_reference: string;
@@ -9713,9 +10794,11 @@ export interface operations {
                             funding_agreement: string;
                             maximum_gas_budget_wei: string;
                             /** @enum {string} */
-                            account_model: "provider-controlled-application-safe";
+                            account_model: "provider-controlled-application-safe" | "provider-controlled-user-safe";
                             /** @enum {string} */
                             asset_model: "individual-user-wallets";
+                            maximum_execution_accounts?: number;
+                            maximum_in_flight_per_sponsor?: number;
                             gas_limits?: {
                                 gas_limit: string;
                                 max_fee_per_gas: string;
@@ -9949,7 +11032,7 @@ export interface operations {
                         }[] | {
                             id: string;
                             /** @enum {string} */
-                            kind: "rpc-verification" | "rpc-submission" | "other";
+                            kind: "rpc-verification" | "rpc-submission" | "rpc-observation" | "other";
                             vendor: string;
                             /** @description Opaque application-local secret-store reference. Never a credential, URL, environment-variable lookup or authority to read another application’s secret. Runtime resolution is not enabled by registration. */
                             credential_reference: string;
@@ -9961,9 +11044,11 @@ export interface operations {
                             funding_agreement: string;
                             maximum_gas_budget_wei: string;
                             /** @enum {string} */
-                            account_model: "provider-controlled-application-safe";
+                            account_model: "provider-controlled-application-safe" | "provider-controlled-user-safe";
                             /** @enum {string} */
                             asset_model: "individual-user-wallets";
+                            maximum_execution_accounts?: number;
+                            maximum_in_flight_per_sponsor?: number;
                             gas_limits?: {
                                 gas_limit: string;
                                 max_fee_per_gas: string;
@@ -10758,7 +11843,7 @@ export interface operations {
                             account_id: string;
                             sender: string;
                             /** @enum {string} */
-                            queue_stage: "queued" | "executing" | "succeeded" | "cancelled" | "expired" | "blocked";
+                            queue_stage: "queued" | "executing" | "included" | "failed" | "succeeded" | "cancelled" | "expired" | "blocked";
                             policy_revision: string;
                             /** Format: date-time */
                             expires_at: string;

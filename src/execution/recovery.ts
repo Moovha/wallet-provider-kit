@@ -1,3 +1,4 @@
+import { rpcVerified } from './inclusion.js';
 import {
   replacementStatusSchema,
   checkedReplacementStatus,
@@ -121,7 +122,7 @@ export function diagnoseExecution(input: {
     )
   )
     return finish('blocked', 'provider-nonce-conflict', 'operator-review');
-  if (input.observation?.verification === 'rpc-quorum') {
+  if (input.observation && rpcVerified(input.observation.verification)) {
     if (input.observation.chain_status === 'finalized')
       return finish('finalized', 'verified-finality', 'wait');
     if (['included', 'safe'].includes(input.observation.chain_status))

@@ -1,5 +1,33 @@
 # Changelog
 
+## Unreleased cold provider build verification
+
+- Allow the Compose smoke check up to thirty minutes to build the pinned Rust
+  Relayer from source. Keep runtime commands and readiness checks under their
+  existing shorter deadlines, and allow the CI job to finish the full build and
+  verification sequence. The previous three-minute command deadline interrupted
+  cold compilation before container readiness could be tested.
+
+## Unreleased Safe-only wallets and self-hosted sponsorship
+
+- Give each user one Safe address for deposits, balances and transactions, with a
+  private OWS signer, an application-owned verifying paymaster and a private Alto
+  bundler. Applications fund one retained gas address. Existing explicitly
+  configured relayer and pool profiles remain supported.
+- Progress independent account queues at verified canonical inclusion. Preserve
+  signed payloads, durable attempt authority, shared gas reservations and
+  independent per-operation execution proofs through uncertainty and restart.
+- Share RPC capacity, provider capability selection, chain-head reads and exact
+  receipt proofs across user transports. Add bounded Etherscan observation reads,
+  network-derived fees, overload limits and SSE delivery of verified status.
+- Generate application execution scopes for Safe-only clients and keep legacy
+  access, transfer and sponsor controls out of that setup flow.
+- Keep dispatch unclaimed when final preflight fails before transport. Cache
+  bundler capability discovery separately from current spending authority.
+- Treat the profile as experimental: the latest ten-user Base Sepolia run verified
+  eight operations, with two uncertain records retained and latency acceptance
+  still open. Funded crash recovery and production capacity remain unverified.
+
 ## Application provisioning and funding recovery
 
 - Create dynamic gas signers with the pinned Relayer API’s `plain` request type
@@ -8,7 +36,8 @@
   sponsor budgets before infrastructure creation. Safe reads expose the network
   and exact configured admission reserve alongside the sponsor funding address.
 - Keep retained Safe reconciliation available after sponsor funds are spent, and
-  allow protected provisioning responses up to sixty seconds for RPC reconciliation.
+  allow authenticated wallet and application responses up to sixty seconds for
+  provider and RPC reconciliation.
 - Create service-owned storage and vault subdirectories in new local deployments
   so bind-mount root ownership does not prevent first startup. Existing stores
   keep their configured paths.

@@ -27,6 +27,41 @@ const collections = [
   'logins',
 ] as const;
 
+/** Hydrate a row only when read; nested changes are compared before committing. */
+function lazyJson(target: object, key: string, load: () => string) {
+  let materialized = false;
+  let value: unknown;
+  let encoded: string | undefined;
+  const original = () => (encoded ??= load());
+  const get = () => {
+    if (!materialized) {
+      value = JSON.parse(original());
+      materialized = true;
+    }
+    return value;
+  };
+  const set = (replacement: unknown) => {
+    value = replacement;
+    materialized = true;
+  };
+  Object.defineProperty(target, key, {
+    get,
+    set,
+    enumerable: true,
+    configurable: true,
+  });
+  return {
+    original,
+    untouched(current: object) {
+      const descriptor = Object.getOwnPropertyDescriptor(current, key);
+      return !materialized && descriptor?.get === get && descriptor.set === set;
+    },
+    encode(current: object) {
+      return JSON.stringify(Reflect.get(current, key));
+    },
+  };
+}
+
 export function sqliteOnboardingStore(
   connection: StorageConnection,
 ): OnboardingStore {
@@ -39,32 +74,49 @@ export function sqliteOnboardingStore(
         } as unknown as ProviderState;
         for (const collection of collections)
           state[collection] = Object.create(null);
-        const previous = new Map<string, string>();
+        const previous = new Set<string>();
+        const encode = new Map<string, ReturnType<typeof lazyJson>>();
         for (const row of connection.all(
-          'SELECT collection,id,record FROM onboarding_records',
+          'SELECT collection,id FROM onboarding_records',
         )) {
           const collection = String(
             row.collection,
           ) as (typeof collections)[number];
           if (!collections.includes(collection)) throw new Error();
-          Object.defineProperty(state[collection], String(row.id), {
-            value: JSON.parse(String(row.record)),
-            writable: true,
-            enumerable: true,
-            configurable: true,
-          });
-          previous.set(
-            JSON.stringify([collection, row.id]),
-            String(row.record),
+          const key = JSON.stringify([collection, row.id]);
+          encode.set(
+            key,
+            lazyJson(state[collection]!, String(row.id), () => {
+              const record = connection.get(
+                'SELECT record FROM onboarding_records WHERE collection=? AND id=?',
+                collection,
+                String(row.id),
+              );
+              if (typeof record?.record !== 'string') throw new Error();
+              return record.record;
+            }),
           );
+          previous.add(key);
         }
-        state.audit = connection
-          .all('SELECT record FROM onboarding_audit ORDER BY sequence')
-          .map((r) => JSON.parse(String(r.record)));
-        const originalAudit = state.audit.map((r) => JSON.stringify(r));
+        const originalAudit = connection.all(
+          'SELECT sequence FROM onboarding_audit ORDER BY sequence',
+        );
+        state.audit = new Array(originalAudit.length);
+        const auditEncoders = originalAudit.map((row, index) =>
+          lazyJson(state.audit, String(index), () => {
+            const record = connection.get(
+              'SELECT record FROM onboarding_audit WHERE sequence=?',
+              String(row.sequence),
+            );
+            if (typeof record?.record !== 'string') throw new Error();
+            return record.record;
+          }),
+        );
         const result = operation(state);
         if (result && typeof (result as { then?: unknown }).then === 'function')
           throw new Error();
+        // Returned snapshots must be detached while original rows still exist.
+        const detached = structuredClone(result);
         if (
           Object.keys(state).some(
             (key) =>
@@ -75,7 +127,15 @@ export function sqliteOnboardingStore(
           state.format !== 'moovha-onboarding-1' ||
           !Array.isArray(state.audit) ||
           state.audit.length < originalAudit.length ||
-          originalAudit.some((r, i) => JSON.stringify(state.audit[i]) !== r)
+          auditEncoders.some((cell) => {
+            if (cell.untouched(state.audit)) return false;
+            const current = cell.encode(state.audit),
+              original = cell.original();
+            return (
+              current !== original &&
+              current !== JSON.stringify(JSON.parse(original))
+            );
+          })
         )
           throw new Error();
         for (const collection of collections) {
@@ -85,10 +145,15 @@ export function sqliteOnboardingStore(
             Array.isArray(state[collection])
           )
             throw new Error();
-          for (const [id, record] of Object.entries(state[collection])) {
+          for (const id of Object.keys(state[collection])) {
             const key = JSON.stringify([collection, id]);
-            const encoded = JSON.stringify(record);
-            if (previous.get(key) !== encoded)
+            const cell = encode.get(key);
+            if (cell?.untouched(state[collection])) {
+              previous.delete(key);
+              continue;
+            }
+            const encoded = JSON.stringify(state[collection][id]);
+            if (!cell || cell.original() !== encoded)
               connection.run(
                 'INSERT INTO onboarding_records(collection,id,record) VALUES(?,?,?) ON CONFLICT(collection,id) DO UPDATE SET record=excluded.record',
                 collection,
@@ -111,7 +176,7 @@ export function sqliteOnboardingStore(
             'INSERT INTO onboarding_audit(record) VALUES(?)',
             JSON.stringify(event),
           );
-        return result;
+        return detached;
       });
     },
   };

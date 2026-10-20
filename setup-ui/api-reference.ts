@@ -74,16 +74,17 @@ export function operationStatus(
     financial: !!config.financial,
     execution: !!config.execution,
     nonceCancellation:
-      !config.runtimeConfiguration?.sharedApplicationSafes &&
       !!config.execution?.local &&
       config.execution.profile === 'approved-evm-executor-v1',
     safeQueue: !!config.execution?.safeQueue,
     safeProvisioning:
       !!config.safeProvisioning &&
       !config.runtimeConfiguration?.sharedApplicationSafes,
+    safeWallet: !!config.safeWallet,
     walletCalls:
-      !!config.runtimeConfiguration?.authorizeContracts &&
-      !!config.execution?.safeQueue,
+      (!!config.runtimeConfiguration?.authorizeContracts &&
+        !!config.execution?.safeQueue) ||
+      !!config.safeWallet,
     runtimeConfiguration: !!config.runtimeConfiguration,
     executionService: !!config.execution?.service,
     contractCalls: !!config.approvedCalls?.policy,
@@ -158,6 +159,14 @@ export function requestExample(
   config: ProviderConfiguration,
   applicationIndex: number,
 ): object | undefined {
+  if (id === 'provisionSafeWalletInfrastructure') return {};
+  if (id === 'configureApplicationExecutionPool')
+    return {
+      expected_safe_count: 5,
+      expected_sponsor_count: 5,
+      safe_count: 5,
+      sponsor_count: 5,
+    };
   if (['provisionApplicationSafe', 'provisionApplicationSponsor'].includes(id))
     return {};
   if (id === 'writeApplicationCredential')
@@ -394,7 +403,62 @@ export function responseExample(
   id: string,
   config?: ProviderConfiguration,
   requestedPermissions?: string[],
-): object {
+): object | string {
+  if (
+    [
+      'readApplicationExecutionPool',
+      'configureApplicationExecutionPool',
+    ].includes(id)
+  )
+    return { application_id: 'a'.repeat(64), safe_count: 5, sponsor_count: 5 };
+  if (
+    [
+      'readSafeWalletInfrastructure',
+      'provisionSafeWalletInfrastructure',
+    ].includes(id)
+  )
+    return {
+      application_id: 'a'.repeat(64),
+      chain_id: providerNetwork(config?.network).caip,
+      profile: 'safe-only-4337-v1',
+      status: 'needs-funding',
+      funding_address: '0x' + '1'.repeat(40),
+    };
+  if (id === 'readApplicationGasFunding' && config?.safeWallet)
+    return {
+      application_id: 'a'.repeat(64),
+      chain_id: providerNetwork(config.network).caip,
+      profile: 'safe-only-4337-v1',
+      status: 'needs-funding',
+      funding_address: '0x' + '1'.repeat(40),
+    };
+  if (id === 'readApplicationGasFunding')
+    return {
+      application_id: 'a'.repeat(64),
+      funding_address: '0x' + '1'.repeat(40),
+      chain_id: providerNetwork(config?.network).caip,
+      sponsor_count: 5,
+      ready_sponsors: 5,
+      minimum_initial_funding_wei: '66550000000000',
+      status: 'ready',
+    };
+  if (id === 'streamWalletCallsStatus')
+    return (
+      'event: status\ndata: ' +
+      JSON.stringify({
+        version: '2.0.0',
+        id: 'batch',
+        chainId: providerNetwork(config?.network).hex,
+        status: 100,
+        atomic: true,
+      }) +
+      '\n\n'
+    );
+  if (id === 'readWalletExecutionAccount')
+    return {
+      address: '0x' + '2'.repeat(40),
+      chainId: providerNetwork(config?.network).hex,
+    };
   if (id === 'provisionApplicationSponsor')
     return {
       application_id: 'a'.repeat(64),
@@ -895,7 +959,9 @@ export function referenceSpec(
       ];
     if (success) {
       success.description = item.guide.success;
-      const body = success.content?.['application/json'];
+      const body =
+        success.content?.['application/json'] ??
+        success.content?.['text/event-stream'];
       if (body)
         body.example = responseExample(
           item.operation.operationId,

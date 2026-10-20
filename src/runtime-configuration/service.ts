@@ -1,3 +1,5 @@
+import { etherscanEndpoint } from '../execution/etherscan.js';
+import { RpcEndpointPool } from '../execution/rpc-pool.js';
 import {
   ApplicationCredentialCipher,
   credentialMetadata,
@@ -28,6 +30,7 @@ import { WalletProviderError } from '../domain/signing.js';
 import { serviceHash } from '../executor/auth.js';
 import {
   application,
+  fingerprint,
   deny,
   invalid,
   text,
@@ -42,9 +45,11 @@ import { trustedHttpsUrl } from '../service/auth.js';
 import { policyChangeSchema, runtimeConfigurationSchema } from './schemas.js';
 
 export interface RuntimeConfigurationOptions {
+  rpcVerification?: 'single' | 'quorum';
   authorizeContracts?: boolean;
   credentialKey?: { env: string };
   sharedApplicationSafes?: boolean;
+  executionPool?: { safeCount: number; sponsorCount: number };
   operators: { issuer: string; clientId: string; subject: string }[];
 }
 export interface RuntimePolicy {
@@ -106,6 +111,35 @@ export interface RuntimeReview {
   approved_by: string;
 }
 export interface RuntimeConfigurationState {
+  safeWalletAccounts?: Record<
+    string,
+    import('../sponsorship/safe-wallet.js').SafeWalletAccount
+  >;
+  safeWalletInfrastructure?: Record<
+    string,
+    import('../sponsorship/safe-wallet.js').SafeWalletInfrastructure
+  >;
+
+  poolConfigurationReceipts?: Record<
+    string,
+    {
+      hash: string;
+      result: {
+        application_id: string;
+        safe_count: number;
+        sponsor_count: number;
+      };
+    }
+  >;
+  applicationFunding?: Record<
+    string,
+    import('../provisioning/application-funding.js').ApplicationFundingRecord
+  >;
+  applicationPoolConfigurations?: Record<
+    string,
+    { safeCount: number; sponsorCount: number }
+  >;
+  applicationSafeAssignments?: Record<string, Record<string, string>>;
   applicationSponsors?: Record<
     string,
     import('../provisioning/application-sponsor.js').ApplicationSponsorRecord
@@ -321,6 +355,71 @@ export function normalizeRuntimePolicy(
 /** Durable configuration control plane. Published records do not authorize wallet effects. */
 export class RuntimeConfigurationService {
   private readonly options: RuntimeConfigurationOptions;
+  private readonly rpcPools = new Map<
+    string,
+    { hash: string; pool: RpcEndpointPool; transport: typeof fetch }
+  >();
+  get rpcVerification() {
+    return (
+      this.options.rpcVerification ??
+      (this.options.sharedApplicationSafes ? 'single' : 'quorum')
+    );
+  }
+  async withRpc<T>(
+    applicationId: string,
+    work: (endpoints: string[]) => Promise<T>,
+    transport: typeof fetch = fetch,
+  ): Promise<T> {
+    const endpoints = await this.rpcEndpoints(applicationId);
+    if (this.rpcVerification === 'quorum') return work(endpoints);
+    const hash = fingerprint(endpoints);
+    let cached = this.rpcPools.get(applicationId);
+    if (cached?.hash !== hash || cached.transport !== transport) {
+      cached = {
+        hash,
+        pool: new RpcEndpointPool(
+          endpoints,
+          transport,
+          this.options.sharedApplicationSafes,
+        ),
+        transport,
+      };
+      this.rpcPools.set(applicationId, cached);
+    }
+    return cached!.pool.run((endpoint) => work([endpoint]));
+  }
+  async withSubmissionRpc<T>(
+    applicationId: string,
+    work: (endpoint: string, unavailable: () => void) => Promise<T>,
+    transport: typeof fetch = fetch,
+  ): Promise<T> {
+    const endpoints = await this.rpcEndpoints(applicationId, 'rpc-submission');
+    const hash = fingerprint(endpoints),
+      key = applicationId + ':submission';
+    let cached = this.rpcPools.get(key);
+    if (cached?.hash !== hash || cached.transport !== transport) {
+      cached = {
+        hash,
+        pool: new RpcEndpointPool(
+          endpoints,
+          transport,
+          this.options.sharedApplicationSafes,
+        ),
+        transport,
+      };
+      this.rpcPools.set(key, cached);
+    }
+    const pool = cached!.pool;
+    return pool.run((endpoint) =>
+      work(endpoint, () => pool.cooldown(endpoint)),
+    );
+  }
+  get executionPool() {
+    return this.options.executionPool ?? { safeCount: 1, sponsorCount: 1 };
+  }
+  get hasExecutionPool() {
+    return !!this.options.executionPool;
+  }
   constructor(
     readonly onboardingPolicy: ResolvedPolicy,
     private readonly store: OnboardingStore,
@@ -548,7 +647,10 @@ export class RuntimeConfigurationService {
   /** Resolve only accepted resources belonging to the authenticated application's identity. */
   async rpcEndpoints(
     applicationId: string,
-    kind: 'rpc-verification' | 'rpc-submission' = 'rpc-verification',
+    kind:
+      | 'rpc-verification'
+      | 'rpc-submission'
+      | 'rpc-observation' = 'rpc-verification',
   ): Promise<string[]> {
     this.target(applicationId);
     return this.transaction((registry) => {
@@ -572,13 +674,140 @@ export class RuntimeConfigurationService {
           return this.credentialCipher!.open(record);
         });
       if (
-        endpoints.length < (kind === 'rpc-verification' ? 2 : 1) ||
+        endpoints.length <
+          (kind === 'rpc-verification' && this.rpcVerification === 'quorum'
+            ? 2
+            : kind === 'rpc-observation'
+              ? 0
+              : 1) ||
         endpoints.length > 3 ||
+        (kind !== 'rpc-observation' &&
+          endpoints.some((e) => etherscanEndpoint(e))) ||
         new Set(endpoints.map((e) => new URL(e).origin)).size !==
           endpoints.length
       )
         deny();
       return endpoints;
+    });
+  }
+  private configuredPool(
+    registry: RuntimeConfigurationState,
+    applicationId: string,
+  ) {
+    const saved = registry.applicationPoolConfigurations?.[applicationId];
+    if (saved) return saved;
+    const safes = Object.values(registry.applicationSafes ?? {}).filter(
+      (r) => r.applicationId === applicationId && r.userAccountId === undefined,
+    );
+    const sponsors = Object.values(registry.applicationSponsors ?? {}).filter(
+      (r) => r.applicationId === applicationId,
+    );
+    if (safes.length || sponsors.length)
+      return {
+        safeCount: Math.max(1, ...safes.map((r) => (r.poolIndex ?? 0) + 1)),
+        sponsorCount: Math.max(
+          1,
+          ...sponsors.map((r) => (r.poolIndex ?? 0) + 1),
+        ),
+      };
+    return (
+      this.options.executionPool ??
+      (this.options.sharedApplicationSafes
+        ? { safeCount: 5, sponsorCount: 5 }
+        : this.executionPool)
+    );
+  }
+  async poolConfiguration(applicationId: string) {
+    this.target(applicationId);
+    return this.transaction((registry) =>
+      structuredClone(this.configuredPool(registry, applicationId)),
+    );
+  }
+  async readPool(principal: VerifiedPrincipal) {
+    if (!principal.scopes.includes('wallet:configuration:read')) deny();
+    const applicationId = this.application(principal);
+    const pool = await this.poolConfiguration(applicationId);
+    return {
+      application_id: applicationId,
+      safe_count: pool.safeCount,
+      sponsor_count: pool.sponsorCount,
+    };
+  }
+  async configurePool(
+    context: AuthorityContext,
+    input: {
+      expected_safe_count: number;
+      expected_sponsor_count: number;
+      safe_count: number;
+      sponsor_count: number;
+    },
+  ) {
+    const applicationId = this.application(context.principal);
+    const key = this.key(
+      context,
+      'wallet:configuration:propose',
+      'execution-pool',
+      applicationId,
+    );
+    if (
+      !input ||
+      Object.keys(input).sort().join(',') !==
+        'expected_safe_count,expected_sponsor_count,safe_count,sponsor_count' ||
+      Object.values(input).some((n) => !Number.isInteger(n) || n < 1 || n > 16)
+    )
+      invalid();
+    input = structuredClone(input);
+    const hash = fingerprint(input);
+    return this.transaction((registry) => {
+      const receipts = (registry.poolConfigurationReceipts ??= {});
+      if (receipts[key]) {
+        if (receipts[key].hash !== hash) conflict();
+        return structuredClone(receipts[key].result);
+      }
+      const result = {
+        application_id: applicationId,
+        safe_count: input.safe_count,
+        sponsor_count: input.sponsor_count,
+      };
+      const retain = () => {
+        receipts[key] = { hash, result };
+        return structuredClone(result);
+      };
+      const current = this.configuredPool(registry, applicationId);
+      if (
+        current.safeCount === input.safe_count &&
+        current.sponsorCount === input.sponsor_count
+      )
+        return retain();
+      if (
+        current.safeCount !== input.expected_safe_count ||
+        current.sponsorCount !== input.expected_sponsor_count
+      )
+        conflict();
+      // Choose capacity before provisioning; changing a signed execution configuration requires a separate migration.
+      if (
+        Object.values(registry.applicationSafes ?? {}).some(
+          (r) => r.applicationId === applicationId,
+        ) ||
+        Object.values(registry.applicationSponsors ?? {}).some(
+          (r) => r.applicationId === applicationId,
+        )
+      )
+        conflict();
+      (registry.applicationPoolConfigurations ??= {})[applicationId] = {
+        safeCount: input.safe_count,
+        sponsorCount: input.sponsor_count,
+      };
+      return retain();
+    });
+  }
+  async acceptedSponsorship(applicationId: string) {
+    this.target(applicationId);
+    return this.transaction((registry) => {
+      const record =
+        registry.obligations?.records[applicationId + ':sponsorship'];
+      if (record?.decision !== 'accepted') deny();
+      return structuredClone(record);
     });
   }
   async readObligations(principal: VerifiedPrincipal, applicationId?: string) {

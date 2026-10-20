@@ -153,3 +153,40 @@ it('reports transport loss as disconnected without retrying a possibly admitted 
   ).rejects.toMatchObject({ code: 4900 });
   expect(request).toHaveBeenCalledTimes(1);
 });
+
+it('streams authenticated status without exposing tokens in URLs and cancels the stream at terminal status', async () => {
+  const pending = {
+    version: '2.0.0',
+    id: 'batch',
+    chainId: '0x14a34',
+    status: 100,
+    atomic: true,
+  };
+  const failed = { ...pending, status: 500 };
+  const request = vi.fn<typeof fetch>(async (url, options) => {
+    expect(String(url)).toBe(
+      'https://wallet.example.test/v1/accounts/offline/wallet/calls/batch/events',
+    );
+    expect(options?.headers).toMatchObject({
+      authorization: 'Bearer offline-access',
+    });
+    return new Response(
+      'event: status\ndata: ' +
+        JSON.stringify(pending) +
+        '\n\nevent: status\ndata: ' +
+        JSON.stringify(failed) +
+        '\n\n',
+      { headers: { 'content-type': 'text/event-stream' } },
+    );
+  });
+  const provider = createWalletCallsProvider({
+    url: 'https://wallet.example.test/v1/accounts/offline/wallet',
+    authorization: async () => 'Bearer offline-access',
+    fetch: request,
+  });
+  const statuses = [];
+  for await (const status of provider.watchCallsStatus('batch'))
+    statuses.push(status.status);
+  expect(statuses).toEqual([100, 500]);
+  expect(request).toHaveBeenCalledOnce();
+});

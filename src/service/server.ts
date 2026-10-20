@@ -1,3 +1,4 @@
+import { setAuthenticatedResponseTimeout } from './response-timeout.js';
 import { registerWalletCallsRoutes } from '../wallet-calls/http.js';
 import type { WalletCallsService } from '../wallet-calls/service.js';
 import { readFile } from 'node:fs/promises';
@@ -42,7 +43,9 @@ import {
 } from './schemas.js';
 
 export interface ServerOptions {
+  requestsPerMinute?: number;
   safeProvisioning?: import('../provisioning/safe.js').SafeProvisioningService;
+  safeWallet?: import('../sponsorship/safe-wallet.js').SafeWalletRuntime;
   applicationSafes?: import('../provisioning/application.js').ApplicationSafeService;
   applicationSponsors?: import('../provisioning/application-sponsor.js').ApplicationSponsorService;
   authorizationServer?: {
@@ -94,7 +97,14 @@ export async function createServer(options: ServerOptions = {}) {
   if (options.onClose) app.addHook('onClose', options.onClose);
   const principals = new WeakMap<FastifyRequest, VerifiedPrincipal>();
   await app.register(helmet);
-  await app.register(rateLimit, { max: 60, timeWindow: '1 minute' });
+  const requestLimit = options.requestsPerMinute ?? 60;
+  if (
+    !Number.isInteger(requestLimit) ||
+    requestLimit < 1 ||
+    requestLimit > 6000
+  )
+    throw new Error('Invalid request limit');
+  await app.register(rateLimit, { max: requestLimit, timeWindow: '1 minute' });
   await app.register(swagger, {
     openapi: {
       openapi: '3.0.3',
@@ -159,6 +169,7 @@ export async function createServer(options: ServerOptions = {}) {
           safeQueue: !!options.onboarding?.safeQueue,
           safeProvisioning: !!options.safeProvisioning,
           walletCalls: !!options.walletCalls,
+          safeWallet: !!options.safeWallet,
           runtimeConfiguration: !!options.runtimeConfiguration,
           executionService: !!options.onboarding?.executionIdentity,
           contractCalls: !!options.onboarding?.contractNonce,
@@ -342,6 +353,7 @@ export async function createServer(options: ServerOptions = {}) {
       request,
       await options.authenticate(request.headers.authorization, scope),
     );
+    setAuthenticatedResponseTimeout(request);
   }
   function mutationSchema(
     id: string | undefined,
@@ -520,6 +532,8 @@ export async function createServer(options: ServerOptions = {}) {
                 }
               : undefined,
           );
+      if (options.safeWallet)
+        return options.safeWallet.provision(context, request.params.accountId);
       const smart_account = await options.safeProvisioning?.provision(
         context,
         request.params.accountId,
@@ -531,6 +545,109 @@ export async function createServer(options: ServerOptions = {}) {
       };
     },
   );
+  app.get<{ Params: { applicationId: string } }>(
+    '/v1/configuration/applications/:applicationId/safe-wallet',
+    {
+      onRequest: (request) => authorize(request, 'wallet:configuration:write'),
+      schema: {
+        operationId: 'readSafeWalletInfrastructure',
+        response: {
+          200: {
+            type: 'object',
+            additionalProperties: false,
+            required: ['application_id', 'chain_id', 'profile', 'status'],
+            properties: {
+              application_id: { type: 'string' },
+              chain_id: { type: 'string' },
+              profile: { const: 'safe-only-4337-v1' },
+              status: {
+                type: 'string',
+                enum: ['unprovisioned', 'needs-funding', 'provisioned'],
+              },
+              funding_address: { type: 'string' },
+              paymaster: { type: 'string' },
+            },
+          },
+          403: problemSchema,
+          503: problemSchema,
+        },
+        security: [{ accessToken: [] }],
+        params: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['applicationId'],
+          properties: {
+            applicationId: { type: 'string', pattern: '^[a-f0-9]{64}$' },
+          },
+        },
+      },
+    },
+    (request) =>
+      (
+        options.safeWallet ??
+        (() => {
+          throw Object.assign(new Error('Unavailable'), { statusCode: 503 });
+        })()
+      ).read(principals.get(request)!, request.params.applicationId),
+  );
+  app.post<{ Params: { applicationId: string } }>(
+    '/v1/configuration/applications/:applicationId/safe-wallet',
+    {
+      onRequest: (request) => authorize(request, 'wallet:configuration:write'),
+      schema: {
+        operationId: 'provisionSafeWalletInfrastructure',
+        headers: {
+          type: 'object',
+          required: ['idempotency-key'],
+          properties: { 'idempotency-key': uuidSchema },
+        },
+        response: {
+          200: {
+            type: 'object',
+            additionalProperties: false,
+            required: ['application_id', 'chain_id', 'profile', 'status'],
+            properties: {
+              application_id: { type: 'string' },
+              chain_id: { type: 'string' },
+              profile: { const: 'safe-only-4337-v1' },
+              status: {
+                type: 'string',
+                enum: ['unprovisioned', 'needs-funding', 'provisioned'],
+              },
+              funding_address: { type: 'string' },
+              paymaster: { type: 'string' },
+            },
+          },
+          403: problemSchema,
+          503: problemSchema,
+        },
+        security: [{ accessToken: [] }],
+        params: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['applicationId'],
+          properties: {
+            applicationId: { type: 'string', pattern: '^[a-f0-9]{64}$' },
+          },
+        },
+        body: { type: 'object', additionalProperties: false },
+      },
+    },
+    (request) =>
+      (
+        options.safeWallet ??
+        (() => {
+          throw Object.assign(new Error('Unavailable'), { statusCode: 503 });
+        })()
+      ).ensure(
+        {
+          principal: principals.get(request)!,
+          idempotencyKey: String(request.headers['idempotency-key'] ?? ''),
+        },
+        request.params.applicationId,
+      ),
+  );
+
   app.get<{ Params: { accountId: string } }>(
     '/v1/accounts/:accountId/safe',
     {
@@ -616,6 +733,7 @@ export async function createServer(options: ServerOptions = {}) {
     options.walletCalls,
     options.applicationSafes,
     options.applicationSponsors,
+    options.safeWallet,
   );
   if (options.documentation !== false && options.documentationTokens)
     await registerDocumentationTokens(app, options.documentationTokens);

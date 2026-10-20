@@ -101,8 +101,14 @@ export function createTransferExecutionProvider(
     }
   }
   return {
-    async supportsReplacement() {
-      for (const sponsor of sponsors) {
+    async supportsReplacement(selected) {
+      const checked = selected
+        ? sponsors.filter(
+            (sponsor) => fingerprint(sponsor) === fingerprint(selected),
+          )
+        : sponsors;
+      if (!checked.length) return false;
+      for (const sponsor of checked) {
         const binding = await client.binding(sponsor.accountId);
         if (
           binding?.metadata.wpk_replacement_contract !==
@@ -123,6 +129,9 @@ export function createTransferExecutionProvider(
       const policies = selected?.metadata.policies;
       if (
         !selected ||
+        (plan.networkFees &&
+          selected.metadata.wpk_replacement_contract !==
+            replacementProviderContract) ||
         (plan.replacement &&
           (selected.metadata.wpk_replacement_contract !==
             replacementProviderContract ||

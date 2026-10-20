@@ -10,6 +10,7 @@ export interface OperationGuide {
   safeQueue?: boolean;
   safeProvisioning?: boolean;
   walletCalls?: boolean;
+  safeWallet?: boolean;
   runtimeConfiguration?: boolean;
   applicationLed?: boolean;
   records?: boolean;
@@ -24,6 +25,65 @@ export interface OperationGuide {
 }
 // Shared operator guidance. Runtime authentication and authority remain authoritative.
 export const operationGuides: Record<string, OperationGuide> = {
+  readSafeWalletInfrastructure: {
+    title: 'Inspect Safe-only sponsorship',
+    group: 'Application infrastructure',
+    scope: 'wallet:configuration:write',
+    safeWallet: true,
+    prerequisite:
+      'Use a configured provider operator and an accepted application ID.',
+    success:
+      '200: the retained funding address, paymaster and setup status. Private signer credentials are never returned.',
+  },
+  provisionSafeWalletInfrastructure: {
+    title: 'Prepare the application paymaster and bundler',
+    group: 'Application infrastructure',
+    scope: 'wallet:configuration:write',
+    safeWallet: true,
+    prerequisite:
+      'Accept the application RPC and sponsorship terms. Fund the returned application address and retry with the original application identity.',
+    success:
+      '200: journaled paymaster deployment and gas funding. Uncertain transactions retain their original signed payload and hash.',
+  },
+
+  readApplicationExecutionPool: {
+    title: 'Read application execution capacity',
+    group: 'Application infrastructure',
+    scope: 'wallet:configuration:read',
+    runtimeConfiguration: true,
+    prerequisite: 'Connect the enabled application.',
+    success: '200: configured Safe and sponsor counts for this application.',
+  },
+  configureApplicationExecutionPool: {
+    title: 'Configure application execution capacity',
+    group: 'Application infrastructure',
+    scope: 'wallet:configuration:propose',
+    runtimeConfiguration: true,
+    prerequisite:
+      'Choose counts from one to sixteen before provisioning any pool member. Supply expected counts and a UUIDv4 idempotency key.',
+    success:
+      '200: selected counts. Stale updates and resizing a provisioned pool conflict.',
+  },
+  readApplicationGasFunding: {
+    title: 'Read the application gas funding address',
+    group: 'Application infrastructure',
+    scope: 'wallet:configuration:read',
+    runtimeConfiguration: true,
+    prerequisite:
+      'Have the provider accept sponsorship and prepare the application execution profile.',
+    success:
+      '200: one stable application gas-funding address and infrastructure status for the selected execution profile.',
+  },
+  readWalletExecutionAccount: {
+    title: 'Read the user’s assigned execution Safe',
+    group: 'Wallet calls',
+    scope: 'wallet:execute:read',
+    walletCalls: true,
+    prerequisite:
+      'Use current account access and contract delegation after the application execution pool is ready.',
+    success:
+      '200: the Safe address and chain ID. In the Safe-only profile, this is the user’s deposit, balance and execution address.',
+  },
   readApplicationSafe: {
     title: 'Read application funding addresses and Safe status',
     group: 'Application infrastructure',
@@ -52,7 +112,7 @@ export const operationGuides: Record<string, OperationGuide> = {
     prerequisite:
       'Accept the application sponsorship and submission service declarations. The bundled engine and encrypted credential storage must be configured.',
     success:
-      '200: a retained application-specific sponsor address. Fund this address before provisioning the Safe. Retries reconcile the same signer and relayer identities.',
+      '200: the retained application gas funding address, shared by all pool members. Retries reconcile the same sponsor and relayer identities.',
   },
   provisionApplicationSafe: {
     title: 'Provision a funded application Safe',
@@ -205,6 +265,16 @@ export const operationGuides: Record<string, OperationGuide> = {
     success:
       '200: a durable review decision. Automatic mode publishes subsequent contract/method changes only when provider terms exactly match the enabled current policy. Claims, value/call limits, validity, enablement and chain remain provider controlled. Existing pending proposals are not retroactively accepted.',
   },
+  streamWalletCallsStatus: {
+    title: 'Stream wallet batch status',
+    group: 'Wallet calls',
+    scope: 'wallet:execute:read',
+    walletCalls: true,
+    prerequisite:
+      'Retain the admitted batch ID and use an authenticated fetch stream. Account ownership and batch access are checked before opening; authorization is checked before each update. Reconnect after 55 seconds or use wallet_getCallsStatus.',
+    success:
+      '200: text/event-stream status events after durable observations. Preconfirmation remains pending; verified inner execution determines success. Connections are bounded to two per account, 16 per application and 64 per service.',
+  },
   walletCallsRpc: {
     title: 'Submit or inspect a standard wallet call batch',
     group: 'Wallet calls',
@@ -305,7 +375,7 @@ export const operationGuides: Record<string, OperationGuide> = {
     prerequisite:
       'Use the original request ID and current owner-bound application access. Reading never signs, dispatches or advances the queue.',
     success:
-      '200: queued, executing, succeeded, cancelled, expired or blocked and an action_id when materialized. Succeeded requires finalized RPC-quorum execution success. Signed failures and uncertainty require recovery; the queue does not skip or replace them.',
+      '200: queued, executing, included, succeeded, failed, cancelled, expired or blocked and an action_id when materialized. Verified inclusion with consumed Safe nonce allows the next head; settlement remains pending until finality. Unknown effects and unconsumed Safe nonces require recovery.',
   },
   cancelContractCallRequest: {
     title: 'Cancel an unsigned queued Safe request',
@@ -471,7 +541,7 @@ export const operationGuides: Record<string, OperationGuide> = {
     prerequisite:
       'Use the original action ID, an empty body, exact execution profile headers and a UUIDv4 Idempotency-Key. Current original caller, owner, grant, identity, consent and approval remain required; status reconciliation is allowed after signing expiry. Optional recovery configuration adds nonce diagnostics and durable payer quarantine.',
     success:
-      '200: refreshed original execution and operational diagnosis. The procedure performs only read-only provider and RPC lookup, preserves attempts and budgets, and never signs, claims dispatch, reprices, cancels or clears a nonce. Only exact verified finalized receipts clear corresponding quarantine reasons; nonce consumption without matching effects requires operator review.',
+      '200: refreshed original execution and operational diagnosis. The procedure performs only read-only provider and RPC lookup, preserves attempts and budgets, and never signs, claims dispatch, reprices, cancels or clears a nonce. Matching canonical finalized evidence remains finalized when a rotated RPC reports lagging heads. Explicit reconciliation bypasses inclusion caches and can clear an integrity fence only after a fresh full proof restores the original plan, transaction, block and outcome. Only exact verified finalized receipts clear corresponding quarantine reasons; nonce consumption without matching effects requires operator review.',
   },
   authorizeSafeNonceCancellation: {
     title: 'Authorize cancellation of an unsubmitted signed Safe action',
@@ -590,6 +660,7 @@ export interface ApiFeatures {
   safeQueue?: boolean;
   safeProvisioning?: boolean;
   walletCalls?: boolean;
+  safeWallet?: boolean;
   runtimeConfiguration?: boolean;
   executionService?: boolean;
   contractCalls?: boolean;
@@ -616,6 +687,8 @@ export function operationUnavailableReason(
     return features.runtimeConfiguration
       ? undefined
       : 'Runtime configuration control plane is not configured';
+  if (guide.safeWallet && !features.safeWallet)
+    return 'Requires the Safe-only wallet profile.';
   if (guide.walletCalls && !features.walletCalls)
     return 'Runtime financial authority and Safe queue are not configured';
   if (guide.safeQueue && !features.safeQueue)

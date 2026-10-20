@@ -557,7 +557,7 @@ test('mobile layout has usable controls and no horizontal page overflow', async 
   );
   await step(page, 'Backend');
   await expect(
-    page.getByRole('button', { name: 'Coinbase CDP', exact: true }),
+    page.getByRole('button', { name: 'Open Wallet Standard', exact: true }),
   ).toBeVisible();
   expect(
     await page.evaluate(
@@ -630,7 +630,7 @@ test('API reference follows the configuration, preserves edits, shows Swagger sc
   await expect(
     page.getByRole('heading', { name: 'Provider API reference', exact: true }),
   ).toBeVisible();
-  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(55);
+  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(62);
   await expect(
     page
       .getByText('Not enabled: Wallet operations are disabled in Deployment', {
@@ -674,7 +674,7 @@ test('API reference follows the configuration, preserves edits, shows Swagger sc
     page.getByLabel('cURL request example', { exact: true }),
   ).toContainText('wallet.example.com/v1/accounts/');
   await page.getByLabel('Find an endpoint', { exact: true }).fill('');
-  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(55);
+  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(62);
   await page
     .getByLabel('Example endpoint', { exact: true })
     .selectOption('signAction');
@@ -735,7 +735,7 @@ test('API reference follows the configuration, preserves edits, shows Swagger sc
     permissions: ['account:read', 'transfers:request'],
   });
   await imported(page, financial);
-  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(55);
+  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(62);
   await page
     .getByLabel('Example endpoint', { exact: true })
     .selectOption('signAction');
@@ -818,7 +818,7 @@ test('API renderer can retry a failed bundled asset without losing setup', async
   await page
     .getByRole('button', { name: 'Reload API reference', exact: true })
     .click();
-  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(55);
+  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(62);
   await page
     .getByRole('button', { name: 'Setup configuration', exact: true })
     .click();
@@ -1394,7 +1394,7 @@ test('operators can export per-Safe queue limits and multiple sponsors for one a
   await page
     .getByRole('button', { name: 'API reference', exact: true })
     .click();
-  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(55);
+  await expect(page.locator('.swagger-ui .opblock')).toHaveCount(62);
   await page
     .getByLabel('Example endpoint', { exact: true })
     .selectOption('enqueueContractCall');
@@ -1563,7 +1563,7 @@ test('a new provider exports the bundled issuer, OWS vault and Caddy profile wit
   expect(restored).toEqual(config);
 });
 
-test('shared execution is prebundled without wizard sponsors, RPCs or contract policies', async ({
+test('Safe-only execution is prebundled without wizard sponsors, RPCs or contract policies', async ({
   page,
 }) => {
   await step(page, 'Services');
@@ -1571,7 +1571,7 @@ test('shared execution is prebundled without wizard sponsors, RPCs or contract p
     page.getByLabel('Local execution engine', { exact: true }),
   ).toHaveCount(0);
   await expect(
-    page.getByText('Local setup starts the execution engine'),
+    page.getByText('Local setup starts the private bundler'),
   ).toBeVisible();
   await step(page, 'Applications');
   await expect(page.getByLabel('Access flow', { exact: true })).toHaveCount(0);
@@ -1948,4 +1948,58 @@ test('automatic Safe provisioning exports canonical pins without a static accoun
   saved = await exported(page);
   expect(saved.approvedCalls.policy.accounts).toEqual([]);
   expect(saved.safeProvisioning.profile).toBe('safe-1.4.1');
+});
+
+test('exports shared Safe and sponsor pools with explicit overload limits', async ({
+  page,
+}) => {
+  const config = JSON.parse(
+    await readFile(
+      new URL(
+        '../../docs/provider.config.application.example.json',
+        import.meta.url,
+      ),
+      'utf8',
+    ),
+  );
+  await imported(page, config);
+  await step(page, 'Deployment');
+  await page
+    .getByRole('checkbox', {
+      name: 'Use parallel Safe and sponsor pools',
+      exact: true,
+    })
+    .check();
+  await page
+    .getByLabel('Execution Safes per application', { exact: true })
+    .fill('4');
+  await page
+    .getByLabel('Gas sponsors per application', { exact: true })
+    .fill('2');
+  await page
+    .getByLabel('Maximum queued transactions per user', { exact: true })
+    .fill('2');
+  await page
+    .getByLabel('Maximum queued transactions per application', { exact: true })
+    .fill('16');
+  await page
+    .getByLabel('Maximum queued transactions across this service', {
+      exact: true,
+    })
+    .fill('64');
+  const saved = await exported(page);
+  expect(saved.runtimeConfiguration.executionPool).toEqual({
+    safeCount: 4,
+    sponsorCount: 2,
+  });
+  expect(saved.execution.safeQueue).toMatchObject({
+    maxDepthPerUser: 2,
+    maxDepthPerApplication: 16,
+    maxDepthTotal: 64,
+  });
+  await imported(page, saved);
+  await step(page, 'Deployment');
+  await expect(
+    page.getByLabel('Execution Safes per application', { exact: true }),
+  ).toHaveValue('4');
 });

@@ -52,7 +52,8 @@ export function explainIssue(issue: string) {
             ? 'Applications'
             : issue.startsWith('/financial')
               ? 'Applications'
-              : issue.startsWith('/execution') ||
+              : issue.startsWith('/runtimeConfiguration/executionPool') ||
+                  issue.startsWith('/execution') ||
                   issue.startsWith('/activation') ||
                   issue.startsWith('/apiExplorer') ||
                   issue.startsWith('/http') ||
@@ -106,6 +107,17 @@ export function explainIssue(issue: string) {
 
 function fieldLabel(path: string): string {
   const labels: Record<string, string> = {
+    '/runtimeConfiguration/executionPool/safeCount':
+      'Execution Safes per application',
+    '/runtimeConfiguration/executionPool/sponsorCount':
+      'Gas sponsors per application',
+    '/execution/safeQueue/maxDepthPerUser':
+      'Maximum queued transactions per user',
+    '/execution/safeQueue/maxDepthPerApplication':
+      'Maximum queued transactions per application',
+    '/execution/safeQueue/maxDepthTotal':
+      'Maximum queued transactions across this service',
+    '/http/requestsPerMinute': 'HTTP requests per minute per peer',
     '/': 'Configuration',
     '/version': 'Configuration version',
     '/policy': 'Access policy',

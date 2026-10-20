@@ -593,7 +593,9 @@ See the [HTTP reference](http-reference.md).
 
 ```ts
 export interface ServerOptions {
+  requestsPerMinute?: number;
   safeProvisioning?: import('../provisioning/safe.js').SafeProvisioningService;
+  safeWallet?: import('../sponsorship/safe-wallet.js').SafeWalletRuntime;
   applicationSafes?: import('../provisioning/application.js').ApplicationSafeService;
   applicationSponsors?: import('../provisioning/application-sponsor.js').ApplicationSponsorService;
   authorizationServer?: {
@@ -633,7 +635,14 @@ export interface WalletCallsBatchSummary extends WalletCallsStatus {
   account_id: string;
   sender: string;
   queue_stage:
-    'cancelled' | 'expired' | 'blocked' | 'succeeded' | 'queued' | 'executing';
+    | 'cancelled'
+    | 'expired'
+    | 'blocked'
+    | 'succeeded'
+    | 'included'
+    | 'failed'
+    | 'queued'
+    | 'executing';
   policy_revision: string;
   expires_at: string;
   application_id: string;
@@ -647,6 +656,13 @@ export interface WalletCallsBatchSummary extends WalletCallsStatus {
 ```ts
 /** Account-scoped EIP-5792 adapter. The server selects the durable execution driver for each account. */
 export declare class WalletCallsService {
+  account(
+    principal: VerifiedPrincipal,
+    accountId: string,
+  ): Promise<{
+    address: string;
+    chainId: '0x2105' | '0x14a34';
+  }>;
   constructor(actions: SupportedActions, driver: WalletCallsDriver);
   constructor(
     actions: SupportedActions,
@@ -654,6 +670,13 @@ export declare class WalletCallsService {
     execution: ExecutionCoordinatorPort,
     driver?: WalletCallsDriver,
   );
+  /** Streams current authorized status; notifications contain no account data. */
+  watch(
+    principal: VerifiedPrincipal,
+    accountId: string,
+    batchId: string,
+    signal: AbortSignal,
+  ): AsyncGenerator<WalletCallsStatus | undefined, void, unknown>;
   list(
     principal: VerifiedPrincipal,
     authorizeOperator?: (state: ProviderState) => void,
@@ -1002,6 +1025,7 @@ export interface OnboardingProviderConfiguration {
 export declare class OnboardingService {
   readonly store: OnboardingStore;
   readonly runtimeContracts: boolean;
+  readonly safeOnlyWallet: boolean;
   readonly policy: Readonly<{
     revision: string;
     identity: {
@@ -1031,6 +1055,7 @@ export declare class OnboardingService {
     walletReader?: Pick<WalletSigningProvider, 'findAccount'> | undefined,
     transferPolicyRevision?: string | undefined,
     runtimeContracts?: boolean,
+    safeOnlyWallet?: boolean,
   );
   applicationAccessPolicy(principal: VerifiedPrincipal): Promise<
     | {
@@ -1864,8 +1889,20 @@ export declare function createCdpWalletProvider(
 
 Import from `@moovha/wallet-provider-kit/ows`. [Integration guide](ows-adapter.md).
 
+- [createOwsSigningBackend](#createowssigningbackend)
 - [createOwsWalletProvider](#createowswalletprovider)
 - [OwsProviderOptions](#owsprovideroptions)
+
+### createOwsSigningBackend
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/providers/ows.ts).
+
+```ts
+/** Internal backend; the caller must supply its durable financial journal. */
+export declare function createOwsSigningBackend(
+  options: OwsProviderOptions,
+): WalletSigningProvider;
+```
 
 ### createOwsWalletProvider
 
@@ -2533,6 +2570,7 @@ export declare function openProviderDatabase(
     approval: FinancialApproval,
     allowExpired?: boolean,
   ): Promise<boolean>;
+  hasAttemptAdmission(request: WalletAttemptRequest): boolean;
   /** Synchronous inside the shared storage transaction; any admission retains possible signing exposure. */
   hasActionAttempts(id: string): boolean;
   /** Synchronous with cancellation admission: a provider handoff, even before claim, prevents cancellation. */
@@ -2871,6 +2909,8 @@ export declare class ApprovedExecutionCoordinator {
   readonly actions: SupportedActions;
   readonly configurationHash: string;
   readonly profile: ExecutionConfiguration['profile'];
+  setObservationWake(wake: () => void): void;
+  subscribe(listener: (id: string) => void): () => void;
   constructor(
     actions: SupportedActions,
     database: ProviderDatabase,
@@ -2879,6 +2919,7 @@ export declare class ApprovedExecutionCoordinator {
     provider: ExecutionProvider,
     observer: ExecutionObserver,
     operations?: PayerOperations | undefined,
+    onInclusion?: ((id: string) => Promise<void> | void) | undefined,
   );
   get nonceCancellationEnabled(): boolean;
   /** Bound every encoded wallet/executor envelope before accepting a standard batch. No signatures or attempts are issued. */
@@ -2927,6 +2968,7 @@ export declare class ApprovedExecutionCoordinator {
 ```ts
 /** Immutable private plan. Requests may propose policy-controlled calls; execute uses only this stored envelope and server-selected sponsor. */
 export interface ApprovedExecutionPlan {
+  networkFees?: import('./network-fees.js').NetworkFeeQuote;
   runtimePolicy?: import('../runtime-configuration/authority.js').RuntimePolicySnapshot;
   profile: ExecutionProfile;
   revision: '1';
@@ -2981,10 +3023,18 @@ export interface BundledAuthorizationConfiguration {
 
 ```ts
 export interface ChainObservation {
+  preconfirmation?: {
+    stage: 'preconfirmed';
+    transaction_hash: string;
+    observed_at: string;
+    rpc_source_origin: string;
+  };
+  safe_nonce_consumed?: boolean;
   callsReceipt?: import('../wallet-calls/types.js').WalletCallsReceipt;
   chain_status:
     'unobserved' | 'pending' | 'included' | 'safe' | 'finalized' | 'reorged';
-  verification: 'unverified' | 'rpc-quorum';
+  verification: 'unverified' | 'rpc-quorum' | 'rpc-single';
+  rpc_source_origin?: string;
   outcome: 'unknown' | 'succeeded' | 'reverted';
   settlement: 'pending' | 'succeeded' | 'reverted';
   observed_at: string;
@@ -3147,6 +3197,10 @@ export declare function createWalletCallsProvider(
     method: string;
     params?: readonly unknown[] | object;
   }) => Promise<unknown>;
+  watchCallsStatus: (
+    batchId: string,
+    signal?: AbortSignal,
+  ) => AsyncGenerator<WalletCallsStatus>;
 };
 ```
 
@@ -3251,6 +3305,9 @@ export interface ExecutionConfiguration {
   safeQueue?: {
     maxDepthPerSafe: number;
     maxWaitSeconds: number;
+    maxDepthPerUser?: number;
+    maxDepthPerApplication?: number;
+    maxDepthTotal?: number;
   };
   recovery?: import('./recovery.js').RecoveryConfiguration;
   replacement?: import('./replacement.js').ReplacementPolicy;
@@ -3292,6 +3349,32 @@ export interface ExecutionDispatchContext {
 
 ```ts
 export interface ExecutionObserver {
+  observeFresh?(
+    plan: TransferExecutionPlan,
+    candidates: string[],
+    ownHash?: string,
+  ): Promise<ChainObservation>;
+  /** Trusted, service-persisted full proof only; a fresh canonical check remains mandatory. */
+  recheckInclusion?(
+    plan: TransferExecutionPlan,
+    observation: ChainObservation,
+    ownHash?: string,
+  ): Promise<ChainObservation | undefined>;
+  subscribe?(
+    plan: TransferExecutionPlan,
+    wake: () => void,
+  ): Promise<() => void>;
+  quoteFees?(
+    sponsor: ExecutionSponsor,
+    principal: VerifiedPrincipal,
+  ): Promise<import('./network-fees.js').NetworkFeeQuote | undefined>;
+  anchorWithFees?(
+    sponsor: ExecutionSponsor,
+    principal: VerifiedPrincipal,
+  ): Promise<{
+    scanFromBlock: string;
+    networkFees: import('./network-fees.js').NetworkFeeQuote | undefined;
+  }>;
   nonceSnapshot?(
     plan: TransferExecutionPlan,
     ownHash?: string,
@@ -3329,7 +3412,7 @@ export type ExecutionProfile =
 
 ```ts
 export interface ExecutionProvider {
-  supportsReplacement?(): Promise<boolean>;
+  supportsReplacement?(sponsor?: ExecutionSponsor): Promise<boolean>;
   replace?(
     plan: TransferExecutionPlan,
     transactionId: string,
@@ -3679,6 +3762,7 @@ export type PinnedReplacementPolicy = {
 
 ```ts
 export interface ProviderConfiguration {
+  safeWallet?: import('../sponsorship/safe-wallet.js').SafeWalletConfiguration;
   network?: ProviderNetwork;
   safeProvisioning?: import('../provisioning/safe.js').SafeProvisioningConfiguration;
   runtimeConfiguration?: RuntimeConfigurationOptions;
@@ -3756,6 +3840,7 @@ export interface ProviderConfiguration {
   execution?: ExecutionConfiguration;
   operations?: import('../execution/operations.js').OperationsConfiguration;
   http?: {
+    requestsPerMinute?: number;
     host?: '127.0.0.1' | '0.0.0.0' | '::1' | '::';
     port?: number;
     documentation?: boolean;
@@ -3790,17 +3875,39 @@ export declare class QuorumExecutionObserver implements ExecutionObserver {
     maxLogRange: number,
     request?: typeof fetch,
     network?: ProviderNetwork | undefined,
+    verificationMode?: 'single' | 'quorum',
+    reuseInclusionProofs?: boolean,
+    aggregateSafeReads?: boolean,
   );
+  verifyNetwork(): Promise<void>;
   anchor(): Promise<string>;
   /** Read-only Safe simulation using its owner's prevalidated signature; never a dispatch payload. */
   preflightUnsigned(plan: TransferExecutionPlan): Promise<void>;
   preflight(plan: TransferExecutionPlan): Promise<void>;
+  /** Read a nonce for unsigned intent construction; preflight verifies current account authority before signing. */
+  actionNonce(binding: SafeAccountBinding): Promise<string>;
   /** Read-only verified account binding and common nonce before constructing an approved action. */
   contractNonce(
     binding: SafeAccountBinding,
     owner: string,
     _principal?: import('../domain/principal.js').VerifiedPrincipal,
   ): Promise<string>;
+  /** Explicit reconciliation bypasses every inclusion-proof cache. */
+  observeFresh(
+    plan: TransferExecutionPlan,
+    candidates: string[],
+    ownHash?: string,
+  ): Promise<
+    ChainObservation & {
+      scanNextBlock?: string;
+    }
+  >;
+  /** Restore only a trusted local full proof, then use the ordinary fresh canonical guard. */
+  recheckInclusion(
+    plan: TransferExecutionPlan,
+    observation: ChainObservation,
+    ownHash?: string,
+  ): Promise<ChainObservation | undefined>;
   /** Native balance at a common canonical block, with chain identity and block-hash agreement. */
   payerBalance(sponsor: string): Promise<string>;
   /** Read-only nonce diagnostics at common canonical block heights; pending counts are explicitly local hints. */
@@ -3834,17 +3941,39 @@ export declare class QuorumExecutionObserver implements ExecutionObserver {
     maxLogRange: number,
     request?: typeof fetch,
     network?: ProviderNetwork | undefined,
+    verificationMode?: 'single' | 'quorum',
+    reuseInclusionProofs?: boolean,
+    aggregateSafeReads?: boolean,
   );
+  verifyNetwork(): Promise<void>;
   anchor(): Promise<string>;
   /** Read-only Safe simulation using its owner's prevalidated signature; never a dispatch payload. */
   preflightUnsigned(plan: TransferExecutionPlan): Promise<void>;
   preflight(plan: TransferExecutionPlan): Promise<void>;
+  /** Read a nonce for unsigned intent construction; preflight verifies current account authority before signing. */
+  actionNonce(binding: SafeAccountBinding): Promise<string>;
   /** Read-only verified account binding and common nonce before constructing an approved action. */
   contractNonce(
     binding: SafeAccountBinding,
     owner: string,
     _principal?: import('../domain/principal.js').VerifiedPrincipal,
   ): Promise<string>;
+  /** Explicit reconciliation bypasses every inclusion-proof cache. */
+  observeFresh(
+    plan: TransferExecutionPlan,
+    candidates: string[],
+    ownHash?: string,
+  ): Promise<
+    ChainObservation & {
+      scanNextBlock?: string;
+    }
+  >;
+  /** Restore only a trusted local full proof, then use the ordinary fresh canonical guard. */
+  recheckInclusion(
+    plan: TransferExecutionPlan,
+    observation: ChainObservation,
+    ownHash?: string,
+  ): Promise<ChainObservation | undefined>;
   /** Native balance at a common canonical block, with chain identity and block-hash agreement. */
   payerBalance(sponsor: string): Promise<string>;
   /** Read-only nonce diagnostics at common canonical block heights; pending counts are explicitly local hints. */
@@ -3995,11 +4124,16 @@ export declare const runtimeApplicationId: (
 
 ```ts
 export interface RuntimeConfigurationOptions {
+  rpcVerification?: 'single' | 'quorum';
   authorizeContracts?: boolean;
   credentialKey?: {
     env: string;
   };
   sharedApplicationSafes?: boolean;
+  executionPool?: {
+    safeCount: number;
+    sponsorCount: number;
+  };
   operators: {
     issuer: string;
     clientId: string;
@@ -4016,6 +4150,22 @@ export interface RuntimeConfigurationOptions {
 /** Durable configuration control plane. Published records do not authorize wallet effects. */
 export declare class RuntimeConfigurationService {
   readonly onboardingPolicy: ResolvedPolicy;
+  get rpcVerification(): 'single' | 'quorum';
+  withRpc<T>(
+    applicationId: string,
+    work: (endpoints: string[]) => Promise<T>,
+    transport?: typeof fetch,
+  ): Promise<T>;
+  withSubmissionRpc<T>(
+    applicationId: string,
+    work: (endpoint: string, unavailable: () => void) => Promise<T>,
+    transport?: typeof fetch,
+  ): Promise<T>;
+  get executionPool(): {
+    safeCount: number;
+    sponsorCount: number;
+  };
+  get hasExecutionPool(): boolean;
   constructor(
     onboardingPolicy: ResolvedPolicy,
     store: OnboardingStore,
@@ -4042,8 +4192,31 @@ export declare class RuntimeConfigurationService {
   /** Resolve only accepted resources belonging to the authenticated application's identity. */
   rpcEndpoints(
     applicationId: string,
-    kind?: 'rpc-verification' | 'rpc-submission',
+    kind?: 'rpc-verification' | 'rpc-submission' | 'rpc-observation',
   ): Promise<string[]>;
+  poolConfiguration(applicationId: string): Promise<{
+    safeCount: number;
+    sponsorCount: number;
+  }>;
+  readPool(principal: VerifiedPrincipal): Promise<{
+    application_id: string;
+    safe_count: number;
+    sponsor_count: number;
+  }>;
+  configurePool(
+    context: AuthorityContext,
+    input: {
+      expected_safe_count: number;
+      expected_sponsor_count: number;
+      safe_count: number;
+      sponsor_count: number;
+    },
+  ): Promise<{
+    application_id: string;
+    safe_count: number;
+    sponsor_count: number;
+  }>;
+  acceptedSponsorship(applicationId: string): Promise<ObligationRecord>;
   readObligations(
     principal: VerifiedPrincipal,
     applicationId?: string,
@@ -4288,6 +4461,7 @@ export interface SafeDeploymentDriver {
 
 ```ts
 export interface SafeDeploymentPlan {
+  networkFees?: import('../execution/network-fees.js').NetworkFeeQuote;
   accountId: string;
   owner: string;
   address: string;
@@ -4333,6 +4507,8 @@ export declare class SafeExecutionQueue {
     status:
       | 'cancelled'
       | 'expired'
+      | 'failed'
+      | 'included'
       | 'blocked'
       | 'succeeded'
       | 'queued'
@@ -4362,10 +4538,13 @@ export declare class SafeExecutionQueue {
     executeKey: string;
     identityHash: string;
     actionId?: string;
+    progressionActionId?: string;
     status:
       | 'queued'
       | 'executing'
+      | 'included'
       | 'succeeded'
+      | 'failed'
       | 'cancelled'
       | 'expired'
       | 'blocked';
@@ -4392,10 +4571,13 @@ export declare class SafeExecutionQueue {
       executeKey: string;
       identityHash: string;
       actionId?: string;
+      progressionActionId?: string;
       status:
         | 'queued'
         | 'executing'
+        | 'included'
         | 'succeeded'
+        | 'failed'
         | 'cancelled'
         | 'expired'
         | 'blocked';
@@ -4413,6 +4595,8 @@ export declare class SafeExecutionQueue {
     status:
       | 'cancelled'
       | 'expired'
+      | 'failed'
+      | 'included'
       | 'blocked'
       | 'succeeded'
       | 'queued'
@@ -4430,6 +4614,8 @@ export declare class SafeExecutionQueue {
     status:
       | 'cancelled'
       | 'expired'
+      | 'failed'
+      | 'included'
       | 'blocked'
       | 'succeeded'
       | 'queued'
@@ -4439,6 +4625,9 @@ export declare class SafeExecutionQueue {
   /** Process a bounded set of independent Safe heads; duplicates join the same signing and dispatch attempts. */
   process(): Promise<void>;
   start(): void;
+  /** Consume the just-persisted inclusion observation without verifying that same head a second time. */
+  included(actionId: string): Promise<void>;
+  wake(): void;
   close(): Promise<void>;
 }
 ```
@@ -4483,6 +4672,8 @@ export declare class SafeProvisioningService {
           caller: Pick<VerifiedPrincipal, 'issuer' | 'subject' | 'clientId'>;
         }>)
       | undefined,
+    verificationMode?: 'single' | 'quorum',
+    readiness?: 'included' | 'finalized',
   );
   read(
     context: AuthorityContext,
@@ -4527,8 +4718,16 @@ export interface SafeQueueRecord {
   executeKey: string;
   identityHash: string;
   actionId?: string;
+  progressionActionId?: string;
   status:
-    'queued' | 'executing' | 'succeeded' | 'cancelled' | 'expired' | 'blocked';
+    | 'queued'
+    | 'executing'
+    | 'included'
+    | 'succeeded'
+    | 'failed'
+    | 'cancelled'
+    | 'expired'
+    | 'blocked';
 }
 ```
 
@@ -4658,6 +4857,8 @@ export declare class ApprovedExecutionCoordinator {
   readonly actions: SupportedActions;
   readonly configurationHash: string;
   readonly profile: ExecutionConfiguration['profile'];
+  setObservationWake(wake: () => void): void;
+  subscribe(listener: (id: string) => void): () => void;
   constructor(
     actions: SupportedActions,
     database: ProviderDatabase,
@@ -4666,6 +4867,7 @@ export declare class ApprovedExecutionCoordinator {
     provider: ExecutionProvider,
     observer: ExecutionObserver,
     operations?: PayerOperations | undefined,
+    onInclusion?: ((id: string) => Promise<void> | void) | undefined,
   );
   get nonceCancellationEnabled(): boolean;
   /** Bound every encoded wallet/executor envelope before accepting a standard batch. No signatures or attempts are issued. */
@@ -4852,6 +5054,13 @@ export declare class WalletCallsRpcError extends Error {
 ```ts
 /** Account-scoped EIP-5792 adapter. The server selects the durable execution driver for each account. */
 export declare class WalletCallsService {
+  account(
+    principal: VerifiedPrincipal,
+    accountId: string,
+  ): Promise<{
+    address: string;
+    chainId: '0x2105' | '0x14a34';
+  }>;
   constructor(actions: SupportedActions, driver: WalletCallsDriver);
   constructor(
     actions: SupportedActions,
@@ -4859,6 +5068,13 @@ export declare class WalletCallsService {
     execution: ExecutionCoordinatorPort,
     driver?: WalletCallsDriver,
   );
+  /** Streams current authorized status; notifications contain no account data. */
+  watch(
+    principal: VerifiedPrincipal,
+    accountId: string,
+    batchId: string,
+    signal: AbortSignal,
+  ): AsyncGenerator<WalletCallsStatus | undefined, void, unknown>;
   list(
     principal: VerifiedPrincipal,
     authorizeOperator?: (state: ProviderState) => void,
@@ -4886,6 +5102,13 @@ export interface WalletCallsStatus {
   chainId: '0x14a34' | '0x2105';
   status: 100 | 200 | 400 | 500;
   atomic: true;
+  capabilities?: {
+    preconfirmation?: {
+      stage: 'preconfirmed';
+      transactionHash: string;
+      observedAt: string;
+    };
+  };
   receipts?: WalletCallsReceipt[];
 }
 ```
@@ -4913,6 +5136,10 @@ export declare function createWalletCallsProvider(
     method: string;
     params?: readonly unknown[] | object;
   }) => Promise<unknown>;
+  watchCallsStatus: (
+    batchId: string,
+    signal?: AbortSignal,
+  ) => AsyncGenerator<WalletCallsStatus>;
 };
 ```
 
@@ -4974,6 +5201,13 @@ export interface WalletCallsStatus {
   chainId: '0x14a34' | '0x2105';
   status: 100 | 200 | 400 | 500;
   atomic: true;
+  capabilities?: {
+    preconfirmation?: {
+      stage: 'preconfirmed';
+      transactionHash: string;
+      observedAt: string;
+    };
+  };
   receipts?: WalletCallsReceipt[];
 }
 ```
@@ -4987,7 +5221,13 @@ Import from `@moovha/wallet-provider-kit/sponsorship`. [Integration guide](accou
 - [applicationGasBudgetLimit](#applicationgasbudgetlimit)
 - [BundlerConfigurationV07](#bundlerconfigurationv07)
 - [createBundlerClientV07](#createbundlerclientv07)
+- [createLocalPaymasterTransport](#createlocalpaymastertransport)
 - [createPaymasterClientV07](#createpaymasterclientv07)
+- [LocalPaymasterAuthorization](#localpaymasterauthorization)
+- [localPaymasterDeployment](#localpaymasterdeployment)
+- [localPaymasterHashV07](#localpaymasterhashv07)
+- [localPaymasterUrl](#localpaymasterurl)
+- [LocalVerifyingPaymasterOptions](#localverifyingpaymasteroptions)
 - [maximumUserOperationCostV07](#maximumuseroperationcostv07)
 - [normalizeUserOperationV07](#normalizeuseroperationv07)
 - [packedUserOperation](#packeduseroperation)
@@ -5009,6 +5249,7 @@ Import from `@moovha/wallet-provider-kit/sponsorship`. [Integration guide](accou
 - [safeUserOperationCallData](#safeuseroperationcalldata)
 - [signedUserOperationHash](#signeduseroperationhash)
 - [SignedUserOperationV07](#signeduseroperationv07)
+- [singletonPaymasterSource](#singletonpaymastersource)
 - [SponsorshipConsentTerms](#sponsorshipconsentterms)
 - [UserOperationDomainV07](#useroperationdomainv07)
 - [UserOperationExecution](#useroperationexecution)
@@ -5091,6 +5332,18 @@ export declare function createBundlerClientV07(
 };
 ```
 
+### createLocalPaymasterTransport
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/sponsorship/local-paymaster.ts).
+
+```ts
+/** In-process ERC-7677 transport for an application-owned paymaster; all other requests use the supplied transport. */
+export declare function createLocalPaymasterTransport(
+  options: LocalVerifyingPaymasterOptions,
+  fallback?: typeof fetch,
+): typeof fetch;
+```
+
 ### createPaymasterClientV07
 
 [Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/sponsorship/paymaster.ts).
@@ -5110,6 +5363,82 @@ export declare function createPaymasterClientV07(
     context: PaymasterContext,
   ) => Promise<PaymasterStubV07>;
 };
+```
+
+### LocalPaymasterAuthorization
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/sponsorship/local-paymaster.ts).
+
+```ts
+export interface LocalPaymasterAuthorization {
+  method: 'pm_getPaymasterStubData' | 'pm_getPaymasterData';
+  operation: UserOperationV07;
+  context: PaymasterContext;
+  maximumCostWei: string;
+}
+```
+
+### localPaymasterDeployment
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/sponsorship/local-paymaster.ts).
+
+```ts
+/** Exact constructor payload and runtime pin for a new application-owned upstream paymaster. */
+export declare function localPaymasterDeployment(
+  entryPoint: string,
+  owner: string,
+  manager: string,
+  signer: string,
+): {
+  data: string;
+  runtimeCodeHash: string;
+};
+```
+
+### localPaymasterHashV07
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/sponsorship/local-paymaster.ts).
+
+```ts
+/** Hash used by the pinned upstream SingletonPaymasterV7 verifying mode. */
+export declare function localPaymasterHashV07(
+  operation: UserOperationV07,
+  chainId: string,
+): string;
+```
+
+### localPaymasterUrl
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/sponsorship/local-paymaster.ts).
+
+```ts
+/** Internal transport identity; this address is never resolved over the network. */
+export declare const localPaymasterUrl =
+  'https://local-paymaster.wallet-provider-kit.invalid/v07';
+```
+
+### LocalVerifyingPaymasterOptions
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/sponsorship/local-paymaster.ts).
+
+```ts
+export interface LocalVerifyingPaymasterOptions {
+  domain: PaymasterClientOptionsV07['domain'];
+  paymaster: string;
+  signer: string;
+  maximumVerificationGas: string;
+  maximumPostOpGas: string;
+  maximumCostWei: string;
+  l1FeeReserveWei: string;
+  maximumValiditySeconds?: number;
+  /** Resolve current persisted authority and the already claimed sponsorship phase. */
+  authorize(request: LocalPaymasterAuthorization): Promise<{
+    validAfter: string;
+    validUntil: string;
+  } | null>;
+  /** Protected infrastructure signer. Sign the EIP-191 digest of these exact hash bytes. */
+  sign(hash: string, request: LocalPaymasterAuthorization): Promise<string>;
+}
 ```
 
 ### maximumUserOperationCostV07
@@ -5278,7 +5607,10 @@ export interface Safe4337Acceptance {
   module: PinnedContract;
   paymaster: PinnedContract;
   genesisHash: string;
-  rpcUrls: [string, string];
+  rpcUrls: string[];
+  rpcVerification?: 'single' | 'quorum';
+  aggregateReads?: boolean;
+  observationRpcUrls?: string[];
 }
 ```
 
@@ -5372,7 +5704,16 @@ export declare class Safe4337SigningService {
     principal: import('../domain/principal.js').VerifiedPrincipal,
     accountId: string,
   ): Promise<void>;
-  authorizeSubmission(context: AuthorityContext, id: string): Promise<void>;
+  authorizeSubmission(
+    context: AuthorityContext,
+    id: string,
+    verifyChain?: boolean,
+  ): Promise<void>;
+  /** Internal paymaster port. A claimed durable phase and current authority are required before usable sponsorship. */
+  authorizeLocalPaymaster(request: LocalPaymasterAuthorization): Promise<{
+    validAfter: string;
+    validUntil: string;
+  }>;
   withExecutionRead<T>(
     principal: import('../domain/principal.js').VerifiedPrincipal,
     id: string,
@@ -5535,6 +5876,15 @@ export type SignedUserOperationV07 = UserOperationV07 & {
 };
 ```
 
+### singletonPaymasterSource
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/sponsorship/local-paymaster.ts).
+
+```ts
+export declare const singletonPaymasterSource =
+  '1e2305d1102242379b582142f62bd17add12b8c2';
+```
+
 ### SponsorshipConsentTerms
 
 [Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/sponsorship/signing.ts).
@@ -5607,6 +5957,7 @@ export declare class UserOperationExecutionCoordinator {
   readonly actions: SupportedActions;
   readonly signing: Safe4337SigningService;
   readonly configurationHash: string;
+  subscribe(listener: (id: string) => void): () => void;
   constructor(
     actions: SupportedActions,
     database: ProviderDatabase,
@@ -5715,6 +6066,8 @@ export interface UserOperationWalletCallsConfiguration {
   maxDepthPerSafe: number;
   maxWaitSeconds: number;
   pollIntervalSeconds: number;
+  maxConcurrentAccounts?: number;
+  maxDepthTotal?: number;
 }
 ```
 
@@ -5730,7 +6083,16 @@ export declare class UserOperationWalletCallsDriver implements WalletCallsDriver
     database: ProviderDatabase,
     execution: UserOperationExecutionCoordinator,
     configuration: UserOperationWalletCallsConfiguration,
+    networkFees?:
+      | (() => Promise<
+          Pick<UserOperationV07, 'maxFeePerGas' | 'maxPriorityFeePerGas'>
+        >)
+      | undefined,
+    prepareWork?: ((work: () => Promise<void>) => Promise<void>) | undefined,
+    estimateOperation?:
+      ((operation: UserOperationV07) => Promise<UserOperationV07>) | undefined,
   );
+  subscribe(listener: (batchId: string) => void): () => void;
   handles(accountId: string): boolean;
   capabilities(principal: VerifiedPrincipal, accountId: string): Promise<void>;
   acceptPaymaster(value: unknown): void;
@@ -5747,6 +6109,7 @@ export declare class UserOperationWalletCallsDriver implements WalletCallsDriver
     principal: VerifiedPrincipal,
     accountId: string,
     id: string,
+    refresh?: boolean,
   ): Promise<WalletCallsStatus>;
   list(
     principal: VerifiedPrincipal,
@@ -5767,6 +6130,7 @@ export declare class UserOperationWalletCallsDriver implements WalletCallsDriver
 
 ```ts
 export interface WalletCallsDriver {
+  subscribe?(listener: (batchId: string) => void): () => void;
   handles(accountId: string): boolean;
   capabilities(principal: VerifiedPrincipal, accountId: string): Promise<void>;
   acceptPaymaster(value: unknown): void;
@@ -5783,6 +6147,7 @@ export interface WalletCallsDriver {
     principal: VerifiedPrincipal,
     accountId: string,
     id: string,
+    refresh?: boolean,
   ): Promise<import('../wallet-calls/types.js').WalletCallsStatus>;
   list(
     principal: VerifiedPrincipal,

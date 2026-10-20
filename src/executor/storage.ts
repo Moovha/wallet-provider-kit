@@ -1,4 +1,5 @@
 import { executionAttemptInput } from './protocol.js';
+import { includedExecution } from '../execution/inclusion.js';
 import type {
   ReplacementAttempt,
   ReplacementStatus,
@@ -469,9 +470,11 @@ export function openExecutorDatabase(
                 entry.dispatch.plan.sponsor.binding.address.toLowerCase() ===
                   sponsor.binding.address.toLowerCase() &&
                 !(
-                  entry.observation?.chain_status === 'finalized' &&
-                  entry.observation.verification === 'rpc-quorum' &&
-                  !entry.integrityFailure
+                  (entry.dispatch.plan.profile === 'approved-evm-executor-v1' &&
+                    includedExecution(entry)) ||
+                  (entry.observation?.chain_status === 'finalized' &&
+                    entry.observation.verification === 'rpc-quorum' &&
+                    !entry.integrityFailure)
                 ),
             );
           if (active.length >= provider.sponsorPool.maxInFlightPerSponsor)

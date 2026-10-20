@@ -1,4 +1,4 @@
-import { sponsorshipGas } from '../runtime-configuration/obligations.js';
+import { poolMembers } from '../provisioning/pools.js';
 import { runtimeApplicationId } from '../runtime-configuration/service.js';
 import {
   safeProvisioningIdentity,
@@ -80,6 +80,7 @@ export interface TransactionEventReport extends TransactionEventInput {
   verification: 'unverified';
 }
 export interface TransferRecord {
+  nonceDomain?: 'safe-4337-v07';
   runtimePolicy?: RuntimePolicySnapshot;
   intent?: import('../execution/approved-calls.js').ApprovedCallIntent;
   nonceReleased?: boolean;
@@ -139,6 +140,8 @@ export class SupportedActions {
     private readonly automaticSafes:
       SafeProvisioningConfiguration | false = false,
     private readonly sharedApplicationSafes = false,
+    private readonly sharedSafeCount = 1,
+    readonly safeOnlyWallet = false,
   ) {
     this.network = providerNetwork(network);
     this.transferPolicy = policy ? structuredClone(policy) : undefined;
@@ -242,7 +245,82 @@ export class SupportedActions {
     );
     const deployment = state.deploymentBindings?.['service-v1'];
     const registry = deployment?.runtimeConfiguration;
-    const signer = registry?.applicationSafes?.[applicationId];
+    const agreement =
+      registry?.obligations?.records[applicationId + ':sponsorship'];
+    if (this.safeOnlyWallet) {
+      const wallet = accountId
+        ? registry?.safeWalletAccounts?.[accountId]
+        : Object.values(registry?.safeWalletAccounts ?? {}).find(
+            (r) => r.applicationId === applicationId && r.status === 'ready',
+          );
+      if (
+        !wallet ||
+        wallet.applicationId !== applicationId ||
+        wallet.status !== 'ready' ||
+        wallet.owner !== state.accounts[wallet.accountId]?.owner ||
+        deployment?.activeRevision !== this.revision ||
+        ['actions', 'services', 'sponsorship'].some(
+          (kind) =>
+            registry?.obligations?.records[applicationId + ':' + kind]
+              ?.decision !== 'accepted',
+        )
+      )
+        deny();
+      return { signer: wallet.signer, binding: wallet.binding };
+    }
+
+    const perUser =
+      (
+        agreement?.value as
+          | import('../runtime-configuration/obligations.js').ApplicationObligations['sponsorship']
+          | undefined
+      )?.account_model === 'provider-controlled-user-safe';
+    const members = perUser
+      ? Object.values(registry?.applicationSafes ?? {}).filter(
+          (r) =>
+            r.applicationId === applicationId && r.userAccountId !== undefined,
+        )
+      : poolMembers(registry?.applicationSafes, applicationId);
+    if (!registry) deny();
+    let signer: (typeof members)[number] | undefined;
+    if (perUser) {
+      signer = members.find((r) =>
+        accountId
+          ? r.userAccountId === accountId &&
+            r.userOwner === state.accounts[accountId]?.owner
+          : deployment?.safeAccounts?.[r.accountId]?.state === 'ready',
+      );
+    } else {
+      if (
+        members.length !==
+          (registry.applicationPoolConfigurations?.[applicationId]?.safeCount ??
+            this.sharedSafeCount) ||
+        members.some(
+          (member) =>
+            deployment?.safeAccounts?.[member.accountId]?.state !== 'ready',
+        )
+      )
+        deny();
+      const assignments = (registry.applicationSafeAssignments ??= {});
+      const users = (assignments[applicationId] ??= {});
+      let selected = accountId ? users[accountId] : undefined;
+      if (accountId && !selected) {
+        const prior = Object.values(state.supportedActions ?? {}).find(
+          (r) =>
+            r.approval.userAccount?.accountId === accountId &&
+            r.approval.caller.issuer === principal.issuer &&
+            r.approval.caller.clientId === principal.clientId,
+        );
+        selected =
+          prior?.approval.account.accountId ??
+          members[Object.keys(users).length % members.length]?.accountId;
+        if (!selected) deny();
+        users[accountId] = selected;
+      }
+      signer =
+        members.find((r) => r.accountId === selected) ??
+        (!accountId ? members[0] : undefined);
+    }
     const safe = signer && deployment?.safeAccounts?.[signer.accountId];
     if (
       deployment?.activeRevision !== this.revision ||
@@ -275,15 +353,25 @@ export class SupportedActions {
         BigInt(sponsorship.maximum_gas_budget_wei)
     )
       deny();
-    const sponsor = registry?.applicationSponsors?.[applicationId];
+    const sponsor = poolMembers(
+      registry?.applicationSponsors,
+      applicationId,
+    ).find((r) => r.sponsor.accountId === safe.plan.sponsor.accountId);
     if (
       sponsor &&
       (sponsor.status !== 'ready' ||
-        fingerprint(sponsor.sponsor) !== fingerprint(safe.plan.sponsor) ||
-        Object.entries(sponsorshipGas(sponsorship)).some(
-          ([field, value]) =>
-            sponsor.sponsor[field as keyof typeof sponsor.sponsor] !== value,
-        ))
+        fingerprint([
+          sponsor.sponsor.accountId,
+          sponsor.sponsor.clientId,
+          sponsor.sponsor.binding,
+          sponsor.sponsor.fundingAgreement,
+        ]) !==
+          fingerprint([
+            safe.plan.sponsor.accountId,
+            safe.plan.sponsor.clientId,
+            safe.plan.sponsor.binding,
+            safe.plan.sponsor.fundingAgreement,
+          ]))
     )
       deny();
     return {
@@ -344,7 +432,9 @@ export class SupportedActions {
         validateRuntimeUserCalls(
           record.runtimePolicy ?? deny(),
           record.intent.input,
-          record.approval.userAccount.address,
+          this.safeOnlyWallet
+            ? shared.binding.address
+            : record.approval.userAccount.address,
         );
     } else if (record.approval.userAccount) deny();
     if (record.intent?.cancellation) {
@@ -719,7 +809,11 @@ export class SupportedActions {
       validateRuntimeUserCalls(
         authority.snapshot ?? deny(),
         input,
-        account.address!,
+        this.safeOnlyWallet
+          ? authority.policy.accounts.find(
+              (a) => a.accountId === input.account_id,
+            )!.address
+          : account.address!,
       );
     const intent = buildApprovedCallIntent(
       authority.policy,
@@ -746,6 +840,19 @@ export class SupportedActions {
       ) ?? deny();
     return { address: binding.address, snapshot: authority.snapshot ?? deny() };
   }
+  async walletSignerAccount(principal: VerifiedPrincipal, accountId: string) {
+    const { account } = await this.binding(
+      principal,
+      accountId,
+      'contracts:request',
+    );
+    return (
+      (await this.callAuthority(principal, accountId)).signer ?? {
+        accountId,
+        address: account.address!,
+      }
+    );
+  }
   /** Pure preview under current authority; it reserves no budget, nonce, action or signing attempt. */
   async previewWalletCalls(
     principal: VerifiedPrincipal,
@@ -760,7 +867,15 @@ export class SupportedActions {
     const snapshot = authority.snapshot ?? deny();
     validateRuntimeCalls(snapshot, input);
     if (this.sharedApplicationSafes)
-      validateRuntimeUserCalls(snapshot, input, account.address!);
+      validateRuntimeUserCalls(
+        snapshot,
+        input,
+        this.safeOnlyWallet
+          ? authority.policy.accounts.find(
+              (a) => a.accountId === input.account_id,
+            )!.address
+          : account.address!,
+      );
     const expiresAt = this.queueExpiry(authority.validity);
     const intent = buildApprovedCallIntent(
       authority.policy,
@@ -831,7 +946,11 @@ export class SupportedActions {
       validateRuntimeUserCalls(
         authority.snapshot ?? deny(),
         input,
-        account.address!,
+        this.safeOnlyWallet
+          ? authority.policy.accounts.find(
+              (a) => a.accountId === input.account_id,
+            )!.address
+          : account.address!,
       );
     const key = fingerprint([
       'supported-call',
@@ -914,6 +1033,9 @@ export class SupportedActions {
       // Expired actions release a nonce only when the same transaction proves no signing admission ever existed.
       for (const record of Object.values(records)) {
         if (
+          (this.safeOnlyWallet
+            ? record.nonceDomain !== 'safe-4337-v07'
+            : record.nonceDomain === 'safe-4337-v07') ||
           record.nonceReleased ||
           record.intent?.account.address.toLowerCase() !==
             intent.account.address.toLowerCase() ||
@@ -943,6 +1065,9 @@ export class SupportedActions {
         this.network.name,
       );
       const created: TransferRecord = {
+        ...(this.safeOnlyWallet
+          ? { nonceDomain: 'safe-4337-v07' as const }
+          : {}),
         intent,
         ...(authority.snapshot ? { runtimePolicy: authority.snapshot } : {}),
         revision: this.revision,

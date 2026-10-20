@@ -87,7 +87,9 @@ const flow = computed(() => model.value.policy.access?.mode ?? 'hosted');
   <SetupField
     type="select"
     guide="executionEnabled"
-    v-if="!model.runtimeConfiguration?.sharedApplicationSafes"
+    v-if="
+      !model.safeWallet && !model.runtimeConfiguration?.sharedApplicationSafes
+    "
     label="Local execution engine"
     :modelValue="model.localExecution ? 'bundled' : 'external'"
     :options="[
@@ -99,6 +101,13 @@ const flow = computed(() => model.value.policy.access?.mode ?? 'hosted');
     ]"
     @update:modelValue="setExecution"
   />
+  <p v-if="model.safeWallet" class="callout">
+    Local setup starts the private bundler and its persistent queue
+    automatically. Each user receives one Safe address. After connection, the
+    application supplies RPC services and action policies, then funds one
+    application gas address for its paymaster and bundler. The signing engine
+    remains private behind the Safe.
+  </p>
   <p v-if="model.localExecution" class="callout">
     Local setup starts the execution engine and its persistent queue
     automatically on private networks. Configure approved-action policies, then

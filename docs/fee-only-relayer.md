@@ -1,11 +1,13 @@
 # Build the fee-only Relayer provider
 
-Bounded fee replacement needs a submission provider that preserves the original
-transaction while accepting only approved fee changes. Use this separate provider
-build when selecting [automatic replacements](automatic-replacements.md) in
+Bundled execution and bounded fee replacement need a submission provider that
+preserves quoted fees and accepts only approved fee changes. The bundled Docker
+build applies the pinned patch below and enables its contract automatically.
+Use this separate provider build for external providers selecting [automatic replacements](automatic-replacements.md) in
 [Deployment](setup-wizard.md#_5-deployment). It retains Relayer's signer, nonce
 allocator and durable record. Building the toolkit does not install this artifact
-or modify your running Relayer.
+or modify your running Relayer. Exported Docker deployment builds the provider
+image separately; its first build compiles the pinned Rust source.
 
 The patch targets OpenZeppelin Relayer **v1.8.0**, commit
 `b8cf360a49c5739e43491ca5d2f6bbc934b7438e`. Apply it only to that exact source:

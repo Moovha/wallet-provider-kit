@@ -39,6 +39,10 @@ import {
   safeOpSignatureV07,
 } from './safe-op.js';
 import type { SponsorshipAdmission } from './admission.js';
+import {
+  localPaymasterUrl,
+  type LocalPaymasterAuthorization,
+} from './local-paymaster.js';
 
 export interface Safe4337SigningConfiguration {
   submissionBinding?: string;
@@ -103,8 +107,11 @@ export class Safe4337SigningService {
       typeof options.authorization !== 'function'
     )
       throw new WalletProviderError('wallet_provider_configuration');
+    const financialConfiguration = structuredClone(this.config);
+    delete financialConfiguration.acceptance.aggregateReads;
+    delete financialConfiguration.acceptance.observationRpcUrls;
     this.configurationHash = fingerprint([
-      this.config,
+      financialConfiguration,
       options.backend.provider,
     ]);
     this.authorizeConsent = options.authorizeSponsorship;
@@ -199,12 +206,8 @@ export class Safe4337SigningService {
     const account =
       this.config.basePolicy.accounts.find((a) => a.accountId === accountId) ??
       deny();
-    const owner = await this.actions.onboarding.withAccountAccess(
-      principal,
-      accountId,
-      'contracts:request',
-      (state) => state.accounts[accountId].address ?? deny(),
-    );
+    const owner = (await this.actions.walletSignerAccount(principal, accountId))
+      .address;
     if (binding.address.toLowerCase() !== account.address.toLowerCase()) deny();
     await this.verifier.verify(
       {
@@ -216,8 +219,50 @@ export class Safe4337SigningService {
       owner,
     );
   }
-  async authorizeSubmission(context: AuthorityContext, id: string) {
-    await this.current(context, this.load(id));
+  async authorizeSubmission(
+    context: AuthorityContext,
+    id: string,
+    verifyChain = true,
+  ) {
+    await this.current(context, this.load(id), verifyChain);
+  }
+  /** Internal paymaster port. A claimed durable phase and current authority are required before usable sponsorship. */
+  async authorizeLocalPaymaster(request: LocalPaymasterAuthorization) {
+    if (this.config.paymaster.url !== localPaymasterUrl) deny();
+    const id = request.context.actionId;
+    const record = this.load(id);
+    const stage =
+      request.method === 'pm_getPaymasterStubData'
+        ? 'stub'
+        : request.method === 'pm_getPaymasterData'
+          ? 'final'
+          : deny();
+    const expected = {
+      applicationId: record.preparation.runtimePolicy.application_id,
+      policyRevision: record.preparation.runtimePolicy.revision,
+      policyHash: record.preparation.runtimePolicy.policy_hash,
+      actionId: id,
+    };
+    if (
+      fingerprint(request.context) !== fingerprint(expected) ||
+      request.maximumCostWei !== record.maximumCostWei
+    )
+      deny();
+    await this.current(record.context, record, false);
+    await this.actions.withAuthorizedTransfer(
+      record.context.principal,
+      id,
+      () => {
+        const phase = this.load(id).phases[stage] ?? deny();
+        return this.database.sponsorship.assertDispatch(
+          id,
+          stage,
+          phase.token,
+          fingerprint(normalizeUserOperationV07(request.operation)),
+        );
+      },
+    );
+    return { validAfter: record.validAfter, validUntil: record.validUntil };
   }
   async withExecutionRead<T>(
     principal: import('../domain/principal.js').VerifiedPrincipal,
@@ -230,7 +275,7 @@ export class Safe4337SigningService {
     const record = this.load(id);
     return this.actions.onboarding.withAccountAccess(
       principal,
-      record.source.account.accountId,
+      (record.source.userAccount ?? record.source.account).accountId,
       'account:read',
       (state, grant) => {
         if (
@@ -244,7 +289,9 @@ export class Safe4337SigningService {
               record.source.caller[key as 'issuer' | 'subject' | 'clientId'],
           ) ||
           state.accounts[grant.accountId].address?.toLowerCase() !==
-            record.source.account.address.toLowerCase() ||
+            (
+              record.source.userAccount ?? record.source.account
+            ).address.toLowerCase() ||
           fingerprint(state.supportedActions?.[id]?.approval) !==
             fingerprint(record.source)
         )
@@ -277,6 +324,7 @@ export class Safe4337SigningService {
   private async current(
     context: AuthorityContext,
     record: SponsorshipAdmission,
+    verifyChain = true,
   ) {
     if (
       !context.principal.scopes.includes('wallet:actions') ||
@@ -315,11 +363,12 @@ export class Safe4337SigningService {
       consent.consentReference !== record.consentReference
     )
       deny();
-    await this.verifier.verify(
-      terms.preparation.intent,
-      record.source.account.address,
-      record.preparation.operation.nonce,
-    );
+    if (verifyChain)
+      await this.verifier.verify(
+        terms.preparation.intent,
+        record.source.account.address,
+        record.preparation.operation.nonce,
+      );
     // Re-read current owner, claims, grant, publication and deployment after external reads.
     await this.source(context, record.id);
     return terms;
@@ -494,7 +543,7 @@ export class Safe4337SigningService {
             request.maximumCostWei !== record.maximumCostWei
           )
             deny();
-          await this.current(context, this.load(id));
+          await this.current(context, this.load(id), false);
           return this.actions.withAuthorizedTransfer(
             context.principal,
             id,
@@ -554,7 +603,7 @@ export class Safe4337SigningService {
         paymasterPostOpGasLimit: final.paymasterPostOpGasLimit,
       };
     }
-    await this.current(context, this.load(id));
+    await this.current(context, this.load(id), false);
     return operation;
   }
   private finalOperation(record: SponsorshipAdmission) {
@@ -606,7 +655,7 @@ export class Safe4337SigningService {
     const record = this.load(approval.action.operation_id);
     if (fingerprint(this.approval(record)) !== fingerprint(approval))
       return null;
-    await this.current(context, record);
+    await this.current(context, record, false);
     const action = approval.action;
     return {
       ownerSubject: approval.ownerSubject,
@@ -640,7 +689,7 @@ export class Safe4337SigningService {
       authority.action,
       authority.attemptId,
     );
-    await this.current(context, this.load(id));
+    await this.current(context, this.load(id), false);
     return {
       ...this.finalOperation(record),
       signature: safeOpSignatureV07(

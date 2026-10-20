@@ -159,7 +159,6 @@ test('a new operator configures application-led access without user login, vendo
       requiredFields: ['country', 'customer_type'],
     });
     expect(config.runtimeConfiguration).toMatchObject({
-      sharedApplicationSafes: true,
       authorizeContracts: true,
       operators: [
         {
@@ -169,6 +168,8 @@ test('a new operator configures application-led access without user login, vendo
         },
       ],
     });
+    expect(config.safeWallet).toMatchObject({ profile: 'safe-only-4337-v1' });
+    expect(config.runtimeConfiguration.sharedApplicationSafes).toBeUndefined();
     expect(config.ownerLogin).toBeUndefined();
     expect(config.reviewers).toBeUndefined();
     expect(config.identity).toEqual({});
@@ -228,7 +229,7 @@ test('a new operator configures application-led access without user login, vendo
       .getByRole('button', { name: 'API reference', exact: true })
       .click();
     await page.locator('.swagger-ui .opblock').first().waitFor();
-    await expect(page.locator('.swagger-ui .opblock')).toHaveCount(55);
+    await expect(page.locator('.swagger-ui .opblock')).toHaveCount(62);
     await page
       .getByLabel('Example endpoint', { exact: true })
       .selectOption('requestAccountAccess');

@@ -1,3 +1,5 @@
+import type { EmbeddedWalletService } from '../src/domain/embedded-wallet.js';
+import type { WalletCallsService } from '../src/wallet-calls/service.js';
 import { randomUUID } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
 import { expect, it } from 'vitest';
@@ -65,3 +67,55 @@ it.each(['safe', 'sponsorship/provision'])(
     }
   },
 );
+
+it('keeps an authenticated wallet status response open during RPC reconciliation', async () => {
+  const result = {
+    version: '2.0.0',
+    id: 'retained-batch',
+    chainId: '0x2105',
+    status: 100,
+    atomic: true,
+  };
+  const server = await createServer({
+    service: {} as EmbeddedWalletService,
+    walletCalls: {
+      request: async () => {
+        await delay(150);
+        return result;
+      },
+    } as unknown as WalletCallsService,
+    ready: async () => true,
+    authenticate: async () => ({
+      issuer: 'https://issuer.example.test',
+      clientId: 'application',
+      subject: 'application',
+      scopes: ['wallet:access:read'],
+    }),
+  });
+  server.server.setTimeout(50);
+  try {
+    const origin = await server.listen({ host: '127.0.0.1', port: 0 });
+    const response = await fetch(
+      origin + '/v1/accounts/' + randomUUID() + '/wallet',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', connection: 'close' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'wallet_getCallsStatus',
+          params: ['retained-batch'],
+        }),
+        signal: AbortSignal.timeout(3000),
+      },
+    );
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      jsonrpc: '2.0',
+      id: 1,
+      result,
+    });
+  } finally {
+    await server.close();
+  }
+});

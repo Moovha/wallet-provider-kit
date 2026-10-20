@@ -1,0 +1,7 @@
+# Alto remains a separate GPL-licensed runtime; the scheduler patch and modified source stay in the image.
+FROM ghcr.io/pimlicolabs/alto@sha256:f2661042aadefc6a4fc9c5826a14404f574c7ef2de76bdf83fe6a0829137b3c5
+COPY scripts/bundled-bundler-launcher.mjs /app/wpk-bundler-launcher.mjs
+COPY scripts/bundler-simulations.mjs /app/wpk-bundler-simulations.mjs
+COPY scripts/patch-bundler-scheduling.mjs /app/wpk-patch-bundler-scheduling.mjs
+RUN node /app/wpk-patch-bundler-scheduling.mjs
+ENTRYPOINT ["node", "/app/wpk-bundler-launcher.mjs"]

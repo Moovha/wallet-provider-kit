@@ -44,8 +44,9 @@ function removeSigner(index: number) {
     <span class="eyebrow">Wallet infrastructure</span>
     <h2>Choose your wallet backend</h2>
     <p>
-      A wallet backend is the engine that creates wallet accounts and signs
-      actions your service approves. Choose where that engine runs.
+      The signing engine authorizes approved operations. In the Safe-only
+      profile, each user receives one Safe address for deposits, balances and
+      transactions.
     </p>
   </div>
   <div class="callout step-orientation">
@@ -66,7 +67,9 @@ function removeSigner(index: number) {
   </div>
   <div class="provider-cards" role="group" aria-label="Wallet backend">
     <button
-      v-for="backend in backends"
+      v-for="backend in backends.filter(
+        (b) => !model.safeWallet || b.kind === 'ows',
+      )"
       :key="backend.kind"
       type="button"
       class="provider-card"

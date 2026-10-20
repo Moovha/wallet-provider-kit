@@ -57,3 +57,15 @@ export type {
   UserOperationExecution,
   UserOperationObservation,
 } from './execution-types.js';
+
+export {
+  createLocalPaymasterTransport,
+  localPaymasterDeployment,
+  localPaymasterHashV07,
+  localPaymasterUrl,
+  singletonPaymasterSource,
+} from './local-paymaster.js';
+export type {
+  LocalPaymasterAuthorization,
+  LocalVerifyingPaymasterOptions,
+} from './local-paymaster.js';

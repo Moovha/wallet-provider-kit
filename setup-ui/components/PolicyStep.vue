@@ -76,13 +76,23 @@ function financial(enabled: unknown) {
       requires agreed route prices and an application funding agreement.
       Configure those rules below and connect the vendors in Services.
     </p>
-    <p v-if="!model.runtimeConfiguration?.sharedApplicationSafes">
+    <p
+      v-if="
+        !(
+          model.safeWallet || model.runtimeConfiguration?.sharedApplicationSafes
+        )
+      "
+    >
       Transfer signing is optional. Leave it off if you only need wallet
       creation and account access. Keep the starting policy version for a first
       setup; review the access periods against your own requirements.
     </p>
   </div>
-  <details :open="!model.runtimeConfiguration?.sharedApplicationSafes">
+  <details
+    :open="
+      !(model.safeWallet || model.runtimeConfiguration?.sharedApplicationSafes)
+    "
+  >
     <summary>Provider identity baseline and access duration</summary>
     <AccessPolicyFields
       v-model="model"
@@ -132,7 +142,14 @@ function financial(enabled: unknown) {
         {{ accessDays }} days and ends sooner if identity evidence or consent
         expires, or access is revoked.
       </p>
-      <details v-if="!model.runtimeConfiguration?.sharedApplicationSafes">
+      <details
+        v-if="
+          !(
+            model.safeWallet ||
+            model.runtimeConfiguration?.sharedApplicationSafes
+          )
+        "
+      >
         <summary>Need different policy rules?</summary>
         <p>
           The wizard configures the built-in rules shown on this page, including
@@ -163,9 +180,11 @@ function financial(enabled: unknown) {
           ...(model.policy.access?.mode === 'application'
             ? { assertionTrust: { agreement: '' } }
             : {}),
-          permissions: model.runtimeConfiguration?.sharedApplicationSafes
-            ? ['account:read', 'contracts:request']
-            : ['account:read'],
+          permissions:
+            model.safeWallet ||
+            model.runtimeConfiguration?.sharedApplicationSafes
+              ? ['account:read', 'contracts:request']
+              : ['account:read'],
         })
       "
     >
@@ -228,7 +247,7 @@ function financial(enabled: unknown) {
       type="checkbox"
       label="Allowed permissions"
       :options="
-        model.runtimeConfiguration?.sharedApplicationSafes
+        model.safeWallet || model.runtimeConfiguration?.sharedApplicationSafes
           ? [
               { value: 'account:read', label: 'Read wallet accounts' },
               {
@@ -385,7 +404,9 @@ function financial(enabled: unknown) {
     </template>
   </section>
   <div
-    v-if="!model.runtimeConfiguration?.sharedApplicationSafes"
+    v-if="
+      !(model.safeWallet || model.runtimeConfiguration?.sharedApplicationSafes)
+    "
     class="feature-panel"
   >
     <h3>Optional delegated transfer signing</h3>
@@ -411,7 +432,8 @@ function financial(enabled: unknown) {
   </div>
   <template
     v-if="
-      model.financial && !model.runtimeConfiguration?.sharedApplicationSafes
+      model.financial &&
+      !(model.safeWallet || model.runtimeConfiguration?.sharedApplicationSafes)
     "
   >
     <p class="help-text">

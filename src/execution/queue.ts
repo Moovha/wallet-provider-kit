@@ -1,4 +1,6 @@
+import { rpcVerified } from './inclusion.js';
 import { executionPlanHash } from '../executor/protocol.js';
+import { consumedSafeNonce } from './inclusion.js';
 import { WalletCallsError } from '../wallet-calls/errors.js';
 import type { WalletCallsMetadata } from '../wallet-calls/types.js';
 import type { ProviderState } from '../onboarding/types.js';
@@ -35,8 +37,16 @@ export interface SafeQueueRecord {
   executeKey: string;
   identityHash: string;
   actionId?: string;
+  progressionActionId?: string;
   status:
-    'queued' | 'executing' | 'succeeded' | 'cancelled' | 'expired' | 'blocked';
+    | 'queued'
+    | 'executing'
+    | 'included'
+    | 'succeeded'
+    | 'failed'
+    | 'cancelled'
+    | 'expired'
+    | 'blocked';
 }
 const active = (entry: SafeQueueRecord) =>
   ['queued', 'executing', 'blocked'].includes(entry.status);
@@ -45,6 +55,7 @@ function identity(entry: SafeQueueRecord) {
     identityHash: _hash,
     actionId: _action,
     status: _status,
+    progressionActionId: _progression,
     ...immutable
   } = entry;
   return fingerprint(immutable);
@@ -55,6 +66,10 @@ export class SafeExecutionQueue {
   private running?: Promise<void>;
   private stopped = true;
   private cursor = 0;
+  private activeWork = false;
+  private scheduledAt = Infinity;
+  private readonly lanes = new Map<string, Promise<void>>();
+  private readonly readyLanes = new Set<string>();
   private readonly configuration: NonNullable<
     ExecutionConfiguration['safeQueue']
   >;
@@ -86,6 +101,13 @@ export class SafeExecutionQueue {
     )
       throw new WalletProviderError('wallet_provider_configuration');
     this.configuration = structuredClone(configuration);
+    for (const [value, maximum] of [
+      [configuration.maxDepthPerUser ?? 8, 100],
+      [configuration.maxDepthPerApplication ?? 128, 1000],
+      [configuration.maxDepthTotal ?? 512, 10000],
+    ])
+      if (!Number.isInteger(value) || value < 1 || value > maximum)
+        throw new WalletProviderError('wallet_provider_configuration');
   }
   private checkAction(state: ProviderState, entry: SafeQueueRecord) {
     const key = fingerprint([
@@ -99,6 +121,13 @@ export class SafeExecutionQueue {
     if (entry.actionId && binding?.id !== entry.actionId) deny();
     if (!binding) return;
     const action = state.supportedActions?.[binding.id];
+    if (
+      entry.progressionActionId &&
+      (action?.cancellationId !== entry.progressionActionId ||
+        state.supportedActions?.[entry.progressionActionId]?.intent
+          ?.cancellation?.actionId !== binding.id)
+    )
+      deny();
     if (
       !action ||
       binding.hash !==
@@ -226,6 +255,7 @@ export class SafeExecutionQueue {
         throw new WalletProviderError('wallet_attempt_conflict');
       const entry = await this.load(previous.id);
       await this.authorized(context.principal, entry);
+      this.wake();
       return this.receipt(entry);
     }
     const expiresAt = await this.actions.applicationQueueExpiry(
@@ -293,6 +323,20 @@ export class SafeExecutionQueue {
         const lane = Object.values(entries).filter(
           (entry) => entry.safeAddress === authority.safeAddress,
         );
+        const pending = Object.values(entries).filter(active);
+        const application = pending.filter(
+          (e) =>
+            e.principal.issuer === context.principal.issuer &&
+            e.principal.clientId === context.principal.clientId,
+        );
+        if (
+          pending.length >= (this.configuration.maxDepthTotal ?? 512) ||
+          application.length >=
+            (this.configuration.maxDepthPerApplication ?? 128) ||
+          application.filter((e) => e.input.account_id === input.account_id)
+            .length >= (this.configuration.maxDepthPerUser ?? 8)
+        )
+          throw new WalletProviderError('wallet_attempt_pending');
         if (lane.filter(active).length >= this.configuration.maxDepthPerSafe)
           throw new WalletProviderError('wallet_attempt_pending');
         const sequence =
@@ -329,6 +373,7 @@ export class SafeExecutionQueue {
     );
     if (!entry) throw new WalletCallsError(5720);
     await this.authorized(context.principal, entry);
+    this.wake();
     return this.receipt(entry);
   }
   /** Read batch evidence without renewing financial consent or permitting a new effect. */
@@ -382,7 +427,8 @@ export class SafeExecutionQueue {
     )
       throw new WalletProviderError('wallet_attempt_unavailable', 'unknown');
     if (
-      execution?.observation?.verification === 'rpc-quorum' &&
+      execution &&
+      rpcVerified(execution.observation?.verification) &&
       !execution.plan
     )
       throw new WalletProviderError('wallet_attempt_unavailable', 'unknown');
@@ -540,6 +586,30 @@ export class SafeExecutionQueue {
         deny();
       const heads = new Map<string, SafeQueueRecord>();
       for (const entry of Object.values(state.safeRequests ?? {})) {
+        if (entry.status === 'included') {
+          const execution =
+            state.supportedActions?.[
+              entry.progressionActionId ?? entry.actionId!
+            ]?.execution;
+          if (
+            consumedSafeNonce(execution) &&
+            execution?.observation?.chain_status === 'finalized'
+          ) {
+            this.check(entry);
+            this.checkAction(state, entry);
+            entry.status = entry.progressionActionId
+              ? 'cancelled'
+              : execution.observation.outcome === 'succeeded'
+                ? 'succeeded'
+                : 'failed';
+            state.audit.push({
+              at: Date.now(),
+              event: 'safe_request_finalized',
+              resource: entry.id,
+              revision: this.actions.revision,
+            });
+          }
+        }
         if (!active(entry)) continue;
         if (entry.identityHash !== identity(entry)) deny();
         this.checkAction(state, entry);
@@ -551,29 +621,109 @@ export class SafeExecutionQueue {
       }
       return [...heads.values()];
     });
-    const selected = entries.length
+    this.activeWork = entries.length > 0;
+    const available = entries.filter(
+      (entry) => !this.lanes.has(entry.safeAddress),
+    );
+    const selected = available.length
       ? Array.from(
-          { length: Math.min(4, entries.length) },
-          (_, index) => entries[(this.cursor + index) % entries.length],
+          {
+            length: Math.min(
+              Math.max(0, 10 - this.lanes.size),
+              available.length,
+            ),
+          },
+          (_, index) => available[(this.cursor + index) % available.length],
         )
       : [];
-    this.cursor = entries.length
-      ? (this.cursor + selected.length) % entries.length
+    this.cursor = available.length
+      ? (this.cursor + selected.length) % available.length
       : 0;
-    await Promise.allSettled(selected.map((entry) => this.advance(entry)));
+    await Promise.allSettled(
+      selected.map((entry) => {
+        const existing = this.lanes.get(entry.safeAddress);
+        if (existing) return existing;
+        const running = this.advance(entry).finally(() => {
+          if (this.lanes.get(entry.safeAddress) === running)
+            this.lanes.delete(entry.safeAddress);
+          const ready = this.readyLanes.delete(entry.safeAddress);
+          if (!this.stopped) this.schedule(ready ? 0 : 1000);
+        });
+        this.lanes.set(entry.safeAddress, running);
+        return running;
+      }),
+    );
   }
   private async advance(entry: SafeQueueRecord) {
+    // Unsigned expiry must not wait behind an unavailable or quarantined predecessor.
+    if (
+      Date.parse(entry.expiresAt) <= Date.now() &&
+      (!entry.actionId || !this.database.hasActionAttempts(entry.actionId))
+    ) {
+      try {
+        await this.finishUnsigned(entry, 'expired');
+      } catch {
+        await this.block(entry);
+      }
+      return;
+    }
+    // A released predecessor must remain canonically included before this lane advances.
+    const predecessor = await this.actions.onboarding.store.transaction(
+      (state) => {
+        const prior = Object.values(state.safeRequests ?? {}).filter(
+          (e) =>
+            e.safeAddress === entry.safeAddress &&
+            e.sequence < entry.sequence &&
+            ['included', 'succeeded', 'failed'].includes(e.status),
+        );
+        if (
+          prior.some(
+            (e) =>
+              state.supportedActions?.[e.progressionActionId ?? e.actionId!]
+                ?.execution?.integrityFailure,
+          )
+        )
+          deny();
+        return prior.sort((a, b) => b.sequence - a.sequence)[0];
+      },
+    );
+    if (predecessor?.actionId) {
+      const predecessorId =
+        predecessor.progressionActionId ?? predecessor.actionId;
+      const before = Date.now();
+      const finalized = await this.actions.onboarding.store.transaction(
+        (state) =>
+          state.supportedActions?.[predecessorId]?.execution?.observation
+            ?.chain_status === 'finalized',
+      );
+      if (!finalized) await this.execution.refresh(predecessorId);
+      const previous = await this.actions.onboarding.store.transaction(
+        (state) => state.supportedActions?.[predecessorId]?.execution,
+      );
+      if (
+        !consumedSafeNonce(previous) ||
+        (previous?.observation?.chain_status !== 'finalized' &&
+          Date.parse(previous?.observation?.observed_at ?? '') < before)
+      )
+        return;
+    }
     if (entry.actionId) {
-      await this.execution.refresh(entry.actionId);
+      const progressionId = await this.actions.onboarding.store.transaction(
+        (state) =>
+          state.supportedActions?.[entry.actionId!]?.cancellationId ??
+          entry.actionId!,
+      );
+      const before = Date.now();
+      await this.execution.refresh(progressionId);
       const execution = await this.actions.onboarding.store.transaction(
-        (state) => state.supportedActions?.[entry.actionId!]?.execution,
+        (state) => state.supportedActions?.[progressionId]?.execution,
       );
       if (execution?.integrityFailure) return;
       const observation = execution?.observation;
       if (
-        observation?.chain_status === 'finalized' &&
-        observation.verification === 'rpc-quorum' &&
-        observation.outcome === 'succeeded'
+        consumedSafeNonce(execution) &&
+        (observation?.chain_status === 'finalized' ||
+          Date.parse(observation?.observed_at ?? '') >= before)
       ) {
         await this.actions.onboarding.store.transaction((state) => {
           const latest = state.safeRequests?.[entry.id] ?? deny();
@@ -582,21 +732,31 @@ export class SafeExecutionQueue {
           if (
             latest.actionId !== entry.actionId ||
             !active(latest) ||
-            state.supportedActions?.[entry.actionId!]?.execution
+            state.supportedActions?.[progressionId]?.execution
               ?.integrityFailure ||
             fingerprint(
-              state.supportedActions?.[entry.actionId!]?.execution?.observation,
+              state.supportedActions?.[progressionId]?.execution?.observation,
             ) !== fingerprint(observation)
           )
             return;
-          latest.status = 'succeeded';
+          if (progressionId !== entry.actionId)
+            latest.progressionActionId = progressionId;
+          latest.status =
+            observation?.chain_status === 'finalized' &&
+            observation.outcome === 'succeeded'
+              ? 'succeeded'
+              : 'included';
           state.audit.push({
             at: Date.now(),
-            event: 'safe_request_finalized',
+            event:
+              latest.status === 'succeeded'
+                ? 'safe_request_finalized'
+                : 'safe_request_included',
             resource: latest.id,
             revision: this.actions.revision,
           });
         });
+        this.wake();
         return;
       }
     }
@@ -654,22 +814,86 @@ export class SafeExecutionQueue {
   start() {
     if (!this.stopped) return;
     this.stopped = false;
-    const schedule = () => {
-      this.running = this.process()
+    this.schedule(0);
+  }
+  /** Consume the just-persisted inclusion observation without verifying that same head a second time. */
+  async included(actionId: string) {
+    const addresses = await this.actions.onboarding.store.transaction(
+      (state) => {
+        if (
+          state.deploymentBindings?.['service-v1']?.activeRevision !==
+          this.actions.revision
+        )
+          deny();
+        const changed: string[] = [];
+        for (const entry of Object.values(state.safeRequests ?? {})) {
+          if (!active(entry) || !entry.actionId) continue;
+          const progressionId =
+            state.supportedActions?.[entry.actionId]?.cancellationId ??
+            entry.actionId;
+          if (progressionId !== actionId) continue;
+          this.check(entry);
+          this.checkAction(state, entry);
+          const execution = state.supportedActions?.[progressionId]?.execution;
+          if (!consumedSafeNonce(execution)) continue;
+          if (progressionId !== entry.actionId)
+            entry.progressionActionId = progressionId;
+          entry.status =
+            execution?.observation?.chain_status === 'finalized' &&
+            execution.observation.outcome === 'succeeded'
+              ? 'succeeded'
+              : 'included';
+          state.audit.push({
+            at: Date.now(),
+            event:
+              entry.status === 'succeeded'
+                ? 'safe_request_finalized'
+                : 'safe_request_included',
+            resource: entry.id,
+            revision: this.actions.revision,
+          });
+          changed.push(entry.safeAddress);
+        }
+        return changed;
+      },
+    );
+    for (const address of addresses)
+      if (this.lanes.has(address)) this.readyLanes.add(address);
+    if (addresses.length) this.wake();
+  }
+  wake() {
+    if (this.stopped) return;
+    this.schedule(0);
+  }
+  private schedule(delay: number) {
+    const due = Date.now() + delay;
+    if (this.timer && this.scheduledAt <= due) return;
+    clearTimeout(this.timer);
+    this.scheduledAt = due;
+    this.timer = setTimeout(() => {
+      this.timer = undefined;
+      this.scheduledAt = Infinity;
+      const running = this.process()
         .catch(() => {})
         .finally(() => {
-          if (!this.stopped) {
-            this.timer = setTimeout(schedule, this.pollIntervalSeconds * 1000);
-            this.timer.unref();
-          }
+          if (this.running === running) this.running = undefined;
+          if (!this.stopped && !this.timer)
+            this.schedule(
+              this.activeWork || this.lanes.size
+                ? 1000
+                : this.pollIntervalSeconds * 1000,
+            );
         });
-    };
-    this.timer = setTimeout(schedule, this.pollIntervalSeconds * 1000);
+      this.running = running;
+    }, delay);
     this.timer.unref();
   }
   async close() {
     this.stopped = true;
     clearTimeout(this.timer);
+    this.timer = undefined;
+    this.scheduledAt = Infinity;
     await this.running;
+    await Promise.allSettled(this.lanes.values());
   }
 }
