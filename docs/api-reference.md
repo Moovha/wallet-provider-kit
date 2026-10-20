@@ -1,19 +1,14 @@
 # TypeScript API reference
 
-Use these declarations when extending the backend selected in
-[Backend](setup-wizard.md#_2-backend), or embedding the service in your own server.
-The configured wizard service does not require library composition. For the API
-your connected applications call after deployment, use the [HTTP guide](http-api.md).
-For contributing or regeneration, see the [development guide](../CONTRIBUTING.md#development).
+Use these declarations when embedding the toolkit in your own server. Start with
+[TypeScript integration](api.md) to choose the module and responsibility boundary.
+Applications calling a running provider use the [HTTP API](http-api.md) instead.
 
-Start with the [API guide](api.md) for composition, ownership and errors, and [wallet calls](wallet-calls.md). These declaration excerpts
-are a reference, not standalone programs. Read [roles and terms](concepts.md)
-for owners, application clients, host authority, wallet backends and journals.
-Supporting names and schema aliases
-retain their source declaration names; follow the declaration link for their imports.
-
-The root `@moovha/wallet-provider-kit` re-exports core, HTTP, onboarding,
-identity, telemetry, storage and deployment. Provider adapters require their explicit subpaths.
+These excerpts preserve exact source names and are not standalone programs.
+Follow each source link for its declaration. The root `@moovha/wallet-provider-kit`
+re-exports core, HTTP, onboarding, identity, telemetry, storage and deployment;
+provider adapters use explicit subpaths. [Package guidance](package.md) explains
+consumer checks, and the [contributor guide](../CONTRIBUTING.md#development) covers regeneration.
 
 ## Host authority and signing attempts
 

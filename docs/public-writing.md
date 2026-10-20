@@ -126,3 +126,23 @@ agreement is not verified identity, and configuration checks do not establish
 production readiness. Explain meaningful consequences next to the action that
 causes them. Errors should tell people what they can do next without exposing
 private request details or implying that an uncertain action failed safely.
+
+## Guide the reader one task at a time
+
+Use the ordinary journey: install, sign in, connect an application, agree its
+needs, test and operate. Open each guide with the reader’s task and the starting
+state. Introduce only what they need for the next decision, explain the expected
+result and offer a concrete next step.
+
+Keep API fields, protocol constraints and component details in labelled developer
+references or expandable sections. Keep costs, consent, irreversible effects and
+uncertain outcomes visible beside the relevant action. Optional integrations
+should say who needs them and point other readers back to the standard flow.
+Maintainer rationale and evidence belong in maintainer references or PR records,
+rather than interrupting operator instructions.
+
+Rehearse linked guides after editing: read them as a new operator, then as an
+application developer. Follow the next-step links, compare labels to the interface
+and check that each prerequisite appears before it is needed. Remove stale
+anchors, unexplained terms, redundant cautions and references to retired flows.
+Do not simplify by removing meaningful authority or recovery limits.

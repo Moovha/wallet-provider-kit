@@ -1,56 +1,62 @@
-# Set up your wallet service
+---
+prev: false
+next: { 'text': 'Install and sign in', 'link': '/docs/provider-installation' }
+---
 
-Run a wallet service with one Safe account per user. The bundled OWS engine
-holds private signing identities; a private ERC-4337 bundler submits approved
-operations and an application-owned paymaster covers gas. Users receive their
-Safe address for deposits and transactions.
+# Welcome to your wallet service
 
-The service is experimental and single-host. Applications retain responsibility
-for current identity evidence, consent, action requests and sponsorship funding.
-Offline checks do not establish production custody or latency acceptance.
+Wallet Provider Kit helps your team offer wallets inside the applications your
+customers already use. You run the service; each person receives a Safe, their
+wallet address on the blockchain. Connected applications request access with
+that person’s permission.
 
-## Deploy and establish administration
+You can install the service before choosing an application. There is no need to
+arrange user checks, transaction rules or network-fee funding during installation.
 
-Follow [installation and administration](provider-installation.md) for a reviewed
-release bundle on your computer or Linux server, or the AWS deployment template.
-Release bundles use pinned prebuilt images with Docker Compose. Verify that the
-selected release actually exists before attempting a registry installation.
+## Start with a place to run it
 
-For contributor evaluation, the source setup command remains available:
+Follow [Install your wallet service](provider-installation.md) to choose your
+computer, a Linux server or the AWS template. Then create your administrator
+account and sign in. If you are evaluating the source code, use
+[Run from source](local-setup.md).
 
-```sh
-git clone https://github.com/Moovha/wallet-provider-kit.git
-cd wallet-provider-kit
-npm ci
-npm run build
-npm start -- setup
-```
+At the end, you should have an administration console and an empty application
+list. **Wallet operations disabled** is expected at this point.
 
-Source builds require Node 24.22.0 and npm 11.11.1. The graphical flow has three
-stages: choose a destination, review deployment and open administration. The
-private installation claim establishes the first administrator. No connected
-application, RPC credentials or sponsor funding is required to finish installation.
+## When an application is ready to connect
 
-## Connect applications afterward
+Follow [Connect your first application](runtime-workspace.md). You will add the
+application, save its connection details and agree how it handles user checks
+and permission. Your developer can then use the [application API guide](http-api.md)
+to complete the connection.
 
-Use `/admin/` or the protected provider API to register an application. Save its
-credential once, accept identity/consent trust and choose permitted owner actions.
-Then configure action policies, service credentials and sponsorship through
-[application management](runtime-workspace.md). Registration, trust, funding,
-activation and owner authority are separate decisions.
+Transaction rules and who pays network fees come next, when you know what the
+application needs. The connection guide introduces those decisions in order.
 
-An available management service with disabled wallet operations is a successful
-installation. Complete [provider acceptance](conformance.md), backups and tested
-recovery before admitting wallet use. See [maintenance](provider-maintenance.md).
+## Build the experience people will use
 
-## Advanced configuration
+Once the application is connected, walk through [creating a first wallet](create-wallet.md),
+[returning to an existing wallet](connect-wallet.md) and
+[sending a small transfer](send-transfer.md). Each guide starts with the person’s
+experience and keeps developer requests available in expandable sections.
 
-The setup tool's **Advanced configuration** editor retains six explicit screens
-for static source integrations. Follow the [configuration reference](setup-wizard.md)
-for that path. It is not a prerequisite for API-managed installations.
+## Before welcoming users
 
-## When you need a custom integration
+[Test the connection](staging-walkthrough.md), arrange [backups](provider-maintenance.md)
+and complete the [launch checks](conformance.md). The toolkit is experimental:
+it supports one active host and Base or Base Sepolia. Production custody and
+funded mainnet acceptance remain pending.
 
-Low-level signing, authority and storage interfaces are available for reviewed
-host integrations. They do not select another supported configured execution
-flow. Configuration must include the Safe account and its application infrastructure.
+## Find help for your task
+
+| I want to…                           | Start here                                                             |
+| ------------------------------------ | ---------------------------------------------------------------------- |
+| Understand who does what             | [Meet the people and services](concepts.md)                            |
+| Connect an application               | [Connection guide](runtime-workspace.md)                               |
+| Change permitted transactions        | [Application rules](runtime-configuration.md)                          |
+| Keep the service running             | [Monitoring](operations.md) and [maintenance](provider-maintenance.md) |
+| Use an existing static configuration | [Advanced setup](setup-wizard.md)                                      |
+| Embed the toolkit in my own server   | [TypeScript integration](api.md)                                       |
+
+You only need the advanced references when your task calls for them. The standard
+journey is **install → sign in → connect an application → test → welcome users**.

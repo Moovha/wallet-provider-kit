@@ -1,8 +1,17 @@
-# Back up, recover and update a provider
+---
+prev: { 'text': 'Monitor your service', 'link': '/docs/operations' }
+next: false
+---
 
-Operate one active writer with retained configuration, database/journals, OWS
-vault, encryption and issuer credentials, bundler state and the matching release
-bundle. Installation and administrator access do not establish custody acceptance.
+# Back up and look after your service
+
+Plan backups before welcoming users, and agree who can restore the service. A
+backup contains private keys and credentials as well as records; protect it as
+strongly as the running service. Keep the backup password separately.
+
+Run one active writer. Retain configuration, database/journals, OWS vault,
+encryption and issuer credentials, bundler state and the matching release bundle
+together. Administrator access alone does not establish custody readiness.
 
 ## Create an encrypted stopped-service backup
 
@@ -66,12 +75,10 @@ actual schema and chain evidence. Do not promise zero downtime for the single-ho
 runtime. Operating-system updates and cloud resource replacement remain with the
 provider's infrastructure tools; the wallet service has no host shell authority.
 
-## Release and acceptance evidence
+## Choose the right release
 
-The **Package provider release** workflow builds amd64/arm64 images, immutable
-manifest references, SBOM/provenance, an attested archive and experimental release
-assets. Dispatching it publishes artifacts; it does not deploy a host, create a
-provider account, fund a wallet or publish npm. Dispatch requires separate release
-authority. Container and cloud acceptance must be reported independently from
-offline application tests. Further cloud targets, SSO and offline installation
-bundles require their own implementation and evidence.
+Use a reviewed release bundle with verified provenance and compatibility.
+[Release preparation](releases.md) is a maintainer task, separate from updating
+your installation. Image builds and offline tests do not establish container,
+cloud or custody acceptance. After maintenance, repeat the affected
+[launch checks](conformance.md) before enabling wallet operations.

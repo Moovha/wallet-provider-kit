@@ -1,14 +1,14 @@
 # HTTP schema reference
 
-After [Export and deployment](setup-wizard.md#_6-export), use these schemas to
-implement application access and permitted wallet actions. They describe the
-[implemented provider contract](../spec/provider-api.json); the [HTTP guide](http-api.md)
-explains the request sequence and the [access guide](application-access.md) connects
-identity, consent and grants to the policy configured in the wizard. For contributing or
-regeneration, see the [development guide](../CONTRIBUTING.md#development).
-Read the [HTTP usage guide](http-api.md) for authentication, scopes, error handling
-and the Safe execution contract. Availability depends on current configuration. Read [roles and terms](concepts.md)
-for application clients, account owners, authority and journals.
+Use this reference to look up an exact request or response while integrating an
+application or management tool. Start with the [application API guide](http-api.md)
+for the request sequence, or [provider administration](provider-installation.md#automate-provider-administration)
+for management access.
+
+These schemas come from the [implemented contract](../spec/provider-api.json).
+Route availability depends on current configuration and permission. A schema
+describes an input; it does not grant authority to use it. The
+[contributor guide](../CONTRIBUTING.md#development) covers regeneration.
 
 ## GET /v1/execution-capabilities
 

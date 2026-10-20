@@ -1,12 +1,29 @@
-# Configure the Safe service
+# Configuration reference
 
-New installations can use [durable provider administration](provider-installation.md)
-and start without applications. Installation settings and runtime registrations
-have separate ownership. The reference below also supports explicit static
-configuration for advanced source integrations.
+Use this page when a developer needs to inspect or maintain service configuration.
+For ordinary installation, follow [Install your wallet service](provider-installation.md)
+and add applications afterward. You do not need to fill out the example’s every
+application setting before starting a new service.
 
-Use [provider.config.safe.example.json](provider.config.safe.example.json) as the configuration reference. The only backend kind is `ows`; `safeWallet`, `safeProvisioning`, `approvedCalls` and `runtimeConfiguration` are required. Unknown properties and missing required sections are rejected before service startup.
+## Find the setting you need
 
-Configure the provider HTTPS identity, application clients and trusted application identity assertions. Retain separate provider operator credentials. Set pinned Safe, module, handler, EntryPoint and contract addresses for the chosen chain. Accepted runtime policy defines actions, services and bounded sponsorship.
+The [Safe example](provider.config.safe.example.json) shows the supported shape.
+The backend kind is `ows`; `safeWallet`, `safeProvisioning`, `approvedCalls` and
+`runtimeConfiguration` are required. Unknown properties or missing required
+sections stop startup rather than silently enabling a partial service.
 
-Secret values belong in retained environment variables, never the JSON export. Start with `activation.enabled: false`. Complete backup/recovery and backend acceptance before enabling wallet operations. See [setup wizard](setup-wizard.md) and [deployment](operator-deployment.md).
+Installation settings describe the provider’s HTTPS identity and retained storage.
+API-managed application registrations live in durable records. Static source
+integrations instead configure startup clients and their identity agreements.
+Keep provider operator credentials separate and choose one registration authority.
+
+## Keep the service safe while configuring it
+
+Start with `activation.enabled: false`. Keep secret values in retained environment
+variables or the deployment’s secret store, outside JSON. Review the selected
+chain’s pinned Safe, module, handler, EntryPoint and contract addresses. Applications
+need accepted rules, services and bounded network-fee sponsorship before use.
+
+Use the [advanced editor](setup-wizard.md) for a guided static configuration, or
+[application management](runtime-workspace.md) for a running API-managed service.
+Complete [launch checks](conformance.md), including backup and recovery, before activation.

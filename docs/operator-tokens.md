@@ -1,29 +1,18 @@
-# Get and renew application tokens in the GUI
+# Try the API with staff token controls
 
-Staff testing the deployed API can obtain short-lived application tokens directly
-in Swagger instead of moving them between tools. Enable these optional controls
-in [Deployment](setup-wizard.md#_5-deployment), then configure staff login in
-Services and an explicit operator allowlist. Staff login authorizes token
-controls; users continue to authenticate and consent within the connected
-application. This guide explains setup, issuance, renewal and troubleshooting.
+If you test the API regularly, the optional **Application tokens** panel can
+obtain a short-lived application token without copying it between tools. You will
+need a staff login and explicit permission to use the panel. Ordinary application
+integration can use a token with **Authorize** instead; this feature is optional.
 
-The optional **Application tokens** panel in deployed Swagger lets an authorized
-operator obtain a short-lived calling-application token, renew it and use it for
-Try it out without copying tokens between tools. The provider server exchanges
-an environment-held application secret with your configured OAuth issuer.
+This guide is for staff and the developer configuring an advanced static
+deployment. The panel exchanges a server-held application secret using client
+credentials and `client_secret_post`, with an `audience` parameter as in the
+[Auth0 recipe](auth0-setup.md). Other issuer profiles may need manual Authorize
+or custom composition. The token represents the application, not the staff member
+or wallet owner. It never replaces current user approval or activates wallet use.
 
-This supports **Machine to Machine applications using client credentials and
-client_secret_post**, including the Auth0 reference setup. It obtains a token for
-the selected application, not for the signed-in operator or a wallet owner.
-The supplied exchange sends the configured API audience using the `audience`
-parameter, as in the Auth0 recipe. Issuers requiring another token request or
-client authentication method can use manual Authorize or advanced host composition.
-
-A token still needs the API's required scopes and the application's current owner
-access grant, identity and other authority. Enabling this panel does not activate
-wallet operations or give operators owner/spending consent.
-
-## Prepare a client and token operator
+## Prepare the application and staff access
 
 1. Follow the [Auth0 registration guide](auth0-setup.md) or use your compatible
    issuer. Register the wallet API with the exact configured audience, RFC 9068
@@ -36,7 +25,7 @@ wallet operations or give operators owner/spending consent.
    from wallet/identity vendor credentials. Enable client-credentials grants
    and client_secret_post authentication; do not use a public SPA/mobile client
    or a client that requires private_key_jwt/mTLS with this supplied panel.
-3. Add the exact Client ID and issuer to the wizard's **Policies** application
+3. Add the exact Client ID and issuer to the wizard's **Applications** application
    registration. Keep it enabled. Prefer an isolated staging application with
    approved test identities and its own owner access grants. The application's
    owner must authorize sharing its secret with the provider's token broker.
@@ -46,20 +35,23 @@ wallet operations or give operators owner/spending consent.
    the existing provider login registration and callback. Do not register a new
    Swagger OAuth callback or put a client secret in the browser.
 
-The operator allowlist is separate from **Reviewers**. Reviewer status alone
+The staff allowlist is separate from the hosted-access reviewer list. Reviewer status alone
 cannot obtain application tokens. A listed token operator can obtain tokens for
 all clients explicitly selected for this panel, up to each configured scope limit.
 Choose those subjects and limits accordingly.
 
-## Configure without writing code
+<details>
+<summary>Configuration steps for the developer</summary>
+
+## Configure the optional panel
 
 In the local wizard, import your saved configuration and open **Deployment**:
 
 1. Check **Enable application token controls for staff**. It also enables the deployed explorer.
-2. In **Token operator account IDs (sub)**, enter one exact subject per line from the
+2. In **Staff account IDs allowed to test (sub)**, enter one exact subject per line from the
    configured staff-login issuer. At least one is required.
 3. For each intended application, check **Allow staff to get tokens for …**. Enter its
-   **Application client secret variable name**. The suggested name is
+   **Application client secret** variable name. The suggested name is
    `WALLET_EXPLORER_APP_1_SECRET`, numbered by the wizard's application list.
    This is only the deployment variable's name; do not enter the secret value.
 4. Select **Allowed API permissions (scopes)**. These are the maximum scopes the
@@ -75,12 +67,14 @@ In the local wizard, import your saved configuration and open **Deployment**:
 
 Validation rejects unregistered/disabled clients, duplicate clients, empty operator
 or scope lists, unsupported scopes, plaintext secrets and tokens configured while
-documentation is disabled. If you rename or remove an application client, remove
+documentation is disabled. If you change an application’s client ID or remove it, remove
 its old token selection and select the new registration before exporting.
 Keep `/docs/`, its assets and `/docs/operator/*` forwarded to the provider service,
 along with the existing `/onboarding/callback`. Preserve the configured public
 Host header through ingress; forwarded host headers are not trusted. Restrict documentation at ingress
 according to your operator access policy. Use your real HTTPS origin.
+
+</details>
 
 ## Get a token and send a request
 
@@ -91,23 +85,19 @@ token issuance happens only on the deployed provider.
 1. In **Application tokens**, choose **Sign in to token controls**. Complete
    your configured login/MFA. The existing login flow returns you to Swagger.
    If you signed in elsewhere, **Check sign-in** checks the current session.
-2. Select the **Calling application**, then select only the required scopes.
+2. Select the **Application to test**, then select only the required scopes.
    Choose **Get token**. The panel shows the application and expiry countdown;
    it does not display the token or require a paste operation.
 3. Expand the desired endpoint, choose **Try it out**, supply its real IDs/inputs
    and idempotency key where required, then **Execute**. The managed token is
    attached to protected provider requests. Public discovery needs no token.
-   See the [live API testing guide](http-api.md#try-deployed-apis) for the first
-   request, owner/reviewer flow, actual responses and safe retry handling.
+   See the [live API testing guide](http-api.md#try-deployed-apis) for the request sequence,
+   user permission and safe retry handling.
 
 Changing the application/scopes clears the previous token. Managed token controls
 also clear Swagger's manual bearer authorization to avoid mixing callers.
 POST calls have real effects, including durable records, vendor charges and
 signatures that may authorize later transactions. This panel is not a simulator.
-
-These interface screenshots use an offline fixture, invented identities and no
-real application secret or valid API token. They illustrate the controls without
-establishing compatibility with your identity provider or wallet backend.
 
 ## Renew, expire and sign out
 
@@ -146,8 +136,8 @@ public-client integrations outside this supplied M2M broker.
 
 ## If it fails
 
-- **No Application tokens panel:** confirm your toolkit build supports `apiExplorer`,
-  enable it in validated configuration with documentation enabled, then restart.
+- **No Application tokens panel:** check `apiExplorer`
+  and enable it in validated configuration with documentation enabled, then restart.
 - **Sign-in loop / access denied:** check the exact operator subject and staff-login
   issuer, HTTPS/cookies, the callback and your existing short ID-token lifetime and
   fresh authentication settings. A reviewer account is not automatically a token operator.
@@ -160,6 +150,6 @@ public-client integrations outside this supplied M2M broker.
 - **Token ready but API returns 403/503:** follow the live guide's authority/readiness
   checks. Token issuance does not prove provider acceptance or create owner grants.
 
-The server does not expose vendor error bodies, secrets, refresh tokens or arbitrary
-issuer URLs through these controls. Configured issuers and secret references are
+The controls do not expose vendor error bodies, secrets, refresh tokens or arbitrary
+issuer URLs. Configured issuers and secret references are
 provider-controlled; the browser cannot choose another token endpoint or an unconfigured client.

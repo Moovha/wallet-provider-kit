@@ -1,35 +1,46 @@
-# Graphical installation and advanced configuration
+# Use advanced configuration when you need it
 
-The default installation flow is **Choose where to run → Review your setup →
-Start and sign in**. It deploys a manageable provider with no
-applications. Claim its administrator privately, then configure applications in
-`/admin/` or through the API. See [installation](provider-installation.md).
+For a new service, start with [installation](provider-installation.md). Its three
+stages are **Choose where to run → Review your setup → Start and sign in**.
+You can add applications afterward in the console or through the API.
 
-The **Advanced configuration** editor retains the following explicit static
-configuration screens for source integrations. Applications configured here are
-startup registrations; API-managed installations use durable registrations instead.
-Do not mix these authorities in one configuration.
+This page is for developers maintaining an explicit static source configuration.
+Choose **Advanced configuration** in setup to open its six screens. Applications
+entered here are startup registrations; API-managed installations keep durable
+registrations instead. Choose one registration authority per configuration.
 
 ## 1. Provider
 
-Set the provider name, HTTPS origin and privacy notice.
+Give your service a name, final HTTPS address and privacy notice. These tell people
+who operates the service and where to find its terms.
 
 ## 2. Wallet storage
 
-Configure the OWS vault binding and retained owner passphrase reference. Each user account is a Safe; the vault account is its private signer.
+Choose the private OWS vault location and retained passphrase reference. Each
+person receives a Safe; the vault holds its private signer. Follow
+[signing-key storage](ows-adapter.md) for the recovery boundary.
 
 ## 3. Services
 
-Register application authentication and optional staff token controls. Keep secret references separate from values.
+Configure application authentication and, only if needed, staff token controls.
+[Service connections](operator-services.md) explain which registration each uses.
+Enter secret variable names here and save actual values privately.
 
 ## 4. Applications
 
-Define application trust, identity fields, consent and permitted contract calls. Register provider policy operators separately from application clients.
+Set up allowed applications, their user-check agreements, identity requirements,
+consent and transaction limits. [User access](application-access.md) explains the
+experience to build. Register provider policy operators separately.
 
 ## 5. Deployment
 
-Choose persistent storage and review backup/recovery evidence. Keep wallet operations disabled until acceptance is complete.
+Choose persistent storage and review [backup and recovery](provider-maintenance.md).
+Keep wallet operations disabled until [launch checks](conformance.md) pass.
 
 ## 6. Finish setup
 
-Validate and export the configuration. Retain generated secrets and persistent volumes. Local setup prepares the API, private bundler and paymaster services using the same [Safe configuration](setup.md).
+Validate and export, then retain configuration, generated secrets and persistent
+volumes together. [Source deployment](operator-deployment.md) prepares the API,
+private bundler and paymaster using the [configuration reference](setup.md).
+The editor does not update a running service; apply exported changes through a
+reviewed restart that preserves pending work.

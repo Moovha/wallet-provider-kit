@@ -1,4 +1,10 @@
-# Service architecture
+# How your wallet service fits together
+
+The application handles the person’s experience. Your provider service checks
+permission, keeps the private signing identities and verifies transaction results.
+This page gives developers and security reviewers a closer look at that boundary.
+
+## From request to verified result
 
 The application authenticates to the provider, establishes a current owner grant and submits approved calls to the user Safe. The provider durably acknowledges each batch before background preparation. Preparation obtains the EntryPoint nonce and fee quote, estimates the exact calls, checks canonical Safe/module/handler/guard and contract pins, and reserves sponsorship.
 

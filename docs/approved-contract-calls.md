@@ -1,4 +1,10 @@
-# Approved calls
+# Choose which calls an application can request
+
+A transaction rule describes exactly which calls a person may approve. Review the
+contracts, methods and limits with the application developer before publishing
+the rule. Start with [application rules](runtime-configuration.md) for that decision.
+
+## How developers bind exact calls
 
 Applications submit exact atomic calls through the user Safe wallet endpoint. The provider validates current policy, target and method pins, value and asset limits, application action metadata and owner grant. A SafeCallIntent binds those calls before UserOperation preparation.
 
