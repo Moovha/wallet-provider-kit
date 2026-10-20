@@ -778,6 +778,7 @@ footer img {
   border: 1px solid #dfe5e8;
   border-radius: 16px;
   min-width: 0;
+  overflow-wrap: anywhere;
 }
 .api-controls {
   margin: 1.5rem 0;

@@ -26,24 +26,24 @@ function updateHttp(
 </script>
 <template>
   <div class="step-heading">
-    <span class="eyebrow">Deployment inputs</span>
-    <h2>Prepare the deployment</h2>
+    <span class="eyebrow">Getting ready to launch</span>
+    <h2>Choose how your service will run</h2>
     <p>
-      Review the supplied deployment settings, then choose any optional features
-      and acceptance requirements.
+      Start with the supplied settings, then choose any extra tools you need.
+      Wallet operations stay off until you have tested your setup.
     </p>
   </div>
   <div class="callout step-orientation">
-    <strong>Prepare where the exported service will run</strong>
+    <strong>The essentials are already filled in</strong>
     <p>
-      Setup prepares private persistent storage and container networking
-      automatically. The default host port is 8080, and bundled Caddy supplies
-      the HTTPS gateway configuration. Expand advanced settings to use a
-      different data directory, port or existing gateway.
+      Setup prepares a private place for your service and its data. It uses port
+      8080 by default and includes Caddy for secure HTTPS access. Open advanced
+      settings if your team needs different storage, ports or an existing
+      gateway.
     </p>
     <p>
-      The API testing tools are optional. Leave activation off for your first
-      deployment; test your integrations and recovery before enabling it.
+      API testing tools are optional. For your first setup, leave wallet
+      operations off while you test connections, permissions and recovery.
     </p>
   </div>
   <p class="help-text">
@@ -100,9 +100,9 @@ function updateHttp(
     />
   </AdvancedSettings>
   <p class="help-text">
-    Local setup saves the gateway configuration. Public HTTPS starts separately
-    after your domain points to the deployment host and ports 80/443 are
-    reachable. Wallet operations stay disabled until acceptance.
+    Secure public access needs a separate step: connect your web address to the
+    server and make ports 80 and 443 reachable. Keep wallet operations off until
+    your team has completed the required tests.
   </p>
   <SetupField
     guide="explorer"
@@ -118,7 +118,7 @@ function updateHttp(
   <SetupField
     guide="httpRequestLimit"
     type="number"
-    label="HTTP requests per minute per peer"
+    label="Request limit per connecting address, per minute"
     :min="1"
     :max="6000"
     :modelValue="http.requestsPerMinute ?? 60"
@@ -127,27 +127,24 @@ function updateHttp(
   <div class="callout">
     <strong>Next, choose local setup or a manual deployment</strong>
     <p>
-      Local setup can save private files, prepare persistent storage and start a
-      container for you. It uses 0.0.0.0:8080 inside the container and publishes
-      your selected port only on this machine. The bundled Caddy profile
-      supplies automatic HTTPS for your public address when you start it on the
-      final host; you can also connect an existing gateway. The deployment guide
-      walks through these tasks and backups.
+      Run the service on this computer, or save the settings for another server.
+      Local access stays on this computer. For a public service, your team will
+      also need to set up secure web access and backups.
     </p>
   </div>
   <div v-if="model.safeWallet" class="callout">
     <strong>One Safe address per user</strong>
     <p>
-      The bundled signing engine stays behind each user's Safe. Applications
-      fund one gas address; the service replenishes its own paymaster and
-      private bundler. Application infrastructure funds submission gas.
+      Wallet signing keys stay private. Connected applications arrange funding
+      for network fees; connecting an application does not fund those fees
+      automatically.
     </p>
   </div>
   <h3>Enable wallet operations</h3>
   <p class="help-text">
-    Leave this off for your first deployment. Complete wallet backend and
-    recovery tests, then record their report references below. Test the Safe,
-    bundler, paymaster and configured application calls before activation.
+    Leave this off until your team has tested wallet creation, approved
+    transactions, network fee funding and recovery. Then add the references to
+    your completed test reports below.
   </p>
   <SetupField
     guide="activation"

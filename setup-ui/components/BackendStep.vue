@@ -7,22 +7,22 @@ const model = defineModel<ProviderConfiguration>({ required: true });
 </script>
 <template>
   <div class="step-heading">
-    <span class="eyebrow">Wallet infrastructure</span>
-    <h2>Your Safe wallet backend</h2>
+    <span class="eyebrow">Looking after wallets</span>
+    <h2>A wallet for each person</h2>
     <p>
-      Each user receives one Safe address for deposits, balances and
-      transactions. The bundled OWS engine holds its private signer. A private
-      ERC-4337 bundler submits approved operations and an application-owned
-      paymaster covers gas.
+      Each person gets their own Safe wallet address for deposits and approved
+      transactions. The included wallet tools keep signing keys private.
+      Connected applications arrange payment of network fees separately.
     </p>
   </div>
   <template v-if="model.backend.kind === 'ows'">
     <div class="callout">
-      <strong>Your local vault is included</strong>
+      <strong>Private wallet storage is included</strong>
       <p>
-        The pinned engine is included in the standard image. Setup creates a
-        private, persistent vault and generates a missing owner passphrase.
-        Retain the environment file and back up both vault and database.
+        Setup creates a private vault that stays in place when the service
+        restarts. It also creates a password if one is missing. Keep the saved
+        passwords and back up both the vault and the service records so you can
+        recover them together.
       </p>
     </div>
     <AdvancedSettings label="Advanced vault settings">
@@ -30,22 +30,23 @@ const model = defineModel<ProviderConfiguration>({ required: true });
         guide="vault"
         v-model="model.backend.vaultDirectory"
         type="text"
-        label="OWS vault directory"
+        label="Private wallet folder"
         validation="required|length:1,256"
       />
       <SecretField
         guide="passphrase"
         v-model="model.backend.passphrase"
-        label="OWS owner passphrase"
+        label="Wallet storage password"
       />
       <p class="help-text">
-        Use an owner passphrase of 16–4096 characters at deployment. Agent
-        tokens cannot be used.
+        Use a password of 16–4096 characters to unlock the vault. An OWS agent
+        token cannot replace this password.
       </p>
     </AdvancedSettings>
   </template>
   <p class="help-text">
-    Keep the wallet environment ID with the saved configuration across restarts.
+    Keep the generated wallet environment ID with your saved settings. Changing
+    it can disconnect stored accounts from their wallets.
   </p>
   <AdvancedSettings label="Advanced wallet environment settings">
     <SetupField

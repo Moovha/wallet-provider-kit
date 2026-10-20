@@ -14,7 +14,7 @@ const step = ref(1),
   error = ref('');
 const config = ref<ProviderConfiguration>();
 const origin = ref('https://localhost'),
-  name = ref('Wallet provider'),
+  name = ref('Wallet service'),
   privacy = ref('https://localhost/privacy');
 const network = ref<'base' | 'base-sepolia'>('base');
 const valid = computed(
@@ -117,18 +117,18 @@ function openAdvanced() {
       </button>
     </header>
     <main>
-      <span class="eyebrow">PROVIDER INSTALLATION</span>
-      <h1>Deploy your wallet provider</h1>
+      <span class="eyebrow">GETTING STARTED</span>
+      <h1>Let’s set up your wallet service</h1>
       <p>
-        Start the service and secure administrator access. Connect applications
-        and configure their policies and sponsorship afterward.
+        Choose where your service will run. Once it’s ready, you can sign in,
+        add applications and decide how they use wallets.
       </p>
       <ol class="installation-steps" aria-label="Installation progress">
         <li
           v-for="(label, index) in [
-            'Choose destination',
-            'Review deployment',
-            'Deploy and open administration',
+            'Choose where to run',
+            'Review your setup',
+            'Start and sign in',
           ]"
           :key="label"
           :aria-current="step === index + 1 ? 'step' : undefined"
@@ -138,11 +138,11 @@ function openAdvanced() {
       </ol>
       <p v-if="error" role="alert">{{ error }}</p>
       <section v-if="step === 1">
-        <h2>Where should it run?</h2>
+        <h2>Where would you like to run it?</h2>
         <div class="destination-options">
           <button
             v-for="[value, title, detail] in [
-              ['local', 'This computer', 'Reuse your local container runtime.'],
+              ['local', 'This computer', 'Try it on this computer first.'],
               [
                 'server',
                 'Existing server',
@@ -151,7 +151,7 @@ function openAdvanced() {
               [
                 'cloud',
                 'Cloud account',
-                'Review a deployment template in your cloud console.',
+                'Set it up in your own cloud account.',
               ],
             ]"
             :key="value"
@@ -164,9 +164,8 @@ function openAdvanced() {
         </div>
         <template v-if="target === 'local'"
           ><p>
-            The source setup tool builds the current checkout. Versioned release
-            bundles use prebuilt images and do not require Node or a source
-            build.
+            This setup builds the service on your computer. It uses Docker to
+            keep your service and its data separate from other installations.
           </p>
           <button class="primary" :disabled="!config" @click="step = 2">
             Continue
@@ -174,14 +173,15 @@ function openAdvanced() {
         >
         <template v-else
           ><p v-if="target === 'server'">
-            Use the installer in a versioned release bundle on your server. It
-            checks Docker, prepares private storage and starts the same service.
-            Your SSH and cloud credentials stay with your infrastructure tools.
+            Your server keeps your service running independently of this
+            computer. Open the installation guide for the release installer and
+            the settings you’ll need. Keep your server sign-in details in your
+            usual administration tools.
           </p>
           <p v-else>
-            The AWS template creates one Linux VM and an encrypted persistent
-            disk. Review resources, network access and costs in AWS before
-            creating the stack. Cloud acceptance must be completed separately.
+            For AWS, the supplied template sets up one server and encrypted
+            storage. Review what it will create and what it will cost in AWS
+            before starting. This cloud option still needs deployment testing.
           </p>
           <p>
             <a
@@ -202,20 +202,20 @@ function openAdvanced() {
         >
       </section>
       <form v-else-if="step === 2" @submit.prevent="review">
-        <h2>Review deployment</h2>
+        <h2>Make it yours</h2>
         <p>
-          No application, RPC credential, sponsor funding or external identity
-          provider is needed.
+          Just a name to get started. You can connect applications, arrange
+          network fees and set up user checks later.
         </p>
         <label
-          >Provider name<input v-model="name" required maxlength="100"
+          >Service name<input v-model="name" required maxlength="100"
         /></label>
         <details>
-          <summary>Provider identity and network</summary>
+          <summary>Service address and network</summary>
           <p>
-            Local evaluation uses localhost. Choose the final HTTPS origin
-            before connecting real applications; deployment identity is
-            retained.
+            For a local trial, keep the supplied addresses. Before connecting
+            real applications, choose the secure web address your service will
+            keep using.
           </p>
           <label
             >HTTPS origin<input v-model="origin" type="url" required /></label
@@ -232,21 +232,21 @@ function openAdvanced() {
           >
         </details>
         <p>
-          Data and secrets are saved in a private deployment directory. HTTP
-          access stays on this computer’s loopback interface. Wallet operations
-          start disabled.
+          Your settings and private data stay in a separate folder on this
+          computer. Only this computer can open the local service. Wallet
+          operations start disabled.
         </p>
         <div class="installation-actions">
           <button class="secondary" type="button" @click="step = 1">
             Back
           </button>
           <button class="primary" :disabled="busy || !valid">
-            {{ busy ? 'Validating…' : 'Review and deploy' }}
+            {{ busy ? 'Validating…' : 'Continue to setup' }}
           </button>
         </div>
       </form>
       <section v-else>
-        <h2>Deploy and open administration</h2>
+        <h2>Let’s get your service running</h2>
         <LocalSetup
           :config="config"
           :request="request"

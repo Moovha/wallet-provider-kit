@@ -60,7 +60,7 @@ function toggleClient(clientId: string, index: number, enabled: unknown) {
 </script>
 <template>
   <section aria-label="Integrated application tokens">
-    <h3>Application tokens for API testing</h3>
+    <h3>Try the API as an application</h3>
     <SetupField
       guide="operatorControls"
       type="checkbox"
@@ -70,8 +70,8 @@ function toggleClient(clientId: string, index: number, enabled: unknown) {
     />
     <template v-if="model.apiExplorer">
       <p class="help-text">
-        Configure staff login in Services before exporting. This login is for
-        token operators, not wallet users.
+        First, set up staff sign-in in Services. Only approved staff can use
+        these testing tools; wallet users do not sign in here.
       </p>
       <button
         type="button"
@@ -84,14 +84,14 @@ function toggleClient(clientId: string, index: number, enabled: unknown) {
         guide="operators"
         v-model="operators"
         type="textarea"
-        label="Token operator account IDs (sub)"
+        label="Staff account IDs allowed to test (sub)"
         validation="required"
       />
       <p class="help-text">
-        Select applications whose owners authorize operator testing, then limit
-        their token scopes. Supply each calling application's client secret
-        privately at deployment. Tokens do not bypass owner access, identity or
-        transfer policy.
+        Choose applications whose teams have approved staff testing, then select
+        only the permissions needed. Save each application’s secret privately
+        when you set up the service. Test access still requires the wallet
+        owner’s permission and all identity and transaction checks.
       </p>
       <fieldset
         v-for="(application, index) in model.policy.applications"
@@ -122,7 +122,7 @@ function toggleClient(clientId: string, index: number, enabled: unknown) {
         </template>
       </fieldset>
       <div class="callout">
-        <strong>Get and renew tokens on your deployed service</strong>
+        <strong>Get ready to try a request</strong>
         <p>
           After export and deployment, sign in at the explorer, select scopes
           and choose Get token or Renew token. Execute renews a token nearing

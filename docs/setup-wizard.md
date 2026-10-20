@@ -1,7 +1,7 @@
 # Graphical installation and advanced configuration
 
-The default installation flow is **Choose destination → Review deployment →
-Deploy and open administration**. It deploys a manageable provider with no
+The default installation flow is **Choose where to run → Review your setup →
+Start and sign in**. It deploys a manageable provider with no
 applications. Claim its administrator privately, then configure applications in
 `/admin/` or through the API. See [installation](provider-installation.md).
 
@@ -14,7 +14,7 @@ Do not mix these authorities in one configuration.
 
 Set the provider name, HTTPS origin and privacy notice.
 
-## 2. Backend
+## 2. Wallet storage
 
 Configure the OWS vault binding and retained owner passphrase reference. Each user account is a Safe; the vault account is its private signer.
 
@@ -30,6 +30,6 @@ Define application trust, identity fields, consent and permitted contract calls.
 
 Choose persistent storage and review backup/recovery evidence. Keep wallet operations disabled until acceptance is complete.
 
-## 6. Export
+## 6. Finish setup
 
 Validate and export the configuration. Retain generated secrets and persistent volumes. Local setup prepares the API, private bundler and paymaster services using the same [Safe configuration](setup.md).

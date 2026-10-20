@@ -167,14 +167,15 @@ onMounted(() => {
 </script>
 <template>
   <section class="local-setup callout" aria-labelledby="local-setup-title">
-    <h3 id="local-setup-title">Set up and run locally</h3>
+    <h3 id="local-setup-title">Start your service on this computer</h3>
     <p>
-      Run an isolated provider on this computer. Setup saves private
-      configuration and storage, starts the service and checks its health.
+      We’ll save your settings and private data in a separate folder, start the
+      service and check that you can reach it.
     </p>
     <p>
-      Setup checks Docker and Compose. You can install missing tools here. The
-      first build downloads dependencies and may take several minutes.
+      This uses Docker and Compose to run the service separately from other
+      software. Setup checks for them and can help install missing tools. The
+      first start downloads software and may take several minutes.
     </p>
     <p>
       Wallet operations start disabled. Complete application configuration and
@@ -190,7 +191,7 @@ onMounted(() => {
       :disabled="busy || !config || runtime?.state === 'installing'"
       @click="prepare"
     >
-      {{ busy ? 'Checking Docker…' : 'Check local setup prerequisites' }}
+      {{ busy ? 'Checking your computer…' : 'Check this computer' }}
     </button>
     <div
       v-if="
@@ -198,7 +199,7 @@ onMounted(() => {
       "
       aria-live="polite"
     >
-      <h4>Local container runtime</h4>
+      <h4>Software for running your service</h4>
       <p>{{ runtime.message }}</p>
       <ul>
         <li v-for="check in runtime.checks" :key="check.id">
@@ -226,7 +227,7 @@ onMounted(() => {
               : step.state === 'running'
                 ? 'In progress'
                 : step.state === 'failed'
-                  ? 'Failed'
+                  ? 'Needs attention'
                   : 'Waiting'
           }}</strong>
           · {{ step.label }}
@@ -240,15 +241,15 @@ onMounted(() => {
     <template v-if="plan">
       <dl class="export-summary">
         <div>
-          <dt>Private deployment directory</dt>
+          <dt>Your private service folder</dt>
           <dd class="local-path">{{ plan.directory }}</dd>
         </div>
         <div>
-          <dt>Local API</dt>
+          <dt>Service address on this computer</dt>
           <dd>http://127.0.0.1:{{ plan.port }}</dd>
         </div>
         <div>
-          <dt>Public origin retained in configuration</dt>
+          <dt>Saved public service address</dt>
           <dd>{{ plan.config.policy.provider.origin }}</dd>
         </div>
       </dl>
@@ -256,13 +257,12 @@ onMounted(() => {
         <li v-for="change in plan.changes" :key="change">{{ change }}</li>
       </ul>
       <template v-if="progress.state === 'idle'">
-        <h4>Supply deployment secrets</h4>
+        <h4>Passwords and secrets for setup</h4>
         <p>
-          Values are sent only to this local setup process and saved in
-          provider.env with owner-only permissions. They are plaintext on the
-          host and mounted read-only into the container. They are never included
-          in downloads, progress or browser storage. Use isolated test
-          credentials.
+          Missing passwords and secrets go only to setup on this computer. They
+          are saved in the private provider.env file, not browser storage or
+          downloaded settings. The file contains readable secrets, so protect it
+          and use separate details for testing.
         </p>
         <div
           v-for="secret in plan.secrets"
@@ -291,10 +291,10 @@ onMounted(() => {
           </label>
         </div>
         <p>
-          Starting setup builds an image, writes the displayed directory and
-          initializes its new database. The container stays running after you
-          close the wizard while Docker is running, and uses an unless-stopped
-          restart policy.
+          Starting setup prepares the software and creates new service records
+          in the folder shown above. The service keeps running if you close this
+          page, as long as Docker is running. It restarts with Docker unless you
+          stop it.
         </p>
         <button
           type="button"
@@ -302,7 +302,7 @@ onMounted(() => {
           :disabled="busy || !canStart"
           @click="start"
         >
-          Start local setup
+          Start my service
         </button>
       </template>
       <div
@@ -315,9 +315,9 @@ onMounted(() => {
             progress.state === 'running'
               ? 'Setup in progress'
               : progress.state === 'complete'
-                ? 'Local service running · wallet operations disabled'
+                ? 'Your service is running · wallet operations off'
                 : progress.state === 'stopped'
-                  ? 'Local service stopped'
+                  ? 'Your service is stopped'
                   : 'Setup needs attention'
           }}
         </h4>
@@ -329,7 +329,7 @@ onMounted(() => {
                 : step.state === 'running'
                   ? 'In progress'
                   : step.state === 'failed'
-                    ? 'Failed'
+                    ? 'Needs attention'
                     : 'Waiting'
             }}</strong>
             · {{ step.label }}
@@ -337,8 +337,9 @@ onMounted(() => {
         </ol>
         <p>{{ progress.message }}</p>
         <p v-if="progress.cleanup === 'unconfirmed'" role="alert">
-          Stopping the container could not be confirmed. Use the saved Compose
-          stop command before investigating.
+          We couldn’t confirm that the service stopped. Ask your administrator
+          to use the stop command in your saved instructions before making
+          further changes.
         </p>
         <p v-if="progress.state === 'running'">
           Keep this page open to follow progress. Closing it does not cancel
@@ -365,16 +366,17 @@ onMounted(() => {
         </button>
         <div v-if="progress.state === 'complete' && plan.config.management">
           <p>
-            Read the private
+            Open the private
             <code>{{ plan.directory }}/installation-claim</code> file on this
-            computer. Use it once to create the provider administrator; it
-            expires 30 minutes after the first service startup.
+            computer to find your setup code. Use it to create your
+            administrator account within 30 minutes of the service first
+            starting.
           </p>
           <a
             :href="`http://127.0.0.1:${plan.port}/admin/`"
             target="_blank"
             rel="noreferrer"
-            >Open provider administration ↗</a
+            >Open my wallet service ↗</a
           >
         </div>
         <p v-if="progress.state === 'complete'">
@@ -382,26 +384,26 @@ onMounted(() => {
             :href="`http://127.0.0.1:${plan.port}/health/live`"
             target="_blank"
             rel="noreferrer"
-            >Open local liveness ↗</a
+            >Check service health ↗</a
           >
           ·
           <a
             :href="`http://127.0.0.1:${plan.port}/v1/capabilities`"
             target="_blank"
             rel="noreferrer"
-            >Open local capabilities ↗</a
+            >View available features ↗</a
           >
         </p>
       </div>
       <p>
         <a :href="docs + 'local-setup.html'" target="_blank" rel="noreferrer"
-          >Local setup, recovery and final-host handoff ↗</a
+          >Help with setup, recovery and moving to a server ↗</a
         >
       </p>
     </template>
     <p v-if="!plan">
       <a :href="docs + 'local-setup.html'" target="_blank" rel="noreferrer"
-        >Runtime installation, prerequisites and recovery ↗</a
+        >Help with software requirements and recovery ↗</a
       >
     </p>
   </section>

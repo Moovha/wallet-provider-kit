@@ -52,7 +52,7 @@ test('deployed Swagger executes same-origin HTTP and displays real success/auth/
     .addCookies([{ name: 'offline-owner-session', value: 'fixture', url }]);
   await page.goto(`${url}/docs/`);
   await expect(
-    page.getByRole('heading', { name: /Provider API · Live testing/ }),
+    page.getByRole('heading', { name: /Wallet service API · Try a request/ }),
   ).toBeVisible();
   await expect(page.locator('.opblock')).toHaveCount(46);
   const discovery = page.locator('#operations-Discovery-getCapabilities');

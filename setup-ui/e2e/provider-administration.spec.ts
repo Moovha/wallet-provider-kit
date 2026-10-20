@@ -69,45 +69,59 @@ test('claims, registers and manages applications through the real protected mana
     page.on('pageerror', (error) => errors.push(error.message));
     await page.goto(url + '/admin/');
     await page
-      .getByRole('button', { name: 'Set up administrator', exact: true })
+      .getByRole('button', { name: 'First-time setup', exact: true })
       .click();
-    await page.getByLabel('Installation claim credential').fill(claim);
-    await page.getByLabel('Administrator username').fill('offline-admin');
+    await page.getByLabel('Setup code').fill(claim);
+    await page.getByLabel('Choose a username').fill('offline-admin');
     await page.getByLabel('Password', { exact: true }).fill(password);
     await page.getByLabel('Confirm password').fill(password);
-    await page.getByRole('button', { name: 'Create administrator' }).click();
+    await page
+      .getByRole('button', { name: 'Create administrator account' })
+      .click();
     await expect(
-      page.getByRole('heading', { name: 'Your provider' }),
+      page.getByRole('heading', { name: 'Welcome to your service' }),
     ).toBeVisible();
     await expect(page.getByText('Disabled', { exact: true })).toBeVisible();
     await page
       .getByRole('button', { name: 'Applications', exact: true })
       .click();
     await expect(
-      page.getByText('No applications connected.', { exact: false }),
+      page.getByText('No applications yet.', { exact: false }),
     ).toBeVisible();
     await page
       .getByLabel('Application name', { exact: true })
       .fill('Offline application');
     await page
-      .getByRole('button', { name: 'Register application', exact: true })
+      .getByRole('button', { name: 'Add application', exact: true })
       .click();
     await expect(
-      page.getByRole('heading', { name: 'Save this credential now' }),
+      page.getByRole('heading', { name: 'Keep these connection details safe' }),
     ).toBeVisible();
-    await page.getByRole('button', { name: 'I have saved it' }).click();
+    await page.screenshot({
+      path: 'artifacts/provider-installation/connection-details.png',
+      fullPage: true,
+      mask: [page.locator('#credential-value')],
+      maskColor: '#d8e2ea',
+    });
+    await page
+      .getByRole('button', { name: 'I’ve saved these details' })
+      .click();
     await expect(
       page.getByRole('heading', { name: 'Offline application' }),
     ).toBeVisible();
     await page
-      .getByLabel('Identity and consent trust agreement reference')
+      .getByLabel('Agreement reference')
       .fill('Offline trust agreement');
-    await page.getByRole('button', { name: 'Save trust settings' }).click();
+    await page.getByRole('button', { name: 'Save access settings' }).click();
     await expect(
-      page.getByText('Identity trust accepted', { exact: false }),
+      page.getByText('User checks: agreement saved', { exact: false }),
     ).toBeVisible();
-    await page.getByRole('button', { name: 'Suspend', exact: true }).click();
-    await expect(page.getByText('Suspended', { exact: false })).toBeVisible();
+    await page
+      .getByRole('button', { name: 'Pause connection', exact: true })
+      .click();
+    await expect(
+      page.getByText('Connection paused', { exact: false }),
+    ).toBeVisible();
     await page.screenshot({
       path: 'artifacts/provider-installation/administration.png',
       fullPage: true,
@@ -137,9 +151,9 @@ test('claims, registers and manages applications through the real protected mana
       await route.fulfill({ response });
     });
     await page.getByRole('button', { name: 'Access', exact: true }).click();
-    await page.getByLabel('Automation name').fill('Delayed offline automation');
+    await page.getByLabel('Tool name').fill('Delayed offline automation');
     await page
-      .getByRole('button', { name: 'Create automation identity', exact: true })
+      .getByRole('button', { name: 'Add management tool', exact: true })
       .click();
     await created;
     const arriving = page.waitForResponse(
@@ -149,7 +163,7 @@ test('claims, registers and manages applications through the real protected mana
     );
     await page.getByRole('button', { name: 'Sign out', exact: true }).click();
     await expect(
-      page.getByRole('heading', { name: 'Sign in', exact: true }),
+      page.getByRole('heading', { name: 'Welcome back', exact: true }),
     ).toBeVisible();
     releaseResponse();
     await arriving;

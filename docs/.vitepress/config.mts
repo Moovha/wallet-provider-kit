@@ -108,15 +108,15 @@ export default defineConfig({
         text: 'Install and administer',
         items: [
           {
-            text: '1. Choose destination',
+            text: '1. Choose where to run',
             link: '/docs/provider-installation#choose-a-destination',
           },
           {
-            text: '2. Review and install',
+            text: '2. Review your setup',
             link: '/docs/provider-installation#install-a-release-bundle',
           },
           {
-            text: '3. Open administration',
+            text: '3. Start and sign in',
             link: '/docs/provider-installation#claim-administrator-access',
           },
           {
@@ -155,8 +155,8 @@ export default defineConfig({
             ],
           },
           {
-            text: '2. Backend',
-            link: '/docs/setup-wizard#_2-backend',
+            text: '2. Wallet storage',
+            link: '/docs/setup-wizard#_2-wallet-storage',
             collapsed: true,
             items: [
               {
@@ -232,8 +232,8 @@ export default defineConfig({
             ],
           },
           {
-            text: '6. Export',
-            link: '/docs/setup-wizard#_6-export',
+            text: '6. Finish setup',
+            link: '/docs/setup-wizard#_6-finish-setup',
             collapsed: true,
             items: [
               { text: 'Run locally with progress', link: '/docs/local-setup' },

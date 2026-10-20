@@ -137,30 +137,29 @@ async function copy() {
 <template>
   <section class="api-reference" aria-label="Provider API reference">
     <div class="step-heading">
-      <span class="eyebrow">Explore the interface</span>
+      <span class="eyebrow">For your developers</span>
       <h2>Provider API reference</h2>
       <p>
-        Explore requests and example responses for your current settings. Choose
-        an application to see which permissions you have configured for it.
+        See how applications talk to your service. Choose an application to
+        explore its requests, permissions and example responses.
       </p>
     </div>
     <div class="callout">
-      <strong>Local preview · no API calls are sent</strong>
+      <strong>Take a look before sending anything</strong>
       <p>
-        This preview uses the settings in this wizard, including unsaved edits.
-        It does not check your deployed service or give an application access.
-        Your deployed service still checks its configuration, application
-        tokens, owner consent, identity status and permissions before allowing a
-        request.
+        This is a preview of your current settings, including unsaved changes.
+        It does not contact your running service or give an application wallet
+        access. The running service still checks sign-in, user identity, wallet
+        approvals and permissions.
       </p>
     </div>
     <section class="callout api-live" aria-label="Try deployed APIs">
       <span class="eyebrow">After deployment</span>
-      <h3>Try it out · real service responses</h3>
+      <h3>Ready to try your running service?</h3>
       <p>
-        Open Swagger on your provider's HTTPS domain to send requests and see
-        the actual status, headers, response body and timing. Nothing runs
-        automatically. Your local preview and edits stay here.
+        Open the API testing page at your service’s secure web address to send a
+        request and see its result. Nothing is sent automatically, and your
+        draft settings stay here.
       </p>
       <p v-if="!config.http?.documentation">
         Enable the deployed explorer in this draft, then validate, export and
@@ -251,11 +250,11 @@ async function copy() {
         </select></label
       >
       <label
-        >Find an endpoint<input
+        >Find a request<input
           v-model="search"
           type="search"
-          placeholder="Path, action or scope"
-          aria-label="Find an endpoint"
+          placeholder="Search by address, action or permission"
+          aria-label="Find a request"
       /></label>
     </div>
     <p class="help-text">
@@ -267,34 +266,30 @@ async function copy() {
       download.
     </p>
     <div class="callout">
-      <h3>Signing, submission and transaction reports</h3>
+      <h3>Understand what a transaction request does</h3>
       <p>
-        POST /v1/transfer-authorizations authorizes an exact transfer. POST
-        /v1/actions/{actionId}/sign returns its signature; it does not submit a
-        transaction. With execution configured, POST
-        /v1/actions/{actionId}/execute coordinates the approved transfer with an
-        admitted gas sponsor. GET /v1/actions/{actionId}/execution verifies
-        chain effects and finality through independent RPC sources. Discover and
-        select the exact contract through GET /v1/execution-capabilities.
-        Applications can still submit separately when coordination is absent.
-        Arbitrary transaction submission is unavailable.
+        Applications use POST /v1/accounts/{accountId}/wallet to request
+        approved transactions. Your service checks wallet permission,
+        transaction rules and network fee funding before sending anything. A
+        saved request is not proof that a blockchain transaction has completed.
       </p>
       <p>
-        POST /v1/actions/{actionId}/transaction-events records application
-        reports of submission, confirmation or failure. GET on the same path
-        reads them. Reports remain unverified and do not establish settlement or
-        change signing authority or budgets. Request metrics and traces are
-        exported separately to a monitoring collector.
+        Applications can follow transaction progress through the wallet API and
+        read events at GET
+        /v1/accounts/{accountId}/wallet/calls/{batchId}/events. Acknowledgement,
+        verified blockchain completion and business settlement are separate
+        results. Your developer should check the result required for each task
+        before reporting success.
       </p>
     </div>
     <div class="api-flow">
       <h3>Connect an application</h3>
       <p v-if="config.policy.access?.mode === 'application'">
-        Read the access policy → collect identity evidence and wallet-access
-        consent in your application → submit the user assertion → receive a
-        grant when policy passes → create the wallet → read account details. No
-        provider user login or manual review is required. Use the revoke
-        endpoint when the user withdraws access.
+        Start by reading the service’s access rules. In the application, check
+        the person’s identity and ask for wallet permission. Send that evidence
+        to the service; once it accepts the request, the application can create
+        the wallet and read its details. People stay in the application.
+        Withdraw access through the API when they ask you to stop.
       </p>
       <p v-else>
         Hosted compatibility flow: Request access → owner signs in and consents
@@ -319,7 +314,7 @@ async function copy() {
       >
     </div>
     <div v-if="selected" class="api-example">
-      <h3>How to call it</h3>
+      <h3>Try an example request</h3>
       <label
         >Example endpoint<select
           v-model="selectedOperation"
@@ -335,7 +330,7 @@ async function copy() {
         </select></label
       >
       <p>
-        <strong>{{ selected.status }}</strong> · Required scope:
+        <strong>{{ selected.status }}</strong> · API permission (scope):
         <code>{{
           selected.guide.scope ||
           (selected.guide.serviceAuthenticated
@@ -365,7 +360,7 @@ async function copy() {
     <div class="section-heading">
       <h3>Requests and responses</h3>
       <button type="button" class="secondary" @click="download">
-        Download displayed OpenAPI
+        Download API description (OpenAPI)
       </button>
     </div>
     <p class="help-text">

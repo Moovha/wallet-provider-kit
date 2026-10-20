@@ -27,22 +27,27 @@ async function api(path, method = 'GET', data, authorized = true) {
   if (!response.ok) {
     if (response.status === 401 && authorized) logout();
     const descriptions = {
-      401: 'Sign-in credentials are invalid or expired.',
-      403: 'Access denied. Check installation ownership, identity permissions or claim expiry.',
-      409: 'The record changed or this request cannot be repeated. Refresh before trying again.',
-      422: 'Check the supplied fields.',
-      429: 'Too many attempts. Wait before trying again.',
-      503: 'The service is unavailable. Check deployment status.',
+      401: authorized
+        ? 'Your sign-in has ended. Please sign in again to continue.'
+        : 'We couldn’t sign you in. Check your username and password, then try again.',
+      403:
+        path === '/v1/provider/claim'
+          ? 'This setup code was not accepted. Check that it is correct, unused and less than 30 minutes old. The person who installed the service can help renew an expired code.'
+          : 'Your account cannot make this change. Ask your service administrator to check your access.',
+      409: 'These details may have changed. Refresh the page and check whether your change was saved before trying again.',
+      422: 'Some details need attention. Check the form and try again.',
+      429: 'Please wait a minute before trying again.',
+      503: 'The service cannot complete this request right now. Check its status before trying again.',
     };
     throw new Error(
       descriptions[response.status] ||
-        'The request failed. Refresh status before retrying.',
+        'We couldn’t confirm the result. Refresh status and check whether your change was saved before trying again.',
     );
   }
   const result = await response.json();
   if (authorized && started !== generation)
     throw new Error(
-      'The session ended before the response arrived. Sign in and inspect the operation before retrying.',
+      'The session ended before we could show the result. Sign in and check whether your change was saved before trying again.',
     );
   return result;
 }
@@ -95,7 +100,7 @@ async function signIn(username, password) {
   );
   token = result.access_token;
   expiresAt = Date.now() + result.expires_in * 1000;
-  el('session').textContent = 'Session: 5:00';
+  el('session').textContent = 'Sign-in ends in 5:00';
   el('welcome').hidden = true;
   el('workspace').hidden = false;
   el('logout').hidden = false;
@@ -146,12 +151,15 @@ function node(tag, value, parent) {
 function secret(record) {
   if (!record.client_secret) {
     message(
-      'Request already completed. The credential is not shown again. Rotate it if it was not saved.',
+      'This connection is already saved. Its secret can only be shown once. Replace the secret if you did not save it.',
     );
     return;
   }
   el('credential-value').textContent =
-    'Client ID: ' + record.id + '\nClient secret: ' + record.client_secret;
+    'Connection ID (client_id): ' +
+    record.id +
+    '\nSecret (client_secret): ' +
+    record.client_secret;
   el('credential').hidden = false;
   el('credential').scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
@@ -170,7 +178,7 @@ async function refresh() {
   ]);
   el('status-cards').replaceChildren();
   for (const [label, value] of [
-    ['Management', 'Available'],
+    ['Service administration', 'Available'],
     ['Connected applications', String(status.applications.length)],
     [
       'Wallet operations',
@@ -190,38 +198,48 @@ async function refresh() {
     if (!records.length)
       node(
         'p',
-        'No applications connected. Register one here or through the provider API.',
+        'No applications yet. Add your first one above, or ask your developer to connect it using the API.',
         list,
       );
     for (const record of records) {
       const article = node('article', undefined, list);
       node('h3', record.name, article);
-      node('p', record.id, article);
+      const details = node('details', undefined, article);
+      node('summary', 'Connection details', details);
+      node('p', 'Connection ID (client_id): ' + record.id, details);
+      node('p', 'Settings revision: ' + record.revision, details);
       node(
         'p',
-        (record.enabled ? 'Enabled' : 'Suspended') +
-          ' · Revision ' +
-          record.revision +
+        (record.enabled ? 'Connection active' : 'Connection paused') +
           (record.role === 'application'
-            ? ' · Identity trust ' +
-              (record.policy?.assertionTrust ? 'accepted' : 'not configured')
-            : ' · ' + record.role),
+            ? ' · User checks: ' +
+              (record.policy?.assertionTrust
+                ? 'agreement saved'
+                : 'agreement needed')
+            : ' · ' +
+              (record.role === 'administrator'
+                ? 'Administrator'
+                : 'Management tool')),
         article,
       );
       const actions = node('div', undefined, article);
       actions.className = 'actions';
       if (record.role !== 'administrator') {
-        action(actions, record.enabled ? 'Suspend' : 'Enable', async () => {
-          await api('/v1/provider/identities/' + record.id, 'PATCH', {
-            expected_revision: record.revision,
-            enabled: !record.enabled,
-          });
-          await refresh();
-        });
-        action(actions, 'Rotate credential', async () => {
+        action(
+          actions,
+          record.enabled ? 'Pause connection' : 'Resume connection',
+          async () => {
+            await api('/v1/provider/identities/' + record.id, 'PATCH', {
+              expected_revision: record.revision,
+              enabled: !record.enabled,
+            });
+            await refresh();
+          },
+        );
+        action(actions, 'Replace secret', async () => {
           if (
             !confirm(
-              'Replace this identity’s credential and invalidate its existing tokens? Owner grants remain subject to current policy.',
+              'Replace this secret? The current secret and access tokens will stop working. Existing wallet approvals stay in place, and wallet requests still go through all permission checks.',
             )
           )
             return;
@@ -236,25 +254,35 @@ async function refresh() {
         });
       }
       if (record.role === 'application') {
+        node(
+          'p',
+          'Pausing this connection blocks access and ends existing wallet approvals. Resuming it does not restore those approvals.',
+          article,
+        );
         const form = node('form', undefined, article);
-        const label = node(
-          'label',
-          'Identity and consent trust agreement reference',
+        node('h4', 'User checks and permissions', form);
+        node(
+          'p',
+          'Agree with the application’s team how they check identity and record each person’s permission. Save the reference to your reviewed agreement below; do not include private agreement contents.',
           form,
         );
+        const label = node('label', 'Agreement reference', form);
         const input = node('input', undefined, label);
         input.required = true;
         input.maxLength = 256;
         input.value = record.policy?.assertionTrust?.agreement ?? '';
         const permissionLabel = node(
           'label',
-          'Owner permissions allowed by this registration',
+          'What people can allow this application to do',
           form,
         );
         const select = node('select', undefined, permissionLabel);
         for (const [value, text] of [
-          ['read', 'Read accounts'],
-          ['contracts', 'Read accounts and request approved contract calls'],
+          ['read', 'View wallet details'],
+          [
+            'contracts',
+            'View wallet details and request approved transactions',
+          ],
         ]) {
           const option = node('option', text, select);
           option.value = value;
@@ -262,7 +290,12 @@ async function refresh() {
         select.value = record.policy?.permissions?.includes('contracts:request')
           ? 'contracts'
           : 'read';
-        node('button', 'Save trust settings', form).className = 'primary';
+        node('button', 'Save access settings', form).className = 'primary';
+        node(
+          'p',
+          'Each person must still approve wallet access. Changing this agreement or these permissions ends existing approvals, so people will need to approve access again.',
+          form,
+        );
         form.onsubmit = run(async () => {
           await api('/v1/provider/identities/' + record.id, 'PATCH', {
             expected_revision: record.revision,
@@ -275,7 +308,7 @@ async function refresh() {
           await refresh();
         });
         if (record.policy?.assertionTrust)
-          action(actions, 'Remove identity trust', async () => {
+          action(actions, 'Stop accepting user checks', async () => {
             await api('/v1/provider/identities/' + record.id, 'PATCH', {
               expected_revision: record.revision,
               trust_agreement: null,
@@ -284,7 +317,7 @@ async function refresh() {
           });
         node(
           'p',
-          'Configure action policies, service credentials and sponsorship through the application configuration APIs. Provider acceptance remains separate.',
+          'Next, your developer can use the API to set up allowed transactions, network connections and who pays network fees. You’ll need to approve those settings separately before wallet use.',
           article,
         );
       }
@@ -307,7 +340,7 @@ setInterval(() => {
   if (!token) return;
   const seconds = Math.max(0, Math.ceil((expiresAt - Date.now()) / 1000));
   el('session').textContent =
-    'Session: ' +
+    'Sign-in ends in ' +
     Math.floor(seconds / 60) +
     ':' +
     String(seconds % 60).padStart(2, '0');

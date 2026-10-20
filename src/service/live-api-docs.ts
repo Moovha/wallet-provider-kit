@@ -27,18 +27,18 @@ export function liveApiSpecification<T extends object>(
       >
     >;
   };
-  api.info.title = 'Provider API · Live testing';
-  api.info.description = `**Live service: Execute sends a real request to this domain.**
+  api.info.title = 'Wallet service API · Try a request';
+  api.info.description = `**You’re connected to a running service. Execute sends a real request, so review the details before you continue.**
 
-All implemented provider API endpoints are listed. **Not enabled** identifies a missing configuration prerequisite; **Configured** does not establish current access or readiness.
+Explore the available requests below. **Not enabled** means some setup is still needed. **Configured** means the settings are present; the service still checks access and readiness when you send a request.
 
 ${transactionBoundaryDescription}
 
-Start with GET /v1/capabilities without authorization. configured=false means the service is not ready for wallet operations. A 200 discovery response does not confirm that wallet creation, identity checks or recovery work.
+A good first request is GET /v1/capabilities; it needs no access token. If configured is false, wallet operations are not ready. A successful response here checks discovery only, not wallet creation, user checks or recovery.
 
 For protected calls, use the Application tokens panel when enabled: sign in as an allowed operator, choose a calling application and the API permissions (scopes) you need, then Get token or Renew token. Otherwise choose Authorize and paste a short-lived application access token without the Bearer prefix. Never enter client secrets, vendor keys, owner ID tokens or the local wizard session token. Tokens are kept in page memory; reload or Logout to clear authorization. Do not share screenshots containing tokens, cURL commands, personal data or signatures.
 
-Use real IDs returned by this deployment. POST requests can create records, incur vendor charges or issue usable signatures. Use a new UUIDv4 Idempotency-Key for each distinct mutation and retain the original key for retries. Reconcile unknown outcomes before retrying. In standard application-led access, first read GET /v1/access-policy. Submit identity and consent attestations from a trusted application; users remain in that application. Optional staff sign-in is for token controls, not wallet users. Wallet calls require current owner access, identity acceptance, consent and provider policy checks.
+Use real IDs returned by this deployment. POST requests can create records, incur vendor charges or issue usable signatures. Use a new UUIDv4 Idempotency-Key for each distinct mutation and retain the original key for retries. If the result is uncertain, check what happened to the original request before trying again. In standard application-led access, first read GET /v1/access-policy. Submit identity and consent attestations from a trusted application; users remain in that application. Optional staff sign-in is for token controls, not wallet users. Wallet calls require current owner access, identity acceptance, consent and provider policy checks.
 
 For a 401, obtain a current application token. For a 403, check the required scope and current owner access. For a 409, inspect the original attempt. For a 503 or a connection error, check service readiness and the outcome before retrying. A failed connection does not prove the request had no effect; preserve its idempotency key.
 

@@ -234,7 +234,7 @@ it('the terminal continues from runtime installation through ordered local setup
     1,
   );
   expect(commands.at(-1)).toContain('exec');
-  expect(report.join()).toContain('Local service is running');
+  expect(report.join()).toContain('Your service is running');
   expect(report.join() + JSON.stringify(commands)).not.toContain(
     'offline-cli-secret',
   );

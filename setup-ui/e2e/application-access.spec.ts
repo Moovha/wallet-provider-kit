@@ -21,7 +21,7 @@ test('a new operator configures application-led access without user login, vendo
       .getByLabel('Public wallet service address', { exact: true })
       .fill('https://wallet.example.test');
     await page
-      .getByLabel('Privacy notice URL', { exact: true })
+      .getByLabel('Privacy notice address', { exact: true })
       .fill('https://wallet.example.test/privacy');
     await page.getByRole('button', { name: 'Next', exact: true }).click();
     await page
@@ -67,7 +67,7 @@ test('a new operator configures application-led access without user login, vendo
       0,
     );
     await page
-      .getByText('Provider identity baseline and access duration', {
+      .getByText('User checks and how long access lasts', {
         exact: true,
       })
       .click();
@@ -104,7 +104,7 @@ test('a new operator configures application-led access without user login, vendo
       .getByLabel('Application client ID', { exact: true })
       .fill('example-app');
     await page
-      .getByLabel('Identity and consent trust agreement reference', {
+      .getByLabel('Agreement reference', {
         exact: true,
       })
       .fill('reviewed-offline-agreement');
@@ -135,14 +135,14 @@ test('a new operator configures application-led access without user login, vendo
     ).toBeVisible();
     await expect(
       page.getByRole('heading', {
-        name: 'What to do after downloading',
+        name: 'Your next steps',
         exact: true,
       }),
     ).toHaveCount(0);
     await page
-      .getByRole('button', { name: 'Validate configuration', exact: true })
+      .getByRole('button', { name: 'Check settings', exact: true })
       .click();
-    await expect(page.getByRole('status')).toContainText('Configuration valid');
+    await expect(page.getByRole('status')).toContainText('Settings checked');
     const download = page.waitForEvent('download');
     await page
       .getByRole('button', { name: 'Download configuration', exact: true })
@@ -173,7 +173,7 @@ test('a new operator configures application-led access without user login, vendo
     expect(config.identity).toEqual({});
     await expect(
       page.getByRole('heading', {
-        name: 'What to do after downloading',
+        name: 'Your next steps',
         exact: true,
       }),
     ).toBeVisible();

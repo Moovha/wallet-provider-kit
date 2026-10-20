@@ -107,9 +107,7 @@ test('operator gets and renews tokens without paste, Execute renews near expiry,
     },
   ]);
   await panel.getByRole('button', { name: 'Check sign-in' }).click();
-  await expect(panel.getByRole('status')).toContainText(
-    'Signed in to token controls',
-  );
+  await expect(panel.getByRole('status')).toContainText('You’re signed in.');
   await panel
     .getByRole('checkbox', { name: /\(wallet:provision\)$/, exact: true })
     .check();
@@ -191,9 +189,7 @@ test('clearing during issuance discards the arriving token and never silently ch
   const panel = page.getByRole('region', {
     name: 'Application token controls',
   });
-  await expect(panel.getByRole('status')).toContainText(
-    'Signed in to token controls',
-  );
+  await expect(panel.getByRole('status')).toContainText('You’re signed in.');
   await panel
     .getByRole('checkbox', { name: /\(wallet:provision\)$/, exact: true })
     .check();

@@ -8,13 +8,13 @@ const guidance = computed(() => settings[props.guide]);
   <div class="formkit-help setting-help" :data-setting="guide">
     <p>{{ guidance.summary }}</p>
     <details>
-      <summary :aria-label="'Why do I need this? Where do I get it? ' + label">
-        Why do I need this? Where do I get it?
+      <summary :aria-label="'Help with this setting ' + label">
+        Help with this setting
       </summary>
       <dl>
-        <dt>Why it’s needed</dt>
+        <dt>What this means</dt>
         <dd>{{ guidance.why }}</dd>
-        <dt>Where to get it / what to choose</dt>
+        <dt>How to fill it in</dt>
         <dd>{{ guidance.source }}</dd>
       </dl>
       <a :href="guidance.url" target="_blank" rel="noopener noreferrer"

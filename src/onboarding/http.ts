@@ -116,7 +116,7 @@ const permissionLabels = {
   'operations:request':
     'Request wallet operations, subject to your provider’s approvals',
   'contracts:request':
-    'Request approved contract calls under the configured target, function and operation limits.',
+    'Request wallet transactions within the approved contract and transaction limits.',
 };
 const statusLabels: Record<string, string> = {
   consent_required: 'Your permission is needed.',
@@ -131,9 +131,23 @@ const statusLabels: Record<string, string> = {
   denied: 'This request was declined.',
   expired: 'This request has expired. Start again from your application.',
   suspended: 'Application access is paused.',
-  revoked: 'Application access has been revoked.',
+  revoked: 'Application access has been removed.',
   policy_changed:
     'Your provider’s requirements have changed. Start a new request from your application.',
+};
+const reviewStatusLabels: Record<string, string> = {
+  consent_required: 'Waiting for wallet permission',
+  verification_required: 'Identity check needed',
+  funding_approval_required: 'Verification costs need agreement',
+  identity_pending: 'Identity check in progress',
+  reconciliation_required: 'Previous request needs checking',
+  provider_review_required: 'Ready for your identity review',
+  granted: 'Access approved',
+  denied: 'Request declined',
+  expired: 'Request expired',
+  suspended: 'Access paused',
+  revoked: 'Access removed',
+  policy_changed: 'Access rules changed',
 };
 function page(title: string, content: string) {
   return `<!doctype html>
@@ -599,11 +613,11 @@ export async function registerOnboardingRoutes(
         status === 401
           ? 'Your confirmation session has expired. Open your request again to sign in.'
           : status === 403
-            ? 'We could not authorize this request. Check that you are using the right provider account and that the identity evidence meets the provider’s requirements.'
+            ? 'We couldn’t approve this request. Check that you signed in with the right wallet-service account. Your service team can help check whether the required identity checks are complete.'
             : status === 409
               ? 'This request is already being handled or has changed. Ask your provider to check the original request.'
               : status === 503
-                ? 'We could not confirm the result. Your provider needs to check the original attempt before trying another verification or wallet creation.'
+                ? 'We couldn’t confirm what happened. Please ask your service team to check the original request before starting another identity check or creating another wallet.'
                 : 'Check the form values and try again.';
       reply
         .code(status)
@@ -739,23 +753,23 @@ export async function registerOnboardingRoutes(
         return html(
           reply,
           'Your application access',
-          `<p>Choose which applications can use your wallet. Revoking access stops future requests; completed blockchain actions remain.</p>${
+          `<p>You’re in control of which applications can use your wallet. Remove access whenever you need to stop future requests. This cannot undo transactions that have already happened.</p>${
             grants.length
               ? grants
                   .map(
                     (g) => `<article>
 <h2>${escape(g.application)}</h2>
-<p>${escape(g.permissions.map((p) => permissionLabels[p]).join('; '))} · ${escape(g.state)}<br>Expires ${escape(new Date(g.expiresAt).toISOString())}</p>
+<p>${escape(g.permissions.map((p) => permissionLabels[p]).join('; '))} · ${escape(g.state === 'active' ? 'Access allowed' : g.state === 'suspended' ? 'Access paused' : 'Access removed')}<br>Expires ${escape(new Date(g.expiresAt).toISOString())}</p>
 <form method="post" action="/onboarding/access/${escape(g.id)}">
 <input type="hidden" name="csrf" value="${escape(current.csrf)}">
 <button name="decision" value="suspended">Pause access</button>
-<button name="decision" value="revoked">Revoke access</button>
+<button name="decision" value="revoked">Remove access</button>
 </form>
 </article>`,
                   )
                   .join('')
               : '<p>No applications have access yet.</p>'
-          }<h2>Pending requests</h2><p>You can cancel a request before access is granted. Checks already started may still finish and incur the agreed cost.</p>${pending.length ? pending.map((r) => `<article><h2>${escape(r.application)}</h2><p>${escape(statusLabels[r.status] ?? 'Your provider will help with the next step.')}</p><form method="post" action="/onboarding/requests/${r.id}/cancel"><input type="hidden" name="csrf" value="${escape(current.csrf)}"><button>Cancel request</button></form></article>`).join('') : '<p>No requests are waiting.</p>'}`,
+          }<h2>Requests waiting for a decision</h2><p>You can cancel a request before access is granted. Checks already started may still finish and incur the agreed cost.</p>${pending.length ? pending.map((r) => `<article><h2>${escape(r.application)}</h2><p>${escape(statusLabels[r.status] ?? 'Your provider will help with the next step.')}</p><form method="post" action="/onboarding/requests/${r.id}/cancel"><input type="hidden" name="csrf" value="${escape(current.csrf)}"><button>Cancel request</button></form></article>`).join('') : '<p>No requests are waiting.</p>'}`,
         );
       },
     );
@@ -828,15 +842,15 @@ export async function registerOnboardingRoutes(
         );
         return html(
           reply,
-          'Review wallet requests',
-          `<p>${service().policy.identity.records ? 'Review the application-supplied record, match it to the authenticated provider user and accept it only for your unfunded evaluation. Required fields do not establish externally verified KYC.' : 'Check identity evidence in your vendor workspace and match it to the provider user below. A share token or application login alone does not establish that match.'}</p>${
+          'Help people connect their wallets',
+          `<p>${service().policy.identity.records ? 'Check that the information shared by the application belongs to this person. Accept it only for a test without funds; filled-in fields are not independently verified identity checks.' : 'Open your identity-checking service’s dashboard and confirm that its results belong to the person below. An import code or application sign-in alone does not prove this match.'}</p>${
             pending.length
               ? pending
                   .map(
                     (r) => `<article>
-<p>Provider user: <code>${escape(r.owner?.subject)}</code>
-<br>Issuer: ${escape(r.owner?.issuer)}${r.applicationRecord ? '' : `<br>Evidence: ${escape(r.vendor ?? 'not supplied')} <code>${escape(r.reference ?? '')}</code>`}
-<br>Status: ${escape(r.status)}</p>
+<p>Wallet-service account: <code>${escape(r.owner?.subject)}</code>
+<br>Sign-in service: ${escape(r.owner?.issuer)}${r.applicationRecord ? '' : `<br>Evidence: ${escape(r.vendor ?? 'not supplied')} <code>${escape(r.reference ?? '')}</code>`}
+<br>Status: ${escape(reviewStatusLabels[r.status] ?? 'Ready for your review')}</p>
 <form method="post" action="/onboarding/review/${r.requestId}">
 <input type="hidden" name="csrf" value="${escape(current.csrf)}">
 ${
@@ -848,16 +862,16 @@ ${
             `<dt>${escape(field)}</dt><dd>${escape(value)}</dd>`,
         )
         .join('')}</dl>
-<label><input type="checkbox" name="identity_matches_owner" value="yes"> I matched this submitted record to this provider user and accept it for an unfunded evaluation.</label>
+<label><input type="checkbox" name="identity_matches_owner" value="yes"> I checked that this information belongs to this person and accept it only for a test without funds.</label>
 <button name="decision" value="accept">Accept submitted record</button>`
     : `<label>Vendor <select name="vendor">
 <option value="didit"${r.vendor === 'didit' ? ' selected' : ''}>Didit</option>
 <option value="sumsub"${r.vendor === 'sumsub' ? ' selected' : ''}>Sumsub</option>
 </select>
 </label>
-<label>Recipient evidence reference (also used to recover a lost import response)<input name="reference" value="${escape(r.reference ?? '')}" maxlength="256">
+<label>Identity-check reference (keep this to follow up on the original check)<input name="reference" value="${escape(r.reference ?? '')}" maxlength="256">
 </label>
-<label>Verification date from evidence, in UTC<input name="verified_at" value="${escape(r.verifiedAt ?? '')}" placeholder="2026-10-15T12:00:00Z" maxlength="40">
+<label>When the identity check was completed (UTC)<input name="verified_at" value="${escape(r.verifiedAt ?? '')}" placeholder="2026-10-15T12:00:00Z" maxlength="40">
 </label>
 <label>
 <input type="checkbox" name="identity_matches_owner" value="yes"> I checked that this verified identity belongs to this provider user and meets our policy.</label>
@@ -869,15 +883,15 @@ ${
                   )
                   .join('')
               : '<p>No requests need review.</p>'
-          }<h2>Provider accounts</h2>${accounts
+          }<h2>Wallet accounts</h2>${accounts
             .map(
               (a) => `<article>
 <code>${escape(a.id)}</code>
-<p>${escape(a.status)} · ${a.provisioned ? 'Wallet provisioned' : 'Wallet not confirmed'}</p>
+<p>${escape(a.status === 'active' ? 'Account active' : 'Account paused')} · ${a.provisioned ? 'Wallet created' : 'Wallet not confirmed'}</p>
 <form method="post" action="/onboarding/accounts/${a.id}">
 <input type="hidden" name="csrf" value="${escape(current.csrf)}">
 <button name="decision" value="reconcile">Check wallet creation</button>
-<button name="decision" value="suspend">Suspend account and revoke access</button>
+<button name="decision" value="suspend">Pause account and remove access</button>
 </form>
 </article>`,
             )
@@ -997,11 +1011,11 @@ ${
 <ul>${view.permissions.map((p) => `<li>${escape(permissionLabels[p])}</li>`).join('')}</ul>
 ${
   view.permissions.includes('contracts:request')
-    ? `<p>Wallet-call delegation on ${escape(actions().network.label)}: you permit exact calls within the accepted policy, including explicitly allowed native recipients and any selected optional operation adapters. Limits and account bindings: <code>${escape(JSON.stringify(actions().callConsentTerms()))}</code>. Contract-call signatures remain private to coordinated execution. Safe signatures have no native expiry; revocation stops new service dispatch but cannot recall an already submitted authorization.</p>`
+    ? `<p>You allow this application to request approved transactions on ${escape(actions().network.label)}, within the limits below. Withdrawing access stops new requests through this service. It cannot undo a transaction or recall an authorization already issued.</p><details><summary>Review the exact transaction limits</summary><p>The technical rules below identify allowed contracts, recipients and operation limits. Safe signatures have no native expiry; revocation stops new service dispatch but cannot recall an already submitted authorization.</p><code>${escape(JSON.stringify(actions().callConsentTerms()))}</code></details>`
     : ''
 }
-<p>Access lasts up to ${view.durationDays} days. You can pause or revoke it at any time. Each financial action still needs the provider’s authorization.</p>
-<p>${view.identitySource === 'application_record' ? 'Your application submitted a record for provider review. This is an unfunded evaluation; the record is not externally verified KYC.' : 'Your provider may receive identity evidence to review your account. The requesting application funds agreed verification costs.'} <a href="${escape(view.privacyUrl)}">Read the provider’s privacy notice</a>.</p>
+<p>Access lasts up to ${view.durationDays} days. You can pause or remove it at any time. Your wallet service still checks each financial request before allowing it.</p>
+<p>${view.identitySource === 'application_record' ? 'Your application shared information for your service team to review. This is a test without funds. The information has not been independently verified as an identity check.' : 'Your wallet service may receive information from your identity checks to review your account. The application pays the agreed cost of those checks.'} <a href="${escape(view.privacyUrl)}">Read how your information is used</a>.</p>
 <p><strong>${escape(view.verificationUrl ? 'Your identity verification session is ready.' : view.identitySource === 'application_record' && view.status === 'provider_review_required' ? 'Your provider is reviewing your submitted record.' : (statusLabels[view.status] ?? 'Your provider will help with the next step.'))}</strong>
 </p>${
             view.status === 'consent_required'
@@ -1013,7 +1027,7 @@ ${
               : view.verificationUrl
                 ? `<p><a href="${escape(view.verificationUrl)}" rel="noreferrer">Continue to identity verification</a></p>`
                 : view.status === 'verification_required'
-                  ? `<p>Your application can share existing identity evidence. If you need a new check, choose a provider below. Verification starts only when an agreed budget covers it.</p>
+                  ? `<p>Your application can share an identity check you have already completed. If you need a new check, choose a service below. It starts only when the cost has been agreed and covered.</p>
 <form method="post" action="/onboarding/${request.params.requestId}/verify">
 <input type="hidden" name="csrf" value="${escape(current.csrf)}">
 <select name="vendor">${service()

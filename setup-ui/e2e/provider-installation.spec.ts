@@ -10,25 +10,25 @@ test('reviews a zero-application local installation in three stages', async ({
   try {
     await page.goto(`${url}/#${token}`);
     await expect(
-      page.getByRole('heading', { name: 'Deploy your wallet provider' }),
+      page.getByRole('heading', { name: 'Let’s set up your wallet service' }),
     ).toBeVisible();
     await page.getByRole('button', { name: 'Continue', exact: true }).click();
     await expect(
       page.getByText(
-        'No application, RPC credential, sponsor funding or external identity provider is needed.',
+        'Just a name to get started. You can connect applications, arrange network fees and set up user checks later.',
       ),
     ).toBeVisible();
     await page
-      .getByRole('button', { name: 'Review and deploy', exact: true })
+      .getByRole('button', { name: 'Continue to setup', exact: true })
       .click();
     await expect(
       page.getByRole('heading', {
-        name: 'Deploy and open administration',
+        name: 'Let’s get your service running',
         exact: true,
       }),
     ).toBeVisible();
     await expect(
-      page.getByRole('button', { name: 'Check local setup prerequisites' }),
+      page.getByRole('button', { name: 'Check this computer' }),
     ).toBeVisible();
     await page.screenshot({
       path: 'artifacts/provider-installation/review.png',

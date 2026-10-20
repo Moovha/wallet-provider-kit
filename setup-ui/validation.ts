@@ -44,7 +44,7 @@ export function explainIssue(issue: string) {
         )
       ? 'Applications'
       : issue.startsWith('/backend')
-        ? 'Backend'
+        ? 'Wallet storage'
         : issue.startsWith('/ownerLogin') ||
             issue.startsWith('/oauth') ||
             issue.startsWith('/authorizationServer') ||
@@ -106,7 +106,7 @@ function fieldLabel(path: string): string {
     '/policy/provider': 'Provider details',
     '/policy/provider/name': 'Provider name',
     '/policy/provider/origin': 'Public wallet service address',
-    '/policy/provider/privacyUrl': 'Privacy notice URL',
+    '/policy/provider/privacyUrl': 'Privacy notice address',
     '/policy/version': 'Policy version',
     '/policy/identity/maxAgeDays': 'Maximum age of identity checks (days)',
     '/policy/access/mode': 'Access flow',

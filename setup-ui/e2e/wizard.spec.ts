@@ -38,16 +38,14 @@ async function imported(page: Page, config = sample) {
       mimeType: 'application/json',
       buffer: Buffer.from(JSON.stringify(config)),
     });
-  await expect(page.getByRole('status')).toContainText(
-    'Configuration imported',
-  );
+  await expect(page.getByRole('status')).toContainText('Settings imported');
 }
 async function exported(page: Page) {
-  await step(page, 'Export');
+  await step(page, 'Finish setup');
   await page
-    .getByRole('button', { name: 'Validate configuration', exact: true })
+    .getByRole('button', { name: 'Check settings', exact: true })
     .click();
-  await expect(page.getByRole('status')).toContainText('Configuration valid');
+  await expect(page.getByRole('status')).toContainText('Settings checked');
   const pending = page.waitForEvent('download');
   await page
     .getByRole('button', { name: 'Download configuration', exact: true })
@@ -79,7 +77,7 @@ test('exports one Safe execution flow and retains configuration across import', 
   await page
     .getByLabel('Provider name', { exact: true })
     .fill('Changed Wallet Provider');
-  await step(page, 'Export');
+  await step(page, 'Finish setup');
   await expect(
     page.getByRole('button', {
       name: 'Download configuration',
@@ -92,10 +90,10 @@ test('exports one Safe execution flow and retains configuration across import', 
 test('shows the bundled Safe infrastructure without backend, relayer or pool selectors', async ({
   page,
 }) => {
-  await step(page, 'Backend');
+  await step(page, 'Wallet storage');
   await expect(
     page.getByRole('heading', {
-      name: 'Your Safe wallet backend',
+      name: 'A wallet for each person',
       exact: true,
     }),
   ).toBeVisible();
@@ -110,11 +108,13 @@ test('shows the bundled Safe infrastructure without backend, relayer or pool sel
   ).not.toBeVisible();
   await page.getByText('Advanced vault settings', { exact: true }).click();
   await expect(
-    page.getByLabel('OWS vault directory', { exact: true }),
+    page.getByLabel('Private wallet folder', { exact: true }),
   ).toBeVisible();
   await step(page, 'Services');
   await expect(
-    page.getByText('Local setup starts the private bundler'),
+    page.getByText(
+      'Setup includes the private tools that send approved wallet transactions',
+    ),
   ).toBeVisible();
   await step(page, 'Applications');
   await expect(page.getByLabel('Access flow', { exact: true })).toHaveCount(0);
@@ -172,7 +172,7 @@ test('retains advanced vault and environment references without exposing secret 
   page,
 }) => {
   await imported(page);
-  await step(page, 'Backend');
+  await step(page, 'Wallet storage');
   await page
     .getByText('Advanced wallet environment settings', { exact: true })
     .click();
@@ -181,10 +181,10 @@ test('retains advanced vault and environment references without exposing secret 
     .fill('reviewed-environment');
   await page.getByText('Advanced vault settings', { exact: true }).click();
   await page
-    .getByLabel('OWS vault directory', { exact: true })
+    .getByLabel('Private wallet folder', { exact: true })
     .fill('private-vault');
   await page
-    .getByLabel('OWS owner passphrase variable name', { exact: true })
+    .getByLabel('Wallet storage password setting name', { exact: true })
     .fill('RETAINED_VAULT_PASSPHRASE');
   const saved = await exported(page);
   expect(saved.backend).toEqual({
@@ -197,10 +197,10 @@ test('retains advanced vault and environment references without exposing secret 
 
 test('mobile controls stay within the viewport', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await step(page, 'Backend');
+  await step(page, 'Wallet storage');
   await expect(
     page.getByRole('heading', {
-      name: 'Your Safe wallet backend',
+      name: 'A wallet for each person',
       exact: true,
     }),
   ).toBeVisible();

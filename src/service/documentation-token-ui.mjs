@@ -44,7 +44,7 @@
       ...(body ? { body: JSON.stringify(body) } : {}),
     }).catch(() => {
       throw new Error(
-        'Cannot reach token controls. Check your connection and try Check sign-in. If the problem continues, ask the provider administrator to check the service.',
+        'We couldn’t reach the testing tools. Check your connection and select Check sign-in. If the problem continues, ask the provider administrator to check the service.',
       );
     });
     if (!response.ok) {
@@ -109,7 +109,7 @@
     panel.querySelector('[data-controls]').hidden = false;
     selection();
     message(
-      'Signed in to token controls. Select only the API permissions you need, then choose Get token.',
+      'You’re signed in. Choose the permissions you need for this test, then select Get token.',
     );
   }
   function status() {
@@ -205,10 +205,10 @@
       panel = document.createElement('section');
       panel.className = 'wpk-token-panel';
       panel.setAttribute('aria-label', 'Application token controls');
-      panel.innerHTML = `<h2>Application tokens</h2>
-<p>Sign in with a staff account allowed to use these controls. Choose a calling application and the API permissions it needs, then get its access token. Application secrets stay on the server. Tokens do not replace wallet owner consent or account permissions.</p>
+      panel.innerHTML = `<h2>Try a request as your application</h2>
+<p>Sign in with an approved staff account, choose an application and select the permissions you need for this test. An access token lets the application identify itself for a short time. Its secret stays on the server, and wallet owners must still approve access.</p>
 <p><a href="/docs/operator/login">Sign in to token controls</a> <button type="button" data-session>Check sign-in</button></p>
-<div data-controls hidden><label>Calling application <select aria-label="Token application"></select></label><p>API permissions (scopes): select only what you need for this test.</p><fieldset aria-label="Token scopes"></fieldset>
+<div data-controls hidden><label>Application to test <select aria-label="Token application"></select></label><p>Choose only the API permissions needed for this test. Developers call these scopes.</p><fieldset aria-label="Token scopes"></fieldset>
 <button type="button" data-get>Get token</button><button type="button" data-renew>Renew token</button><button type="button" data-clear>Clear token</button><button type="button" data-logout>Sign out of token controls</button></div>
 <p role="status" aria-live="polite">Checking sign-in…</p>
 <p>Renew token requests a new access token from your token service. After Get token, Execute renews a token nearing expiry before sending your request. It never retries a wallet API call automatically. Reload clears the token and earlier responses. Token requests may count toward your login provider’s usage limits.</p>`;
