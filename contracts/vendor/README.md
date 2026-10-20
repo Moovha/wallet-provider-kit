@@ -23,9 +23,3 @@ identity with Pimlico's deployed instances. `npm run check:paymaster` checks the
 source-derived ABI, creation bytecode and runtime immutable references. The local
 EVM test checks deployed runtime pins and verifying-mode signatures against the
 compiled upstream contract. This does not establish Base deployment acceptance.
-
-`Math.sol` is the unmodified OpenZeppelin Contracts 5.0.2 math library already
-pinned in the paymaster manifest. Atomic swaps use its full-precision `mulDiv`
-with upward rounding for proportional quote floors. The atomic-swap build checks
-this copy against that manifest. Its MIT license is retained in
-`docs/licenses/paymaster-openzeppelin-MIT.txt`.

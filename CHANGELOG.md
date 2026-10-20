@@ -2,9 +2,12 @@
 
 ## Unreleased
 
+- Remove application-specific atomic vault/DEX helpers, concrete router adapters and generated deployment artifacts from the public package and exports. Generic approved Safe calls remain available.
+- Support Ethereum Sepolia domains in the low-level ERC-4337 helpers without enabling another supplied-service network.
+
+- Retain atomic Safe deployment recipes, predict addresses locally and inspect cross-chain recovery against pinned dependencies, original ownership and a canonical block snapshot. Reconstruct earlier atomic recipes only from retained deployment evidence.
+
 - Pipeline concurrent Safe provisioning through durable funding nonces after broadcast acknowledgement, with bounded preparation, aggregate reservations and recovery for lost acknowledgements.
-- Add atomic ERC-4626 redemption, exact-input swaps and destination deposits using actual amounts, bounded quotes and proportional slippage floors.
-- Add code-hash-approved Uniswap v3/v4 and Aerodrome Slipstream/classic adapters, mixed DEX routes and route builders without a fixed hop-count cap. Existing calldata, gas and sponsorship ceilings remain enforced.
 - Preserve structured EVM revert responses and terminate correlated pre-admission bundler execution failures without reserving a Safe nonce.
 
 - Keep one execution path: a user Safe, private ERC-4337 v0.7 bundler and verifying paymaster.

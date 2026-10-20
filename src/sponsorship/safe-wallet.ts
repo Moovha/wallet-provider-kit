@@ -1,4 +1,9 @@
 import {
+  createSafeRecoveryManifest,
+  predictSafeAddress,
+  type SafeRecoveryManifest,
+} from '../provisioning/recovery.js';
+import {
   applyEstimatedUserOperationGas,
   readUserOperationGasEstimate,
 } from './estimated-gas.js';
@@ -99,6 +104,7 @@ export interface SafeWalletAccount {
   binding: SafeAccountBinding;
   status: 'prepared' | 'ready';
   initialization?: { profile: 'atomic-4337-v1'; initializer: string };
+  recovery?: SafeRecoveryManifest;
 }
 interface SetupPreparation {
   fees: import('../execution/network-fees.js').NetworkFeeQuote;
@@ -1042,6 +1048,38 @@ export class SafeWalletRuntime {
       rpcUrls: await this.resources.rpcEndpoints(applicationId),
     };
   }
+  private assertRecoveryRecipe(wallet: SafeWalletAccount) {
+    if (
+      wallet.initialization &&
+      wallet.initialization.initializer !==
+        atomicSafeInitializer(
+          wallet.signer.address,
+          this.config.safeWallet!.module.address,
+        )
+    )
+      deny();
+    if (
+      wallet.recovery &&
+      (wallet.recovery.owner.toLowerCase() !==
+        wallet.signer.address.toLowerCase() ||
+        wallet.recovery.initializer !== wallet.initialization?.initializer ||
+        wallet.recovery.address.toLowerCase() !==
+          wallet.binding.address.toLowerCase() ||
+        predictSafeAddress(wallet.recovery).toLowerCase() !==
+          wallet.binding.address.toLowerCase() ||
+        JSON.stringify(wallet.recovery.factory) !==
+          JSON.stringify(this.config.safeProvisioning!.factory) ||
+        JSON.stringify(wallet.recovery.singleton) !==
+          JSON.stringify(this.config.safeProvisioning!.singleton) ||
+        wallet.recovery.proxyCodeHash !==
+          this.config.safeProvisioning!.proxyCodeHash ||
+        JSON.stringify(wallet.recovery.module) !==
+          JSON.stringify(this.config.safeWallet!.module) ||
+        JSON.stringify(wallet.recovery.entryPoint) !==
+          JSON.stringify(this.config.safeWallet!.entryPoint))
+    )
+      deny();
+  }
   async provision(context: AuthorityContext, accountId: string) {
     const applicationId = runtimeApplicationId(
       context.principal.issuer,
@@ -1060,6 +1098,17 @@ export class SafeWalletRuntime {
           }),
         );
       const current = await authority();
+      const retainedWallet = await this.transaction(
+        (r) => r.safeWalletAccounts?.[accountId],
+      );
+      if (retainedWallet) {
+        if (
+          retainedWallet.owner !== current.owner ||
+          retainedWallet.applicationId !== applicationId
+        )
+          deny();
+        this.assertRecoveryRecipe(retainedWallet);
+      }
       await this.recoverSetup(applicationId);
       const infrastructure = await this.current(applicationId);
       for (const saved of infrastructure.transactions.filter(
@@ -1129,15 +1178,7 @@ export class SafeWalletRuntime {
       let wallet = await this.transaction(
         (r) => r.safeWalletAccounts![accountId],
       );
-      if (
-        wallet.initialization &&
-        wallet.initialization.initializer !==
-          atomicSafeInitializer(
-            wallet.signer.address,
-            this.config.safeWallet!.module.address,
-          )
-      )
-        deny();
+      this.assertRecoveryRecipe(wallet);
       if (wallet.status !== 'ready') {
         const reader = await this.reader(applicationId);
         await Promise.all([
@@ -1175,18 +1216,40 @@ export class SafeWalletRuntime {
           'createProxyWithNonce',
           [this.config.safeProvisioning!.singleton.address, initializer, salt],
         );
-        const result = await reader.call('eth_call', [
-          { to: this.config.safeProvisioning!.factory.address, data },
+        const creation = await reader.call('eth_call', [
+          {
+            to: this.config.safeProvisioning!.factory.address,
+            data: safeFactoryInterface.encodeFunctionData('proxyCreationCode'),
+          },
           'latest',
         ]);
-        const address = String(
+        const proxyCreationCode = String(
           safeFactoryInterface.decodeFunctionResult(
-            'createProxyWithNonce',
-            String(result),
+            'proxyCreationCode',
+            String(creation),
           )[0],
         );
+        const recovery = wallet.initialization
+          ? createSafeRecoveryManifest({
+              config: this.config.safeProvisioning!,
+              owner: wallet.signer.address,
+              module: this.config.safeWallet!.module,
+              entryPoint: this.config.safeWallet!.entryPoint,
+              saltNonce: salt.toString(),
+              proxyCreationCode,
+            })
+          : undefined;
+        const address = predictSafeAddress({
+          factory: this.config.safeProvisioning!.factory,
+          singleton: this.config.safeProvisioning!.singleton,
+          initializer,
+          saltNonce: salt.toString(),
+          proxyCreationCode,
+        });
         await this.transaction((r) => {
-          r.safeWalletAccounts![accountId].binding.address = address;
+          const saved = r.safeWalletAccounts![accountId];
+          saved.binding.address = address;
+          if (recovery) saved.recovery = recovery;
         });
         await this.send(
           applicationId,
@@ -1298,6 +1361,86 @@ export class SafeWalletRuntime {
     return this.prepare(() =>
       this.exclusive('provision:' + applicationId + ':' + accountId, work),
     );
+  }
+  /** Read or reconstruct the original atomic deployment recipe under current account authority. */
+  async recoveryManifest(
+    context: AuthorityContext,
+    accountId: string,
+  ): Promise<SafeRecoveryManifest> {
+    const access = () =>
+      this.onboarding.withAccountAccess(
+        context.principal,
+        accountId,
+        'contracts:request',
+        () => undefined,
+      );
+    await access();
+    const applicationId = runtimeApplicationId(
+      context.principal.issuer,
+      context.principal.clientId,
+    );
+    const wallet = await this.transaction(
+      (r) => r.safeWalletAccounts?.[accountId],
+    );
+    if (
+      !wallet ||
+      wallet.applicationId !== applicationId ||
+      !wallet.initialization
+    )
+      deny();
+    if (wallet.recovery) return structuredClone(wallet.recovery);
+    const original = (await this.current(applicationId)).transactions.find(
+      (t) => t.purpose === 'safe-deployment-' + accountId,
+    );
+    if (!original) deny();
+    const unsigned = JSON.parse(this.cipher.open(original.unsigned));
+    if (
+      unsigned.to?.toLowerCase() !==
+      this.config.safeProvisioning!.factory.address.toLowerCase()
+    )
+      deny();
+    const decoded = safeFactoryInterface.decodeFunctionData(
+      'createProxyWithNonce',
+      unsigned.data,
+    );
+    if (
+      decoded[0].toLowerCase() !==
+        this.config.safeProvisioning!.singleton.address.toLowerCase() ||
+      decoded[1] !== wallet.initialization.initializer
+    )
+      deny();
+    const reader = await this.reader(applicationId);
+    await this.pin(reader, this.config.safeProvisioning!.factory);
+    const creation = await reader.call('eth_call', [
+      {
+        to: unsigned.to,
+        data: safeFactoryInterface.encodeFunctionData('proxyCreationCode'),
+      },
+      'latest',
+    ]);
+    const manifest = createSafeRecoveryManifest({
+      config: this.config.safeProvisioning!,
+      owner: wallet.signer.address,
+      module: this.config.safeWallet!.module,
+      entryPoint: this.config.safeWallet!.entryPoint,
+      saltNonce: decoded[2].toString(),
+      proxyCreationCode: String(
+        safeFactoryInterface.decodeFunctionResult(
+          'proxyCreationCode',
+          String(creation),
+        )[0],
+      ),
+    });
+    if (
+      manifest.initializer !== decoded[1] ||
+      manifest.address.toLowerCase() !== wallet.binding.address.toLowerCase()
+    )
+      deny();
+    await access();
+    await this.transaction((r) => {
+      r.safeWalletAccounts![accountId].recovery = manifest;
+    });
+    return structuredClone(manifest);
   }
   private async configureAccount(
     applicationId: string,

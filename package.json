@@ -69,10 +69,7 @@
     "CONTRIBUTING.md",
     "GOVERNANCE.md",
     "CODE_OF_CONDUCT.md",
-    "CHANGELOG.md",
-    "contracts/AtomicVaultSwap.sol",
-    "contracts/DexAdapters.sol",
-    "contracts/vendor/Math.sol"
+    "CHANGELOG.md"
   ],
   "scripts": {
     "dev": "tsx src/main.ts",
@@ -86,7 +83,7 @@
     "generate:spec": "node --import tsx scripts/check-spec.mjs --write",
     "check:secrets": "secretlint \"**/*\"",
     "sbom": "npm sbom --sbom-format cyclonedx --omit=dev",
-    "verify": "npm run check:safe-surface && npm run typecheck && npm run test && npm run check:read-helper && npm run check:paymaster && npm run check:vault-swap && npm run check:spec && npm run check:docs && npm run format:check && npm run check:secrets",
+    "verify": "npm run check:safe-surface && npm run typecheck && npm run test && npm run check:read-helper && npm run check:paymaster && npm run check:spec && npm run check:docs && npm run format:check && npm run check:secrets",
     "pack:local": "npm run build && npm pack --ignore-scripts",
     "check:package": "npm run build && node scripts/check-package.mjs",
     "generate:docs": "node scripts/api-docs.mjs --write",
@@ -100,9 +97,7 @@
     "generate:paymaster": "node scripts/local-paymaster-contract.mjs --write",
     "check:read-helper": "node scripts/safe-state-reader.mjs",
     "generate:read-helper": "node scripts/safe-state-reader.mjs --write",
-    "check:safe-surface": "node scripts/check-safe-surface.mjs",
-    "check:vault-swap": "node scripts/atomic-vault-swap.mjs",
-    "generate:vault-swap": "node scripts/atomic-vault-swap.mjs --write"
+    "check:safe-surface": "node scripts/check-safe-surface.mjs"
   },
   "dependencies": {
     "@fastify/helmet": "13.2.0",

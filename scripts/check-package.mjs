@@ -37,10 +37,6 @@ try {
   );
   const paths = candidate.files.map(({ path }) => path);
   assert.ok(paths.includes('dist/providers/ows-worker.js'));
-  assert.ok(paths.includes('contracts/AtomicVaultSwap.sol'));
-  assert.ok(paths.includes('contracts/DexAdapters.sol'));
-  assert.ok(paths.includes('contracts/vendor/Math.sol'));
-  assert.ok(paths.includes('contracts/vendor/README.md'));
   assert.ok(paths.includes('dist/service/documentation-token-ui.mjs'));
   assert.ok(paths.includes('examples/inspect-api.mjs'));
   assert.ok(paths.includes('spec/provider-config.schema.json'));
@@ -66,9 +62,11 @@ try {
     assert.ok(paths.includes('dist/setup-ui/reference/' + asset));
   }
   for (const path of paths) {
-    assert.match(
+    assert.match(path, /^(dist\/|spec\/|docs\/|examples\/|[^/]+$)/);
+    assert.doesNotMatch(path, /local-adapters|atomic-vault-swap|DexAdapters/);
+    assert.doesNotMatch(
       path,
-      /^(dist\/|spec\/|docs\/|examples\/|contracts\/((AtomicVaultSwap|DexAdapters|vendor\/Math)\.sol|vendor\/README\.md)$|[^/]+$)/,
+      /(^|\/)(AGENTS\.md|agents\.md|CLAUDE\.md|\.codex|\.claude|\.idea|\.vscode|\.local|scratch)(\/|$)|\.code-workspace$/,
     );
     assert.doesNotMatch(
       path,
@@ -110,6 +108,7 @@ try {
     for (const name of ${JSON.stringify(imports)}) {
       const surface = await import(name);
       assert.ok(Object.keys(surface).length > 0);
+      for (const key of ['atomicVaultSwapCalls', 'dexAdapterArtifacts', 'encodeDexSwapRoute']) assert.equal(surface[key], undefined);
       if (!name.endsWith('/ows')) {
         for (const [key, value] of Object.entries(surface)) assert.equal(root[key], value);
       }

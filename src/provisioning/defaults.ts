@@ -1,6 +1,6 @@
 import type { SafeProvisioningConfiguration } from './safe.js';
 
-/** Safe 1.4.1 canonical deployments from safe-deployments v1.37.40 and safe-contracts 1.4.1. Runtime code is checked through both RPCs before deployment. */
+/** Safe 1.4.1 canonical deployments from safe-deployments v1.37.40 and safe-contracts 1.4.1. Runtime code is checked against the accepted pins before deployment. */
 export function defaultSafeProvisioning(): SafeProvisioningConfiguration {
   return {
     profile: 'safe-1.4.1',

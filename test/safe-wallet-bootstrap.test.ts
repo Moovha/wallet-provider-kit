@@ -688,3 +688,115 @@ it('retains the acknowledged nonce tail across a database and service restart', 
   await second;
   expect(t.broadcasts).toBe(2);
 });
+
+it('retains the complete original deployment recipe before attempting its transaction and fences later configuration changes', async () => {
+  const t = await bootstrap('1');
+  await t.runtime
+    .ensure(t.f.operatorContext, t.applicationId)
+    .catch(() => undefined);
+  const historicalSetup = structuredClone((await t.stored())!.transactions[0]);
+  await t.f.db.onboardingStore.transaction((s) => {
+    const r = s.deploymentBindings!['service-v1'].runtimeConfiguration!;
+    r.safeWalletInfrastructure![t.applicationId].transactions = [];
+    r.safeWalletInfrastructure![t.applicationId].paymaster =
+      t.f.config.acceptance.paymaster;
+    delete r.safeWalletAccounts![t.f.grant.account_id!];
+    const snapshot = currentRuntimePolicy(s, t.f.context.principal);
+    const revision = fingerprint(['financial-terms', snapshot]);
+    for (const grant of Object.values(s.grants)) {
+      grant.actionPolicyRevision = revision;
+      s.requests[grant.requestId].actionPolicyRevision = revision;
+      s.requests[grant.requestId].runtimePolicy = snapshot;
+    }
+  });
+  const { safeFactoryInterface } = await import('../src/provisioning/safe.js');
+  const { predictSafeAddress } =
+    await import('../src/provisioning/recovery.js');
+  const internal = t.runtime as unknown as {
+    pin(...args: unknown[]): Promise<void>;
+    reader(
+      ...args: unknown[]
+    ): Promise<{ call(...args: unknown[]): Promise<unknown> }>;
+    send(...args: unknown[]): Promise<void>;
+  };
+  vi.spyOn(internal, 'pin').mockResolvedValue();
+  vi.spyOn(internal, 'reader').mockResolvedValue({
+    call: async () =>
+      safeFactoryInterface.encodeFunctionResult('proxyCreationCode', [
+        '0x6001',
+      ]),
+  });
+  vi.spyOn(internal, 'send').mockRejectedValue(
+    new Error('Offline pre-broadcast stop'),
+  );
+  await expect(
+    t.runtime.provision(t.f.context, t.f.grant.account_id!),
+  ).rejects.toThrow('Offline pre-broadcast stop');
+  const manifest = await t.runtime.recoveryManifest(
+    t.f.context,
+    t.f.grant.account_id!,
+  );
+  expect(predictSafeAddress(manifest)).toBe(manifest.address);
+  expect(manifest.saltNonce).toBe(
+    BigInt(
+      '0x' +
+        fingerprint(['safe-wallet', t.applicationId, t.f.grant.account_id!]),
+    ).toString(),
+  );
+  const { sealed: _sealed, ...metadata } = historicalSetup.unsigned;
+  historicalSetup.purpose = 'safe-deployment-' + t.f.grant.account_id!;
+  historicalSetup.unsigned = new ApplicationCredentialCipher(
+    Buffer.alloc(32, 7).toString('base64'),
+  ).seal(
+    metadata,
+    JSON.stringify({
+      to: manifest.factory.address,
+      data: safeFactoryInterface.encodeFunctionData('createProxyWithNonce', [
+        manifest.singleton.address,
+        manifest.initializer,
+        manifest.saltNonce,
+      ]),
+    }),
+  );
+  await t.f.db.onboardingStore.transaction((s) => {
+    const r = s.deploymentBindings!['service-v1'].runtimeConfiguration!;
+    delete r.safeWalletAccounts![t.f.grant.account_id!].recovery;
+    r.safeWalletInfrastructure![t.applicationId].transactions = [];
+  });
+  await expect(
+    t.runtime.recoveryManifest(t.f.context, t.f.grant.account_id!),
+  ).rejects.toMatchObject({ code: 'wallet_authorization_denied' });
+  await t.f.db.onboardingStore.transaction((s) => {
+    s.deploymentBindings![
+      'service-v1'
+    ].runtimeConfiguration!.safeWalletInfrastructure![
+      t.applicationId
+    ].transactions.push(historicalSetup);
+  });
+  expect(
+    await t.runtime.recoveryManifest(t.f.context, t.f.grant.account_id!),
+  ).toEqual(manifest);
+  const originalOwner = manifest.owner;
+  manifest.owner = Wallet.createRandom().address;
+  expect(
+    (await t.runtime.recoveryManifest(t.f.context, t.f.grant.account_id!))
+      .owner,
+  ).toBe(originalOwner);
+  await t.f.db.onboardingStore.transaction((s) => {
+    s.deploymentBindings![
+      'service-v1'
+    ].runtimeConfiguration!.safeWalletAccounts![
+      t.f.grant.account_id!
+    ].recovery!.proxyCodeHash = '0x' + '00'.repeat(32);
+  });
+  await expect(
+    t.runtime.provision(t.f.context, t.f.grant.account_id!),
+  ).rejects.toMatchObject({ code: 'wallet_authorization_denied' });
+  await t.f.db.onboardingStore.transaction((s) => {
+    s.grants[t.f.grant.grant_id!].state = 'revoked';
+  });
+  await expect(
+    t.runtime.recoveryManifest(t.f.context, t.f.grant.account_id!),
+  ).rejects.toMatchObject({ code: 'wallet_authorization_denied' });
+  expect(t.broadcasts).toBe(0);
+});

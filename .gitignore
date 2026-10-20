@@ -15,3 +15,21 @@ artifacts/
 .DS_Store
 docs/.vitepress/cache/
 docs/.vitepress/dist/
+
+# Private application-owned protocol integrations; excluded from the public toolkit.
+/local-adapters/
+
+# Local agent instructions, editor state and scratch work.
+AGENTS.md
+agents.md
+CLAUDE.md
+.codex/
+.claude/
+.idea/
+.vscode/
+*.code-workspace
+*.swp
+*.swo
+*~
+/.local/
+/scratch/
