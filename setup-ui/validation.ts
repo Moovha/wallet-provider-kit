@@ -84,7 +84,7 @@ export function explainIssue(issue: string) {
     'documentation and enabled registered clients are required; duplicate clients are not allowed':
       'Enable the deployed API explorer, select enabled applications registered in Applications, and remove duplicate application entries.',
     'transfer signing and separate execution acceptance are required':
-      'Configure delegated transfer signing, then complete the separate execution/RPC/recovery report before enabling operations.',
+      'Check the wallet settings and application transaction rules, then complete the required service and recovery tests before enabling wallet operations.',
     'invalid policy, integration or activation settings':
       'Review the service addresses, application trust agreements, identity/access policy and activation settings using their field instructions.',
   };

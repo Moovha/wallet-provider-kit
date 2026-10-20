@@ -292,13 +292,13 @@ async function copy() {
         Withdraw access through the API when they ask you to stop.
       </p>
       <p v-else>
-        Hosted compatibility flow: Request access → owner signs in and consents
-        → identity checks and staff review → read the access status until
-        granted → create the wallet → read account details. Identity checks
-        require an agreed price and funding. With delegated transfer signing,
-        the application requests a transfer, your service authorizes it, then
-        the application requests its signature. Submitting the transaction,
-        paying network fees and confirming completion are separate steps.
+        When your service hosts the user pages, the person signs in and approves
+        access there. Complete the required identity checks and staff review,
+        then follow the request status until access is approved. Identity checks
+        need an agreed cost and funding. The application can then create the
+        wallet and read its details. Transaction requests use the account wallet
+        API and still need current wallet permission, approved transaction rules
+        and network fee funding.
       </p>
       <p v-if="config.policy.access?.mode !== 'application'">
         Hosted login, consent, access management and provider review pages use
