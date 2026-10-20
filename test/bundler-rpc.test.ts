@@ -286,3 +286,46 @@ it('bounds concurrent endpoint reads and releases queued work after completion',
   await Promise.all(tasks);
   expect(maximum).toBe(16);
 });
+it('returns structured Geth execution reverts without retrying or cooling down the endpoint', async () => {
+  const f = fixture((_url, b) =>
+    Response.json({
+      jsonrpc: '2.0',
+      id: b.id,
+      ...(b.method === 'eth_call'
+        ? {
+            error: {
+              code: 3,
+              message: 'execution reverted',
+              data: '0x1234abcd',
+            },
+          }
+        : { result: '0x1' }),
+    }),
+  );
+  expect(
+    await f.rpc(body(1, 'eth_call', [{ to: '0x1234' }, 'latest'])),
+  ).toMatchObject({
+    id: 1,
+    error: { code: 3, data: '0x1234abcd' },
+  });
+  expect(f.calls.filter((c) => c.method === 'eth_call')).toHaveLength(1);
+  await f.rpc(body(2));
+  expect(f.calls.filter((c) => c.method === 'eth_getBalance')).toHaveLength(1);
+});
+it('does not treat a positive gateway error with malformed revert data as an EVM result', async () => {
+  const f = fixture((url, b) =>
+    Response.json({
+      jsonrpc: '2.0',
+      id: b.id,
+      ...(url === config.rpcUrls[0]
+        ? {
+            error: { code: 3, message: 'Gateway unavailable', data: 'not hex' },
+          }
+        : { result: '0x1' }),
+    }),
+  );
+  expect(
+    (await f.rpc(body(1, 'eth_call', [{ to: '0x1234' }, 'latest']))).result,
+  ).toBe('0x1');
+  expect(f.calls.filter((c) => c.method === 'eth_call')).toHaveLength(2);
+});

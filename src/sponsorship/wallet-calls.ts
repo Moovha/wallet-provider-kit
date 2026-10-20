@@ -217,13 +217,15 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
         );
         if (
           lane.filter(
-            (e) => !['included', 'complete', 'expired'].includes(e.stage),
+            (e) =>
+              !['included', 'complete', 'expired', 'failed'].includes(e.stage),
           ).length >= this.config.maxDepthPerSafe
         )
           return 5740;
         if (
           Object.values(entries).filter(
-            (e) => !['included', 'complete', 'expired'].includes(e.stage),
+            (e) =>
+              !['included', 'complete', 'expired', 'failed'].includes(e.stage),
           ).length >= (this.config.maxDepthTotal ?? 512)
         )
           return 5740;
@@ -311,7 +313,9 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
           : 500
         : entry.stage === 'expired'
           ? 400
-          : 100,
+          : entry.stage === 'failed'
+            ? 500
+            : 100,
       ...(receipt ? { receipts: [receipt] } : {}),
     };
   }
@@ -535,7 +539,7 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
       )
         deny();
       if (entry.operationId) current.operationId = entry.operationId;
-      if (!['complete', 'expired'].includes(current.stage))
+      if (!['complete', 'expired', 'failed'].includes(current.stage))
         current.stage = stage;
     });
   }
@@ -549,7 +553,7 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
       .filter(
         (e) =>
           e.configurationHash === this.configurationHash &&
-          !['complete', 'expired'].includes(e.stage),
+          !['complete', 'expired', 'failed'].includes(e.stage),
       )
       .sort((a, b) => a.sequence - b.sequence || a.id.localeCompare(b.id));
     const retained = new Set(entries.map((e) => e.id));
@@ -611,7 +615,15 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
             current.lastFailure = { code, at: new Date().toISOString() };
             current.retryCount = (current.retryCount ?? 0) + 1;
           });
-          await this.update(entry, 'blocked');
+          const rejectedBeforeAdmission =
+            error instanceof WalletProviderError &&
+            error.code === 'wallet_provider_rejected' &&
+            error.outcome === 'not_dispatched' &&
+            !entry.operationId;
+          await this.update(
+            entry,
+            rejectedBeforeAdmission ? 'failed' : 'blocked',
+          );
           this.retryAt.set(
             entry.id,
             Date.now() + (error instanceof NetworkFeeLimitError ? 2000 : 1000),

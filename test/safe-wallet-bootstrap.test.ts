@@ -3,7 +3,8 @@ import { fingerprint } from '../src/onboarding/policy.js';
 import { Safe4337Verifier } from '../src/sponsorship/verifier.js';
 import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
-import { Wallet, keccak256 } from 'ethers';
+import { resolve } from 'node:path';
+import { Transaction, Wallet, keccak256 } from 'ethers';
 import { expect, it, vi, afterEach } from 'vitest';
 import { fixture } from './helpers/safe-4337.js';
 import { SafeWalletRuntime } from '../src/sponsorship/safe-wallet.js';
@@ -20,6 +21,9 @@ async function bootstrap(
   invisibleBlocks = 0,
   observationErrors = 0,
   receiptStatus = '0x1',
+  acknowledge = false,
+  pendingLookup = false,
+  fundingBalance = '0xde0b6b3a7640000',
 ) {
   const f = await fixture();
   const applicationId = runtimeApplicationId(
@@ -84,6 +88,7 @@ async function bootstrap(
     executorBalanceWei: '10',
     paymasterDepositWei: '10',
   };
+  const submitted: Transaction[] = [];
   let broadcasts = 0,
     included = false;
   let dispatched!: () => void;
@@ -129,7 +134,7 @@ async function bootstrap(
         result = '0x186a0';
         break;
       case 'eth_getBalance':
-        result = '0xde0b6b3a7640000';
+        result = fundingBalance;
         break;
       case 'eth_getTransactionCount':
         result = '0x0';
@@ -143,9 +148,28 @@ async function bootstrap(
             }
           : null;
         break;
+      case 'eth_getTransactionByHash': {
+        const tx = submitted.find((tx) => tx.hash === b.params[0]);
+        result =
+          pendingLookup && tx
+            ? {
+                hash: tx.hash,
+                from: tx.from,
+                nonce: '0x' + tx.nonce.toString(16),
+              }
+            : null;
+        break;
+      }
       case 'eth_sendRawTransaction':
+        submitted.push(Transaction.from(b.params[0]));
         broadcasts++;
         dispatched();
+        if (acknowledge)
+          return Response.json({
+            jsonrpc: '2.0',
+            id: b.id,
+            result: submitted.at(-1)!.hash,
+          });
         return Response.json({
           jsonrpc: '2.0',
           id: b.id,
@@ -156,18 +180,20 @@ async function bootstrap(
     }
     return Response.json({ jsonrpc: '2.0', id: b.id, result });
   }) as typeof fetch;
-  const runtime = new SafeWalletRuntime(
-    config,
-    f.db,
-    f.runtime,
-    f.onboarding,
-    f.actions,
-    f.backend,
-    new ApplicationCredentialCipher(Buffer.alloc(32, 7).toString('base64')),
-    f.directory,
-    'offline-bundler-authorization-with-32-characters',
-    request,
-  );
+  const createRuntime = () =>
+    new SafeWalletRuntime(
+      config,
+      f.db,
+      f.runtime,
+      f.onboarding,
+      f.actions,
+      f.backend,
+      new ApplicationCredentialCipher(Buffer.alloc(32, 7).toString('base64')),
+      f.directory,
+      'offline-bundler-authorization-with-32-characters',
+      request,
+    );
+  const runtime = createRuntime();
   const stored = () =>
     f.db.onboardingStore.transaction(
       (s) =>
@@ -185,10 +211,12 @@ async function bootstrap(
   return {
     f,
     runtime,
+    createRuntime,
     applicationId,
     stored,
     budget,
     didDispatch,
+    submitted,
     get broadcasts() {
       return broadcasts;
     },
@@ -450,4 +478,213 @@ it('does not advance the funding queue or release gas reservations for a reverte
   expect(tx.settled).not.toBe(true);
   expect((await t.budget())!.reserved).toBe(reserved);
   expect(t.broadcasts).toBe(1);
+});
+
+it('broadcasts consecutive durable nonces before either receipt arrives, even when the RPC pending nonce is stale', async () => {
+  const t = await bootstrap('1000000000', 0, 0, '0x1', true);
+  vi.useFakeTimers();
+  const first = t.runtime
+    .ensure(t.f.operatorContext, t.applicationId)
+    .catch((error) => error);
+  await t.didDispatch;
+  const internal = t.runtime as unknown as {
+    send(
+      applicationId: string,
+      purpose: string,
+      tx: { to: string; value: string },
+      authorize: () => Promise<void>,
+    ): Promise<unknown>;
+  };
+  const authority = vi.fn(async () => {});
+  const second = internal.send(
+    t.applicationId,
+    'safe-deployment-' + randomUUID(),
+    { to: Wallet.createRandom().address, value: '0' },
+    authority,
+  );
+  await vi.waitFor(() => expect(t.broadcasts).toBe(2));
+  const rows = (await t.stored())!.transactions;
+  expect(rows.map((t) => t.nonce)).toEqual([0, 1]);
+  expect(t.submitted.map((t) => t.nonce)).toEqual([0, 1]);
+  expect(rows.every((t) => t.submitted && !t.included)).toBe(true);
+  expect(authority).toHaveBeenCalledTimes(2);
+  expect((await t.budget())!.reserved).toBe(
+    rows.reduce((n, t) => n + BigInt(t.feeReserveWei), 0n).toString(),
+  );
+  t.include();
+  await vi.advanceTimersByTimeAsync(1000);
+  expect(await first).toMatchObject({ code: 'wallet_authorization_denied' });
+  await second;
+  expect(
+    (await t.stored())!.transactions.every((t) => t.included && t.settled),
+  ).toBe(true);
+  expect(t.broadcasts).toBe(2);
+});
+
+it.each([false, true])(
+  'requires exact pending-hash observation to advance after a lost acknowledgement (visible=%s)',
+  async (visible) => {
+    const t = await bootstrap('1000000000', 0, 0, '0x1', false, visible);
+    vi.useFakeTimers();
+    const first = t.runtime
+      .ensure(t.f.operatorContext, t.applicationId)
+      .catch((error) => error);
+    await t.didDispatch;
+    const internal = t.runtime as unknown as {
+      send(
+        applicationId: string,
+        purpose: string,
+        tx: { to: string; value: string },
+        authorize: () => Promise<void>,
+      ): Promise<unknown>;
+    };
+    const authority = vi.fn(async () => {});
+    const next = internal
+      .send(
+        t.applicationId,
+        'safe-deployment-' + randomUUID(),
+        { to: Wallet.createRandom().address, value: '0' },
+        authority,
+      )
+      .catch((error) => error);
+    if (visible) {
+      await vi.waitFor(() => expect(t.broadcasts).toBe(2));
+      t.include();
+      await vi.advanceTimersByTimeAsync(1000);
+      await first;
+      await next;
+      expect((await t.stored())!.transactions).toHaveLength(2);
+    } else {
+      expect(await next).toMatchObject({ code: 'wallet_attempt_pending' });
+      expect(authority).not.toHaveBeenCalled();
+      expect((await t.stored())!.transactions).toHaveLength(1);
+      t.include();
+      await vi.advanceTimersByTimeAsync(1000);
+      await first;
+      expect(t.broadcasts).toBe(1);
+    }
+  },
+);
+
+it.each([
+  { limit: 1, balance: '0xde0b6b3a7640000', code: 'wallet_attempt_pending' },
+  { limit: 10, balance: '0x2dc6c0', code: 'wallet_provider_unavailable' },
+])(
+  'bounds pending setup by accepted capacity and aggregate funding ($code)',
+  async ({ limit, balance, code }) => {
+    const t = await bootstrap('1000000000', 0, 0, '0x1', true, false, balance);
+    await t.f.db.onboardingStore.transaction((s) => {
+      const terms = s.deploymentBindings!['service-v1'].runtimeConfiguration!
+        .obligations!.records[t.applicationId + ':sponsorship'].value as {
+        maximum_in_flight_per_sponsor?: number;
+      };
+      terms.maximum_in_flight_per_sponsor = limit;
+    });
+    vi.useFakeTimers();
+    const first = t.runtime
+      .ensure(t.f.operatorContext, t.applicationId)
+      .catch((error) => error);
+    await t.didDispatch;
+    await vi.waitFor(() => expect(t.submitted).toHaveLength(1));
+    const internal = t.runtime as unknown as {
+      send(
+        applicationId: string,
+        purpose: string,
+        tx: { to: string; value: string },
+      ): Promise<unknown>;
+    };
+    const reservation = (await t.budget())!.reserved;
+    await expect(
+      internal.send(t.applicationId, 'safe-deployment-' + randomUUID(), {
+        to: Wallet.createRandom().address,
+        value: '0',
+      }),
+    ).rejects.toMatchObject({ code });
+    expect((await t.stored())!.transactions).toHaveLength(1);
+    expect((await t.budget())!.reserved).toBe(reservation);
+    expect(t.broadcasts).toBe(1);
+    t.include();
+    await vi.advanceTimersByTimeAsync(1000);
+    await first;
+  },
+);
+
+it('publishes concurrent readiness updates atomically without temporary-file collisions or missing ready accounts', async () => {
+  const t = await bootstrap('1');
+  await t.runtime
+    .ensure(t.f.operatorContext, t.applicationId)
+    .catch(() => undefined);
+  const secondId = randomUUID(),
+    secondAddress = Wallet.createRandom().address;
+  await t.f.db.onboardingStore.transaction((s) => {
+    const r = s.deploymentBindings!['service-v1'].runtimeConfiguration!;
+    r.safeWalletInfrastructure![t.applicationId].paymaster =
+      t.f.config.acceptance.paymaster;
+    const first = Object.values(r.safeWalletAccounts!)[0];
+    r.safeWalletAccounts![secondId] = {
+      ...first,
+      accountId: secondId,
+      binding: {
+        ...first.binding,
+        accountId: secondId,
+        address: secondAddress,
+      },
+    };
+  });
+  const internal = t.runtime as unknown as {
+    publishBundler(applicationId: string): Promise<void>;
+  };
+  await Promise.all(
+    Array.from({ length: 10 }, () => internal.publishBundler(t.applicationId)),
+  );
+  const config = JSON.parse(
+    await readFile(
+      resolve(
+        t.f.directory,
+        '.provider-data/bundler',
+        t.applicationId + '.json',
+      ),
+      'utf8',
+    ),
+  );
+  expect(config.accounts).toHaveLength(2);
+  expect(config.accounts).toContain(t.f.operation.sender);
+  expect(config.accounts).toContain(secondAddress);
+  expect(t.broadcasts).toBe(0);
+});
+
+it('retains the acknowledged nonce tail across a database and service restart', async () => {
+  const t = await bootstrap('1000000000', 0, 0, '0x1', true);
+  vi.useFakeTimers();
+  const first = t.runtime
+    .ensure(t.f.operatorContext, t.applicationId)
+    .catch((error) => error);
+  await t.didDispatch;
+  await vi.advanceTimersByTimeAsync(31000);
+  expect(await first).toMatchObject({ code: 'wallet_attempt_pending' });
+  const before = (await t.stored())!.transactions[0];
+  expect(before.submitted).toBe(true);
+  await t.f.restart();
+  t.f.runtime.rpcEndpoints = async (_id, kind) =>
+    kind === 'rpc-observation' ? [] : ['https://rpc.example.test'];
+  t.f.runtime.withRpc = async (_id, work) => work(['https://rpc.example.test']);
+  const restored = t.createRuntime() as unknown as {
+    send(
+      applicationId: string,
+      purpose: string,
+      tx: { to: string; value: string },
+    ): Promise<unknown>;
+  };
+  const second = restored.send(
+    t.applicationId,
+    'safe-deployment-' + randomUUID(),
+    { to: Wallet.createRandom().address, value: '0' },
+  );
+  await vi.waitFor(() => expect(t.broadcasts).toBe(2));
+  expect(t.submitted.map((t) => t.nonce)).toEqual([0, 1]);
+  expect((await t.stored())!.transactions[0].hash).toBe(before.hash);
+  t.include();
+  await vi.advanceTimersByTimeAsync(1000);
+  await second;
+  expect(t.broadcasts).toBe(2);
 });

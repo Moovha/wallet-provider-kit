@@ -1,3 +1,5 @@
+import { WalletProviderError } from '../src/domain/signing.js';
+import type { UserOperationV07 } from '../src/sponsorship/user-operation.js';
 import { NetworkFeeLimitError } from '../src/execution/network-fees.js';
 import { describe, it, expect, vi } from 'vitest';
 import { Wallet, toQuantity, ZeroAddress } from 'ethers';
@@ -32,6 +34,7 @@ async function setup(
     maxFeePerGas: string;
     maxPriorityFeePerGas: string;
   }>,
+  estimate?: (operation: UserOperationV07) => Promise<UserOperationV07>,
 ) {
   const nativeRecipient = native ? Wallet.createRandom().address : undefined;
   const f = await fixture((c) => {
@@ -230,6 +233,8 @@ async function setup(
         pollIntervalSeconds: 5,
       },
       networkFees,
+      undefined,
+      estimate,
     );
     return {
       execution,
@@ -770,4 +775,43 @@ it('retries a known fee-ceiling wait before account reads and retains only a sta
   });
   await t.ports.driver.runOnce();
   expect(t.s.sends).toBe(1);
+});
+
+it('makes a known pre-admission execution revert terminal without reserving a nonce or blocking the next batch', async () => {
+  let rejected = false;
+  const t = await setup(
+    '10000000',
+    false,
+    false,
+    undefined,
+    async (operation) => {
+      if (!rejected) {
+        rejected = true;
+        throw new WalletProviderError(
+          'wallet_provider_rejected',
+          'not_dispatched',
+        );
+      }
+      return operation;
+    },
+  );
+  await t.submit();
+  await t.ports.driver.runOnce();
+  expect(await t.status()).toMatchObject({ status: 500 });
+  expect(t.s.sends + t.f.state.posts + t.f.state.signs).toBe(0);
+  await t.submit('next');
+  await t.ports.driver.runOnce();
+  expect(t.s.sends).toBe(1);
+});
+it('retains uncertain estimator failures as retryable without signing', async () => {
+  const t = await setup('10000000', false, false, undefined, async () => {
+    throw new WalletProviderError(
+      'wallet_provider_unavailable',
+      'not_dispatched',
+    );
+  });
+  await t.submit();
+  await t.ports.driver.runOnce();
+  expect(await t.status()).toMatchObject({ status: 100 });
+  expect(t.s.sends + t.f.state.posts + t.f.state.signs).toBe(0);
 });

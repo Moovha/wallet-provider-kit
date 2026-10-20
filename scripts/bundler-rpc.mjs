@@ -250,8 +250,18 @@ export function createBundlerRpc(configuration, request = fetch) {
             });
             continue;
           }
-          // Positive gateway codes describe provider service failures, not EVM reverts.
-          if (transient.has(result.error?.code) || result.error?.code >= 0)
+          // Geth's execution-revert code is positive; preserve its structured EVM result.
+          const executionRevert =
+            ['eth_call', 'eth_estimateGas', 'debug_traceCall'].includes(
+              body.method,
+            ) &&
+            result.error?.code === 3 &&
+            typeof result.error.data === 'string' &&
+            /^0x(?:[0-9a-f]{2})*$/i.test(result.error.data);
+          if (
+            transient.has(result.error?.code) ||
+            (result.error?.code >= 0 && !executionRevert)
+          )
             throw Error('RPC unavailable');
           s.capabilities.set(feature, {
             supported: true,

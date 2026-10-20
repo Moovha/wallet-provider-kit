@@ -61,7 +61,13 @@ export interface UserOperationBatch {
   sequence: number;
   operationId?: string;
   stage:
-    'queued' | 'processing' | 'blocked' | 'included' | 'complete' | 'expired';
+    | 'queued'
+    | 'processing'
+    | 'blocked'
+    | 'included'
+    | 'complete'
+    | 'expired'
+    | 'failed';
 }
 export interface WalletCallsDriver {
   subscribe?(listener: (batchId: string) => void): () => void;
