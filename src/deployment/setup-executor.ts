@@ -724,9 +724,8 @@ export function createSetupExecutor(options: SetupExecutorOptions = {}) {
         ...(job.state === 'failed' ? ['down', '--remove-orphans'] : ['stop']),
       ]);
       job.state = 'stopped';
-      job.message = plan!.config.management
-        ? 'Provider management is available. Open administration and use the private installation-claim file to create the first administrator. Wallet operations remain disabled.'
-        : 'Local service stopped. Private configuration, secrets and persistent records are retained.';
+      job.message =
+        'Local service stopped. Private configuration, secrets and persistent records are retained.';
       job.cleanup = 'stopped';
       await persistProgress();
     } catch {

@@ -169,22 +169,16 @@ onMounted(() => {
   <section class="local-setup callout" aria-labelledby="local-setup-title">
     <h3 id="local-setup-title">Set up and run locally</h3>
     <p>
-      Use Docker Compose to run the same service image and container security
-      settings as a single-host deployment. Setup saves private files outside
-      the checkout, prepares new persistent storage, starts the container and
-      checks its health. Downloads are optional for this path.
+      Run an isolated provider on this computer. Setup saves private
+      configuration and storage, starts the service and checks its health.
     </p>
     <p>
-      Setup checks Docker, Compose and the image builder on macOS or Linux. If
-      tools are missing, install them here and continue automatically. The
-      bundled OWS engine, private bundler and application paymaster support Safe
-      wallets. The first image build needs network access and may take several
-      minutes.
+      Setup checks Docker and Compose. You can install missing tools here. The
+      first build downloads dependencies and may take several minutes.
     </p>
     <p>
-      Wallet operations must stay disabled. This creates a new isolated
-      deployment, without changing any existing service. The public HTTPS origin
-      and external acceptance remain separate tasks.
+      Wallet operations start disabled. Complete application configuration and
+      deployment acceptance before enabling them.
     </p>
     <ul v-if="errors.length" role="alert" class="issue-list">
       <li v-for="error in errors" :key="error">{{ error }}</li>

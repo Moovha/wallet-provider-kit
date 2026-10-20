@@ -236,10 +236,14 @@ function openAdvanced() {
           access stays on this computer’s loopback interface. Wallet operations
           start disabled.
         </p>
-        <button class="secondary" type="button" @click="step = 1">Back</button>
-        <button class="primary" :disabled="busy || !valid">
-          {{ busy ? 'Validating…' : 'Review and deploy' }}
-        </button>
+        <div class="installation-actions">
+          <button class="secondary" type="button" @click="step = 1">
+            Back
+          </button>
+          <button class="primary" :disabled="busy || !valid">
+            {{ busy ? 'Validating…' : 'Review and deploy' }}
+          </button>
+        </div>
       </form>
       <section v-else>
         <h2>Deploy and open administration</h2>
@@ -306,6 +310,11 @@ function openAdvanced() {
 .installation-steps [aria-current='step'] {
   font-weight: 700;
   color: #0f2338;
+}
+.installation-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
 }
 .destination-options {
   display: grid;
