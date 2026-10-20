@@ -7,6 +7,13 @@ export interface NetworkFeeQuote {
   baseFeePerGas: string;
   quotedAt: string;
 }
+/** The accepted total fee cannot cover the current base fee and bounded tip. */
+export class NetworkFeeLimitError extends WalletProviderError {
+  readonly reason = 'network_fee_limit';
+  constructor() {
+    super('wallet_provider_unavailable', 'not_dispatched');
+  }
+}
 function quantity(value: unknown): bigint {
   if (
     typeof value !== 'string' ||
@@ -23,7 +30,7 @@ export async function quoteNetworkFees(
   reader: RpcReader,
   limits: { maxFeePerGas: string; maxPriorityFeePerGas: string },
 ): Promise<NetworkFeeQuote> {
-  const raw = await reader.call('eth_feeHistory', ['0x5', 'latest', [75]]);
+  const raw = await reader.feeHistory();
   const history = raw as { baseFeePerGas?: unknown[]; reward?: unknown[][] };
   if (
     !history ||
@@ -48,14 +55,11 @@ export async function quoteNetworkFees(
     })
     .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
   const base = bases.at(-1)!;
-  const tip = rewards[2];
+  const priorityCeiling = BigInt(limits.maxPriorityFeePerGas);
+  const tip = rewards[2] > priorityCeiling ? priorityCeiling : rewards[2];
   const minimum = base + tip;
   const ceiling = BigInt(limits.maxFeePerGas);
-  if (tip > BigInt(limits.maxPriorityFeePerGas) || minimum > ceiling)
-    throw new WalletProviderError(
-      'wallet_provider_unavailable',
-      'not_dispatched',
-    );
+  if (minimum > ceiling) throw new NetworkFeeLimitError();
   const buffered = base * 2n + tip;
   return {
     maxFeePerGas: (buffered > ceiling ? ceiling : buffered).toString(),

@@ -1,5 +1,10 @@
 # Use OpenZeppelin Relayer
 
+> Historical integration reference. New configured deployments use
+> [per-user Safe wallets, ERC-4337 bundling and application paymasters](self-hosted-sponsorship.md).
+> The legacy execution exports and separate executor CLI are unavailable in the
+> configured service. Retain existing journals and reconcile uncertain work before migration.
+
 Choose Relayer in [Backend](setup-wizard.md#_2-backend) when your team already
 operates a signer service and can assign distinct signers to wallet accounts.
 Configure its [signer pool](operator-services.md#openzeppelin-relayer) through the

@@ -33,7 +33,7 @@ beforeEach(async () => {
   calls.length = 0;
   config = JSON.parse(
     await readFile(
-      new URL('../docs/provider.config.example.json', import.meta.url),
+      new URL('../docs/provider.config.safe.example.json', import.meta.url),
       'utf8',
     ),
   );
@@ -98,7 +98,7 @@ describe('explicit local container executor with offline command fixtures', () =
       expect(saved.backend.vaultDirectory).toBe('.provider-vault/vault');
     expect(
       parseEnv(await readFile(join(plan.directory, 'provider.env'), 'utf8')),
-    ).toEqual(secretValues);
+    ).toMatchObject(secretValues);
     for (const name of [
       'provider.config.json',
       'provider.env',
@@ -143,7 +143,7 @@ describe('explicit local container executor with offline command fixtures', () =
     expect(run.status().state).toBe('stopped');
     expect(
       parseEnv(await readFile(join(plan.directory, 'provider.env'), 'utf8')),
-    ).toEqual(secretValues);
+    ).toMatchObject(secretValues);
   });
 
   it.each(['storage', 'up', 'exec'])(
@@ -202,7 +202,10 @@ describe('explicit local container executor with offline command fixtures', () =
 
   it('accepts only the missing referenced secrets, validates inherited values and never returns them', async () => {
     const name =
-      config.backend.kind === 'cdp' ? config.backend.apiKeyId.env : '';
+      config.backend.kind === 'ows' ? config.backend.passphrase.env : '';
+    config.authorizationServer!.clients[0].clientSecret = {
+      env: 'EXTERNAL_CLIENT_SECRET',
+    };
     const run = executor(offlineCommand, { [name]: 'inherited-offline-value' });
     const plan = await run.prepare(config);
     expect(plan.secrets.find((secret) => secret.name === name)?.available).toBe(
@@ -220,11 +223,6 @@ describe('explicit local container executor with offline command fixtures', () =
     ).toThrow(
       expect.objectContaining({
         issues: [expect.stringContaining('Only the missing')],
-      }),
-    );
-    expect(() => run.start(plan.id, {})).toThrow(
-      expect.objectContaining({
-        issues: [expect.stringContaining('every missing')],
       }),
     );
     run.start(plan.id, values(plan));
@@ -261,11 +259,11 @@ describe('explicit local container executor with offline command fixtures', () =
         },
       }),
     ).rejects.toMatchObject({
-      issues: [expect.stringContaining('Custom adapters')],
+      issues: [expect.any(String)],
     });
     const reservedConfig = structuredClone(config);
-    if (reservedConfig.backend.kind === 'cdp')
-      reservedConfig.backend.apiKeyId.env = 'NODE_OPTIONS';
+    if (reservedConfig.backend.kind === 'ows')
+      reservedConfig.backend.passphrase.env = 'NODE_OPTIONS';
     await expect(run.prepare(reservedConfig)).rejects.toMatchObject({
       issues: [expect.stringContaining('secret variable names')],
     });

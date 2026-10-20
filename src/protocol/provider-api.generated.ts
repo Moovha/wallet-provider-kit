@@ -272,7 +272,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Public versioned execution discovery. Profile implementation, configuration and service readiness do not establish live-provider certification or production custody acceptance. Clients must select an exact supported ID/revision and ignore unknown profiles. */
+        /** @description Execution discovery for per-user Safe accounts using ERC-4337 and an application paymaster. Readiness does not establish production custody acceptance. */
         get: operations["getExecutionCapabilities"];
         put?: never;
         post?: never;

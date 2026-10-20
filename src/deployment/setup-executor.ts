@@ -1,4 +1,3 @@
-import { prepareLocalExecution } from './local-execution.js';
 import { localExecutionImages } from './local-execution-contract.js';
 import { caddyImage, caddyConfiguration } from './https-ingress.js';
 import {
@@ -16,6 +15,7 @@ import {
   ConfigurationError,
   secretReferences,
   validateProviderConfiguration,
+  assertSafeWalletConfiguration,
   type ProviderConfiguration,
 } from './config.js';
 
@@ -100,6 +100,7 @@ export function setupEnvironment(values: Record<string, string>): string {
 }
 
 export function localCompose(plan: SetupPlan, buildSource: string) {
+  assertSafeWalletConfiguration(plan.config);
   // Compose interpolation also applies to YAML/JSON path strings.
   const path = (value: string) => value.replaceAll('$', '$$');
   return {
@@ -149,14 +150,6 @@ export function localCompose(plan: SetupPlan, buildSource: string) {
         cap_drop: ['ALL'],
         security_opt: ['no-new-privileges:true'],
         restart: 'unless-stopped',
-        ...(plan.config.localExecution
-          ? {
-              depends_on: {
-                'local-execution': { condition: 'service_healthy' },
-              },
-              networks: ['default', 'execution'],
-            }
-          : {}),
         ...(plan.config.safeWallet
           ? {
               depends_on: { bundler: { condition: 'service_started' } },
@@ -165,93 +158,6 @@ export function localCompose(plan: SetupPlan, buildSource: string) {
           : {}),
         stop_grace_period: '15s',
       },
-      ...(plan.config.localExecution
-        ? {
-            'local-execution': {
-              image: `${plan.project}:execution`,
-              build: {
-                context: path(buildSource),
-                dockerfile: 'Dockerfile.relayer',
-              },
-              user: `${process.getuid?.()}:${process.getgid?.()}`,
-              volumes: [
-                {
-                  type: 'bind',
-                  source: path(join(plan.directory, '.local-execution')),
-                  target: '/app/config',
-                  read_only: true,
-                },
-                {
-                  type: 'bind',
-                  source: path(join(plan.directory, 'execution.env')),
-                  target: '/secrets/execution.env',
-                  read_only: true,
-                },
-              ],
-              depends_on: {
-                'execution-store': { condition: 'service_healthy' },
-              },
-              networks: ['execution', 'execution-store'],
-              read_only: true,
-              tmpfs: ['/tmp'],
-              cap_drop: ['ALL'],
-              security_opt: ['no-new-privileges:true'],
-              restart: 'unless-stopped',
-              logging: { driver: 'none' },
-              healthcheck: {
-                test: [
-                  'CMD',
-                  'node',
-                  '-e',
-                  "fetch('http://127.0.0.1:8080/api/v1/ready',{signal:AbortSignal.timeout(3000)}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
-                ],
-                interval: '5s',
-                timeout: '4s',
-                retries: 12,
-                start_period: '10s',
-              },
-              stop_grace_period: '30s',
-            },
-            'execution-store': {
-              image: localExecutionImages.store,
-              user: `${process.getuid?.()}:${process.getgid?.()}`,
-              command: [
-                'valkey-server',
-                '--appendonly',
-                'yes',
-                '--appendfsync',
-                'always',
-                '--save',
-                '',
-                '--protected-mode',
-                'no',
-                '--maxmemory-policy',
-                'noeviction',
-              ],
-              volumes: [
-                {
-                  type: 'bind',
-                  source: path(join(plan.directory, '.execution-data')),
-                  target: '/data',
-                },
-              ],
-              networks: ['execution-store'],
-              read_only: true,
-              tmpfs: ['/tmp'],
-              cap_drop: ['ALL'],
-              security_opt: ['no-new-privileges:true'],
-              restart: 'unless-stopped',
-              logging: { driver: 'none' },
-              healthcheck: {
-                test: ['CMD', 'valkey-cli', 'ping'],
-                interval: '5s',
-                timeout: '3s',
-                retries: 12,
-              },
-              stop_grace_period: '30s',
-            },
-          }
-        : {}),
       ...(plan.config.safeWallet
         ? {
             bundler: {
@@ -367,15 +273,6 @@ export function localCompose(plan: SetupPlan, buildSource: string) {
           },
         }
       : {}),
-    ...(plan.config.localExecution
-      ? {
-          networks: {
-            default: {},
-            execution: {},
-            'execution-store': { internal: true },
-          },
-        }
-      : {}),
   };
 }
 
@@ -465,10 +362,7 @@ export function createSetupExecutor(options: SetupExecutorOptions = {}) {
     inherited = {};
     try {
       const config = validateProviderConfiguration(input);
-      if (config.backend.kind === 'custom')
-        failure(
-          'Custom adapters use a reviewed custom image or native deployment. The bundled setup supports OWS, CDP and existing Relayer services.',
-        );
+      assertSafeWalletConfiguration(config);
       if (config.activation.enabled)
         failure(
           'Turn off Enable wallet operations in Deployment before starting a new local setup.',
@@ -481,8 +375,6 @@ export function createSetupExecutor(options: SetupExecutorOptions = {}) {
           'Run local setup as an unprivileged account on macOS or Linux.',
         );
       await access(join(buildSource, 'Dockerfile'));
-      if (config.localExecution)
-        await access(join(buildSource, 'Dockerfile.relayer'));
       await access(join(buildSource, '.dockerignore'));
       // Select and pin a local daemon before any build, file write or container operation.
       const host = (
@@ -532,11 +424,6 @@ export function createSetupExecutor(options: SetupExecutorOptions = {}) {
       const changes = [
         'Container HTTP listen address: 0.0.0.0:8080. The published host port stays on 127.0.0.1.',
         'Container storage: .provider-data beside the saved configuration, on a private host bind mount.',
-        ...(config.localExecution
-          ? [
-              'Start the bundled local execution engine and durable Valkey store on private container networks. Retain encrypted sponsor keystores and execution data; no public administration ports are published.',
-            ]
-          : []),
         ...(config.backend.kind === 'ows'
           ? [
               'OWS engine included in the image; new private .provider-vault bind mount retained alongside the database. A missing passphrase is generated and saved privately.',
@@ -666,47 +553,6 @@ export function createSetupExecutor(options: SetupExecutorOptions = {}) {
               flag: 'wx',
               mode: 0o600,
             });
-          let apiSecrets = secretFile;
-          if (plan!.config.localExecution) {
-            const values = Object.fromEntries(
-              Object.entries(parseEnv(secretFile)).filter(
-                (entry): entry is [string, string] => entry[1] !== undefined,
-              ),
-            );
-            const materialized = structuredClone(plan!.config);
-            const prepared = prepareLocalExecution(materialized, values);
-            await mkdir(join(plan!.directory, '.local-execution'), {
-              mode: 0o700,
-            });
-            await mkdir(join(plan!.directory, '.local-execution', 'keys'), {
-              mode: 0o700,
-            });
-            await mkdir(join(plan!.directory, '.execution-data'), {
-              mode: 0o700,
-            });
-            for (const key of prepared.keys)
-              await save(
-                '.local-execution/keys/' + key.name,
-                key.contents + '\n',
-              );
-            await save(
-              '.local-execution/config.json',
-              JSON.stringify(prepared.relayer, null, 2) + '\n',
-            );
-            await save('execution.env', setupEnvironment(prepared.environment));
-            const privateNames = [
-              plan!.config.localExecution.keystorePassphrase.env,
-              plan!.config.localExecution.storageKey.env,
-            ];
-            apiSecrets = setupEnvironment(
-              Object.fromEntries(
-                Object.entries(values).filter(
-                  ([name]) => !privateNames.includes(name),
-                ),
-              ),
-            );
-            plan!.config = validateProviderConfiguration(materialized);
-          }
           await save(
             'provider.config.json',
             JSON.stringify(plan!.config, null, 2) + '\n',
@@ -724,7 +570,7 @@ export function createSetupExecutor(options: SetupExecutorOptions = {}) {
               ) + '\n',
             );
           }
-          await save('provider.env', apiSecrets);
+          await save('provider.env', secretFile);
           secretFile = '';
           await save(
             'compose.json',
@@ -737,12 +583,7 @@ export function createSetupExecutor(options: SetupExecutorOptions = {}) {
           );
         } else if (step.id === 'image')
           await compose(
-            [
-              'build',
-              'api',
-              ...(plan!.config.localExecution ? ['local-execution'] : []),
-              ...(plan!.config.safeWallet ? ['bundler'] : []),
-            ],
+            ['build', 'api', ...(plan!.config.safeWallet ? ['bundler'] : [])],
             15 * 60 * 1000,
           );
         else if (['validate', 'storage', 'doctor'].includes(step.id)) {
@@ -836,9 +677,6 @@ export function createSetupExecutor(options: SetupExecutorOptions = {}) {
           ![
             'api',
             ...(plan!.config.safeWallet ? ['bundler', 'bundler-store'] : []),
-            ...(plan!.config.localExecution
-              ? ['local-execution', 'execution-store']
-              : []),
           ].every((service) => services.trim().split(/\s+/).includes(service))
         )
           throw new Error();
@@ -929,7 +767,9 @@ ${command} run --rm --no-deps api doctor --config /config/provider.json
 
 If setup failed before initialization, inspect its failed step before deliberately initializing this new store. If a start or stop could not be confirmed, use ps and stop before investigating. Build failures require working Docker, network access for pinned image/package downloads and enough disk space. Never share raw logs or secrets.
 
-${plan.config.localExecution ? 'The local execution engine and Valkey start automatically with the API. Their readiness is required at startup. Retain .local-execution encrypted sponsor keys, execution.env credentials and .execution-data queue/nonce records together with SQLite and OWS state. No engine administration ports are published. Configured sponsor public addresses are recorded in provider.config.json; fund them and complete execution acceptance before activation. Never regenerate keys or restore only one store after an uncertain dispatch.\n\n' : ''}The private provider.env file is plaintext and mounted read-only; Node loads it without Compose interpolation. Keep it outside source control and protect host storage/backups. Local Docker administrators can access container secrets.
+The private bundler and durable Valkey store start with the API. Back up the Safe runtime directory, .bundler-data, SQLite and OWS vault together. Never regenerate keys or restore only one store after an uncertain dispatch. Complete sponsorship and recovery acceptance before enabling operations.
+
+The private provider.env file is plaintext and mounted read-only; Node loads it without Compose interpolation. Keep it outside source control and protect host storage/backups. Local Docker administrators can access container secrets.
 
 The host API is loopback HTTP. ${plan.config.http?.ingress === 'caddy' ? 'The saved Caddy gateway supplies automatic HTTPS for the configured origin. After DNS points to this host, ports 80/443 are reachable and you approve public exposure of the disabled service, start the gateway with the same Compose command followed by --profile https up --detach --no-build. This contacts a public certificate authority and publishes the hostname in certificate transparency logs. Retain .provider-tls; do not enable the profile on a local evaluation machine without that DNS and network setup.' : 'Connect your existing HTTPS gateway to the loopback API.'} Arrange encrypted backups and perform application authority, backend and recovery acceptance. Do not copy this local database to create an independent provider. Reuse the reviewed image and configuration pattern on the final host with separate secrets and a fresh, isolated test store.
 

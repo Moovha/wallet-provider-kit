@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-import { executionServiceCommand } from './executor/cli.js';
 import { setupCommand } from './deployment/cli.js';
 import { createConfiguredProvider } from './deployment/provider.js';
 import {
@@ -18,7 +17,9 @@ async function main() {
     throw new Error('Unsafe environment');
   }
   if (process.argv[2] === 'executor')
-    return executionServiceCommand(process.argv.slice(3));
+    throw new ConfigurationError([
+      'The separate executor is retired; run the Safe wallet service with its bundled ERC-4337 infrastructure.',
+    ]);
   if (await setupCommand(process.argv.slice(2))) return;
   const loaded =
     process.argv[2] === 'run'

@@ -239,18 +239,9 @@ export function deploymentChecklist(
     lines.push(
       '- The pinned @open-wallet-standard/core@1.4.3 engine is included. New-deployment setup prepares a private vault (0700) and generates a missing owner passphrase. Back up the vault, SQLite and retained secrets together.',
     );
-  if (config.backend.kind === 'openzeppelin-relayer')
-    lines.push(
-      '- Provision and verify each Relayer/signer/address binding first. Retain assigned signers and stable backend binding across deployments; never replace them to recover an uncertain result.',
-    );
-  if (config.execution?.service)
-    lines.push(
-      `- Deploy and accept the separate execution service using ${docs}execution-service.html. Match provider/sponsor policy and service public keys on both sides; keep owner signing keys outside the executor. Back up and recover both stores without replacing execution identities.`,
-    );
-  if (config.execution)
-    lines.push(
-      `- Configure the dedicated application gas sponsors, private RPC endpoint variables and independent receipt verification described in ${docs}execution.html. Test lost-response recovery and record execution acceptance before activation. Gas admission reservations do not guarantee a hard cap on Relayer recovery or L1 costs.`,
-    );
+  lines.push(
+    `- Start and accept the private bundler, paymaster and Valkey queue described in ${docs}self-hosted-sponsorship.html. Back up their persistent state with SQLite and OWS; never reset an uncertain attempt or regenerate keys to recover a timeout.`,
+  );
   lines.push(
     '',
     '## Prepare the deployment host and files',
@@ -292,7 +283,7 @@ export function deploymentChecklist(
     '## Integrate',
     `- Consume the implemented HTTP API: ${docs}http-api.html`,
     `- Deployment instructions: ${docs}operator-deployment.html`,
-    '- Experimental Base EOA profile on the selected network. Signing alone does not submit a transaction. Optional execution requires a dedicated sponsor and independent RPC acceptance; otherwise the application owns submission and settlement verification.',
+    '- Each user receives one Safe asset account. The private ERC-4337 bundler submits approved operations and the application paymaster covers accepted gas. Fund the application gas address and accept its services and policy before provisioning.',
     '- To update settings, import your saved configuration in the wizard, edit, validate and export again. Deploy the reviewed files and restart the service. Policy changes invalidate previous grants and approvals; applications need consent to the current terms before requesting fresh access.',
     '- Stop the local setup wizard with Ctrl+C when finished.',
     '',

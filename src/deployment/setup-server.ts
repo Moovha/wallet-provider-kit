@@ -13,6 +13,7 @@ import {
   ConfigurationError,
   secretReferences,
   validateProviderConfiguration,
+  assertSafeWalletConfiguration,
 } from './config.js';
 
 import {
@@ -82,10 +83,7 @@ export async function createSetupServer(options: {
   if (!files.has('/index.html')) throw new Error('Setup assets unavailable');
   const example = JSON.parse(
     await readFile(
-      new URL(
-        '../../docs/provider.config.bundled.example.json',
-        import.meta.url,
-      ),
+      new URL('../../docs/provider.config.safe.example.json', import.meta.url),
       'utf8',
     ),
   );
@@ -146,10 +144,7 @@ export async function createSetupServer(options: {
   app.post('/api/validate', async (request, reply) => {
     try {
       const config = validateProviderConfiguration(request.body);
-      if (config.backend.kind === 'custom')
-        throw new ConfigurationError([
-          '/backend: custom adapters use the advanced setup guide',
-        ]);
+      assertSafeWalletConfiguration(config);
       const environment = [
         ...new Set(secretReferences(config).map((r) => r.env)),
       ];
@@ -189,7 +184,8 @@ export async function createSetupServer(options: {
       runtimeIdle();
       executor.resetPlan();
       const config = validateProviderConfiguration(request.body);
-      if (config.activation.enabled || config.backend.kind === 'custom')
+      assertSafeWalletConfiguration(config);
+      if (config.activation.enabled)
         throw new ConfigurationError([
           'Local setup requires a built-in backend with wallet operations disabled.',
         ]);

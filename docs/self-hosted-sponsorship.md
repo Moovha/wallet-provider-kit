@@ -1,6 +1,6 @@
 # Safe-only wallets and application-owned sponsorship
 
-The Safe-only profile gives each user one Safe address for deposits, balances,
+The configured service gives each user one Safe address for deposits, balances,
 approvals and execution. OWS retains its private signing identity. The signer
 address is not returned as a second asset wallet and requires no user gas balance.
 Recovery and custody remain the provider's responsibility.
@@ -13,11 +13,14 @@ checks does not establish funded network acceptance or a latency guarantee.
 
 ## Configure and start
 
-The setup wizard selects this profile for a new OWS application-led deployment.
+The setup wizard exports this execution flow for every new deployment.
+Use `provider.config.safe.example.json` as the manual configuration example.
 The export includes `safeWallet`, `safeProvisioning`, approved calls and encrypted
 application credential storage. Relayer execution, EOA transfers, shared Safe
-pools and sponsor pools are incompatible with this profile. Existing explicitly
-configured profiles retain their contracts and historical journals.
+pools and sponsor pools are retired service choices. Old exports are rejected
+before startup or setup effects; loading one does not migrate its accounts,
+assets or historical journals. Low-level adapter and historical recovery fixtures
+remain available for compatibility testing, outside the configured service.
 
 Local setup starts the API, private bundler and a separate Valkey journal. The
 bundler gateway publishes no host port. It requires a private credential, accepts
@@ -120,3 +123,6 @@ Measure queueing, preparation, sponsorship, signing, submission and inclusion
 separately. Protect raw captures and report the actual network, source revision,
 funding, failed requests and sample size. Unfunded discovery and offline fixtures
 are separate evidence and do not replace this Base test.
+
+See [execution latency](execution-latency.md) for the request sequence, RPC reuse,
+expired-operation recovery and ten-user measurement requirements.

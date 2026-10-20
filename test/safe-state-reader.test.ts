@@ -1,4 +1,4 @@
-import { beforeAll, afterAll, it, expect } from 'vitest';
+import { beforeAll, afterAll, it, expect, vi } from 'vitest';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { once } from 'node:events';
 import { createServer } from 'node:net';
@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import {
   JsonRpcProvider,
+  Interface,
   ContractFactory,
   keccak256,
   type BaseContract,
@@ -239,4 +240,157 @@ it('checks the complete ERC-4337 Safe authority and nonce in one read-only call 
       )
     ).wait();
   }
+});
+
+it.each(['owner', 'code'])(
+  'batches ten fixed-block inspections and isolates rejected %s evidence without deploying the helper',
+  async (fault) => {
+    const pin = async (c: BaseContract) => ({
+      address: await c.getAddress(),
+      codeHash: keccak256(await provider.getCode(await c.getAddress())),
+    });
+    const profile = {
+      entryPoint: await pin(entryPointFixture),
+      module: await pin(moduleFixture),
+    };
+    const pins = [
+      binding,
+      binding.singleton,
+      profile.entryPoint,
+      profile.module,
+    ];
+    await (
+      await contract.getFunction('configureModule')(profile.module.address)
+    ).wait();
+    const tag = '0x' + (await provider.getBlockNumber()).toString(16);
+    const spy = vi.spyOn(reader, 'call');
+    try {
+      const results = await Promise.allSettled(
+        Array.from({ length: 10 }, (_, index) =>
+          readSafe4337State(
+            reader,
+            binding,
+            index === 4 && fault === 'owner'
+              ? '0x0000000000000000000000000000000000000010'
+              : owner,
+            profile,
+            index === 4 && fault === 'code'
+              ? [
+                  { ...binding, codeHash: '0x' + '1'.repeat(64) },
+                  ...pins.slice(1),
+                ]
+              : pins,
+            tag,
+          ),
+        ),
+      );
+      expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(9);
+      expect(results[4]).toMatchObject({
+        status: 'rejected',
+        reason: { code: 'wallet_authorization_denied' },
+      });
+      for (let i = 0; i < results.length; i++)
+        if (i !== 4)
+          expect(results[i]).toEqual({ status: 'fulfilled', value: '42' });
+      expect(spy).toHaveBeenCalledTimes(1);
+      const call = spy.mock.calls[0];
+      expect(call[0]).toBe('eth_call');
+      expect(call[1][1]).toBe(tag);
+      expect(await provider.getCode((call[1][0] as { to: string }).to)).toBe(
+        '0x',
+      );
+      expect(await contract.getFunction('nonce')()).toBe(42n);
+    } finally {
+      spy.mockRestore();
+      await (
+        await contract.getFunction('configureModule')(
+          '0x0000000000000000000000000000000000000000',
+        )
+      ).wait();
+    }
+  },
+);
+
+it('keeps distinct block tags in separate inspection RPCs', async () => {
+  const pin = async (c: BaseContract) => ({
+    address: await c.getAddress(),
+    codeHash: keccak256(await provider.getCode(await c.getAddress())),
+  });
+  const profile = {
+    entryPoint: await pin(entryPointFixture),
+    module: await pin(moduleFixture),
+  };
+  const pins = [binding, binding.singleton, profile.entryPoint, profile.module];
+  await (
+    await contract.getFunction('configureModule')(profile.module.address)
+  ).wait();
+  const tag = '0x' + (await provider.getBlockNumber()).toString(16);
+  const spy = vi.spyOn(reader, 'call');
+  try {
+    expect(
+      await Promise.all(
+        ['latest', tag].map((block) =>
+          readSafe4337State(reader, binding, owner, profile, pins, block),
+        ),
+      ),
+    ).toEqual(['42', '42']);
+    expect(spy).toHaveBeenCalledTimes(2);
+  } finally {
+    spy.mockRestore();
+    await (
+      await contract.getFunction('configureModule')(
+        '0x0000000000000000000000000000000000000000',
+      )
+    ).wait();
+  }
+});
+
+it('rejects a truncated batch result for every caller', async () => {
+  const profile = { entryPoint: binding.singleton, module: binding.singleton };
+  const abi = new Interface([
+    'function inspect4337Batch() view returns(bool[] valid,uint256[] nonces)',
+  ]);
+  const spy = vi
+    .spyOn(reader, 'call')
+    .mockResolvedValue(
+      abi.encodeFunctionResult('inspect4337Batch', [[true], [42]]),
+    );
+  try {
+    const results = await Promise.allSettled(
+      Array.from({ length: 2 }, () =>
+        readSafe4337State(reader, binding, owner, profile, [binding], '0x1234'),
+      ),
+    );
+    expect(results.every((result) => result.status === 'rejected')).toBe(true);
+    expect(spy).toHaveBeenCalledTimes(1);
+  } finally {
+    spy.mockRestore();
+  }
+});
+
+it('never shares an inspection across different RPC endpoint identities', async () => {
+  const request = vi.fn(async () =>
+    Response.json({
+      jsonrpc: '2.0',
+      id: 1,
+      result: '0x' + 42n.toString(16).padStart(64, '0'),
+    }),
+  );
+  const readers = ['a', 'b'].map(
+    (host) =>
+      new RpcReader(
+        'https://' + host + '.example.test',
+        request as typeof fetch,
+        4,
+      ),
+  );
+  const profile = { entryPoint: binding.singleton, module: binding.singleton };
+  expect(
+    await Promise.all(
+      readers.map((r) =>
+        readSafe4337State(r, binding, owner, profile, [binding], '0x1234'),
+      ),
+    ),
+  ).toEqual(['42', '42']);
+  expect(request).toHaveBeenCalledTimes(2);
 });

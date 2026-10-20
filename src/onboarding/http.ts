@@ -589,7 +589,7 @@ export async function registerOnboardingRoutes(
       schema: {
         operationId: 'getExecutionCapabilities',
         description:
-          'Public versioned execution discovery. Profile implementation, configuration and service readiness do not establish live-provider certification or production custody acceptance. Clients must select an exact supported ID/revision and ignore unknown profiles.',
+          'Execution discovery for per-user Safe accounts using ERC-4337 and an application paymaster. Readiness does not establish production custody acceptance.',
         response: { 200: executionCapabilitiesSchema },
       },
     },
@@ -598,36 +598,24 @@ export async function registerOnboardingRoutes(
       return {
         contract_version: '1',
         profiles: [
-          'erc3009-relayer-v1',
-          'erc3009-executor-v1',
-          'approved-evm-executor-v1',
-        ].map((profile) => ({
-          id: profile,
-          revision: '1',
-          implemented: true,
-          configured: options?.execution?.profile === profile,
-          ready: options?.execution?.profile === profile && readyValue,
-          chain_id: network.caip,
-          account_type:
-            profile === 'approved-evm-executor-v1'
-              ? 'eoa-or-safe-1.4.1'
-              : 'eoa',
-          signing: 'eip-712',
-          token_authorization:
-            profile === 'approved-evm-executor-v1'
-              ? 'erc-3009-or-approved-contract-calls'
-              : 'erc-3009',
-          submission:
-            profile === 'erc3009-relayer-v1'
-              ? 'openzeppelin-relayer-1.8.0'
-              : 'designated-execution-service-v1',
-          verification:
-            options?.rpcVerification === 'single' ? 'rpc-single' : 'rpc-quorum',
-          finality: 'finalized',
-          minimum_rpc_sources: options?.rpcVerification === 'single' ? 1 : 2,
-          execute_scopes: ['wallet:execute', 'wallet:sign'],
-          read_scopes: ['wallet:execute:read'],
-        })),
+          {
+            id: 'safe-only-4337-v1',
+            revision: '1',
+            implemented: true,
+            configured: options?.service.safeOnlyWallet === true,
+            ready: options?.service.safeOnlyWallet === true && readyValue,
+            chain_id: network.caip,
+            account_type: 'safe-1.4.1',
+            signing: 'safe-4337-module-0.3.0',
+            token_authorization: 'approved-contract-calls',
+            submission: 'erc-4337-v0.7-bundler',
+            verification: 'rpc-single',
+            finality: 'finalized',
+            minimum_rpc_sources: 1,
+            execute_scopes: ['wallet:actions', 'wallet:sign', 'wallet:execute'],
+            read_scopes: ['wallet:execute:read'],
+          },
+        ],
       };
     },
   );

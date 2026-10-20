@@ -180,9 +180,8 @@ export class Safe4337SigningService {
     >,
   ) {
     const preview = await this.actions.previewWalletCalls(principal, input);
-    const nonce = await this.verifier.verify(
-      preview.intent,
-      preview.action.chain_account_id.split(':')[2],
+    const nonce = await this.verifier.prepareNonce(
+      preview.intent.account.address,
     );
     const intent = { ...preview.intent, nonce };
     return normalizeUserOperationV07({

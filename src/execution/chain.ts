@@ -167,6 +167,16 @@ export class RpcReader {
       throw new WalletProviderError('wallet_provider_configuration');
     }
   }
+  /** Opaque endpoint/transport identity for bounded read-only inspection batching. */
+  get readScope(): object {
+    return this.capacity;
+  }
+  /** Cache only the public fee sample briefly; each caller applies its current spending ceilings. */
+  async feeHistory() {
+    return this.capacity.feedRead('network-fee-history-75', 500, () =>
+      this.call('eth_feeHistory', ['0x5', 'latest', [75]]),
+    );
+  }
   async feed(
     method: 'eth_chainId' | 'eth_getBlockByNumber',
     params: unknown[],

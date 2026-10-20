@@ -269,3 +269,32 @@ it('waits through receipt-before-block visibility without rejecting or broadcast
   expect((await t.stored())!.transactions[0].included).toBe(true);
   expect(t.broadcasts).toBe(1);
 });
+
+it('shares one batch snapshot while a stalled account leaves other account workers free to progress', async () => {
+  const t = await bootstrap('10000000000');
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const slow = { runOnce: vi.fn(() => gate), stop: async () => {} };
+  const fast = { runOnce: vi.fn(async () => {}), stop: async () => {} };
+  const worker = t.runtime as unknown as {
+    drivers: Map<string, unknown>;
+    runWallets(): Promise<void>;
+  };
+  worker.drivers.set('slow', slow);
+  worker.drivers.set('fast', fast);
+  try {
+    await worker.runWallets();
+    expect(slow.runOnce).toHaveBeenCalledOnce();
+    expect(fast.runOnce).toHaveBeenCalledOnce();
+    expect(slow.runOnce.mock.calls[0]).toEqual(fast.runOnce.mock.calls[0]);
+    await Promise.resolve();
+    await worker.runWallets();
+    expect(slow.runOnce).toHaveBeenCalledOnce();
+    expect(fast.runOnce).toHaveBeenCalledTimes(2);
+  } finally {
+    release();
+    await t.runtime.close();
+  }
+});

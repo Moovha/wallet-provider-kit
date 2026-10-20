@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import AdvancedSettings from './AdvancedSettings.vue';
 import SetupField from './SetupField.vue';
-import ExecutionStep from './ExecutionStep.vue';
-import ContractCallsStep from './ContractCallsStep.vue';
 import ExplorerTokensStep from './ExplorerTokensStep.vue';
 import { computed } from 'vue';
 import type { ProviderConfiguration } from '../model';
@@ -145,138 +143,11 @@ function updateHttp(
       private bundler. No sponsor pool or separate user gas wallet is required.
     </p>
   </div>
-  <div
-    v-if="model.runtimeConfiguration?.sharedApplicationSafes"
-    class="callout"
-  >
-    <strong>Application execution is prepared after connection</strong>
-    <p>
-      The bundled engine starts without sponsor keys, RPC credentials or
-      application policies. Each connected application supplies its services and
-      action schema. The provider reviews them, exposes a funding address and
-      provisions the application Safe after funding.
-    </p>
-    <SetupField
-      guide="executionPools"
-      type="checkbox"
-      label="Use parallel Safe and sponsor pools"
-      :modelValue="
-        (model.runtimeConfiguration.executionPool?.safeCount ?? 5) > 1 ||
-        (model.runtimeConfiguration.executionPool?.sponsorCount ?? 5) > 1
-      "
-      @update:modelValue="
-        model.runtimeConfiguration.executionPool = $event
-          ? { safeCount: 5, sponsorCount: 5 }
-          : { safeCount: 1, sponsorCount: 1 }
-      "
-    />
-    <div>
-      <SetupField
-        guide="executionPools"
-        type="number"
-        label="Execution Safes per application"
-        :min="1"
-        :max="16"
-        :modelValue="model.runtimeConfiguration.executionPool?.safeCount ?? 5"
-        @update:modelValue="
-          model.runtimeConfiguration.executionPool = {
-            safeCount: Number($event),
-            sponsorCount:
-              model.runtimeConfiguration.executionPool?.sponsorCount ?? 5,
-          }
-        "
-        validation="required|number|between:1,16"
-      />
-      <SetupField
-        guide="executionPools"
-        type="number"
-        label="Gas sponsors per application"
-        :min="1"
-        :max="16"
-        :modelValue="
-          model.runtimeConfiguration.executionPool?.sponsorCount ?? 5
-        "
-        @update:modelValue="
-          model.runtimeConfiguration.executionPool = {
-            safeCount: model.runtimeConfiguration.executionPool?.safeCount ?? 5,
-            sponsorCount: Number($event),
-          }
-        "
-        validation="required|number|between:1,16"
-      />
-      <p>
-        Provision each pool member and fund the one application gas address.
-        User assignments remain stable; changing a deployed pool requires
-        migration review. All sponsors share one application gas allowance.
-      </p>
-    </div>
-    <template v-if="model.execution?.safeQueue">
-      <SetupField
-        guide="queueOverload"
-        type="number"
-        label="Maximum queued transactions per Safe"
-        :min="1"
-        :max="100"
-        :modelValue="model.execution.safeQueue.maxDepthPerSafe"
-        @update:modelValue="
-          model.execution.safeQueue.maxDepthPerSafe = Number($event)
-        "
-      />
-      <SetupField
-        guide="queueOverload"
-        type="number"
-        label="Queue validity in seconds"
-        :min="30"
-        :max="3600"
-        :modelValue="model.execution.safeQueue.maxWaitSeconds"
-        @update:modelValue="
-          model.execution.safeQueue.maxWaitSeconds = Number($event)
-        "
-      />
-      <SetupField
-        guide="queueOverload"
-        type="number"
-        label="Maximum queued transactions per user"
-        :min="1"
-        :max="100"
-        :modelValue="model.execution.safeQueue.maxDepthPerUser ?? 8"
-        @update:modelValue="
-          model.execution.safeQueue.maxDepthPerUser = Number($event)
-        "
-      />
-      <SetupField
-        guide="queueOverload"
-        type="number"
-        label="Maximum queued transactions per application"
-        :min="1"
-        :max="1000"
-        :modelValue="model.execution.safeQueue.maxDepthPerApplication ?? 128"
-        @update:modelValue="
-          model.execution.safeQueue.maxDepthPerApplication = Number($event)
-        "
-      />
-      <SetupField
-        guide="queueOverload"
-        type="number"
-        label="Maximum queued transactions across this service"
-        :min="1"
-        :max="10000"
-        :modelValue="model.execution.safeQueue.maxDepthTotal ?? 512"
-        @update:modelValue="
-          model.execution.safeQueue.maxDepthTotal = Number($event)
-        "
-      />
-    </template>
-  </div>
-  <template v-else-if="!model.safeWallet">
-    <ExecutionStep v-model="model" />
-    <ContractCallsStep v-model="model" />
-  </template>
   <h3>Enable wallet operations</h3>
   <p class="help-text">
     Leave this off for your first deployment. Complete wallet backend and
-    recovery tests, then record their report references below. Transfer signing
-    also requires tests of the exact token contract and signing settings.
+    recovery tests, then record their report references below. Test the Safe,
+    bundler, paymaster and configured application calls before activation.
   </p>
   <SetupField
     guide="activation"

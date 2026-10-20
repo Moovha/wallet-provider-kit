@@ -35,6 +35,8 @@ export function explainIssue(issue: string) {
   if (!issue.startsWith('/') || separator < 0) return issue;
   const path = issue.slice(0, separator);
   const reason = issue.slice(separator + 2);
+  if (path === '/safeWallet')
+    return 'Deployment — only per-user Safe accounts with the bundled bundler and application paymaster are supported. Reconcile retained legacy work before migrating an old export.';
   const area = issue.startsWith('/policy/provider')
     ? 'Provider'
     : /^\/identity\/(didit|sumsub)\/(importPrice|verificationPrice)(?:\/|$)/.test(

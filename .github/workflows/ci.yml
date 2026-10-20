@@ -42,37 +42,3 @@ jobs:
           name: release-candidate
           path: artifacts/
           retention-days: 14
-
-  provider-contract:
-    runs-on: ubuntu-latest
-    timeout-minutes: 40
-    env:
-      CARGO_INCREMENTAL: '0'
-      CARGO_PROFILE_DEV_DEBUG: '0'
-      CARGO_PROFILE_TEST_DEBUG: '0'
-      CARGO_BUILD_JOBS: '2'
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Prepare pinned provider source
-        run: |
-          git clone --depth 1 --branch v1.8.0 https://github.com/OpenZeppelin/openzeppelin-relayer.git /tmp/wpk-relayer
-          test "$(git -C /tmp/wpk-relayer rev-parse HEAD)" = b8cf360a49c5739e43491ca5d2f6bbc934b7438e
-          git -C /tmp/wpk-relayer apply --check "$GITHUB_WORKSPACE/docs/public/patches/openzeppelin-relayer-v1.8.0-fee-only.patch.txt"
-          git -C /tmp/wpk-relayer apply "$GITHUB_WORKSPACE/docs/public/patches/openzeppelin-relayer-v1.8.0-fee-only.patch.txt"
-          rustup toolchain install 1.95.0 --profile minimal --component rustfmt
-          sudo apt-get update
-          sudo apt-get install --yes libsodium-dev pkg-config
-      - name: Compile provider and run ordinary-mode EVM regression tests
-        working-directory: /tmp/wpk-relayer
-        run: |
-          cargo +1.95.0 fmt --check
-          cargo +1.95.0 check --locked --all-targets
-          cargo +1.95.0 test --locked --lib domain::transaction::evm::
-          cargo +1.95.0 test --locked --lib test_evm_tx_for_replacement
-      - name: Verify fee-only deployment contract without live providers
-        working-directory: /tmp/wpk-relayer
-        env:
-          WPK_FEE_ONLY_REPLACEMENTS: '1'
-        run: cargo +1.95.0 test --locked --lib test_wpk

@@ -147,6 +147,58 @@ const pending = () =>
 export class SafeWalletRuntime {
   private readonly locks = new Map<string, Promise<unknown>>();
   private readonly drivers = new Map<string, UserOperationWalletCallsDriver>();
+  private walletTimer?: ReturnType<typeof setTimeout>;
+  private walletWakeAt = Infinity;
+  private walletTick?: Promise<void>;
+  private readonly walletRuns = new Map<
+    UserOperationWalletCallsDriver,
+    Promise<void>
+  >();
+
+  /** Share the retained-batch snapshot; a stalled account never holds other accounts' workers. */
+  private async runWallets() {
+    const snapshot = await this.database.onboardingStore.transaction(
+      (state) => {
+        if (
+          state.deploymentBindings?.['service-v1']?.activeRevision !==
+          this.actions.revision
+        )
+          deny();
+        return Object.values(state.userOperationBatches ?? {});
+      },
+    );
+    for (const driver of this.drivers.values()) {
+      if (this.walletRuns.has(driver)) continue;
+      const running = driver
+        .runOnce(snapshot)
+        .catch(() => undefined)
+        .finally(() => {
+          if (this.walletRuns.get(driver) === running)
+            this.walletRuns.delete(driver);
+        });
+      this.walletRuns.set(driver, running);
+    }
+  }
+  private scheduleWallets(delay: number) {
+    if (this.stopped) return;
+    const at = Date.now() + delay;
+    if (this.walletTimer && this.walletWakeAt <= at) return;
+    clearTimeout(this.walletTimer);
+    this.walletWakeAt = at;
+    this.walletTimer = setTimeout(() => {
+      this.walletTimer = undefined;
+      if (this.stopped) return;
+      const running = this.runWallets();
+      this.walletTick = running;
+      void running
+        .catch(() => undefined)
+        .finally(() => {
+          if (this.walletTick === running) this.walletTick = undefined;
+          this.scheduleWallets(1000);
+        });
+    }, delay);
+    this.walletTimer.unref();
+  }
   private readonly fees = new Map<
     string,
     Promise<import('../execution/network-fees.js').NetworkFeeQuote>
@@ -1412,6 +1464,7 @@ export class SafeWalletRuntime {
         }
         return gas;
       },
+      (delay) => this.scheduleWallets(delay),
     );
     driver.subscribe((batchId) => {
       for (const listener of this.listeners) listener(batchId);
@@ -1488,10 +1541,12 @@ export class SafeWalletRuntime {
         (a) => a.status === 'ready',
       ),
     );
-    for (const wallet of wallets) {
-      await this.publishBundler(wallet.applicationId);
+    for (const applicationId of new Set(
+      wallets.map((wallet) => wallet.applicationId),
+    ))
+      await this.publishBundler(applicationId);
+    for (const wallet of wallets)
       await this.driver(wallet.applicationId, wallet.accountId);
-    }
     const tick = () => {
       if (this.stopped) return;
       this.timer = setTimeout(() => {
@@ -1517,6 +1572,9 @@ export class SafeWalletRuntime {
   async close() {
     this.stopped = true;
     clearTimeout(this.timer);
+    clearTimeout(this.walletTimer);
+    await this.walletTick;
+    await Promise.allSettled([...this.walletRuns.values()]);
     await this.replenishing;
     await Promise.all(
       [...this.drivers.values()].map((driver) => driver.stop()),

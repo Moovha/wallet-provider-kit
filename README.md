@@ -69,8 +69,8 @@ Keep the terminal open. The wizard is bundled; it needs no FormKit Pro subscript
 The package is experimental and not published to npm; a registry install by name
 is not available. See [getting started](docs/README.md) for installation help.
 
-The recommended bundle includes an OAuth application token service, the OWS wallet
-engine, SQLite and a saved Caddy automatic-HTTPS profile. The Safe-only wallet profile starts a private Alto bundler and durable Valkey queues alongside OWS. Each user receives one Safe address; an application-owned paymaster covers gas through one application funding address. Configure application RPCs, action policies and funding before provisioning. See [self-hosted sponsorship](docs/self-hosted-sponsorship.md). Existing services and custom adapters are optional paths. See [the bundled setup](docs/bundled-setup.md).
+The bundle includes an OAuth application token service, the OWS wallet
+engine, SQLite and a saved Caddy automatic-HTTPS configuration. The wallet service starts a private Alto bundler and durable Valkey queues alongside OWS. Each user receives one Safe address; an application-owned paymaster covers gas through one application funding address. Configure application RPCs, action policies and funding before provisioning. See [self-hosted sponsorship](docs/self-hosted-sponsorship.md). EOA, relayer and pool execution configurations cannot start this service. See [the bundled setup](docs/bundled-setup.md).
 After validation, choose **Set up and run locally**: review the plan, supply missing
 secrets privately and watch setup save files, build the Docker image, initialize
 new storage, diagnose and start the service. It uses the single-host container
@@ -87,9 +87,9 @@ Existing deployments are updated through the reviewed maintenance process.
 The [policy controls table](docs/application-access.md#configure-the-trust-policy)
 explains which access rules you can customize in the GUI and how they are enforced.
 
-![FormKit review and export screen using offline example settings](docs/public/screenshots/export.webp)
+![FormKit review and export screen using offline example settings](docs/public/screenshots/export-safe.png)
 
-[Open full-size screenshot](docs/public/screenshots/export.webp)
+[Open full-size screenshot](docs/public/screenshots/export-safe.png)
 
 _Example configuration only. Validation checks the configuration; it does not test
 vendor services or certify readiness. Initial activation remains disabled._
@@ -106,13 +106,11 @@ vendor services or certify readiness. Initial activation remains disabled._
    deployments follow the [deployment guide](docs/operator-deployment.md).
 4. **[Connect your product](docs/application-access.md):** read access policy,
    submit current identity and consent evidence, receive a grant, create the wallet
-   and revoke access when the user withdraws. Select the optional
-   [execution coordinator](docs/execution.md) for transfers or
-   [generic calls and optional operation adapters](docs/approved-contract-calls.md),
-   or use an accepted application submission rail. Optional
-   [Safe queues and sponsor pools](docs/safe-queue-and-sponsor-pools.md),
-   [stuck-transaction recovery](docs/stuck-transactions-and-recovery.md) and
-   [payer alerts and health](docs/payer-events-and-health.md) support operations.
+   and revoke access when the user withdraws. Register
+   [approved calls and optional operation adapters](docs/approved-contract-calls.md)
+   for the [Safe execution flow](docs/self-hosted-sponsorship.md).
+   [Execution latency and recovery](docs/execution-latency.md) explains account lanes,
+   verified status and expired uncertain operations.
    Applications arrange sponsor funding; verified chain status is separate from
    business settlement.
 
@@ -126,8 +124,10 @@ Optional [operator token controls](docs/operator-tokens.md) obtain and renew tok
 in that GUI using server-held secrets and an explicit operator allowlist.
 The wizard’s API reference preview sends no API calls; deployed requests have real effects and permission checks.
 
-The [getting-started guide](docs/README.md) links every stage. Supported profiles
-remain single-host, with selectable Base mainnet or Base Sepolia (EOA transfers and explicitly bound Safe 1.4.1 contract calls); production custody acceptance is pending.
+The [getting-started guide](docs/README.md) links every stage. The service uses
+per-user Safe 1.4.1 accounts, ERC-4337 bundling and application-owned paymasters
+on Base or Base Sepolia. Deployment remains single-host and production custody
+acceptance is pending. See [execution latency](docs/execution-latency.md).
 
 ## Who takes part
 

@@ -126,6 +126,31 @@ export class ConfigurationError extends Error {
   }
 }
 const validate = new Ajv({ allErrors: true, strict: true }).compile(schema);
+/** Reject retired execution configurations before opening storage or contacting a backend.
+ * Parsing an old export does not migrate its accounts, attempts or reservations.
+ */
+export function assertSafeWalletConfiguration(
+  config: ProviderConfiguration,
+): asserts config is ProviderConfiguration & {
+  safeWallet: import('../sponsorship/safe-wallet.js').SafeWalletConfiguration;
+  backend: Extract<ProviderConfiguration['backend'], { kind: 'ows' }>;
+} {
+  if (
+    !config.safeWallet ||
+    config.backend.kind !== 'ows' ||
+    config.financial ||
+    config.execution ||
+    config.localExecution ||
+    config.operations ||
+    config.runtimeConfiguration?.sharedApplicationSafes ||
+    config.runtimeConfiguration?.executionPool
+  ) {
+    throw new ConfigurationError([
+      '/safeWallet: only per-user Safe accounts with the bundled ERC-4337 bundler and application paymaster are supported; reconcile retained legacy work before migrating configuration',
+    ]);
+  }
+}
+
 /** Offline and side-effect free. Diagnostics never include configuration values or credentials. */
 export function validateProviderConfiguration(
   input: unknown,
@@ -619,14 +644,18 @@ export function validateProviderConfiguration(
   }
   return config;
 }
-export async function loadProviderConfiguration(path: string) {
+export async function loadProviderConfiguration(path: string): Promise<{
+  config: ProviderConfiguration;
+  directory: string;
+}> {
   try {
     const bytes = await readFile(path);
     if (bytes.length > 65536) throw new Error();
-    return {
-      config: validateProviderConfiguration(JSON.parse(bytes.toString('utf8'))),
-      directory: dirname(resolve(path)),
-    };
+    const config = validateProviderConfiguration(
+      JSON.parse(bytes.toString('utf8')),
+    );
+    assertSafeWalletConfiguration(config);
+    return { config, directory: dirname(resolve(path)) };
   } catch (error) {
     if (error instanceof ConfigurationError) throw error;
     throw new ConfigurationError([

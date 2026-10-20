@@ -132,30 +132,6 @@ try {
   );
   const executable = join(installed, 'dist/main.js');
   assert.match(
-    run(process.execPath, [executable, 'executor', 'init']),
-    /Execution service configuration created/,
-  );
-  assert.match(
-    run(process.execPath, [
-      executable,
-      'executor',
-      'validate',
-      '--config',
-      'executor.config.json',
-    ]),
-    /Execution service configuration valid/,
-  );
-  assert.match(
-    run(process.execPath, [
-      executable,
-      'executor',
-      'init-storage',
-      '--config',
-      'executor.config.json',
-    ]),
-    /Execution service storage initialized/,
-  );
-  assert.match(
     run(process.execPath, [executable, 'init']),
     /Configuration created/,
   );

@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { recoverAddress, Wallet } from 'ethers';
 import { generateDeploymentSecrets } from '../src/deployment/deployment-secrets.js';
-import { createConfiguredProvider } from '../src/deployment/provider.js';
+import { createLegacyProviderFixture as createConfiguredProvider } from './helpers/legacy-provider.js';
 import type { ProviderConfiguration } from '../src/deployment/config.js';
 import { openProviderDatabase } from '../src/storage/index.js';
 import { providerNetwork, type ProviderNetwork } from '../src/networks.js';

@@ -98,20 +98,38 @@ export function sqliteOnboardingStore(
           );
           previous.add(key);
         }
-        const originalAudit = connection.all(
-          'SELECT sequence FROM onboarding_audit ORDER BY sequence',
-        );
-        state.audit = new Array(originalAudit.length);
-        const auditEncoders = originalAudit.map((row, index) =>
-          lazyJson(state.audit, String(index), () => {
-            const record = connection.get(
-              'SELECT record FROM onboarding_audit WHERE sequence=?',
-              String(row.sequence),
+        let originalAudit: ReturnType<StorageConnection['all']> | undefined;
+        let auditEncoders: ReturnType<typeof lazyJson>[] = [];
+        let audit: ProviderState['audit'];
+        const loadAudit = () => {
+          if (!originalAudit) {
+            originalAudit = connection.all(
+              'SELECT sequence FROM onboarding_audit ORDER BY sequence',
             );
-            if (typeof record?.record !== 'string') throw new Error();
-            return record.record;
-          }),
-        );
+            audit = new Array(originalAudit.length);
+            auditEncoders = originalAudit.map((row, index) =>
+              lazyJson(audit, String(index), () => {
+                const record = connection.get(
+                  'SELECT record FROM onboarding_audit WHERE sequence=?',
+                  String(row.sequence),
+                );
+                if (typeof record?.record !== 'string') throw new Error();
+                return record.record;
+              }),
+            );
+          }
+          return audit;
+        };
+        const replaceAudit = (replacement: ProviderState['audit']) => {
+          loadAudit();
+          audit = replacement;
+        };
+        Object.defineProperty(state, 'audit', {
+          get: loadAudit,
+          set: replaceAudit,
+          enumerable: true,
+          configurable: true,
+        });
         const result = operation(state);
         if (result && typeof (result as { then?: unknown }).then === 'function')
           throw new Error();
@@ -124,18 +142,28 @@ export function sqliteOnboardingStore(
               key !== 'audit' &&
               !collections.includes(key as (typeof collections)[number]),
           ) ||
-          state.format !== 'moovha-onboarding-1' ||
-          !Array.isArray(state.audit) ||
-          state.audit.length < originalAudit.length ||
-          auditEncoders.some((cell) => {
-            if (cell.untouched(state.audit)) return false;
-            const current = cell.encode(state.audit),
-              original = cell.original();
-            return (
-              current !== original &&
-              current !== JSON.stringify(JSON.parse(original))
-            );
-          })
+          state.format !== 'moovha-onboarding-1'
+        )
+          throw new Error();
+        const auditDescriptor = Object.getOwnPropertyDescriptor(state, 'audit');
+        if (
+          auditDescriptor?.get !== loadAudit ||
+          auditDescriptor.set !== replaceAudit
+        )
+          loadAudit();
+        if (
+          originalAudit &&
+          (!Array.isArray(state.audit) ||
+            state.audit.length < originalAudit.length ||
+            auditEncoders.some((cell) => {
+              if (cell.untouched(state.audit)) return false;
+              const current = cell.encode(state.audit),
+                original = cell.original();
+              return (
+                current !== original &&
+                current !== JSON.stringify(JSON.parse(original))
+              );
+            }))
         )
           throw new Error();
         for (const collection of collections) {
@@ -171,7 +199,9 @@ export function sqliteOnboardingStore(
             id,
           );
         }
-        for (const event of state.audit.slice(originalAudit.length))
+        for (const event of originalAudit
+          ? state.audit.slice(originalAudit.length)
+          : [])
           connection.run(
             'INSERT INTO onboarding_audit(record) VALUES(?)',
             JSON.stringify(event),

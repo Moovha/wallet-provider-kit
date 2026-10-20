@@ -26,7 +26,7 @@ beforeEach(async () => {
   );
   example = JSON.parse(
     await readFile(
-      new URL('../docs/provider.config.hosted.example.json', import.meta.url),
+      new URL('../docs/provider.config.safe.example.json', import.meta.url),
       'utf8',
     ),
   );
@@ -52,7 +52,7 @@ describe('local operator setup boundary', () => {
     expect(
       (
         await app.inject({
-          url: '/%2e%2e/docs/provider.config.hosted.example.json',
+          url: '/%2e%2e/docs/provider.config.safe.example.json',
           headers,
         })
       ).statusCode,
@@ -138,7 +138,7 @@ describe('local operator setup boundary', () => {
     });
     expect(reply.statusCode).toBe(200);
     expect(reply.json().config).toEqual(example);
-    expect(reply.json().environment).toContain('PROVIDER_LOGIN_SECRET');
+    expect(reply.json().environment).toContain('OWS_OWNER_PASSPHRASE');
     expect(reply.json().acceptance).toBe('not_verified');
     expect(network).not.toHaveBeenCalled();
   });
@@ -172,7 +172,7 @@ describe('local operator setup boundary', () => {
         })
       ).statusCode,
     ).toBe(422);
-    example.ownerLogin.clientSecret = 'do-not-reflect-this-value';
+    example.backend.passphrase = 'do-not-reflect-this-value';
     const invalid = await app.inject({
       method: 'POST',
       url: '/api/validate',
@@ -221,8 +221,11 @@ describe('local operator setup boundary', () => {
   });
 });
 
-it('distinguishes valid configuration from usable new-user identity and financial paths', () => {
-  let config = validateProviderConfiguration(example);
+it('distinguishes valid configuration from usable new-user identity and financial paths', async () => {
+  const hosted = JSON.parse(
+    await readFile('docs/provider.config.hosted.example.json', 'utf8'),
+  );
+  let config = validateProviderConfiguration(hosted);
   expect(setupWarnings(config).join()).toContain(
     'new identity checks are unavailable',
   );

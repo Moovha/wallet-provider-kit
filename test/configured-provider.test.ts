@@ -43,7 +43,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { executionFixture } from './helpers/execution.js';
 import { fingerprint } from '../src/onboarding/policy.js';
 import { SupportedActions } from '../src/deployment/actions.js';
-import { createConfiguredProvider } from '../src/deployment/provider.js';
+import { createLegacyProviderFixture as createConfiguredProvider } from './helpers/legacy-provider.js';
 import {
   validateProviderConfiguration,
   type ProviderConfiguration,
@@ -653,7 +653,7 @@ describe('configuration convention and CLI', () => {
   });
 });
 
-describe('configured API and provider transfer authorization', () => {
+describe('legacy host authority and recovery regression fixtures', () => {
   it('composes the runtime registry with real JWT application/operator separation and live publication', async () => {
     const t = await fixture();
     t.config.runtimeConfiguration = {
@@ -1063,8 +1063,9 @@ describe('configured API and provider transfer authorization', () => {
     db.close();
     const discovery = (await f.app.inject('/v1/execution-capabilities')).json();
     expect(discovery.profiles[0]).toMatchObject({
-      configured: true,
-      ready: true,
+      id: 'safe-only-4337-v1',
+      configured: false,
+      ready: false,
       revision: '1',
       finality: 'finalized',
     });

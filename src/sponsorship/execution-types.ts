@@ -13,7 +13,13 @@ import type {
   VerifiedPrincipal,
 } from '../domain/principal.js';
 export interface UserOperationObservation {
-  state: 'pending' | 'included' | 'safe' | 'finalized' | 'reorged';
+  state: 'pending' | 'included' | 'safe' | 'finalized' | 'reorged' | 'expired';
+  expiry?: {
+    validUntil: string;
+    finalizedBlock: string;
+    blockHash: string;
+    blockTimestamp: string;
+  };
   receipt?: WalletCallsReceipt;
   actualGasCost?: string;
   actualGasUsed?: string;
@@ -38,6 +44,8 @@ export interface UserOperationExecution {
   observationRevision: number;
 }
 export interface UserOperationBatch {
+  lastFailure?: { code: string; at: string };
+  retryCount?: number;
   timings?: Record<string, string>;
   id: string;
   metadata: WalletCallsMetadata;

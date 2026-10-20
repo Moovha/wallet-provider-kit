@@ -177,8 +177,9 @@ onMounted(() => {
     <p>
       Setup checks Docker, Compose and the image builder on macOS or Linux. If
       tools are missing, install them here and continue automatically. The
-      bundled OWS engine, CDP and existing Relayer services are supported. The
-      first image build needs network access and may take several minutes.
+      bundled OWS engine, private bundler and application paymaster support Safe
+      wallets. The first image build needs network access and may take several
+      minutes.
     </p>
     <p>
       Wallet operations must stay disabled. This creates a new isolated

@@ -226,7 +226,7 @@ export async function setupCommand(args: string[]): Promise<boolean> {
     const example: ProviderConfiguration = JSON.parse(
       await readFile(
         new URL(
-          '../../docs/provider.config.bundled.example.json',
+          '../../docs/provider.config.safe.example.json',
           import.meta.url,
         ),
         'utf8',
