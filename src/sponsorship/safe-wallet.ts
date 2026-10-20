@@ -1,4 +1,8 @@
 import {
+  applyEstimatedUserOperationGas,
+  readUserOperationGasEstimate,
+} from './estimated-gas.js';
+import {
   atomicSafeInitializer,
   safeModuleSetup,
 } from '../provisioning/atomic-safe.js';
@@ -96,6 +100,12 @@ export interface SafeWalletAccount {
   status: 'prepared' | 'ready';
   initialization?: { profile: 'atomic-4337-v1'; initializer: string };
 }
+interface SetupPreparation {
+  fees: import('../execution/network-fees.js').NetworkFeeQuote;
+  estimate: unknown;
+  balance: unknown;
+  pendingNonce: unknown;
+}
 interface SetupTransaction {
   id: string;
   request: import('../domain/attempt-journal.js').WalletAttemptRequest;
@@ -109,6 +119,7 @@ interface SetupTransaction {
   maximumCostWei: string;
   included?: boolean;
   settled?: boolean;
+  submitted?: boolean;
 }
 export interface SafeWalletInfrastructure {
   applicationId: string;
@@ -216,14 +227,14 @@ export class SafeWalletRuntime {
   private replenishing?: Promise<void>;
   private preparing = 0;
   private readonly waiting: (() => void)[] = [];
-  private async prepare(work: () => Promise<void>) {
+  private async prepare<T>(work: () => Promise<T>): Promise<T> {
     if (this.preparing >= 10) {
       if (this.waiting.length >= 100)
         throw new WalletProviderError('wallet_provider_unavailable');
       await new Promise<void>((resolve) => this.waiting.push(resolve));
     } else this.preparing++;
     try {
-      await work();
+      return await work();
     } finally {
       const next = this.waiting.shift();
       if (next) next();
@@ -531,11 +542,12 @@ export class SafeWalletRuntime {
       };
     });
   }
-  private async send(
+  private async dispatchSetup(
     applicationId: string,
     purpose: string,
     transaction: { to?: string; data?: string; value: string },
     beforeEffect?: () => Promise<void>,
+    prepared?: SetupPreparation,
   ) {
     await this.agreement(applicationId);
     const reader = await this.reader(applicationId),
@@ -548,18 +560,8 @@ export class SafeWalletRuntime {
       const wallet = new Wallet(this.cipher.open(infra.fundingKey));
       if (wallet.address.toLowerCase() !== infra.fundingAddress.toLowerCase())
         deny();
-      const base = {
-        from: wallet.address,
-        ...(transaction.to ? { to: transaction.to } : {}),
-        data: transaction.data ?? '0x',
-        value: toQuantity(BigInt(transaction.value)),
-      };
-      const [fees, estimate, balance, pendingNonce] = await Promise.all([
-        this.networkFees(applicationId),
-        this.infrastructureRpc(applicationId, 'eth_estimateGas', [base]),
-        reader.call('eth_getBalance', [wallet.address, 'pending']),
-        reader.call('eth_getTransactionCount', [wallet.address, 'pending']),
-      ]);
+      if (!prepared) throw pending();
+      const { fees, estimate, balance, pendingNonce } = prepared;
       const gas = (BigInt(String(estimate)) * 12n) / 10n;
       const reserved =
         gas * BigInt(fees.maxFeePerGas) +
@@ -574,10 +576,31 @@ export class SafeWalletRuntime {
         BigInt(this.config.safeWallet!.maximumSetupCostWei)
       )
         deny();
-      if (BigInt(String(balance)) < reserved)
+      const inflight = infra.transactions.filter((t) => !t.included);
+      const limit = agreement.maximum_in_flight_per_sponsor ?? 10;
+      if (
+        inflight.length >= limit ||
+        inflight.some((t) => !t.submitted || !t.hash || !t.raw)
+      )
+        throw pending();
+      const held = inflight.reduce(
+        (sum, t) => sum + BigInt(t.maximumCostWei),
+        0n,
+      );
+      if (BigInt(String(balance)) < held + reserved)
         throw new WalletProviderError('wallet_provider_unavailable');
-      const nonce = Number(BigInt(String(pendingNonce)));
-      if (infra.transactions.some((t) => !t.included)) throw pending();
+      const observed = BigInt(String(pendingNonce));
+      const tail = infra.transactions.reduce(
+        (n, t) => Math.max(n, t.nonce + 1),
+        0,
+      );
+      if (
+        observed < 0n ||
+        observed > BigInt(Number.MAX_SAFE_INTEGER) ||
+        !Number.isSafeInteger(tail)
+      )
+        deny();
+      const nonce = Math.max(Number(observed), tail);
       const unsigned = {
         ...transaction,
         value: transaction.value,
@@ -616,7 +639,10 @@ export class SafeWalletRuntime {
         const current = r.safeWalletInfrastructure![applicationId];
         if (
           current.transactions.some(
-            (t) => t.purpose === purpose || !t.included || t.nonce === nonce,
+            (t) =>
+              t.purpose === purpose ||
+              t.nonce >= nonce ||
+              (!t.included && (!t.submitted || !t.hash || !t.raw)),
           )
         )
           deny();
@@ -629,6 +655,23 @@ export class SafeWalletRuntime {
           BigInt(this.config.safeWallet!.maximumSetupCostWei)
         )
           deny();
+        const pendingTransactions = current.transactions.filter(
+          (t) => !t.included,
+        );
+        if (
+          pendingTransactions.length >=
+          (agreement.maximum_in_flight_per_sponsor ?? 10)
+        )
+          throw pending();
+        if (
+          pendingTransactions.reduce(
+            (sum, t) => sum + BigInt(t.maximumCostWei),
+            0n,
+          ) +
+            reserved >
+          BigInt(String(balance))
+        )
+          throw new WalletProviderError('wallet_provider_unavailable');
         current.transactions.push(retained!);
       });
     }
@@ -683,33 +726,98 @@ export class SafeWalletRuntime {
       });
     }
     if (keccak256(this.cipher.open(saved.raw)) !== saved.hash) deny();
+    if (
+      !newlySigned &&
+      (await this.observeSetup(applicationId, saved, reader, claim))
+    )
+      return { saved, claim, included: true };
+    await this.agreement(applicationId);
+    await beforeEffect?.();
+    try {
+      const hash = await this.infrastructureRpc(
+        applicationId,
+        'eth_sendRawTransaction',
+        [this.cipher.open(saved.raw)],
+      );
+      if (hash !== saved.hash) throw pending();
+      await this.markSubmitted(applicationId, saved);
+    } catch {
+      // A lost acknowledgement retains the original hash and blocks later nonce admission.
+    }
+    return { saved, claim, included: false };
+  }
+
+  private async markSubmitted(applicationId: string, saved: SetupTransaction) {
+    await this.transaction((r) => {
+      const current =
+        r.safeWalletInfrastructure![applicationId].transactions.find(
+          (t) => t.id === saved.id,
+        ) ?? deny();
+      if (
+        current.hash !== saved.hash ||
+        current.request.requestHash !== saved.request.requestHash
+      )
+        deny();
+      current.submitted = true;
+    });
+  }
+
+  private async send(
+    applicationId: string,
+    purpose: string,
+    transaction: { to?: string; data?: string; value: string },
+    beforeEffect?: () => Promise<void>,
+  ) {
+    const reader = await this.reader(applicationId);
+    const infrastructure = await this.current(applicationId);
+    let prepared: SetupPreparation | undefined;
+    if (!infrastructure.transactions.some((t) => t.purpose === purpose)) {
+      const wallet = new Wallet(this.cipher.open(infrastructure.fundingKey));
+      if (
+        wallet.address.toLowerCase() !==
+        infrastructure.fundingAddress.toLowerCase()
+      )
+        deny();
+      const base = {
+        from: wallet.address,
+        ...(transaction.to ? { to: transaction.to } : {}),
+        data: transaction.data ?? '0x',
+        value: toQuantity(BigInt(transaction.value)),
+      };
+      const [fees, estimate, balance, pendingNonce] = await Promise.all([
+        this.networkFees(applicationId),
+        this.infrastructureRpc(applicationId, 'eth_estimateGas', [base]),
+        reader.call('eth_getBalance', [wallet.address, 'pending']),
+        reader.call('eth_getTransactionCount', [wallet.address, 'pending']),
+      ]);
+      prepared = { fees, estimate, balance, pendingNonce };
+    }
+    const { saved, claim, included } = await this.exclusive(
+      'funding:' + applicationId,
+      async () => {
+        const current = await this.current(applicationId);
+        if (current.transactions.some((t) => !t.included && !t.submitted))
+          await this.recoverSetup(applicationId);
+        return this.dispatchSetup(
+          applicationId,
+          purpose,
+          transaction,
+          beforeEffect,
+          prepared,
+        );
+      },
+    );
+    if (included) return saved;
     for (let attempt = 0; attempt < 60; attempt++) {
-      if (attempt > 0 || !newlySigned) {
-        try {
-          if (await this.observeSetup(applicationId, saved, reader, claim))
-            return saved;
-        } catch (error) {
-          if (
-            !(error instanceof WalletProviderError) ||
-            error.code !== 'wallet_provider_unavailable'
-          )
-            throw error;
-          // Observation failures retain the exact signed payload and its reservation.
-        }
-      }
-      if (attempt === 0) {
-        await this.agreement(applicationId);
-        await beforeEffect?.();
-        try {
-          const result = await this.infrastructureRpc(
-            applicationId,
-            'eth_sendRawTransaction',
-            [this.cipher.open(saved.raw!)],
-          );
-          if (result !== saved.hash) throw pending();
-        } catch {
-          /* The exact signed transaction remains the only recovery candidate. */
-        }
+      try {
+        if (await this.observeSetup(applicationId, saved, reader, claim))
+          return saved;
+      } catch (error) {
+        if (
+          !(error instanceof WalletProviderError) ||
+          error.code !== 'wallet_provider_unavailable'
+        )
+          throw error;
       }
       await new Promise((resolve) => setTimeout(resolve, 500));
     }
@@ -815,12 +923,25 @@ export class SafeWalletRuntime {
         continue;
       }
       try {
-        await this.observeSetup(
+        const included = await this.observeSetup(
           applicationId,
           saved,
           reader,
           claim ?? undefined,
         );
+        if (!included && !saved.submitted && saved.raw) {
+          const found = (await reader.call('eth_getTransactionByHash', [
+            saved.hash,
+          ])) as { hash?: string; from?: string; nonce?: string } | null;
+          const exact = Transaction.from(this.cipher.open(saved.raw));
+          if (
+            found &&
+            found.hash === saved.hash &&
+            found.from?.toLowerCase() === exact.from?.toLowerCase() &&
+            BigInt(found.nonce ?? '-1') === BigInt(exact.nonce)
+          )
+            await this.markSubmitted(applicationId, saved);
+        }
       } catch (error) {
         if (
           !(error instanceof WalletProviderError) ||
@@ -927,7 +1048,7 @@ export class SafeWalletRuntime {
       context.principal.clientId,
     );
     await this.agreement(applicationId);
-    return this.exclusive(applicationId, async () => {
+    const work = async () => {
       const authority = async () =>
         this.onboarding.withAccountAccess(
           context.principal,
@@ -1173,7 +1294,10 @@ export class SafeWalletRuntime {
       await this.publishBundler(applicationId);
 
       return { account_id: accountId, address: wallet.binding.address };
-    });
+    };
+    return this.prepare(() =>
+      this.exclusive('provision:' + applicationId + ':' + accountId, work),
+    );
   }
   private async configureAccount(
     applicationId: string,
@@ -1337,6 +1461,11 @@ export class SafeWalletRuntime {
     }
   }
   private async publishBundler(applicationId: string) {
+    return this.exclusive('publication:' + applicationId, () =>
+      this.writeBundler(applicationId),
+    );
+  }
+  private async writeBundler(applicationId: string) {
     const infrastructure = await this.current(applicationId),
       urls = await this.resources.rpcEndpoints(applicationId);
     if (!infrastructure.paymaster) deny();
@@ -1559,31 +1688,23 @@ export class SafeWalletRuntime {
           }),
           signal: AbortSignal.timeout(15000),
         });
-        const body = (await response.json()) as {
-          id: string;
-          error?: unknown;
-          result?: Record<string, string>;
-        };
-        if (!response.ok || body.id !== id || body.error || !body.result)
-          throw new WalletProviderError('wallet_provider_unavailable');
-        const gas = { ...operation };
-        for (const field of [
-          'callGasLimit',
-          'verificationGasLimit',
-          'preVerificationGas',
-        ] as const) {
-          const value = body.result[field];
-          if (
-            typeof value !== 'string' ||
-            !/^0x[0-9a-f]+$/.test(value) ||
-            BigInt(value) <= 0n
-          )
-            deny();
-          const bounded = (BigInt(value) * 12n + 9n) / 10n;
-          if (bounded > BigInt(this.configGas()[field])) deny();
-          gas[field] = toQuantity(bounded);
-        }
-        return gas;
+        const estimate = readUserOperationGasEstimate(
+          response.ok,
+          await response.json(),
+          id,
+        );
+        const accepted = await this.agreement(applicationId);
+        const ceilings = this.configGas();
+        if (accepted.gas_limits)
+          ceilings.callGasLimit = toQuantity(
+            BigInt(accepted.gas_limits.gas_limit),
+          );
+        return applyEstimatedUserOperationGas(
+          operation,
+          estimate,
+          ceilings,
+          accepted.gas_limits?.gas_limit,
+        );
       },
       (delay) => this.scheduleWallets(delay),
     );

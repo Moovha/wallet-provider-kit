@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Pipeline concurrent Safe provisioning through durable funding nonces after broadcast acknowledgement, with bounded preparation, aggregate reservations and recovery for lost acknowledgements.
+- Add atomic ERC-4626 redemption, exact-input swaps and destination deposits using actual amounts, bounded quotes and proportional slippage floors.
+- Add code-hash-approved Uniswap v3/v4 and Aerodrome Slipstream/classic adapters, mixed DEX routes and route builders without a fixed hop-count cap. Existing calldata, gas and sponsorship ceilings remain enforced.
+- Preserve structured EVM revert responses and terminate correlated pre-admission bundler execution failures without reserving a Safe nonce.
+
 - Keep one execution path: a user Safe, private ERC-4337 v0.7 bundler and verifying paymaster.
 - Remove alternate account implementations, execution services, profile configuration, adapter exports, tests and operator guides.
 - Require the Safe configuration and initialize SQLite schema version 2. Unsupported configurations and database formats fail closed; no compatibility conversion is provided.

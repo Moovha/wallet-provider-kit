@@ -1996,6 +1996,15 @@ Import from `@moovha/wallet-provider-kit/deployment`. [Integration guide](setup.
 - [ApprovedCallPolicy](#approvedcallpolicy)
 - [ApprovedCallsConfiguration](#approvedcallsconfiguration)
 - [ApprovedContractCall](#approvedcontractcall)
+- [AtomicDexStep](#atomicdexstep)
+- [atomicSwapMinimum](#atomicswapminimum)
+- [atomicSwapQuote](#atomicswapquote)
+- [AtomicSwapQuote](#atomicswapquote)
+- [AtomicSwapRequest](#atomicswaprequest)
+- [AtomicV4Pool](#atomicv4pool)
+- [atomicVaultSwapAbi](#atomicvaultswapabi)
+- [atomicVaultSwapCalls](#atomicvaultswapcalls)
+- [atomicVaultSwapCreationCode](#atomicvaultswapcreationcode)
 - [buildApprovedCallIntent](#buildapprovedcallintent)
 - [BundledAuthorizationConfiguration](#bundledauthorizationconfiguration)
 - [CompiledOperationAdapter](#compiledoperationadapter)
@@ -2004,6 +2013,14 @@ Import from `@moovha/wallet-provider-kit/deployment`. [Integration guide](setup.
 - [createConfiguredProvider](#createconfiguredprovider)
 - [createWalletCallsProvider](#createwalletcallsprovider)
 - [defaultSafeProvisioning](#defaultsafeprovisioning)
+- [dexAdapterArtifacts](#dexadapterartifacts)
+- [encodeAerodromeAdapterData](#encodeaerodromeadapterdata)
+- [encodeDexSwapRoute](#encodedexswaproute)
+- [encodeSlipstreamAdapterData](#encodeslipstreamadapterdata)
+- [encodeV3AdapterData](#encodev3adapterdata)
+- [encodeV3SwapPath](#encodev3swappath)
+- [encodeV4AdapterData](#encodev4adapterdata)
+- [encodeV4SwapPath](#encodev4swappath)
 - [loadProviderConfiguration](#loadproviderconfiguration)
 - [OperationAdapters](#operationadapters)
 - [OperationAdapterTerms](#operationadapterterms)
@@ -2181,6 +2198,127 @@ export interface ApprovedContractCall {
 }
 ```
 
+### AtomicDexStep
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/atomic-vault-swap.ts).
+
+```ts
+export interface AtomicDexStep {
+  adapter: string;
+  tokenOut: string;
+  data: string;
+}
+```
+
+### atomicSwapMinimum
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/atomic-vault-swap.ts).
+
+```ts
+/** Round the minimum received upward, using integer token units and the actual intermediate amount. */
+export declare function atomicSwapMinimum(
+  quotedOutput: bigint,
+  actualBasis: bigint,
+  quotedBasis: bigint,
+  slippageBps: number,
+): bigint;
+```
+
+### atomicSwapQuote
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/atomic-vault-swap.ts).
+
+```ts
+/** Quote anchors must come from one consistent application quote snapshot, including vault previews. */
+export declare function atomicSwapQuote(input: {
+  assetsIn: bigint;
+  assetsOut: bigint;
+  amountOut: bigint;
+  slippageBps?: number;
+  quotedAt?: bigint;
+  ttlSeconds?: number;
+}): AtomicSwapQuote;
+```
+
+### AtomicSwapQuote
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/atomic-vault-swap.ts).
+
+```ts
+export interface AtomicSwapQuote {
+  assetsIn: bigint;
+  assetsOut: bigint;
+  amountOut: bigint;
+  quotedAt: bigint;
+  deadline: bigint;
+  slippageBps: number;
+}
+```
+
+### AtomicSwapRequest
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/atomic-vault-swap.ts).
+
+```ts
+export interface AtomicSwapRequest {
+  tokenIn: string;
+  tokenOut: string;
+  sourceVault?: string;
+  destinationVault?: string;
+  amount: bigint;
+  protocol: 3 | 4 | 5;
+  path: string;
+  quote: AtomicSwapQuote;
+}
+```
+
+### AtomicV4Pool
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/atomic-vault-swap.ts).
+
+```ts
+export interface AtomicV4Pool {
+  currency0: string;
+  currency1: string;
+  fee: number;
+  tickSpacing: number;
+  hooks?: string;
+}
+```
+
+### atomicVaultSwapAbi
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/atomic-vault-swap.generated.ts).
+
+```ts
+export declare const atomicVaultSwapAbi: InterfaceAbi;
+```
+
+### atomicVaultSwapCalls
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/atomic-vault-swap.ts).
+
+```ts
+/** Four exact wallet calls; provider policy, current authority and on-chain quote bounds remain authoritative. */
+export declare function atomicVaultSwapCalls(
+  input: AtomicSwapRequest & {
+    helper: string;
+  },
+): {
+  to: string;
+  data: string;
+  value: '0x0';
+}[];
+```
+
+### atomicVaultSwapCreationCode
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/atomic-vault-swap.generated.ts).
+
+```ts
+export declare const atomicVaultSwapCreationCode: string;
+```
+
 ### buildApprovedCallIntent
 
 [Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/approved-calls.ts).
@@ -2301,6 +2439,88 @@ export declare function createWalletCallsProvider(
 ```ts
 /** Safe 1.4.1 canonical deployments from safe-deployments v1.37.40 and safe-contracts 1.4.1. Runtime code is checked through both RPCs before deployment. */
 export declare function defaultSafeProvisioning(): SafeProvisioningConfiguration;
+```
+
+### dexAdapterArtifacts
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/atomic-vault-swap.generated.ts).
+
+```ts
+export declare const dexAdapterArtifacts: Record<
+  | 'UniswapV3DexAdapter'
+  | 'UniswapV4DexAdapter'
+  | 'AerodromeSlipstreamDexAdapter'
+  | 'AerodromeClassicDexAdapter',
+  {
+    abi: InterfaceAbi;
+    creationCode: string;
+  }
+>;
+```
+
+### encodeAerodromeAdapterData
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/atomic-vault-swap.ts).
+
+```ts
+export declare function encodeAerodromeAdapterData(
+  stable: boolean,
+  factory: string,
+): string;
+```
+
+### encodeDexSwapRoute
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/atomic-vault-swap.ts).
+
+```ts
+/** Ordered approved-adapter calls. Each step receives the full actual output of its predecessor. */
+export declare function encodeDexSwapRoute(steps: AtomicDexStep[]): string;
+```
+
+### encodeSlipstreamAdapterData
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/atomic-vault-swap.ts).
+
+```ts
+export declare function encodeSlipstreamAdapterData(
+  tickSpacing: number,
+): string;
+```
+
+### encodeV3AdapterData
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/atomic-vault-swap.ts).
+
+```ts
+export declare function encodeV3AdapterData(fee: number): string;
+```
+
+### encodeV3SwapPath
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/atomic-vault-swap.ts).
+
+```ts
+export declare function encodeV3SwapPath(
+  tokens: string[],
+  fees: number[],
+): string;
+```
+
+### encodeV4AdapterData
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/atomic-vault-swap.ts).
+
+```ts
+export declare function encodeV4AdapterData(pool: AtomicV4Pool): string;
+```
+
+### encodeV4SwapPath
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/atomic-vault-swap.ts).
+
+```ts
+export declare function encodeV4SwapPath(pools: AtomicV4Pool[]): string;
 ```
 
 ### loadProviderConfiguration
@@ -2893,11 +3113,149 @@ export interface WalletCallsStatus {
 
 Import from `@moovha/wallet-provider-kit/wallet-calls`. [Integration guide](wallet-calls.md).
 
+- [AtomicDexStep](#atomicdexstep)
+- [atomicSwapMinimum](#atomicswapminimum)
+- [atomicSwapQuote](#atomicswapquote)
+- [AtomicSwapQuote](#atomicswapquote)
+- [AtomicSwapRequest](#atomicswaprequest)
+- [AtomicV4Pool](#atomicv4pool)
+- [atomicVaultSwapAbi](#atomicvaultswapabi)
+- [atomicVaultSwapCalls](#atomicvaultswapcalls)
+- [atomicVaultSwapCreationCode](#atomicvaultswapcreationcode)
 - [createWalletCallsProvider](#createwalletcallsprovider)
+- [dexAdapterArtifacts](#dexadapterartifacts)
+- [encodeAerodromeAdapterData](#encodeaerodromeadapterdata)
+- [encodeDexSwapRoute](#encodedexswaproute)
+- [encodeSlipstreamAdapterData](#encodeslipstreamadapterdata)
+- [encodeV3AdapterData](#encodev3adapterdata)
+- [encodeV3SwapPath](#encodev3swappath)
+- [encodeV4AdapterData](#encodev4adapterdata)
+- [encodeV4SwapPath](#encodev4swappath)
 - [WalletCallsClientOptions](#walletcallsclientoptions)
 - [WalletCallsReceipt](#walletcallsreceipt)
 - [WalletCallsRpcError](#walletcallsrpcerror)
 - [WalletCallsStatus](#walletcallsstatus)
+
+### AtomicDexStep
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/atomic-vault-swap.ts).
+
+```ts
+export interface AtomicDexStep {
+  adapter: string;
+  tokenOut: string;
+  data: string;
+}
+```
+
+### atomicSwapMinimum
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/atomic-vault-swap.ts).
+
+```ts
+/** Round the minimum received upward, using integer token units and the actual intermediate amount. */
+export declare function atomicSwapMinimum(
+  quotedOutput: bigint,
+  actualBasis: bigint,
+  quotedBasis: bigint,
+  slippageBps: number,
+): bigint;
+```
+
+### atomicSwapQuote
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/atomic-vault-swap.ts).
+
+```ts
+/** Quote anchors must come from one consistent application quote snapshot, including vault previews. */
+export declare function atomicSwapQuote(input: {
+  assetsIn: bigint;
+  assetsOut: bigint;
+  amountOut: bigint;
+  slippageBps?: number;
+  quotedAt?: bigint;
+  ttlSeconds?: number;
+}): AtomicSwapQuote;
+```
+
+### AtomicSwapQuote
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/atomic-vault-swap.ts).
+
+```ts
+export interface AtomicSwapQuote {
+  assetsIn: bigint;
+  assetsOut: bigint;
+  amountOut: bigint;
+  quotedAt: bigint;
+  deadline: bigint;
+  slippageBps: number;
+}
+```
+
+### AtomicSwapRequest
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/atomic-vault-swap.ts).
+
+```ts
+export interface AtomicSwapRequest {
+  tokenIn: string;
+  tokenOut: string;
+  sourceVault?: string;
+  destinationVault?: string;
+  amount: bigint;
+  protocol: 3 | 4 | 5;
+  path: string;
+  quote: AtomicSwapQuote;
+}
+```
+
+### AtomicV4Pool
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/atomic-vault-swap.ts).
+
+```ts
+export interface AtomicV4Pool {
+  currency0: string;
+  currency1: string;
+  fee: number;
+  tickSpacing: number;
+  hooks?: string;
+}
+```
+
+### atomicVaultSwapAbi
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/atomic-vault-swap.generated.ts).
+
+```ts
+export declare const atomicVaultSwapAbi: InterfaceAbi;
+```
+
+### atomicVaultSwapCalls
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/atomic-vault-swap.ts).
+
+```ts
+/** Four exact wallet calls; provider policy, current authority and on-chain quote bounds remain authoritative. */
+export declare function atomicVaultSwapCalls(
+  input: AtomicSwapRequest & {
+    helper: string;
+  },
+): {
+  to: string;
+  data: string;
+  value: '0x0';
+}[];
+```
+
+### atomicVaultSwapCreationCode
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/atomic-vault-swap.generated.ts).
+
+```ts
+export declare const atomicVaultSwapCreationCode: string;
+```
 
 ### createWalletCallsProvider
 
@@ -2917,6 +3275,88 @@ export declare function createWalletCallsProvider(
     signal?: AbortSignal,
   ) => AsyncGenerator<WalletCallsStatus>;
 };
+```
+
+### dexAdapterArtifacts
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/atomic-vault-swap.generated.ts).
+
+```ts
+export declare const dexAdapterArtifacts: Record<
+  | 'UniswapV3DexAdapter'
+  | 'UniswapV4DexAdapter'
+  | 'AerodromeSlipstreamDexAdapter'
+  | 'AerodromeClassicDexAdapter',
+  {
+    abi: InterfaceAbi;
+    creationCode: string;
+  }
+>;
+```
+
+### encodeAerodromeAdapterData
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/atomic-vault-swap.ts).
+
+```ts
+export declare function encodeAerodromeAdapterData(
+  stable: boolean,
+  factory: string,
+): string;
+```
+
+### encodeDexSwapRoute
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/atomic-vault-swap.ts).
+
+```ts
+/** Ordered approved-adapter calls. Each step receives the full actual output of its predecessor. */
+export declare function encodeDexSwapRoute(steps: AtomicDexStep[]): string;
+```
+
+### encodeSlipstreamAdapterData
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/atomic-vault-swap.ts).
+
+```ts
+export declare function encodeSlipstreamAdapterData(
+  tickSpacing: number,
+): string;
+```
+
+### encodeV3AdapterData
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/atomic-vault-swap.ts).
+
+```ts
+export declare function encodeV3AdapterData(fee: number): string;
+```
+
+### encodeV3SwapPath
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/atomic-vault-swap.ts).
+
+```ts
+export declare function encodeV3SwapPath(
+  tokens: string[],
+  fees: number[],
+): string;
+```
+
+### encodeV4AdapterData
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/atomic-vault-swap.ts).
+
+```ts
+export declare function encodeV4AdapterData(pool: AtomicV4Pool): string;
+```
+
+### encodeV4SwapPath
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/atomic-vault-swap.ts).
+
+```ts
+export declare function encodeV4SwapPath(pools: AtomicV4Pool[]): string;
 ```
 
 ### WalletCallsClientOptions
