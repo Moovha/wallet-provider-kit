@@ -40,6 +40,7 @@ try {
   assert.ok(paths.includes('contracts/AtomicVaultSwap.sol'));
   assert.ok(paths.includes('contracts/DexAdapters.sol'));
   assert.ok(paths.includes('contracts/vendor/Math.sol'));
+  assert.ok(paths.includes('contracts/vendor/README.md'));
   assert.ok(paths.includes('dist/service/documentation-token-ui.mjs'));
   assert.ok(paths.includes('examples/inspect-api.mjs'));
   assert.ok(paths.includes('spec/provider-config.schema.json'));
@@ -67,7 +68,7 @@ try {
   for (const path of paths) {
     assert.match(
       path,
-      /^(dist\/|spec\/|docs\/|examples\/|contracts\/(AtomicVaultSwap|DexAdapters|vendor\/Math)\.sol$|[^/]+$)/,
+      /^(dist\/|spec\/|docs\/|examples\/|contracts\/((AtomicVaultSwap|DexAdapters|vendor\/Math)\.sol|vendor\/README\.md)$|[^/]+$)/,
     );
     assert.doesNotMatch(
       path,
