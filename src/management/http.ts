@@ -302,6 +302,10 @@ export async function registerManagementRoutes(
       name?: string;
       enabled?: boolean;
       trust_agreement?: string | null;
+      wallet_sharing?: Omit<
+        import('../onboarding/types.js').WalletSharingPolicy,
+        'revision'
+      > | null;
       permissions?: (
         'account:read' | 'contracts:request' | 'operations:request'
       )[];
@@ -330,6 +334,29 @@ export async function registerManagementRoutes(
             anyOf: [
               { type: 'string', minLength: 1, maxLength: 256 },
               { type: 'null' },
+            ],
+          },
+          wallet_sharing: {
+            description:
+              'Allow selected applications to request these wallets under a reviewed identity-and-consent sharing agreement. Null disables sharing and ends dependent approvals. Each requester needs its own consent and permissions.',
+            anyOf: [
+              { type: 'null' },
+              body(['applications', 'matchingFields', 'agreement'], {
+                applications: {
+                  type: 'array',
+                  minItems: 1,
+                  maxItems: 99,
+                  uniqueItems: true,
+                  items: { type: 'string', maxLength: 256 },
+                },
+                matchingFields: {
+                  ...checkFields.required_fields,
+                  minItems: 3,
+                  description:
+                    'All fields must match exactly. Include identity_number, document_type and issuing_country; each must also be required under User checks.',
+                },
+                agreement: { type: 'string', minLength: 1, maxLength: 256 },
+              }),
             ],
           },
           permissions: {

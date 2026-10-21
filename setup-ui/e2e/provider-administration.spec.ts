@@ -96,6 +96,12 @@ test('claims, registers and manages applications through the real protected mana
     await page
       .getByRole('checkbox', { name: 'Given name', exact: true })
       .check();
+    for (const name of [
+      'ID number',
+      'Document type',
+      'Document issuing country',
+    ])
+      await page.getByRole('checkbox', { name, exact: true }).check();
     await page
       .getByLabel('How recently must identity have been checked? (days)')
       .fill('30');
@@ -110,7 +116,10 @@ test('claims, registers and manages applications through the real protected mana
     );
     expect(service.currentUserChecks()?.required_fields).toEqual([
       'country',
+      'document_type',
       'given_name',
+      'identity_number',
+      'issuing_country',
     ]);
     await page.reload();
     await page.getByLabel('Username or access ID').fill('offline-admin');
@@ -163,7 +172,7 @@ test('claims, registers and manages applications through the real protected mana
       page.getByRole('heading', { name: 'Offline application' }),
     ).toBeVisible();
     await page
-      .getByLabel('Agreement reference')
+      .getByLabel('Agreement reference', { exact: true })
       .fill('Offline trust agreement');
     await page.getByRole('button', { name: 'Save access settings' }).click();
     await expect(
@@ -177,6 +186,87 @@ test('claims, registers and manages applications through the real protected mana
     ).toBeVisible();
     await page.screenshot({
       path: 'artifacts/provider-installation/administration.png',
+      fullPage: true,
+    });
+    await page
+      .getByRole('button', { name: 'Resume connection', exact: true })
+      .click();
+    await page
+      .getByLabel('Application name', { exact: true })
+      .fill('Second application');
+    await page
+      .getByRole('button', { name: 'Add application', exact: true })
+      .click();
+    await page
+      .getByRole('button', { name: 'I’ve saved these details' })
+      .click();
+    const second = page.locator('#application-list article').filter({
+      has: page.getByRole('heading', {
+        name: 'Second application',
+        exact: true,
+      }),
+    });
+    await second
+      .getByLabel('Agreement reference', { exact: true })
+      .fill('Offline second application trust');
+    await second.getByRole('button', { name: 'Save access settings' }).click();
+    const first = page.locator('#application-list article').filter({
+      has: page.getByRole('heading', {
+        name: 'Offline application',
+        exact: true,
+      }),
+    });
+    await expect(
+      first.getByRole('checkbox', {
+        name: 'Allow wallet sharing',
+        exact: true,
+      }),
+    ).not.toBeChecked();
+    await first
+      .getByRole('checkbox', { name: 'Allow wallet sharing', exact: true })
+      .check();
+    await first
+      .getByRole('checkbox', {
+        name: 'Allow requests from Second application',
+        exact: true,
+      })
+      .check();
+    await first
+      .getByRole('checkbox', { name: 'Match Given name', exact: true })
+      .check();
+    await first
+      .getByLabel('Sharing agreement reference')
+      .fill('Offline cross-application agreement');
+    await first
+      .getByRole('button', { name: 'Save wallet sharing', exact: true })
+      .click();
+    await expect(
+      first.getByRole('checkbox', {
+        name: 'Allow wallet sharing',
+        exact: true,
+      }),
+    ).toBeChecked();
+    await expect(
+      first.getByRole('checkbox', { name: 'Match ID number', exact: true }),
+    ).toBeChecked();
+    await expect(
+      first.getByRole('checkbox', { name: 'Match ID number', exact: true }),
+    ).toBeDisabled();
+    await expect(
+      first.getByRole('checkbox', { name: 'Match Given name', exact: true }),
+    ).toBeChecked();
+    expect(
+      Object.values(state.management!.provider.identities).find(
+        (i) => i.name === 'Offline application',
+      )!.policy!.walletSharing!.matchingFields,
+    ).toEqual([
+      'document_type',
+      'given_name',
+      'identity_number',
+      'issuing_country',
+    ]);
+    await page.screenshot({
+      path: 'artifacts/provider-installation/wallet-sharing.png',
       fullPage: true,
     });
     await page.setViewportSize({ width: 390, height: 844 });

@@ -19,6 +19,7 @@ import {
   text,
   uuid,
 } from '../onboarding/policy.js';
+import { canonicalHash } from '../domain/canonical.js';
 import { WalletProviderError } from '../domain/signing.js';
 import {
   applicationScopes,
@@ -395,6 +396,10 @@ export class ManagementService {
       enabled?: boolean;
       trust_agreement?: string | null;
       permissions?: ApplicationPolicy['permissions'];
+      wallet_sharing?: Omit<
+        import('../onboarding/types.js').WalletSharingPolicy,
+        'revision'
+      > | null;
     },
   ) {
     if (!uuid.test(key)) invalid();
@@ -476,7 +481,8 @@ export class ManagementService {
             deny();
           if (
             input.trust_agreement !== undefined ||
-            input.permissions !== undefined
+            input.permissions !== undefined ||
+            input.wallet_sharing !== undefined
           )
             invalid();
           if (
@@ -498,6 +504,7 @@ export class ManagementService {
           );
         const tokenAuthority = () =>
           hash(JSON.stringify([grantAuthority(), [...identity.scopes].sort()]));
+        const previousSharing = JSON.stringify(identity.policy?.walletSharing);
         const previousGrantAuthority = grantAuthority(),
           previousTokenAuthority = tokenAuthority();
         if (operation === 'rotate') {
@@ -536,6 +543,10 @@ export class ManagementService {
               issuer: this.issuer,
               clientId: identity.id,
               name: identity.name,
+              ...(identity.policy?.walletSharing &&
+              input.wallet_sharing !== null
+                ? { walletSharing: identity.policy.walletSharing }
+                : {}),
               permissions: input.permissions ??
                 identity.policy?.permissions ?? ['account:read'],
               ...(agreement ? { assertionTrust: { agreement } } : {}),
@@ -544,6 +555,13 @@ export class ManagementService {
               try {
                 defineOnboardingPolicy({
                   ...this.basePolicy,
+                  identity: {
+                    application: {
+                      requiredFields: this.userChecks(state).required_fields,
+                      verificationLevel:
+                        this.userChecks(state).verification_level,
+                    },
+                  },
                   applications: [policy],
                 });
               } catch {
@@ -564,11 +582,89 @@ export class ManagementService {
               invalid();
             identity.policy = policy;
           }
+          if (input.wallet_sharing !== undefined) {
+            if (
+              identity.role !== 'application' ||
+              (!identity.policy?.assertionTrust &&
+                input.wallet_sharing !== null)
+            )
+              invalid();
+            if (input.wallet_sharing === null) {
+              if (identity.policy) delete identity.policy.walletSharing;
+            } else {
+              if (!identity.policy) invalid();
+              const sharing = structuredClone(input.wallet_sharing);
+              const fields = this.userChecks(state).required_fields;
+              if (
+                Object.keys(sharing).some(
+                  (key) =>
+                    !['applications', 'matchingFields', 'agreement'].includes(
+                      key,
+                    ),
+                ) ||
+                !Array.isArray(sharing.applications) ||
+                !Array.isArray(sharing.matchingFields) ||
+                sharing.matchingFields.some(
+                  (field) => !fields.includes(field),
+                ) ||
+                sharing.applications.some(
+                  (id) =>
+                    id === identity.id ||
+                    !state.identities[id]?.enabled ||
+                    state.identities[id]?.role !== 'application' ||
+                    !state.identities[id]?.policy?.assertionTrust,
+                )
+              )
+                invalid();
+              sharing.applications.sort();
+              sharing.matchingFields.sort();
+              try {
+                defineOnboardingPolicy({
+                  ...this.basePolicy,
+                  identity: {
+                    application: {
+                      requiredFields: fields,
+                      verificationLevel:
+                        this.userChecks(state).verification_level,
+                    },
+                  },
+                  access: { mode: 'application' },
+                  applications: [
+                    { ...identity.policy, walletSharing: sharing },
+                  ],
+                });
+              } catch {
+                invalid();
+              }
+              const { revision: _revision, ...before } =
+                identity.policy.walletSharing ?? {};
+              if (canonicalHash(before) !== canonicalHash(sharing))
+                identity.policy.walletSharing = {
+                  ...sharing,
+                  revision: randomUUID(),
+                };
+            }
+          }
           if (identity.policy) identity.policy.name = identity.name;
           if (tokenAuthority() !== previousTokenAuthority)
             identity.credentialRevision++;
         }
         const invalidatesGrants = grantAuthority() !== previousGrantAuthority;
+        const invalidatesSharing =
+          invalidatesGrants ||
+          previousSharing !== JSON.stringify(identity.policy?.walletSharing);
+        if (invalidatesSharing) {
+          for (const request of Object.values(s.requests ?? {})) {
+            if (
+              request.sharing?.sourceApplicationId === identity.id &&
+              request.caller.issuer === this.issuer
+            ) {
+              request.denied = true;
+              if (request.grantId && s.grants[request.grantId])
+                s.grants[request.grantId].state = 'revoked';
+            }
+          }
+        }
         for (const request of Object.values(s.requests ?? {})) {
           if (
             invalidatesGrants &&

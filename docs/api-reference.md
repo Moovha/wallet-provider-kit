@@ -579,6 +579,7 @@ Import from `@moovha/wallet-provider-kit/onboarding`. [Integration guide](onboar
 - [ProviderState](#providerstate)
 - [SumsubConfiguration](#sumsubconfiguration)
 - [VendorPrice](#vendorprice)
+- [WalletSharingPolicy](#walletsharingpolicy)
 
 ### AccessInput
 
@@ -586,7 +587,8 @@ Import from `@moovha/wallet-provider-kit/onboarding`. [Integration guide](onboar
 
 ```ts
 export interface AccessInput {
-  mode: 'create' | 'connect';
+  mode: 'create' | 'connect' | 'connect_from_application';
+  source_application_id?: string;
   account_id?: string;
   identity_record?: ApplicationIdentityRecord;
   user?: ApplicationUserAssertion;
@@ -633,6 +635,7 @@ export interface ApplicationPolicy {
   assertionTrust?: {
     agreement: string;
   };
+  walletSharing?: WalletSharingPolicy;
   permissions?: Permission[];
   /** Contractually agreed reimbursement, not a payment instruction or vendor price quote. */
   funding?: {
@@ -672,6 +675,8 @@ export interface ApplicationUserAssertion {
     expires_at: string;
     policy_revision: string;
     action_policy_revision?: string;
+    source_application_id?: string;
+    sharing_revision?: string;
   };
 }
 ```
@@ -901,8 +906,18 @@ export declare class OnboardingService {
       ): import('./types.js').ApplicationPolicy;
     },
   );
-  applicationAccessPolicy(principal: VerifiedPrincipal): Promise<
+  applicationAccessPolicy(
+    principal: VerifiedPrincipal,
+    sourceApplicationId?: string,
+  ): Promise<
     | {
+        wallet_sharing?:
+          | {
+              source_application_id: string;
+              matching_fields: string[];
+              revision: string;
+            }
+          | undefined;
         source: string;
         evaluation_only: boolean;
         required_fields: string[];
@@ -921,6 +936,13 @@ export declare class OnboardingService {
         action_policy_revision: string | undefined;
         required_fields: string[];
         runtime_contract_terms: import('../runtime-configuration/authority.js').RuntimePolicySnapshot;
+        wallet_sharing?:
+          | {
+              source_application_id: string;
+              matching_fields: string[];
+              revision: string;
+            }
+          | undefined;
         source: string;
         evaluation_only: boolean;
         maximum_field_characters: number;
@@ -1006,7 +1028,7 @@ export declare class OnboardingService {
     permissions: (
       'account:read' | 'operations:request' | 'contracts:request'
     )[];
-    mode: 'create' | 'connect';
+    mode: 'create' | 'connect' | 'connect_from_application';
     durationDays: number;
     status: string;
   }>;
@@ -1105,6 +1127,12 @@ export declare class OnboardingService {
     request_id: string;
     status: string;
   }>;
+  /** Verify a current, independently consented sharing grant for an application-bound Safe. */
+  hasSharedWalletAccess(
+    state: ProviderState,
+    applicationId: string,
+    accountId: string,
+  ): boolean;
   authorize(
     principal: VerifiedPrincipal,
     accountId: string,
@@ -1124,7 +1152,7 @@ export declare class OnboardingService {
     status: string;
     address?: string | undefined;
     identity_source?:
-      'application_attestation' | 'application_record' | undefined;
+      'application_record' | 'application_attestation' | undefined;
     evaluation_only?: boolean | undefined;
     account_id: string;
   }>;
@@ -1402,6 +1430,19 @@ export interface VendorPrice {
   /** Upper bound in USD cents, confirmed with the vendor for this configured workflow/level. */
   maximumMinor: number;
   termsReference: string;
+}
+```
+
+### WalletSharingPolicy
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/onboarding/types.ts).
+
+```ts
+export interface WalletSharingPolicy {
+  revision?: string;
+  applications: string[];
+  matchingFields: string[];
+  agreement: string;
 }
 ```
 

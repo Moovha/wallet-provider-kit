@@ -117,14 +117,103 @@ with `GET /v1/access-requests/{requestId}` and `wallet:access:read`.
 ## Keep each person’s account separate
 
 Use a stable private user ID. The provider scopes it to the application’s issuer
-and client ID: matching names, emails or IDs in two applications never link wallets.
+and client ID. Matching identity fields in two applications only links wallets through the explicitly configured sharing flow below.
 Repeated create requests for the same application user resolve to one account.
 Creating the on-chain wallet is a separate step.
 
 `mode: "connect"` requires an `account_id` belonging to that same application-scoped
-user. Cross-application linking requires a separately verified ownership integration.
+user. Use the sharing flow below to request a wallet from another application under a reviewed identity-and-consent agreement.
 Evidence references cannot be reassigned to another person, and a suspended account
 cannot be reactivated by sending a new access request.
+
+## Allow another application to request existing wallets
+
+Sharing is off by default and works within one provider installation and issuer.
+In **User checks**, require **ID number**, **Document type** and **Document issuing country**.
+Existing users must submit those fields through their application; changing shared
+requirements ends previous approvals as described above. The provider does not
+perform identity verification itself.
+
+In **Applications**, open the source application (App A), enable **Allow wallet
+sharing**, select the requesting application (App B), choose any additional
+matching fields, and save your **Sharing agreement reference**. Both applications
+must be active with reviewed user-check and consent agreements. The sharing
+agreement explicitly trusts B to verify the same person and record permission for
+the wallet connection. Enabling A → B does not enable B → A or onward sharing.
+
+ID number, document type and issuing country are mandatory matching fields.
+Values are compared exactly as text: preserve leading zeros and agree country
+codes, document-type labels, dates and other formats between applications. No
+fuzzy matching or case conversion is applied. Choose additional fields carefully:
+names can change, and residence country is different from document issuing country.
+
+For the developer integrating App B:
+
+1. Authenticate as B. Read `GET /v1/access-policy?source_application_id=APP_A_CONNECTION_ID`.
+   Use A’s connection ID (`client_id`) from Applications, not the hashed transaction-policy application ID.
+2. Show the person that B will connect to their existing wallet, the requested
+   permissions, the source application and the current terms. Record B’s own
+   consent; A’s earlier consent cannot authorize B.
+3. Submit `POST /v1/access-requests` using B’s stable user reference, verified
+   identity evidence and normal authorization details. Set `mode` to
+   `connect_from_application`, add `source_application_id`, and omit `account_id`.
+   Include `source_application_id` and `sharing_revision` in `user.consent` using
+   the returned `wallet_sharing.revision`. Transaction consent also needs B’s own
+   `action_policy_revision`.
+4. Save B’s returned grant and account IDs. A unique current identity match reuses
+   A’s account and wallet. Missing, mismatching or ambiguous evidence denies access
+   without revealing another application’s identity records. An existing B user
+   cannot be rebound to a different account, and shared wallets cannot be shared onward.
+
+```json
+{
+  "mode": "connect_from_application",
+  "source_application_id": "APP_A_CONNECTION_ID",
+  "user": {
+    "id": "APP_B_PRIVATE_USER_REFERENCE",
+    "identity": {
+      "reference": "APP_B_VERIFIED_EVIDENCE_REFERENCE",
+      "level": "verified",
+      "verified_at": "2030-01-01T09:00:00.000Z",
+      "fields": {
+        "identity_number": "0000000000001",
+        "document_type": "national_id",
+        "issuing_country": "ZA"
+      }
+    },
+    "consent": {
+      "reference": "APP_B_FRESH_CONSENT_REFERENCE",
+      "granted_at": "2030-01-01T10:00:00.000Z",
+      "expires_at": "2030-01-02T10:00:00.000Z",
+      "policy_revision": "CURRENT_POLICY_REVISION",
+      "source_application_id": "APP_A_CONNECTION_ID",
+      "sharing_revision": "CURRENT_SHARING_REVISION"
+    }
+  },
+  "authorization_details": [
+    {
+      "type": "https://moovha.com/wallet/account-access",
+      "actions": ["account:read"]
+    }
+  ]
+}
+```
+
+These are illustrative placeholders and a fictional document number. Use current
+UTC evidence, returned revision hashes and every required identity field. B receives
+its own limited, expiring grant, not A’s permissions or KYC response. B must publish
+its own transaction rules and have accepted services, sponsorship and prepared fee
+infrastructure before requesting transactions. Its transactions use the existing
+Safe and B’s fee funding; B cannot provision a second wallet over the shared account.
+If A has not created the wallet yet, A must provision it first.
+
+Withdrawing either application’s wallet consent leaves the other application’s
+approval in place. Pausing an application, removing its identity trust, or changing
+or disabling A’s sharing settings blocks dependent B access. Re-enabling sharing
+requires fresh consent to its new revision. Sharing does not replace wallet
+ownership. Source evidence updates, expiry or changed requirements can also require
+B to reconnect; permissions and matching evidence are rechecked before account use
+and financial effects. Already-issued signatures remain subject to their on-chain expiry.
 
 ## Create the wallet and request transactions
 

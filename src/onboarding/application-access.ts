@@ -53,6 +53,8 @@ export function checkApplicationAssertion(
       'expires_at',
       'policy_revision',
       'action_policy_revision',
+      'source_application_id',
+      'sharing_revision',
     ])
   )
     invalid();

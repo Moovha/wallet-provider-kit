@@ -2,6 +2,12 @@ import {
   currentRuntimePolicy,
   validateRuntimeClaims,
 } from '../runtime-configuration/authority.js';
+import {
+  matchSharedAccount,
+  sharingTerms,
+  validateSharedAccess,
+} from './wallet-sharing.js';
+import { runtimeApplicationId } from '../runtime-configuration/service.js';
 import { checkApplicationAssertion } from './application-access.js';
 import { randomUUID } from 'node:crypto';
 import type {
@@ -210,9 +216,23 @@ export class OnboardingService {
       return false;
     }
   }
-  async applicationAccessPolicy(principal: VerifiedPrincipal) {
+  async applicationAccessPolicy(
+    principal: VerifiedPrincipal,
+    sourceApplicationId?: string,
+  ) {
     return this.store.transaction((state) => {
-      const terms = this.accessPolicy(principal);
+      const terms = {
+        ...this.accessPolicy(principal),
+        ...(sourceApplicationId
+          ? {
+              wallet_sharing: sharingTerms(
+                this.policy,
+                principal,
+                sourceApplicationId,
+              ),
+            }
+          : {}),
+      };
       if (!this.runtimeContracts) return terms;
       const snapshot = currentRuntimePolicy(state, principal);
       return {
@@ -285,6 +305,13 @@ export class OnboardingService {
         account.acceptedUntil <= Date.now()
       )
         return 'verification_required';
+      if (request.sharing) {
+        try {
+          validateSharedAccess(this.policy, state, request);
+        } catch {
+          return 'policy_changed';
+        }
+      }
       return 'granted';
     }
     if (request.expiresAt <= Date.now()) return 'expired';
@@ -335,6 +362,12 @@ export class OnboardingService {
       this.policy.identity.records,
       this.policy.access.mode === 'application',
     );
+    if (
+      input.mode !== 'connect_from_application' &&
+      (input.user?.consent.source_application_id !== undefined ||
+        input.user?.consent.sharing_revision !== undefined)
+    )
+      invalid();
     const delegatesTransfers = input.authorization_details[0].actions.some(
       (permission) => ['contracts:request'].includes(permission),
     );
@@ -404,7 +437,8 @@ export class OnboardingService {
         for (const grant of Object.values(state.grants)) {
           const previousRequest = state.requests[grant.requestId];
           if (
-            grant.owner === assertion.owner &&
+            (state.requests[grant.requestId]?.sharing?.subjectOwner ??
+              grant.owner) === assertion.owner &&
             grant.withdrawnAt !== undefined &&
             previousRequest?.input.user &&
             (previousRequest.input.user.consent.reference ===
@@ -414,14 +448,21 @@ export class OnboardingService {
             deny();
         }
         const existing = Object.values(state.accounts).find(
-          (account) => account.owner === assertion.owner,
+          (account) =>
+            account.owner === assertion.owner ||
+            account.linkedOwners?.includes(assertion.owner),
         );
         if (
           input.mode === 'connect' &&
           state.accounts[request.accountId]?.owner !== assertion.owner
         )
           deny();
-        if (existing) {
+        if (
+          existing?.linkedOwners?.includes(assertion.owner) &&
+          input.mode !== 'connect_from_application'
+        )
+          deny();
+        if (existing && input.mode !== 'connect_from_application') {
           if (
             existing.status !== 'active' ||
             (input.mode === 'connect' && existing.id !== request.accountId)
@@ -442,16 +483,19 @@ export class OnboardingService {
           expiresAt: assertion.acceptedUntil,
           source: 'application_attestation',
         };
-        state.accounts[request.accountId] = {
-          ...existing,
-          id: request.accountId,
-          owner: assertion.owner,
-          status: 'active',
-          acceptedUntil: assertion.acceptedUntil,
-          acceptanceRevision: this.policy.revision,
-          evidenceHash: assertion.evidenceHash,
-          identitySource: 'application_attestation',
-        };
+        if (input.mode === 'connect_from_application') {
+          matchSharedAccount(this.policy, state, request, assertion.owner);
+        } else
+          state.accounts[request.accountId] = {
+            ...existing,
+            id: request.accountId,
+            owner: assertion.owner,
+            status: 'active',
+            acceptedUntil: assertion.acceptedUntil,
+            acceptanceRevision: this.policy.revision,
+            evidenceHash: assertion.evidenceHash,
+            identitySource: 'application_attestation',
+          };
         this.grant(state, request);
         state.grants[request.grantId!].expiresAt = Math.min(
           state.grants[request.grantId!].expiresAt,
@@ -1242,6 +1286,9 @@ export class OnboardingService {
         (!permission || g.permissions.includes(permission)),
     );
     if (!grant) deny();
+    const accessRequest = state.requests[grant.requestId];
+    if (accessRequest?.sharing)
+      validateSharedAccess(this.policy, state, accessRequest);
     if (permission === 'contracts:request') {
       const request = state.requests[grant.requestId];
       const consent = request?.consent;
@@ -1274,6 +1321,34 @@ export class OnboardingService {
         );
     }
     return grant;
+  }
+  /** Verify a current, independently consented sharing grant for an application-bound Safe. */
+  hasSharedWalletAccess(
+    state: ProviderState,
+    applicationId: string,
+    accountId: string,
+  ): boolean {
+    for (const grant of Object.values(state.grants)) {
+      if (
+        grant.accountId !== accountId ||
+        !state.requests[grant.requestId]?.sharing ||
+        runtimeApplicationId(grant.caller.issuer, grant.caller.clientId) !==
+          applicationId
+      )
+        continue;
+      try {
+        this.activeGrant(state, grant.caller, accountId, 'contracts:request');
+        return true;
+      } catch (error) {
+        if (
+          !(error instanceof WalletProviderError) ||
+          error.code !== 'wallet_authorization_denied'
+        )
+          throw error;
+        /* A stale grant cannot extend wallet infrastructure authority. */
+      }
+    }
+    return false;
   }
   async authorize(
     principal: VerifiedPrincipal,
@@ -1358,6 +1433,8 @@ export class OnboardingService {
           related.id === grant.id ||
           (reference &&
             related.owner === grant.owner &&
+            related.caller.issuer === grant.caller.issuer &&
+            related.caller.clientId === grant.caller.clientId &&
             state.requests[related.requestId]?.input.user?.consent.reference ===
               reference)
         ) {

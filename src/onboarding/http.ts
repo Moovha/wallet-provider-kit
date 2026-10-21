@@ -267,8 +267,18 @@ export async function registerOnboardingRoutes(
         additionalProperties: false,
         required: ['mode', 'authorization_details'],
         properties: {
-          mode: { type: 'string', enum: ['create', 'connect'] },
+          mode: {
+            type: 'string',
+            enum: ['create', 'connect', 'connect_from_application'],
+          },
           account_id: uuidSchema,
+          source_application_id: {
+            type: 'string',
+            minLength: 1,
+            maxLength: 256,
+            description:
+              'Source application connection ID for connect_from_application, using the same provider issuer. Omit account_id; the provider requires one unique verified identity match.',
+          },
           identity_record: applicationRecordSchema,
           user: {
             description:
@@ -314,6 +324,15 @@ export async function registerOnboardingRoutes(
                     type: 'string',
                     pattern: '^[a-f0-9]{64}$',
                   },
+                  source_application_id: {
+                    type: 'string',
+                    minLength: 1,
+                    maxLength: 256,
+                  },
+                  sharing_revision: {
+                    type: 'string',
+                    pattern: '^[a-f0-9]{64}$',
+                  },
                   action_policy_revision: {
                     type: 'string',
                     pattern: '^[a-f0-9]{64}$',
@@ -348,11 +367,22 @@ export async function registerOnboardingRoutes(
     async (request) =>
       service().request(await context(request, 'wallet:access'), request.body),
   );
-  app.get(
+  app.get<{ Querystring: { source_application_id?: string } }>(
     '/v1/access-policy',
     {
       schema: {
         ...schema('getAccountAccessPolicy'),
+        querystring: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            source_application_id: {
+              type: 'string',
+              minLength: 1,
+              maxLength: 256,
+            },
+          },
+        },
         response: {
           ...schema('getAccountAccessPolicy').response,
           200: {
@@ -392,6 +422,20 @@ export async function registerOnboardingRoutes(
               runtime_contract_terms: runtimeSnapshotSchema,
               max_identity_age_days: { type: 'integer' },
               max_access_days: { type: 'integer' },
+              wallet_sharing: {
+                type: 'object',
+                additionalProperties: false,
+                required: [
+                  'source_application_id',
+                  'matching_fields',
+                  'revision',
+                ],
+                properties: {
+                  source_application_id: { type: 'string' },
+                  matching_fields: { type: 'array', items: { type: 'string' } },
+                  revision: { type: 'string' },
+                },
+              },
               verification_level: { type: 'string' },
             },
           },
@@ -401,7 +445,10 @@ export async function registerOnboardingRoutes(
     async (request) => {
       const principal = (await context(request, 'wallet:access:read'))
         .principal;
-      const terms = await service().applicationAccessPolicy(principal);
+      const terms = await service().applicationAccessPolicy(
+        principal,
+        request.query.source_application_id,
+      );
       const snapshot =
         'runtime_contract_terms' in terms
           ? terms.runtime_contract_terms

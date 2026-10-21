@@ -572,7 +572,7 @@ Operation: `requestAccountAccess`.
 
 **When you need it:** Use after reading the access requirements and obtaining consent inside the application. Creating or reconnecting access is separate from creating the blockchain wallet.
 
-**Before you start:** After the person completes the agreed identity checks and approves wallet access in your application, submit those records here. First read GET /v1/access-policy for the required fields and current terms. Use mode=create for a first wallet account or mode=connect with the existing account_id for the same application user. The provider must trust your application’s checks. Hosted compatibility mode uses a separate provider login and review.
+**Before you start:** After the person completes the agreed identity checks and approves wallet access in your application, submit those records here. First read GET /v1/access-policy for the required fields and current terms. Use mode=create for a first wallet account or mode=connect with the existing account_id for the same application user. To request a wallet from a selected source application, read GET /v1/access-policy?source_application_id=SOURCE_CONNECTION_ID, then use mode=connect_from_application and source_application_id without account_id. Include the returned sharing revision and source application in fresh consent for the requesting application. All configured identity fields must match exactly; ambiguous matches are denied. The provider must trust your application’s checks. Hosted compatibility mode uses a separate provider login and review.
 
 **Result and next step:** 200: the access decision. A granted response includes account_id, grant_id, allowed actions and expiry. Save those IDs, then call POST /v1/accounts/{accountId}/provision to create the blockchain wallet. Reconnecting preserves the existing account. This request does not create an on-chain wallet or send money. Missing, stale or unauthorized evidence is rejected; consent_url is only for hosted compatibility mode.
 
@@ -590,11 +590,17 @@ Request body (application/json):
   "properties": {
     "mode": {
       "type": "string",
-      "enum": ["create", "connect"]
+      "enum": ["create", "connect", "connect_from_application"]
     },
     "account_id": {
       "type": "string",
       "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "source_application_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "description": "Source application connection ID for connect_from_application, using the same provider issuer. Omit account_id; the provider requires one unique verified identity match."
     },
     "identity_record": {
       "type": "object",
@@ -682,6 +688,15 @@ Request body (application/json):
               "format": "date-time"
             },
             "policy_revision": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "source_application_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "sharing_revision": {
               "type": "string",
               "pattern": "^[a-f0-9]{64}$"
             },
@@ -810,7 +825,11 @@ Operation: `getAccountAccessPolicy`.
 
 **Before you start:** Call this before asking a person for wallet permission. Use your application token to learn which identity information to send, how recent the checks must be and how long permission can last. The provider operator sets these shared requirements under User checks in administration; this endpoint reads them and does not change settings or return customer records.
 
-**Result and next step:** 200: required_fields lists the identity field names; verification_level is the agreed check label. max_identity_age_days limits check age and max_access_days limits permission duration. Show the requested actions and terms, record the person’s consent to policy_revision (and action_policy_revision for transactions), then submit POST /v1/access-requests. Reading these requirements does not grant wallet access.
+**Result and next step:** 200: required_fields lists the identity field names; verification_level is the agreed check label. max_identity_age_days limits check age and max_access_days limits permission duration. Show the requested actions and terms, record the person’s consent to policy_revision (and action_policy_revision for transactions), then submit POST /v1/access-requests. For cross-application access, supply source_application_id as a query parameter to receive wallet_sharing.matching_fields and wallet_sharing.revision. Record consent to that revision and source application. Reading these requirements does not grant wallet access.
+
+| Parameter               | Location | Required | Schema                                            |
+| ----------------------- | -------- | -------- | ------------------------------------------------- |
+| `source_application_id` | query    | no       | `{"type":"string","minLength":1,"maxLength":256}` |
 
 | Status | Content type             | Description      |
 | ------ | ------------------------ | ---------------- |
@@ -2102,6 +2121,25 @@ Success response schema:
     },
     "max_access_days": {
       "type": "integer"
+    },
+    "wallet_sharing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_application_id", "matching_fields", "revision"],
+      "properties": {
+        "source_application_id": {
+          "type": "string"
+        },
+        "matching_fields": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "revision": {
+          "type": "string"
+        }
+      }
     },
     "verification_level": {
       "type": "string"
@@ -13901,6 +13939,41 @@ Request body (application/json):
       "type": "string",
       "minLength": 1,
       "maxLength": 256,
+      "nullable": true
+    },
+    "wallet_sharing": {
+      "description": "Allow selected applications to request these wallets under a reviewed identity-and-consent sharing agreement. Null disables sharing and ends dependent approvals. Each requester needs its own consent and permissions.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["applications", "matchingFields", "agreement"],
+      "properties": {
+        "applications": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 99,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
+        "matchingFields": {
+          "type": "array",
+          "maxItems": 16,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]{0,63}$"
+          },
+          "description": "All fields must match exactly. Include identity_number, document_type and issuing_country; each must also be required under User checks.",
+          "minItems": 3
+        },
+        "agreement": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      },
       "nullable": true
     },
     "permissions": {

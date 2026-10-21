@@ -118,7 +118,40 @@ export function defineOnboardingPolicy(
         'permissions',
         'funding',
         'assertionTrust',
+        'walletSharing',
       ]);
+      if (app.walletSharing) {
+        const sharing = app.walletSharing;
+        keys(sharing, [
+          'applications',
+          'matchingFields',
+          'agreement',
+          'revision',
+        ]);
+        if (
+          mode !== 'application' ||
+          !text(sharing.agreement) ||
+          (sharing.revision !== undefined && !text(sharing.revision)) ||
+          ['identity_number', 'document_type', 'issuing_country'].some(
+            (field) => !sharing.matchingFields?.includes(field),
+          ) ||
+          !Array.isArray(sharing.applications) ||
+          !sharing.applications.length ||
+          sharing.applications.length > 99 ||
+          new Set(sharing.applications).size !== sharing.applications.length ||
+          sharing.applications.some((id) => !text(id) || id === app.clientId) ||
+          !Array.isArray(sharing.matchingFields) ||
+          !sharing.matchingFields.length ||
+          new Set(sharing.matchingFields).size !==
+            sharing.matchingFields.length ||
+          sharing.matchingFields.some(
+            (field) => !appIdentity?.requiredFields.includes(field),
+          )
+        )
+          throw new Error();
+        sharing.applications.sort();
+        sharing.matchingFields.sort();
+      }
       if (app.assertionTrust) {
         keys(app.assertionTrust, ['agreement']);
         if (!text(app.assertionTrust.agreement)) throw new Error();
@@ -202,12 +235,13 @@ export function normalizeInput(
 ): AccessInput {
   if (
     !value ||
-    !['create', 'connect'].includes(value.mode) ||
+    !['create', 'connect', 'connect_from_application'].includes(value.mode) ||
     Object.keys(value).some(
       (k) =>
         ![
           'mode',
           'account_id',
+          'source_application_id',
           'authorization_details',
           'identity_record',
           'user',
@@ -219,6 +253,14 @@ export function normalizeInput(
     value.mode === 'connect'
       ? !uuid.test(value.account_id ?? '')
       : value.account_id !== undefined
+  )
+    invalid();
+  if (
+    value.mode === 'connect_from_application'
+      ? !applicationLed ||
+        !text(value.source_application_id) ||
+        value.source_application_id === app.clientId
+      : value.source_application_id !== undefined
   )
     invalid();
   const details = value.authorization_details;
@@ -273,6 +315,9 @@ export function normalizeInput(
   return {
     ...(applicationLed ? { user: value.user } : {}),
     mode: value.mode,
+    ...(value.source_application_id
+      ? { source_application_id: value.source_application_id }
+      : {}),
     ...(value.account_id ? { account_id: value.account_id } : {}),
     ...(identityRecord ? { identity_record: identityRecord } : {}),
     authorization_details: [{ type: accessType, actions: [...actions].sort() }],
