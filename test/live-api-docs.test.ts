@@ -117,6 +117,19 @@ describe('live API explorer boundaries', () => {
       '[Not enabled]',
     );
   });
+  it('distinguishes private installation claiming from public discovery', () => {
+    const live = liveApiSpecification(contract, {
+      management: true,
+      onboarding: false,
+      enrollment: false,
+      wallet: false,
+    });
+    const claim = live.paths['/v1/provider/claim'].post;
+    expect(claim.summary).toContain('[Setup code]');
+    expect(claim.description).toContain('private installation code');
+    expect(claim.description).not.toContain('Discovery reports readiness');
+    expect(live.paths['/v1/capabilities'].get.summary).toContain('[Public]');
+  });
   it('never falls back to an example or unsafe live destination for incomplete drafts', () => {
     expect(deployedExplorerUrl('https://wallet.example.test')).toBe(
       'https://wallet.example.test/docs/',
