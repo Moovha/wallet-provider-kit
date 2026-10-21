@@ -1,8 +1,19 @@
+import { readFile } from 'node:fs/promises';
 import { test, expect } from '@playwright/test';
 import { createServer } from '../../dist/service/server.js';
 import { AuthenticationError } from '../../dist/service/auth.js';
 import { WalletProviderError } from '../../dist/domain/signing.js';
 import type { EmbeddedWalletService } from '../../dist/domain/embedded-wallet.js';
+
+const contract = JSON.parse(
+  await readFile(
+    new URL('../../spec/provider-api.json', import.meta.url),
+    'utf8',
+  ),
+);
+const endpointCount = Object.values(
+  contract.paths as Record<string, Record<string, unknown>>,
+).reduce((count, methods) => count + Object.keys(methods).length, 0);
 
 // Offline HTTP fixture: no vendor adapters, keys, identity data or financial effects.
 let app: Awaited<ReturnType<typeof createServer>>;
@@ -54,7 +65,7 @@ test('deployed Swagger executes same-origin HTTP and displays real success/auth/
   await expect(
     page.getByRole('heading', { name: /Wallet service API · Try a request/ }),
   ).toBeVisible();
-  await expect(page.locator('.opblock')).toHaveCount(46);
+  await expect(page.locator('.opblock')).toHaveCount(endpointCount);
   const discovery = page.locator('#operations-Discovery-getCapabilities');
   await discovery.locator('.opblock-summary-control').click();
   await discovery

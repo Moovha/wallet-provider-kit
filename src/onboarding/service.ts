@@ -76,7 +76,9 @@ export class OnboardingService {
     readonly runtimeContracts = false,
     readonly safeOnlyWallet = false,
     liveApplications?: {
-      userChecks?(): import('./types.js').UserCheckSettings | undefined;
+      userChecks?():
+        | (import('./types.js').UserCheckSettings & { revision: number })
+        | undefined;
       list(): import('./types.js').ApplicationPolicy[];
       current(
         principal: VerifiedPrincipal,

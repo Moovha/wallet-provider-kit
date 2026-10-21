@@ -212,8 +212,11 @@ export class ManagementService {
       };
     });
   }
-  currentUserChecks(): UserCheckSettings | undefined {
-    return structuredClone(this.snapshot()?.userChecks?.settings);
+  currentUserChecks(): (UserCheckSettings & { revision: number }) | undefined {
+    const current = this.snapshot()?.userChecks;
+    return current
+      ? structuredClone({ ...current.settings, revision: current.revision })
+      : undefined;
   }
   private userChecks(state: ManagementState) {
     const policy = defineOnboardingPolicy(this.basePolicy);

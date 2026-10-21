@@ -890,7 +890,11 @@ export declare class OnboardingService {
     runtimeContracts?: boolean,
     safeOnlyWallet?: boolean,
     liveApplications?: {
-      userChecks?(): import('./types.js').UserCheckSettings | undefined;
+      userChecks?():
+        | (import('./types.js').UserCheckSettings & {
+            revision: number;
+          })
+        | undefined;
       list(): import('./types.js').ApplicationPolicy[];
       current(
         principal: VerifiedPrincipal,

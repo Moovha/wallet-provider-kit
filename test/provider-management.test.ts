@@ -669,4 +669,23 @@ it('updates shared user checks durably, fences old consent and preserves approva
     f.config.policy,
   );
   expect(await reloaded.readUserChecks(operator)).toEqual(saved);
+  await f.service.saveUserChecks(operator, randomUUID(), {
+    ...update,
+    expected_revision: saved.revision,
+  });
+  expect(onboarding.accessPolicy(caller).policy_revision).toBe(
+    changedPolicy.policy_revision,
+  );
+  expect(
+    await onboarding.authorize(caller, renewed.account_id!, 'account:read'),
+  ).toBeDefined();
+  await f.service.saveUserChecks(operator, randomUUID(), {
+    ...initial,
+    expected_revision: saved.revision,
+  });
+  expect(onboarding.accessPolicy(caller).policy_revision).not.toBe(
+    originalPolicy.policy_revision,
+  );
+  input.user.consent.policy_revision = originalPolicy.policy_revision;
+  await expect(onboarding.request(context(), input)).rejects.toThrow();
 });
