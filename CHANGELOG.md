@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Configure shared user-check requirements from administration with labelled
+  identity information and access duration controls. Saved settings take effect
+  without restart; changed requirements end current wallet approvals and require
+  fresh consent. Identical saves preserve approvals.
+- Explain reading access requirements, submitting completed checks and permission,
+  and creating the blockchain wallet as separate API tasks.
+
 - Deploy a provider with zero applications, claim its administrator privately and
   manage application registrations, identity trust, suspension and credentials
   through a persistent console and protected APIs.

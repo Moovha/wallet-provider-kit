@@ -23,6 +23,19 @@ The [user-access guide](application-access.md) explains this sequence and its
 request example. Use stable private user IDs and retain the resulting request,
 account and grant IDs.
 
+The three steps have separate effects:
+
+| Task                                   | Request                                   | Result                                                                                                                                 |
+| -------------------------------------- | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Learn what to collect                  | `GET /v1/access-policy`                   | Current required identity fields, check age, permission duration and consent terms. This reads requirements; it does not grant access. |
+| Submit completed checks and permission | `POST /v1/access-requests`                | A decision and, when granted, account and approval IDs. This does not create a blockchain wallet.                                      |
+| Create the blockchain wallet           | `POST /v1/accounts/{accountId}/provision` | Wallet creation status and address, using the approved account ID. This does not grant spending permission.                            |
+
+The provider operator changes shared requirements under **User checks** in
+administration. Your application reads them from the access-policy endpoint.
+After requirements change, read the new policy revision and collect fresh consent
+before requesting access again.
+
 ## 3. Create and use their wallet
 
 Call `POST /v1/accounts/{accountId}/provision` to create the user’s Safe. Discover

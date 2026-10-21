@@ -148,6 +148,17 @@ export function requestExample(
   config: ProviderConfiguration,
   applicationIndex: number,
 ): object | undefined {
+  if (id === 'saveProviderUserChecks')
+    return {
+      expected_revision: 1,
+      required_fields: config.policy.identity?.application?.requiredFields ?? [
+        'country',
+      ],
+      verification_level:
+        config.policy.identity?.application?.verificationLevel ?? 'verified',
+      max_identity_age_days: config.policy.identity?.maxAgeDays ?? 90,
+      max_access_days: config.policy.access?.maxAgeDays ?? 7,
+    };
   if (id === 'claimProviderInstallation')
     return {
       claim: 'offline-claim-placeholder-' + 'x'.repeat(43),
@@ -346,6 +357,18 @@ export function responseExample(
   config?: ProviderConfiguration,
   requestedPermissions?: string[],
 ): object | string {
+  if (id === 'readProviderUserChecks' || id === 'saveProviderUserChecks')
+    return {
+      available: true,
+      revision: 1,
+      required_fields: config?.policy.identity?.application?.requiredFields ?? [
+        'country',
+      ],
+      verification_level:
+        config?.policy.identity?.application?.verificationLevel ?? 'verified',
+      max_identity_age_days: config?.policy.identity?.maxAgeDays ?? 90,
+      max_access_days: config?.policy.access?.maxAgeDays ?? 7,
+    };
   const managedIdentity = {
     id: 'app-10000000-0000-4000-8000-000000000001',
     name: 'Offline application',

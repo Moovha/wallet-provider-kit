@@ -62,6 +62,13 @@ export interface ApplicationPolicy {
   /** Contractually agreed reimbursement, not a payment instruction or vendor price quote. */
   funding?: { agreement: string; monthlyLimitMinor: number };
 }
+/** Shared requirements for application-attested identity and wallet consent. */
+export interface UserCheckSettings {
+  required_fields: string[];
+  verification_level: string;
+  max_identity_age_days: number;
+  max_access_days: number;
+}
 export interface OnboardingPolicy {
   version: string;
   provider: { name: string; origin: string; privacyUrl: string };

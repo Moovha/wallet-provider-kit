@@ -65,6 +65,7 @@ const day = 86400000;
 /** Provider decisions are stored locally. Vendor results, OAuth scopes and share tokens cannot grant access. */
 export class OnboardingService {
   readonly policy: import('./types.js').ResolvedPolicy;
+  readonly installationPolicyRevision: string;
   private readonly adapters: Map<Vendor, IdentityAdapter>;
   constructor(
     input: OnboardingPolicy,
@@ -75,6 +76,7 @@ export class OnboardingService {
     readonly runtimeContracts = false,
     readonly safeOnlyWallet = false,
     liveApplications?: {
+      userChecks?(): import('./types.js').UserCheckSettings | undefined;
       list(): import('./types.js').ApplicationPolicy[];
       current(
         principal: VerifiedPrincipal,
@@ -100,12 +102,57 @@ export class OnboardingService {
         adapters.map((a) => [a.vendor, a.policyFingerprint ?? a.vendor]).sort(),
       ]),
     });
+    this.installationPolicyRevision = this.policy.revision;
     if (liveApplications) {
       const livePolicy = { ...this.policy };
       Object.defineProperty(livePolicy, 'applications', {
         enumerable: true,
         get: liveApplications.list,
       });
+      if (liveApplications.userChecks) {
+        const initialRevision = this.policy.revision;
+        Object.defineProperties(livePolicy, {
+          identity: {
+            enumerable: true,
+            get: () => {
+              const checks = liveApplications.userChecks!();
+              return checks
+                ? Object.freeze({
+                    ...resolved.identity,
+                    maxAgeDays: checks.max_identity_age_days,
+                    application: Object.freeze({
+                      requiredFields: Object.freeze([
+                        ...checks.required_fields,
+                      ]),
+                      verificationLevel: checks.verification_level,
+                    }),
+                  })
+                : resolved.identity;
+            },
+          },
+          access: {
+            enumerable: true,
+            get: () => {
+              const checks = liveApplications.userChecks!();
+              return checks
+                ? Object.freeze({
+                    ...resolved.access,
+                    maxAgeDays: checks.max_access_days,
+                  })
+                : resolved.access;
+            },
+          },
+          revision: {
+            enumerable: true,
+            get: () => {
+              const checks = liveApplications.userChecks!();
+              return checks
+                ? fingerprint([initialRevision, checks])
+                : initialRevision;
+            },
+          },
+        });
+      }
       this.policy = Object.freeze(livePolicy);
     }
     this.adapters = new Map(
