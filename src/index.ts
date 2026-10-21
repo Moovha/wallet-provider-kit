@@ -7,6 +7,7 @@ export * from './telemetry.js';
 export * from './storage/index.js';
 export * from './deployment/index.js';
 export * from './sponsorship/index.js';
+export * from './wallets/client.js';
 
 export {
   providerNetwork,
