@@ -1,3 +1,38 @@
+const identityFieldChoices = [
+  [
+    'country',
+    'Country',
+    'For example, ZA. Agree whether this means residence or another country with each application.',
+  ],
+  [
+    'identity_number',
+    'ID number',
+    'The identity document number, kept as text so leading zeros are preserved.',
+  ],
+  [
+    'document_type',
+    'Document type',
+    'For example, national_id or passport. Agree the exact value with applications.',
+  ],
+  [
+    'issuing_country',
+    'Document issuing country',
+    'Use an agreed country code, for example ZA. This is separate from residence.',
+  ],
+  ['given_name', 'Given name', 'For example, Alex.'],
+  ['family_name', 'Family name', 'For example, Example.'],
+  [
+    'date_of_birth',
+    'Date of birth',
+    'Agree a date format with each application; the service checks presence, not age or date accuracy.',
+  ],
+  [
+    'nationality',
+    'Nationality',
+    'Agree the accepted country codes with each application.',
+  ],
+];
+
 let token = '',
   expiresAt = 0,
   generation = 0;
@@ -191,27 +226,8 @@ function renderUserChecks(checks) {
   );
   const group = node('fieldset', undefined, form);
   node('legend', 'Required information', group);
-  const choices = [
-    [
-      'country',
-      'Country',
-      'For example, ZA. Agree whether this means residence or another country with each application.',
-    ],
-    ['given_name', 'Given name', 'For example, Alex.'],
-    ['family_name', 'Family name', 'For example, Example.'],
-    [
-      'date_of_birth',
-      'Date of birth',
-      'Agree a date format with each application; the service checks presence, not age or date accuracy.',
-    ],
-    [
-      'nationality',
-      'Nationality',
-      'Agree the accepted country codes with each application.',
-    ],
-  ];
   const selected = new Map();
-  for (const [name, title, example] of choices) {
+  for (const [name, title, example] of identityFieldChoices) {
     const label = node('label', undefined, group);
     const checkbox = node('input', undefined, label);
     checkbox.type = 'checkbox';
@@ -226,7 +242,7 @@ function renderUserChecks(checks) {
   node('summary', 'Developer details and additional information', developer);
   node(
     'p',
-    'Field names: country (Country), given_name (Given name), family_name (Family name), date_of_birth (Date of birth), nationality (Nationality). Values must be nonempty text, up to 512 characters. No document upload is requested here.',
+    'Field names: country (Country), given_name (Given name), family_name (Family name), date_of_birth (Date of birth), nationality (Nationality), identity_number (ID number), document_type (Document type), issuing_country (Document issuing country). Values must be nonempty text, up to 512 characters. No document upload is requested here.',
     developer,
   );
   const customLabel = node(
@@ -327,6 +343,132 @@ function renderUserChecks(checks) {
     message(
       'User-check requirements saved. Applications must read the current access policy before requesting wallet permission.',
     );
+  });
+}
+function renderWalletSharing(article, record, identities, checks) {
+  const form = node('form', undefined, article);
+  node('h4', 'Share wallets with selected applications', form);
+  node(
+    'p',
+    'Let another application request access to a person’s existing wallet. The person must give that application its own permission. Wallet ownership and each application’s approvals stay separate.',
+    form,
+  );
+  const toggleLabel = node('label', undefined, form);
+  const enabled = node('input', undefined, toggleLabel);
+  enabled.type = 'checkbox';
+  enabled.setAttribute('aria-label', 'Allow wallet sharing');
+  enabled.checked = Boolean(record.policy?.walletSharing);
+  toggleLabel.append(document.createTextNode('Allow wallet sharing'));
+  const group = node('fieldset', undefined, form);
+  node('legend', 'Sharing settings', group);
+  node('p', 'Applications allowed to request these wallets', group);
+  const selectedApps = new Map();
+  for (const candidate of identities.filter(
+    (i) => i.role === 'application' && i.id !== record.id,
+  )) {
+    const label = node('label', undefined, group);
+    const checkbox = node('input', undefined, label);
+    checkbox.type = 'checkbox';
+    checkbox.setAttribute(
+      'aria-label',
+      'Allow requests from ' + candidate.name,
+    );
+    checkbox.checked =
+      record.policy?.walletSharing?.applications.includes(candidate.id) ??
+      false;
+    checkbox.disabled = !candidate.enabled || !candidate.policy?.assertionTrust;
+    label.append(
+      document.createTextNode(
+        candidate.name +
+          (checkbox.disabled
+            ? ' — save its user-check agreement and activate it first'
+            : ''),
+      ),
+    );
+    selectedApps.set(candidate.id, checkbox);
+  }
+  if (!selectedApps.size)
+    node('p', 'Add another application before enabling sharing.', group);
+  node('p', 'Information that must match', group);
+  node(
+    'small',
+    'Every selected value must match exactly. ID number, document type and issuing country are required for sharing. Add them under User checks first; existing users must submit updated checks. Names or country alone cannot identify a wallet owner.',
+    group,
+  );
+  const required = ['identity_number', 'document_type', 'issuing_country'];
+  const selectedFields = new Map();
+  for (const field of [...new Set([...required, ...checks.required_fields])]) {
+    const label = node('label', undefined, group);
+    const checkbox = node('input', undefined, label);
+    checkbox.type = 'checkbox';
+    const title =
+      identityFieldChoices.find(([name]) => name === field)?.[1] ?? field;
+    checkbox.setAttribute('aria-label', 'Match ' + title);
+    checkbox.checked =
+      required.includes(field) ||
+      (record.policy?.walletSharing?.matchingFields.includes(field) ?? false);
+    checkbox.disabled = required.includes(field);
+    label.append(
+      document.createTextNode(
+        title + (required.includes(field) ? ' (required)' : ''),
+      ),
+    );
+    selectedFields.set(field, checkbox);
+  }
+  const agreementLabel = node('label', 'Sharing agreement reference', group);
+  const agreement = node('input', undefined, agreementLabel);
+  agreement.required = true;
+  agreement.maxLength = 256;
+  agreement.value = record.policy?.walletSharing?.agreement ?? '';
+  node(
+    'small',
+    'Record your reviewed agreement to trust the selected applications to verify the same person and capture permission for this wallet connection. Save a reference, not private agreement contents.',
+    group,
+  );
+  const sync = () => {
+    group.hidden = !enabled.checked;
+    group.disabled = !enabled.checked;
+  };
+  enabled.onchange = sync;
+  sync();
+  enabled.disabled =
+    !checks.available ||
+    (!record.policy?.assertionTrust && !record.policy?.walletSharing);
+  if (enabled.disabled)
+    node(
+      'p',
+      'Save this application’s user-check agreement before enabling sharing. Sharing is available in application-led installations.',
+      form,
+    );
+  node(
+    'p',
+    'Changing or turning off sharing ends approvals granted through these settings. This application’s own wallet approvals remain in place.',
+    form,
+  );
+  const save = node('button', 'Save wallet sharing', form);
+  save.disabled = enabled.disabled;
+  form.onsubmit = run(async () => {
+    const applications = [...selectedApps]
+      .filter(([, field]) => field.checked && !field.disabled)
+      .map(([id]) => id);
+    const matchingFields = [...selectedFields]
+      .filter(([, field]) => field.checked)
+      .map(([name]) => name);
+    if (
+      enabled.checked &&
+      (!applications.length ||
+        required.some((field) => !checks.required_fields.includes(field)))
+    )
+      throw new Error(
+        'Select an active application with a saved user-check agreement, and require ID number, document type and issuing country under User checks.',
+      );
+    await api('/v1/provider/identities/' + record.id, 'PATCH', {
+      expected_revision: record.revision,
+      wallet_sharing: enabled.checked
+        ? { applications, matchingFields, agreement: agreement.value }
+        : null,
+    });
+    await refresh();
   });
 }
 async function refresh() {
@@ -467,6 +609,7 @@ async function refresh() {
           });
           await refresh();
         });
+        renderWalletSharing(article, record, identities, checks);
         if (record.policy?.assertionTrust)
           action(actions, 'Stop accepting user checks', async () => {
             await api('/v1/provider/identities/' + record.id, 'PATCH', {

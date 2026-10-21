@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add directional wallet sharing in Applications, exact matching on selected identity fields (including ID number, document type and issuing country), and `connect_from_application` access requests. Requesting apps receive their own consent grants, transaction rules and fee authority; sharing never replaces the original wallet owner.
+
 - Organize API explorers by task, starting with six wallet-access requests. Give
   all 48 requests a plain-language name, purpose, caller and usage guidance, with
   a generated endpoint map and explanations of overlapping setup requests.

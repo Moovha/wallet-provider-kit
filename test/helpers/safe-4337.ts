@@ -3,6 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Wallet, Interface, keccak256, zeroPadValue } from 'ethers';
+import type { OnboardingPolicy } from '../../src/onboarding/types.js';
 import { afterEach } from 'vitest';
 import {
   openProviderDatabase,
@@ -52,6 +53,7 @@ export async function fixture(
   nativeRecipient?: string,
   assetBudget?: { maximumAmount: string; lifetimeAmount?: string },
   selectTokenAdapter = true,
+  sharing = false,
 ) {
   const directory = await mkdtemp(join(tmpdir(), 'wpk-as2-'));
   dirs.push(directory);
@@ -118,7 +120,7 @@ export async function fixture(
       );
     },
   };
-  const policy = {
+  const policy: OnboardingPolicy = {
     version: '1',
     provider: {
       name: 'Offline',
@@ -144,6 +146,24 @@ export async function fixture(
       },
     ],
   };
+  if (sharing) {
+    policy.identity!.application!.requiredFields.push(
+      'identity_number',
+      'document_type',
+      'issuing_country',
+    );
+    policy.applications[0].walletSharing = {
+      applications: ['application-b'],
+      matchingFields: ['identity_number', 'document_type', 'issuing_country'],
+      agreement: 'offline-sharing',
+    };
+    policy.applications.push({
+      ...policy.applications[0],
+      clientId: 'application-b',
+      name: 'Offline B',
+      walletSharing: undefined,
+    });
+  }
   let onboarding = new OnboardingService(
     policy,
     db.onboardingStore,
@@ -236,7 +256,16 @@ export async function fixture(
           reference: 'offline',
           level: 'verified',
           verified_at: new Date(Date.now() - 1000).toISOString(),
-          fields: { country: 'ZA' },
+          fields: {
+            country: 'ZA',
+            ...(sharing
+              ? {
+                  identity_number: '0000000000001',
+                  document_type: 'national_id',
+                  issuing_country: 'ZA',
+                }
+              : {}),
+          },
         },
         consent: {
           reference: 'contract-consent',

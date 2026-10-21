@@ -40,6 +40,7 @@ import type {
 } from '../domain/signing.js';
 import { WalletProviderError } from '../domain/signing.js';
 import { deny, fingerprint } from '../onboarding/policy.js';
+import type { ProviderState } from '../onboarding/types.js';
 import type { OnboardingService } from '../onboarding/service.js';
 import type {
   ProviderConfiguration,
@@ -270,6 +271,7 @@ export class SafeWalletRuntime {
   private transaction<T>(
     fn: (
       registry: import('../runtime-configuration/service.js').RuntimeConfigurationState,
+      state: ProviderState,
     ) => T,
   ) {
     return this.database.onboardingStore.transaction((s) => {
@@ -279,7 +281,7 @@ export class SafeWalletRuntime {
         !deployment.runtimeConfiguration
       )
         deny();
-      return fn(deployment.runtimeConfiguration);
+      return fn(deployment.runtimeConfiguration, s);
     });
   }
   private async exclusive<T>(
@@ -1095,12 +1097,48 @@ export class SafeWalletRuntime {
           (s, grant) => ({
             owner: grant.owner,
             account: s.accounts[accountId],
+            shared: Boolean(s.requests[grant.requestId]?.sharing),
           }),
         );
       const current = await authority();
       const retainedWallet = await this.transaction(
         (r) => r.safeWalletAccounts?.[accountId],
       );
+      if (
+        current.shared &&
+        (!retainedWallet || retainedWallet.status !== 'ready')
+      )
+        deny();
+      if (retainedWallet && retainedWallet.applicationId !== applicationId) {
+        if (
+          retainedWallet.owner !== current.owner ||
+          retainedWallet.status !== 'ready'
+        )
+          deny();
+        await this.onboarding.withAccountAccess(
+          context.principal,
+          accountId,
+          'contracts:request',
+          (state) => {
+            if (
+              !this.onboarding.hasSharedWalletAccess(
+                state,
+                applicationId,
+                accountId,
+              )
+            )
+              deny();
+          },
+        );
+        this.assertRecoveryRecipe(retainedWallet);
+        await this.current(applicationId);
+        await this.publishBundler(applicationId);
+        await authority();
+        return {
+          account_id: accountId,
+          address: retainedWallet.binding.address,
+        };
+      }
       if (retainedWallet) {
         if (
           retainedWallet.owner !== current.owner ||
@@ -1612,10 +1650,17 @@ export class SafeWalletRuntime {
     const infrastructure = await this.current(applicationId),
       urls = await this.resources.rpcEndpoints(applicationId);
     if (!infrastructure.paymaster) deny();
-    const accounts = await this.transaction((r) =>
+    const accounts = await this.transaction((r, state) =>
       Object.values(r.safeWalletAccounts ?? {})
         .filter(
-          (a) => a.applicationId === applicationId && a.status === 'ready',
+          (a) =>
+            (a.applicationId === applicationId ||
+              this.onboarding.hasSharedWalletAccess(
+                state,
+                applicationId,
+                a.accountId,
+              )) &&
+            a.status === 'ready',
         )
         .map((a) => a.binding.address),
     );
@@ -1657,11 +1702,16 @@ export class SafeWalletRuntime {
     };
   }
   async driver(applicationId: string, accountId: string) {
-    await this.transaction((r) => {
+    await this.transaction((r, state) => {
       const wallet = r.safeWalletAccounts?.[accountId];
       if (
         !wallet ||
-        wallet.applicationId !== applicationId ||
+        (wallet.applicationId !== applicationId &&
+          !this.onboarding.hasSharedWalletAccess(
+            state,
+            applicationId,
+            accountId,
+          )) ||
         wallet.status !== 'ready'
       )
         deny();
@@ -1669,17 +1719,23 @@ export class SafeWalletRuntime {
     const driverKey = applicationId + ':' + accountId;
     const existing = this.drivers.get(driverKey);
     if (existing) return existing;
+    await this.publishBundler(applicationId);
     const infra = await this.current(applicationId),
       agreement = await this.agreement(applicationId);
     const application =
       this.config.policy.applications.find(
         (a) => runtimeApplicationId(a.issuer, a.clientId) === applicationId,
       ) ?? deny();
-    const accounts = await this.transaction((r) =>
+    const accounts = await this.transaction((r, state) =>
       Object.values(r.safeWalletAccounts ?? {})
         .filter(
           (a) =>
-            a.applicationId === applicationId &&
+            (a.applicationId === applicationId ||
+              this.onboarding.hasSharedWalletAccess(
+                state,
+                applicationId,
+                accountId,
+              )) &&
             a.accountId === accountId &&
             a.status === 'ready',
         )
@@ -1905,9 +1961,41 @@ export class SafeWalletRuntime {
             (a) => a.status === 'ready',
           ),
         );
+        const shared = await this.onboarding.store.transaction((state) =>
+          Object.values(state.grants)
+            .filter(
+              (grant) =>
+                state.requests[grant.requestId]?.sharing &&
+                (authorize ||
+                  (grant.caller.issuer === principal.issuer &&
+                    grant.caller.clientId === principal.clientId)),
+            )
+            .map((grant) => ({
+              accountId: grant.accountId,
+              applicationId: runtimeApplicationId(
+                grant.caller.issuer,
+                grant.caller.clientId,
+              ),
+            }))
+            .filter(
+              (link) =>
+                wallets.some((wallet) => wallet.accountId === link.accountId) &&
+                this.onboarding.hasSharedWalletAccess(
+                  state,
+                  link.applicationId,
+                  link.accountId,
+                ),
+            ),
+        );
+        const readers = new Map(
+          [...wallets, ...shared].map((wallet) => [
+            wallet.applicationId + ':' + wallet.accountId,
+            wallet,
+          ]),
+        );
         const results = await Promise.all(
-          wallets.map(async (w) =>
-            (await this.driver(w.applicationId, w.accountId)).list(
+          [...readers.values()].map(async (wallet) =>
+            (await this.driver(wallet.applicationId, wallet.accountId)).list(
               principal,
               authorize,
             ),
@@ -1932,6 +2020,28 @@ export class SafeWalletRuntime {
       await this.publishBundler(applicationId);
     for (const wallet of wallets)
       await this.driver(wallet.applicationId, wallet.accountId);
+    const shared = await this.onboarding.store.transaction((state) =>
+      Object.values(state.grants)
+        .filter((grant) => state.requests[grant.requestId]?.sharing)
+        .map((grant) => ({
+          accountId: grant.accountId,
+          applicationId: runtimeApplicationId(
+            grant.caller.issuer,
+            grant.caller.clientId,
+          ),
+        }))
+        .filter(
+          (link) =>
+            wallets.some((wallet) => wallet.accountId === link.accountId) &&
+            this.onboarding.hasSharedWalletAccess(
+              state,
+              link.applicationId,
+              link.accountId,
+            ),
+        ),
+    );
+    for (const link of shared)
+      await this.driver(link.applicationId, link.accountId);
     const tick = () => {
       if (this.stopped) return;
       this.timer = setTimeout(() => {

@@ -42,14 +42,23 @@ export interface ApplicationUserAssertion {
     expires_at: string;
     policy_revision: string;
     action_policy_revision?: string;
+    source_application_id?: string;
+    sharing_revision?: string;
   };
 }
 export interface AccessInput {
-  mode: 'create' | 'connect';
+  mode: 'create' | 'connect' | 'connect_from_application';
+  source_application_id?: string;
   account_id?: string;
   identity_record?: ApplicationIdentityRecord;
   user?: ApplicationUserAssertion;
   authorization_details: [{ type: typeof accessType; actions: Permission[] }];
+}
+export interface WalletSharingPolicy {
+  revision?: string;
+  applications: string[];
+  matchingFields: string[];
+  agreement: string;
 }
 export interface ApplicationPolicy {
   issuer: string;
@@ -58,6 +67,7 @@ export interface ApplicationPolicy {
   enabled?: boolean;
   /** Explicit permission to attest user identity and consent; an OAuth scope alone is insufficient. */
   assertionTrust?: { agreement: string };
+  walletSharing?: WalletSharingPolicy;
   permissions?: Permission[];
   /** Contractually agreed reimbursement, not a payment instruction or vendor price quote. */
   funding?: { agreement: string; monthlyLimitMinor: number };
@@ -124,6 +134,13 @@ export interface OwnerIdentity {
   authenticatedAt: number;
 }
 export interface AccessRequest {
+  sharing?: {
+    sourceApplicationId: string;
+    sourceRequestId: string;
+    subjectOwner: string;
+    revision: string;
+    evidenceHash: string;
+  };
   runtimePolicy?: import('../runtime-configuration/authority.js').RuntimePolicySnapshot;
   id: string;
   caller: Pick<VerifiedPrincipal, 'issuer' | 'subject' | 'clientId'>;
@@ -159,6 +176,8 @@ export interface AccessRequest {
   grantId?: string;
 }
 export interface AccountRecord {
+  /** Permanent application-user bindings; sharing never replaces the original owner. */
+  linkedOwners?: string[];
   id: string;
   owner: string;
   acceptedUntil: number;

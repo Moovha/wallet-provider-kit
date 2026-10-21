@@ -107,3 +107,17 @@ or wallet approvals. Existing transaction attempts keep their original identitie
 and checks through these changes. Replacing credentials cannot undo a transaction.
 
 For programmatic updates, use the [provider management API](provider-installation.md#automate-provider-administration).
+
+## Share existing wallets between applications
+
+Open the application that first connected the wallets and use **Share wallets with
+selected applications**. Select which applications may request access and which
+identity information must match. Both apps need reviewed user-check agreements;
+each person gives the requesting app separate consent and permissions. ID number,
+document type and issuing country must be required under **User checks** first.
+Save the reference to your reviewed sharing agreement. Sharing starts disabled.
+
+Changing sharing settings ends approvals that depended on them while preserving
+the source application’s own approvals. See [connect an existing wallet from another
+application](application-access.md#allow-another-application-to-request-existing-wallets)
+for the request flow, identity matching and withdrawal rules.

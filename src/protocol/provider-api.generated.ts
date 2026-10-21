@@ -232,7 +232,7 @@ export interface paths {
          *
          *     **When you need it:** Use after reading the access requirements and obtaining consent inside the application. Creating or reconnecting access is separate from creating the blockchain wallet.
          *
-         *     **Before you start:** After the person completes the agreed identity checks and approves wallet access in your application, submit those records here. First read GET /v1/access-policy for the required fields and current terms. Use mode=create for a first wallet account or mode=connect with the existing account_id for the same application user. The provider must trust your application’s checks. Hosted compatibility mode uses a separate provider login and review.
+         *     **Before you start:** After the person completes the agreed identity checks and approves wallet access in your application, submit those records here. First read GET /v1/access-policy for the required fields and current terms. Use mode=create for a first wallet account or mode=connect with the existing account_id for the same application user. To request a wallet from a selected source application, read GET /v1/access-policy?source_application_id=SOURCE_CONNECTION_ID, then use mode=connect_from_application and source_application_id without account_id. Include the returned sharing revision and source application in fresh consent for the requesting application. All configured identity fields must match exactly; ambiguous matches are denied. The provider must trust your application’s checks. Hosted compatibility mode uses a separate provider login and review.
          *
          *     **Result and next step:** 200: the access decision. A granted response includes account_id, grant_id, allowed actions and expiry. Save those IDs, then call POST /v1/accounts/{accountId}/provision to create the blockchain wallet. Reconnecting preserves the existing account. This request does not create an on-chain wallet or send money. Missing, stale or unauthorized evidence is rejected; consent_url is only for hosted compatibility mode.
          */
@@ -260,7 +260,7 @@ export interface paths {
          *
          *     **Before you start:** Call this before asking a person for wallet permission. Use your application token to learn which identity information to send, how recent the checks must be and how long permission can last. The provider operator sets these shared requirements under User checks in administration; this endpoint reads them and does not change settings or return customer records.
          *
-         *     **Result and next step:** 200: required_fields lists the identity field names; verification_level is the agreed check label. max_identity_age_days limits check age and max_access_days limits permission duration. Show the requested actions and terms, record the person’s consent to policy_revision (and action_policy_revision for transactions), then submit POST /v1/access-requests. Reading these requirements does not grant wallet access.
+         *     **Result and next step:** 200: required_fields lists the identity field names; verification_level is the agreed check label. max_identity_age_days limits check age and max_access_days limits permission duration. Show the requested actions and terms, record the person’s consent to policy_revision (and action_policy_revision for transactions), then submit POST /v1/access-requests. For cross-application access, supply source_application_id as a query parameter to receive wallet_sharing.matching_fields and wallet_sharing.revision. Record consent to that revision and source application. Reading these requirements does not grant wallet access.
          */
         get: operations["getAccountAccessPolicy"];
         put?: never;
@@ -2388,8 +2388,10 @@ export interface operations {
             content: {
                 "application/json": {
                     /** @enum {string} */
-                    mode: "create" | "connect";
+                    mode: "create" | "connect" | "connect_from_application";
                     account_id?: string;
+                    /** @description Source application connection ID for connect_from_application, using the same provider issuer. Omit account_id; the provider requires one unique verified identity match. */
+                    source_application_id?: string;
                     identity_record?: {
                         reference: string;
                         fields: {
@@ -2415,6 +2417,8 @@ export interface operations {
                             /** Format: date-time */
                             expires_at: string;
                             policy_revision: string;
+                            source_application_id?: string;
+                            sharing_revision?: string;
                             action_policy_revision?: string;
                         };
                     };
@@ -2624,7 +2628,9 @@ export interface operations {
     };
     getAccountAccessPolicy: {
         parameters: {
-            query?: never;
+            query?: {
+                source_application_id?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -2938,6 +2944,11 @@ export interface operations {
                         };
                         max_identity_age_days?: number;
                         max_access_days?: number;
+                        wallet_sharing?: {
+                            source_application_id: string;
+                            matching_fields: string[];
+                            revision: string;
+                        };
                         verification_level?: string;
                     };
                 };
@@ -12014,6 +12025,13 @@ export interface operations {
                     scopes?: ("wallet:configuration:read" | "wallet:configuration:propose" | "wallet:access" | "wallet:access:read" | "wallet:account:read" | "wallet:provision" | "wallet:actions" | "wallet:sign" | "wallet:execute" | "wallet:execute:read" | "provider:manage" | "wallet:configuration:write")[];
                     enabled?: boolean;
                     trust_agreement?: string | null;
+                    /** @description Allow selected applications to request these wallets under a reviewed identity-and-consent sharing agreement. Null disables sharing and ends dependent approvals. Each requester needs its own consent and permissions. */
+                    wallet_sharing?: {
+                        applications: string[];
+                        /** @description All fields must match exactly. Include identity_number, document_type and issuing_country; each must also be required under User checks. */
+                        matchingFields: string[];
+                        agreement: string;
+                    } | null;
                     permissions?: ("account:read" | "contracts:request" | "operations:request")[];
                 };
             };

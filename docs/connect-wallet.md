@@ -10,8 +10,11 @@ a new address. Use the account you saved for that same person and application.
 If their permission has expired or been withdrawn, ask them to approve access again.
 
 This guide covers wallets created for the **same user in the same application**.
-An address from another application or an external wallet needs a separately
-verified ownership integration; the standard flow does not link it automatically.
+To connect a wallet from another application on this provider, use
+[application sharing](application-access.md#allow-another-application-to-request-existing-wallets):
+the source application must allow yours, verified identity information must match,
+and the person gives your application separate consent. An external wallet still
+requires a separately verified ownership integration.
 
 ## 1. Find the person’s saved account
 

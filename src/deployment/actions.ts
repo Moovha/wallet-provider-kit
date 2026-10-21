@@ -131,7 +131,12 @@ export class SupportedActions {
         );
     if (
       !wallet ||
-      wallet.applicationId !== applicationId ||
+      (wallet.applicationId !== applicationId &&
+        !this.onboarding.hasSharedWalletAccess(
+          state,
+          applicationId,
+          wallet.accountId,
+        )) ||
       wallet.status !== 'ready' ||
       wallet.owner !== state.accounts[wallet.accountId]?.owner ||
       deployment?.activeRevision !== this.revision ||
