@@ -173,6 +173,8 @@ export class SafeWalletRuntime {
   private walletTimer?: ReturnType<typeof setTimeout>;
   private walletWakeAt = Infinity;
   private walletTick?: Promise<void>;
+  private settlement?: Promise<void>;
+  private settlementCursor = 0;
   private readonly walletRuns = new Map<
     UserOperationWalletCallsDriver,
     Promise<void>
@@ -193,13 +195,28 @@ export class SafeWalletRuntime {
     for (const driver of this.drivers.values()) {
       if (this.walletRuns.has(driver)) continue;
       const running = driver
-        .runOnce(snapshot)
+        .runOnce(snapshot, false)
         .catch(() => undefined)
         .finally(() => {
           if (this.walletRuns.get(driver) === running)
             this.walletRuns.delete(driver);
         });
       this.walletRuns.set(driver, running);
+    }
+    // One provider-wide finality observer avoids a restart burst from every retained wallet.
+    if (!this.settlement) {
+      const drivers = [...this.drivers.values()];
+      const running = (async () => {
+        for (let i = 0; i < drivers.length; i++) {
+          const index = this.settlementCursor++ % drivers.length;
+          if (await drivers[index].settleOnce(snapshot)) break;
+        }
+      })()
+        .catch(() => undefined)
+        .finally(() => {
+          if (this.settlement === running) this.settlement = undefined;
+        });
+      this.settlement = running;
     }
   }
   private scheduleWallets(delay: number) {
@@ -2079,6 +2096,7 @@ export class SafeWalletRuntime {
     await this.walletTick;
     await Promise.allSettled([...this.walletRuns.values()]);
     await this.replenishing;
+    await this.settlement;
     await Promise.all(
       [...this.drivers.values()].map((driver) => driver.stop()),
     );

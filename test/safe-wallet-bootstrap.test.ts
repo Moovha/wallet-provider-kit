@@ -325,8 +325,16 @@ it('shares one batch snapshot while a stalled account leaves other account worke
   const gate = new Promise<void>((resolve) => {
     release = resolve;
   });
-  const slow = { runOnce: vi.fn(() => gate), stop: async () => {} };
-  const fast = { runOnce: vi.fn(async () => {}), stop: async () => {} };
+  const slow = {
+    runOnce: vi.fn(() => gate),
+    settleOnce: vi.fn(async () => false),
+    stop: async () => {},
+  };
+  const fast = {
+    runOnce: vi.fn(async () => {}),
+    settleOnce: vi.fn(async () => false),
+    stop: async () => {},
+  };
   const worker = t.runtime as unknown as {
     drivers: Map<string, unknown>;
     runWallets(): Promise<void>;
@@ -799,4 +807,47 @@ it('retains the complete original deployment recipe before attempting its transa
     t.runtime.recoveryManifest(t.f.context, t.f.grant.account_id!),
   ).rejects.toMatchObject({ code: 'wallet_authorization_denied' });
   expect(t.broadcasts).toBe(0);
+});
+
+it('bounds historical observation across wallets without blocking new admission and rotates after an observer finishes', async () => {
+  const t = await bootstrap('10000000000');
+  let release!: () => void;
+  const gate = new Promise<boolean>((resolve) => {
+    release = () => resolve(true);
+  });
+  const first = {
+    runOnce: vi.fn(async () => {}),
+    settleOnce: vi.fn(() => gate),
+    stop: async () => {},
+  };
+  const second = {
+    runOnce: vi.fn(async () => {}),
+    settleOnce: vi.fn(async () => true),
+    stop: async () => {},
+  };
+  const worker = t.runtime as unknown as {
+    drivers: Map<string, unknown>;
+    runWallets(): Promise<void>;
+    settlement?: Promise<void>;
+  };
+  worker.drivers.set('first', first);
+  worker.drivers.set('second', second);
+  try {
+    await worker.runWallets();
+    await worker.runWallets();
+    expect(first.runOnce).toHaveBeenCalledTimes(2);
+    expect(second.runOnce).toHaveBeenCalledTimes(2);
+    expect(first.settleOnce).toHaveBeenCalledOnce();
+    expect(second.settleOnce).not.toHaveBeenCalled();
+    release();
+    await worker.settlement;
+    await worker.runWallets();
+    await worker.settlement;
+    expect(second.settleOnce).toHaveBeenCalledOnce();
+    expect(first.settleOnce).toHaveBeenCalledOnce();
+    expect(first.runOnce.mock.calls[0]).toEqual([expect.any(Array), false]);
+  } finally {
+    release();
+    await t.runtime.close();
+  }
 });

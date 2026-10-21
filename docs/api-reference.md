@@ -4253,7 +4253,12 @@ export declare class UserOperationWalletCallsDriver implements WalletCallsDriver
     truncated: boolean;
     batches: WalletCallsBatchSummary[];
   }>;
-  runOnce(snapshot?: readonly UserOperationBatch[]): Promise<void>;
+  runOnce(
+    snapshot?: readonly UserOperationBatch[],
+    settlement?: boolean,
+  ): Promise<void>;
+  /** Observe historical inclusion separately so finality reads cannot hold an admission worker. */
+  settleOnce(snapshot?: readonly UserOperationBatch[]): Promise<boolean>;
   start(): void;
   stop(): Promise<void>;
 }
