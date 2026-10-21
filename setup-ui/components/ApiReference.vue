@@ -10,6 +10,7 @@ import {
   referenceSpec,
   type ApiContract,
 } from '../api-reference';
+import { apiTasks, sortApiOperations } from '../../src/service/api-guides';
 import { loadSwagger, type SwaggerInstance } from '../swagger';
 const props = defineProps<{
   config: ProviderConfiguration;
@@ -21,6 +22,7 @@ const liveUrl = computed(() =>
 );
 const applicationIndex = ref(0);
 const search = ref('');
+const task = ref('Wallet access');
 const selectedOperation = ref('getAccountAccessPolicy');
 const canvas = ref<HTMLElement>();
 const loading = ref(true);
@@ -31,10 +33,12 @@ const operations = computed(() =>
   referenceOperations(props.contract, props.config, applicationIndex.value),
 );
 const shown = computed(() =>
-  operations.value.filter((item) =>
-    `${item.method} ${item.path} ${item.guide.title} ${item.guide.scope ?? ''}`
-      .toLowerCase()
-      .includes(search.value.toLowerCase().trim()),
+  operations.value.filter(
+    (item) =>
+      (!task.value || item.guide.group === task.value) &&
+      `${item.method} ${item.path} ${item.guide.title} ${item.guide.scope ?? ''} ${item.guide.purpose} ${item.guide.whenToUse}`
+        .toLowerCase()
+        .includes(search.value.toLowerCase().trim()),
   ),
 );
 const spec = computed(() =>
@@ -87,6 +91,7 @@ async function renderReference() {
       queryConfigEnabled: false,
       deepLinking: false,
       docExpansion: 'list',
+      operationsSorter: sortApiOperations,
       defaultModelsExpandDepth: -1,
       plugins: [
         () => ({
@@ -191,9 +196,10 @@ async function copy() {
         endpoints, use the Application tokens panel when operator token controls
         are configured, or Authorize with a short-lived application access
         token. POST requests can create records, incur vendor charges or issue
-        signatures that can authorize later transactions. Use an application
-        access token, never a vendor secret or this wizard's local session
-        token.
+        signatures that can authorize later transactions. Use the token for the
+        caller named on the request: application tokens for application work,
+        provider operator tokens for administration and review. Never use a
+        vendor secret or the wizard session token.
       </p>
       <a
         :href="docs + 'http-api.html#try-deployed-apis'"
@@ -257,14 +263,35 @@ async function copy() {
           aria-label="Find a request"
       /></label>
     </div>
-    <p class="help-text">
-      {{ shown.length }} endpoint(s). All implemented provider API endpoints are
-      shown by default, including unavailable services.
-      <strong>Not enabled</strong>
-      marks missing configuration; showing an endpoint does not enable it or
-      grant access. The search field filters the displayed reference and its
-      download.
-    </p>
+    <section class="callout" aria-label="Choose an API task">
+      <h3>What do you want to do?</h3>
+      <label
+        >Browse requests by task<select
+          v-model="task"
+          aria-label="Browse requests by task"
+        >
+          <option
+            v-for="entry in apiTasks"
+            :key="entry.name"
+            :value="entry.name"
+          >
+            {{ entry.name }}
+          </option>
+          <option value="">All requests</option>
+        </select></label
+      >
+      <p>
+        {{
+          apiTasks.find((entry) => entry.name === task)?.description ??
+          'Complete technical reference, including optional integrations.'
+        }}
+      </p>
+      <p>
+        {{ shown.length }} of {{ operations.length }} requests shown. Search and
+        task selection filter this preview and its download. Not enabled marks
+        missing setup; showing a request does not grant permission.
+      </p>
+    </section>
     <div class="callout">
       <h3>Understand what a transaction request does</h3>
       <p>
@@ -325,7 +352,8 @@ async function copy() {
             :key="item.operation.operationId"
             :value="item.operation.operationId"
           >
-            {{ item.method.toUpperCase() }} {{ item.path }}
+            {{ item.guide.title }} · {{ item.method.toUpperCase() }}
+            {{ item.path }}
           </option>
         </select></label
       >
@@ -338,7 +366,13 @@ async function copy() {
             : 'None')
         }}</code>
       </p>
-      <p>{{ selected.guide.prerequisite }}</p>
+      <h4>{{ selected.guide.title }}</h4>
+      <p><strong>Why this exists:</strong> {{ selected.guide.purpose }}</p>
+      <p><strong>Who uses it:</strong> {{ selected.guide.audience }}</p>
+      <p><strong>When you need it:</strong> {{ selected.guide.whenToUse }}</p>
+      <p>
+        <strong>Before you start:</strong> {{ selected.guide.prerequisite }}
+      </p>
       <p>{{ selected.guide.success }}</p>
       <p class="help-text">
         This request is an example. Replace the token, account/request/action

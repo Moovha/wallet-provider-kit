@@ -1,5 +1,6 @@
 import {
   operationGuides,
+  apiTasks,
   operationUnavailableReason,
   transactionBoundaryDescription,
   type ApiFeatures,
@@ -28,21 +29,20 @@ export function liveApiSpecification<T extends object>(
     >;
   };
   api.info.title = 'Wallet service API · Try a request';
-  api.info.description = `**You’re connected to a running service. Execute sends a real request, so review the details before you continue.**
+  api.info.description = `**Choose a task to see the requests you need. Start with Wallet access for the everyday user journey.**
 
-Explore the available requests below. **Not enabled** means some setup is still needed. **Configured** means the settings are present; the service still checks access and readiness when you send a request.
+Service operators can manage connections and user checks in [/admin/](/admin/). Application developers use the wallet and application setup requests. Optional identity integrations are for custom hosts and can be skipped in the standard flow.
+
+**You are connected to a running service.** Execute sends a real request. Read why the request exists, who uses it, and its result before trying it. Not enabled means setup is missing; Configured means settings are present, while current permission and readiness are still checked.
+
+Use an application token for application requests and a provider operator token for administration and review. Authorize accepts a short-lived access token, not a client secret, vendor key or identity token. The optional Application tokens panel supplies application tokens; it does not grant provider administration.
+
+Start with GET /v1/capabilities to check connectivity without a token. Keep original IDs and retry keys after an uncertain result. A 401 needs a current token; for 403 check the caller’s permissions and owner access; for 409 inspect the original request and current revision. Investigate 503 or connection errors before repeating a mutation.
 
 ${transactionBoundaryDescription}
 
-A good first request is GET /v1/capabilities; it needs no access token. If configured is false, wallet operations are not ready. A successful response here checks discovery only, not wallet creation, user checks or recovery.
-
-For protected calls, use the Application tokens panel when enabled: sign in as an allowed operator, choose a calling application and the API permissions (scopes) you need, then Get token or Renew token. Otherwise choose Authorize and paste a short-lived application access token without the Bearer prefix. Never enter client secrets, vendor keys, owner ID tokens or the local wizard session token. Tokens are kept in page memory; reload or Logout to clear authorization. Do not share screenshots containing tokens, cURL commands, personal data or signatures.
-
-Use real IDs returned by this deployment. POST requests can create records, incur vendor charges or issue usable signatures. Use a new UUIDv4 Idempotency-Key for each distinct mutation and retain the original key for retries. If the result is uncertain, check what happened to the original request before trying again. In standard application-led access, first read GET /v1/access-policy. Submit identity and consent attestations from a trusted application; users remain in that application. Optional staff sign-in is for token controls, not wallet users. Wallet calls require current owner access, identity acceptance, consent and provider policy checks.
-
-For a 401, obtain a current application token. For a 403, check the required scope and current owner access. For a 409, inspect the original attempt. For a 503 or a connection error, check service readiness and the outcome before retrying. A failed connection does not prove the request had no effect; preserve its idempotency key.
-
-See [operator testing instructions](https://moovha.github.io/wallet-provider-kit/docs/http-api.html#try-deployed-apis) for tokens, the first test and troubleshooting. The request examples and response schemas below explain the format. After Execute, read Server response for the actual result from this deployment.`;
+[Task guide and endpoint map](https://moovha.github.io/wallet-provider-kit/docs/api-endpoints.html) · [Authentication and retry guide](https://moovha.github.io/wallet-provider-kit/docs/http-api.html)`;
+  Object.assign(api, { tags: apiTasks.map((task) => ({ ...task })) });
   // Relative origin survives TLS ingress without trusting forwarded host headers.
   api.servers = [{ url: '/' }];
   for (const [path, methods] of Object.entries(api.paths)) {
@@ -53,7 +53,8 @@ See [operator testing instructions](https://moovha.github.io/wallet-provider-kit
         operation.operationId!,
         features,
       );
-      operation.summary = `[${reason ? 'Not enabled' : guide.scope || guide.serviceAuthenticated ? 'Configured' : 'Public'}] ${guide.title}`;
+      const setupCode = operation.operationId === 'claimProviderInstallation';
+      operation.summary = `[${reason ? 'Not enabled' : setupCode ? 'Setup code' : guide.scope || guide.serviceAuthenticated ? 'Configured' : 'Public'}] ${guide.title}`;
       operation.tags = [guide.group];
       operation.description = [
         reason
@@ -62,16 +63,16 @@ See [operator testing instructions](https://moovha.github.io/wallet-provider-kit
             ? '**Configured:** Current authentication, authority and service readiness are still required.'
             : '**Public:** No token is required. Discovery reports readiness without enabling wallet operations.',
         guide.scope
-          ? `Required application scope: **${guide.scope}**. Scopes alone do not grant account or spending authority.`
+          ? `Required token scope: **${guide.scope}**. Scopes alone do not grant account or spending authority.`
           : guide.serviceAuthenticated
             ? 'Requires a pinned signed service request. Application OAuth tokens are not accepted.'
-            : 'Public discovery; no access token required.',
-        guide.prerequisite,
-        method === 'post' && !guide.serviceAuthenticated
+            : setupCode
+              ? 'Requires the private, unexpired, single-use installation setup code. No application token can replace it.'
+              : 'Public read; no access token required.',
+        ['post', 'put', 'patch'].includes(method) && !guide.serviceAuthenticated
           ? '**Live mutation.** Execute may create records, incur vendor charges or issue a usable signature. Supply your own real inputs and retain the idempotency key.'
           : '',
         operation.description ?? '',
-        guide.success,
       ]
         .filter(Boolean)
         .join('\n\n');
@@ -123,8 +124,11 @@ export function liveRequestInterceptor(request: Record<string, unknown>) {
   return controller ? controller.prepare(request) : request;
 }
 
-/** Called after Swagger renders; the optional local theme supplies the controller. */
-export function mountDocumentationTokens() {
+/** Called after Swagger renders; task navigation never sends API requests. */
+export function mountApiDocumentation() {
+  (
+    globalThis as unknown as { wpkApiNavigation?: { mount(): void } }
+  ).wpkApiNavigation?.mount();
   (
     globalThis as unknown as { wpkExplorerTokens?: { mount: () => void } }
   ).wpkExplorerTokens?.mount();
@@ -137,5 +141,79 @@ export function documentationTokenPlugin(system: unknown) {
       wpkExplorerTokens?: { attach: (value: unknown) => void };
     }
   ).wpkExplorerTokens?.attach(system);
+  return {};
+}
+
+/** Serialized by Swagger UI; all navigation state stays in the page. */
+export function apiNavigationPlugin(system: unknown) {
+  interface NavigationElement {
+    id: string;
+    className: string;
+    textContent: string | null;
+    value: string;
+    onchange: (() => void) | null;
+    append(...children: NavigationElement[]): void;
+    before(child: NavigationElement): void;
+    setAttribute(name: string, value: string): void;
+  }
+  const document = (
+    globalThis as unknown as {
+      document: {
+        getElementById(id: string): NavigationElement | null;
+        querySelector(selector: string): NavigationElement | null;
+        createElement(tag: string): NavigationElement;
+      };
+    }
+  ).document;
+  const ui = system as {
+    getConfigs(): { walletApiTasks?: { name: string; description: string }[] };
+    layoutActions: { updateFilter(value: string): void };
+  };
+  (
+    globalThis as unknown as { wpkApiNavigation: { mount(): void } }
+  ).wpkApiNavigation = {
+    mount() {
+      if (document.getElementById('wallet-api-navigation')) return;
+      const root = document.querySelector('#swagger-ui');
+      if (!root) return;
+      const panel = document.createElement('section');
+      panel.id = 'wallet-api-navigation';
+      panel.className = 'wpk-api-navigation';
+      panel.setAttribute('aria-label', 'Choose an API task');
+      const heading = document.createElement('h2');
+      heading.textContent = 'What do you want to do?';
+      const label = document.createElement('label');
+      label.textContent = 'Browse requests by task';
+      const select = document.createElement('select');
+      select.setAttribute('aria-label', 'Browse requests by task');
+      const tasks = ui.getConfigs().walletApiTasks ?? [];
+      for (const task of [
+        ...tasks,
+        {
+          name: 'All requests',
+          description:
+            'Complete technical reference, including optional integrations. Each request still requires its own configured service and authority.',
+        },
+      ]) {
+        const option = document.createElement('option');
+        option.value = task.name === 'All requests' ? '' : task.name;
+        option.textContent = task.name;
+        select.append(option);
+      }
+      select.value = 'Wallet access';
+      const description = document.createElement('p');
+      description.textContent =
+        tasks.find((task) => task.name === select.value)?.description ?? '';
+      select.onchange = () => {
+        ui.layoutActions.updateFilter(select.value);
+        description.textContent =
+          tasks.find((task) => task.name === select.value)?.description ??
+          'Complete technical reference, including optional integrations. Choose a task to narrow the list.';
+      };
+      label.append(select);
+      panel.append(heading, label, description);
+      root.before(panel);
+    },
+  };
   return {};
 }

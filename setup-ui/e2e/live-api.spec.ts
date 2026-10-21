@@ -65,8 +65,25 @@ test('deployed Swagger executes same-origin HTTP and displays real success/auth/
   await expect(
     page.getByRole('heading', { name: /Wallet service API · Try a request/ }),
   ).toBeVisible();
+  await expect(
+    page.getByLabel('Browse requests by task', { exact: true }),
+  ).toHaveValue('Wallet access');
+  await expect(page.locator('.opblock')).toHaveCount(6);
+  await expect(page.locator('.opblock').first()).toHaveAttribute(
+    'id',
+    'operations-Wallet_access-getAccountAccessPolicy',
+  );
+  expect(calls).toHaveLength(0);
+  await page
+    .getByLabel('Browse requests by task', { exact: true })
+    .selectOption('Service status');
+  await expect(page.locator('.opblock')).toHaveCount(2);
+  expect(calls).toHaveLength(0);
+  await page
+    .getByLabel('Browse requests by task', { exact: true })
+    .selectOption('');
   await expect(page.locator('.opblock')).toHaveCount(endpointCount);
-  const discovery = page.locator('#operations-Discovery-getCapabilities');
+  const discovery = page.locator('#operations-Service_status-getCapabilities');
   await discovery.locator('.opblock-summary-control').click();
   await discovery
     .getByRole('button', { name: 'Try it out', exact: true })
@@ -83,9 +100,7 @@ test('deployed Swagger executes same-origin HTTP and displays real success/auth/
   await expect(discovery.locator('.responses-inner')).toContainText(
     'Request duration',
   );
-  const provision = page.locator(
-    '#operations-Wallet_accounts-provisionAccount',
-  );
+  const provision = page.locator('#operations-Wallet_access-provisionAccount');
   await provision.locator('.opblock-summary-control').click();
   await expect(provision).toContainText('wallet:provision');
   await provision
@@ -141,6 +156,9 @@ test('deployed Swagger executes same-origin HTTP and displays real success/auth/
   ).toEqual({ local: 0, session: 0 });
   await page.reload();
   await page
+    .getByLabel('Browse requests by task', { exact: true })
+    .selectOption('');
+  await page
     .getByRole('button', { name: 'Authorize', exact: true })
     .first()
     .click();
@@ -161,7 +179,7 @@ test('deployed Swagger executes same-origin HTTP and displays real success/auth/
     return route.fulfill({ json: {} });
   });
   const reloadedDiscovery = page.locator(
-    '#operations-Discovery-getCapabilities',
+    '#operations-Service_status-getCapabilities',
   );
   await reloadedDiscovery.locator('.opblock-summary-control').click();
   await reloadedDiscovery

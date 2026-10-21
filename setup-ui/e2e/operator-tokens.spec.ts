@@ -116,9 +116,7 @@ test('operator gets and renews tokens without paste, Execute renews near expiry,
     'Application token ready',
   );
   expect(issued).toBe(1);
-  const provision = page.locator(
-    '#operations-Wallet_accounts-provisionAccount',
-  );
+  const provision = page.locator('#operations-Wallet_access-provisionAccount');
   await provision.locator('.opblock-summary-control').click();
   await provision
     .getByRole('button', { name: 'Try it out', exact: true })
@@ -202,9 +200,7 @@ test('clearing during issuance discards the arriving token and never silently ch
   await expect(panel.getByRole('status')).toContainText(
     'Token selection changed',
   );
-  const provision = page.locator(
-    '#operations-Wallet_accounts-provisionAccount',
-  );
+  const provision = page.locator('#operations-Wallet_access-provisionAccount');
   await provision.locator('.opblock-summary-control').click();
   await provision
     .getByRole('button', { name: 'Try it out', exact: true })

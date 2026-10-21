@@ -171,9 +171,56 @@ for (const [path, methods] of Object.entries(schema.paths)) {
     http += '\n';
   }
 }
+let catalog = `---
+outline: 2
+---
+
+# Find the API request you need
+
+Choose a task before choosing an endpoint. Application developers normally start
+with wallet access, then transactions. Service operators can use administration
+at \`/admin/\` for connections and shared user checks. Optional identity integrations
+are separate host integrations and can be skipped in the standard flow.
+
+The explorer starts with **Wallet access**. Use **Browse requests by task** to
+choose another area, or **All requests** for the complete technical reference.
+Selecting a task sends no API request and grants no access. The request URLs and
+permission boundaries are the same in every view.
+
+## Understand requests that look similar
+
+| Question | Which requests to use |
+| --- | --- |
+| Access approval or wallet creation? | Read the access policy, submit identity and consent, then provision the approved account. Permission and blockchain wallet creation are separate steps. |
+| Account details or transaction wallet? | The account-details read shows access/provisioning status and the address once created. The transaction-wallet read provides the execution address and chain after transaction access is ready. |
+| Agreements or transaction rules? | Agreements record business actions, trusted network services and who pays fees. Transaction rules define the exact contract calls and limits. Both must be accepted/current before eligible transactions. |
+| Propose, approve a proposal, or publish directly? | Applications propose rules; operators review and publish saved proposals. Direct provider publication is an alternative for provider-authored baselines or changes. Historical reads support audit rather than activating older rules. |
+| Application route or provider route? | Applications see and change their own permitted records. Provider routes let a separately authorized operator review a selected application. These routes keep review separate from application requests. |
+| Fee funding or a person’s receiving address? | The application funding address covers eligible network fees. Individual user wallets hold their assets. Funding and user spending permission are separate. |
+| Standard access or enrollment/vendor import? | Standard applications submit their agreed user checks and consent with the access request. Custom login enrollment, vendor evidence import and read-only hosted evaluation are optional integrations. |
+
+`;
+const orderedOperations = Object.entries(schema.paths)
+  .flatMap(([path, methods]) =>
+    Object.entries(methods).map(([method, op]) => ({ path, method, op })),
+  )
+  .sort((a, b) => a.op['x-task-order'] - b.op['x-task-order']);
+for (const task of schema.tags ?? []) {
+  catalog += `## ${task.name}\n\n${task.description}\n\n`;
+  for (const { path, method, op } of orderedOperations) {
+    if (!op.tags?.includes(task.name)) continue;
+    const anchor = (method + '-' + path)
+      .toLowerCase()
+      .replace(/[{}]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '');
+    catalog += `### ${op.summary}\n\n${op['x-purpose']}\n\n**Who uses it:** ${op['x-audience']}.\n\n**When you need it:** ${op['x-when-to-use']}\n\n[\`${method.toUpperCase()} ${path}\`](http-reference.md#${anchor}) — request body, permissions, effects and response details.\n\n`;
+  }
+}
 for (const [path, text] of [
   ['docs/api-reference.md', markdown],
   ['docs/http-reference.md', http],
+  ['docs/api-endpoints.md', catalog],
 ]) {
   const content = await format(text, {
     ...(await resolveConfig(resolve(root, path))),

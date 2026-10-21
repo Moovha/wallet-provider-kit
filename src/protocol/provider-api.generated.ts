@@ -6,6 +6,18 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /**
+         * See supported transaction features
+         * @description **Why this exists:** Learn which transaction methods, network and execution features the service supports.
+         *
+         *     **Who uses it:** Application developer.
+         *
+         *     **When you need it:** Use when implementing wallet transactions or checking integration compatibility. GET /v1/capabilities is the simpler first connectivity check.
+         *
+         *     **Before you start:** No authentication required.
+         *
+         *     **Result and next step:** 200: the Safe ERC-4337 contract and configuration availability.
+         */
         get: operations["getExecutionCapabilities"];
         put?: never;
         post?: never;
@@ -22,6 +34,18 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /**
+         * Check the service connection
+         * @description **Why this exists:** Confirm that the provider responds and see whether it is configured for wallet operations.
+         *
+         *     **Who uses it:** Anyone connecting an application.
+         *
+         *     **When you need it:** Start here when connecting or troubleshooting. This public request needs no token.
+         *
+         *     **Before you start:** No token is needed. The configured field says whether the service is ready for wallet operations.
+         *
+         *     **Result and next step:** 200: the service profile and configured status. A 200 response confirms that discovery works; check configured before trying wallet operations.
+         */
         get: operations["getCapabilities"];
         put?: never;
         post?: never;
@@ -40,7 +64,20 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Reserve an owner-enrollment challenge through current host policy and durable storage. No wallet is created. */
+        /**
+         * Start a custom provider-login identity flow
+         * @description **Why this exists:** Reserve an identity-enrollment request and a login challenge for a custom host-owned identity integration.
+         *
+         *     **Who uses it:** Host integration developer.
+         *
+         *     **When you need it:** Use only when embedding the separate EnrollmentService with your own identity and authority integration. It is not available in the standard configured service.
+         *
+         *     **Before you start:** Compose the separate EnrollmentService with host-owned durable authority and OIDC identity verification. This profile is unavailable in the configured setup service and cannot be combined with application access onboarding.
+         *
+         *     **Result and next step:** 201: reserved enrollment/account IDs and a nonce-bound identity challenge. No wallet or spending grant is created.
+         *
+         *     **Request details:** Reserve an owner-enrollment challenge through current host policy and durable storage. No wallet is created.
+         */
         post: operations["beginEnrollment"];
         delete?: never;
         options?: never;
@@ -57,7 +94,20 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Submit a provider-nonce-bound OIDC Identity Assurance ID token. Provider policy decides acceptance; this never creates a wallet or spend grant. */
+        /**
+         * Submit identity proof from a custom provider login
+         * @description **Why this exists:** Submit the completed provider-login identity proof for a reserved enrollment request.
+         *
+         *     **Who uses it:** Host integration developer.
+         *
+         *     **When you need it:** Use only in the custom EnrollmentService flow, after its nonce-bound login. This does not grant application wallet access or spending authority.
+         *
+         *     **Before you start:** Complete the provider-owned OIDC flow using the reserved nonce. Submit a provider-audience OIDC Identity Assurance ID token only to this identity endpoint; the HTTP Authorization header still requires an application access token.
+         *
+         *     **Result and next step:** 200: the provider enrollment decision. A verified identity token does not grant wallet access or spending authority.
+         *
+         *     **Request details:** Submit a provider-nonce-bound OIDC Identity Assurance ID token. Provider policy decides acceptance; this never creates a wallet or spend grant.
+         */
         post: operations["submitEnrollmentIdentity"];
         delete?: never;
         options?: never;
@@ -72,7 +122,20 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Read the current authorized enrollment receipt without identity attributes or the proof token. */
+        /**
+         * Check a custom identity-enrollment request
+         * @description **Why this exists:** Read the decision for a previously reserved custom identity enrollment without returning private identity attributes.
+         *
+         *     **Who uses it:** Host integration developer.
+         *
+         *     **When you need it:** Use only in the separate EnrollmentService integration. Standard applications check their wallet-access request instead.
+         *
+         *     **Before you start:** Use the reserved enrollment ID with the original authorized caller and current host permission.
+         *
+         *     **Result and next step:** 200: the current enrollment receipt without identity attributes or proof tokens.
+         *
+         *     **Request details:** Read the current authorized enrollment receipt without identity attributes or the proof token.
+         */
         get: operations["getEnrollment"];
         put?: never;
         post?: never;
@@ -91,7 +154,20 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Provision a host-authorized account by stored ID with an empty body and durable attempt. When enrollment is configured, current provider acceptance for the same caller/account/owner is also required. Acceptance does not grant signing rights. */
+        /**
+         * Create the person’s blockchain wallet
+         * @description **Why this exists:** Create or locate the Safe wallet for an account that already has current approved access.
+         *
+         *     **Who uses it:** Application developer.
+         *
+         *     **When you need it:** Use after POST /v1/access-requests returns a granted account. Keep the original retry key if creation is pending or its outcome is uncertain.
+         *
+         *     **Before you start:** Use the accepted account_id with current owner-granted access and an empty JSON body: {}. Keep the original idempotency key when retrying. Investigate an unknown outcome before trying again.
+         *
+         *     **Result and next step:** 200: the user Safe account address and provisioning status. Deployment uses accepted application infrastructure. Pending deployment retains its original attempt; retry with the same identity. Wallet creation does not grant spending permission.
+         *
+         *     **Request details:** Provision a host-authorized account by stored ID with an empty body and durable attempt. When enrollment is configured, current provider acceptance for the same caller/account/owner is also required. Acceptance does not grant signing rights.
+         */
         post: operations["provisionAccount"];
         delete?: never;
         options?: never;
@@ -106,8 +182,32 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /**
+         * Check network-fee setup for an application
+         * @description **Why this exists:** See whether the application’s fee-paying infrastructure is prepared and whether it needs funding.
+         *
+         *     **Who uses it:** Service operator.
+         *
+         *     **When you need it:** Use before preparing or troubleshooting wallet creation. This concerns application fee funding, not a person’s wallet balance.
+         *
+         *     **Before you start:** Use a configured provider operator and an accepted application ID.
+         *
+         *     **Result and next step:** 200: the retained funding address, paymaster and setup status. Private signer credentials are never returned.
+         */
         get: operations["readSafeWalletInfrastructure"];
         put?: never;
+        /**
+         * Prepare an application to pay network fees
+         * @description **Why this exists:** Prepare the private transaction submission service and fee-paying contract needed for the application’s wallets.
+         *
+         *     **Who uses it:** Service operator.
+         *
+         *     **When you need it:** Use after accepting its network services and fee agreement. This setup may deploy contracts and consume application funding; it does not create a user wallet.
+         *
+         *     **Before you start:** Accept the application RPC and sponsorship terms. Fund the returned application address and retry with the original application identity.
+         *
+         *     **Result and next step:** 200: journaled paymaster deployment and gas funding. Uncertain transactions retain their original signed payload and hash.
+         */
         post: operations["provisionSafeWalletInfrastructure"];
         delete?: never;
         options?: never;
@@ -124,6 +224,18 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /**
+         * Submit a person’s checks and wallet permission
+         * @description **Why this exists:** Ask the provider to accept completed identity checks and the person’s recorded permission, then obtain account access IDs.
+         *
+         *     **Who uses it:** Application developer.
+         *
+         *     **When you need it:** Use after reading the access requirements and obtaining consent inside the application. Creating or reconnecting access is separate from creating the blockchain wallet.
+         *
+         *     **Before you start:** After the person completes the agreed identity checks and approves wallet access in your application, submit those records here. First read GET /v1/access-policy for the required fields and current terms. Use mode=create for a first wallet account or mode=connect with the existing account_id for the same application user. The provider must trust your application’s checks. Hosted compatibility mode uses a separate provider login and review.
+         *
+         *     **Result and next step:** 200: the access decision. A granted response includes account_id, grant_id, allowed actions and expiry. Save those IDs, then call POST /v1/accounts/{accountId}/provision to create the blockchain wallet. Reconnecting preserves the existing account. This request does not create an on-chain wallet or send money. Missing, stale or unauthorized evidence is rejected; consent_url is only for hosted compatibility mode.
+         */
         post: operations["requestAccountAccess"];
         delete?: never;
         options?: never;
@@ -138,6 +250,18 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /**
+         * See what to collect before connecting a wallet
+         * @description **Why this exists:** Learn which identity information, check age and consent terms your application must meet before requesting wallet access.
+         *
+         *     **Who uses it:** Application developer.
+         *
+         *     **When you need it:** Use before asking someone for permission, and after shared requirements or transaction policies change.
+         *
+         *     **Before you start:** Call this before asking a person for wallet permission. Use your application token to learn which identity information to send, how recent the checks must be and how long permission can last. The provider operator sets these shared requirements under User checks in administration; this endpoint reads them and does not change settings or return customer records.
+         *
+         *     **Result and next step:** 200: required_fields lists the identity field names; verification_level is the agreed check label. max_identity_age_days limits check age and max_access_days limits permission duration. Show the requested actions and terms, record the person’s consent to policy_revision (and action_policy_revision for transactions), then submit POST /v1/access-requests. Reading these requirements does not grant wallet access.
+         */
         get: operations["getAccountAccessPolicy"];
         put?: never;
         post?: never;
@@ -156,6 +280,18 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /**
+         * Disconnect an application from a person’s wallet
+         * @description **Why this exists:** End the application’s saved wallet permission when the person withdraws consent.
+         *
+         *     **Who uses it:** Application developer.
+         *
+         *     **When you need it:** Use when the person chooses Disconnect or withdraws wallet access in your application. Reconnecting requires new consent; existing signatures cannot be recalled.
+         *
+         *     **Before you start:** Use the grant_id returned to this application and the same caller. Send an empty JSON body. Your application must provide the user’s access-revocation control and call this endpoint when consent is withdrawn.
+         *
+         *     **Result and next step:** 200: revoked. Current wallet access and subsequent signing are denied. Already issued signatures are not cancelled. A renewed grant requires fresh consent evidence and a new request.
+         */
         post: operations["revokeAccountAccess"];
         delete?: never;
         options?: never;
@@ -172,6 +308,18 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /**
+         * Submit identity records for a read-only evaluation
+         * @description **Why this exists:** Submit a batch of application records into the optional hosted, unfunded evaluation flow.
+         *
+         *     **Who uses it:** Host integration developer.
+         *
+         *     **When you need it:** Use only when application-record evaluation is explicitly configured. The standard application-led flow submits each person’s evidence with POST /v1/access-requests instead.
+         *
+         *     **Before you start:** Select application-record evaluation in provider policy. Read GET /v1/access-policy, then submit up to 50 records in a body no larger than 512 KiB. Each reference must be unique within the batch and fields must contain every required policy field. Only required fields are retained. Keep the batch idempotency key; a changed batch requires a new key.
+         *
+         *     **Result and next step:** 200: an indexed result for each record. Complete records receive their own access request and consent URL; incomplete or duplicate records are marked invalid. Replaying the original batch resumes its requests without duplicate creation. Submission makes no wallet or vendor call. Owner consent and explicit provider review are still required.
+         */
         post: operations["submitAccountAccessRecords"];
         delete?: never;
         options?: never;
@@ -186,6 +334,18 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /**
+         * Check whether wallet access was approved
+         * @description **Why this exists:** Look up the decision for a saved access request and recover its returned account and permission details.
+         *
+         *     **Who uses it:** Application developer.
+         *
+         *     **When you need it:** Use after requesting access, after a lost response, or while a hosted review is pending. This does not submit new evidence or create a wallet.
+         *
+         *     **Before you start:** Use the returned request_id and a token for the same application and caller. Application-led access is decided from the trusted application’s submitted identity and consent evidence. Hosted compatibility mode requires its separate browser steps.
+         *
+         *     **Result and next step:** 200: the current request status. granted includes account and access-grant details. For funding_approval_required, arrange identity funding; for provider_review_required, wait for staff review; for reconciliation_required, ask the operator to investigate the original attempt.
+         */
         get: operations["getAccountAccessRequest"];
         put?: never;
         post?: never;
@@ -204,6 +364,18 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /**
+         * Reuse checks from an identity-verification service
+         * @description **Why this exists:** Import shared verification evidence for a pending hosted identity request using a vendor sharing token.
+         *
+         *     **Who uses it:** Host integration developer.
+         *
+         *     **When you need it:** Use only for a separately configured hosted identity integration, with owner consent and agreed vendor funding. It is not used by the standard application-led flow.
+         *
+         *     **Before you start:** Obtain owner consent and a valid share token from the selected identity vendor. Configure the recipient workflow, agreed import price and application funding first. Provider staff still review the imported evidence.
+         *
+         *     **Result and next step:** 200: the updated access request status. Vendor approval does not grant wallet access. If the import outcome is unknown, investigate that attempt before requesting another import.
+         */
         post: operations["importAccessIdentity"];
         delete?: never;
         options?: never;
@@ -218,6 +390,18 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /**
+         * See a person’s wallet account details
+         * @description **Why this exists:** Read an approved account’s status and, once provisioned, its receiving address.
+         *
+         *     **Who uses it:** Application developer.
+         *
+         *     **When you need it:** Use for the wallet overview or to check whether wallet creation completed. The transaction-wallet read provides the execution address and chain once transaction access is ready.
+         *
+         *     **Before you start:** The same application and caller need current account:read permission for this owner’s account, with accepted identity evidence.
+         *
+         *     **Result and next step:** 200: accepted or provisioned account status. An address is present after provisioning.
+         */
         get: operations["readGrantedAccount"];
         put?: never;
         post?: never;
@@ -234,7 +418,20 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Authenticated bounded SSE status stream. Sends current account-authorized EIP-5792 status after durable observation changes. Reconnect after 55 seconds; ordinary status reads remain available. */
+        /**
+         * Follow a transaction’s progress live
+         * @description **Why this exists:** Receive status updates for an admitted transaction request without repeatedly polling.
+         *
+         *     **Who uses it:** Application developer.
+         *
+         *     **When you need it:** Optional: use for live progress in your interface. Poll wallet_getCallsStatus through the wallet endpoint if you do not need a stream.
+         *
+         *     **Before you start:** Retain the admitted batch ID and use an authenticated fetch stream. Account ownership and batch access are checked before opening; authorization is checked before each update. Reconnect after 55 seconds or use wallet_getCallsStatus.
+         *
+         *     **Result and next step:** 200: text/event-stream status events after durable observations. Preconfirmation remains pending; verified inner execution determines success. Connections are bounded to two per account, 16 per application and 64 per service.
+         *
+         *     **Request details:** Authenticated bounded SSE status stream. Sends current account-authorized EIP-5792 status after durable observation changes. Reconnect after 55 seconds; ordinary status reads remain available.
+         */
         get: operations["streamWalletCallsStatus"];
         put?: never;
         post?: never;
@@ -251,9 +448,34 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /**
+         * See the wallet address and transaction network
+         * @description **Why this exists:** Get the user’s assigned Safe address and chain for wallet transactions. This is also their receiving address.
+         *
+         *     **Who uses it:** Application developer.
+         *
+         *     **When you need it:** Use when preparing transaction calls. GET /v1/accounts/{accountId} is the general account-details read and can be used before the wallet is provisioned.
+         *
+         *     **Before you start:** Use current account access and contract delegation after the application bundler and paymaster are ready.
+         *
+         *     **Result and next step:** 200: the Safe address and chain ID. This is the user’s deposit, balance and execution address.
+         */
         get: operations["readWalletExecutionAccount"];
         put?: never;
-        /** @description Optional account-scoped EIP-5792 2.0.0 JSON-RPC transport. Runtime financial authority, the Safe ERC-4337 driver, current owner consent and method-specific scopes remain required. wallet_sendCalls admits a durable atomic batch without waiting for chain inclusion. Headless wallet_showCallsStatus returns unsupported method; the client adapter can present status through an explicit host callback. */
+        /**
+         * Send a transaction or check its result
+         * @description **Why this exists:** Request approved contract calls, discover wallet call capabilities, or check a retained transaction result through one wallet endpoint.
+         *
+         *     **Who uses it:** Application developer.
+         *
+         *     **When you need it:** Use after wallet access, transaction rules and fee funding are ready. Choose wallet_sendCalls to submit or wallet_getCallsStatus to inspect; these methods have different effects and permissions.
+         *
+         *     **Before you start:** Enable Safe wallet calls. The account endpoint binds the authenticated application and current owner. Send requires wallet:actions, wallet:sign and wallet:execute plus contracts:request consent; status/discovery require wallet:execute:read.
+         *
+         *     **Result and next step:** 200: a JSON-RPC result or sanitized RPC error. Use EIP-5792 version 2.0.0, retain the batch ID and poll wallet_getCallsStatus. Inclusion is distinct from finality. HTTP authentication/readiness failures use the normal problem envelope.
+         *
+         *     **Request details:** Optional account-scoped EIP-5792 2.0.0 JSON-RPC transport. Runtime financial authority, the Safe ERC-4337 driver, current owner consent and method-specific scopes remain required. wallet_sendCalls admits a durable atomic batch without waiting for chain inclusion. Headless wallet_showCallsStatus returns unsupported method; the client adapter can present status through an explicit host callback.
+         */
         post: operations["walletCallsRpc"];
         delete?: never;
         options?: never;
@@ -268,7 +490,20 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Optional runtime configuration control plane. Application proposals and provider publications are configuration records, not wallet grants, signing authority or execution activation. Publications become readable immediately without restarting the service. Immutable historical revisions remain available. Requires the documented scope and configured application or operator identity. */
+        /**
+         * Find where to fund application network fees
+         * @description **Why this exists:** Get the application’s stable funding address and setup status so its operator knows where eligible network fees are funded.
+         *
+         *     **Who uses it:** Application developer.
+         *
+         *     **When you need it:** Use after the provider accepts fee sponsorship and prepares the application infrastructure. This address is separate from users’ receiving addresses.
+         *
+         *     **Before you start:** Have the provider accept sponsorship and prepare the application infrastructure.
+         *
+         *     **Result and next step:** 200: one stable application gas-funding address and infrastructure status for the application.
+         *
+         *     **Request details:** Optional runtime configuration control plane. Application proposals and provider publications are configuration records, not wallet grants, signing authority or execution activation. Publications become readable immediately without restarting the service. Immutable historical revisions remain available. Requires the documented scope and configured application or operator identity.
+         */
         get: operations["readApplicationGasFunding"];
         put?: never;
         post?: never;
@@ -285,7 +520,20 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Optional runtime configuration control plane. Application proposals and provider publications are configuration records, not wallet grants, signing authority or execution activation. Publications become readable immediately without restarting the service. Immutable historical revisions remain available. Requires the documented scope and configured application or operator identity. */
+        /**
+         * See saved network connection details
+         * @description **Why this exists:** List your saved service connection references and their status without returning secret values.
+         *
+         *     **Who uses it:** Application developer.
+         *
+         *     **When you need it:** Use before adding, replacing or removing an application-owned network connection.
+         *
+         *     **Before you start:** Use the registered application identity. Credential values are never returned.
+         *
+         *     **Result and next step:** 200: application-local references, revisions, origins and active or revoked status.
+         *
+         *     **Request details:** Optional runtime configuration control plane. Application proposals and provider publications are configuration records, not wallet grants, signing authority or execution activation. Publications become readable immediately without restarting the service. Immutable historical revisions remain available. Requires the documented scope and configured application or operator identity.
+         */
         get: operations["readApplicationCredentials"];
         put?: never;
         post?: never;
@@ -302,7 +550,20 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Optional runtime configuration control plane. Application proposals and provider publications are configuration records, not wallet grants, signing authority or execution activation. Publications become readable immediately without restarting the service. Immutable historical revisions remain available. Requires the documented scope and configured application or operator identity. */
+        /**
+         * Review an application’s network connections
+         * @description **Why this exists:** Inspect the service origins and saved connection references an application wants the provider to use.
+         *
+         *     **Who uses it:** Service operator.
+         *
+         *     **When you need it:** Use while reviewing its network-service agreement. The separate operator route lets you inspect the chosen application without sharing its secret values.
+         *
+         *     **Before you start:** Use an exact configured provider identity and the application ID. Review each origin before accepting the service declaration.
+         *
+         *     **Result and next step:** 200: credential metadata without secret paths. Reject service declarations to prevent their use.
+         *
+         *     **Request details:** Optional runtime configuration control plane. Application proposals and provider publications are configuration records, not wallet grants, signing authority or execution activation. Publications become readable immediately without restarting the service. Immutable historical revisions remain available. Requires the documented scope and configured application or operator identity.
+         */
         get: operations["readProviderApplicationCredentials"];
         put?: never;
         post?: never;
@@ -320,7 +581,20 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** @description Store or rotate an application-owned HTTPS service endpoint in encrypted storage. Send null to revoke it. Secret paths are never returned. Associated service declarations require provider review after every change. */
+        /**
+         * Save or remove a network service connection
+         * @description **Why this exists:** Securely retain an application-owned service endpoint, or revoke it, for use by approved network services.
+         *
+         *     **Who uses it:** Application developer.
+         *
+         *     **When you need it:** Use when a service connection is added, changed or removed. The provider must review affected service declarations again; metadata reads never reveal the saved value.
+         *
+         *     **Before you start:** Configure a retained runtimeConfiguration.credentialKey. Use the application identity, an original idempotency key and the current credential revision. Supply a vendor HTTPS endpoint or null to revoke it.
+         *
+         *     **Result and next step:** 200: encrypted credential retained and metadata returned. Referencing service declarations return to pending review. No provider secrets can be selected.
+         *
+         *     **Request details:** Store or rotate an application-owned HTTPS service endpoint in encrypted storage. Send null to revoke it. Secret paths are never returned. Associated service declarations require provider review after every change.
+         */
         put: operations["writeApplicationCredential"];
         post?: never;
         delete?: never;
@@ -336,7 +610,20 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Protected, application-scoped declarations and provider decisions. Accepted actions constrain off-chain payloads. Accepted service declarations permit resolving application-owned verifier credentials when credential storage is configured. Acceptance does not fund gas, provision a user Safe, activate execution or authorize spending. User assets remain in individual user wallets. Secrets and actual user payloads must not be submitted here. */
+        /**
+         * Check your application agreements
+         * @description **Why this exists:** See the transactions, network services and fee terms your application submitted, and whether the provider accepted each one.
+         *
+         *     **Who uses it:** Application developer.
+         *
+         *     **When you need it:** Use before changing an agreement or investigating why wallet setup or transactions are blocked.
+         *
+         *     **Before you start:** Use your application token. Read the saved revisions before preparing an agreement update.
+         *
+         *     **Result and next step:** 200: your action, service and fee declarations with their review decisions. Submit changed terms through the matching agreement endpoint, then wait for provider acceptance.
+         *
+         *     **Request details:** Protected, application-scoped declarations and provider decisions. Accepted actions constrain off-chain payloads. Accepted service declarations permit resolving application-owned verifier credentials when credential storage is configured. Acceptance does not fund gas, provision a user Safe, activate execution or authorize spending. User assets remain in individual user wallets. Secrets and actual user payloads must not be submitted here.
+         */
         get: operations["readApplicationObligations"];
         put?: never;
         post?: never;
@@ -353,7 +640,20 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Protected, application-scoped declarations and provider decisions. Accepted actions constrain off-chain payloads. Accepted service declarations permit resolving application-owned verifier credentials when credential storage is configured. Acceptance does not fund gas, provision a user Safe, activate execution or authorize spending. User assets remain in individual user wallets. Secrets and actual user payloads must not be submitted here. */
+        /**
+         * Review an application’s submitted agreements
+         * @description **Why this exists:** See one application’s proposed transactions, network services and fee terms before deciding whether to accept them.
+         *
+         *     **Who uses it:** Service operator.
+         *
+         *     **When you need it:** Use during application onboarding and after agreement changes. Applications read their own agreements through the separate application route.
+         *
+         *     **Before you start:** Use a provider operator token and the selected application ID.
+         *
+         *     **Result and next step:** 200: the selected application’s declarations, revisions and decisions. Review the matching connection metadata and policy before accepting each declaration.
+         *
+         *     **Request details:** Protected, application-scoped declarations and provider decisions. Accepted actions constrain off-chain payloads. Accepted service declarations permit resolving application-owned verifier credentials when credential storage is configured. Acceptance does not fund gas, provision a user Safe, activate execution or authorize spending. User assets remain in individual user wallets. Secrets and actual user payloads must not be submitted here.
+         */
         get: operations["readProviderApplicationObligations"];
         put?: never;
         post?: never;
@@ -371,7 +671,20 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** @description Protected, application-scoped declarations and provider decisions. Accepted actions constrain off-chain payloads. Accepted service declarations permit resolving application-owned verifier credentials when credential storage is configured. Acceptance does not fund gas, provision a user Safe, activate execution or authorize spending. User assets remain in individual user wallets. Secrets and actual user payloads must not be submitted here. */
+        /**
+         * Submit the transactions your application needs
+         * @description **Why this exists:** Describe the business actions and supporting information your application expects to submit for provider review.
+         *
+         *     **Who uses it:** Application developer.
+         *
+         *     **When you need it:** Use during application setup or when supported business actions change. Send field definitions, not an actual person’s transaction data.
+         *
+         *     **Before you start:** Use your application token, the current action-declaration revision and a UUIDv4 idempotency key. Submit action definitions and required fields, never actual user payloads.
+         *
+         *     **Result and next step:** 200: a saved action declaration awaiting provider review. Send its current revisions to the provider operator for a decision. This does not publish call policy or authorize a transaction.
+         *
+         *     **Request details:** Protected, application-scoped declarations and provider decisions. Accepted actions constrain off-chain payloads. Accepted service declarations permit resolving application-owned verifier credentials when credential storage is configured. Acceptance does not fund gas, provision a user Safe, activate execution or authorize spending. User assets remain in individual user wallets. Secrets and actual user payloads must not be submitted here.
+         */
         put: operations["submitApplicationActions"];
         post?: never;
         delete?: never;
@@ -389,7 +702,20 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Protected, application-scoped declarations and provider decisions. Accepted actions constrain off-chain payloads. Accepted service declarations permit resolving application-owned verifier credentials when credential storage is configured. Acceptance does not fund gas, provision a user Safe, activate execution or authorize spending. User assets remain in individual user wallets. Secrets and actual user payloads must not be submitted here. */
+        /**
+         * Accept or decline an application’s transactions
+         * @description **Why this exists:** Record your decision on the current submitted business actions and information requirements.
+         *
+         *     **Who uses it:** Service operator.
+         *
+         *     **When you need it:** Use after reviewing an application’s transaction declaration. Acceptance alone does not publish transaction rules or approve anyone’s spending.
+         *
+         *     **Before you start:** Use a provider operator token, the application ID, current declaration and decision revisions, and a UUIDv4 idempotency key.
+         *
+         *     **Result and next step:** 200: accepted or rejected action definitions. Acceptance constrains supporting transaction data; the active call policy, owner consent and every transaction check remain required.
+         *
+         *     **Request details:** Protected, application-scoped declarations and provider decisions. Accepted actions constrain off-chain payloads. Accepted service declarations permit resolving application-owned verifier credentials when credential storage is configured. Acceptance does not fund gas, provision a user Safe, activate execution or authorize spending. User assets remain in individual user wallets. Secrets and actual user payloads must not be submitted here.
+         */
         post: operations["decideApplicationActions"];
         delete?: never;
         options?: never;
@@ -405,7 +731,20 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** @description Protected, application-scoped declarations and provider decisions. Accepted actions constrain off-chain payloads. Accepted service declarations permit resolving application-owned verifier credentials when credential storage is configured. Acceptance does not fund gas, provision a user Safe, activate execution or authorize spending. User assets remain in individual user wallets. Secrets and actual user payloads must not be submitted here. */
+        /**
+         * Submit the network services your application will use
+         * @description **Why this exists:** Declare the network-reading and verification services the application will pay for and their saved connection references.
+         *
+         *     **Who uses it:** Application developer.
+         *
+         *     **When you need it:** Use after saving service connections, or when the selected services change. Submit references rather than secret values.
+         *
+         *     **Before you start:** Save application-owned service connections first. Use your application token, the current service-declaration revision and a UUIDv4 idempotency key. Submit opaque saved references rather than secrets.
+         *
+         *     **Result and next step:** 200: saved service declarations awaiting provider review. Changes require a new provider decision before eligible connections can be used.
+         *
+         *     **Request details:** Protected, application-scoped declarations and provider decisions. Accepted actions constrain off-chain payloads. Accepted service declarations permit resolving application-owned verifier credentials when credential storage is configured. Acceptance does not fund gas, provision a user Safe, activate execution or authorize spending. User assets remain in individual user wallets. Secrets and actual user payloads must not be submitted here.
+         */
         put: operations["submitApplicationServices"];
         post?: never;
         delete?: never;
@@ -423,7 +762,20 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Protected, application-scoped declarations and provider decisions. Accepted actions constrain off-chain payloads. Accepted service declarations permit resolving application-owned verifier credentials when credential storage is configured. Acceptance does not fund gas, provision a user Safe, activate execution or authorize spending. User assets remain in individual user wallets. Secrets and actual user payloads must not be submitted here. */
+        /**
+         * Accept or decline an application’s network services
+         * @description **Why this exists:** Record whether the declared network services and saved connection origins are acceptable.
+         *
+         *     **Who uses it:** Service operator.
+         *
+         *     **When you need it:** Use after reviewing the current service declaration and connection metadata. Acceptance permits eligible connections to be used; it does not fund them.
+         *
+         *     **Before you start:** Review the declared services and credential origins. Use a provider operator token, both current revisions and a UUIDv4 idempotency key.
+         *
+         *     **Result and next step:** 200: accepted or rejected service declarations. Accepted references can resolve only application-owned credentials when credential storage is configured.
+         *
+         *     **Request details:** Protected, application-scoped declarations and provider decisions. Accepted actions constrain off-chain payloads. Accepted service declarations permit resolving application-owned verifier credentials when credential storage is configured. Acceptance does not fund gas, provision a user Safe, activate execution or authorize spending. User assets remain in individual user wallets. Secrets and actual user payloads must not be submitted here.
+         */
         post: operations["decideApplicationServices"];
         delete?: never;
         options?: never;
@@ -439,7 +791,20 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** @description Protected, application-scoped declarations and provider decisions. Accepted actions constrain off-chain payloads. Accepted service declarations permit resolving application-owned verifier credentials when credential storage is configured. Acceptance does not fund gas, provision a user Safe, activate execution or authorize spending. User assets remain in individual user wallets. Secrets and actual user payloads must not be submitted here. */
+        /**
+         * Submit who pays network fees and the limits
+         * @description **Why this exists:** Declare the application’s agreement to pay eligible network fees, with bounded costs and account limits.
+         *
+         *     **Who uses it:** Application developer.
+         *
+         *     **When you need it:** Use before preparing fee-paying infrastructure or changing fee terms. Saving this agreement does not transfer money or fund the address.
+         *
+         *     **Before you start:** Use your application token, the current fee-agreement revision and a UUIDv4 idempotency key. Include bounded funding and account limits for the configured network.
+         *
+         *     **Result and next step:** 200: a saved fee agreement awaiting provider review. After acceptance, the provider can prepare the application’s fee infrastructure and the application can fund its returned address.
+         *
+         *     **Request details:** Protected, application-scoped declarations and provider decisions. Accepted actions constrain off-chain payloads. Accepted service declarations permit resolving application-owned verifier credentials when credential storage is configured. Acceptance does not fund gas, provision a user Safe, activate execution or authorize spending. User assets remain in individual user wallets. Secrets and actual user payloads must not be submitted here.
+         */
         put: operations["submitApplicationSponsorship"];
         post?: never;
         delete?: never;
@@ -457,7 +822,20 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Protected, application-scoped declarations and provider decisions. Accepted actions constrain off-chain payloads. Accepted service declarations permit resolving application-owned verifier credentials when credential storage is configured. Acceptance does not fund gas, provision a user Safe, activate execution or authorize spending. User assets remain in individual user wallets. Secrets and actual user payloads must not be submitted here. */
+        /**
+         * Accept or decline an application’s fee agreement
+         * @description **Why this exists:** Record your decision on who pays network fees and the proposed cost limits.
+         *
+         *     **Who uses it:** Service operator.
+         *
+         *     **When you need it:** Use before preparing application fee infrastructure, and whenever fee terms change. Actual funding remains a separate step.
+         *
+         *     **Before you start:** Review the network, funding agreement and limits. Use a provider operator token, both current revisions and a UUIDv4 idempotency key.
+         *
+         *     **Result and next step:** 200: accepted or rejected fee terms. Acceptance permits eligible infrastructure setup; it does not fund gas or approve user transactions.
+         *
+         *     **Request details:** Protected, application-scoped declarations and provider decisions. Accepted actions constrain off-chain payloads. Accepted service declarations permit resolving application-owned verifier credentials when credential storage is configured. Acceptance does not fund gas, provision a user Safe, activate execution or authorize spending. User assets remain in individual user wallets. Secrets and actual user payloads must not be submitted here.
+         */
         post: operations["decideApplicationSponsorship"];
         delete?: never;
         options?: never;
@@ -472,7 +850,20 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Optional runtime configuration control plane. Application proposals and provider publications are configuration records, not wallet grants, signing authority or execution activation. Publications become readable immediately without restarting the service. Immutable historical revisions remain available. Requires the documented scope and configured application or operator identity. */
+        /**
+         * Find an application and its setup progress
+         * @description **Why this exists:** List visible application setups and optionally load one application’s current rules and recent proposals.
+         *
+         *     **Who uses it:** Application developer or service operator.
+         *
+         *     **When you need it:** Use for a setup dashboard. Operators can inspect their configured applications; applications can see only their own setup.
+         *
+         *     **Before you start:** Use application configuration read scope or an exact configured provider operator with configuration write scope. Supply application_id to load one application’s policy and latest 20 proposals. Application callers cannot select another namespace.
+         *
+         *     **Result and next step:** 200: enabled application summaries and selected policy/proposal details. The provider sees its configured applications; applications see only their own registration. No spending authority is granted.
+         *
+         *     **Request details:** Optional runtime configuration control plane. Application proposals and provider publications are configuration records, not wallet grants, signing authority or execution activation. Publications become readable immediately without restarting the service. Immutable historical revisions remain available. Requires the documented scope and configured application or operator identity.
+         */
         get: operations["listApplicationConfigurations"];
         put?: never;
         post?: never;
@@ -489,7 +880,20 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Optional runtime configuration control plane. Application proposals and provider publications are configuration records, not wallet grants, signing authority or execution activation. Publications become readable immediately without restarting the service. Immutable historical revisions remain available. Requires the documented scope and configured application or operator identity. */
+        /**
+         * See recent transaction requests
+         * @description **Why this exists:** List the transaction requests you may read, including their queue stages and retained verified outcomes.
+         *
+         *     **Who uses it:** Application developer or service operator.
+         *
+         *     **When you need it:** Use for history and monitoring. Read an individual transaction’s current status through the wallet endpoint when an observation is still pending.
+         *
+         *     **Before you start:** Applications need current owner account-read access and execute read scope. Exact configured provider operators can inspect the provider ledger using configuration write scope. No application token can become an operator through scopes alone.
+         *
+         *     **Result and next step:** 200: up to 100 readable batch summaries, queue stages and retained finalized RPC-quorum receipts. Unfinalized observations remain pending in this list; applications can refresh individual wallet_getCallsStatus results. Listing never signs, submits or retries.
+         *
+         *     **Request details:** Optional runtime configuration control plane. Application proposals and provider publications are configuration records, not wallet grants, signing authority or execution activation. Publications become readable immediately without restarting the service. Immutable historical revisions remain available. Requires the documented scope and configured application or operator identity.
+         */
         get: operations["listWalletBatches"];
         put?: never;
         post?: never;
@@ -508,7 +912,20 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Optional runtime configuration control plane. Application proposals and provider publications are configuration records, not wallet grants, signing authority or execution activation. Publications become readable immediately without restarting the service. Immutable historical revisions remain available. Requires the documented scope and configured application or operator identity. */
+        /**
+         * Choose how future transaction-rule changes are reviewed
+         * @description **Why this exists:** Choose manual review or limited automatic publication for future application contract and method changes.
+         *
+         *     **Who uses it:** Service operator.
+         *
+         *     **When you need it:** Optional: use after publishing baseline rules. Automatic review accepts only changes whose provider-controlled terms exactly match the current policy; it does not approve existing pending proposals.
+         *
+         *     **Before you start:** Publish a baseline policy first. An exact configured provider operator chooses automatic or manual review using both expected_revision and expected_review_revision with a UUID idempotency key. Choose the review mode explicitly.
+         *
+         *     **Result and next step:** 200: a durable review decision. Automatic mode publishes subsequent contract/method changes only when provider terms exactly match the enabled current policy. Claims, value/call limits, validity, enablement and chain remain provider controlled. Existing pending proposals are not retroactively accepted.
+         *
+         *     **Request details:** Optional runtime configuration control plane. Application proposals and provider publications are configuration records, not wallet grants, signing authority or execution activation. Publications become readable immediately without restarting the service. Immutable historical revisions remain available. Requires the documented scope and configured application or operator identity.
+         */
         post: operations["setRuntimeReviewMode"];
         delete?: never;
         options?: never;
@@ -523,7 +940,20 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Optional runtime configuration control plane. Application proposals and provider publications are configuration records, not wallet grants, signing authority or execution activation. Publications become readable immediately without restarting the service. Immutable historical revisions remain available. Requires the documented scope and configured application or operator identity. */
+        /**
+         * See your application’s current transaction rules
+         * @description **Why this exists:** Read the active allowed calls, identity claims and transaction limits before requesting permission or preparing a change.
+         *
+         *     **Who uses it:** Application developer.
+         *
+         *     **When you need it:** Use during application integration and before proposing changes. This reads the published policy, not business declarations or anyone’s wallet permission.
+         *
+         *     **Before you start:** Use your registered application token with configuration-read permission.
+         *
+         *     **Result and next step:** 200: the current published transaction policy and its revision, or the unpublished state. Retain the revision before proposing changes and show current terms before collecting transaction consent.
+         *
+         *     **Request details:** Optional runtime configuration control plane. Application proposals and provider publications are configuration records, not wallet grants, signing authority or execution activation. Publications become readable immediately without restarting the service. Immutable historical revisions remain available. Requires the documented scope and configured application or operator identity.
+         */
         get: operations["readRuntimeConfiguration"];
         put?: never;
         post?: never;
@@ -540,7 +970,20 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Optional runtime configuration control plane. Application proposals and provider publications are configuration records, not wallet grants, signing authority or execution activation. Publications become readable immediately without restarting the service. Immutable historical revisions remain available. Requires the documented scope and configured application or operator identity. */
+        /**
+         * Review an application’s current transaction rules
+         * @description **Why this exists:** Inspect the active transaction rules for a selected application before approving or changing them.
+         *
+         *     **Who uses it:** Service operator.
+         *
+         *     **When you need it:** Use for provider review. The separate application route lets an application read only its own current rules.
+         *
+         *     **Before you start:** Use a separately configured provider operator token. Application tokens cannot read another application’s registry or publish changes.
+         *
+         *     **Result and next step:** 200: the current durable publication and predecessor information. Read it before preparing a compare-and-set policy update. Configuration does not authorize spending.
+         *
+         *     **Request details:** Optional runtime configuration control plane. Application proposals and provider publications are configuration records, not wallet grants, signing authority or execution activation. Publications become readable immediately without restarting the service. Immutable historical revisions remain available. Requires the documented scope and configured application or operator identity.
+         */
         get: operations["readRuntimeApplicationConfiguration"];
         put?: never;
         post?: never;
@@ -557,7 +1000,20 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Optional runtime configuration control plane. Application proposals and provider publications are configuration records, not wallet grants, signing authority or execution activation. Publications become readable immediately without restarting the service. Immutable historical revisions remain available. Requires the documented scope and configured application or operator identity. */
+        /**
+         * Look up an earlier version of transaction rules
+         * @description **Why this exists:** Read an immutable published rules version to understand which terms applied at that point.
+         *
+         *     **Who uses it:** Application developer.
+         *
+         *     **When you need it:** Optional: use for audit and troubleshooting. Reading history does not reactivate those rules or restore wallet permission.
+         *
+         *     **Before you start:** Use your application token and the exact saved policy revision. Historical versions remain immutable.
+         *
+         *     **Result and next step:** 200: the requested historical publication. Compare it with the current policy when investigating a request; its presence does not make it current.
+         *
+         *     **Request details:** Optional runtime configuration control plane. Application proposals and provider publications are configuration records, not wallet grants, signing authority or execution activation. Publications become readable immediately without restarting the service. Immutable historical revisions remain available. Requires the documented scope and configured application or operator identity.
+         */
         get: operations["readRuntimeConfigurationRevision"];
         put?: never;
         post?: never;
@@ -576,7 +1032,20 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Optional runtime configuration control plane. Application proposals and provider publications are configuration records, not wallet grants, signing authority or execution activation. Publications become readable immediately without restarting the service. Immutable historical revisions remain available. Requires the documented scope and configured application or operator identity. */
+        /**
+         * Submit transaction-rule changes for review
+         * @description **Why this exists:** Propose the contract calls and limits your application needs without publishing them yourself.
+         *
+         *     **Who uses it:** Application developer.
+         *
+         *     **When you need it:** Use when initially configuring transactions or requesting changes. A provider operator reviews and publishes the proposal unless an explicitly enabled automatic-review rule applies.
+         *
+         *     **Before you start:** Read the current policy first. Use your application token, expected_revision and an original UUIDv4 idempotency key.
+         *
+         *     **Result and next step:** 200: a durable proposal and its outcome. Keep its ID and inspect it through the proposal-status endpoint. Publication follows the provider’s explicit review mode; proposing never authorizes spending.
+         *
+         *     **Request details:** Optional runtime configuration control plane. Application proposals and provider publications are configuration records, not wallet grants, signing authority or execution activation. Publications become readable immediately without restarting the service. Immutable historical revisions remain available. Requires the documented scope and configured application or operator identity.
+         */
         post: operations["proposeRuntimeConfiguration"];
         delete?: never;
         options?: never;
@@ -591,7 +1060,20 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Optional runtime configuration control plane. Application proposals and provider publications are configuration records, not wallet grants, signing authority or execution activation. Publications become readable immediately without restarting the service. Immutable historical revisions remain available. Requires the documented scope and configured application or operator identity. */
+        /**
+         * Check a transaction-rule proposal
+         * @description **Why this exists:** Inspect a saved proposal to see its requested rules and publication outcome.
+         *
+         *     **Who uses it:** Application developer.
+         *
+         *     **When you need it:** Use after submitting a proposal or losing its response. Keep its ID so you can check the original request.
+         *
+         *     **Before you start:** Use your application token and the original proposal ID. Applications cannot inspect another application’s proposals.
+         *
+         *     **Result and next step:** 200: the retained proposal and any publication result. If it still needs manual review, ask the provider operator to review that proposal rather than submitting duplicates.
+         *
+         *     **Request details:** Optional runtime configuration control plane. Application proposals and provider publications are configuration records, not wallet grants, signing authority or execution activation. Publications become readable immediately without restarting the service. Immutable historical revisions remain available. Requires the documented scope and configured application or operator identity.
+         */
         get: operations["readRuntimeConfigurationProposal"];
         put?: never;
         post?: never;
@@ -610,7 +1092,20 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Optional runtime configuration control plane. Application proposals and provider publications are configuration records, not wallet grants, signing authority or execution activation. Publications become readable immediately without restarting the service. Immutable historical revisions remain available. Requires the documented scope and configured application or operator identity. */
+        /**
+         * Approve and publish proposed transaction rules
+         * @description **Why this exists:** Make a reviewed application proposal the active transaction policy.
+         *
+         *     **Who uses it:** Service operator.
+         *
+         *     **When you need it:** Use for the normal proposal-and-review workflow. This is separate from accepting business declarations; publication defines the exact calls and limits that may be requested.
+         *
+         *     **Before you start:** Read the proposal and current policy. Use a provider operator token, the proposal ID, expected_revision and a UUIDv4 idempotency key.
+         *
+         *     **Result and next step:** 200: the published policy revision, effective without restart. Applications must read the new terms and obtain any required fresh consent. The published rules do not authorize a transaction by themselves.
+         *
+         *     **Request details:** Optional runtime configuration control plane. Application proposals and provider publications are configuration records, not wallet grants, signing authority or execution activation. Publications become readable immediately without restarting the service. Immutable historical revisions remain available. Requires the documented scope and configured application or operator identity.
+         */
         post: operations["publishRuntimeConfiguration"];
         delete?: never;
         options?: never;
@@ -627,7 +1122,20 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Optional runtime configuration control plane. Application proposals and provider publications are configuration records, not wallet grants, signing authority or execution activation. Publications become readable immediately without restarting the service. Immutable historical revisions remain available. Requires the documented scope and configured application or operator identity. */
+        /**
+         * Set transaction rules directly as the provider
+         * @description **Why this exists:** Publish a provider-authored rules version without first creating an application proposal.
+         *
+         *     **Who uses it:** Service operator.
+         *
+         *     **When you need it:** Alternative setup path: use for a baseline or provider-controlled policy change. Use proposal publication instead when reviewing an application’s saved proposal; both retain version history.
+         *
+         *     **Before you start:** Use a provider operator token, the application ID, current expected_revision and a UUIDv4 idempotency key. Submit a complete reviewed policy.
+         *
+         *     **Result and next step:** 200: a new immutable policy publication, effective without restart. Earlier publications remain available for audit. Applications still need current owner consent and approved agreements before transactions.
+         *
+         *     **Request details:** Optional runtime configuration control plane. Application proposals and provider publications are configuration records, not wallet grants, signing authority or execution activation. Publications become readable immediately without restarting the service. Immutable historical revisions remain available. Requires the documented scope and configured application or operator identity.
+         */
         post: operations["updateRuntimeConfiguration"];
         delete?: never;
         options?: never;
@@ -642,10 +1150,36 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Read the shared identity information, check age and wallet permission duration required from applications. available is false for hosted compatibility installations. No customer identity records are returned. */
+        /**
+         * See required user information
+         * @description **Why this exists:** See the identity information and permission limits every connected application must follow.
+         *
+         *     **Who uses it:** Service operator.
+         *
+         *     **When you need it:** Use when reviewing your service’s user checks. The same settings are available under User checks in administration.
+         *
+         *     **Before you start:** Sign in as a provider operator. These shared settings are also shown under User checks in administration.
+         *
+         *     **Result and next step:** 200: required identity fields, the agreed verification label, maximum check age, permission duration and current settings revision. This returns requirements, not anyone’s KYC records.
+         *
+         *     **Request details:** Read the shared identity information, check age and wallet permission duration required from applications. available is false for hosted compatibility installations. No customer identity records are returned.
+         */
         get: operations["readProviderUserChecks"];
         put?: never;
-        /** @description Save shared user-check requirements without restarting the service. Use the current revision and a UUIDv4 idempotency key. Changed settings end all current wallet approvals and pending access requests; people must give fresh permission to the new terms. Identical settings preserve approvals. This does not perform KYC, change application trust or enable transactions. */
+        /**
+         * Change required user information
+         * @description **Why this exists:** Set required identity information, the maximum age of checks and how long wallet permission lasts.
+         *
+         *     **Who uses it:** Service operator.
+         *
+         *     **When you need it:** Use when your shared requirements change. Applications read the resulting requirements through GET /v1/access-policy.
+         *
+         *     **Before you start:** Review the requirements with the applications you trust. Read the current revision first and send it as expected_revision with a new UUIDv4 idempotency key. Repeat an uncertain request with the same key and body.
+         *
+         *     **Result and next step:** 200: saved requirements, effective immediately and retained across restarts. Changed settings end existing wallet approvals and pending access requests across all applications; people must approve the new terms. Identical settings preserve approvals. Applications must read GET /v1/access-policy for the new policy revision.
+         *
+         *     **Request details:** Save shared user-check requirements without restarting the service. Use the current revision and a UUIDv4 idempotency key. Changed settings end all current wallet approvals and pending access requests; people must give fresh permission to the new terms. Identical settings preserve approvals. This does not perform KYC, change application trust or enable transactions.
+         */
         post: operations["saveProviderUserChecks"];
         delete?: never;
         options?: never;
@@ -662,7 +1196,20 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Atomically claim a new installation using its privately delivered single-use credential. Expires 30 minutes after first initialization. Restart never reopens claiming. Establishes administration only. */
+        /**
+         * Create the first administrator account
+         * @description **Why this exists:** Establish the administrator for a new, unclaimed installation using its private setup code.
+         *
+         *     **Who uses it:** Installer.
+         *
+         *     **When you need it:** Use once after installation. The First-time setup form in administration sends this request; ordinary sign-in does not use it.
+         *
+         *     **Before you start:** Use the privately delivered, unexpired installation claim credential. This succeeds once.
+         *
+         *     **Result and next step:** 200: a provider administrator registration; wallet execution remains disabled.
+         *
+         *     **Request details:** Atomically claim a new installation using its privately delivered single-use credential. Expires 30 minutes after first initialization. Restart never reopens claiming. Establishes administration only.
+         */
         post: operations["claimProviderInstallation"];
         delete?: never;
         options?: never;
@@ -677,7 +1224,20 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Protected installation and application administration. Management credentials do not activate wallet operations or authorize spending. */
+        /**
+         * Check your service administration status
+         * @description **Why this exists:** See whether administration is available, which applications are registered and whether wallet operations are enabled.
+         *
+         *     **Who uses it:** Service operator.
+         *
+         *     **When you need it:** Use on your administration dashboard or when troubleshooting service setup.
+         *
+         *     **Before you start:** Authenticate as a current dedicated provider operator.
+         *
+         *     **Result and next step:** 200: management availability, application registrations and wallet activation status.
+         *
+         *     **Request details:** Protected installation and application administration. Management credentials do not activate wallet operations or authorize spending.
+         */
         get: operations["readProviderStatus"];
         put?: never;
         post?: never;
@@ -694,10 +1254,36 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Protected installation and application administration. Management credentials do not activate wallet operations or authorize spending. */
+        /**
+         * See connected applications and tools
+         * @description **Why this exists:** List registered connections so you can find the one to inspect or change.
+         *
+         *     **Who uses it:** Service operator.
+         *
+         *     **When you need it:** Use when managing registrations. This lists application and tool connections, not wallet owners.
+         *
+         *     **Before you start:** Authenticate as a current dedicated provider operator.
+         *
+         *     **Result and next step:** 200: identity metadata without authentication verifiers or secrets.
+         *
+         *     **Request details:** Protected installation and application administration. Management credentials do not activate wallet operations or authorize spending.
+         */
         get: operations["listProviderIdentities"];
         put?: never;
-        /** @description Protected installation and application administration. Management credentials do not activate wallet operations or authorize spending. */
+        /**
+         * Add an application or management tool
+         * @description **Why this exists:** Give an application or administration tool its own connection ID and secret.
+         *
+         *     **Who uses it:** Service operator.
+         *
+         *     **When you need it:** Use once per new connection. Most operators can use Add application or Add management tool in administration.
+         *
+         *     **Before you start:** Use a dedicated provider operator and a fresh idempotency key.
+         *
+         *     **Result and next step:** 200: registration metadata and a secret shown once. Replay returns metadata only; registration does not accept identity trust.
+         *
+         *     **Request details:** Protected installation and application administration. Management credentials do not activate wallet operations or authorize spending.
+         */
         post: operations["createProviderIdentity"];
         delete?: never;
         options?: never;
@@ -718,7 +1304,20 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        /** @description Protected installation and application administration. Management credentials do not activate wallet operations or authorize spending. */
+        /**
+         * Change or pause an application connection
+         * @description **Why this exists:** Rename a connection, pause access, or change the agreement and permissions for an application.
+         *
+         *     **Who uses it:** Service operator.
+         *
+         *     **When you need it:** Use after adding a connection. Changing trust or permissions ends its current wallet approvals; renaming alone preserves them.
+         *
+         *     **Before you start:** Supply the current revision and an idempotency key. Application identities cannot perform this operation.
+         *
+         *     **Result and next step:** 200: updated registration. Authority changes invalidate obsolete tokens; suspension, trust and owner-permission changes revoke related grants. Renaming preserves authority. Wallet activation is unchanged.
+         *
+         *     **Request details:** Protected installation and application administration. Management credentials do not activate wallet operations or authorize spending.
+         */
         patch: operations["updateProviderIdentity"];
         trace?: never;
     };
@@ -731,7 +1330,20 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Protected installation and application administration. Management credentials do not activate wallet operations or authorize spending. */
+        /**
+         * Replace an application or tool secret
+         * @description **Why this exists:** Replace lost or exposed connection details so the old secret and its tokens stop working.
+         *
+         *     **Who uses it:** Service operator.
+         *
+         *     **When you need it:** Use for an existing application or management tool. You can also choose Replace secret in administration.
+         *
+         *     **Before you start:** Use a dedicated provider operator, current revision and an idempotency key.
+         *
+         *     **Result and next step:** 200: a replacement secret shown once. Obsolete credentials and tokens are rejected.
+         *
+         *     **Request details:** Protected installation and application administration. Management credentials do not activate wallet operations or authorize spending.
+         */
         post: operations["rotateProviderIdentityCredential"];
         delete?: never;
         options?: never;

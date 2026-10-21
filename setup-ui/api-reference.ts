@@ -1,6 +1,8 @@
 import { providerNetwork } from '../src/networks.js';
 import {
   operationGuides,
+  apiTasks,
+  apiOperationOrder,
   operationUnavailableReason,
   transactionBoundaryDescription,
   type OperationGuide,
@@ -310,27 +312,33 @@ export function referenceOperations(
   config: ProviderConfiguration,
   applicationIndex: number,
 ) {
-  return Object.entries(contract.paths).flatMap(([path, methods]) =>
-    Object.entries(methods).flatMap(([method, operation]) => {
-      const guide = operationGuides[operation.operationId];
-      return guide
-        ? [
-            {
-              path,
-              method,
-              operation,
-              guide,
-              status: operationStatus(guide, config, applicationIndex),
-              body: requestExample(
-                operation.operationId,
-                config,
-                applicationIndex,
-              ),
-            },
-          ]
-        : [];
-    }),
-  );
+  return Object.entries(contract.paths)
+    .flatMap(([path, methods]) =>
+      Object.entries(methods).flatMap(([method, operation]) => {
+        const guide = operationGuides[operation.operationId];
+        return guide
+          ? [
+              {
+                path,
+                method,
+                operation,
+                guide,
+                status: operationStatus(guide, config, applicationIndex),
+                body: requestExample(
+                  operation.operationId,
+                  config,
+                  applicationIndex,
+                ),
+              },
+            ]
+          : [];
+      }),
+    )
+    .sort(
+      (a, b) =>
+        apiOperationOrder.indexOf(a.operation.operationId) -
+        apiOperationOrder.indexOf(b.operation.operationId),
+    );
 }
 export type ReferenceOperation = ReturnType<typeof referenceOperations>[number];
 const runtimePolicyExample = {
@@ -686,6 +694,7 @@ export function referenceSpec(
       transactionBoundaryDescription,
   };
   spec.servers = [{ url: referenceOrigin(config.policy.provider.origin) }];
+  Object.assign(spec, { tags: apiTasks.map((task) => ({ ...task })) });
   spec.paths = {};
   for (const item of operations) {
     const op = structuredClone(item.operation);
@@ -694,8 +703,6 @@ export function referenceSpec(
     op.description = [
       `**Configuration preview:** ${item.status}.`,
       `**Required OAuth scope:** ${item.guide.scope ?? (item.guide.serviceAuthenticated ? 'Service proof required; application OAuth is not accepted' : 'None (public)')}.`,
-      item.guide.prerequisite,
-      item.guide.success,
       op.description ?? '',
     ].join('\n\n');
     for (const parameter of op.parameters ?? []) {
