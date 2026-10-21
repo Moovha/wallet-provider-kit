@@ -12782,6 +12782,198 @@ Success response schema:
 }
 ```
 
+## GET /v1/provider/user-checks
+
+Operation: `readProviderUserChecks`.
+
+Read the shared identity information, check age and wallet permission duration required from applications. available is false for hosted compatibility installations. No customer identity records are returned.
+
+| Status | Content type             | Description      |
+| ------ | ------------------------ | ---------------- |
+| 200    | application/json         | Default Response |
+| 400    | application/problem+json | Problem response |
+| 401    | application/problem+json | Problem response |
+| 403    | application/problem+json | Problem response |
+| 409    | application/problem+json | Problem response |
+| 413    | application/problem+json | Problem response |
+| 415    | application/problem+json | Problem response |
+| 422    | application/problem+json | Problem response |
+| 429    | application/problem+json | Problem response |
+| 500    | application/problem+json | Problem response |
+| 503    | application/problem+json | Problem response |
+
+Success response schema:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "available",
+    "revision",
+    "required_fields",
+    "verification_level",
+    "max_identity_age_days",
+    "max_access_days"
+  ],
+  "properties": {
+    "available": {
+      "type": "boolean"
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "required_fields": {
+      "type": "array",
+      "maxItems": 16,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9_]{0,63}$"
+      },
+      "description": "Identity field names every application must submit. Values are nonempty strings, up to 512 characters; presence does not verify their accuracy."
+    },
+    "verification_level": {
+      "type": "string",
+      "description": "Agreed verification label; empty when application user-check settings are unavailable in hosted mode."
+    },
+    "max_identity_age_days": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 365
+    },
+    "max_access_days": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 365
+    }
+  }
+}
+```
+
+## POST /v1/provider/user-checks
+
+Operation: `saveProviderUserChecks`.
+
+Save shared user-check requirements without restarting the service. Use the current revision and a UUIDv4 idempotency key. Changed settings end all current wallet approvals and pending access requests; people must give fresh permission to the new terms. Identical settings preserve approvals. This does not perform KYC, change application trust or enable transactions.
+
+| Parameter         | Location | Required | Schema                                                                                                |
+| ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
+| `idempotency-key` | header   | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+
+Request body (application/json):
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "expected_revision",
+    "required_fields",
+    "verification_level",
+    "max_identity_age_days",
+    "max_access_days"
+  ],
+  "properties": {
+    "expected_revision": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "required_fields": {
+      "type": "array",
+      "maxItems": 16,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9_]{0,63}$"
+      },
+      "description": "Identity field names every application must submit. Values are nonempty strings, up to 512 characters; presence does not verify their accuracy."
+    },
+    "verification_level": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100,
+      "description": "Exact agreed label for completed identity checks, such as verified."
+    },
+    "max_identity_age_days": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 365
+    },
+    "max_access_days": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 365
+    }
+  }
+}
+```
+
+| Status | Content type             | Description      |
+| ------ | ------------------------ | ---------------- |
+| 200    | application/json         | Default Response |
+| 400    | application/problem+json | Problem response |
+| 401    | application/problem+json | Problem response |
+| 403    | application/problem+json | Problem response |
+| 409    | application/problem+json | Problem response |
+| 413    | application/problem+json | Problem response |
+| 415    | application/problem+json | Problem response |
+| 422    | application/problem+json | Problem response |
+| 429    | application/problem+json | Problem response |
+| 500    | application/problem+json | Problem response |
+| 503    | application/problem+json | Problem response |
+
+Success response schema:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "available",
+    "revision",
+    "required_fields",
+    "verification_level",
+    "max_identity_age_days",
+    "max_access_days"
+  ],
+  "properties": {
+    "available": {
+      "type": "boolean"
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "required_fields": {
+      "type": "array",
+      "maxItems": 16,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9_]{0,63}$"
+      },
+      "description": "Identity field names every application must submit. Values are nonempty strings, up to 512 characters; presence does not verify their accuracy."
+    },
+    "verification_level": {
+      "type": "string",
+      "description": "Agreed verification label; empty when application user-check settings are unavailable in hosted mode."
+    },
+    "max_identity_age_days": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 365
+    },
+    "max_access_days": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 365
+    }
+  }
+}
+```
+
 ## POST /v1/provider/claim
 
 Operation: `claimProviderInstallation`.

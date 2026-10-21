@@ -24,8 +24,9 @@ perform the checks it reports, retain supporting records and communicate withdra
 promptly. The toolkit validates submitted evidence; it does not contact an identity
 vendor to repeat these checks.
 
-Review your service’s required verification level, identity field names, maximum
-age of checks and maximum access duration. These are policy requirements, not
+Open **User checks** in `/admin/` to choose required identity information, the
+maximum age of checks and how long wallet permission lasts. Exact field names and
+the agreed verification label are under **Developer details and additional information**. These are policy requirements, not
 facts established by registering an application. The example configuration uses
 `verified`, requires `country`, allows evidence up to 90 days old and caps access
 at seven days. Choose requirements appropriate to your product.
@@ -34,9 +35,14 @@ at seven days. Choose requirements appropriate to your product.
 <summary>Policy settings for a developer maintaining configuration</summary>
 
 The standard flow uses `policy.access.mode: "application"`,
-`policy.identity.application.verificationLevel` and `requiredFields`. The advanced
-[Applications screen](setup-wizard.md#_4-applications) exposes the shared identity
-and access limits. Static registrations use
+`policy.identity.application.verificationLevel` and `requiredFields`. API-managed installations save shared requirements through **User checks** in
+administration. `GET /v1/provider/user-checks` reads the settings and their revision;
+`POST /v1/provider/user-checks` saves them with `expected_revision` and an
+`Idempotency-Key`, using a provider operator token. The saved settings override
+installation defaults and persist across restarts. Changed settings revoke all
+wallet approvals and deny pending access requests; identical saves preserve them.
+Static installations use the advanced
+[Applications screen](setup-wizard.md#_4-applications) or those configuration fields. Static registrations use
 `policy.applications[].assertionTrust.agreement`; API-managed registrations use
 the application’s identity/consent agreement instead. Do not combine registration
 authorities in one deployment.

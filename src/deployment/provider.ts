@@ -186,6 +186,7 @@ export async function createConfiguredProvider(
       !!config.safeWallet,
       management
         ? {
+            userChecks: () => management.currentUserChecks(),
             list: () => management.applications(),
             current: (principal) => management.application(principal),
           }
@@ -203,7 +204,7 @@ export async function createConfiguredProvider(
       : undefined;
     const transportRevision = undefined;
     activeRevision = fingerprint([
-      onboarding!.policy.revision,
+      onboarding!.installationPolicyRevision,
       ...(network.testnet ? [] : [network.name]),
       ...(config.safeWallet ? [config.safeWallet] : []),
       ...(config.safeProvisioning ? [config.safeProvisioning] : []),

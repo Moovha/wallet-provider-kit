@@ -880,6 +880,7 @@ export declare class OnboardingService {
   readonly runtimeContracts: boolean;
   readonly safeOnlyWallet: boolean;
   readonly policy: import('./types.js').ResolvedPolicy;
+  readonly installationPolicyRevision: string;
   constructor(
     input: OnboardingPolicy,
     store: OnboardingStore,
@@ -889,6 +890,11 @@ export declare class OnboardingService {
     runtimeContracts?: boolean,
     safeOnlyWallet?: boolean,
     liveApplications?: {
+      userChecks?():
+        | (import('./types.js').UserCheckSettings & {
+            revision: number;
+          })
+        | undefined;
       list(): import('./types.js').ApplicationPolicy[];
       current(
         principal: VerifiedPrincipal,

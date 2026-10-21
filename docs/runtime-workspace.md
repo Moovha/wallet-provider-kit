@@ -32,7 +32,27 @@ an identical retry. The registration API also supports separate management tools
 
 </details>
 
-## 2. Agree how people give permission
+## 2. Choose the user checks your service needs
+
+Open **User checks** in `/admin/`. These requirements are shared by all connected
+applications. Select the information they must provide, then choose how recently
+identity must have been checked and how long wallet permission can last.
+
+The starting configuration requires only **Country**, accepts checks up to 90 days
+old and limits permission to seven days. Select additional information only when
+your service needs it. These choices check that values are supplied; applications
+remain responsible for verifying them under your reviewed agreement.
+
+**Developer details and additional information** contains exact field names,
+custom fields and the agreed verification label. The label must match what the
+application submits; it does not perform or describe the underlying KYC checks.
+
+Choose **Save user checks** to apply the requirements without restarting. Changed
+requirements end current wallet approvals and pending access requests across all
+applications. People must approve the new terms before reconnecting. Saving
+identical settings preserves approvals; wallets and their funds stay in place.
+
+## 3. Agree how people give permission
 
 In the application’s access settings, record the **Agreement reference** and
 choose what people can allow the application to do. The agreement identifies
@@ -44,7 +64,7 @@ permission. Your service checks its submitted evidence before saving a limited,
 expiring wallet approval, called a **grant** in the API. Read
 [User checks and permission](application-access.md) with the application developer.
 
-## 3. Share the connection with your developer
+## 4. Share the connection with your developer
 
 Give the developer your service’s HTTPS address, the application ID, secure access
 to its secret and the [application API guide](http-api.md). Keep administrator
@@ -66,7 +86,7 @@ people will use:
 Each walkthrough explains what the person sees, what the provider needs and the
 requests your developer implements. You can open the technical steps as needed.
 
-## 4. Test before inviting people
+## 5. Test before inviting people
 
 Use an isolated [test connection](staging-walkthrough.md) to check permission,
 revocation, retries and recovery. Complete [launch checks](conformance.md) before

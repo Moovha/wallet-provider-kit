@@ -493,3 +493,199 @@ it('rejects debug logging before reading issuer secrets for a managed installati
     else process.env.DEBUG = previous;
   }
 });
+
+it('updates shared user checks durably, fences old consent and preserves approvals on identical saves', async () => {
+  const { OnboardingService } = await import('../src/onboarding/service.js');
+  const f = await fixture(),
+    adminPassword = password();
+  await f.service.claim({
+    claim: f.claim,
+    username: 'checks-admin',
+    password: adminPassword,
+  });
+  const operator = await f.service.verifyCredentials(
+    'operator-checks-admin',
+    adminPassword,
+    managementScopes,
+  );
+  const created = await f.service.mutate(operator, randomUUID(), 'create', {
+    name: 'Offline application',
+    role: 'application',
+  });
+  if (!('id' in created) || !created.client_secret)
+    throw new Error('Expected new application');
+  await f.service.mutate(operator, randomUUID(), 'update', {
+    id: created.id,
+    expected_revision: created.revision,
+    trust_agreement: 'offline-reviewed-agreement',
+    permissions: ['account:read'],
+  });
+  const caller = await f.service.verifyCredentials(
+    created.id,
+    created.client_secret!,
+    ['wallet:access', 'wallet:access:read', 'wallet:provision'],
+  );
+  await f.store.transaction((s) => {
+    s.requests = {};
+    s.accounts = {};
+    s.evidenceOwners = {};
+    s.idempotency = {};
+    s.admissions = {};
+  });
+  const onboard = () =>
+    new OnboardingService(
+      { ...f.config.policy, applications: [] },
+      f.store,
+      [],
+      undefined,
+      undefined,
+      false,
+      true,
+      {
+        list: () => f.service.applications(),
+        current: (p) => f.service.application(p),
+        userChecks: () => f.service.currentUserChecks(),
+      },
+    );
+  const onboarding = onboard();
+  const context = () => ({ principal: caller, idempotencyKey: randomUUID() });
+  const originalPolicy = onboarding.accessPolicy(caller);
+  const input = {
+    mode: 'create' as const,
+    user: {
+      id: 'offline-user',
+      identity: {
+        reference: 'offline-evidence',
+        level: 'verified',
+        verified_at: new Date(Date.now() - 1000).toISOString(),
+        fields: { country: 'ZA' } as Record<string, string>,
+      },
+      consent: {
+        reference: 'offline-consent',
+        granted_at: new Date(Date.now() - 1000).toISOString(),
+        expires_at: new Date(Date.now() + 86_400_000).toISOString(),
+        policy_revision: originalPolicy.policy_revision,
+      },
+    },
+    authorization_details: [
+      {
+        type: 'https://moovha.com/wallet/account-access' as const,
+        actions: ['account:read' as const],
+      },
+    ] as [
+      {
+        type: 'https://moovha.com/wallet/account-access';
+        actions: ['account:read'];
+      },
+    ],
+  };
+  const access = await onboarding.request(context(), input);
+  const admitted = await onboarding
+    .walletAuthority()
+    .provision(context(), access.account_id!);
+  const {
+    available: _available,
+    revision,
+    ...initial
+  } = await f.service.readUserChecks(operator);
+  await f.service.saveUserChecks(operator, randomUUID(), {
+    ...initial,
+    expected_revision: revision,
+  });
+  expect(
+    await onboarding.canDispatchProvision(
+      admitted!.attemptId!,
+      access.account_id!,
+    ),
+  ).toBe(true);
+  await expect(
+    f.service.saveUserChecks(caller, randomUUID(), {
+      ...initial,
+      expected_revision: revision,
+    }),
+  ).rejects.toThrow();
+  for (const change of [
+    { max_access_days: 0 },
+    { max_identity_age_days: 366 },
+    { required_fields: ['constructor'] },
+    { required_fields: ['country', 'country'] },
+  ])
+    await expect(
+      f.service.saveUserChecks(operator, randomUUID(), {
+        ...initial,
+        ...change,
+        expected_revision: revision,
+      }),
+    ).rejects.toThrow();
+  const key = randomUUID();
+  const update = {
+    ...initial,
+    expected_revision: revision,
+    required_fields: ['given_name', 'country'],
+    max_identity_age_days: 30,
+    max_access_days: 2,
+  };
+  const saved = await f.service.saveUserChecks(operator, key, update);
+  expect(saved.revision).toBe(revision + 1);
+  expect(saved.required_fields).toEqual(['country', 'given_name']);
+  expect(await f.service.saveUserChecks(operator, key, update)).toEqual(saved);
+  await expect(
+    f.service.saveUserChecks(operator, key, { ...update, max_access_days: 3 }),
+  ).rejects.toThrow();
+  await expect(
+    f.service.saveUserChecks(operator, randomUUID(), update),
+  ).rejects.toThrow();
+  expect(
+    await onboarding.canDispatchProvision(
+      admitted!.attemptId!,
+      access.account_id!,
+    ),
+  ).toBe(false);
+  await expect(
+    onboarding.authorize(caller, access.account_id!, 'account:read'),
+  ).rejects.toThrow();
+  await expect(onboarding.request(context(), input)).rejects.toThrow();
+  const changedPolicy = onboarding.accessPolicy(caller);
+  expect(changedPolicy.policy_revision).not.toBe(
+    originalPolicy.policy_revision,
+  );
+  expect(changedPolicy.required_fields).toEqual(['country', 'given_name']);
+  expect(onboard().accessPolicy(caller)).toEqual(changedPolicy);
+  expect(onboard().installationPolicyRevision).toBe(
+    onboarding.installationPolicyRevision,
+  );
+  input.user.consent.policy_revision = changedPolicy.policy_revision;
+  await expect(onboarding.request(context(), input)).rejects.toThrow();
+  input.user.identity.fields.given_name = 'Example';
+  const renewed = await onboarding.request(context(), input);
+  expect(renewed.account_id).toBe(access.account_id);
+  expect(
+    await onboarding.authorize(caller, renewed.account_id!, 'account:read'),
+  ).toBeDefined();
+  const reloaded = new ManagementService(
+    f.store,
+    f.snapshot,
+    f.config.oauth.issuer,
+    f.config.policy,
+  );
+  expect(await reloaded.readUserChecks(operator)).toEqual(saved);
+  await f.service.saveUserChecks(operator, randomUUID(), {
+    ...update,
+    expected_revision: saved.revision,
+  });
+  expect(onboarding.accessPolicy(caller).policy_revision).toBe(
+    changedPolicy.policy_revision,
+  );
+  expect(
+    await onboarding.authorize(caller, renewed.account_id!, 'account:read'),
+  ).toBeDefined();
+  await f.service.saveUserChecks(operator, randomUUID(), {
+    ...initial,
+    expected_revision: saved.revision,
+  });
+  expect(onboarding.accessPolicy(caller).policy_revision).not.toBe(
+    originalPolicy.policy_revision,
+  );
+  input.user.consent.policy_revision = originalPolicy.policy_revision;
+  await expect(onboarding.request(context(), input)).rejects.toThrow();
+});

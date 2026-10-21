@@ -35,6 +35,40 @@ const identity = {
     credential_replayed: { type: 'boolean' },
   },
 };
+const checkFields = {
+  required_fields: {
+    type: 'array',
+    maxItems: 16,
+    uniqueItems: true,
+    items: { type: 'string', pattern: '^[a-z][a-z0-9_]{0,63}$' },
+    description:
+      'Identity field names every application must submit. Values are nonempty strings, up to 512 characters; presence does not verify their accuracy.',
+  },
+  verification_level: {
+    type: 'string',
+    minLength: 1,
+    maxLength: 100,
+    description:
+      'Exact agreed label for completed identity checks, such as verified.',
+  },
+  max_identity_age_days: { type: 'integer', minimum: 1, maximum: 365 },
+  max_access_days: { type: 'integer', minimum: 1, maximum: 365 },
+};
+const userChecks = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['available', 'revision', ...Object.keys(checkFields)],
+  properties: {
+    available: { type: 'boolean' },
+    revision: { type: 'integer', minimum: 1 },
+    ...checkFields,
+    verification_level: {
+      type: 'string',
+      description:
+        'Agreed verification label; empty when application user-check settings are unavailable in hosted mode.',
+    },
+  },
+};
 const errors = Object.fromEntries(
   [400, 401, 403, 409, 413, 415, 422, 429, 500, 503].map((status) => [
     status,
@@ -126,6 +160,43 @@ export async function registerManagementRoutes(
       reply.type('text/html').send(consoleHtml),
     );
   }
+  app.get(
+    '/v1/provider/user-checks',
+    {
+      schema: schema('readProviderUserChecks', userChecks, {
+        description:
+          'Read the shared identity information, check age and wallet permission duration required from applications. available is false for hosted compatibility installations. No customer identity records are returned.',
+      }),
+    },
+    async (request) => configured().readUserChecks(await operator(request)),
+  );
+  app.post<{
+    Body: import('../onboarding/types.js').UserCheckSettings & {
+      expected_revision: number;
+    };
+  }>(
+    '/v1/provider/user-checks',
+    {
+      bodyLimit: 4096,
+      schema: schema('saveProviderUserChecks', userChecks, {
+        description:
+          'Save shared user-check requirements without restarting the service. Use the current revision and a UUIDv4 idempotency key. Changed settings end all current wallet approvals and pending access requests; people must give fresh permission to the new terms. Identical settings preserve approvals. This does not perform KYC, change application trust or enable transactions.',
+        headers: keyHeaders,
+        body: body(['expected_revision', ...Object.keys(checkFields)], {
+          expected_revision: { type: 'integer', minimum: 1 },
+          ...checkFields,
+        }),
+      }),
+    },
+    async (request) => {
+      sameOrigin(request);
+      return configured().saveUserChecks(
+        await operator(request),
+        String(request.headers['idempotency-key']),
+        request.body,
+      );
+    },
+  );
   app.post<{ Body: { claim: string; username: string; password: string } }>(
     '/v1/provider/claim',
     {

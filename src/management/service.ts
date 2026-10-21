@@ -10,6 +10,7 @@ import type {
   ApplicationPolicy,
   OnboardingStore,
   ProviderState,
+  UserCheckSettings,
 } from '../onboarding/types.js';
 import {
   defineOnboardingPolicy,
@@ -44,6 +45,7 @@ export interface ManagementState {
   claimHash: string;
   claimExpiresAt: number;
   claimed: boolean;
+  userChecks?: { revision: number; settings: UserCheckSettings };
   identities: Record<string, ManagedIdentity>;
 }
 const hash = (value: string) =>
@@ -208,6 +210,102 @@ export class ManagementService {
           .filter((i) => i.role === 'application')
           .map(publicIdentity),
       };
+    });
+  }
+  currentUserChecks(): (UserCheckSettings & { revision: number }) | undefined {
+    const current = this.snapshot()?.userChecks;
+    return current
+      ? structuredClone({ ...current.settings, revision: current.revision })
+      : undefined;
+  }
+  private userChecks(state: ManagementState) {
+    const policy = defineOnboardingPolicy(this.basePolicy);
+    return {
+      available: policy.access.mode === 'application',
+      revision: state.userChecks?.revision ?? 1,
+      ...(state.userChecks?.settings ?? {
+        required_fields: policy.identity.application?.requiredFields ?? [],
+        verification_level:
+          policy.identity.application?.verificationLevel ?? '',
+        max_identity_age_days: policy.identity.maxAgeDays,
+        max_access_days: policy.access.maxAgeDays,
+      }),
+    };
+  }
+  async readUserChecks(principal: VerifiedPrincipal) {
+    return this.store.transaction((s) => {
+      const state = this.state(s);
+      this.assertOperator(principal, state);
+      return this.userChecks(state);
+    });
+  }
+  async saveUserChecks(
+    principal: VerifiedPrincipal,
+    key: string,
+    input: UserCheckSettings & { expected_revision: number },
+  ) {
+    if (!uuid.test(key)) invalid();
+    if (
+      !Number.isInteger(input.max_identity_age_days) ||
+      !Number.isInteger(input.max_access_days)
+    )
+      invalid();
+    let settings: UserCheckSettings;
+    try {
+      const policy = defineOnboardingPolicy({
+        ...this.basePolicy,
+        applications: [],
+        identity: {
+          maxAgeDays: input.max_identity_age_days,
+          application: {
+            requiredFields: input.required_fields,
+            verificationLevel: input.verification_level,
+          },
+        },
+        access: { mode: 'application', maxAgeDays: input.max_access_days },
+      });
+      settings = {
+        required_fields: [...policy.identity.application!.requiredFields],
+        verification_level: policy.identity.application!.verificationLevel,
+        max_identity_age_days: policy.identity.maxAgeDays,
+        max_access_days: policy.access.maxAgeDays,
+      };
+    } catch {
+      invalid();
+    }
+    const digest = hash(JSON.stringify(['user-checks', input]));
+    return this.store.transaction((s) => {
+      const state = this.state(s);
+      this.assertOperator(principal, state);
+      const current = this.userChecks(state);
+      if (!current.available) deny();
+      const commandKey = hash(principal.clientId + ':' + key);
+      const commands = (s.managementCommands ??= {});
+      for (const [id, command] of Object.entries(commands))
+        if (command.at + 86_400_000 <= this.now()) delete commands[id];
+      const previous = commands[commandKey];
+      if (previous) {
+        if (previous.hash !== digest) conflict();
+        return previous.result as ReturnType<ManagementService['userChecks']>;
+      }
+      if (Object.keys(commands).length >= 10000) conflict();
+      if (input.expected_revision !== current.revision) conflict();
+      const { available: _available, revision: _revision, ...before } = current;
+      if (JSON.stringify(before) !== JSON.stringify(settings)) {
+        state.userChecks = { revision: current.revision + 1, settings };
+        for (const request of Object.values(s.requests ?? {}))
+          request.denied = true;
+        for (const grant of Object.values(s.grants)) grant.state = 'revoked';
+        s.audit.push({
+          at: this.now(),
+          event: 'user_checks_updated',
+          resource: hash(state.installationId),
+          revision: String(state.userChecks.revision),
+        });
+      }
+      const result = this.userChecks(state);
+      commands[commandKey] = { hash: digest, result, at: this.now() };
+      return result;
     });
   }
   async claim(input: { claim: string; username: string; password: string }) {

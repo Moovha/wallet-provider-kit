@@ -17,6 +17,26 @@ export interface OperationGuide {
 }
 // Shared operator guidance. Runtime authentication and authority remain authoritative.
 export const operationGuides: Record<string, OperationGuide> = {
+  readProviderUserChecks: {
+    title: 'See the user checks required from applications',
+    group: 'Provider administration',
+    management: true,
+    scope: 'provider:manage',
+    prerequisite:
+      'Sign in as a provider operator. These shared settings are also shown under User checks in administration.',
+    success:
+      '200: required identity fields, the agreed verification label, maximum check age, permission duration and current settings revision. This returns requirements, not anyone’s KYC records.',
+  },
+  saveProviderUserChecks: {
+    title: 'Save the user checks required from applications',
+    group: 'Provider administration',
+    management: true,
+    scope: 'provider:manage',
+    prerequisite:
+      'Review the requirements with the applications you trust. Read the current revision first and send it as expected_revision with a new UUIDv4 idempotency key. Repeat an uncertain request with the same key and body.',
+    success:
+      '200: saved requirements, effective immediately and retained across restarts. Changed settings end existing wallet approvals and pending access requests across all applications; people must approve the new terms. Identical settings preserve approvals. Applications must read GET /v1/access-policy for the new policy revision.',
+  },
   rotateProviderIdentityCredential: {
     title: 'Rotate a provider identity credential',
     group: 'Provider administration',
@@ -360,22 +380,22 @@ export const operationGuides: Record<string, OperationGuide> = {
       '200: the service profile and configured status. A 200 response confirms that discovery works; check configured before trying wallet operations.',
   },
   requestAccountAccess: {
-    title: 'Request access to a wallet',
+    title: 'Submit user checks and permission for wallet access',
     group: 'Application access',
     scope: 'wallet:access',
     prerequisite:
-      'Standard application-led access: read GET /v1/access-policy, then include user with the application’s stable user ID, accepted identity evidence and recorded consent for the returned policy revision. The provider must explicitly trust this application’s attestations. Users stay in the application. Hosted compatibility deployments instead return consent_url and require provider login/review.',
+      'After the person completes the agreed identity checks and approves wallet access in your application, submit those records here. First read GET /v1/access-policy for the required fields and current terms. Use mode=create for a first wallet account or mode=connect with the existing account_id for the same application user. The provider must trust your application’s checks. Hosted compatibility mode uses a separate provider login and review.',
     success:
-      '200: request ID and policy outcome. granted includes account_id, grant_id, permissions and expiry; it does not create the wallet. A consent_url appears only in hosted compatibility mode. Missing, stale or unauthorized attestations are rejected before access is granted.',
+      '200: the access decision. A granted response includes account_id, grant_id, allowed actions and expiry. Save those IDs, then call POST /v1/accounts/{accountId}/provision to create the blockchain wallet. Reconnecting preserves the existing account. This request does not create an on-chain wallet or send money. Missing, stale or unauthorized evidence is rejected; consent_url is only for hosted compatibility mode.',
   },
   getAccountAccessPolicy: {
-    title: 'Read access policy and evidence requirements',
+    title: 'See the user checks and permission to collect',
     group: 'Application access',
     scope: 'wallet:access:read',
     prerequisite:
-      'Use an enabled application registration and its API token. The response identifies the provider’s identity source and required submission fields without returning customer records.',
+      'Call this before asking a person for wallet permission. Use your application token to learn which identity information to send, how recent the checks must be and how long permission can last. The provider operator sets these shared requirements under User checks in administration; this endpoint reads them and does not change settings or return customer records.',
     success:
-      '200: flow, policy_revision, required_fields, verification_level, age limits and provider login/review requirements. action_policy_revision identifies the configured Safe call policy. Record the user’s consent to those terms before requesting contract access.',
+      '200: required_fields lists the identity field names; verification_level is the agreed check label. max_identity_age_days limits check age and max_access_days limits permission duration. Show the requested actions and terms, record the person’s consent to policy_revision (and action_policy_revision for transactions), then submit POST /v1/access-requests. Reading these requirements does not grant wallet access.',
   },
   submitAccountAccessRecords: {
     records: true,
@@ -427,7 +447,7 @@ export const operationGuides: Record<string, OperationGuide> = {
       '200: accepted or provisioned account status. An address is present after provisioning.',
   },
   provisionAccount: {
-    title: 'Create the account’s wallet',
+    title: 'Create the blockchain wallet after access is approved',
     group: 'Wallet accounts',
     scope: 'wallet:provision',
     prerequisite:

@@ -171,11 +171,171 @@ function action(parent, title, work) {
   const b = node('button', title, parent);
   b.onclick = run(work);
 }
+function renderUserChecks(checks) {
+  const container = el('user-check-settings');
+  container.replaceChildren();
+  if (!checks.available) {
+    node(
+      'p',
+      'This installation uses provider-hosted identity review. Ask the service operator to review its installation settings; application user-check settings are unavailable here.',
+      container,
+    );
+    return;
+  }
+  const form = node('form', undefined, container);
+  node('h3', 'Information applications must provide', form);
+  node(
+    'p',
+    'Only country is required in the starting configuration. Other fields are optional until you select them here. Applications must use the exact field names in the developer details.',
+    form,
+  );
+  const group = node('fieldset', undefined, form);
+  node('legend', 'Required information', group);
+  const choices = [
+    [
+      'country',
+      'Country',
+      'For example, ZA. Agree whether this means residence or another country with each application.',
+    ],
+    ['given_name', 'Given name', 'For example, Alex.'],
+    ['family_name', 'Family name', 'For example, Example.'],
+    [
+      'date_of_birth',
+      'Date of birth',
+      'Agree a date format with each application; the service checks presence, not age or date accuracy.',
+    ],
+    [
+      'nationality',
+      'Nationality',
+      'Agree the accepted country codes with each application.',
+    ],
+  ];
+  const selected = new Map();
+  for (const [name, title, example] of choices) {
+    const label = node('label', undefined, group);
+    const checkbox = node('input', undefined, label);
+    checkbox.type = 'checkbox';
+    checkbox.setAttribute('aria-label', title);
+    checkbox.setAttribute('aria-describedby', 'user-check-help-' + name);
+    checkbox.checked = checks.required_fields.includes(name);
+    label.append(document.createTextNode(title));
+    node('small', example, label).id = 'user-check-help-' + name;
+    selected.set(name, checkbox);
+  }
+  const developer = node('details', undefined, form);
+  node('summary', 'Developer details and additional information', developer);
+  node(
+    'p',
+    'Field names: country (Country), given_name (Given name), family_name (Family name), date_of_birth (Date of birth), nationality (Nationality). Values must be nonempty text, up to 512 characters. No document upload is requested here.',
+    developer,
+  );
+  const customLabel = node(
+    'label',
+    'Additional field names (one per line)',
+    developer,
+  );
+  const custom = node('textarea', undefined, customLabel);
+  custom.value = checks.required_fields
+    .filter((name) => !selected.has(name))
+    .join('\n');
+  node(
+    'small',
+    'Use lowercase names such as residential_address. Start with a letter and use letters, numbers or underscores, up to 64 characters. Up to 16 fields in total. Agree their meaning and format with each application.',
+    customLabel,
+  );
+  const levelLabel = node(
+    'label',
+    'Agreed label for completed identity checks',
+    developer,
+  );
+  const level = node('input', undefined, levelLabel);
+  level.value = checks.verification_level;
+  level.required = true;
+  level.maxLength = 100;
+  node(
+    'small',
+    'Keep verified if that is the label you agreed with applications. The label does not describe or perform the checks; record those duties in each application’s agreement.',
+    levelLabel,
+  );
+  function days(title, value, help) {
+    const label = node('label', title, form);
+    const input = node('input', undefined, label);
+    Object.assign(input, {
+      type: 'number',
+      min: '1',
+      max: '365',
+      step: '1',
+      required: true,
+      value,
+    });
+    node('small', help, label);
+    return input;
+  }
+  const age = days(
+    'How recently must identity have been checked? (days)',
+    checks.max_identity_age_days,
+    'A check older than this is rejected. Choose 1–365 days based on your service’s requirements.',
+  );
+  const duration = days(
+    'How long can wallet permission last? (days)',
+    checks.max_access_days,
+    'Choose 1–365 days. Identity or consent expiry can end access sooner. People must give permission again when access expires.',
+  );
+  node(
+    'p',
+    'Saving changed requirements ends existing wallet approvals and pending access requests for every application. People must approve the new terms before reconnecting. Saving identical settings keeps approvals in place. Wallets and their funds stay in place.',
+    form,
+  );
+  node('button', 'Save user checks', form).className = 'primary';
+  const steps = node('details', undefined, container);
+  node('summary', 'How your developer connects this to wallet creation', steps);
+  const sequence = node('ol', undefined, steps);
+  for (const text of [
+    'Read GET /v1/access-policy to see the required information and current terms.',
+    'Complete the agreed checks and ask the person for permission inside the application. Submit that evidence to POST /v1/access-requests.',
+    'When access is approved, use the returned account_id with POST /v1/accounts/{accountId}/provision to create the blockchain wallet. This is a separate step from obtaining permission.',
+  ])
+    node('li', text, sequence);
+  form.onsubmit = run(async () => {
+    const fields = [
+      ...new Set([
+        ...[...selected]
+          .filter(([, checkbox]) => checkbox.checked)
+          .map(([name]) => name),
+        ...custom.value.split(/\s+/).filter(Boolean),
+      ]),
+    ];
+    if (
+      fields.length > 16 ||
+      fields.some(
+        (name) =>
+          !/^[a-z][a-z0-9_]{0,63}$/.test(name) ||
+          ['constructor', 'prototype'].includes(name),
+      )
+    )
+      throw new Error(
+        'Use up to 16 field names, starting with a lowercase letter and containing only lowercase letters, numbers or underscores. The names constructor and prototype are reserved.',
+      );
+    await api('/v1/provider/user-checks', 'POST', {
+      expected_revision: checks.revision,
+      required_fields: fields,
+      verification_level: level.value,
+      max_identity_age_days: Number(age.value),
+      max_access_days: Number(duration.value),
+    });
+    await refresh();
+    message(
+      'User-check requirements saved. Applications must read the current access policy before requesting wallet permission.',
+    );
+  });
+}
 async function refresh() {
-  const [status, identities] = await Promise.all([
+  const [status, identities, checks] = await Promise.all([
     api('/v1/provider/status'),
     api('/v1/provider/identities'),
+    api('/v1/provider/user-checks'),
   ]);
+  renderUserChecks(checks);
   el('status-cards').replaceChildren();
   for (const [label, value] of [
     ['Service administration', 'Available'],
@@ -317,7 +477,7 @@ async function refresh() {
           });
         node(
           'p',
-          'Next, your developer can use the API to set up allowed transactions, network connections and who pays network fees. You’ll need to approve those settings separately before wallet use.',
+          'Review the shared requirements under User checks. Next, your developer can use the API to set up allowed transactions, network connections and who pays network fees. You’ll need to approve those settings separately before wallet use.',
           article,
         );
       }

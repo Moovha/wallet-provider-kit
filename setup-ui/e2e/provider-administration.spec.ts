@@ -83,6 +83,59 @@ test('claims, registers and manages applications through the real protected mana
     ).toBeVisible();
     await expect(page.getByText('Disabled', { exact: true })).toBeVisible();
     await page
+      .getByRole('button', { name: 'User checks', exact: true })
+      .click();
+    await expect(
+      page.getByRole('heading', {
+        name: 'Choose the user checks you’ll accept',
+      }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('checkbox', { name: 'Country', exact: true }),
+    ).toBeChecked();
+    await page
+      .getByRole('checkbox', { name: 'Given name', exact: true })
+      .check();
+    await page
+      .getByLabel('How recently must identity have been checked? (days)')
+      .fill('30');
+    await page
+      .getByLabel('How long can wallet permission last? (days)')
+      .fill('2');
+    await page
+      .getByRole('button', { name: 'Save user checks', exact: true })
+      .click();
+    await expect(page.getByRole('status')).toContainText(
+      'User-check requirements saved',
+    );
+    expect(service.currentUserChecks()?.required_fields).toEqual([
+      'country',
+      'given_name',
+    ]);
+    await page.reload();
+    await page.getByLabel('Username or access ID').fill('offline-admin');
+    await page.getByLabel('Password or secret').fill(password);
+    await page
+      .getByRole('button', { name: 'Sign in', exact: true })
+      .last()
+      .click();
+    await expect(
+      page.getByRole('heading', { name: 'Welcome to your service' }),
+    ).toBeVisible();
+    await page
+      .getByRole('button', { name: 'User checks', exact: true })
+      .click();
+    await expect(
+      page.getByRole('checkbox', { name: 'Given name', exact: true }),
+    ).toBeChecked();
+    await expect(
+      page.getByLabel('How long can wallet permission last? (days)'),
+    ).toHaveValue('2');
+    await page.screenshot({
+      path: 'artifacts/provider-installation/user-checks.png',
+      fullPage: true,
+    });
+    await page
       .getByRole('button', { name: 'Applications', exact: true })
       .click();
     await expect(

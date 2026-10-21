@@ -6,6 +6,16 @@ import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createSetupServer } from '../../dist/deployment/setup-server.js';
 
+const contract = JSON.parse(
+  await readFile(
+    new URL('../../spec/provider-api.json', import.meta.url),
+    'utf8',
+  ),
+);
+const endpointCount = Object.values(
+  contract.paths as Record<string, Record<string, unknown>>,
+).reduce((count, methods) => count + Object.keys(methods).length, 0);
+
 test('a new operator configures application-led access without user login, vendors or reviewers and previews its contract', async ({
   page,
 }) => {
@@ -227,7 +237,9 @@ test('a new operator configures application-led access without user login, vendo
       .getByRole('button', { name: 'API reference', exact: true })
       .click();
     await page.locator('.swagger-ui .opblock').first().waitFor();
-    await expect(page.locator('.swagger-ui .opblock')).toHaveCount(46);
+    await expect(page.locator('.swagger-ui .opblock')).toHaveCount(
+      endpointCount,
+    );
     await page
       .getByLabel('Example endpoint', { exact: true })
       .selectOption('requestAccountAccess');
