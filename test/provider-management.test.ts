@@ -689,3 +689,101 @@ it('updates shared user checks durably, fences old consent and preserves approva
   input.user.consent.policy_revision = originalPolicy.policy_revision;
   await expect(onboarding.request(context(), input)).rejects.toThrow();
 });
+
+it('gives a new application the scopes needed to submit approved Safe wallet calls without granting provider administration', async () => {
+  const f = await fixture(),
+    adminPassword = password();
+  await f.service.claim({
+    claim: f.claim,
+    username: 'admin',
+    password: adminPassword,
+  });
+  const operator = await f.service.verifyCredentials(
+    'operator-admin',
+    adminPassword,
+    managementScopes,
+  );
+  const created = (await f.service.mutate(operator, randomUUID(), 'create', {
+    name: 'Wallet application',
+    role: 'application',
+  })) as { id: string; client_secret: string; scopes: string[] };
+  expect(created.scopes).toEqual(
+    expect.arrayContaining([
+      'wallet:actions',
+      'wallet:sign',
+      'wallet:execute',
+      'wallet:execute:read',
+    ]),
+  );
+  expect(created.scopes).not.toContain('provider:manage');
+  const app = await f.service.verifyCredentials(
+    created.id,
+    created.client_secret,
+    created.scopes,
+  );
+  expect(() => f.service.assertOperator(app)).toThrow();
+  expect(() => f.service.application(app)).toThrow();
+});
+
+it('keeps user-check settings readable after live applications enable matching fields added after installation', async () => {
+  const f = await fixture(),
+    adminPassword = password();
+  await f.service.claim({
+    claim: f.claim,
+    username: 'admin',
+    password: adminPassword,
+  });
+  const operator = await f.service.verifyCredentials(
+    'operator-admin',
+    adminPassword,
+    managementScopes,
+  );
+  const initial = await f.service.readUserChecks(operator);
+  const fields = [
+    'country',
+    'identity_number',
+    'document_type',
+    'issuing_country',
+  ];
+  const saved = await f.service.saveUserChecks(operator, randomUUID(), {
+    expected_revision: initial.revision,
+    required_fields: fields,
+    verification_level: 'verified',
+    max_identity_age_days: 90,
+    max_access_days: 7,
+  });
+  const apps = [] as { id: string; revision: number }[];
+  for (const name of ['Source', 'Requesting']) {
+    const a = (await f.service.mutate(operator, randomUUID(), 'create', {
+      name,
+      role: 'application',
+    })) as { id: string; revision: number };
+    apps.push(
+      (await f.service.mutate(operator, randomUUID(), 'update', {
+        id: a.id,
+        expected_revision: a.revision,
+        trust_agreement: 'Offline identity checks',
+      })) as { id: string; revision: number },
+    );
+  }
+  await f.service.mutate(operator, randomUUID(), 'update', {
+    id: apps[0].id,
+    expected_revision: apps[0].revision,
+    wallet_sharing: {
+      applications: [apps[1].id],
+      matchingFields: fields.slice(1),
+      agreement: 'Offline sharing',
+    },
+  });
+  Object.defineProperty(f.config.policy, 'applications', {
+    enumerable: true,
+    get: () => f.service.applications(),
+  });
+  expect(await f.service.readUserChecks(operator)).toEqual(saved);
+  expect(
+    await f.service.saveUserChecks(operator, randomUUID(), {
+      ...saved,
+      expected_revision: saved.revision,
+    }),
+  ).toEqual(saved);
+});

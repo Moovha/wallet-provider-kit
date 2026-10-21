@@ -1,4 +1,5 @@
 import { createWalletCallsProvider } from '../wallet-calls/client.js';
+import type { ProviderNetwork } from '../networks.js';
 import type {
   AccessRequestInput,
   Permission,
@@ -40,6 +41,7 @@ export class WalletAccessError extends Error {
 /** For a trusted application backend. Supply short-lived bearer authorization; never embed a client secret in a browser. */
 export function createWalletsClient(options: {
   url: string;
+  network?: ProviderNetwork;
   authorization(): Promise<string>;
   fetch?: typeof fetch;
 }) {
@@ -53,10 +55,11 @@ export function createWalletsClient(options: {
     origin.pathname !== '/'
   )
     throw new Error('An HTTPS provider origin is required');
+  const uuid =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
   const send = options.fetch ?? fetch;
   const accountPath = (id: string) => {
-    if (!/^[a-f0-9-]{36}$/.test(id))
-      throw new Error('A valid wallet ID is required');
+    if (!uuid.test(id)) throw new Error('A valid wallet ID is required');
     return '/v1/accounts/' + id;
   };
   async function request<T>(
@@ -66,9 +69,9 @@ export function createWalletsClient(options: {
     key?: string,
     grantId?: string,
   ): Promise<T> {
-    if (key !== undefined && !/^[a-f0-9-]{36}$/.test(key))
+    if (key !== undefined && !uuid.test(key))
       throw new Error('Keep a valid idempotency key for retries');
-    if (grantId !== undefined && !/^[a-f0-9-]{36}$/.test(grantId))
+    if (grantId !== undefined && !uuid.test(grantId))
       throw new Error('A valid wallet grant ID is required');
     const response = await send(new URL(path, origin), {
       method,
@@ -97,6 +100,16 @@ export function createWalletsClient(options: {
         permissions?: Permission[];
         expires_at?: string;
       }>('/v1/access-requests', 'POST', input, idempotencyKey);
+    },
+    revokeAccess(grantId: string, idempotencyKey: string) {
+      if (!uuid.test(grantId))
+        throw new Error('A valid wallet grant ID is required');
+      return request<{ grant_id: string; status: 'revoked' }>(
+        '/v1/access-grants/' + grantId + '/revoke',
+        'POST',
+        {},
+        idempotencyKey,
+      );
     },
     listWallets(userId: string) {
       return request<{ accounts: WalletSummary[] }>(
@@ -155,6 +168,7 @@ export function createWalletsClient(options: {
     },
     walletProvider(wallet: WalletSummary) {
       return createWalletCallsProvider({
+        network: options.network,
         url: new URL(accountPath(wallet.account_id) + '/wallet', origin).href,
         authorization: options.authorization,
         fetch: send,

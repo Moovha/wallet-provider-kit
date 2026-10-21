@@ -583,6 +583,14 @@ it('serves the app integration over HTTP, and the SDK keeps each selected wallet
       url: '/v1/accounts/' + owner.account_id + '/members',
     });
     expect(missing.statusCode).toBe(403);
+    const revoked = await client.revokeAccess(owner.grant_id!, randomUUID());
+    expect(revoked.status).toBe('revoked');
+    await expect(
+      client.members(owner.account_id!, owner.grant_id!),
+    ).rejects.toMatchObject({ status: 403 });
+    const remaining = await client.listWallets('owner');
+    expect(remaining.accounts).toHaveLength(1);
+    expect(remaining.accounts[0].is_default).toBe(true);
   } finally {
     await app.close();
   }
@@ -615,4 +623,80 @@ it('pins shared-wallet provisioning to the creator grant and rejects member prov
   expect(await f.service.canDispatchProvision(admission!.attemptId, id)).toBe(
     false,
   );
+});
+
+it('reads only the selected wallet grant when unrelated people have active grants', async () => {
+  const f = await fixture();
+  await f.service.request(ctx(), f.input());
+  const shared = await f.service.request(
+    ctx(),
+    f.extra('family', 'shared', ['account:read', 'members:manage']),
+  );
+  for (let i = 0; i < 8; i++)
+    await f.service.request(ctx(), f.input('other-person-' + i));
+  const transact = f.store.transaction.bind(f.store);
+  let grantReads = 0;
+  f.store.transaction = (work) =>
+    transact((state) => {
+      const grants = state.grants;
+      state.grants = new Proxy(grants, {
+        get(target, key, receiver) {
+          if (typeof key === 'string' && Object.hasOwn(target, key))
+            grantReads++;
+          return Reflect.get(target, key, receiver);
+        },
+      });
+      try {
+        return work(state);
+      } finally {
+        state.grants = grants;
+      }
+    });
+  await expect(
+    f.service.account(principal('app-a', shared.grant_id), shared.account_id!),
+  ).resolves.toMatchObject({ account_id: shared.account_id });
+  expect(grantReads).toBe(1);
+  await expect(
+    f.service.account(principal('app-b', shared.grant_id), shared.account_id!),
+  ).rejects.toThrow();
+});
+
+it('keeps the configured network when the wallets client creates a transaction adapter', async () => {
+  const grantId = randomUUID(),
+    accountId = randomUUID();
+  const client = createWalletsClient({
+    url: 'https://wallet.example.test',
+    network: 'base',
+    authorization: async () => 'Bearer offline',
+    fetch: async (_url, init) => {
+      expect(new Headers(init?.headers).get('Wallet-Grant-Id')).toBe(grantId);
+      const body = JSON.parse(String(init?.body));
+      return Response.json({
+        jsonrpc: '2.0',
+        id: body.id,
+        result: {
+          version: '2.0.0',
+          id: 'batch',
+          chainId: '0x2105',
+          status: 100,
+          atomic: true,
+        },
+      });
+    },
+  });
+  const provider = client.walletProvider({
+    account_id: accountId,
+    grant_id: grantId,
+    is_default: true,
+    wallet: { reference: 'personal', name: 'Personal', kind: 'personal' },
+    role: 'owner',
+    permissions: ['account:read', 'contracts:request'],
+    expires_at: new Date(Date.now() + 60000).toISOString(),
+  });
+  expect(
+    await provider.request({
+      method: 'wallet_getCallsStatus',
+      params: ['batch'],
+    }),
+  ).toMatchObject({ chainId: '0x2105', status: 100 });
 });

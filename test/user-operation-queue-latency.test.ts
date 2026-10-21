@@ -2,6 +2,7 @@ import { expect, it, vi } from 'vitest';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { WalletProviderError } from '../src/domain/signing.js';
 import { randomUUID } from 'node:crypto';
 import { openProviderDatabase } from '../src/storage/index.js';
 import type { SupportedActions } from '../src/deployment/actions.js';
@@ -28,6 +29,7 @@ it('keeps other accounts progressing while one ERC-4337 preparation is stalled, 
     scopes: ['wallet:actions', 'wallet:sign', 'wallet:execute'],
   };
   const policyHash = 'a'.repeat(64);
+  let revokedAccount: string | undefined;
   const actions = {
     revision: 'offline',
     onboarding: {
@@ -38,12 +40,20 @@ it('keeps other accounts progressing while one ERC-4337 preparation is stalled, 
         _permission: unknown,
         operation: Parameters<OnboardingService['withAccountAccess']>[3],
       ) =>
-        database.onboardingStore.transaction((s) =>
-          operation(s, users.find((u) => u.accountId === id)! as never),
-        ),
+        database.onboardingStore.transaction((s) => {
+          if (id === revokedAccount)
+            throw new WalletProviderError('wallet_authorization_denied');
+          return operation(s, users.find((u) => u.accountId === id)! as never);
+        }),
     },
-    applicationQueueExpiry: async () =>
-      new Date(Date.now() + 300000).toISOString(),
+    applicationQueueExpiry: async (
+      _principal: VerifiedPrincipal,
+      _maximumSeconds: number,
+      accountId: string,
+    ) => {
+      expect(users.some((user) => user.accountId === accountId)).toBe(true);
+      return new Date(Date.now() + 300000).toISOString();
+    },
     queueAuthority: async (
       _principal: VerifiedPrincipal,
       input: { account_id: string },
@@ -152,6 +162,24 @@ it('keeps other accounts progressing while one ERC-4337 preparation is stalled, 
       expect(
         preparations.filter((id) => id === user.accountId).length,
       ).toBeLessThanOrEqual(2);
+    revokedAccount = users[1].accountId;
+    const beforeRevocation = preparations.filter(
+      (id) => id === revokedAccount,
+    ).length;
+    await vi.advanceTimersByTimeAsync(3000);
+    const revoked = await database.onboardingStore.transaction((s) =>
+      Object.values(s.userOperationBatches ?? {}).find(
+        (entry) => entry.input.account_id === revokedAccount,
+      ),
+    );
+    expect(revoked).toMatchObject({
+      stage: 'failed',
+      lastFailure: { code: 'wallet_authorization_denied' },
+    });
+    expect(revoked?.operationId).toBeUndefined();
+    expect(preparations.filter((id) => id === revokedAccount)).toHaveLength(
+      beforeRevocation,
+    );
   } finally {
     release();
     await driver.stop();

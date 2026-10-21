@@ -673,3 +673,7 @@ setInterval(() => {
     message('Your session expired. Sign in again.');
   }
 }, 1000);
+
+// Enable form interaction only after every submit handler is installed.
+for (const form of document.querySelectorAll('form[inert]')) form.inert = false;
+el('console-loading').hidden = true;

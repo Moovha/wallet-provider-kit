@@ -173,6 +173,7 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
     const expiresAt = await this.actions.applicationQueueExpiry(
         context.principal,
         this.config.maxWaitSeconds,
+        input.account_id,
       ),
       authority = await this.actions.queueAuthority(
         context.principal,
@@ -422,15 +423,6 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
     entry: UserOperationBatch,
     predecessor?: UserOperationBatch,
   ) {
-    if (predecessor) {
-      if (!predecessor.operationId) deny();
-      const previous = await this.execution.refresh(predecessor.operationId);
-      if (
-        !previous?.observation.receipt ||
-        !['included', 'safe', 'finalized'].includes(previous.observation.state)
-      )
-        deny();
-    }
     const context = entry.context;
     if (!entry.operationId) {
       const key = fingerprint([
@@ -448,6 +440,66 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
     const plan = entry.operationId
       ? await this.execution.load(entry.operationId)
       : null;
+    if (!entry.operationId) {
+      try {
+        await this.actions.onboarding.withAccountAccess(
+          context.principal,
+          entry.input.account_id,
+          'contracts:request',
+          (_state, grant) => {
+            if (grant.id !== entry.grantId || grant.owner !== entry.owner)
+              deny();
+          },
+        );
+      } catch (error) {
+        if (
+          !(error instanceof WalletProviderError) ||
+          error.code !== 'wallet_authorization_denied'
+        )
+          throw error;
+        await this.actions.onboarding.store.transaction((state) => {
+          const current = state.userOperationBatches?.[entry.id] ?? deny();
+          if (
+            current.configurationHash !== this.configurationHash ||
+            state.deploymentBindings?.['service-v1']?.activeRevision !==
+              this.actions.revision
+          )
+            deny();
+          // Recover any concurrently admitted action before ending a request that has no financial effects.
+          const admitted =
+            state.idempotency[
+              fingerprint([
+                'supported-call',
+                context.principal.issuer,
+                context.principal.subject,
+                context.principal.clientId,
+                context.idempotencyKey,
+              ])
+            ]?.id;
+          if (admitted) current.operationId = admitted;
+          else if (
+            !current.operationId &&
+            !['complete', 'expired', 'failed'].includes(current.stage)
+          ) {
+            current.stage = 'failed';
+            current.lastFailure = {
+              code: 'wallet_authorization_denied',
+              at: new Date().toISOString(),
+            };
+          }
+        });
+        return;
+      }
+    }
+    if (predecessor) {
+      if (!predecessor.operationId) deny();
+      const previous = await this.execution.refresh(predecessor.operationId);
+      if (
+        !previous?.observation.receipt ||
+        !['included', 'safe', 'finalized'].includes(previous.observation.state)
+      )
+        deny();
+    }
     if (plan?.dispatch) {
       await this.execution.refresh(plan.operationId);
     } else if (Date.parse(entry.expiresAt) <= Date.now()) {

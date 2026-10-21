@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+- Stop queued wallet requests after their grant loses authority and before a
+  financial action is admitted. Preserve recovery of any concurrently admitted
+  action instead of retrying revoked access.
+- Allow an application with an approved shared wallet to queue transactions without
+  first creating its own wallet. Keep queue setup bound to the selected account.
+- Preserve the selected wallet grant on SDK status streams, expose wallet
+  disconnection in the backend client, and carry the configured network into its
+  transaction adapter. Resolve an explicitly selected grant without scanning
+  unrelated grants.
+- Include the required Safe authorization scope in new application registrations.
+  Consent, current wallet authority and transaction policy remain required.
+- Keep administrator forms inactive until their handlers load, and use POST as
+  their native fallback so credentials cannot appear in a form-submission URL.
+  Keep user-check settings readable after applications enable wallet sharing.
+- Initialize the empty runtime registry before starting an activated installation;
+  wallet access still requires accepted application configuration and consent.
+
 - Add named personal and shared wallets under current user checks, preserving the original Personal wallet as the default. Add member invitations, read or approved-transaction permissions, and independent wallet-specific consent. The backend wallets client carries the selected wallet grant. Provider signing keys and Safe thresholds are unchanged. Back up durable storage before upgrading: older builds cannot read the verified-user JSON collection.
 
 - Add directional wallet sharing in Applications, exact matching on selected identity fields (including ID number, document type and issuing country), and `connect_from_application` access requests. Requesting apps receive their own consent grants, transaction rules and fee authority; sharing never replaces the original wallet owner.

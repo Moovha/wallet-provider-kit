@@ -67,7 +67,19 @@ test('claims, registers and manages applications through the real protected mana
   try {
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
+    await page.route('**/admin/app.js', (route) => route.abort());
     await page.goto(url + '/admin/');
+    await expect(page.locator('#login')).toHaveAttribute('inert', '');
+    await expect(page.locator('#login')).toHaveAttribute('method', 'post');
+    await expect(page.locator('#claim')).toHaveAttribute('inert', '');
+    await expect(
+      page.getByText('Loading secure administration.', { exact: false }),
+    ).toBeVisible();
+    await page.getByLabel('Username or access ID').press('Tab');
+    expect(new URL(page.url()).search).toBe('');
+    await page.unroute('**/admin/app.js');
+    await page.reload();
+    await expect(page.locator('#login')).not.toHaveAttribute('inert', '');
     await page
       .getByRole('button', { name: 'First-time setup', exact: true })
       .click();

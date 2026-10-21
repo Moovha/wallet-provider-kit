@@ -1364,8 +1364,12 @@ export class OnboardingService {
       !principal.accessGrantId
     )
       deny();
-    const grant = Object.values(state.grants).find(
+    const candidates = principal.accessGrantId
+      ? [state.grants[principal.accessGrantId]]
+      : Object.values(state.grants);
+    const grant = candidates.find(
       (g) =>
+        g &&
         (!principal.accessGrantId || g.id === principal.accessGrantId) &&
         g.accountId === accountId &&
         sameCaller(g.caller, principal) &&

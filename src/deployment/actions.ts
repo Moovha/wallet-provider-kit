@@ -116,7 +116,7 @@ export class SupportedActions {
   private walletAuthority(
     state: ProviderState,
     principal: Pick<VerifiedPrincipal, 'issuer' | 'clientId'>,
-    accountId?: string,
+    accountId: string,
   ) {
     const applicationId = runtimeApplicationId(
       principal.issuer,
@@ -124,11 +124,7 @@ export class SupportedActions {
     );
     const deployment = state.deploymentBindings?.['service-v1'];
     const registry = deployment?.runtimeConfiguration;
-    const wallet = accountId
-      ? registry?.safeWalletAccounts?.[accountId]
-      : Object.values(registry?.safeWalletAccounts ?? {}).find(
-          (r) => r.applicationId === applicationId && r.status === 'ready',
-        );
+    const wallet = registry?.safeWalletAccounts?.[accountId];
     if (
       !wallet ||
       (wallet.applicationId !== applicationId &&
@@ -149,10 +145,7 @@ export class SupportedActions {
       deny();
     return { signer: wallet.signer, binding: wallet.binding };
   }
-  private async callAuthority(
-    principal: VerifiedPrincipal,
-    accountId?: string,
-  ) {
+  private async callAuthority(principal: VerifiedPrincipal, accountId: string) {
     const configuration = this.callConfiguration ?? deny();
     const snapshot = await this.onboarding.store.transaction((state) =>
       currentRuntimePolicy(state, principal),
@@ -444,9 +437,13 @@ export class SupportedActions {
   async applicationQueueExpiry(
     principal: VerifiedPrincipal,
     maximumSeconds: number,
+    accountId: string,
   ) {
     return this.queueExpiry(
-      Math.min(maximumSeconds, (await this.callAuthority(principal)).validity),
+      Math.min(
+        maximumSeconds,
+        (await this.callAuthority(principal, accountId)).validity,
+      ),
     );
   }
   queueExpiry(maximumSeconds: number) {

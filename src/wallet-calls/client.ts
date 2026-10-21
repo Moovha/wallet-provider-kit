@@ -162,6 +162,9 @@ export function createWalletCallsProvider(options: WalletCallsClientOptions) {
         headers: {
           authorization: await options.authorization(),
           accept: 'text/event-stream',
+          ...(options.accessGrantId
+            ? { 'Wallet-Grant-Id': options.accessGrantId }
+            : {}),
         },
         redirect: 'error',
         credentials: 'omit',
