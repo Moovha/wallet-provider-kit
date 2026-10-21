@@ -48,38 +48,48 @@ it.each([
   expect(await readdir(directory)).toEqual([]);
   expect(network).not.toHaveBeenCalled();
 });
-it('starts only the Safe runtime, advertises one execution choice and preserves its configuration identity after restart', async () => {
-  const directory = await mkdtemp(join(tmpdir(), 'wpk-safe-runtime-'));
-  folders.push(directory);
-  const config = await current();
-  assertSafeWalletConfiguration(config);
-  config.storage.directory = join(directory, 'data');
-  config.backend.vaultDirectory = join(directory, 'vault');
-  await mkdir(config.backend.vaultDirectory, { mode: 0o700 });
-  for (const [name, value] of Object.entries(
-    generateDeploymentSecrets(config, {}),
-  ))
-    vi.stubEnv(name, value);
-  const db = openProviderDatabase({
-    directory: config.storage.directory,
-    initialize: true,
-  });
-  db.close();
-  const network = vi
-    .spyOn(globalThis, 'fetch')
-    .mockRejectedValue(Error('No network'));
-  for (let i = 0; i < 2; i++) {
-    const app = await createConfiguredProvider(config, directory);
-    apps.push(app);
-    const response = await app.inject({ url: '/v1/execution-capabilities' });
-    expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual({
-      profile: 'safe-only-4337-v1',
-      revision: '1',
-      configured: false,
+it.each([false, true])(
+  'starts the Safe runtime with activation=%s before policy publication and preserves configuration identity after restart',
+  async (enabled) => {
+    const directory = await mkdtemp(join(tmpdir(), 'wpk-safe-runtime-'));
+    folders.push(directory);
+    const config = await current();
+    config.activation = enabled
+      ? {
+          enabled: true,
+          backendAcceptance: 'Offline fixture only',
+          recoveryAcceptance: 'Offline fixture only',
+        }
+      : { enabled: false };
+    assertSafeWalletConfiguration(config);
+    config.storage.directory = join(directory, 'data');
+    config.backend.vaultDirectory = join(directory, 'vault');
+    await mkdir(config.backend.vaultDirectory, { mode: 0o700 });
+    for (const [name, value] of Object.entries(
+      generateDeploymentSecrets(config, {}),
+    ))
+      vi.stubEnv(name, value);
+    const db = openProviderDatabase({
+      directory: config.storage.directory,
+      initialize: true,
     });
-    await app.close();
-    apps.pop();
-  }
-  expect(network).not.toHaveBeenCalled();
-});
+    db.close();
+    const network = vi
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValue(Error('No network'));
+    for (let i = 0; i < 2; i++) {
+      const app = await createConfiguredProvider(config, directory);
+      apps.push(app);
+      const response = await app.inject({ url: '/v1/execution-capabilities' });
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toEqual({
+        profile: 'safe-only-4337-v1',
+        revision: '1',
+        configured: enabled,
+      });
+      await app.close();
+      apps.pop();
+    }
+    expect(network).not.toHaveBeenCalled();
+  },
+);

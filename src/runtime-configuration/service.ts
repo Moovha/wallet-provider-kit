@@ -427,6 +427,10 @@ export class RuntimeConfigurationService {
     )
       deny();
   }
+  /** Initialize the current deployment's empty registry without publishing policy or granting access. */
+  async initialize() {
+    await this.transaction(() => undefined);
+  }
   private transaction<T>(
     operation: (registry: RuntimeConfigurationState, state: ProviderState) => T,
   ) {

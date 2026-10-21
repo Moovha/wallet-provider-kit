@@ -13,6 +13,11 @@ The toolkit is experimental. Offline tests, a container build and a testnet
 transaction answer different questions; none is provider certification or proof
 of production custody readiness.
 
+A [limited Base Sepolia wallet acceptance report](base-sepolia-wallet-acceptance.md)
+records live wallet-sharing, membership and token-transfer evidence, measurements
+and remaining limits. Use it as an example of evidence scope, alongside your own
+deployment review.
+
 ## Review with your team
 
 | Area                   | What you need to establish                                                                                  |

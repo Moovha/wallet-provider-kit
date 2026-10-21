@@ -284,6 +284,7 @@ export async function createConfiguredProvider(
             : undefined,
         )
       : undefined;
+    await runtimeConfiguration?.initialize();
     const safeWallet =
       config.safeWallet &&
       actions &&

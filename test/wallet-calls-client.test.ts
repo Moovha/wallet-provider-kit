@@ -155,6 +155,7 @@ it('reports transport loss as disconnected without retrying a possibly admitted 
 });
 
 it('streams authenticated status without exposing tokens in URLs and cancels the stream at terminal status', async () => {
+  const accessGrantId = '11111111-1111-4111-8111-111111111111';
   const pending = {
     version: '2.0.0',
     id: 'batch',
@@ -169,6 +170,7 @@ it('streams authenticated status without exposing tokens in URLs and cancels the
     );
     expect(options?.headers).toMatchObject({
       authorization: 'Bearer offline-access',
+      'Wallet-Grant-Id': accessGrantId,
     });
     return new Response(
       'event: status\ndata: ' +
@@ -181,6 +183,7 @@ it('streams authenticated status without exposing tokens in URLs and cancels the
   });
   const provider = createWalletCallsProvider({
     url: 'https://wallet.example.test/v1/accounts/offline/wallet',
+    accessGrantId,
     authorization: async () => 'Bearer offline-access',
     fetch: request,
   });

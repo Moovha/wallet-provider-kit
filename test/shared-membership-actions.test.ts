@@ -125,6 +125,22 @@ it('binds member admission to its grant, shares the Safe nonce, and denies signi
   const granted = await access(2, true),
     principal = { ...f.context.principal, accessGrantId: granted.grant_id },
     context = { principal, idempotencyKey: randomUUID() };
+  await f.db.onboardingStore.transaction((s) => {
+    const wallets =
+      s.deploymentBindings!['service-v1'].runtimeConfiguration!
+        .safeWalletAccounts!;
+    delete wallets[f.input.account_id];
+    wallets[accountId].applicationId = runtimeApplicationId(
+      ownerPrincipal.issuer,
+      'source-application',
+    );
+  });
+  // The requesting application has no wallet of its own; its member grant selects this shared Safe.
+  expect(
+    Date.parse(
+      await f.actions.applicationQueueExpiry(principal, 120, accountId),
+    ),
+  ).toBeGreaterThan(Date.now());
   const plan = await f.actions.requestCalls(context, input, async () => '0');
   const approval = await f.db.onboardingStore.transaction(
     (s) => s.supportedActions![plan.action_id].approval,

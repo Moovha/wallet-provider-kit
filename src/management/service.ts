@@ -220,7 +220,10 @@ export class ManagementService {
       : undefined;
   }
   private userChecks(state: ManagementState) {
-    const policy = defineOnboardingPolicy(this.basePolicy);
+    const policy = defineOnboardingPolicy({
+      ...this.basePolicy,
+      applications: [],
+    });
     return {
       available: policy.access.mode === 'application',
       revision: state.userChecks?.revision ?? 1,
@@ -445,6 +448,7 @@ export class ManagementService {
                 'wallet:configuration:read',
                 'wallet:configuration:propose',
                 'wallet:actions',
+                'wallet:sign',
                 'wallet:execute',
                 'wallet:execute:read',
               ]

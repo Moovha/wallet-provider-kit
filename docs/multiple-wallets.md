@@ -94,6 +94,7 @@ import { createWalletsClient } from '@moovha/wallet-provider-kit/wallets';
 
 const client = createWalletsClient({
   url: 'https://wallet.example.test',
+  network: 'base-sepolia',
   authorization: getApplicationBearerAuthorization,
 });
 const { accounts } = await client.listWallets(authenticatedPrivateUserId);
@@ -105,10 +106,12 @@ if (selected) {
 }
 ```
 
-Supply your token callback and authenticated user ID. `walletProvider(selected)`
+Select the provider’s network (`base` or `base-sepolia`) and supply your token
+callback and authenticated user ID. `walletProvider(selected)`
 implements the existing [wallet calls adapter](wallet-calls.md) and automatically
 carries the selected account and grant. `requestAccess`, `provision`, `members`
-and `saveMember` cover access and membership. Mutation methods require you to
+and `saveMember` cover access and membership. Use `revokeAccess(grantId, key)`
+when the person disconnects a wallet; retain the same key for a retry. Mutation methods require you to
 retain a UUIDv4 idempotency key for retries; the client does not retry mutations
 automatically. See the [TypeScript reference](api-reference.md#personal-and-shared-wallets)
 for signatures.

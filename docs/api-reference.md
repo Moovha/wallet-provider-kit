@@ -2794,6 +2794,8 @@ export declare class RuntimeConfigurationService {
   );
   assertOperator(principal: VerifiedPrincipal): void;
   assertOperatorState(principal: VerifiedPrincipal, state: ProviderState): void;
+  /** Initialize the current deployment's empty registry without publishing policy or granting access. */
+  initialize(): Promise<void>;
   readCredentials(
     principal: VerifiedPrincipal,
     applicationId?: string,
@@ -4326,6 +4328,7 @@ export type AccessRequestInput = Omit<AccessInput, 'user'> & {
 /** For a trusted application backend. Supply short-lived bearer authorization; never embed a client secret in a browser. */
 export declare function createWalletsClient(options: {
   url: string;
+  network?: ProviderNetwork;
   authorization(): Promise<string>;
   fetch?: typeof fetch;
 }): {
@@ -4340,6 +4343,13 @@ export declare function createWalletsClient(options: {
     wallet?: WalletDescription;
     permissions?: Permission[];
     expires_at?: string;
+  }>;
+  revokeAccess(
+    grantId: string,
+    idempotencyKey: string,
+  ): Promise<{
+    grant_id: string;
+    status: 'revoked';
   }>;
   listWallets(userId: string): Promise<{
     accounts: WalletSummary[];
