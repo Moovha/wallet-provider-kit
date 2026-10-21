@@ -4,7 +4,9 @@ Use this reference when embedding or extending the toolkit. Application develope
 calling a deployed service can start with the [HTTP guide](http-api.md) instead.
 
 The package exposes core authority, HTTP composition, onboarding, identity,
-telemetry, storage, deployment, OWS signing, wallet calls and sponsorship modules.
+telemetry, storage, deployment, OWS signing, wallet calls, sponsorship and personal/shared wallet client modules.
+Use [the wallets client](multiple-wallets.md#backend-client) to keep wallet selection
+and the person’s approval together in application backend requests.
 The generated [TypeScript reference](api-reference.md) lists exact exports and
 import paths. Use the [integration guide](api.md) to choose the right boundary.
 

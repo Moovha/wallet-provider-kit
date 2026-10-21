@@ -232,9 +232,9 @@ export interface paths {
          *
          *     **When you need it:** Use after reading the access requirements and obtaining consent inside the application. Creating or reconnecting access is separate from creating the blockchain wallet.
          *
-         *     **Before you start:** After the person completes the agreed identity checks and approves wallet access in your application, submit those records here. First read GET /v1/access-policy for the required fields and current terms. Use mode=create for a first wallet account or mode=connect with the existing account_id for the same application user. To request a wallet from a selected source application, read GET /v1/access-policy?source_application_id=SOURCE_CONNECTION_ID, then use mode=connect_from_application and source_application_id without account_id. Include the returned sharing revision and source application in fresh consent for the requesting application. All configured identity fields must match exactly; ambiguous matches are denied. The provider must trust your application’s checks. Hosted compatibility mode uses a separate provider login and review.
+         *     **Before you start:** After the person completes the agreed identity checks and approves wallet access in your application, submit those records here. First read GET /v1/access-policy for the required fields and current terms. Use mode=create without wallet to preserve the default Personal account. To add a wallet, supply wallet.reference, name and kind (personal or shared), and consent.wallet_reference. A verified user can omit identity while their saved checks remain current. Each wallet needs its own consent. Use mode=connect with account_id and consent.account_id to renew a selected wallet; invited members also supply consent.membership_revision. To request a wallet from a selected source application, read GET /v1/access-policy?source_application_id=SOURCE_CONNECTION_ID, then use mode=connect_from_application and source_application_id without account_id. Omit source_account_id to connect the source Personal wallet, or select another source_account_id and include consent.account_id. Include the returned sharing revision and source application in fresh consent for the requesting application. All configured identity fields must match exactly; ambiguous matches are denied. The provider must trust your application’s checks. Hosted compatibility mode uses a separate provider login and review.
          *
-         *     **Result and next step:** 200: the access decision. A granted response includes account_id, grant_id, allowed actions and expiry. Save those IDs, then call POST /v1/accounts/{accountId}/provision to create the blockchain wallet. Reconnecting preserves the existing account. This request does not create an on-chain wallet or send money. Missing, stale or unauthorized evidence is rejected; consent_url is only for hosted compatibility mode.
+         *     **Result and next step:** 200: the access decision. A granted response includes account_id, grant_id, allowed actions and expiry. Save those IDs, then let the creating application provision the blockchain wallet. Shared-wallet account requests require Wallet-Grant-Id; use the selected person’s grant_id. List consented wallets with POST /v1/accounts/query. Reconnecting preserves the existing account. This request does not create an on-chain wallet or send money. Missing, stale or unauthorized evidence is rejected; consent_url is only for hosted compatibility mode.
          */
         post: operations["requestAccountAccess"];
         delete?: never;
@@ -265,6 +265,74 @@ export interface paths {
         get: operations["getAccountAccessPolicy"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/accounts/query": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Find a person’s approved wallets
+         * @description **Why this exists:** Build a wallet switcher from the wallets this person has currently approved for your application.
+         *
+         *     **Who uses it:** Application developer.
+         *
+         *     **When you need it:** Use after access is granted and when switching wallets. The existing Personal wallet is listed first.
+         *
+         *     **Before you start:** Send your private user_id in the JSON body and an application token. Only current grants for that exact application user are returned; keep stored account references for later renewal.
+         *
+         *     **Result and next step:** 200: accounts with wallet names, kind, roles, grant IDs, permissions and expiry. Send Wallet-Grant-Id with the selected grant on shared-wallet requests. No KYC records or other users’ wallets are returned.
+         */
+        post: operations["listUserWallets"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/accounts/{accountId}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Review a shared wallet’s members
+         * @description **Why this exists:** Show the owner who has been invited and the permissions available to each member.
+         *
+         *     **Who uses it:** Application developer acting for the wallet owner.
+         *
+         *     **When you need it:** Use before inviting someone, changing their permissions or removing them.
+         *
+         *     **Before you start:** Use the owner’s current Wallet-Grant-Id for this shared wallet. The application and the owner must explicitly allow members:manage. Being a member or knowing a wallet ID cannot grant administration.
+         *
+         *     **Result and next step:** 200: current settings revision and invited, active or removed members. Use the revision when saving. Another application’s private user reference is omitted.
+         */
+        get: operations["readWalletMembers"];
+        put?: never;
+        /**
+         * Invite someone or change their wallet access
+         * @description **Why this exists:** Invite a verified application user to a shared wallet, limit their permissions or remove their future access.
+         *
+         *     **Who uses it:** Application developer acting for the wallet owner.
+         *
+         *     **When you need it:** Use after the owner chooses View wallet or View and request approved transactions for a member.
+         *
+         *     **Before you start:** Send Wallet-Grant-Id for the owner, a UUIDv4 Idempotency-Key, expected_revision, enabled and permissions. Use user_id to invite someone from your application or member_id to update a saved member. New or changed permissions need the member’s fresh consent to account_id and membership_revision through mode=connect.
+         *
+         *     **Result and next step:** 200: member settings and their revisions. Invitations do not grant account or spending access. Removing or changing a member invalidates their previous grants. The provider signer and on-chain owner threshold are unchanged; issued signatures remain subject to their on-chain validity.
+         */
+        post: operations["saveWalletMember"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2034,6 +2102,8 @@ export interface operations {
             query?: never;
             header: {
                 "idempotency-key": string;
+                /** @description Select this person’s current grant for this wallet. Required for shared wallets; the selector alone grants no authority. */
+                "wallet-grant-id"?: string;
             };
             path: {
                 accountId: string;
@@ -2389,6 +2459,13 @@ export interface operations {
                 "application/json": {
                     /** @enum {string} */
                     mode: "create" | "connect" | "connect_from_application";
+                    wallet?: {
+                        reference: string;
+                        name: string;
+                        /** @enum {unknown} */
+                        kind: "personal" | "shared";
+                    };
+                    source_account_id?: string;
                     account_id?: string;
                     /** @description Source application connection ID for connect_from_application, using the same provider issuer. Omit account_id; the provider requires one unique verified identity match. */
                     source_application_id?: string;
@@ -2401,7 +2478,7 @@ export interface operations {
                     /** @description Required in application-led mode. The explicitly trusted application attests its stable user identity and recorded consent; OAuth scopes alone do not establish these facts. */
                     user?: {
                         id: string;
-                        identity: {
+                        identity?: {
                             reference: string;
                             level: string;
                             /** Format: date-time */
@@ -2418,6 +2495,9 @@ export interface operations {
                             expires_at: string;
                             policy_revision: string;
                             source_application_id?: string;
+                            account_id?: string;
+                            wallet_reference?: string;
+                            membership_revision?: number;
                             sharing_revision?: string;
                             action_policy_revision?: string;
                         };
@@ -2425,7 +2505,7 @@ export interface operations {
                     authorization_details: {
                         /** @enum {string} */
                         type: "https://moovha.com/wallet/account-access";
-                        actions: ("account:read" | "operations:request" | "contracts:request")[];
+                        actions: ("account:read" | "operations:request" | "contracts:request" | "members:manage")[];
                     }[];
                 };
             };
@@ -2438,6 +2518,13 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
+                        wallet?: {
+                            reference: string;
+                            name: string;
+                            /** @enum {unknown} */
+                            kind: "personal" | "shared";
+                        };
+                        membership_revision?: number;
                         request_id: string;
                         /** @enum {string} */
                         status: "consent_required" | "verification_required" | "funding_approval_required" | "identity_pending" | "reconciliation_required" | "provider_review_required" | "granted" | "denied" | "expired" | "suspended" | "revoked" | "policy_changed";
@@ -2448,7 +2535,7 @@ export interface operations {
                         consent_url?: string;
                         grant_id?: string;
                         account_id?: string;
-                        permissions?: ("account:read" | "operations:request" | "contracts:request")[];
+                        permissions?: ("account:read" | "operations:request" | "contracts:request" | "members:manage")[];
                         /** Format: date-time */
                         expires_at?: string;
                     };
@@ -3125,6 +3212,662 @@ export interface operations {
             };
         };
     };
+    listUserWallets: {
+        parameters: {
+            query?: never;
+            header: {
+                "idempotency-key": string;
+                /** @description Select this person’s current grant for this wallet. Required for shared wallets; the selector alone grants no authority. */
+                "wallet-grant-id"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    user_id: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        accounts: {
+                            account_id: string;
+                            is_default: boolean;
+                            wallet: {
+                                reference: string;
+                                name: string;
+                                /** @enum {unknown} */
+                                kind: "personal" | "shared";
+                            };
+                            grant_id: string;
+                            permissions: ("account:read" | "operations:request" | "contracts:request" | "members:manage")[];
+                            expires_at: string;
+                            /** @enum {unknown} */
+                            role: "owner" | "member";
+                        }[];
+                    };
+                };
+            };
+            /** @description Default Response */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+        };
+    };
+    readWalletMembers: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Select this person’s current grant for this wallet. Required for shared wallets; the selector alone grants no authority. */
+                "wallet-grant-id"?: string;
+            };
+            path: {
+                accountId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        account_id: string;
+                        wallet: {
+                            reference: string;
+                            name: string;
+                            /** @enum {unknown} */
+                            kind: "personal" | "shared";
+                        };
+                        revision: number;
+                        members: {
+                            member_id: string;
+                            application_id: string;
+                            user_id?: string;
+                            name: string;
+                            permissions: ("account:read" | "contracts:request")[];
+                            membership_revision: number;
+                            /** @enum {unknown} */
+                            status: "invited" | "active" | "removed";
+                        }[];
+                    };
+                };
+            };
+            /** @description Default Response */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+        };
+    };
+    saveWalletMember: {
+        parameters: {
+            query?: never;
+            header: {
+                "idempotency-key": string;
+                /** @description Select this person’s current grant for this wallet. Required for shared wallets; the selector alone grants no authority. */
+                "wallet-grant-id"?: string;
+            };
+            path: {
+                accountId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    expected_revision: number;
+                    user_id?: string;
+                    member_id?: string;
+                    name?: string;
+                    enabled: boolean;
+                    permissions: ("account:read" | "contracts:request")[];
+                };
+            };
+        };
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        account_id: string;
+                        wallet: {
+                            reference: string;
+                            name: string;
+                            /** @enum {unknown} */
+                            kind: "personal" | "shared";
+                        };
+                        revision: number;
+                        members: {
+                            member_id: string;
+                            application_id: string;
+                            user_id?: string;
+                            name: string;
+                            permissions: ("account:read" | "contracts:request")[];
+                            membership_revision: number;
+                            /** @enum {unknown} */
+                            status: "invited" | "active" | "removed";
+                        }[];
+                    };
+                };
+            };
+            /** @description Default Response */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+        };
+    };
     revokeAccountAccess: {
         parameters: {
             query?: never;
@@ -3311,6 +4054,13 @@ export interface operations {
                             status: "submitted" | "invalid";
                             required_fields?: string[];
                             receipt?: {
+                                wallet?: {
+                                    reference: string;
+                                    name: string;
+                                    /** @enum {unknown} */
+                                    kind: "personal" | "shared";
+                                };
+                                membership_revision?: number;
                                 request_id: string;
                                 /** @enum {string} */
                                 status: "consent_required" | "verification_required" | "funding_approval_required" | "identity_pending" | "reconciliation_required" | "provider_review_required" | "granted" | "denied" | "expired" | "suspended" | "revoked" | "policy_changed";
@@ -3321,7 +4071,7 @@ export interface operations {
                                 consent_url?: string;
                                 grant_id?: string;
                                 account_id?: string;
-                                permissions?: ("account:read" | "operations:request" | "contracts:request")[];
+                                permissions?: ("account:read" | "operations:request" | "contracts:request" | "members:manage")[];
                                 /** Format: date-time */
                                 expires_at?: string;
                             };
@@ -3519,6 +4269,13 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
+                        wallet?: {
+                            reference: string;
+                            name: string;
+                            /** @enum {unknown} */
+                            kind: "personal" | "shared";
+                        };
+                        membership_revision?: number;
                         request_id: string;
                         /** @enum {string} */
                         status: "consent_required" | "verification_required" | "funding_approval_required" | "identity_pending" | "reconciliation_required" | "provider_review_required" | "granted" | "denied" | "expired" | "suspended" | "revoked" | "policy_changed";
@@ -3529,7 +4286,7 @@ export interface operations {
                         consent_url?: string;
                         grant_id?: string;
                         account_id?: string;
-                        permissions?: ("account:read" | "operations:request" | "contracts:request")[];
+                        permissions?: ("account:read" | "operations:request" | "contracts:request" | "members:manage")[];
                         /** Format: date-time */
                         expires_at?: string;
                     };
@@ -3735,6 +4492,13 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
+                        wallet?: {
+                            reference: string;
+                            name: string;
+                            /** @enum {unknown} */
+                            kind: "personal" | "shared";
+                        };
+                        membership_revision?: number;
                         request_id: string;
                         /** @enum {string} */
                         status: "consent_required" | "verification_required" | "funding_approval_required" | "identity_pending" | "reconciliation_required" | "provider_review_required" | "granted" | "denied" | "expired" | "suspended" | "revoked" | "policy_changed";
@@ -3745,7 +4509,7 @@ export interface operations {
                         consent_url?: string;
                         grant_id?: string;
                         account_id?: string;
-                        permissions?: ("account:read" | "operations:request" | "contracts:request")[];
+                        permissions?: ("account:read" | "operations:request" | "contracts:request" | "members:manage")[];
                         /** Format: date-time */
                         expires_at?: string;
                     };
@@ -3926,7 +4690,10 @@ export interface operations {
     readGrantedAccount: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Select this person’s current grant for this wallet. Required for shared wallets; the selector alone grants no authority. */
+                "wallet-grant-id"?: string;
+            };
             path: {
                 accountId: string;
             };
@@ -3941,6 +4708,12 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
+                        wallet?: {
+                            reference: string;
+                            name: string;
+                            /** @enum {unknown} */
+                            kind: "personal" | "shared";
+                        };
                         account_id: string;
                         /** @enum {string} */
                         identity_source?: "application_record" | "application_attestation";
@@ -4075,7 +4848,10 @@ export interface operations {
     streamWalletCallsStatus: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Select this person’s current grant for this wallet. Required for shared wallets; the selector alone grants no authority. */
+                "wallet-grant-id"?: string;
+            };
             path: {
                 accountId: string;
                 batchId: string;
@@ -4166,7 +4942,10 @@ export interface operations {
     readWalletExecutionAccount: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Select this person’s current grant for this wallet. Required for shared wallets; the selector alone grants no authority. */
+                "wallet-grant-id"?: string;
+            };
             path: {
                 accountId: string;
             };
@@ -4242,7 +5021,10 @@ export interface operations {
     walletCallsRpc: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Select this person’s current grant for this wallet. Required for shared wallets; the selector alone grants no authority. */
+                "wallet-grant-id"?: string;
+            };
             path: {
                 accountId: string;
             };
@@ -12032,7 +12814,7 @@ export interface operations {
                         matchingFields: string[];
                         agreement: string;
                     } | null;
-                    permissions?: ("account:read" | "contracts:request" | "operations:request")[];
+                    permissions?: ("account:read" | "contracts:request" | "operations:request" | "members:manage")[];
                 };
             };
         };

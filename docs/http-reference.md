@@ -374,6 +374,7 @@ Operation: `provisionAccount`.
 | ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
 | `accountId`       | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
 | `idempotency-key` | header   | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+| `wallet-grant-id` | header   | no       | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
 
 Request body (application/json):
 
@@ -572,9 +573,9 @@ Operation: `requestAccountAccess`.
 
 **When you need it:** Use after reading the access requirements and obtaining consent inside the application. Creating or reconnecting access is separate from creating the blockchain wallet.
 
-**Before you start:** After the person completes the agreed identity checks and approves wallet access in your application, submit those records here. First read GET /v1/access-policy for the required fields and current terms. Use mode=create for a first wallet account or mode=connect with the existing account_id for the same application user. To request a wallet from a selected source application, read GET /v1/access-policy?source_application_id=SOURCE_CONNECTION_ID, then use mode=connect_from_application and source_application_id without account_id. Include the returned sharing revision and source application in fresh consent for the requesting application. All configured identity fields must match exactly; ambiguous matches are denied. The provider must trust your application’s checks. Hosted compatibility mode uses a separate provider login and review.
+**Before you start:** After the person completes the agreed identity checks and approves wallet access in your application, submit those records here. First read GET /v1/access-policy for the required fields and current terms. Use mode=create without wallet to preserve the default Personal account. To add a wallet, supply wallet.reference, name and kind (personal or shared), and consent.wallet_reference. A verified user can omit identity while their saved checks remain current. Each wallet needs its own consent. Use mode=connect with account_id and consent.account_id to renew a selected wallet; invited members also supply consent.membership_revision. To request a wallet from a selected source application, read GET /v1/access-policy?source_application_id=SOURCE_CONNECTION_ID, then use mode=connect_from_application and source_application_id without account_id. Omit source_account_id to connect the source Personal wallet, or select another source_account_id and include consent.account_id. Include the returned sharing revision and source application in fresh consent for the requesting application. All configured identity fields must match exactly; ambiguous matches are denied. The provider must trust your application’s checks. Hosted compatibility mode uses a separate provider login and review.
 
-**Result and next step:** 200: the access decision. A granted response includes account_id, grant_id, allowed actions and expiry. Save those IDs, then call POST /v1/accounts/{accountId}/provision to create the blockchain wallet. Reconnecting preserves the existing account. This request does not create an on-chain wallet or send money. Missing, stale or unauthorized evidence is rejected; consent_url is only for hosted compatibility mode.
+**Result and next step:** 200: the access decision. A granted response includes account_id, grant_id, allowed actions and expiry. Save those IDs, then let the creating application provision the blockchain wallet. Shared-wallet account requests require Wallet-Grant-Id; use the selected person’s grant_id. List consented wallets with POST /v1/accounts/query. Reconnecting preserves the existing account. This request does not create an on-chain wallet or send money. Missing, stale or unauthorized evidence is rejected; consent_url is only for hosted compatibility mode.
 
 | Parameter         | Location | Required | Schema                                                                                                |
 | ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
@@ -591,6 +592,29 @@ Request body (application/json):
     "mode": {
       "type": "string",
       "enum": ["create", "connect", "connect_from_application"]
+    },
+    "wallet": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reference", "name", "kind"],
+      "properties": {
+        "reference": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "kind": {
+          "enum": ["personal", "shared"]
+        }
+      }
+    },
+    "source_account_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
     },
     "account_id": {
       "type": "string",
@@ -627,7 +651,7 @@ Request body (application/json):
       "description": "Required in application-led mode. The explicitly trusted application attests its stable user identity and recorded consent; OAuth scopes alone do not establish these facts.",
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "identity", "consent"],
+      "required": ["id", "consent"],
       "properties": {
         "id": {
           "type": "string",
@@ -696,6 +720,18 @@ Request body (application/json):
               "minLength": 1,
               "maxLength": 256
             },
+            "account_id": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            },
+            "wallet_reference": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+            },
+            "membership_revision": {
+              "type": "integer",
+              "minimum": 1
+            },
             "sharing_revision": {
               "type": "string",
               "pattern": "^[a-f0-9]{64}$"
@@ -724,14 +760,15 @@ Request body (application/json):
           "actions": {
             "type": "array",
             "minItems": 1,
-            "maxItems": 3,
+            "maxItems": 4,
             "uniqueItems": true,
             "items": {
               "type": "string",
               "enum": [
                 "account:read",
                 "operations:request",
-                "contracts:request"
+                "contracts:request",
+                "members:manage"
               ]
             }
           }
@@ -764,6 +801,29 @@ Success response schema:
   "additionalProperties": false,
   "required": ["request_id", "status"],
   "properties": {
+    "wallet": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reference", "name", "kind"],
+      "properties": {
+        "reference": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "kind": {
+          "enum": ["personal", "shared"]
+        }
+      }
+    },
+    "membership_revision": {
+      "type": "integer",
+      "minimum": 1
+    },
     "request_id": {
       "type": "string",
       "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
@@ -802,7 +862,12 @@ Success response schema:
       "type": "array",
       "items": {
         "type": "string",
-        "enum": ["account:read", "operations:request", "contracts:request"]
+        "enum": [
+          "account:read",
+          "operations:request",
+          "contracts:request",
+          "members:manage"
+        ]
       }
     },
     "expires_at": {
@@ -2148,6 +2213,402 @@ Success response schema:
 }
 ```
 
+## POST /v1/accounts/query
+
+Operation: `listUserWallets`.
+
+**Why this exists:** Build a wallet switcher from the wallets this person has currently approved for your application.
+
+**Who uses it:** Application developer.
+
+**When you need it:** Use after access is granted and when switching wallets. The existing Personal wallet is listed first.
+
+**Before you start:** Send your private user_id in the JSON body and an application token. Only current grants for that exact application user are returned; keep stored account references for later renewal.
+
+**Result and next step:** 200: accounts with wallet names, kind, roles, grant IDs, permissions and expiry. Send Wallet-Grant-Id with the selected grant on shared-wallet requests. No KYC records or other users’ wallets are returned.
+
+| Parameter         | Location | Required | Schema                                                                                                |
+| ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
+| `idempotency-key` | header   | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+| `wallet-grant-id` | header   | no       | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+
+Request body (application/json):
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["user_id"],
+  "properties": {
+    "user_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    }
+  }
+}
+```
+
+| Status | Content type             | Description      |
+| ------ | ------------------------ | ---------------- |
+| 200    | application/json         | Default Response |
+| 400    | application/problem+json | Default Response |
+| 401    | application/problem+json | Default Response |
+| 403    | application/problem+json | Default Response |
+| 409    | application/problem+json | Default Response |
+| 413    | application/problem+json | Default Response |
+| 415    | application/problem+json | Default Response |
+| 422    | application/problem+json | Default Response |
+| 429    | application/problem+json | Default Response |
+| 500    | application/problem+json | Default Response |
+| 503    | application/problem+json | Default Response |
+
+Success response schema:
+
+```json
+{
+  "type": "object",
+  "required": ["accounts"],
+  "additionalProperties": false,
+  "properties": {
+    "accounts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "account_id",
+          "is_default",
+          "wallet",
+          "grant_id",
+          "permissions",
+          "expires_at",
+          "role"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "account_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "is_default": {
+            "type": "boolean"
+          },
+          "wallet": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["reference", "name", "kind"],
+            "properties": {
+              "reference": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80
+              },
+              "kind": {
+                "enum": ["personal", "shared"]
+              }
+            }
+          },
+          "grant_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "permissions": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "account:read",
+                "operations:request",
+                "contracts:request",
+                "members:manage"
+              ]
+            }
+          },
+          "expires_at": {
+            "type": "string"
+          },
+          "role": {
+            "enum": ["owner", "member"]
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+## GET /v1/accounts/{accountId}/members
+
+Operation: `readWalletMembers`.
+
+**Why this exists:** Show the owner who has been invited and the permissions available to each member.
+
+**Who uses it:** Application developer acting for the wallet owner.
+
+**When you need it:** Use before inviting someone, changing their permissions or removing them.
+
+**Before you start:** Use the owner’s current Wallet-Grant-Id for this shared wallet. The application and the owner must explicitly allow members:manage. Being a member or knowing a wallet ID cannot grant administration.
+
+**Result and next step:** 200: current settings revision and invited, active or removed members. Use the revision when saving. Another application’s private user reference is omitted.
+
+| Parameter         | Location | Required | Schema                                                                                                |
+| ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
+| `accountId`       | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+| `wallet-grant-id` | header   | no       | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+
+| Status | Content type             | Description      |
+| ------ | ------------------------ | ---------------- |
+| 200    | application/json         | Default Response |
+| 400    | application/problem+json | Default Response |
+| 401    | application/problem+json | Default Response |
+| 403    | application/problem+json | Default Response |
+| 409    | application/problem+json | Default Response |
+| 413    | application/problem+json | Default Response |
+| 415    | application/problem+json | Default Response |
+| 422    | application/problem+json | Default Response |
+| 429    | application/problem+json | Default Response |
+| 500    | application/problem+json | Default Response |
+| 503    | application/problem+json | Default Response |
+
+Success response schema:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["account_id", "wallet", "revision", "members"],
+  "properties": {
+    "account_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "wallet": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reference", "name", "kind"],
+      "properties": {
+        "reference": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "kind": {
+          "enum": ["personal", "shared"]
+        }
+      }
+    },
+    "revision": {
+      "type": "integer"
+    },
+    "members": {
+      "type": "array",
+      "maxItems": 100,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "member_id",
+          "application_id",
+          "name",
+          "permissions",
+          "membership_revision",
+          "status"
+        ],
+        "properties": {
+          "member_id": {
+            "type": "string"
+          },
+          "application_id": {
+            "type": "string"
+          },
+          "user_id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "permissions": {
+            "type": "array",
+            "items": {
+              "enum": ["account:read", "contracts:request"]
+            }
+          },
+          "membership_revision": {
+            "type": "integer"
+          },
+          "status": {
+            "enum": ["invited", "active", "removed"]
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+## POST /v1/accounts/{accountId}/members
+
+Operation: `saveWalletMember`.
+
+**Why this exists:** Invite a verified application user to a shared wallet, limit their permissions or remove their future access.
+
+**Who uses it:** Application developer acting for the wallet owner.
+
+**When you need it:** Use after the owner chooses View wallet or View and request approved transactions for a member.
+
+**Before you start:** Send Wallet-Grant-Id for the owner, a UUIDv4 Idempotency-Key, expected_revision, enabled and permissions. Use user_id to invite someone from your application or member_id to update a saved member. New or changed permissions need the member’s fresh consent to account_id and membership_revision through mode=connect.
+
+**Result and next step:** 200: member settings and their revisions. Invitations do not grant account or spending access. Removing or changing a member invalidates their previous grants. The provider signer and on-chain owner threshold are unchanged; issued signatures remain subject to their on-chain validity.
+
+| Parameter         | Location | Required | Schema                                                                                                |
+| ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
+| `accountId`       | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+| `idempotency-key` | header   | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+| `wallet-grant-id` | header   | no       | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+
+Request body (application/json):
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["expected_revision", "enabled", "permissions"],
+  "properties": {
+    "expected_revision": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "user_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "member_id": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80
+    },
+    "enabled": {
+      "type": "boolean"
+    },
+    "permissions": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 2,
+      "uniqueItems": true,
+      "items": {
+        "enum": ["account:read", "contracts:request"]
+      }
+    }
+  }
+}
+```
+
+| Status | Content type             | Description      |
+| ------ | ------------------------ | ---------------- |
+| 200    | application/json         | Default Response |
+| 400    | application/problem+json | Default Response |
+| 401    | application/problem+json | Default Response |
+| 403    | application/problem+json | Default Response |
+| 409    | application/problem+json | Default Response |
+| 413    | application/problem+json | Default Response |
+| 415    | application/problem+json | Default Response |
+| 422    | application/problem+json | Default Response |
+| 429    | application/problem+json | Default Response |
+| 500    | application/problem+json | Default Response |
+| 503    | application/problem+json | Default Response |
+
+Success response schema:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["account_id", "wallet", "revision", "members"],
+  "properties": {
+    "account_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "wallet": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reference", "name", "kind"],
+      "properties": {
+        "reference": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "kind": {
+          "enum": ["personal", "shared"]
+        }
+      }
+    },
+    "revision": {
+      "type": "integer"
+    },
+    "members": {
+      "type": "array",
+      "maxItems": 100,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "member_id",
+          "application_id",
+          "name",
+          "permissions",
+          "membership_revision",
+          "status"
+        ],
+        "properties": {
+          "member_id": {
+            "type": "string"
+          },
+          "application_id": {
+            "type": "string"
+          },
+          "user_id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "permissions": {
+            "type": "array",
+            "items": {
+              "enum": ["account:read", "contracts:request"]
+            }
+          },
+          "membership_revision": {
+            "type": "integer"
+          },
+          "status": {
+            "enum": ["invited", "active", "removed"]
+          }
+        }
+      }
+    }
+  }
+}
+```
+
 ## POST /v1/access-grants/{grantId}/revoke
 
 Operation: `revokeAccountAccess`.
@@ -2310,6 +2771,29 @@ Success response schema:
             "additionalProperties": false,
             "required": ["request_id", "status"],
             "properties": {
+              "wallet": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["reference", "name", "kind"],
+                "properties": {
+                  "reference": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  },
+                  "kind": {
+                    "enum": ["personal", "shared"]
+                  }
+                }
+              },
+              "membership_revision": {
+                "type": "integer",
+                "minimum": 1
+              },
               "request_id": {
                 "type": "string",
                 "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
@@ -2351,7 +2835,8 @@ Success response schema:
                   "enum": [
                     "account:read",
                     "operations:request",
-                    "contracts:request"
+                    "contracts:request",
+                    "members:manage"
                   ]
                 }
               },
@@ -2408,6 +2893,29 @@ Success response schema:
   "additionalProperties": false,
   "required": ["request_id", "status"],
   "properties": {
+    "wallet": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reference", "name", "kind"],
+      "properties": {
+        "reference": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "kind": {
+          "enum": ["personal", "shared"]
+        }
+      }
+    },
+    "membership_revision": {
+      "type": "integer",
+      "minimum": 1
+    },
     "request_id": {
       "type": "string",
       "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
@@ -2446,7 +2954,12 @@ Success response schema:
       "type": "array",
       "items": {
         "type": "string",
-        "enum": ["account:read", "operations:request", "contracts:request"]
+        "enum": [
+          "account:read",
+          "operations:request",
+          "contracts:request",
+          "members:manage"
+        ]
       }
     },
     "expires_at": {
@@ -2519,6 +3032,29 @@ Success response schema:
   "additionalProperties": false,
   "required": ["request_id", "status"],
   "properties": {
+    "wallet": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reference", "name", "kind"],
+      "properties": {
+        "reference": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "kind": {
+          "enum": ["personal", "shared"]
+        }
+      }
+    },
+    "membership_revision": {
+      "type": "integer",
+      "minimum": 1
+    },
     "request_id": {
       "type": "string",
       "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
@@ -2557,7 +3093,12 @@ Success response schema:
       "type": "array",
       "items": {
         "type": "string",
-        "enum": ["account:read", "operations:request", "contracts:request"]
+        "enum": [
+          "account:read",
+          "operations:request",
+          "contracts:request",
+          "members:manage"
+        ]
       }
     },
     "expires_at": {
@@ -2582,9 +3123,10 @@ Operation: `readGrantedAccount`.
 
 **Result and next step:** 200: accepted or provisioned account status. An address is present after provisioning.
 
-| Parameter   | Location | Required | Schema                                                                                                |
-| ----------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
-| `accountId` | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+| Parameter         | Location | Required | Schema                                                                                                |
+| ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
+| `accountId`       | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+| `wallet-grant-id` | header   | no       | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
 
 | Status | Content type             | Description      |
 | ------ | ------------------------ | ---------------- |
@@ -2605,6 +3147,25 @@ Success response schema:
   "additionalProperties": false,
   "required": ["account_id", "status"],
   "properties": {
+    "wallet": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reference", "name", "kind"],
+      "properties": {
+        "reference": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "kind": {
+          "enum": ["personal", "shared"]
+        }
+      }
+    },
     "account_id": {
       "type": "string",
       "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
@@ -2644,10 +3205,11 @@ Operation: `streamWalletCallsStatus`.
 
 **Request details:** Authenticated bounded SSE status stream. Sends current account-authorized EIP-5792 status after durable observation changes. Reconnect after 55 seconds; ordinary status reads remain available.
 
-| Parameter   | Location | Required | Schema                                                                                                |
-| ----------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
-| `accountId` | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
-| `batchId`   | path     | yes      | `{"type":"string","maxLength":8194}`                                                                  |
+| Parameter         | Location | Required | Schema                                                                                                |
+| ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
+| `accountId`       | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+| `batchId`         | path     | yes      | `{"type":"string","maxLength":8194}`                                                                  |
+| `wallet-grant-id` | header   | no       | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
 
 | Status | Content type      | Description                                    |
 | ------ | ----------------- | ---------------------------------------------- |
@@ -2671,9 +3233,10 @@ Operation: `readWalletExecutionAccount`.
 
 **Result and next step:** 200: the Safe address and chain ID. This is the user’s deposit, balance and execution address.
 
-| Parameter   | Location | Required | Schema                                                                                                |
-| ----------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
-| `accountId` | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+| Parameter         | Location | Required | Schema                                                                                                |
+| ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
+| `accountId`       | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+| `wallet-grant-id` | header   | no       | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
 
 | Status | Content type     | Description      |
 | ------ | ---------------- | ---------------- |
@@ -2716,9 +3279,10 @@ Operation: `walletCallsRpc`.
 
 **Request details:** Optional account-scoped EIP-5792 2.0.0 JSON-RPC transport. Runtime financial authority, the Safe ERC-4337 driver, current owner consent and method-specific scopes remain required. wallet_sendCalls admits a durable atomic batch without waiting for chain inclusion. Headless wallet_showCallsStatus returns unsupported method; the client adapter can present status through an explicit host callback.
 
-| Parameter   | Location | Required | Schema                                                                                                |
-| ----------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
-| `accountId` | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+| Parameter         | Location | Required | Schema                                                                                                |
+| ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
+| `accountId`       | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+| `wallet-grant-id` | header   | no       | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
 
 Request body (application/json):
 
@@ -13979,10 +14543,15 @@ Request body (application/json):
     "permissions": {
       "type": "array",
       "minItems": 1,
-      "maxItems": 3,
+      "maxItems": 4,
       "uniqueItems": true,
       "items": {
-        "enum": ["account:read", "contracts:request", "operations:request"]
+        "enum": [
+          "account:read",
+          "contracts:request",
+          "operations:request",
+          "members:manage"
+        ]
       }
     }
   }

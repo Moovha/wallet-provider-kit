@@ -2,6 +2,7 @@ import type { OnboardingStore, ProviderState } from '../onboarding/types.js';
 import type { StorageConnection } from './connection.js';
 
 const collections = [
+  'verifiedUsers',
   'management',
   'managementCommands',
   'supportedActions',

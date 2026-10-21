@@ -6,6 +6,8 @@ export type { WalletCallsStatus, WalletCallsReceipt } from './types.js';
 export interface WalletCallsClientOptions {
   network?: ProviderNetwork;
   url: string;
+  /** Select the person’s current wallet-specific approval, required for shared wallets. */
+  accessGrantId?: string;
   authorization: () => Promise<string>;
   fetch?: typeof fetch;
   /** Present status in the application's wallet UI; called only after an authenticated status read. */
@@ -31,6 +33,11 @@ export function createWalletCallsProvider(options: WalletCallsClientOptions) {
     url.hash
   )
     throw new Error('An HTTPS account wallet endpoint is required');
+  if (
+    options.accessGrantId !== undefined &&
+    !/^[a-f0-9-]{36}$/.test(options.accessGrantId)
+  )
+    throw new Error('A valid wallet grant ID is required');
   const send = options.fetch ?? fetch;
   let sequence = 0;
   async function request(input: {
@@ -65,6 +72,9 @@ export function createWalletCallsProvider(options: WalletCallsClientOptions) {
         headers: {
           'content-type': 'application/json',
           authorization: await options.authorization(),
+          ...(options.accessGrantId
+            ? { 'Wallet-Grant-Id': options.accessGrantId }
+            : {}),
         },
         body: JSON.stringify({
           jsonrpc: '2.0',

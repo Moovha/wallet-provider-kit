@@ -1,3 +1,4 @@
+import { selectWalletGrant } from '../service/wallet-grant.js';
 import { setAuthenticatedResponseTimeout } from '../service/response-timeout.js';
 import type { VerifiedPrincipal } from '../domain/principal.js';
 import { runtimeSnapshotSchema } from '../runtime-configuration/schemas.js';
@@ -13,6 +14,7 @@ import {
   accessType,
   permissions,
   type AccessInput,
+  type AccessRequestInput,
   type Vendor,
   type ApplicationIdentityRecord,
 } from './types.js';
@@ -47,11 +49,23 @@ export interface OnboardingHttpOptions {
   /** Fence superseded configured-service instances, including browser authority writers. */
   currentConfiguration?: () => Promise<boolean>;
 }
+export const walletDescriptionSchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['reference', 'name', 'kind'],
+  properties: {
+    reference: { type: 'string', pattern: '^[a-z][a-z0-9_-]{0,63}$' },
+    name: { type: 'string', minLength: 1, maxLength: 80 },
+    kind: { enum: ['personal', 'shared'] },
+  },
+};
 export const accessReceiptSchema = {
   type: 'object',
   additionalProperties: false,
   required: ['request_id', 'status'],
   properties: {
+    wallet: walletDescriptionSchema,
+    membership_revision: { type: 'integer', minimum: 1 },
     request_id: uuidSchema,
     status: {
       type: 'string',
@@ -115,6 +129,7 @@ const permissionLabels = {
   'account:read': 'Read your wallet address and account status',
   'operations:request':
     'Request wallet operations, subject to your provider’s approvals',
+  'members:manage': 'Invite people and change their shared-wallet permissions',
   'contracts:request':
     'Request wallet transactions within the approved contract and transaction limits.',
 };
@@ -206,7 +221,10 @@ export async function registerOnboardingRoutes(
   const service = () => options?.service ?? unavailable();
   async function context(request: FastifyRequest, scope: string) {
     if (!authenticate || !options || !(await ready())) return unavailable();
-    const principal = await authenticate(request.headers.authorization, scope);
+    const principal = selectWalletGrant(
+      await authenticate(request.headers.authorization, scope),
+      request.headers['wallet-grant-id'],
+    );
     setAuthenticatedResponseTimeout(request);
     if (!(await ready())) return unavailable();
     return {
@@ -258,7 +276,7 @@ export async function registerOnboardingRoutes(
     required: ['actionId'],
     properties: { actionId: uuidSchema },
   };
-  app.post<{ Body: AccessInput }>(
+  app.post<{ Body: AccessRequestInput }>(
     '/v1/access-requests',
     {
       bodyLimit: 32768,
@@ -271,6 +289,8 @@ export async function registerOnboardingRoutes(
             type: 'string',
             enum: ['create', 'connect', 'connect_from_application'],
           },
+          wallet: walletDescriptionSchema,
+          source_account_id: uuidSchema,
           account_id: uuidSchema,
           source_application_id: {
             type: 'string',
@@ -285,7 +305,7 @@ export async function registerOnboardingRoutes(
               'Required in application-led mode. The explicitly trusted application attests its stable user identity and recorded consent; OAuth scopes alone do not establish these facts.',
             type: 'object',
             additionalProperties: false,
-            required: ['id', 'identity', 'consent'],
+            required: ['id', 'consent'],
             properties: {
               id: { type: 'string', minLength: 1, maxLength: 256 },
               identity: {
@@ -329,6 +349,12 @@ export async function registerOnboardingRoutes(
                     minLength: 1,
                     maxLength: 256,
                   },
+                  account_id: uuidSchema,
+                  wallet_reference: {
+                    type: 'string',
+                    pattern: '^[a-z][a-z0-9_-]{0,63}$',
+                  },
+                  membership_revision: { type: 'integer', minimum: 1 },
                   sharing_revision: {
                     type: 'string',
                     pattern: '^[a-f0-9]{64}$',
@@ -460,6 +486,167 @@ export async function registerOnboardingRoutes(
         ...(calls ? { contract_call_terms: calls } : {}),
       };
     },
+  );
+  const accountParams = {
+    type: 'object',
+    required: ['accountId'],
+    additionalProperties: false,
+    properties: { accountId: uuidSchema },
+  };
+  const memberResult = {
+    type: 'object',
+    additionalProperties: false,
+    required: ['account_id', 'wallet', 'revision', 'members'],
+    properties: {
+      account_id: uuidSchema,
+      wallet: walletDescriptionSchema,
+      revision: { type: 'integer' },
+      members: {
+        type: 'array',
+        maxItems: 100,
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          required: [
+            'member_id',
+            'application_id',
+            'name',
+            'permissions',
+            'membership_revision',
+            'status',
+          ],
+          properties: {
+            member_id: { type: 'string' },
+            application_id: { type: 'string' },
+            user_id: { type: 'string' },
+            name: { type: 'string' },
+            permissions: {
+              type: 'array',
+              items: { enum: ['account:read', 'contracts:request'] },
+            },
+            membership_revision: { type: 'integer' },
+            status: { enum: ['invited', 'active', 'removed'] },
+          },
+        },
+      },
+    },
+  };
+  app.post<{ Body: { user_id: string } }>(
+    '/v1/accounts/query',
+    {
+      bodyLimit: 1024,
+      schema: {
+        ...schema('listUserWallets', {
+          type: 'object',
+          additionalProperties: false,
+          required: ['user_id'],
+          properties: {
+            user_id: { type: 'string', minLength: 1, maxLength: 256 },
+          },
+        }),
+        response: {
+          ...schema('listUserWallets').response,
+          200: {
+            type: 'object',
+            required: ['accounts'],
+            additionalProperties: false,
+            properties: {
+              accounts: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  required: [
+                    'account_id',
+                    'is_default',
+                    'wallet',
+                    'grant_id',
+                    'permissions',
+                    'expires_at',
+                    'role',
+                  ],
+                  additionalProperties: false,
+                  properties: {
+                    account_id: uuidSchema,
+                    is_default: { type: 'boolean' },
+                    wallet: walletDescriptionSchema,
+                    grant_id: uuidSchema,
+                    permissions: {
+                      type: 'array',
+                      items: { enum: permissions },
+                    },
+                    expires_at: { type: 'string' },
+                    role: { enum: ['owner', 'member'] },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    async (request) =>
+      service().wallets(
+        await context(request, 'wallet:account:read'),
+        request.body.user_id,
+      ),
+  );
+  app.get<{ Params: { accountId: string } }>(
+    '/v1/accounts/:accountId/members',
+    {
+      schema: {
+        ...schema('readWalletMembers', undefined, accountParams),
+        response: {
+          ...schema('readWalletMembers').response,
+          200: memberResult,
+        },
+      },
+    },
+    async (request) =>
+      service().members(
+        (await context(request, 'wallet:access')).principal,
+        request.params.accountId,
+      ),
+  );
+  app.post<{
+    Params: { accountId: string };
+    Body: Parameters<OnboardingService['saveMember']>[2];
+  }>(
+    '/v1/accounts/:accountId/members',
+    {
+      bodyLimit: 4096,
+      schema: {
+        ...schema(
+          'saveWalletMember',
+          {
+            type: 'object',
+            additionalProperties: false,
+            required: ['expected_revision', 'enabled', 'permissions'],
+            properties: {
+              expected_revision: { type: 'integer', minimum: 0 },
+              user_id: { type: 'string', minLength: 1, maxLength: 256 },
+              member_id: { type: 'string', pattern: '^[a-f0-9]{64}$' },
+              name: { type: 'string', minLength: 1, maxLength: 80 },
+              enabled: { type: 'boolean' },
+              permissions: {
+                type: 'array',
+                minItems: 1,
+                maxItems: 2,
+                uniqueItems: true,
+                items: { enum: ['account:read', 'contracts:request'] },
+              },
+            },
+          },
+          accountParams,
+        ),
+        response: { ...schema('saveWalletMember').response, 200: memberResult },
+      },
+    },
+    async (request) =>
+      service().saveMember(
+        await context(request, 'wallet:access'),
+        request.params.accountId,
+        request.body,
+      ),
   );
   app.post<{ Params: { grantId: string }; Body: Record<string, never> }>(
     '/v1/access-grants/:grantId/revoke',
@@ -599,7 +786,9 @@ export async function registerOnboardingRoutes(
           type: 'object',
           required: ['accountId'],
           additionalProperties: false,
-          properties: { accountId: uuidSchema },
+          properties: {
+            accountId: uuidSchema,
+          },
         },
         response: {
           200: {
@@ -607,6 +796,7 @@ export async function registerOnboardingRoutes(
             additionalProperties: false,
             required: ['account_id', 'status'],
             properties: {
+              wallet: walletDescriptionSchema,
               account_id: uuidSchema,
               identity_source: {
                 type: 'string',

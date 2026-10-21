@@ -8,6 +8,16 @@ import {
   validateSharedAccess,
 } from './wallet-sharing.js';
 import { runtimeApplicationId } from '../runtime-configuration/service.js';
+import {
+  defaultWallet,
+  walletDescription,
+  requestPerson,
+  resolveWalletInput,
+  saveVerifiedUser,
+  connectWalletMember,
+  validateWalletMember,
+  userOwner,
+} from './wallets.js';
 import { checkApplicationAssertion } from './application-access.js';
 import { randomUUID } from 'node:crypto';
 import type {
@@ -31,6 +41,8 @@ import {
 import type {
   AccessGrant,
   AccessInput,
+  AccessRequestInput,
+  WalletMember,
   AccessRequest,
   IdentityAdapter,
   IdentityEvidence,
@@ -305,9 +317,12 @@ export class OnboardingService {
         account.acceptedUntil <= Date.now()
       )
         return 'verification_required';
-      if (request.sharing) {
+      if (request.sharing || request.membership) {
         try {
-          validateSharedAccess(this.policy, state, request);
+          if (request.sharing)
+            validateSharedAccess(this.policy, state, request);
+          if (request.membership)
+            validateWalletMember(this.policy, state, request);
         } catch {
           return 'policy_changed';
         }
@@ -346,6 +361,12 @@ export class OnboardingService {
       ...(status === 'granted'
         ? {
             account_id: request.accountId,
+            ...(this.policy.access.mode === 'application'
+              ? { wallet: walletDescription(state.accounts[request.accountId]) }
+              : {}),
+            ...(request.membership
+              ? { membership_revision: request.membership.revision }
+              : {}),
             permissions: state.grants[request.grantId!].permissions,
             expires_at: new Date(
               state.grants[request.grantId!].expiresAt,
@@ -354,21 +375,21 @@ export class OnboardingService {
         : {}),
     };
   }
-  async request(inputContext: AuthorityContext, value: AccessInput) {
+  async request(inputContext: AuthorityContext, value: AccessRequestInput) {
     const context = this.context(inputContext);
-    const input = normalizeInput(
-      structuredClone(value),
+    const normalized = normalizeInput(
+      structuredClone(value) as AccessInput,
       application(this.policy, context.principal),
       this.policy.identity.records,
       this.policy.access.mode === 'application',
     );
     if (
-      input.mode !== 'connect_from_application' &&
-      (input.user?.consent.source_application_id !== undefined ||
-        input.user?.consent.sharing_revision !== undefined)
+      normalized.mode !== 'connect_from_application' &&
+      (normalized.user?.consent.source_application_id !== undefined ||
+        normalized.user?.consent.sharing_revision !== undefined)
     )
       invalid();
-    const delegatesTransfers = input.authorization_details[0].actions.some(
+    const delegatesTransfers = normalized.authorization_details[0].actions.some(
       (permission) => ['contracts:request'].includes(permission),
     );
     if (delegatesTransfers && !this.actionPolicyRevision) deny();
@@ -380,6 +401,12 @@ export class OnboardingService {
       context.idempotencyKey,
     ]);
     return this.store.transaction((state) => {
+      const input = resolveWalletInput(
+        this.policy,
+        state,
+        context.principal,
+        normalized,
+      );
       const snapshot =
         delegatesTransfers && this.runtimeContracts
           ? currentRuntimePolicy(state, context.principal)
@@ -399,8 +426,8 @@ export class OnboardingService {
           : undefined;
       if (snapshot) validateRuntimeClaims(snapshot, input.user);
       const hash = delegatesTransfers
-        ? fingerprint([input, actionRevision])
-        : fingerprint(input);
+        ? fingerprint([normalized, actionRevision])
+        : fingerprint(normalized);
       const previous = state.idempotency[key];
       if (previous) {
         if (previous.hash !== hash) conflict();
@@ -434,43 +461,46 @@ export class OnboardingService {
         )
           deny();
         state.evidenceOwners[evidenceKey] = assertion.owner;
-        for (const grant of Object.values(state.grants)) {
-          const previousRequest = state.requests[grant.requestId];
-          if (
-            (state.requests[grant.requestId]?.sharing?.subjectOwner ??
-              grant.owner) === assertion.owner &&
-            grant.withdrawnAt !== undefined &&
-            previousRequest?.input.user &&
-            (previousRequest.input.user.consent.reference ===
-              input.user!.consent.reference ||
-              assertion.consentAt <= grant.withdrawnAt)
-          )
-            deny();
-        }
-        const existing = Object.values(state.accounts).find(
-          (account) =>
-            account.owner === assertion.owner ||
-            account.linkedOwners?.includes(assertion.owner),
-        );
-        if (
-          input.mode === 'connect' &&
-          state.accounts[request.accountId]?.owner !== assertion.owner
-        )
-          deny();
-        if (
-          existing?.linkedOwners?.includes(assertion.owner) &&
-          input.mode !== 'connect_from_application'
-        )
-          deny();
-        if (existing && input.mode !== 'connect_from_application') {
-          if (
-            existing.status !== 'active' ||
-            (input.mode === 'connect' && existing.id !== request.accountId)
-          )
-            deny();
-          request.accountId = existing.id;
-        }
+        request.userOwner = assertion.owner;
         request.owner = assertion.owner;
+        if (input.mode === 'create') {
+          const description = input.wallet ?? defaultWallet;
+          if (
+            input.wallet &&
+            input.user!.consent.wallet_reference !== description.reference
+          )
+            deny();
+          const existing = Object.values(state.accounts).find(
+            (account) =>
+              walletDescription(account).reference === description.reference &&
+              (account.owner === assertion.owner ||
+                (description.reference === 'personal' &&
+                  account.linkedOwners?.includes(assertion.owner))),
+          );
+          if (existing) {
+            if (
+              existing.owner !== assertion.owner ||
+              existing.status !== 'active'
+            )
+              deny();
+            if (
+              input.wallet &&
+              fingerprint(walletDescription(existing)) !==
+                fingerprint(description)
+            )
+              conflict();
+            request.accountId = existing.id;
+          }
+        } else if (input.mode === 'connect') {
+          const account = state.accounts[request.accountId] ?? deny();
+          if (account.owner !== assertion.owner)
+            connectWalletMember(this.policy, state, request, assertion.owner);
+          else if (
+            walletDescription(account).reference !== 'personal' &&
+            input.user!.consent.account_id !== account.id
+          )
+            deny();
+        }
         request.consent = {
           at: assertion.consentAt,
           revision: this.policy.revision,
@@ -485,9 +515,22 @@ export class OnboardingService {
         };
         if (input.mode === 'connect_from_application') {
           matchSharedAccount(this.policy, state, request, assertion.owner);
-        } else
+        } else if (!request.membership) {
+          const existing = state.accounts[request.accountId];
+          if (
+            !existing &&
+            Object.values(state.accounts).filter(
+              (account) => account.owner === assertion.owner,
+            ).length >= 100
+          )
+            deny();
           state.accounts[request.accountId] = {
             ...existing,
+            creatorApplication: existing?.creatorApplication ?? {
+              issuer: context.principal.issuer,
+              clientId: context.principal.clientId,
+            },
+            wallet: existing?.wallet ?? input.wallet ?? { ...defaultWallet },
             id: request.accountId,
             owner: assertion.owner,
             status: 'active',
@@ -496,6 +539,45 @@ export class OnboardingService {
             evidenceHash: assertion.evidenceHash,
             identitySource: 'application_attestation',
           };
+        }
+        const consent = input.user!.consent;
+        if (
+          (consent.account_id !== undefined &&
+            consent.account_id !== request.accountId) ||
+          (consent.wallet_reference !== undefined &&
+            consent.wallet_reference !==
+              walletDescription(state.accounts[request.accountId]).reference)
+        )
+          deny();
+        for (const grant of Object.values(state.grants)) {
+          const previousRequest = state.requests[grant.requestId];
+          if (
+            grant.accountId === request.accountId &&
+            requestPerson(previousRequest) === assertion.owner &&
+            grant.withdrawnAt !== undefined &&
+            previousRequest?.input.user &&
+            (previousRequest.input.user.consent.reference ===
+              input.user!.consent.reference ||
+              assertion.consentAt <= grant.withdrawnAt)
+          )
+            deny();
+        }
+        for (const previous of Object.values(state.requests)) {
+          if (
+            requestPerson(previous) === assertion.owner &&
+            previous.input.user?.consent.reference ===
+              input.user!.consent.reference &&
+            previous.accountId !== request.accountId
+          )
+            deny();
+        }
+        saveVerifiedUser(
+          this.policy,
+          state,
+          context.principal,
+          input.user!,
+          assertion,
+        );
         this.grant(state, request);
         state.grants[request.grantId!].expiresAt = Math.min(
           state.grants[request.grantId!].expiresAt,
@@ -698,6 +780,8 @@ export class OnboardingService {
       if (
         previous.accountId === request.accountId &&
         sameCaller(previous.caller, request.caller) &&
+        requestPerson(state.requests[previous.requestId]) ===
+          requestPerson(request) &&
         previous.state !== 'revoked'
       ) {
         previous.state = 'revoked';
@@ -1262,7 +1346,7 @@ export class OnboardingService {
   }
   private activeGrant(
     state: ProviderState,
-    principal: AccessRequest['caller'],
+    principal: AccessRequest['caller'] & { accessGrantId?: string },
     accountId: string,
     permission?: Permission,
   ) {
@@ -1275,8 +1359,14 @@ export class OnboardingService {
     )
       deny();
     application(this.policy, { ...principal, scopes: [] });
+    if (
+      walletDescription(account).kind === 'shared' &&
+      !principal.accessGrantId
+    )
+      deny();
     const grant = Object.values(state.grants).find(
       (g) =>
+        (!principal.accessGrantId || g.id === principal.accessGrantId) &&
         g.accountId === accountId &&
         sameCaller(g.caller, principal) &&
         g.owner === account.owner &&
@@ -1289,6 +1379,18 @@ export class OnboardingService {
     const accessRequest = state.requests[grant.requestId];
     if (accessRequest?.sharing)
       validateSharedAccess(this.policy, state, accessRequest);
+    if (accessRequest?.membership)
+      validateWalletMember(this.policy, state, accessRequest);
+    if (
+      permission &&
+      !application(this.policy, {
+        ...principal,
+        scopes: [],
+      }).permissions?.includes(permission) &&
+      application(this.policy, { ...principal, scopes: [] }).permissions !==
+        undefined
+    )
+      deny();
     if (permission === 'contracts:request') {
       const request = state.requests[grant.requestId];
       const consent = request?.consent;
@@ -1331,13 +1433,19 @@ export class OnboardingService {
     for (const grant of Object.values(state.grants)) {
       if (
         grant.accountId !== accountId ||
-        !state.requests[grant.requestId]?.sharing ||
+        (!state.requests[grant.requestId]?.sharing &&
+          !state.requests[grant.requestId]?.membership) ||
         runtimeApplicationId(grant.caller.issuer, grant.caller.clientId) !==
           applicationId
       )
         continue;
       try {
-        this.activeGrant(state, grant.caller, accountId, 'contracts:request');
+        this.activeGrant(
+          state,
+          { ...grant.caller, accessGrantId: grant.id },
+          accountId,
+          'contracts:request',
+        );
         return true;
       } catch (error) {
         if (
@@ -1379,6 +1487,9 @@ export class OnboardingService {
       const account = state.accounts[accountId];
       return {
         account_id: account.id,
+        ...(this.policy.access.mode === 'application'
+          ? { wallet: walletDescription(account) }
+          : {}),
         ...(account.identitySource
           ? {
               identity_source: account.identitySource,
@@ -1408,6 +1519,248 @@ export class OnboardingService {
       };
     });
   }
+  /** Return only this application's currently consented wallets for its exact private user reference. */
+  async wallets(context: AuthorityContext, userId: string) {
+    const current = this.context(context, 'wallet:account:read');
+    if (!text(userId)) invalid();
+    const personId = userOwner(current.principal, userId);
+    return this.store.transaction((state) => {
+      const accounts = [];
+      const defaultAccount =
+        Object.values(state.accounts).find(
+          (account) =>
+            account.owner === personId &&
+            walletDescription(account).reference === 'personal',
+        ) ??
+        Object.values(state.accounts).find(
+          (account) =>
+            account.linkedOwners?.includes(personId) &&
+            walletDescription(account).reference === 'personal',
+        );
+      for (const grant of Object.values(state.grants)) {
+        if (
+          !sameCaller(grant.caller, current.principal) ||
+          requestPerson(state.requests[grant.requestId]) !== personId
+        )
+          continue;
+        try {
+          this.activeGrant(
+            state,
+            { ...current.principal, accessGrantId: grant.id },
+            grant.accountId,
+            'account:read',
+          );
+          const account = state.accounts[grant.accountId];
+          accounts.push({
+            account_id: account.id,
+            is_default: defaultAccount?.id === account.id,
+            wallet: walletDescription(account),
+            grant_id: grant.id,
+            permissions: [...grant.permissions],
+            expires_at: new Date(grant.expiresAt).toISOString(),
+            role: state.requests[grant.requestId].membership
+              ? 'member'
+              : 'owner',
+          });
+        } catch (error) {
+          if (
+            !(error instanceof WalletProviderError) ||
+            error.code !== 'wallet_authorization_denied'
+          )
+            throw error;
+        }
+      }
+      accounts.sort(
+        (a, b) =>
+          Number(b.wallet.reference === 'personal') -
+            Number(a.wallet.reference === 'personal') ||
+          a.account_id.localeCompare(b.account_id),
+      );
+      return { accounts };
+    });
+  }
+  private memberManager(
+    state: ProviderState,
+    principal: VerifiedPrincipal,
+    accountId: string,
+  ) {
+    if (this.policy.access.mode !== 'application') deny();
+    const grant = this.activeGrant(
+      state,
+      principal,
+      accountId,
+      'members:manage',
+    );
+    const account = state.accounts[accountId],
+      request = state.requests[grant.requestId];
+    if (
+      walletDescription(account).kind !== 'shared' ||
+      request.membership ||
+      (requestPerson(request) !== account.owner && !request.sharing)
+    )
+      deny();
+    return { account, request };
+  }
+  private memberReceipt(
+    account: import('./types.js').AccountRecord,
+    principal: VerifiedPrincipal,
+  ) {
+    return {
+      account_id: account.id,
+      wallet: walletDescription(account),
+      revision: account.membersRevision ?? 0,
+      members: Object.values(account.members ?? {}).map((member) => ({
+        member_id: member.id,
+        application_id: member.clientId,
+        name: member.name ?? 'Member',
+        ...(member.issuer === principal.issuer &&
+        member.clientId === principal.clientId
+          ? { user_id: member.userId }
+          : {}),
+        permissions: [...member.permissions],
+        membership_revision: member.revision,
+        status: member.state,
+      })),
+    };
+  }
+  async members(principal: VerifiedPrincipal, accountId: string) {
+    return this.store.transaction((state) =>
+      this.memberReceipt(
+        this.memberManager(state, principal, accountId).account,
+        principal,
+      ),
+    );
+  }
+  async saveMember(
+    context: AuthorityContext,
+    accountId: string,
+    input: {
+      expected_revision: number;
+      user_id?: string;
+      member_id?: string;
+      name?: string;
+      enabled: boolean;
+      permissions: Permission[];
+    },
+  ) {
+    const current = this.context(context);
+    if (
+      !Number.isInteger(input.expected_revision) ||
+      input.expected_revision < 0 ||
+      typeof input.enabled !== 'boolean' ||
+      !Array.isArray(input.permissions) ||
+      !input.permissions.length ||
+      input.permissions.some(
+        (p) => !['account:read', 'contracts:request'].includes(p),
+      ) ||
+      !input.permissions.includes('account:read') ||
+      new Set(input.permissions).size !== input.permissions.length ||
+      (input.user_id !== undefined
+        ? !text(input.user_id) || input.member_id !== undefined
+        : !/^[a-f0-9]{64}$/.test(input.member_id ?? '')) ||
+      (input.name !== undefined && !text(input.name, 80))
+    )
+      invalid();
+    const digest = fingerprint(input),
+      commandKey = fingerprint([
+        'wallet-member',
+        current.principal.issuer,
+        current.principal.clientId,
+        current.principal.accessGrantId,
+        accountId,
+        current.idempotencyKey,
+      ]);
+    return this.store.transaction((state) => {
+      const { account, request: managerRequest } = this.memberManager(
+        state,
+        current.principal,
+        accountId,
+      );
+      const commands = (state.managementCommands ??= {});
+      const previous = commands[commandKey];
+      if (previous) {
+        if (previous.hash !== digest) conflict();
+        return previous.result as ReturnType<
+          OnboardingService['memberReceipt']
+        >;
+      }
+      if (input.expected_revision !== (account.membersRevision ?? 0))
+        conflict();
+      const id = input.user_id
+        ? userOwner(current.principal, input.user_id)
+        : input.member_id!;
+      if (id === account.owner || id === requestPerson(managerRequest)) deny();
+      const members = (account.members ??= {}),
+        before = members[id];
+      if (
+        !before &&
+        (!input.user_id || !input.enabled || Object.keys(members).length >= 100)
+      )
+        deny();
+      const source = account.creatorApplication ?? deny();
+      const issuer = before?.issuer ?? current.principal.issuer,
+        clientId = before?.clientId ?? current.principal.clientId;
+      const sourceSharing =
+        input.enabled &&
+        (issuer !== source.issuer || clientId !== source.clientId)
+          ? {
+              applicationId: source.clientId,
+              revision: sharingTerms(
+                this.policy,
+                { issuer, clientId },
+                source.clientId,
+              ).revision,
+            }
+          : before?.sourceSharing;
+      const permissions = [...input.permissions].sort();
+      if (
+        !before ||
+        before.state === 'removed' ||
+        fingerprint([before.permissions, before.name, before.sourceSharing]) !==
+          fingerprint([
+            permissions,
+            input.name ?? before?.name,
+            sourceSharing,
+          ]) ||
+        !input.enabled
+      ) {
+        const member: WalletMember = {
+          id,
+          issuer,
+          clientId,
+          userId: before?.userId ?? input.user_id!,
+          name: input.name ?? before?.name,
+          permissions,
+          revision: (before?.revision ?? 0) + 1,
+          state: input.enabled ? 'invited' : 'removed',
+          ...(sourceSharing ? { sourceSharing } : {}),
+        };
+        members[id] = member;
+        account.membersRevision = (account.membersRevision ?? 0) + 1;
+        for (const request of Object.values(state.requests))
+          if (
+            request.accountId === accountId &&
+            request.membership?.personId === id
+          ) {
+            request.denied = true;
+            if (request.grantId)
+              state.grants[request.grantId].state = 'revoked';
+          }
+        audit(
+          state,
+          input.enabled ? 'wallet_member_invited' : 'wallet_member_removed',
+          fingerprint([accountId, id]),
+          String(member.revision),
+        );
+      }
+      for (const [id, value] of Object.entries(commands))
+        if (value.at + day <= Date.now()) delete commands[id];
+      if (Object.keys(commands).length >= 10000) conflict();
+      const result = this.memberReceipt(account, current.principal);
+      commands[commandKey] = { hash: digest, result, at: Date.now() };
+      return result;
+    });
+  }
   async revokeApplicationGrant(context: AuthorityContext, id: string) {
     const current = this.context(context);
     if (this.policy.access.mode !== 'application') deny();
@@ -1432,6 +1785,9 @@ export class OnboardingService {
         if (
           related.id === grant.id ||
           (reference &&
+            related.accountId === grant.accountId &&
+            requestPerson(state.requests[related.requestId]) ===
+              requestPerson(state.requests[grant.requestId]) &&
             related.owner === grant.owner &&
             related.caller.issuer === grant.caller.issuer &&
             related.caller.clientId === grant.caller.clientId &&
@@ -1558,6 +1914,8 @@ export class OnboardingService {
         const context = this.context(input, 'wallet:provision');
         return this.store.transaction((state) => {
           const grant = this.activeGrant(state, context.principal, accountId);
+          const access = state.requests[grant.requestId];
+          if (access?.membership || access?.sharing) deny();
           const key = fingerprint([
             context.principal.issuer,
             context.principal.subject,
@@ -1599,7 +1957,11 @@ export class OnboardingService {
         if (!admission || admission.accountId !== accountId) return false;
         const grant = state.grants[admission.grantId];
         if (!grant) return false;
-        const current = this.activeGrant(state, admission.caller, accountId);
+        const current = this.activeGrant(
+          state,
+          { ...admission.caller, accessGrantId: admission.grantId },
+          accountId,
+        );
         return current.owner === grant.owner;
       });
     } catch {

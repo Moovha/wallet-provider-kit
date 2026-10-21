@@ -217,6 +217,15 @@ export function requestExample(
       },
     };
   if (id === 'publishRuntimeConfiguration') return { expected_revision: '0' };
+  if (id === 'listUserWallets') return { user_id: 'example-application-user' };
+  if (id === 'saveWalletMember')
+    return {
+      expected_revision: 0,
+      user_id: 'example-invited-user',
+      name: 'Alex',
+      enabled: true,
+      permissions: ['account:read'],
+    };
   if (id === 'beginEnrollment')
     return { identity_subject: 'example-provider-subject' };
   if (id === 'submitEnrollmentIdentity')
@@ -365,6 +374,37 @@ export function responseExample(
   config?: ProviderConfiguration,
   requestedPermissions?: string[],
 ): object | string {
+  if (id === 'listUserWallets')
+    return {
+      accounts: [
+        {
+          account_id: exampleId,
+          wallet: { reference: 'personal', name: 'Personal', kind: 'personal' },
+          is_default: true,
+          grant_id: '10000000-0000-4000-8000-000000000002',
+          permissions: ['account:read'],
+          expires_at: '2030-01-02T00:00:00.000Z',
+          role: 'owner',
+        },
+      ],
+    };
+  if (id === 'readWalletMembers' || id === 'saveWalletMember')
+    return {
+      account_id: exampleId,
+      wallet: { reference: 'family', name: 'Family expenses', kind: 'shared' },
+      revision: 1,
+      members: [
+        {
+          member_id: 'a'.repeat(64),
+          application_id: 'example-application',
+          user_id: 'example-invited-user',
+          name: 'Alex',
+          permissions: ['account:read'],
+          membership_revision: 1,
+          status: 'invited',
+        },
+      ],
+    };
   if (id === 'readProviderUserChecks' || id === 'saveProviderUserChecks')
     return {
       available: true,
@@ -763,6 +803,12 @@ export function curlExample(item: ReferenceOperation, origin: string) {
         ? "  --header 'Authorization: Bearer <PROVIDER_OPERATOR_ACCESS_TOKEN>'"
         : "  --header 'Authorization: Bearer <APPLICATION_ACCESS_TOKEN>'",
     );
+  if (
+    ['readWalletMembers', 'saveWalletMember'].includes(
+      item.operation.operationId,
+    )
+  )
+    lines.push("  --header 'Wallet-Grant-Id: <OWNER_WALLET_GRANT_ID>'");
   if (item.body !== undefined)
     lines.push(
       "  --header 'Content-Type: application/json'",

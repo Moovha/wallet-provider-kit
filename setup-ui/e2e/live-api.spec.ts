@@ -76,6 +76,16 @@ test('deployed Swagger executes same-origin HTTP and displays real success/auth/
   expect(calls).toHaveLength(0);
   await page
     .getByLabel('Browse requests by task', { exact: true })
+    .selectOption('Wallets and members');
+  await expect(page.locator('.opblock')).toHaveCount(3);
+  await expect(page.locator('.opblock')).toContainText([
+    'Find a person’s approved wallets',
+    'Review a shared wallet’s members',
+    'Invite someone or change their wallet access',
+  ]);
+  expect(calls).toHaveLength(0);
+  await page
+    .getByLabel('Browse requests by task', { exact: true })
     .selectOption('Service status');
   await expect(page.locator('.opblock')).toHaveCount(2);
   expect(calls).toHaveLength(0);

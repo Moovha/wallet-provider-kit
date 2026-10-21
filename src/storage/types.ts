@@ -17,7 +17,10 @@ export interface AssetBudgetCharge extends PolicyBudgetCharge {}
 /** Insert only from the host's trusted exact-action authorization flow, never an HTTP body. */
 export interface FinancialApproval {
   ownerSubject: string;
-  caller: Pick<VerifiedPrincipal, 'issuer' | 'subject' | 'clientId'>;
+  caller: Pick<
+    VerifiedPrincipal,
+    'issuer' | 'subject' | 'clientId' | 'accessGrantId'
+  >;
   grantId: string;
   consentReference: string;
   policyRevision: string;

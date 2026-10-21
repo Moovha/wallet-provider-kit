@@ -201,6 +201,8 @@ export interface VerifiedPrincipal {
   readonly issuer: string;
   readonly subject: string;
   readonly clientId: string;
+  /** Untrusted wallet-grant selector; the authority layer verifies caller, wallet and current member permissions. */
+  readonly accessGrantId?: string;
   readonly credentialRevision?: number;
   readonly scopes: readonly string[];
 }
@@ -552,6 +554,7 @@ export declare class WalletCallsService {
 Import from `@moovha/wallet-provider-kit/onboarding`. [Integration guide](onboarding.md).
 
 - [AccessInput](#accessinput)
+- [AccessRequestInput](#accessrequestinput)
 - [accessType](#accesstype)
 - [ApplicationIdentityRecord](#applicationidentityrecord)
 - [ApplicationPolicy](#applicationpolicy)
@@ -579,6 +582,9 @@ Import from `@moovha/wallet-provider-kit/onboarding`. [Integration guide](onboar
 - [ProviderState](#providerstate)
 - [SumsubConfiguration](#sumsubconfiguration)
 - [VendorPrice](#vendorprice)
+- [VerifiedUserRecord](#verifieduserrecord)
+- [WalletDescription](#walletdescription)
+- [WalletMember](#walletmember)
 - [WalletSharingPolicy](#walletsharingpolicy)
 
 ### AccessInput
@@ -589,6 +595,8 @@ Import from `@moovha/wallet-provider-kit/onboarding`. [Integration guide](onboar
 export interface AccessInput {
   mode: 'create' | 'connect' | 'connect_from_application';
   source_application_id?: string;
+  source_account_id?: string;
+  wallet?: WalletDescription;
   account_id?: string;
   identity_record?: ApplicationIdentityRecord;
   user?: ApplicationUserAssertion;
@@ -599,6 +607,19 @@ export interface AccessInput {
     },
   ];
 }
+```
+
+### AccessRequestInput
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/onboarding/types.ts).
+
+```ts
+/** A request may reuse the caller's current stored identity evidence; consent is always supplied. */
+export type AccessRequestInput = Omit<AccessInput, 'user'> & {
+  user?: Omit<ApplicationUserAssertion, 'identity'> & {
+    identity?: ApplicationUserAssertion['identity'];
+  };
+};
 ```
 
 ### accessType
@@ -677,6 +698,9 @@ export interface ApplicationUserAssertion {
     action_policy_revision?: string;
     source_application_id?: string;
     sharing_revision?: string;
+    account_id?: string;
+    wallet_reference?: string;
+    membership_revision?: number;
   };
 }
 ```
@@ -958,13 +982,20 @@ export declare class OnboardingService {
   >;
   request(
     inputContext: AuthorityContext,
-    value: AccessInput,
+    value: AccessRequestInput,
   ): Promise<{
-    account_id?: string | undefined;
     permissions?:
-      | ('account:read' | 'operations:request' | 'contracts:request')[]
+      | (
+          | 'account:read'
+          | 'operations:request'
+          | 'contracts:request'
+          | 'members:manage'
+        )[]
       | undefined;
     expires_at?: string | undefined;
+    membership_revision?: number | undefined;
+    wallet?: import('./types.js').WalletDescription | undefined;
+    account_id?: string | undefined;
     grant_id?: string | undefined;
     consent_url?: string | undefined;
     request_id: string;
@@ -974,11 +1005,18 @@ export declare class OnboardingService {
     context: AuthorityContext,
     id: string,
   ): Promise<{
-    account_id?: string | undefined;
     permissions?:
-      | ('account:read' | 'operations:request' | 'contracts:request')[]
+      | (
+          | 'account:read'
+          | 'operations:request'
+          | 'contracts:request'
+          | 'members:manage'
+        )[]
       | undefined;
     expires_at?: string | undefined;
+    membership_revision?: number | undefined;
+    wallet?: import('./types.js').WalletDescription | undefined;
+    account_id?: string | undefined;
     grant_id?: string | undefined;
     consent_url?: string | undefined;
     request_id: string;
@@ -1026,7 +1064,10 @@ export declare class OnboardingService {
     provider: string;
     privacyUrl: string;
     permissions: (
-      'account:read' | 'operations:request' | 'contracts:request'
+      | 'account:read'
+      | 'operations:request'
+      | 'contracts:request'
+      | 'members:manage'
     )[];
     mode: 'create' | 'connect' | 'connect_from_application';
     durationDays: number;
@@ -1037,11 +1078,18 @@ export declare class OnboardingService {
     identity: OwnerIdentity,
     approve: boolean,
   ): Promise<{
-    account_id?: string | undefined;
     permissions?:
-      | ('account:read' | 'operations:request' | 'contracts:request')[]
+      | (
+          | 'account:read'
+          | 'operations:request'
+          | 'contracts:request'
+          | 'members:manage'
+        )[]
       | undefined;
     expires_at?: string | undefined;
+    membership_revision?: number | undefined;
+    wallet?: import('./types.js').WalletDescription | undefined;
+    account_id?: string | undefined;
     grant_id?: string | undefined;
     consent_url?: string | undefined;
     request_id: string;
@@ -1053,11 +1101,18 @@ export declare class OnboardingService {
     vendor: Vendor,
     token: string,
   ): Promise<{
-    account_id?: string | undefined;
     permissions?:
-      | ('account:read' | 'operations:request' | 'contracts:request')[]
+      | (
+          | 'account:read'
+          | 'operations:request'
+          | 'contracts:request'
+          | 'members:manage'
+        )[]
       | undefined;
     expires_at?: string | undefined;
+    membership_revision?: number | undefined;
+    wallet?: import('./types.js').WalletDescription | undefined;
+    account_id?: string | undefined;
     grant_id?: string | undefined;
     consent_url?: string | undefined;
     request_id: string;
@@ -1117,11 +1172,18 @@ export declare class OnboardingService {
       vendor?: Vendor;
     },
   ): Promise<{
-    account_id?: string | undefined;
     permissions?:
-      | ('account:read' | 'operations:request' | 'contracts:request')[]
+      | (
+          | 'account:read'
+          | 'operations:request'
+          | 'contracts:request'
+          | 'members:manage'
+        )[]
       | undefined;
     expires_at?: string | undefined;
+    membership_revision?: number | undefined;
+    wallet?: import('./types.js').WalletDescription | undefined;
+    account_id?: string | undefined;
     grant_id?: string | undefined;
     consent_url?: string | undefined;
     request_id: string;
@@ -1154,7 +1216,80 @@ export declare class OnboardingService {
     identity_source?:
       'application_record' | 'application_attestation' | undefined;
     evaluation_only?: boolean | undefined;
+    wallet?: import('./types.js').WalletDescription | undefined;
     account_id: string;
+  }>;
+  /** Return only this application's currently consented wallets for its exact private user reference. */
+  wallets(
+    context: AuthorityContext,
+    userId: string,
+  ): Promise<{
+    accounts: {
+      account_id: string;
+      is_default: boolean;
+      wallet: import('./types.js').WalletDescription;
+      grant_id: string;
+      permissions: (
+        | 'account:read'
+        | 'operations:request'
+        | 'contracts:request'
+        | 'members:manage'
+      )[];
+      expires_at: string;
+      role: string;
+    }[];
+  }>;
+  members(
+    principal: VerifiedPrincipal,
+    accountId: string,
+  ): Promise<{
+    account_id: string;
+    wallet: import('./types.js').WalletDescription;
+    revision: number;
+    members: {
+      permissions: (
+        | 'account:read'
+        | 'operations:request'
+        | 'contracts:request'
+        | 'members:manage'
+      )[];
+      membership_revision: number;
+      status: 'active' | 'invited' | 'removed';
+      user_id?: string | undefined;
+      member_id: string;
+      application_id: string;
+      name: string;
+    }[];
+  }>;
+  saveMember(
+    context: AuthorityContext,
+    accountId: string,
+    input: {
+      expected_revision: number;
+      user_id?: string;
+      member_id?: string;
+      name?: string;
+      enabled: boolean;
+      permissions: Permission[];
+    },
+  ): Promise<{
+    account_id: string;
+    wallet: import('./types.js').WalletDescription;
+    revision: number;
+    members: {
+      permissions: (
+        | 'account:read'
+        | 'operations:request'
+        | 'contracts:request'
+        | 'members:manage'
+      )[];
+      membership_revision: number;
+      status: 'active' | 'invited' | 'removed';
+      user_id?: string | undefined;
+      member_id: string;
+      application_id: string;
+      name: string;
+    }[];
   }>;
   revokeApplicationGrant(
     context: AuthorityContext,
@@ -1174,11 +1309,18 @@ export declare class OnboardingService {
     id: string,
     identity: OwnerIdentity,
   ): Promise<{
-    account_id?: string | undefined;
     permissions?:
-      | ('account:read' | 'operations:request' | 'contracts:request')[]
+      | (
+          | 'account:read'
+          | 'operations:request'
+          | 'contracts:request'
+          | 'members:manage'
+        )[]
       | undefined;
     expires_at?: string | undefined;
+    membership_revision?: number | undefined;
+    wallet?: import('./types.js').WalletDescription | undefined;
+    account_id?: string | undefined;
     grant_id?: string | undefined;
     consent_url?: string | undefined;
     request_id: string;
@@ -1189,7 +1331,10 @@ export declare class OnboardingService {
       id: string;
       application: string;
       permissions: (
-        'account:read' | 'operations:request' | 'contracts:request'
+        | 'account:read'
+        | 'operations:request'
+        | 'contracts:request'
+        | 'members:manage'
       )[];
       state: 'active' | 'revoked' | 'suspended';
       expiresAt: number;
@@ -1298,6 +1443,7 @@ export type Permission = (typeof permissions)[number];
 
 ```ts
 export interface ProviderState {
+  verifiedUsers?: Record<string, VerifiedUserRecord>;
   managementCommands?: Record<
     string,
     {
@@ -1430,6 +1576,56 @@ export interface VendorPrice {
   /** Upper bound in USD cents, confirmed with the vendor for this configured workflow/level. */
   maximumMinor: number;
   termsReference: string;
+}
+```
+
+### VerifiedUserRecord
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/onboarding/types.ts).
+
+```ts
+export interface VerifiedUserRecord {
+  id: string;
+  issuer: string;
+  clientId: string;
+  userId: string;
+  identity: ApplicationUserAssertion['identity'];
+  evidenceHash: string;
+  acceptedUntil: number;
+  revision: string;
+}
+```
+
+### WalletDescription
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/onboarding/types.ts).
+
+```ts
+export interface WalletDescription {
+  reference: string;
+  name: string;
+  kind: 'personal' | 'shared';
+}
+```
+
+### WalletMember
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/onboarding/types.ts).
+
+```ts
+export interface WalletMember {
+  name?: string;
+  id: string;
+  issuer: string;
+  clientId: string;
+  userId: string;
+  permissions: Permission[];
+  revision: number;
+  state: 'invited' | 'active' | 'removed';
+  sourceSharing?: {
+    applicationId: string;
+    revision: string;
+  };
 }
 ```
 
@@ -1825,7 +2021,10 @@ export interface DatabaseEnrollmentOptions {
 /** Insert only from the host's trusted exact-action authorization flow, never an HTTP body. */
 export interface FinancialApproval {
   ownerSubject: string;
-  caller: Pick<VerifiedPrincipal, 'issuer' | 'subject' | 'clientId'>;
+  caller: Pick<
+    VerifiedPrincipal,
+    'issuer' | 'subject' | 'clientId' | 'accessGrantId'
+  >;
   grantId: string;
   consentReference: string;
   policyRevision: string;
@@ -2936,6 +3135,8 @@ export declare function validateProviderConfiguration(
 export interface WalletCallsClientOptions {
   network?: ProviderNetwork;
   url: string;
+  /** Select the person’s current wallet-specific approval, required for shared wallets. */
+  accessGrantId?: string;
   authorization: () => Promise<string>;
   fetch?: typeof fetch;
   /** Present status in the application's wallet UI; called only after an authenticated status read. */
@@ -3073,6 +3274,8 @@ export declare function createWalletCallsProvider(
 export interface WalletCallsClientOptions {
   network?: ProviderNetwork;
   url: string;
+  /** Select the person’s current wallet-specific approval, required for shared wallets. */
+  accessGrantId?: string;
   authorization: () => Promise<string>;
   fetch?: typeof fetch;
   /** Present status in the application's wallet UI; called only after an authenticated status read. */
@@ -4088,5 +4291,159 @@ export interface WalletCallsDriver {
     truncated: boolean;
     batches: WalletCallsBatchSummary[];
   }>;
+}
+```
+
+## Personal and shared wallets
+
+Import from `@moovha/wallet-provider-kit/wallets`. [Integration guide](multiple-wallets.md).
+
+- [AccessRequestInput](#accessrequestinput)
+- [createWalletsClient](#createwalletsclient)
+- [MemberSettings](#membersettings)
+- [WalletAccessError](#walletaccesserror)
+- [WalletDescription](#walletdescription)
+- [WalletSummary](#walletsummary)
+
+### AccessRequestInput
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/onboarding/types.ts).
+
+```ts
+/** A request may reuse the caller's current stored identity evidence; consent is always supplied. */
+export type AccessRequestInput = Omit<AccessInput, 'user'> & {
+  user?: Omit<ApplicationUserAssertion, 'identity'> & {
+    identity?: ApplicationUserAssertion['identity'];
+  };
+};
+```
+
+### createWalletsClient
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/wallets/client.ts).
+
+```ts
+/** For a trusted application backend. Supply short-lived bearer authorization; never embed a client secret in a browser. */
+export declare function createWalletsClient(options: {
+  url: string;
+  authorization(): Promise<string>;
+  fetch?: typeof fetch;
+}): {
+  requestAccess(
+    input: AccessRequestInput,
+    idempotencyKey: string,
+  ): Promise<{
+    request_id: string;
+    status: string;
+    account_id?: string;
+    grant_id?: string;
+    wallet?: WalletDescription;
+    permissions?: Permission[];
+    expires_at?: string;
+  }>;
+  listWallets(userId: string): Promise<{
+    accounts: WalletSummary[];
+  }>;
+  account(
+    accountId: string,
+    grantId?: string,
+  ): Promise<{
+    account_id: string;
+    wallet: WalletDescription;
+    status: string;
+    address?: string;
+  }>;
+  provision(
+    accountId: string,
+    grantId: string,
+    idempotencyKey: string,
+  ): Promise<{
+    account_id: string;
+    address: string;
+  }>;
+  members(accountId: string, grantId: string): Promise<MemberSettings>;
+  saveMember(
+    accountId: string,
+    grantId: string,
+    input: {
+      expected_revision: number;
+      user_id?: string;
+      member_id?: string;
+      name?: string;
+      enabled: boolean;
+      permissions: ('account:read' | 'contracts:request')[];
+    },
+    idempotencyKey: string,
+  ): Promise<MemberSettings>;
+  walletProvider(wallet: WalletSummary): {
+    request: (input: {
+      method: string;
+      params?: readonly unknown[] | object;
+    }) => Promise<unknown>;
+    watchCallsStatus: (
+      batchId: string,
+      signal?: AbortSignal,
+    ) => AsyncGenerator<import('../wallet-calls/types.js').WalletCallsStatus>;
+  };
+};
+```
+
+### MemberSettings
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/wallets/client.ts).
+
+```ts
+export interface MemberSettings {
+  account_id: string;
+  wallet: WalletDescription;
+  revision: number;
+  members: {
+    member_id: string;
+    application_id: string;
+    user_id?: string;
+    name: string;
+    permissions: Permission[];
+    membership_revision: number;
+    status: 'invited' | 'active' | 'removed';
+  }[];
+}
+```
+
+### WalletAccessError
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/wallets/client.ts).
+
+```ts
+export declare class WalletAccessError extends Error {
+  readonly status: number;
+  constructor(status: number);
+}
+```
+
+### WalletDescription
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/onboarding/types.ts).
+
+```ts
+export interface WalletDescription {
+  reference: string;
+  name: string;
+  kind: 'personal' | 'shared';
+}
+```
+
+### WalletSummary
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/wallets/client.ts).
+
+```ts
+export interface WalletSummary {
+  account_id: string;
+  is_default: boolean;
+  wallet: WalletDescription;
+  grant_id: string;
+  permissions: Permission[];
+  expires_at: string;
+  role: 'owner' | 'member';
 }
 ```

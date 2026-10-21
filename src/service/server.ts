@@ -1,3 +1,4 @@
+import { selectWalletGrant } from './wallet-grant.js';
 import {
   apiTasks,
   apiOperationOrder,
@@ -112,6 +113,23 @@ export async function createServer(options: ServerOptions = {}) {
     throw new Error('Invalid request limit');
   await app.register(rateLimit, { max: requestLimit, timeWindow: '1 minute' });
   app.addHook('onRoute', (route) => {
+    if (route.schema && route.url.startsWith('/v1/accounts/')) {
+      const headers = (route.schema.headers ?? {}) as {
+        properties?: Record<string, unknown>;
+      };
+      route.schema.headers = {
+        type: 'object',
+        ...headers,
+        properties: {
+          ...headers.properties,
+          'wallet-grant-id': {
+            ...uuidSchema,
+            description:
+              'Select this person’s current grant for this wallet. Required for shared wallets; the selector alone grants no authority.',
+          },
+        },
+      };
+    }
     const guide = operationGuides[String(route.schema?.operationId ?? '')];
     if (!guide || !route.schema || Object.hasOwn(route.schema, 'x-purpose'))
       return;
@@ -142,7 +160,7 @@ export async function createServer(options: ServerOptions = {}) {
         title: 'Moovha Wallet Provider Service',
         version: '0.1.0',
         description:
-          'Experimental wallet-provider API. Configured deployments use one Safe account per user, private ERC-4337 v0.7 bundling and an application-owned verifying paymaster. Applications submit policy-approved calls through the account wallet endpoint and observe independently verified inclusion. Current owner, identity, consent, immutable calls and durable attempt authority precede effects. Acknowledgement, wallet inclusion and business settlement are distinct. Not the Moovha operation orchestration API.',
+          'Experimental wallet-provider API. Configured deployments support personal and shared Safe wallets with independent member and application approvals, private ERC-4337 v0.7 bundling and an application-owned verifying paymaster. Applications submit policy-approved calls through the account wallet endpoint and observe independently verified inclusion. Current owner, identity, consent, immutable calls and durable attempt authority precede effects. Acknowledgement, wallet inclusion and business settlement are distinct. Not the Moovha operation orchestration API.',
       },
       components: {
         securitySchemes: {
@@ -402,7 +420,10 @@ export async function createServer(options: ServerOptions = {}) {
       throw Object.assign(new Error('Unavailable'), { statusCode: 503 });
     principals.set(
       request,
-      await options.authenticate(request.headers.authorization, scope),
+      selectWalletGrant(
+        await options.authenticate(request.headers.authorization, scope),
+        request.headers['wallet-grant-id'],
+      ),
     );
     setAuthenticatedResponseTimeout(request);
   }

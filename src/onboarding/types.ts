@@ -11,6 +11,7 @@ export const permissions = [
   'account:read',
   'operations:request',
   'contracts:request',
+  'members:manage',
 ] as const;
 /** Contract delegation must be explicitly enabled; it is never a default permission. */
 export const defaultPermissions: readonly Permission[] = [
@@ -44,11 +45,27 @@ export interface ApplicationUserAssertion {
     action_policy_revision?: string;
     source_application_id?: string;
     sharing_revision?: string;
+    account_id?: string;
+    wallet_reference?: string;
+    membership_revision?: number;
   };
 }
+export interface WalletDescription {
+  reference: string;
+  name: string;
+  kind: 'personal' | 'shared';
+}
+/** A request may reuse the caller's current stored identity evidence; consent is always supplied. */
+export type AccessRequestInput = Omit<AccessInput, 'user'> & {
+  user?: Omit<ApplicationUserAssertion, 'identity'> & {
+    identity?: ApplicationUserAssertion['identity'];
+  };
+};
 export interface AccessInput {
   mode: 'create' | 'connect' | 'connect_from_application';
   source_application_id?: string;
+  source_account_id?: string;
+  wallet?: WalletDescription;
   account_id?: string;
   identity_record?: ApplicationIdentityRecord;
   user?: ApplicationUserAssertion;
@@ -133,7 +150,30 @@ export interface OwnerIdentity {
   subject: string;
   authenticatedAt: number;
 }
+export interface VerifiedUserRecord {
+  id: string;
+  issuer: string;
+  clientId: string;
+  userId: string;
+  identity: ApplicationUserAssertion['identity'];
+  evidenceHash: string;
+  acceptedUntil: number;
+  revision: string;
+}
+export interface WalletMember {
+  name?: string;
+  id: string;
+  issuer: string;
+  clientId: string;
+  userId: string;
+  permissions: Permission[];
+  revision: number;
+  state: 'invited' | 'active' | 'removed';
+  sourceSharing?: { applicationId: string; revision: string };
+}
 export interface AccessRequest {
+  userOwner?: string;
+  membership?: { personId: string; revision: number };
   sharing?: {
     sourceApplicationId: string;
     sourceRequestId: string;
@@ -176,6 +216,10 @@ export interface AccessRequest {
   grantId?: string;
 }
 export interface AccountRecord {
+  creatorApplication?: { issuer: string; clientId: string };
+  wallet?: WalletDescription;
+  members?: Record<string, WalletMember>;
+  membersRevision?: number;
   /** Permanent application-user bindings; sharing never replaces the original owner. */
   linkedOwners?: string[];
   id: string;
@@ -211,6 +255,7 @@ export interface StoredAttempt {
   failure?: WalletAttemptFailure;
 }
 export interface ProviderState {
+  verifiedUsers?: Record<string, VerifiedUserRecord>;
   managementCommands?: Record<
     string,
     { hash: string; result: unknown; at: number }

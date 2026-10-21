@@ -90,6 +90,40 @@ End the application’s saved wallet permission when the person withdraws consen
 
 [`POST /v1/access-grants/{grantId}/revoke`](http-reference.md#post-v1-access-grants-grantid-revoke) — request body, permissions, effects and response details.
 
+## Wallets and members
+
+Switch between a person’s consented personal and shared wallets. Wallet owners invite members; each member gives their own wallet-specific permission.
+
+### Find a person’s approved wallets
+
+Build a wallet switcher from the wallets this person has currently approved for your application.
+
+**Who uses it:** Application developer.
+
+**When you need it:** Use after access is granted and when switching wallets. The existing Personal wallet is listed first.
+
+[`POST /v1/accounts/query`](http-reference.md#post-v1-accounts-query) — request body, permissions, effects and response details.
+
+### Review a shared wallet’s members
+
+Show the owner who has been invited and the permissions available to each member.
+
+**Who uses it:** Application developer acting for the wallet owner.
+
+**When you need it:** Use before inviting someone, changing their permissions or removing them.
+
+[`GET /v1/accounts/{accountId}/members`](http-reference.md#get-v1-accounts-accountid-members) — request body, permissions, effects and response details.
+
+### Invite someone or change their wallet access
+
+Invite a verified application user to a shared wallet, limit their permissions or remove their future access.
+
+**Who uses it:** Application developer acting for the wallet owner.
+
+**When you need it:** Use after the owner chooses View wallet or View and request approved transactions for a member.
+
+[`POST /v1/accounts/{accountId}/members`](http-reference.md#post-v1-accounts-accountid-members) — request body, permissions, effects and response details.
+
 ## Transactions
 
 Send approved transactions and track their outcomes after wallet access, transaction rules and fee funding are ready.

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add named personal and shared wallets under current user checks, preserving the original Personal wallet as the default. Add member invitations, read or approved-transaction permissions, and independent wallet-specific consent. The backend wallets client carries the selected wallet grant. Provider signing keys and Safe thresholds are unchanged. Back up durable storage before upgrading: older builds cannot read the verified-user JSON collection.
+
 - Add directional wallet sharing in Applications, exact matching on selected identity fields (including ID number, document type and issuing country), and `connect_from_application` access requests. Requesting apps receive their own consent grants, transaction rules and fee authority; sharing never replaces the original wallet owner.
 
 - Organize API explorers by task, starting with six wallet-access requests. Give
@@ -27,6 +29,8 @@
   Release publication, cloud acceptance and production custody remain separate.
 
 ## Unreleased
+
+- Add named personal and shared wallets under current user checks, preserving the original Personal wallet as the default. Add member invitations, read or approved-transaction permissions, and independent wallet-specific consent. The backend wallets client carries the selected wallet grant. Provider signing keys and Safe thresholds are unchanged. Back up durable storage before upgrading: older builds cannot read the verified-user JSON collection.
 
 - Remove application-specific atomic vault/DEX helpers, concrete router adapters and generated deployment artifacts from the public package and exports. Generic approved Safe calls remain available.
 - Support Ethereum Sepolia domains in the low-level ERC-4337 helpers without enabling another supplied-service network.

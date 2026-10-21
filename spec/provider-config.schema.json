@@ -95,7 +95,8 @@
                   "enum": [
                     "account:read",
                     "operations:request",
-                    "contracts:request"
+                    "contracts:request",
+                    "members:manage"
                   ]
                 }
               },

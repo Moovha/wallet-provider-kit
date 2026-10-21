@@ -11,7 +11,11 @@ export interface OperationGuide {
   applicationLed?: boolean;
   records?: boolean;
   vendor?: boolean;
-  permission?: 'account:read' | 'operations:request' | 'contracts:request';
+  permission?:
+    | 'account:read'
+    | 'operations:request'
+    | 'contracts:request'
+    | 'members:manage';
   audience: string;
   purpose: string;
   whenToUse: string;
@@ -23,6 +27,11 @@ export const apiTasks = [
     name: 'Wallet access',
     description:
       'Connect a person, obtain permission, create their wallet and support disconnection. Start here for the standard wallet journey.',
+  },
+  {
+    name: 'Wallets and members',
+    description:
+      'Switch between a person’s consented personal and shared wallets. Wallet owners invite members; each member gives their own wallet-specific permission.',
   },
   {
     name: 'Transactions',
@@ -68,6 +77,9 @@ export const apiOperationOrder = [
   'provisionAccount',
   'readGrantedAccount',
   'revokeAccountAccess',
+  'listUserWallets',
+  'readWalletMembers',
+  'saveWalletMember',
   'readWalletExecutionAccount',
   'walletCallsRpc',
   'streamWalletCallsStatus',
@@ -139,6 +151,54 @@ export function operationGuideDescription(guide: OperationGuide) {
 
 // Shared operator guidance. Runtime authentication and authority remain authoritative.
 export const operationGuides: Record<string, OperationGuide> = {
+  listUserWallets: {
+    title: 'Find a person’s approved wallets',
+    group: 'Wallets and members',
+    audience: 'Application developer',
+    purpose:
+      'Build a wallet switcher from the wallets this person has currently approved for your application.',
+    whenToUse:
+      'Use after access is granted and when switching wallets. The existing Personal wallet is listed first.',
+    scope: 'wallet:account:read',
+    applicationLed: true,
+    prerequisite:
+      'Send your private user_id in the JSON body and an application token. Only current grants for that exact application user are returned; keep stored account references for later renewal.',
+    success:
+      '200: accounts with wallet names, kind, roles, grant IDs, permissions and expiry. Send Wallet-Grant-Id with the selected grant on shared-wallet requests. No KYC records or other users’ wallets are returned.',
+  },
+  readWalletMembers: {
+    title: 'Review a shared wallet’s members',
+    group: 'Wallets and members',
+    audience: 'Application developer acting for the wallet owner',
+    purpose:
+      'Show the owner who has been invited and the permissions available to each member.',
+    whenToUse:
+      'Use before inviting someone, changing their permissions or removing them.',
+    scope: 'wallet:access',
+    permission: 'members:manage',
+    applicationLed: true,
+    prerequisite:
+      'Use the owner’s current Wallet-Grant-Id for this shared wallet. The application and the owner must explicitly allow members:manage. Being a member or knowing a wallet ID cannot grant administration.',
+    success:
+      '200: current settings revision and invited, active or removed members. Use the revision when saving. Another application’s private user reference is omitted.',
+  },
+  saveWalletMember: {
+    title: 'Invite someone or change their wallet access',
+    group: 'Wallets and members',
+    audience: 'Application developer acting for the wallet owner',
+    purpose:
+      'Invite a verified application user to a shared wallet, limit their permissions or remove their future access.',
+    whenToUse:
+      'Use after the owner chooses View wallet or View and request approved transactions for a member.',
+    scope: 'wallet:access',
+    permission: 'members:manage',
+    applicationLed: true,
+    prerequisite:
+      'Send Wallet-Grant-Id for the owner, a UUIDv4 Idempotency-Key, expected_revision, enabled and permissions. Use user_id to invite someone from your application or member_id to update a saved member. New or changed permissions need the member’s fresh consent to account_id and membership_revision through mode=connect.',
+    success:
+      '200: member settings and their revisions. Invitations do not grant account or spending access. Removing or changing a member invalidates their previous grants. The provider signer and on-chain owner threshold are unchanged; issued signatures remain subject to their on-chain validity.',
+  },
+
   readProviderUserChecks: {
     title: 'See required user information',
     group: 'Service administration',
@@ -696,9 +756,9 @@ export const operationGuides: Record<string, OperationGuide> = {
       'Use after reading the access requirements and obtaining consent inside the application. Creating or reconnecting access is separate from creating the blockchain wallet.',
     scope: 'wallet:access',
     prerequisite:
-      'After the person completes the agreed identity checks and approves wallet access in your application, submit those records here. First read GET /v1/access-policy for the required fields and current terms. Use mode=create for a first wallet account or mode=connect with the existing account_id for the same application user. To request a wallet from a selected source application, read GET /v1/access-policy?source_application_id=SOURCE_CONNECTION_ID, then use mode=connect_from_application and source_application_id without account_id. Include the returned sharing revision and source application in fresh consent for the requesting application. All configured identity fields must match exactly; ambiguous matches are denied. The provider must trust your application’s checks. Hosted compatibility mode uses a separate provider login and review.',
+      'After the person completes the agreed identity checks and approves wallet access in your application, submit those records here. First read GET /v1/access-policy for the required fields and current terms. Use mode=create without wallet to preserve the default Personal account. To add a wallet, supply wallet.reference, name and kind (personal or shared), and consent.wallet_reference. A verified user can omit identity while their saved checks remain current. Each wallet needs its own consent. Use mode=connect with account_id and consent.account_id to renew a selected wallet; invited members also supply consent.membership_revision. To request a wallet from a selected source application, read GET /v1/access-policy?source_application_id=SOURCE_CONNECTION_ID, then use mode=connect_from_application and source_application_id without account_id. Omit source_account_id to connect the source Personal wallet, or select another source_account_id and include consent.account_id. Include the returned sharing revision and source application in fresh consent for the requesting application. All configured identity fields must match exactly; ambiguous matches are denied. The provider must trust your application’s checks. Hosted compatibility mode uses a separate provider login and review.',
     success:
-      '200: the access decision. A granted response includes account_id, grant_id, allowed actions and expiry. Save those IDs, then call POST /v1/accounts/{accountId}/provision to create the blockchain wallet. Reconnecting preserves the existing account. This request does not create an on-chain wallet or send money. Missing, stale or unauthorized evidence is rejected; consent_url is only for hosted compatibility mode.',
+      '200: the access decision. A granted response includes account_id, grant_id, allowed actions and expiry. Save those IDs, then let the creating application provision the blockchain wallet. Shared-wallet account requests require Wallet-Grant-Id; use the selected person’s grant_id. List consented wallets with POST /v1/accounts/query. Reconnecting preserves the existing account. This request does not create an on-chain wallet or send money. Missing, stale or unauthorized evidence is rejected; consent_url is only for hosted compatibility mode.',
   },
   getAccountAccessPolicy: {
     title: 'See what to collect before connecting a wallet',
