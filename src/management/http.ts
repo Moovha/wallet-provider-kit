@@ -307,7 +307,10 @@ export async function registerManagementRoutes(
         'revision'
       > | null;
       permissions?: (
-        'account:read' | 'contracts:request' | 'operations:request'
+        | 'account:read'
+        | 'contracts:request'
+        | 'operations:request'
+        | 'members:manage'
       )[];
     };
   }>(
@@ -362,10 +365,15 @@ export async function registerManagementRoutes(
           permissions: {
             type: 'array',
             minItems: 1,
-            maxItems: 3,
+            maxItems: 4,
             uniqueItems: true,
             items: {
-              enum: ['account:read', 'contracts:request', 'operations:request'],
+              enum: [
+                'account:read',
+                'contracts:request',
+                'operations:request',
+                'members:manage',
+              ],
             },
           },
         }),

@@ -166,7 +166,7 @@ const internalBundler = 'https://bundled-bundler.invalid';
 const pending = () =>
   new WalletProviderError('wallet_attempt_pending', 'unknown');
 
-/** One Safe asset address per owner; infrastructure keys never authorize user asset calls. */
+/** One Safe asset address per wallet account; infrastructure keys never authorize user asset calls. */
 export class SafeWalletRuntime {
   private readonly locks = new Map<string, Promise<unknown>>();
   private readonly drivers = new Map<string, UserOperationWalletCallsDriver>();
@@ -1097,7 +1097,10 @@ export class SafeWalletRuntime {
           (s, grant) => ({
             owner: grant.owner,
             account: s.accounts[accountId],
-            shared: Boolean(s.requests[grant.requestId]?.sharing),
+            shared: Boolean(
+              s.requests[grant.requestId]?.sharing ||
+              s.requests[grant.requestId]?.membership,
+            ),
           }),
         );
       const current = await authority();
@@ -1965,7 +1968,8 @@ export class SafeWalletRuntime {
           Object.values(state.grants)
             .filter(
               (grant) =>
-                state.requests[grant.requestId]?.sharing &&
+                (state.requests[grant.requestId]?.sharing ||
+                  state.requests[grant.requestId]?.membership) &&
                 (authorize ||
                   (grant.caller.issuer === principal.issuer &&
                     grant.caller.clientId === principal.clientId)),
@@ -2022,7 +2026,11 @@ export class SafeWalletRuntime {
       await this.driver(wallet.applicationId, wallet.accountId);
     const shared = await this.onboarding.store.transaction((state) =>
       Object.values(state.grants)
-        .filter((grant) => state.requests[grant.requestId]?.sharing)
+        .filter(
+          (grant) =>
+            state.requests[grant.requestId]?.sharing ||
+            state.requests[grant.requestId]?.membership,
+        )
         .map((grant) => ({
           accountId: grant.accountId,
           applicationId: runtimeApplicationId(

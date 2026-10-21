@@ -133,11 +133,12 @@ function updateHttp(
     </p>
   </div>
   <div v-if="model.safeWallet" class="callout">
-    <strong>One Safe address per user</strong>
+    <strong>Personal and shared Safe wallets</strong>
     <p>
-      Wallet signing keys stay private. Connected applications arrange funding
-      for network fees; connecting an application does not fund those fees
-      automatically.
+      Each person keeps their default Personal wallet and can add separate
+      wallets. Shared-wallet members approve their own access. Wallet signing
+      keys stay private. Connected applications arrange funding for network
+      fees; connecting an application does not fund those fees automatically.
     </p>
   </div>
   <h3>Enable wallet operations</h3>

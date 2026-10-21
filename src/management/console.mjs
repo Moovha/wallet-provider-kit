@@ -592,6 +592,25 @@ async function refresh() {
         select.value = record.policy?.permissions?.includes('contracts:request')
           ? 'contracts'
           : 'read';
+        const memberLabel = node('label', undefined, form);
+        const manageMembers = node('input', undefined, memberLabel);
+        manageMembers.type = 'checkbox';
+        manageMembers.setAttribute(
+          'aria-label',
+          'Let wallet owners manage shared-wallet members',
+        );
+        manageMembers.checked =
+          record.policy?.permissions?.includes('members:manage') ?? false;
+        memberLabel.append(
+          document.createTextNode(
+            'Let wallet owners manage shared-wallet members',
+          ),
+        );
+        node(
+          'small',
+          'Owners must give separate permission for this. Invited people still verify their identity and approve access to the specific wallet. Existing personal wallets remain the default.',
+          form,
+        );
         node('button', 'Save access settings', form).className = 'primary';
         node(
           'p',
@@ -602,10 +621,12 @@ async function refresh() {
           await api('/v1/provider/identities/' + record.id, 'PATCH', {
             expected_revision: record.revision,
             trust_agreement: input.value,
-            permissions:
-              select.value === 'contracts'
+            permissions: [
+              ...(select.value === 'contracts'
                 ? ['account:read', 'contracts:request']
-                : ['account:read'],
+                : ['account:read']),
+              ...(manageMembers.checked ? ['members:manage'] : []),
+            ],
           });
           await refresh();
         });

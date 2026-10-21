@@ -139,7 +139,9 @@ with the connected application’s login, identity and consent experience. Your 
 connected applications can request access, which accounts they can use and which
 actions they may perform.
 
-The supplied service uses application-led access and one Safe account per user.
+The supplied service uses application-led access with personal and shared Safe wallets per verified user.
+The original Personal wallet remains the default. See [multiple wallets and members](docs/multiple-wallets.md)
+for wallet selection, member permissions and independent application consent.
 Application trust, spending policy and recovery remain under your team's control.
 
 Deploy the configured provider service and connect your product through its API.

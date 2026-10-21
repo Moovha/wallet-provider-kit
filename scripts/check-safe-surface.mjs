@@ -16,6 +16,7 @@ assert.deepEqual(Object.keys(manifest.exports), [
   './spec/provider-config.schema.json',
   './wallet-calls',
   './sponsorship',
+  './wallets',
 ]);
 for (const path of [
   'src/executor',

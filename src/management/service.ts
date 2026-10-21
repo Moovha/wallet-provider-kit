@@ -576,6 +576,7 @@ export class ManagementService {
                       'account:read',
                       'contracts:request',
                       'operations:request',
+                      'members:manage',
                     ].includes(p),
                 ))
             )
@@ -656,7 +657,10 @@ export class ManagementService {
         if (invalidatesSharing) {
           for (const request of Object.values(s.requests ?? {})) {
             if (
-              request.sharing?.sourceApplicationId === identity.id &&
+              (request.sharing?.sourceApplicationId === identity.id ||
+                s.accounts?.[request.accountId]?.members?.[
+                  request.membership?.personId ?? ''
+                ]?.sourceSharing?.applicationId === identity.id) &&
               request.caller.issuer === this.issuer
             ) {
               request.denied = true;

@@ -1,3 +1,4 @@
+import { selectWalletGrant } from '../service/wallet-grant.js';
 import { Readable } from 'node:stream';
 import { setAuthenticatedResponseTimeout } from '../service/response-timeout.js';
 import { uuid } from '../onboarding/policy.js';
@@ -49,9 +50,12 @@ export async function registerWalletCallsRoutes(
     async (request, reply) => {
       if (!service || !authenticate || !(await ready()))
         throw Object.assign(new Error('Unavailable'), { statusCode: 503 });
-      const principal = await authenticate(
-        request.headers.authorization,
-        'wallet:execute:read',
+      const principal = selectWalletGrant(
+        await authenticate(
+          request.headers.authorization,
+          'wallet:execute:read',
+        ),
+        request.headers['wallet-grant-id'],
       );
       // Check current ownership and batch access before opening a stream.
       await service.request(
@@ -170,9 +174,12 @@ export async function registerWalletCallsRoutes(
     async (request) => {
       if (!service || !authenticate || !(await ready()))
         throw Object.assign(new Error('Unavailable'), { statusCode: 503 });
-      const principal = await authenticate(
-        request.headers.authorization,
-        'wallet:execute:read',
+      const principal = selectWalletGrant(
+        await authenticate(
+          request.headers.authorization,
+          'wallet:execute:read',
+        ),
+        request.headers['wallet-grant-id'],
       );
       return service.account(principal, request.params.accountId);
     },
@@ -214,9 +221,9 @@ export async function registerWalletCallsRoutes(
     async (request) => {
       if (!service || !authenticate || !(await ready()))
         throw Object.assign(new Error('Unavailable'), { statusCode: 503 });
-      const principal = await authenticate(
-        request.headers.authorization,
-        'wallet:access:read',
+      const principal = selectWalletGrant(
+        await authenticate(request.headers.authorization, 'wallet:access:read'),
+        request.headers['wallet-grant-id'],
       );
       setAuthenticatedResponseTimeout(request);
       const body = request.body;

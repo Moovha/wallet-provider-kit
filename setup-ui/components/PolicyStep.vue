@@ -122,6 +122,10 @@ function addApplication() {
       :options="[
         { value: 'account:read', label: 'Read wallet accounts' },
         {
+          value: 'members:manage',
+          label: 'Let wallet owners manage shared-wallet members',
+        },
+        {
           value: 'contracts:request',
           label: 'Request transactions people have approved',
         },

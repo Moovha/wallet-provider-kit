@@ -590,6 +590,9 @@ export class SupportedActions {
             issuer: context.principal.issuer,
             subject: context.principal.subject,
             clientId: context.principal.clientId,
+            ...(context.principal.accessGrantId
+              ? { accessGrantId: context.principal.accessGrantId }
+              : {}),
           },
           grantId: grant.id,
           consentReference: grant.requestId,

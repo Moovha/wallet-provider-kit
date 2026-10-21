@@ -71,6 +71,7 @@ const guides = {
     'ERC-4337 and ERC-7677 sponsorship foundation',
     'account-abstraction-sponsorship.md',
   ],
+  './wallets': ['Personal and shared wallets', 'multiple-wallets.md'],
   './wallet-calls': [
     'Standard wallet calls request adapter',
     'wallet-calls.md',

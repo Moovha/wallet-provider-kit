@@ -113,6 +113,10 @@ export default defineConfig({
           },
           { text: 'Create a first wallet', link: '/docs/create-wallet' },
           { text: 'Use an existing wallet', link: '/docs/connect-wallet' },
+          {
+            text: 'Personal and shared wallets',
+            link: '/docs/multiple-wallets',
+          },
           { text: 'Send a small transfer', link: '/docs/send-transfer' },
           {
             text: 'User checks and permission',

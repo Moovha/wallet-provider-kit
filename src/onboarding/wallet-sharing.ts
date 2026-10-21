@@ -126,6 +126,13 @@ export function matchSharedAccount(
   for (const source of Object.values(state.requests)) {
     try {
       sourceEvidence(policy, state, source, request.caller, user, sourceId);
+      const account = state.accounts[source.accountId];
+      if (
+        request.input.source_account_id
+          ? source.accountId !== request.input.source_account_id
+          : (account.wallet?.reference ?? 'personal') !== 'personal'
+      )
+        continue;
       matches.set(source.accountId, source);
     } catch (error) {
       if (
@@ -142,7 +149,15 @@ export function matchSharedAccount(
   const previous = Object.values(state.accounts).find(
     (a) => a.owner === subjectOwner || a.linkedOwners?.includes(subjectOwner),
   );
-  if (previous && previous.id !== account.id) deny();
+  if (
+    !request.input.source_account_id &&
+    previous &&
+    (previous.wallet?.reference ?? 'personal') === 'personal' &&
+    previous.id !== account.id
+  )
+    deny();
+  if (request.input.source_account_id && user.consent.account_id !== account.id)
+    deny();
   request.accountId = account.id;
   request.owner = account.owner;
   request.sharing = {

@@ -54,6 +54,7 @@ export async function fixture(
   assetBudget?: { maximumAmount: string; lifetimeAmount?: string },
   selectTokenAdapter = true,
   sharing = false,
+  multipleWallets = false,
 ) {
   const directory = await mkdtemp(join(tmpdir(), 'wpk-as2-'));
   dirs.push(directory);
@@ -146,6 +147,8 @@ export async function fixture(
       },
     ],
   };
+  if (multipleWallets)
+    policy.applications[0].permissions!.push('members:manage');
   if (sharing) {
     policy.identity!.application!.requiredFields.push(
       'identity_number',

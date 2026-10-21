@@ -242,6 +242,8 @@ export function normalizeInput(
           'mode',
           'account_id',
           'source_application_id',
+          'source_account_id',
+          'wallet',
           'authorization_details',
           'identity_record',
           'user',
@@ -263,6 +265,27 @@ export function normalizeInput(
       : value.source_application_id !== undefined
   )
     invalid();
+  if (
+    value.source_account_id !== undefined &&
+    (value.mode !== 'connect_from_application' ||
+      !uuid.test(value.source_account_id))
+  )
+    invalid();
+  if (value.wallet !== undefined) {
+    if (
+      !applicationLed ||
+      value.mode !== 'create' ||
+      !value.wallet ||
+      Object.keys(value.wallet).some(
+        (key) => !['reference', 'name', 'kind'].includes(key),
+      ) ||
+      !/^[a-z][a-z0-9_-]{0,63}$/.test(value.wallet.reference) ||
+      value.wallet.reference === 'personal' ||
+      !text(value.wallet.name, 80) ||
+      !['personal', 'shared'].includes(value.wallet.kind)
+    )
+      invalid();
+  }
   const details = value.authorization_details;
   if (
     !Array.isArray(details) ||
@@ -315,6 +338,10 @@ export function normalizeInput(
   return {
     ...(applicationLed ? { user: value.user } : {}),
     mode: value.mode,
+    ...(value.wallet ? { wallet: value.wallet } : {}),
+    ...(value.source_account_id
+      ? { source_account_id: value.source_account_id }
+      : {}),
     ...(value.source_application_id
       ? { source_application_id: value.source_application_id }
       : {}),

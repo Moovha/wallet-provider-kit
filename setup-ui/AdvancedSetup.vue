@@ -70,6 +70,7 @@ let setupSteps: FormKitNode | undefined;
 const connectionsReturnStep = ref<'policies' | 'deployment'>();
 const permissionNames: Record<string, string> = {
   'account:read': 'Read wallet accounts',
+  'members:manage': 'Let wallet owners manage shared-wallet members',
   'operations:request': 'Request wallet operations (advanced hosts)',
   'contracts:request':
     'Request approved contract calls, swaps and vault deposits',
@@ -510,7 +511,9 @@ function enableDocumentation() {
                 </div>
                 <div>
                   <dt>User accounts</dt>
-                  <dd>One Safe wallet per user</dd>
+                  <dd>
+                    Personal and shared wallets; Personal stays the default
+                  </dd>
                 </div>
                 <div>
                   <dt>Execution</dt>

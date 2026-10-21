@@ -118,11 +118,15 @@ with `GET /v1/access-requests/{requestId}` and `wallet:access:read`.
 
 Use a stable private user ID. The provider scopes it to the application’s issuer
 and client ID. Matching identity fields in two applications only links wallets through the explicitly configured sharing flow below.
-Repeated create requests for the same application user resolve to one account.
+Create requests without a wallet selection resolve to the same default Personal account.
+You can also create [additional personal and shared wallets](multiple-wallets.md)
+under the person’s current identity checks, with separate consent for each wallet.
 Creating the on-chain wallet is a separate step.
 
-`mode: "connect"` requires an `account_id` belonging to that same application-scoped
-user. Use the sharing flow below to request a wallet from another application under a reviewed identity-and-consent agreement.
+`mode: "connect"` requires an `account_id` owned by that application-scoped
+user or a current invitation to join that shared wallet. Additional wallets need
+`user.consent.account_id`; invited members also need the invitation’s
+`membership_revision`. Use the sharing flow below to request a wallet from another application under a reviewed identity-and-consent agreement.
 Evidence references cannot be reassigned to another person, and a suspended account
 cannot be reactivated by sending a new access request.
 
@@ -161,9 +165,11 @@ For the developer integrating App B:
    the returned `wallet_sharing.revision`. Transaction consent also needs B’s own
    `action_policy_revision`.
 4. Save B’s returned grant and account IDs. A unique current identity match reuses
-   A’s account and wallet. Missing, mismatching or ambiguous evidence denies access
-   without revealing another application’s identity records. An existing B user
-   cannot be rebound to a different account, and shared wallets cannot be shared onward.
+   A’s default Personal account and wallet. To select another wallet, supply
+   `source_account_id` and record that ID in `user.consent.account_id`. Missing, mismatching or ambiguous evidence denies access
+   without revealing another application’s identity records. The default Personal connection cannot be rebound to a different account.
+   Additional wallet connections need explicit wallet selection and consent.
+   A wallet received from A cannot be shared onward through B.
 
 ```json
 {

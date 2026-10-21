@@ -174,7 +174,30 @@ test('claims, registers and manages applications through the real protected mana
     await page
       .getByLabel('Agreement reference', { exact: true })
       .fill('Offline trust agreement');
+    await expect(
+      page.getByRole('checkbox', {
+        name: 'Let wallet owners manage shared-wallet members',
+        exact: true,
+      }),
+    ).not.toBeChecked();
+    await page
+      .getByRole('checkbox', {
+        name: 'Let wallet owners manage shared-wallet members',
+        exact: true,
+      })
+      .check();
     await page.getByRole('button', { name: 'Save access settings' }).click();
+    await expect(
+      page.getByRole('checkbox', {
+        name: 'Let wallet owners manage shared-wallet members',
+        exact: true,
+      }),
+    ).toBeChecked();
+    expect(
+      Object.values(state.management!.provider.identities).find(
+        (i) => i.name === 'Offline application',
+      )!.policy!.permissions,
+    ).toContain('members:manage');
     await expect(
       page.getByText('User checks: agreement saved', { exact: false }),
     ).toBeVisible();

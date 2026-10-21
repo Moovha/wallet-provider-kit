@@ -55,6 +55,10 @@
     "./sponsorship": {
       "types": "./dist/sponsorship/index.d.ts",
       "import": "./dist/sponsorship/index.js"
+    },
+    "./wallets": {
+      "types": "./dist/wallets/client.d.ts",
+      "import": "./dist/wallets/client.js"
     }
   },
   "files": [

@@ -88,3 +88,6 @@ future visits do not depend on recovery.
 **You are done when** the returning person sees the same account and Safe address,
 with a current approval. Next, [send a small transfer](send-transfer.md) or add
 [access withdrawal](application-access.md#let-people-change-their-minds) to their settings.
+
+For additional wallets, member invitations and wallet selection, follow
+[Personal and shared wallets](multiple-wallets.md).

@@ -127,7 +127,7 @@ test('shows the bundled Safe infrastructure without backend, relayer or pool sel
   ])
     await expect(page.getByLabel(name, { exact: true })).toHaveCount(0);
   await expect(
-    page.getByText('One Safe address per user', { exact: true }),
+    page.getByText('Personal and shared Safe wallets', { exact: true }),
   ).toBeVisible();
   await expect(
     page.getByLabel('Enable wallet operations in this configuration', {

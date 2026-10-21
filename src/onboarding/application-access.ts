@@ -55,6 +55,9 @@ export function checkApplicationAssertion(
       'action_policy_revision',
       'source_application_id',
       'sharing_revision',
+      'account_id',
+      'wallet_reference',
+      'membership_revision',
     ])
   )
     invalid();
