@@ -540,6 +540,15 @@ export class OnboardingService {
             identitySource: 'application_attestation',
           };
         }
+        const consent = input.user!.consent;
+        if (
+          (consent.account_id !== undefined &&
+            consent.account_id !== request.accountId) ||
+          (consent.wallet_reference !== undefined &&
+            consent.wallet_reference !==
+              walletDescription(state.accounts[request.accountId]).reference)
+        )
+          deny();
         for (const grant of Object.values(state.grants)) {
           const previousRequest = state.requests[grant.requestId];
           if (

@@ -237,6 +237,12 @@ it('binds consent to the chosen wallet and does not reuse a consent reference ac
   wrong.user!.consent.reference = first.user!.consent.reference;
   await expect(f.service.request(ctx(), wrong)).rejects.toThrow();
   const added = await f.service.request(ctx(), f.extra('holiday'));
+  const mismatchedDefault = f.input();
+  mismatchedDefault.user!.consent.account_id = added.account_id;
+  await expect(f.service.request(ctx(), mismatchedDefault)).rejects.toThrow();
+  delete mismatchedDefault.user!.consent.account_id;
+  mismatchedDefault.user!.consent.wallet_reference = 'holiday';
+  await expect(f.service.request(ctx(), mismatchedDefault)).rejects.toThrow();
   const connect = f.input();
   delete connect.user!.identity;
   connect.mode = 'connect';
