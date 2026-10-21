@@ -62,6 +62,11 @@ const userChecks = {
     available: { type: 'boolean' },
     revision: { type: 'integer', minimum: 1 },
     ...checkFields,
+    verification_level: {
+      type: 'string',
+      description:
+        'Agreed verification label; empty when application user-check settings are unavailable in hosted mode.',
+    },
   },
 };
 const errors = Object.fromEntries(

@@ -12836,9 +12836,7 @@ Success response schema:
     },
     "verification_level": {
       "type": "string",
-      "minLength": 1,
-      "maxLength": 100,
-      "description": "Exact agreed label for completed identity checks, such as verified."
+      "description": "Agreed verification label; empty when application user-check settings are unavailable in hosted mode."
     },
     "max_identity_age_days": {
       "type": "integer",
@@ -12960,9 +12958,7 @@ Success response schema:
     },
     "verification_level": {
       "type": "string",
-      "minLength": 1,
-      "maxLength": 100,
-      "description": "Exact agreed label for completed identity checks, such as verified."
+      "description": "Agreed verification label; empty when application user-check settings are unavailable in hosted mode."
     },
     "max_identity_age_days": {
       "type": "integer",

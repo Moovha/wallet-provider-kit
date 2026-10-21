@@ -10148,7 +10148,7 @@ export interface operations {
                         revision: number;
                         /** @description Identity field names every application must submit. Values are nonempty strings, up to 512 characters; presence does not verify their accuracy. */
                         required_fields: string[];
-                        /** @description Exact agreed label for completed identity checks, such as verified. */
+                        /** @description Agreed verification label; empty when application user-check settings are unavailable in hosted mode. */
                         verification_level: string;
                         max_identity_age_days: number;
                         max_access_days: number;
@@ -10361,7 +10361,7 @@ export interface operations {
                         revision: number;
                         /** @description Identity field names every application must submit. Values are nonempty strings, up to 512 characters; presence does not verify their accuracy. */
                         required_fields: string[];
-                        /** @description Exact agreed label for completed identity checks, such as verified. */
+                        /** @description Agreed verification label; empty when application user-check settings are unavailable in hosted mode. */
                         verification_level: string;
                         max_identity_age_days: number;
                         max_access_days: number;
