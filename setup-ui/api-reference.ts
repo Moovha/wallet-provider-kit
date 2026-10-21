@@ -752,7 +752,7 @@ export function curlExample(item: ReferenceOperation, origin: string) {
   ];
   if (item.guide.scope)
     lines.push(
-      item.guide.scope === 'wallet:configuration:write'
+      item.guide.management || item.guide.scope === 'wallet:configuration:write'
         ? "  --header 'Authorization: Bearer <PROVIDER_OPERATOR_ACCESS_TOKEN>'"
         : "  --header 'Authorization: Bearer <APPLICATION_ACCESS_TOKEN>'",
     );

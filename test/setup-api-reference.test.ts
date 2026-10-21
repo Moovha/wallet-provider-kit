@@ -104,7 +104,8 @@ describe('operator API reference', () => {
       );
       if (item.guide.scope)
         expect(curlExample(item, config.policy.provider.origin)).toContain(
-          item.guide.scope === 'wallet:configuration:write'
+          item.guide.management ||
+            item.guide.scope === 'wallet:configuration:write'
             ? '<PROVIDER_OPERATOR_ACCESS_TOKEN>'
             : '<APPLICATION_ACCESS_TOKEN>',
         );
