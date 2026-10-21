@@ -1,3 +1,8 @@
+import {
+  apiTasks,
+  apiOperationOrder,
+  operationGuides,
+} from '../src/service/api-guides.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { readFile } from 'node:fs/promises';
 import {
@@ -46,6 +51,27 @@ describe('live API explorer boundaries', () => {
       }
     }
     expect(contract).toEqual(before);
+  });
+  it('gives every request a task, caller, purpose and usage guidance without duplicate introductions', () => {
+    const tasks = new Set(apiTasks.map((task) => String(task.name)));
+    expect([...apiOperationOrder].sort()).toEqual(
+      Object.keys(operationGuides).sort(),
+    );
+    for (const methods of Object.values(contract.paths)) {
+      for (const op of Object.values(methods)) {
+        const guide = operationGuides[op.operationId];
+        expect(tasks.has(guide.group), op.operationId).toBe(true);
+        expect(guide.audience.trim().length).toBeGreaterThan(0);
+        for (const field of ['purpose', 'whenToUse'] as const)
+          expect(guide[field].trim().length, op.operationId).toBeGreaterThan(
+            15,
+          );
+        expect(op.summary).toBe(guide.title);
+        expect(op.description?.split('**Why this exists:**')).toHaveLength(2);
+        expect(op.description).toContain(guide.purpose);
+        expect(op.description).toContain(guide.whenToUse);
+      }
+    }
   });
   it('labels missing profiles while retaining every endpoint in every configuration', () => {
     for (const flow of ['application', 'hosted'] as const) {

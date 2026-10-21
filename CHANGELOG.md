@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Organize API explorers by task, starting with six wallet-access requests. Give
+  all 48 requests a plain-language name, purpose, caller and usage guidance, with
+  a generated endpoint map and explanations of overlapping setup requests.
+  Existing URLs, payloads and authority checks are unchanged. Live API testing
+  also supports the existing PUT and PATCH routes with normal permission checks.
+
 - Configure shared user-check requirements from administration with labelled
   identity information and access duration controls. Saved settings take effect
   without restart; changed requirements end current wallet approvals and require

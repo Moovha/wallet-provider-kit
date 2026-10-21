@@ -5,6 +5,11 @@ Ask the provider operator for its HTTPS address, your application ID and secure
 access to its secret. They should first [add your application](runtime-workspace.md)
 and agree its user-check and permission settings.
 
+If you are unsure which request to use, start with [Find the API request you need](api-endpoints.md).
+It explains each task, who performs it and why similar requests remain separate.
+The explorer opens on **Wallet access**; choose **Browse requests by task** to
+review administration, agreements, rules, connections or optional integrations.
+
 ## 1. Identify your application
 
 For a standard API-managed installation, request a short-lived token from

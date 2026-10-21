@@ -73,7 +73,9 @@ describe('operator API reference', () => {
       Object.keys(spec.paths).some((path) => path.includes('enrollment')),
     ).toBe(true);
     expect(contract.info.title).toBe('Moovha Wallet Provider Service');
-    expect(contract.paths['/v1/access-requests'].post.summary).toBeUndefined();
+    expect(contract.paths['/v1/access-requests'].post.summary).toBe(
+      operationGuides.requestAccountAccess.title,
+    );
   });
   it('provides schema-valid request examples and placeholder-only scoped cURL with an explicit retry key', () => {
     const config = fixture();

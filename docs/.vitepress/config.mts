@@ -178,6 +178,7 @@ export default defineConfig({
         text: 'Developer references',
         collapsed: true,
         items: [
+          { text: 'Find an API request', link: '/docs/api-endpoints' },
           {
             text: 'Application API guide',
             link: '/docs/http-api',

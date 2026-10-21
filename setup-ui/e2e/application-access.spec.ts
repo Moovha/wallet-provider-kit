@@ -237,6 +237,17 @@ test('a new operator configures application-led access without user login, vendo
       .getByRole('button', { name: 'API reference', exact: true })
       .click();
     await page.locator('.swagger-ui .opblock').first().waitFor();
+    await expect(
+      page.getByLabel('Browse requests by task', { exact: true }),
+    ).toHaveValue('Wallet access');
+    await expect(page.locator('.swagger-ui .opblock')).toHaveCount(6);
+    await expect(
+      page.getByText('Why this exists:', { exact: false }).first(),
+    ).toBeVisible();
+    await page
+      .getByLabel('Browse requests by task', { exact: true })
+      .selectOption('');
+
     await expect(page.locator('.swagger-ui .opblock')).toHaveCount(
       endpointCount,
     );
