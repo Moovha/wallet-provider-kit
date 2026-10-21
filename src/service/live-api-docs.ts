@@ -59,9 +59,11 @@ ${transactionBoundaryDescription}
       operation.description = [
         reason
           ? `**Not enabled:** ${reason}. Visibility does not enable this operation.`
-          : guide.scope || guide.serviceAuthenticated
-            ? '**Configured:** Current authentication, authority and service readiness are still required.'
-            : '**Public:** No token is required. Discovery reports readiness without enabling wallet operations.',
+          : setupCode
+            ? '**Setup code:** Establish administrator access once using the private installation code.'
+            : guide.scope || guide.serviceAuthenticated
+              ? '**Configured:** Current authentication, authority and service readiness are still required.'
+              : '**Public:** No token is required. Discovery reports readiness without enabling wallet operations.',
         guide.scope
           ? `Required token scope: **${guide.scope}**. Scopes alone do not grant account or spending authority.`
           : guide.serviceAuthenticated
