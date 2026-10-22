@@ -2,11 +2,19 @@
 
 ## Unreleased
 
+- Accept Cognito token responses without optional scope metadata so invited
+  administrators can reach email verification after signing in. Preserve signed
+  identity, group approval and verification checks; log only fixed failure stages.
+
+- Add optional Amazon Cognito administrator sign-in with code/PKCE login,
+  explicit approval-group checks and five-minute provider sessions. Approved
+  directory members can complete host-authorized first-time setup without copying
+  a setup code. Include an AWS template with required authenticator-app MFA.
+
 - Add stable AWS Elastic IP association, keyless Systems Manager administration,
   staged host preparation and instance choices for the new AWS Free plan.
-- Restrict acceptance HTTPS to an approved backend network or a WireGuard peer.
-  Include single-peer Ubuntu VPN setup and provider-only macOS DNS; end-user
-  devices continue to use the connected application backend.
+- Restrict acceptance HTTPS to approved backend networks; end-user devices
+  continue to use the connected application backend.
 - Apply available OS security updates when building runtime images, and keep
   release identity scratch files outside the checkout so formatting checks can pass.
 

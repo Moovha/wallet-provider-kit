@@ -1,0 +1,227 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "Optional Cognito managed sign-in for wallet-provider administrators with TOTP MFA, an explicit approval group and no public self-registration.",
+  "Metadata": {
+    "AWSToolsMetrics": {
+      "AWSAgentToolkit": "aws-cloudformation@3"
+    },
+    "com.aws.cloudformation.Context": {
+      "ref": [
+        {
+          "at": "docs/provider-installation.md#sign-in-with-amazon-cognito",
+          "has": "Administrator trust, bootstrap, revocation and recovery boundaries."
+        }
+      ]
+    }
+  },
+  "Parameters": {
+    "ProviderHostname": {
+      "Type": "String",
+      "AllowedPattern": "^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$",
+      "MaxLength": 253,
+      "Description": "Existing provider HTTPS hostname."
+    },
+    "DomainPrefix": {
+      "Type": "String",
+      "AllowedPattern": "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$",
+      "MinLength": 3,
+      "MaxLength": 63,
+      "Description": "Unique Cognito prefix domain in the selected Region."
+    }
+  },
+  "Resources": {
+    "Administrators": {
+      "Type": "AWS::Cognito::UserPool",
+      "Metadata": {
+        "com.aws.cloudformation.Context": {
+          "why": "Dedicated directory for provider administrators, separate from wallet users and AWS console identities.",
+          "must": [
+            "No public self-registration; require TOTP MFA and verified email.",
+            "Retain the directory and explicitly review identity recovery before replacement."
+          ]
+        }
+      },
+      "Properties": {
+        "UserPoolName": {
+          "Fn::Sub": "${AWS::StackName}-administrators"
+        },
+        "UserPoolTier": "ESSENTIALS",
+        "DeletionProtection": "ACTIVE",
+        "UsernameAttributes": ["email"],
+        "AutoVerifiedAttributes": ["email"],
+        "UsernameConfiguration": {
+          "CaseSensitive": false
+        },
+        "AdminCreateUserConfig": {
+          "AllowAdminCreateUserOnly": true
+        },
+        "Policies": {
+          "PasswordPolicy": {
+            "MinimumLength": 14,
+            "RequireLowercase": true,
+            "RequireUppercase": true,
+            "RequireNumbers": true,
+            "RequireSymbols": true,
+            "TemporaryPasswordValidityDays": 1
+          }
+        },
+        "MfaConfiguration": "ON",
+        "EnabledMfas": ["SOFTWARE_TOKEN_MFA"],
+        "AccountRecoverySetting": {
+          "RecoveryMechanisms": [
+            {
+              "Name": "verified_email",
+              "Priority": 1
+            }
+          ]
+        },
+        "UserAttributeUpdateSettings": {
+          "AttributesRequireVerificationBeforeUpdate": ["email"]
+        }
+      },
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain"
+    },
+    "ConsoleClient": {
+      "Type": "AWS::Cognito::UserPoolClient",
+      "Metadata": {
+        "com.aws.cloudformation.Context": {
+          "why": "Public OIDC client uses PKCE; the provider exchanges codes on the server.",
+          "must": [
+            "Exact provider callback and logout paths; no implicit grant or browser secret.",
+            "Provider discards refresh tokens and grants only five-minute administration sessions."
+          ]
+        }
+      },
+      "Properties": {
+        "UserPoolId": {
+          "Ref": "Administrators"
+        },
+        "ClientName": {
+          "Fn::Sub": "${AWS::StackName}-console"
+        },
+        "GenerateSecret": false,
+        "AllowedOAuthFlowsUserPoolClient": true,
+        "AllowedOAuthFlows": ["code"],
+        "AllowedOAuthScopes": [
+          "openid",
+          "email",
+          "aws.cognito.signin.user.admin"
+        ],
+        "SupportedIdentityProviders": ["COGNITO"],
+        "CallbackURLs": [
+          {
+            "Fn::Sub": "https://${ProviderHostname}/admin/auth/callback"
+          }
+        ],
+        "LogoutURLs": [
+          {
+            "Fn::Sub": "https://${ProviderHostname}/admin/"
+          }
+        ],
+        "AccessTokenValidity": 5,
+        "IdTokenValidity": 5,
+        "RefreshTokenValidity": 1,
+        "TokenValidityUnits": {
+          "AccessToken": "minutes",
+          "IdToken": "minutes",
+          "RefreshToken": "hours"
+        },
+        "EnableTokenRevocation": true,
+        "PreventUserExistenceErrors": "ENABLED",
+        "ExplicitAuthFlows": ["ALLOW_USER_SRP_AUTH"],
+        "ReadAttributes": ["email", "email_verified"],
+        "WriteAttributes": ["email"]
+      }
+    },
+    "AdministratorGroup": {
+      "Type": "AWS::Cognito::UserPoolGroup",
+      "Metadata": {
+        "com.aws.cloudformation.Context": {
+          "why": "Membership is the AWS-managed approval boundary for provider console access.",
+          "must": [
+            "Only approved administrators belong to this group; user creation alone grants no provider access."
+          ]
+        }
+      },
+      "Properties": {
+        "UserPoolId": {
+          "Ref": "Administrators"
+        },
+        "GroupName": "ProviderAdministrators",
+        "Description": "Explicit approval to administer the wallet provider; no wallet execution authority."
+      }
+    },
+    "LoginDomain": {
+      "Type": "AWS::Cognito::UserPoolDomain",
+      "Metadata": {
+        "com.aws.cloudformation.Context": {
+          "why": "Regional Cognito prefix domain provides hosted login without a separate DNS or ACM setup.",
+          "must": [
+            "Use managed login v2; keep resources in the selected Region."
+          ]
+        }
+      },
+      "Properties": {
+        "UserPoolId": {
+          "Ref": "Administrators"
+        },
+        "Domain": {
+          "Ref": "DomainPrefix"
+        },
+        "ManagedLoginVersion": 2
+      }
+    },
+    "LoginBranding": {
+      "Type": "AWS::Cognito::ManagedLoginBranding",
+      "Metadata": {
+        "com.aws.cloudformation.Context": {
+          "why": "The app client requires a managed-login branding style.",
+          "must": ["Keep a style assigned to the console client."]
+        }
+      },
+      "Properties": {
+        "UserPoolId": {
+          "Ref": "Administrators"
+        },
+        "ClientId": {
+          "Ref": "ConsoleClient"
+        },
+        "UseCognitoProvidedValues": true
+      },
+      "DependsOn": "LoginDomain"
+    }
+  },
+  "Outputs": {
+    "UserPoolId": {
+      "Value": {
+        "Ref": "Administrators"
+      },
+      "Description": "Trusted administrator directory; not an AWS console identity pool."
+    },
+    "ClientId": {
+      "Value": {
+        "Ref": "ConsoleClient"
+      },
+      "Description": "Public OIDC client identifier; no client secret."
+    },
+    "Domain": {
+      "Value": {
+        "Fn::Sub": "https://${DomainPrefix}.auth.${AWS::Region}.amazoncognito.com"
+      },
+      "Description": "Cognito managed-login origin for provider configuration."
+    },
+    "AdministratorGroup": {
+      "Value": {
+        "Ref": "AdministratorGroup"
+      },
+      "Description": "Only verified members can receive provider administrator access."
+    },
+    "Administration": {
+      "Value": {
+        "Fn::Sub": "https://${ProviderHostname}/admin/"
+      },
+      "Description": "Provider console; network admission remains required."
+    }
+  }
+}

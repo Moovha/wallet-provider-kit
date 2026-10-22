@@ -72,12 +72,15 @@ node dist/main.js local-setup --config provider.config.json
 ```
 
 The terminal installer prepares a disabled service. Open its `/admin/` address
-and use the private installation claim file to create the administrator. Choose
+and create the administrator with the private setup code or an explicitly
+approved [Amazon Cognito sign-in](docs/provider-installation.md#sign-in-with-amazon-cognito).
+Choose
 networks, add applications and manage user checks in the console. Source users
 can inspect installation settings in JSON before running the installer.
 
-Claiming is protected, expires after 30 minutes and succeeds once. Restart does
-not reopen registration. The persistent `/admin/` console and provider API manage
+Private setup codes expire after 30 minutes and succeed once. Optional Cognito
+bootstrap requires host approval of the directory and administrator group.
+Restart does not reopen registration. The persistent `/admin/` console and provider API manage
 application registrations, identity trust, suspension, credential rotation and
 automation identities. Management availability is separate from wallet execution
 readiness. See [installation and administration](docs/provider-installation.md),

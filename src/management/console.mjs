@@ -33,6 +33,7 @@ const identityFieldChoices = [
   ],
 ];
 
+let cognitoSession = false;
 let token = '',
   expiresAt = 0,
   generation = 0;
@@ -56,7 +57,7 @@ async function api(path, method = 'GET', data, authorized = true) {
   const response = await fetch(path, {
     method,
     headers,
-    credentials: 'omit',
+    credentials: path.startsWith('/admin/auth/') ? 'same-origin' : 'omit',
     cache: 'no-store',
     ...(data ? { body: JSON.stringify(data) } : {}),
   });
@@ -65,7 +66,11 @@ async function api(path, method = 'GET', data, authorized = true) {
     const descriptions = {
       401: authorized
         ? 'Your sign-in has ended. Please sign in again to continue.'
-        : 'We couldn’t sign you in. Check your username and password, then try again.',
+        : path.startsWith('/admin/auth/email/')
+          ? 'The email code could not be verified or the verification session has expired. Check the code or sign in again.'
+          : path.startsWith('/admin/auth/')
+            ? 'Your sign-in could not be completed. Sign in again.'
+            : 'We couldn’t sign you in. Check your username and password, then try again.',
       403:
         path === '/v1/provider/claim'
           ? 'This setup code was not accepted. Check that it is correct, unused and less than 30 minutes old. The person who installed the service can help renew an expired code.'
@@ -134,6 +139,9 @@ async function signIn(username, password) {
     },
     false,
   );
+  await acceptSession(result);
+}
+async function acceptSession(result) {
   token = result.access_token;
   expiresAt = Date.now() + result.expires_in * 1000;
   el('session').textContent = 'Sign-in ends in 5:00';
@@ -168,7 +176,26 @@ for (const mode of ['login', 'claim'])
     }
     message('');
   };
-el('logout').onclick = logout;
+el('cognito-send-code').onclick = run(async () => {
+  await api('/admin/auth/email/send', 'POST', {}, false);
+  message('Check your administrator email for the verification code.');
+});
+el('cognito-verify-form').onsubmit = run(async () => {
+  const form = el('cognito-verify-form');
+  const code = form.elements.code.value;
+  form.reset();
+  const result = await api('/admin/auth/email/verify', 'POST', { code }, false);
+  location.assign(result.url);
+});
+el('logout').onclick = run(async () => {
+  const external = cognitoSession;
+  cognitoSession = false;
+  logout();
+  if (external) {
+    const result = await api('/admin/auth/logout', 'POST', {}, false);
+    location.assign(result.url);
+  }
+});
 for (const button of document.querySelectorAll('[data-view]'))
   button.onclick = () => {
     for (const other of document.querySelectorAll('[data-view]')) {
@@ -747,3 +774,34 @@ setInterval(() => {
 // Enable form interaction only after every submit handler is installed.
 for (const form of document.querySelectorAll('form[inert]')) form.inert = false;
 el('console-loading').hidden = true;
+
+// Discover optional administrator sign-in without persisting authentication tokens.
+(async () => {
+  try {
+    const response = await fetch('/admin/auth/options', {
+      credentials: 'same-origin',
+    });
+    if (!response.ok) return;
+    const options = await response.json();
+    if (!options.cognito) return;
+    el('cognito-login').hidden = false;
+    if (new URL(location.href).searchParams.get('signin') === 'failed') {
+      history.replaceState(null, '', '/admin/');
+      message(
+        'Sign-in was not completed. Use an approved administrator account and try again.',
+        true,
+      );
+    }
+    el('cognito-verify').hidden = !options.verifyEmail;
+    if (options.sessionAvailable) {
+      const session = await api('/admin/auth/session', 'POST', {}, false);
+      cognitoSession = true;
+      await acceptSession(session);
+    }
+  } catch {
+    message(
+      'Administrator sign-in is temporarily unavailable. Try again.',
+      true,
+    );
+  }
+})();

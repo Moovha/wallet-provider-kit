@@ -17,6 +17,7 @@ for (const file of [
   'connect-development-vpn.sh',
   'README.md',
   'aws-cloudformation.json',
+  'aws-cognito.json',
 ])
   await copyFile(
     new URL('../packaging/' + file, import.meta.url),
@@ -34,6 +35,7 @@ for (const name of [
   'connect-development-vpn.sh',
   'README.md',
   'aws-cloudformation.json',
+  'aws-cognito.json',
   'release.env',
 ])
   entries.push(
