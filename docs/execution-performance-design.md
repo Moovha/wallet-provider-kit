@@ -124,6 +124,30 @@ their original identities and reservations were retained for reconciliation. Sub
 
 The patched, pinned mempool was also exercised with the original eight operations and the deposit balance from that block. It selected four, deferred four with their original identities and made one deposit read. A read-only call to the unchanged EntryPoint succeeded for the selected four; the full group still failed with `AA31`. This tests the proposed selection boundary against the reproduced defect.
 
+## Executor acquisition and restart safety
+
+The pinned [Redis sender manager](https://github.com/pimlicolabs/alto/blob/37cade5d2804a60ab30362ea27054514e1d7a7c8/src/executor/senderManager/createRedisSenderManager.ts) removes an executor from its available set with
+`SPOP`. Its registered set survives a restart and prevents registration from
+adding that executor again. The original manager waits 100 milliseconds after
+both successful and unsuccessful pops, then records successful acquisition in
+an in-memory active set. Graceful shutdown releases only that active set.
+Stopping during the successful-pop delay can therefore leave a registered
+executor unavailable after restart. The Redis pool keeps availability and registration sets without an ownership token or expiry.
+
+Acquiring an executor on every empty scheduling cycle increases exposure to
+that race. The private scheduler must first inspect the shared queue without
+removing operations, acquire an executor only when work exists, and then select
+against current funding. An acquired executor must enter the active set without
+a timer delay; unavailable executors retain their polling backoff.
+
+An offline test executes the pinned sender manager with an ephemeral Redis
+substitute and checks active ownership immediately after the pop resolves.
+The pinned scheduler test also checks that empty and unavailable queues do not
+acquire an executor. These tests cover the observed acquisition window; they do
+not establish recovery from an arbitrary process kill or Redis outage. An
+orphaned retained lease must not be reset without reconciling original operations
+and pending executor transactions.
+
 ## Implementation thesis
 
 A viable execution design makes resource feasibility explicit at the component

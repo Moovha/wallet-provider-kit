@@ -56,10 +56,12 @@ ready from broadcast acknowledgement alone.
 
 ## Component versions and licences
 
-The bundler uses source-pinned Pimlico Alto v1.2.8 at `37cade5d2804a60ab30362ea27054514e1d7a7c8`. Its scheduler acquires the executor before selecting a bundle. Selection reserves each operation’s upfront paymaster requirement against a fresh deposit balance; operations that do not fit remain queued with their original identity. Expired private operations leave the bundler pool, while the provider requires finalized absence evidence before recording expiry. Submission retries are bounded at three resubmissions. The external process, scheduler patch and funding helper are GPL-3.0, with source and license material in the image. See [NOTICE](../NOTICE).
+The bundler uses source-pinned Pimlico Alto v1.2.8 at `37cade5d2804a60ab30362ea27054514e1d7a7c8`. Its scheduler checks for queued work before acquiring the executor and selects a funded bundle only after acquisition. Successful acquisition enters the active set without a polling delay. Selection reserves each operation’s upfront paymaster requirement against a fresh deposit balance; operations that do not fit remain queued with their original identity. Expired private operations leave the bundler pool, while the provider requires finalized absence evidence before recording expiry. Submission retries are bounded at three resubmissions. The external process, scheduler patch and funding helper are GPL-3.0, with source and license material in the image. See [NOTICE](../NOTICE).
 
 The local verifying paymaster includes pinned MIT-licensed contract sources listed in [contract provenance](../contracts/vendor/README.md). Keep the paymaster deposit and bundler submission-gas balance funded separately. A funded paymaster does not authorize user spending.
 
 See [deployment](operator-deployment.md), [gas](assets-and-gas.md), [wallet calls](wallet-calls.md) and [execution recovery](user-operation-execution.md).
 
 See [execution scheduling and performance design](execution-performance-design.md) for the execution paths, funding constraints and controlled comparison protocol. The gas-funding endpoint’s `execution_funding` field reports the most recent background check without making a chain request for each page refresh. `needs-funding` means the funding account cannot restore the configured targets; `limit-reached` means the infrastructure limit needs review. Observations expire after 30 seconds and do not authorize a transfer.
+
+A `ready` funding observation reports balances and refill constraints. Check executor availability and transaction progress separately; funding readiness does not establish inclusion or recovery from a process crash.

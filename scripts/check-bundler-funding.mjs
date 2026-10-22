@@ -136,11 +136,30 @@ const executorGate = new Promise((resolve) => {
 });
 const events = [];
 const wallet = { address: '0x' + '5'.repeat(40) };
+let queued = 1;
 const scheduler = Object.create(ExecutorManager.prototype);
 Object.assign(scheduler, {
   opsCount: [],
   bundlingMode: 'manual',
-  config: { maxBundleCount: 1, minBundleInterval: 25, maxBundleInterval: 100 },
+  config: {
+    maxBundleCount: 1,
+    minBundleInterval: 25,
+    maxBundleInterval: 100,
+    entrypoints: [entryPoint],
+    redisKeyPrefix: 'offline',
+    chainId: 84532,
+  },
+  redisBlockCache: {
+    redis: {
+      zcard: async (key) => {
+        assert.equal(
+          key,
+          'offline:84532:' + entryPoint + ':outstanding:ready-queue',
+        );
+        return queued;
+      },
+    },
+  },
   senderManager: {
     getWallet: async () => {
       events.push('wait_executor');
@@ -174,6 +193,18 @@ scheduler.mempool.getBundles = async () => [];
 await scheduler.autoScalingBundling();
 assert.deepEqual(events, ['wait_executor', 'release_executor']);
 events.length = 0;
+queued = 0;
+await scheduler.autoScalingBundling();
+assert.deepEqual(events, []);
+queued = 1;
+const queueRead = scheduler.redisBlockCache.redis.zcard;
+scheduler.redisBlockCache.redis.zcard = async () => {
+  throw Error('Offline unavailable');
+};
+await scheduler.autoScalingBundling();
+assert.deepEqual(events, []);
+scheduler.redisBlockCache.redis.zcard = queueRead;
+events.length = 0;
 scheduler.mempool.getBundles = async () => {
   throw Error('Offline unavailable');
 };
@@ -184,7 +215,79 @@ console.log(
     pinnedExecutorLeasePassed: true,
     selectionWaitsForExecutor: true,
     emptyOrFailedSelectionReleasesLease: true,
+    idleQueueDoesNotAcquireExecutor: true,
+    unavailableQueueDoesNotAcquireExecutor: true,
     externalRequests: 0,
     broadcasts: 0,
+  }),
+);
+
+const { readFile } = await import('node:fs/promises');
+const senderSource = await readFile(
+  '/app/src/esm/executor/senderManager/createRedisSenderManager.js',
+  'utf8',
+);
+const available = new Set([wallet.address]);
+globalThis[Symbol.for('wpk-offline-redis')] = class {
+  async eval() {
+    return [wallet.address];
+  }
+  async scard() {
+    return available.size;
+  }
+  async spop() {
+    const value = available.values().next().value ?? null;
+    if (value) available.delete(value);
+    return value;
+  }
+  async sadd(_key, address) {
+    available.add(address);
+    return 1;
+  }
+};
+const moduleUrl = (source) =>
+  'data:text/javascript;base64,' + Buffer.from(source).toString('base64');
+const patchedSender = senderSource
+  .replace(
+    '"ioredis"',
+    JSON.stringify(
+      moduleUrl('export default globalThis[Symbol.for("wpk-offline-redis")];'),
+    ),
+  )
+  .replace(
+    '"./index.js"',
+    JSON.stringify(
+      moduleUrl(
+        'export const getAvailableWallets = config => config.executorPrivateKeys;',
+      ),
+    ),
+  );
+const { createRedisSenderManager } = await import(moduleUrl(patchedSender));
+const logger = { info() {}, trace() {}, warn() {} };
+const gauge = { set() {} };
+const manager = await createRedisSenderManager({
+  config: {
+    executorPrivateKeys: [wallet],
+    redisKeyPrefix: 'offline',
+    chainId: 84532,
+    getLogger: () => logger,
+  },
+  metrics: { walletsTotal: gauge, walletsAvailable: gauge },
+  redisEndpoint: 'offline',
+});
+const acquisition = manager.getWallet();
+// Observe the exact point after the Redis pop resolves, before timer-based shutdown cleanup.
+await Promise.resolve();
+assert.deepEqual(manager.getActiveWallets(), [wallet]);
+await manager.markWalletProcessed(wallet);
+assert.equal(await acquisition, wallet);
+assert.equal(available.size, 1);
+delete globalThis[Symbol.for('wpk-offline-redis')];
+console.log(
+  JSON.stringify({
+    pinnedSenderAcquisitionPassed: true,
+    acquiredExecutorVisibleWithoutTimerDelay: true,
+    shutdownCanReleaseAcquiredExecutor: true,
+    externalRequests: 0,
   }),
 );

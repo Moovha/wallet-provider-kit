@@ -56,6 +56,16 @@ export function patchBundlerFundingLease(source, expectedHash) {
       selection,
       `
     if (this.config.maxBundleCount !== 1) throw Error("Private bundler requires one bundle per executor lease");
+    if (!this.redisBlockCache) throw Error("Private bundler requires a shared queue");
+    let queued = 0;
+    try {
+    for (const entryPoint of this.config.entrypoints) {
+      const count = await this.redisBlockCache.redis.zcard(this.config.redisKeyPrefix + ":" + this.config.chainId + ":" + entryPoint + ":outstanding:ready-queue");
+      if (!Number.isSafeInteger(count) || count < 0) throw Error("Invalid private queue count");
+      queued += count;
+    }
+    } catch { queued = 0; }
+    if (queued > 0) {
     const wallet = await this.senderManager.getWallet();
     let assigned = false;
     try {
@@ -69,7 +79,7 @@ export function patchBundlerFundingLease(source, expectedHash) {
     )
     .replace(
       'const rpm = this.opsCount.length',
-      `} finally { if (!assigned) await this.senderManager.markWalletProcessed(wallet); }\nconst rpm = this.opsCount.length`,
+      `} finally { if (!assigned) await this.senderManager.markWalletProcessed(wallet); }\n}\nconst rpm = this.opsCount.length`,
     );
   if (patched.includes('async sendBundleToExecutor(userOpBundle)'))
     patched = patched.replace(
@@ -90,6 +100,20 @@ export function patchBundlerFundingLease(source, expectedHash) {
       'const wallet = executor ?? (await this.senderManager.getWallet())',
     );
   return patched.slice(0, start) + body;
+}
+
+/** Register an acquired executor immediately; delay only when no executor is available. */
+export function patchBundlerSenderAcquisition(source, expectedHash) {
+  if (createHash('sha256').update(source).digest('hex') !== expectedHash)
+    throw Error('Bundler sender source mismatch');
+  const acquisition =
+    /walletAddress = await walletPool\.pop\(\);?\s*await delay\(100\);?/;
+  if (!acquisition.test(source))
+    throw Error('Unexpected bundler sender layout');
+  return source.replace(
+    acquisition,
+    'walletAddress = await walletPool.pop();\nif (!walletAddress) await delay(100);',
+  );
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
@@ -126,6 +150,21 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     await writeFile(
       path,
       patchBundlerFunding(await readFile(path, 'utf8'), hash),
+    );
+  }
+  for (const [path, hash] of [
+    [
+      '/app/src/executor/senderManager/createRedisSenderManager.ts',
+      '4cbbf29cfef3e3958cb8ad17ce076f03755c8c9e264a088d1a5d940b8d092c0f',
+    ],
+    [
+      '/app/src/esm/executor/senderManager/createRedisSenderManager.js',
+      '1f64576e3b1b669a512c10d2198ca93aca077cb804d5a434b482200d5375988d',
+    ],
+  ]) {
+    await writeFile(
+      path,
+      patchBundlerSenderAcquisition(await readFile(path, 'utf8'), hash),
     );
   }
 }

@@ -11,3 +11,7 @@ export function patchBundlerFundingLease(
   source: string,
   expectedHash: string,
 ): string;
+export function patchBundlerSenderAcquisition(
+  source: string,
+  expectedHash: string,
+): string;

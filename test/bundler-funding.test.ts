@@ -3,7 +3,10 @@ import {
   requiredPaymasterPrefund,
   reservePaymasterPrefund,
 } from '../scripts/bundler-funding.mjs';
-import { patchBundlerFunding } from '../scripts/patch-bundler-scheduling.mjs';
+import {
+  patchBundlerFunding,
+  patchBundlerSenderAcquisition,
+} from '../scripts/patch-bundler-scheduling.mjs';
 import { createHash } from 'node:crypto';
 const paymaster = '0x' + '1'.repeat(40),
   entryPoint = '0x' + '2'.repeat(40);
@@ -109,4 +112,15 @@ it('patches only the pinned trusted-pool selection branch and rejects already mo
   expect(result).toContain('return {skip:true}');
   expect(result).not.toContain('\\n');
   expect(() => patchBundlerFunding(result, hash)).toThrow('source mismatch');
+});
+
+it('patches only the pinned successful-acquisition delay and rejects source drift', () => {
+  const source =
+    'while (!walletAddress) { walletAddress = await walletPool.pop(); await delay(100); } activeWallets.add(wallet);';
+  const hash = createHash('sha256').update(source).digest('hex');
+  const patched = patchBundlerSenderAcquisition(source, hash);
+  expect(patched).toContain('if (!walletAddress) await delay(100)');
+  expect(() => patchBundlerSenderAcquisition(patched, hash)).toThrow(
+    'source mismatch',
+  );
 });
