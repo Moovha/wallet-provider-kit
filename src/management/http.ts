@@ -35,6 +35,32 @@ const identity = {
     credential_replayed: { type: 'boolean' },
   },
 };
+const userId = { type: 'string', pattern: '^[a-f0-9]{64}$' };
+const userProperties = {
+  id: userId,
+  application_id: { type: 'string' },
+  issuer: { type: 'string' },
+  user_id: { type: 'string' },
+  kyc: {
+    type: 'object',
+    additionalProperties: false,
+    required: ['source', 'level', 'verified_at', 'accepted_until'],
+    properties: {
+      source: { const: 'application_attestation' },
+      level: { type: 'string' },
+      verified_at: { type: 'string', format: 'date-time' },
+      accepted_until: { type: 'string', format: 'date-time' },
+      reference: { type: 'string' },
+      fields: { type: 'object', additionalProperties: { type: 'string' } },
+    },
+  },
+};
+const userSummary = {
+  type: 'object',
+  additionalProperties: false,
+  required: Object.keys(userProperties),
+  properties: userProperties,
+};
 const checkFields = {
   required_fields: {
     type: 'array',
@@ -85,7 +111,18 @@ const schema = (operationId: string, result: object, extra = {}) => ({
   description:
     'Protected installation and application administration. Management credentials do not activate wallet operations or authorize spending.',
   ...extra,
-  response: { 200: result, ...errors },
+  response: {
+    200: result,
+    ...errors,
+    ...(operationId === 'readProviderUser'
+      ? {
+          404: {
+            description: 'Provider user not found',
+            content: { 'application/problem+json': { schema: problemSchema } },
+          },
+        }
+      : {}),
+  },
 });
 const keyHeaders = {
   type: 'object',
@@ -160,6 +197,87 @@ export async function registerManagementRoutes(
       reply.type('text/html').send(consoleHtml),
     );
   }
+  app.get<{
+    Querystring: { limit?: string; after?: string; application_id?: string };
+  }>(
+    '/v1/provider/users',
+    {
+      schema: schema(
+        'listProviderUsers',
+        {
+          type: 'object',
+          additionalProperties: false,
+          required: ['users', 'next_cursor'],
+          properties: {
+            users: { type: 'array', maxItems: 100, items: userSummary },
+            next_cursor: { anyOf: [userId, { type: 'null' }] },
+          },
+        },
+        {
+          description:
+            'List stored application-attested users in ascending provider user ID order. Defaults to 25, maximum 100. Pass next_cursor as after; null ends pagination. Optional application_id filters registrations. Each application user is distinct. Results report stored evidence, not current spending eligibility. Identity fields and wallets are available from the detail route. Concurrent changes are not a snapshot.',
+          querystring: body([], {
+            limit: {
+              type: 'string',
+              pattern: '^(?:[1-9]|[1-9][0-9]|100)$',
+              description: 'Page size from 1 to 100; defaults to 25.',
+            },
+            after: userId,
+            application_id: { type: 'string', minLength: 1, maxLength: 256 },
+          }),
+        },
+      ),
+    },
+    async (request, reply) => {
+      reply.header('Cache-Control', 'no-store');
+      return configured().users(await operator(request), {
+        ...request.query,
+        limit:
+          request.query.limit === undefined
+            ? undefined
+            : Number(request.query.limit),
+      });
+    },
+  );
+  app.get<{ Params: { id: string } }>(
+    '/v1/provider/users/:id',
+    {
+      schema: schema(
+        'readProviderUser',
+        {
+          ...userSummary,
+          required: [...userSummary.required, 'wallets'],
+          properties: {
+            ...userProperties,
+            wallets: {
+              type: 'array',
+              items: body(['account_id', 'wallet', 'role', 'status'], {
+                account_id: uuidSchema,
+                wallet: body(['reference', 'name', 'kind'], {
+                  reference: { type: 'string' },
+                  name: { type: 'string' },
+                  kind: { enum: ['personal', 'shared'] },
+                }),
+                role: { enum: ['owner', 'member'] },
+                status: { enum: ['active', 'suspended'] },
+                address: { type: 'string' },
+                membership_state: { enum: ['invited', 'active'] },
+              }),
+            },
+          },
+        },
+        {
+          params: body(['id'], { id: userId }),
+          description:
+            'Read a stored application-scoped user, application-attested identity fields and owned, linked or invited/active member wallets. Uses the provider user ID returned by the directory, not the application user_id. Includes expired evidence and suspended accounts for administration; does not establish current KYC, consent or transaction authority. Hosted compatibility identities are outside this directory. Unknown IDs return 404.',
+        },
+      ),
+    },
+    async (request, reply) => {
+      reply.header('Cache-Control', 'no-store');
+      return configured().user(await operator(request), request.params.id);
+    },
+  );
   app.get(
     '/v1/provider/user-checks',
     {

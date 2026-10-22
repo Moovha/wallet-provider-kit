@@ -148,7 +148,7 @@ let http =
 for (const [path, methods] of Object.entries(schema.paths)) {
   for (const [method, operation] of Object.entries(methods)) {
     if (!['get', 'post', 'delete', 'put', 'patch'].includes(method)) continue;
-    http += `## ${method.toUpperCase()} ${path}\n\nOperation: \`${operation.operationId}\`.\n\n${operation.description ?? ''}\n\n`;
+    http += `## ${method.toUpperCase()} \`${path}\`\n\nOperation: \`${operation.operationId}\`.\n\n${operation.description ?? ''}\n\n`;
     if (operation.parameters?.length) {
       http +=
         '| Parameter | Location | Required | Schema |\n| --- | --- | --- | --- |\n';

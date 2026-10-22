@@ -442,6 +442,37 @@ export function responseExample(
       management_available: true,
       wallet_operations_enabled: false,
     };
+  const providerUser = {
+    id: 'a'.repeat(64),
+    application_id: managedIdentity.id,
+    issuer: 'https://wallet.example.com/oauth',
+    user_id: 'example-user',
+    kyc: {
+      source: 'application_attestation',
+      level: 'verified',
+      verified_at: '2026-01-01T00:00:00.000Z',
+      accepted_until: '2026-04-01T00:00:00.000Z',
+    },
+  };
+  if (id === 'listProviderUsers')
+    return { users: [providerUser], next_cursor: null };
+  if (id === 'readProviderUser')
+    return {
+      ...providerUser,
+      kyc: {
+        ...providerUser.kyc,
+        reference: 'example-identity-check',
+        fields: { country: 'ZA' },
+      },
+      wallets: [
+        {
+          account_id: exampleId,
+          wallet: { reference: 'personal', name: 'Personal', kind: 'personal' },
+          role: 'owner',
+          status: 'active',
+        },
+      ],
+    };
   if (id === 'listProviderIdentities') return [managedIdentity];
   if (
     ['createProviderIdentity', 'rotateProviderIdentityCredential'].includes(id)
@@ -748,9 +779,11 @@ export function referenceSpec(
     for (const parameter of op.parameters ?? []) {
       if (parameter.in === 'path')
         parameter.example =
-          item.guide.management && parameter.name === 'id'
-            ? 'app-' + exampleId
-            : exampleId;
+          item.operation.operationId === 'readProviderUser'
+            ? 'a'.repeat(64)
+            : item.guide.management && parameter.name === 'id'
+              ? 'app-' + exampleId
+              : exampleId;
       if (
         parameter.in === 'header' &&
         parameter.name.toLowerCase() === 'idempotency-key'
@@ -790,6 +823,11 @@ export function curlExample(item: ReferenceOperation, origin: string) {
     `curl --request ${item.method.toUpperCase()} ${shellQuote(
       referenceOrigin(origin) +
         item.path.replace(/\{([^}]+)\}/g, (_match, name: string) => {
+          if (
+            item.operation.operationId === 'readProviderUser' &&
+            name === 'id'
+          )
+            return 'a'.repeat(64);
           if (item.guide.management && name === 'id') return 'app-' + exampleId;
           if (name === 'revision') return '1';
           if (name === 'applicationId') return 'a'.repeat(64);

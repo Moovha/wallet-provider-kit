@@ -192,6 +192,26 @@ See whether administration is available, which applications are registered and w
 
 [`GET /v1/provider/status`](http-reference.md#get-v1-provider-status) — request body, permissions, effects and response details.
 
+### Browse provider users
+
+Browse stored application-scoped users and their KYC evidence summaries.
+
+**Who uses it:** Provider operator.
+
+**When you need it:** Use when building a provider user directory or reviewing users registered through application-led access.
+
+[`GET /v1/provider/users`](http-reference.md#get-v1-provider-users) — request body, permissions, effects and response details.
+
+### Review a user’s KYC and wallets
+
+Read an application-scoped user’s stored identity information and associated wallets.
+
+**Who uses it:** Provider operator.
+
+**When you need it:** Use after selecting a provider user ID from the directory.
+
+[`GET /v1/provider/users/{id}`](http-reference.md#get-v1-provider-users-id) — request body, permissions, effects and response details.
+
 ### See connected applications and tools
 
 List registered connections so you can find the one to inspect or change.

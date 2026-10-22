@@ -121,3 +121,28 @@ Changing sharing settings ends approvals that depended on them while preserving
 the source application’s own approvals. See [connect an existing wallet from another
 application](application-access.md#allow-another-application-to-request-existing-wallets)
 for the request flow, identity matching and withdrawal rules.
+
+## Review registered users through the API
+
+Use a provider administrator or management tool token with `provider:manage` to
+read `GET /v1/provider/users?limit=25`. The response contains `users` and
+`next_cursor`. When the cursor is non-null, pass it as `after` on the next request.
+The maximum page size is 100. You can filter by `application_id`; keep that filter
+unchanged while paging. Concurrent changes are not a snapshot.
+
+Use the returned provider user `id` with `GET /v1/provider/users/{id}` to retrieve
+stored KYC fields and associated wallets. Each application's user remains a
+separate record, even when private user references match. The directory contains
+stored application-attested users from application-led access; hosted compatibility
+identities are excluded. The list omits identity fields and wallet details.
+
+The detail response includes the attested verification level and time, acceptance
+expiry, identity reference and fields. Wallets include owned or linked accounts
+and invited or active memberships, with account status and the address when
+provisioned. Removed memberships are omitted. Expired evidence and suspended
+accounts remain visible for administration. These records do not establish current
+KYC eligibility, application consent or spending authority. Protect the returned
+customer information; responses use `Cache-Control: no-store`.
+
+See the [endpoint guide](api-endpoints.md#service-administration) and
+[HTTP reference](http-reference.md#get-v1-provider-users) for the exact contracts.

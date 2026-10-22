@@ -10,7 +10,7 @@ Route availability depends on current configuration and permission. A schema
 describes an input; it does not grant authority to use it. The
 [contributor guide](../CONTRIBUTING.md#development) covers regeneration.
 
-## GET /v1/execution-capabilities
+## GET `/v1/execution-capabilities`
 
 Operation: `getExecutionCapabilities`.
 
@@ -49,7 +49,7 @@ Success response schema:
 }
 ```
 
-## GET /v1/capabilities
+## GET `/v1/capabilities`
 
 Operation: `getCapabilities`.
 
@@ -101,7 +101,7 @@ Success response schema:
 }
 ```
 
-## POST /v1/enrollments
+## POST `/v1/enrollments`
 
 Operation: `beginEnrollment`.
 
@@ -210,7 +210,7 @@ Success response schema:
 }
 ```
 
-## POST /v1/enrollments/{enrollmentId}/identity
+## POST `/v1/enrollments/{enrollmentId}/identity`
 
 Operation: `submitEnrollmentIdentity`.
 
@@ -291,7 +291,7 @@ Success response schema:
 }
 ```
 
-## GET /v1/enrollments/{enrollmentId}
+## GET `/v1/enrollments/{enrollmentId}`
 
 Operation: `getEnrollment`.
 
@@ -354,7 +354,7 @@ Success response schema:
 }
 ```
 
-## POST /v1/accounts/{accountId}/provision
+## POST `/v1/accounts/{accountId}/provision`
 
 Operation: `provisionAccount`.
 
@@ -443,7 +443,7 @@ Success response schema:
 }
 ```
 
-## GET /v1/configuration/applications/{applicationId}/safe-wallet
+## GET `/v1/configuration/applications/{applicationId}/safe-wallet`
 
 Operation: `readSafeWalletInfrastructure`.
 
@@ -498,7 +498,7 @@ Success response schema:
 }
 ```
 
-## POST /v1/configuration/applications/{applicationId}/safe-wallet
+## POST `/v1/configuration/applications/{applicationId}/safe-wallet`
 
 Operation: `provisionSafeWalletInfrastructure`.
 
@@ -563,7 +563,7 @@ Success response schema:
 }
 ```
 
-## POST /v1/access-requests
+## POST `/v1/access-requests`
 
 Operation: `requestAccountAccess`.
 
@@ -878,7 +878,7 @@ Success response schema:
 }
 ```
 
-## GET /v1/access-policy
+## GET `/v1/access-policy`
 
 Operation: `getAccountAccessPolicy`.
 
@@ -2213,7 +2213,7 @@ Success response schema:
 }
 ```
 
-## POST /v1/accounts/query
+## POST `/v1/accounts/query`
 
 Operation: `listUserWallets`.
 
@@ -2340,7 +2340,7 @@ Success response schema:
 }
 ```
 
-## GET /v1/accounts/{accountId}/members
+## GET `/v1/accounts/{accountId}/members`
 
 Operation: `readWalletMembers`.
 
@@ -2453,7 +2453,7 @@ Success response schema:
 }
 ```
 
-## POST /v1/accounts/{accountId}/members
+## POST `/v1/accounts/{accountId}/members`
 
 Operation: `saveWalletMember`.
 
@@ -2609,7 +2609,7 @@ Success response schema:
 }
 ```
 
-## POST /v1/access-grants/{grantId}/revoke
+## POST `/v1/access-grants/{grantId}/revoke`
 
 Operation: `revokeAccountAccess`.
 
@@ -2667,7 +2667,7 @@ Success response schema:
 }
 ```
 
-## POST /v1/access-records
+## POST `/v1/access-records`
 
 Operation: `submitAccountAccessRecords`.
 
@@ -2853,7 +2853,7 @@ Success response schema:
 }
 ```
 
-## GET /v1/access-requests/{requestId}
+## GET `/v1/access-requests/{requestId}`
 
 Operation: `getAccountAccessRequest`.
 
@@ -2970,7 +2970,7 @@ Success response schema:
 }
 ```
 
-## POST /v1/access-requests/{requestId}/identity
+## POST `/v1/access-requests/{requestId}/identity`
 
 Operation: `importAccessIdentity`.
 
@@ -3109,7 +3109,7 @@ Success response schema:
 }
 ```
 
-## GET /v1/accounts/{accountId}
+## GET `/v1/accounts/{accountId}`
 
 Operation: `readGrantedAccount`.
 
@@ -3189,7 +3189,7 @@ Success response schema:
 }
 ```
 
-## GET /v1/accounts/{accountId}/wallet/calls/{batchId}/events
+## GET `/v1/accounts/{accountId}/wallet/calls/{batchId}/events`
 
 Operation: `streamWalletCallsStatus`.
 
@@ -3219,7 +3219,7 @@ Operation: `streamWalletCallsStatus`.
 | 429    | application/json  | Default Response                               |
 | 503    | application/json  | Default Response                               |
 
-## GET /v1/accounts/{accountId}/wallet
+## GET `/v1/accounts/{accountId}/wallet`
 
 Operation: `readWalletExecutionAccount`.
 
@@ -3263,7 +3263,7 @@ Success response schema:
 }
 ```
 
-## POST /v1/accounts/{accountId}/wallet
+## POST `/v1/accounts/{accountId}/wallet`
 
 Operation: `walletCallsRpc`.
 
@@ -3841,7 +3841,7 @@ Success response schema:
 }
 ```
 
-## GET /v1/application/gas-funding
+## GET `/v1/application/gas-funding`
 
 Operation: `readApplicationGasFunding`.
 
@@ -3929,7 +3929,7 @@ Success response schema:
 }
 ```
 
-## GET /v1/application/credentials
+## GET `/v1/application/credentials`
 
 Operation: `readApplicationCredentials`.
 
@@ -3994,7 +3994,7 @@ Success response schema:
 }
 ```
 
-## GET /v1/provider/applications/{applicationId}/credentials
+## GET `/v1/provider/applications/{applicationId}/credentials`
 
 Operation: `readProviderApplicationCredentials`.
 
@@ -4063,7 +4063,7 @@ Success response schema:
 }
 ```
 
-## PUT /v1/application/credentials/{reference}
+## PUT `/v1/application/credentials/{reference}`
 
 Operation: `writeApplicationCredential`.
 
@@ -4151,7 +4151,7 @@ Success response schema:
 }
 ```
 
-## GET /v1/application/obligations
+## GET `/v1/application/obligations`
 
 Operation: `readApplicationObligations`.
 
@@ -4425,7 +4425,7 @@ Success response schema:
 }
 ```
 
-## GET /v1/provider/applications/{applicationId}/obligations
+## GET `/v1/provider/applications/{applicationId}/obligations`
 
 Operation: `readProviderApplicationObligations`.
 
@@ -4703,7 +4703,7 @@ Success response schema:
 }
 ```
 
-## PUT /v1/application/obligations/actions
+## PUT `/v1/application/obligations/actions`
 
 Operation: `submitApplicationActions`.
 
@@ -5018,7 +5018,7 @@ Success response schema:
 }
 ```
 
-## POST /v1/provider/applications/{applicationId}/obligations/actions/decision
+## POST `/v1/provider/applications/{applicationId}/obligations/actions/decision`
 
 Operation: `decideApplicationActions`.
 
@@ -5293,7 +5293,7 @@ Success response schema:
 }
 ```
 
-## PUT /v1/application/obligations/services
+## PUT `/v1/application/obligations/services`
 
 Operation: `submitApplicationServices`.
 
@@ -5602,7 +5602,7 @@ Success response schema:
 }
 ```
 
-## POST /v1/provider/applications/{applicationId}/obligations/services/decision
+## POST `/v1/provider/applications/{applicationId}/obligations/services/decision`
 
 Operation: `decideApplicationServices`.
 
@@ -5877,7 +5877,7 @@ Success response schema:
 }
 ```
 
-## PUT /v1/application/obligations/sponsorship
+## PUT `/v1/application/obligations/sponsorship`
 
 Operation: `submitApplicationSponsorship`.
 
@@ -6215,7 +6215,7 @@ Success response schema:
 }
 ```
 
-## POST /v1/provider/applications/{applicationId}/obligations/sponsorship/decision
+## POST `/v1/provider/applications/{applicationId}/obligations/sponsorship/decision`
 
 Operation: `decideApplicationSponsorship`.
 
@@ -6490,7 +6490,7 @@ Success response schema:
 }
 ```
 
-## GET /v1/applications/configurations
+## GET `/v1/applications/configurations`
 
 Operation: `listApplicationConfigurations`.
 
@@ -8304,7 +8304,7 @@ Success response schema:
 }
 ```
 
-## GET /v1/wallet/batches
+## GET `/v1/wallet/batches`
 
 Operation: `listWalletBatches`.
 
@@ -8482,7 +8482,7 @@ Success response schema:
 }
 ```
 
-## POST /v1/provider/applications/{applicationId}/policy/review
+## POST `/v1/provider/applications/{applicationId}/policy/review`
 
 Operation: `setRuntimeReviewMode`.
 
@@ -8565,7 +8565,7 @@ Success response schema:
 }
 ```
 
-## GET /v1/application/policy
+## GET `/v1/application/policy`
 
 Operation: `readRuntimeConfiguration`.
 
@@ -9186,7 +9186,7 @@ Success response schema:
 }
 ```
 
-## GET /v1/provider/applications/{applicationId}/policy
+## GET `/v1/provider/applications/{applicationId}/policy`
 
 Operation: `readRuntimeApplicationConfiguration`.
 
@@ -9811,7 +9811,7 @@ Success response schema:
 }
 ```
 
-## GET /v1/application/policy/revisions/{revision}
+## GET `/v1/application/policy/revisions/{revision}`
 
 Operation: `readRuntimeConfigurationRevision`.
 
@@ -10436,7 +10436,7 @@ Success response schema:
 }
 ```
 
-## POST /v1/application/policy/proposals
+## POST `/v1/application/policy/proposals`
 
 Operation: `proposeRuntimeConfiguration`.
 
@@ -11543,7 +11543,7 @@ Success response schema:
 }
 ```
 
-## GET /v1/application/policy/proposals/{proposalId}
+## GET `/v1/application/policy/proposals/{proposalId}`
 
 Operation: `readRuntimeConfigurationProposal`.
 
@@ -12125,7 +12125,7 @@ Success response schema:
 }
 ```
 
-## POST /v1/provider/policy/proposals/{proposalId}/publish
+## POST `/v1/provider/policy/proposals/{proposalId}/publish`
 
 Operation: `publishRuntimeConfiguration`.
 
@@ -12733,7 +12733,7 @@ Success response schema:
 }
 ```
 
-## POST /v1/provider/applications/{applicationId}/policy/revisions
+## POST `/v1/provider/applications/{applicationId}/policy/revisions`
 
 Operation: `updateRuntimeConfiguration`.
 
@@ -13850,7 +13850,246 @@ Success response schema:
 }
 ```
 
-## GET /v1/provider/user-checks
+## GET `/v1/provider/users`
+
+Operation: `listProviderUsers`.
+
+**Why this exists:** Browse stored application-scoped users and their KYC evidence summaries.
+
+**Who uses it:** Provider operator.
+
+**When you need it:** Use when building a provider user directory or reviewing users registered through application-led access.
+
+**Before you start:** Authenticate as a current administrator or management tool. Use limit (1–100, default 25), optional application_id and next_cursor as after for the next page. Keep filters unchanged between pages. Concurrent changes are not a snapshot.
+
+**Result and next step:** 200: users and next_cursor, or null at the end. Each application user remains distinct; expired evidence remains visible. Hosted compatibility identities are excluded. This read does not establish current wallet or spending authority.
+
+**Request details:** List stored application-attested users in ascending provider user ID order. Defaults to 25, maximum 100. Pass next_cursor as after; null ends pagination. Optional application_id filters registrations. Each application user is distinct. Results report stored evidence, not current spending eligibility. Identity fields and wallets are available from the detail route. Concurrent changes are not a snapshot.
+
+| Parameter        | Location | Required | Schema                                                       |
+| ---------------- | -------- | -------- | ------------------------------------------------------------ |
+| `limit`          | query    | no       | `{"type":"string","pattern":"^(?:[1-9]\|[1-9][0-9]\|100)$"}` |
+| `after`          | query    | no       | `{"type":"string","pattern":"^[a-f0-9]{64}$"}`               |
+| `application_id` | query    | no       | `{"type":"string","minLength":1,"maxLength":256}`            |
+
+| Status | Content type             | Description      |
+| ------ | ------------------------ | ---------------- |
+| 200    | application/json         | Default Response |
+| 400    | application/problem+json | Problem response |
+| 401    | application/problem+json | Problem response |
+| 403    | application/problem+json | Problem response |
+| 409    | application/problem+json | Problem response |
+| 413    | application/problem+json | Problem response |
+| 415    | application/problem+json | Problem response |
+| 422    | application/problem+json | Problem response |
+| 429    | application/problem+json | Problem response |
+| 500    | application/problem+json | Problem response |
+| 503    | application/problem+json | Problem response |
+
+Success response schema:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["users", "next_cursor"],
+  "properties": {
+    "users": {
+      "type": "array",
+      "maxItems": 100,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "application_id", "issuer", "user_id", "kyc"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "application_id": {
+            "type": "string"
+          },
+          "issuer": {
+            "type": "string"
+          },
+          "user_id": {
+            "type": "string"
+          },
+          "kyc": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["source", "level", "verified_at", "accepted_until"],
+            "properties": {
+              "source": {
+                "enum": ["application_attestation"]
+              },
+              "level": {
+                "type": "string"
+              },
+              "verified_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "accepted_until": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "reference": {
+                "type": "string"
+              },
+              "fields": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "next_cursor": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "nullable": true
+    }
+  }
+}
+```
+
+## GET `/v1/provider/users/{id}`
+
+Operation: `readProviderUser`.
+
+**Why this exists:** Read an application-scoped user’s stored identity information and associated wallets.
+
+**Who uses it:** Provider operator.
+
+**When you need it:** Use after selecting a provider user ID from the directory.
+
+**Before you start:** Authenticate as a current administrator or management tool. Use the directory id, not the application user_id. Treat identity fields and wallet addresses as private customer data.
+
+**Result and next step:** 200: application-attested KYC evidence and owned, linked, invited or active member wallets, including suspended accounts. Removed memberships are omitted. Stored evidence is not a fresh KYC decision or wallet authorization. Unknown IDs return 404.
+
+**Request details:** Read a stored application-scoped user, application-attested identity fields and owned, linked or invited/active member wallets. Uses the provider user ID returned by the directory, not the application user_id. Includes expired evidence and suspended accounts for administration; does not establish current KYC, consent or transaction authority. Hosted compatibility identities are outside this directory. Unknown IDs return 404.
+
+| Parameter | Location | Required | Schema                                         |
+| --------- | -------- | -------- | ---------------------------------------------- |
+| `id`      | path     | yes      | `{"type":"string","pattern":"^[a-f0-9]{64}$"}` |
+
+| Status | Content type             | Description             |
+| ------ | ------------------------ | ----------------------- |
+| 200    | application/json         | Default Response        |
+| 400    | application/problem+json | Problem response        |
+| 401    | application/problem+json | Problem response        |
+| 403    | application/problem+json | Problem response        |
+| 404    | application/problem+json | Provider user not found |
+| 409    | application/problem+json | Problem response        |
+| 413    | application/problem+json | Problem response        |
+| 415    | application/problem+json | Problem response        |
+| 422    | application/problem+json | Problem response        |
+| 429    | application/problem+json | Problem response        |
+| 500    | application/problem+json | Problem response        |
+| 503    | application/problem+json | Problem response        |
+
+Success response schema:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "application_id", "issuer", "user_id", "kyc", "wallets"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "application_id": {
+      "type": "string"
+    },
+    "issuer": {
+      "type": "string"
+    },
+    "user_id": {
+      "type": "string"
+    },
+    "kyc": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "level", "verified_at", "accepted_until"],
+      "properties": {
+        "source": {
+          "enum": ["application_attestation"]
+        },
+        "level": {
+          "type": "string"
+        },
+        "verified_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "accepted_until": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "reference": {
+          "type": "string"
+        },
+        "fields": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "wallets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["account_id", "wallet", "role", "status"],
+        "properties": {
+          "account_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "wallet": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["reference", "name", "kind"],
+            "properties": {
+              "reference": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "kind": {
+                "enum": ["personal", "shared"]
+              }
+            }
+          },
+          "role": {
+            "enum": ["owner", "member"]
+          },
+          "status": {
+            "enum": ["active", "suspended"]
+          },
+          "address": {
+            "type": "string"
+          },
+          "membership_state": {
+            "enum": ["invited", "active"]
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+## GET `/v1/provider/user-checks`
 
 Operation: `readProviderUserChecks`.
 
@@ -13930,7 +14169,7 @@ Success response schema:
 }
 ```
 
-## POST /v1/provider/user-checks
+## POST `/v1/provider/user-checks`
 
 Operation: `saveProviderUserChecks`.
 
@@ -14062,7 +14301,7 @@ Success response schema:
 }
 ```
 
-## POST /v1/provider/claim
+## POST `/v1/provider/claim`
 
 Operation: `claimProviderInstallation`.
 
@@ -14172,7 +14411,7 @@ Success response schema:
 }
 ```
 
-## GET /v1/provider/status
+## GET `/v1/provider/status`
 
 Operation: `readProviderStatus`.
 
@@ -14284,7 +14523,7 @@ Success response schema:
 }
 ```
 
-## GET /v1/provider/identities
+## GET `/v1/provider/identities`
 
 Operation: `listProviderIdentities`.
 
@@ -14372,7 +14611,7 @@ Success response schema:
 }
 ```
 
-## POST /v1/provider/identities
+## POST `/v1/provider/identities`
 
 Operation: `createProviderIdentity`.
 
@@ -14502,7 +14741,7 @@ Success response schema:
 }
 ```
 
-## PATCH /v1/provider/identities/{id}
+## PATCH `/v1/provider/identities/{id}`
 
 Operation: `updateProviderIdentity`.
 
@@ -14692,7 +14931,7 @@ Success response schema:
 }
 ```
 
-## POST /v1/provider/identities/{id}/credentials
+## POST `/v1/provider/identities/{id}/credentials`
 
 Operation: `rotateProviderIdentityCredential`.
 
