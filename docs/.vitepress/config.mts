@@ -45,6 +45,7 @@ export default defineConfig({
     'dist/**',
     'coverage/**',
     'artifacts/**',
+    'internal-testing/**',
     'local-adapters/**',
   ],
   rewrites,
@@ -206,14 +207,6 @@ export default defineConfig({
           {
             text: 'Transaction execution',
             link: '/docs/user-operation-execution',
-          },
-          {
-            text: 'Execution performance design',
-            link: '/docs/execution-performance-design',
-          },
-          {
-            text: 'Base Sepolia performance evidence',
-            link: '/docs/base-sepolia-execution-performance',
           },
           {
             text: 'Signature boundaries',

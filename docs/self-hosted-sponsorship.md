@@ -62,7 +62,7 @@ The local verifying paymaster includes pinned MIT-licensed contract sources list
 
 See [deployment](operator-deployment.md), [gas](assets-and-gas.md), [wallet calls](wallet-calls.md) and [execution recovery](user-operation-execution.md).
 
-See [execution scheduling and performance design](execution-performance-design.md) for the execution paths, funding constraints and controlled comparison protocol. The gas-funding endpoint’s `execution_funding` field reports the most recent background check without making a chain request for each page refresh. `needs-funding` means the funding account cannot restore the configured targets; `limit-reached` means the infrastructure limit needs review. Observations expire after 30 seconds and do not authorize a transfer.
+The gas-funding endpoint’s `execution_funding` field reports the most recent background check without making a chain request for each page refresh. `needs-funding` means the funding account cannot restore the configured targets; `limit-reached` means the infrastructure limit needs review. Observations expire after 30 seconds and do not authorize a transfer.
 
 A `ready` funding observation reports balances and refill constraints. Check executor availability and transaction progress separately; funding readiness does not establish inclusion or recovery from a process crash.
 
