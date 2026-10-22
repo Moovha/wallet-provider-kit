@@ -1,20 +1,20 @@
 import { WalletProviderError } from '../domain/signing.js';
-import { rpcCapacity, rpcTransportScope } from './rpc-capacity.js';
+import {
+  isBackgroundRpcRead,
+  rpcCapacity,
+  rpcTransportScope,
+} from './rpc-capacity.js';
 
+interface EndpointAssignments {
+  cursor: number;
+  active: number[];
+  backgroundActive: number[];
+  assigned: Map<string, number>;
+}
 /** Rotate complete read operations; retries never mix providers inside one proof. */
-const groups = new WeakMap<
-  typeof fetch,
-  Map<
-    string,
-    { cursor: number; active: number[]; assigned: Map<string, number> }
-  >
->();
+const groups = new WeakMap<typeof fetch, Map<string, EndpointAssignments>>();
 export class RpcEndpointPool {
-  private readonly state: {
-    cursor: number;
-    active: number[];
-    assigned: Map<string, number>;
-  };
+  private readonly state: EndpointAssignments;
   private get cursor() {
     return this.state.cursor;
   }
@@ -23,6 +23,9 @@ export class RpcEndpointPool {
   }
   private get active() {
     return this.state.active;
+  }
+  private get backgroundActive() {
+    return this.state.backgroundActive;
   }
   private readonly cooldowns = new Map<string, number>();
   private get assigned() {
@@ -52,6 +55,7 @@ export class RpcEndpointPool {
     this.state = transportGroups.get(key) ?? {
       cursor: 0,
       active: endpoints.map(() => 0),
+      backgroundActive: endpoints.map(() => 0),
       assigned: new Map(),
     };
     transportGroups.set(key, this.state);
@@ -60,6 +64,9 @@ export class RpcEndpointPool {
     work: (endpoint: string) => Promise<T>,
     requirements: string[] = [],
   ): Promise<T> {
+    const background = isBackgroundRpcRead();
+    const activeForCaller = (index: number) =>
+      this.active[index] - (background ? 0 : this.backgroundActive[index]);
     const attempted = new Set<number>();
     for (;;) {
       const candidates = this.endpoints
@@ -76,7 +83,7 @@ export class RpcEndpointPool {
         );
       candidates.sort((a, b) => {
         if (!this.preferResponsiveEndpoints)
-          return this.active[a] - this.active[b];
+          return activeForCaller(a) - activeForCaller(b);
         const capacity = (i: number) =>
           rpcCapacity(this.transport, this.endpoints[i]);
         const probe = (i: number) =>
@@ -91,13 +98,13 @@ export class RpcEndpointPool {
         if (probe(a) !== probe(b)) return probe(a) ? -1 : 1;
         return (
           (Math.max(
-            this.active[a],
+            activeForCaller(a),
             capacity(a).readPressure / capacity(a).maximumConcurrentReads,
           ) +
             1) *
             capacity(a).readLatencyMs -
           (Math.max(
-            this.active[b],
+            activeForCaller(b),
             capacity(b).readPressure / capacity(b).maximumConcurrentReads,
           ) +
             1) *
@@ -111,6 +118,7 @@ export class RpcEndpointPool {
       this.assigned.set(this.endpoints[index], Date.now());
       this.cursor = (index + 1) % this.endpoints.length;
       this.active[index]++;
+      if (background) this.backgroundActive[index]++;
       try {
         return await work(this.endpoints[index]);
       } catch (error) {
@@ -130,6 +138,7 @@ export class RpcEndpointPool {
           throw error;
       } finally {
         this.active[index]--;
+        if (background) this.backgroundActive[index]--;
       }
     }
   }

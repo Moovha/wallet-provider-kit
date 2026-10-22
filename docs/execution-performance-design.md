@@ -203,6 +203,32 @@ current authority checks, per-wallet observation cadence and existing feed
 lifetimes remain required. A new controlled comparison is needed to establish
 whether the correction improves both latency and total RPC usage.
 
+## Apply priority to endpoint selection and read admission
+
+Endpoint selection and endpoint capacity are separate components. Their load
+estimates must reflect the caller’s priority. Queued historical reads yield to
+current reads; counting those waiters as current pressure can route a current
+request to a slower endpoint despite available capacity on the faster one.
+Historical proof jobs awaiting reads can also inflate the endpoint pool’s
+logical active-job count.
+
+Two offline routing regressions reproduce those cases with a faster primary
+endpoint and historical work waiting for its two read slots. Before correction,
+a current request selects the slower endpoint. The corrected current-work view
+excludes waiting historical reads and historical logical jobs, while retaining
+physical reads already in progress. Historical callers continue to see the full
+load for their own routing. Capability requirements, endpoint cooldowns,
+availability probes and complete-proof source selection remain unchanged.
+
+The subsequent live series at `88ef6fc` stopped during post-window independent
+verification after its observation source returned a server error. All sixty
+offered transfers were subsequently independently verified using their original
+identities and measurement windows. Its planned final baseline pair was not
+offered. A warm candidate preparation also included a three-second secondary
+read timeout; the routing regressions explain why admission priority must be
+applied at both scheduling layers. A complete comparison of the corrected
+implementation remains required.
+
 ## Make the execution visible before benchmarking
 
 HTTP response timing primarily measures acknowledgement. Existing durable phase

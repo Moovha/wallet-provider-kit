@@ -1,7 +1,10 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { RpcEndpointPool } from '../src/execution/rpc-pool.js';
 import { RpcReader } from '../src/execution/chain.js';
-import { rpcCapacity } from '../src/execution/rpc-capacity.js';
+import {
+  rpcCapacity,
+  runWithBackgroundRpcReads,
+} from '../src/execution/rpc-capacity.js';
 import { WalletProviderError } from '../src/domain/signing.js';
 afterEach(() => vi.useRealTimers());
 const endpoints = [
@@ -216,4 +219,69 @@ it('classifies dRPC state override routing rejection without disabling ordinary 
   );
   expect(rpcCapacity(transport, endpoints[0]).retryAfter).toBe(0);
   expect(await reader.call('eth_chainId', [])).toBe('0x14a34');
+});
+
+it('routes current reads using the capacity ahead of historical waiters while retaining historical load balancing', async () => {
+  const transport = vi.fn(async () =>
+    Response.json({ jsonrpc: '2.0', id: 1, result: '0x1' }),
+  );
+  const primary = rpcCapacity(transport, endpoints[0]);
+  const secondary = rpcCapacity(transport, endpoints[1]);
+  primary.recordReadSuccess(100);
+  secondary.recordReadSuccess(200);
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const historical = runWithBackgroundRpcReads(() =>
+    Promise.all(Array.from({ length: 16 }, () => primary.run(() => gate))),
+  );
+  const pool = new RpcEndpointPool(endpoints, transport, true);
+  try {
+    await expect(pool.run(async (endpoint) => endpoint)).resolves.toBe(
+      endpoints[0],
+    );
+    await expect(
+      runWithBackgroundRpcReads(() => pool.run(async (endpoint) => endpoint)),
+    ).resolves.toBe(endpoints[1]);
+  } finally {
+    release();
+    await historical;
+  }
+});
+
+it('excludes queued historical proof jobs from current endpoint selection while retaining their own load accounting', async () => {
+  const transport = vi.fn(async () =>
+    Response.json({ jsonrpc: '2.0', id: 1, result: '0x1' }),
+  );
+  rpcCapacity(transport, endpoints[0]).recordReadSuccess(100);
+  const secondary = rpcCapacity(transport, endpoints[1]);
+  secondary.recordReadSuccess(200);
+  secondary.unsupportedFor('historical-proof');
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const pool = new RpcEndpointPool(endpoints, transport, true);
+  const historical = runWithBackgroundRpcReads(() =>
+    Promise.all(
+      Array.from({ length: 16 }, () =>
+        pool.run(
+          (endpoint) => rpcCapacity(transport, endpoint).run(() => gate),
+          ['historical-proof'],
+        ),
+      ),
+    ),
+  );
+  try {
+    await expect(pool.run(async (endpoint) => endpoint)).resolves.toBe(
+      endpoints[0],
+    );
+    await expect(
+      runWithBackgroundRpcReads(() => pool.run(async (endpoint) => endpoint)),
+    ).resolves.toBe(endpoints[1]);
+  } finally {
+    release();
+    await historical;
+  }
 });

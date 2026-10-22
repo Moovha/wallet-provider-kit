@@ -2,6 +2,9 @@ import { WalletProviderError } from '../domain/signing.js';
 import { AsyncLocalStorage } from 'node:async_hooks';
 
 const backgroundReads = new AsyncLocalStorage<boolean>();
+export function isBackgroundRpcRead() {
+  return backgroundReads.getStore() === true;
+}
 /** Historical observation yields endpoint capacity to current requests without changing read freshness. */
 export function runWithBackgroundRpcReads<T>(
   work: () => Promise<T>,
@@ -117,10 +120,16 @@ export class RpcCapacity {
     background: boolean;
   }[] = [];
   get readPressure() {
-    return this.active + this.waiting.length;
+    // Historical waiters yield to current work and do not occupy its routing capacity.
+    return (
+      this.active +
+      (isBackgroundRpcRead()
+        ? this.waiting.length
+        : this.waiting.filter((entry) => !entry.background).length)
+    );
   }
   async run<T>(work: () => Promise<T>): Promise<T> {
-    const background = backgroundReads.getStore() === true;
+    const background = isBackgroundRpcRead();
     if (
       this.active >= this.maximumConcurrentReads ||
       (background && this.backgroundActive >= 2) ||
