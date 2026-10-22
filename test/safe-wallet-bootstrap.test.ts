@@ -809,43 +809,42 @@ it('retains the complete original deployment recipe before attempting its transa
   expect(t.broadcasts).toBe(0);
 });
 
-it('bounds historical observation across wallets without blocking new admission and rotates after an observer finishes', async () => {
+it('bounds historical observation batches without blocking admission and rotates to the remaining wallets', async () => {
   const t = await bootstrap('10000000000');
   let release!: () => void;
   const gate = new Promise<boolean>((resolve) => {
     release = () => resolve(true);
   });
-  const first = {
+  const drivers = Array.from({ length: 12 }, (_, index) => ({
     runOnce: vi.fn(async () => {}),
-    settleOnce: vi.fn(() => gate),
+    settleOnce: vi.fn(() => (index === 0 ? gate : Promise.resolve(true))),
     stop: async () => {},
-  };
-  const second = {
-    runOnce: vi.fn(async () => {}),
-    settleOnce: vi.fn(async () => true),
-    stop: async () => {},
-  };
+  }));
   const worker = t.runtime as unknown as {
     drivers: Map<string, unknown>;
     runWallets(): Promise<void>;
     settlement?: Promise<void>;
   };
-  worker.drivers.set('first', first);
-  worker.drivers.set('second', second);
+  drivers.forEach((driver, index) => worker.drivers.set(String(index), driver));
   try {
     await worker.runWallets();
     await worker.runWallets();
-    expect(first.runOnce).toHaveBeenCalledTimes(2);
-    expect(second.runOnce).toHaveBeenCalledTimes(2);
-    expect(first.settleOnce).toHaveBeenCalledOnce();
-    expect(second.settleOnce).not.toHaveBeenCalled();
+    for (const driver of drivers)
+      expect(driver.runOnce).toHaveBeenCalledTimes(2);
+    for (const driver of drivers.slice(0, 10))
+      expect(driver.settleOnce).toHaveBeenCalledOnce();
+    for (const driver of drivers.slice(10))
+      expect(driver.settleOnce).not.toHaveBeenCalled();
     release();
     await worker.settlement;
     await worker.runWallets();
     await worker.settlement;
-    expect(second.settleOnce).toHaveBeenCalledOnce();
-    expect(first.settleOnce).toHaveBeenCalledOnce();
-    expect(first.runOnce.mock.calls[0]).toEqual([expect.any(Array), false]);
+    for (const driver of drivers.slice(10))
+      expect(driver.settleOnce).toHaveBeenCalledOnce();
+    expect(drivers[0].runOnce.mock.calls[0]).toEqual([
+      expect.any(Array),
+      false,
+    ]);
   } finally {
     release();
     await t.runtime.close();

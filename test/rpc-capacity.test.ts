@@ -1,5 +1,8 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { RpcCapacity } from '../src/execution/rpc-capacity.js';
+import {
+  RpcCapacity,
+  runWithBackgroundRpcReads,
+} from '../src/execution/rpc-capacity.js';
 import { RpcReader } from '../src/execution/chain.js';
 afterEach(() => vi.useRealTimers());
 
@@ -185,4 +188,156 @@ it('shares head feed and capacity through independently bound user transport wra
     );
   await readers[0].feed('eth_getBlockByNumber', ['latest', false]);
   expect(request).toHaveBeenCalledTimes(1);
+});
+
+it('shares overlapping head and canonical-block reads across observers, while separated observations each require a fresh read', async () => {
+  vi.useFakeTimers();
+  const measure = async (together: boolean) => {
+    const request = vi.fn(async () =>
+      Response.json({
+        jsonrpc: '2.0',
+        id: 1,
+        result: { number: '0x10', hash: '0x' + '11'.repeat(32) },
+      }),
+    );
+    const readers = Array.from(
+      { length: 10 },
+      () => new RpcReader('https://offline.example.test', request, 4, true),
+    );
+    const observe = (reader: RpcReader) =>
+      Promise.all([
+        reader.feed('eth_getBlockByNumber', ['latest', false]),
+        reader.call('eth_getBlockByNumber', ['0x10', false]),
+      ]);
+    if (together)
+      await runWithBackgroundRpcReads(() => Promise.all(readers.map(observe)));
+    else
+      for (const reader of readers) {
+        await observe(reader);
+        vi.setSystemTime(Date.now() + 1000);
+      }
+    return request.mock.calls.length;
+  };
+  expect(await measure(false)).toBe(20);
+  expect(await measure(true)).toBe(2);
+});
+
+it('limits historical reads to two while allowing current work to bypass their backlog', async () => {
+  const capacity = new RpcCapacity();
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const entered: string[] = [];
+  let active = 0,
+    maximum = 0;
+  const historical = runWithBackgroundRpcReads(() =>
+    Promise.all(
+      Array.from({ length: 10 }, (_, index) =>
+        capacity.run(async () => {
+          entered.push('history-' + index);
+          active++;
+          maximum = Math.max(maximum, active);
+          await gate;
+          active--;
+        }),
+      ),
+    ),
+  );
+  expect(entered).toEqual(['history-0', 'history-1']);
+  await expect(
+    capacity.run(async () => {
+      entered.push('current');
+      return 'admitted';
+    }),
+  ).resolves.toBe('admitted');
+  expect(entered).toEqual(['history-0', 'history-1', 'current']);
+  release();
+  await historical;
+  expect(maximum).toBe(2);
+  expect(entered).toHaveLength(11);
+});
+
+it('gives a freed endpoint slot to queued current work before historical work without exceeding the shared ceiling', async () => {
+  const capacity = new RpcCapacity();
+  const releases: (() => void)[] = [];
+  const foreground = Array.from({ length: 8 }, () =>
+    capacity.run(
+      () =>
+        new Promise<void>((resolve) => {
+          releases.push(resolve);
+        }),
+    ),
+  );
+  const order: string[] = [];
+  const background = runWithBackgroundRpcReads(() =>
+    capacity.run(async () => {
+      order.push('history');
+    }),
+  );
+  const current = capacity.run(async () => {
+    order.push('current');
+  });
+  expect(order).toEqual([]);
+  releases[0]();
+  await current;
+  expect(order[0]).toBe('current');
+  releases.slice(1).forEach((release) => release());
+  await Promise.all([...foreground, background]);
+  expect(order).toEqual(['current', 'history']);
+});
+
+it('expires queued historical reads without executing them or retaining capacity', async () => {
+  vi.useFakeTimers();
+  const capacity = new RpcCapacity();
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const work = vi.fn(async () => {});
+  const active = runWithBackgroundRpcReads(() =>
+    Promise.all([capacity.run(() => gate), capacity.run(() => gate)]),
+  );
+  const waiting = runWithBackgroundRpcReads(() =>
+    Promise.allSettled([capacity.run(work)]),
+  );
+  await vi.advanceTimersByTimeAsync(3000);
+  expect((await waiting)[0].status).toBe('rejected');
+  expect(work).not.toHaveBeenCalled();
+  release();
+  await active;
+  await expect(capacity.run(async () => 'recovered')).resolves.toBe(
+    'recovered',
+  );
+});
+
+it('reserves waiting capacity for current reads when historical work fills its queue', async () => {
+  const capacity = new RpcCapacity();
+  let releaseCurrent!: () => void, releaseHistory!: () => void;
+  const currentGate = new Promise<void>((resolve) => {
+    releaseCurrent = resolve;
+  });
+  const historyGate = new Promise<void>((resolve) => {
+    releaseHistory = resolve;
+  });
+  const current = Promise.all(
+    Array.from({ length: 6 }, () => capacity.run(() => currentGate)),
+  );
+  const historical = runWithBackgroundRpcReads(() =>
+    Promise.allSettled(
+      Array.from({ length: 66 }, () => capacity.run(() => historyGate)),
+    ),
+  );
+  const next = capacity.run(async () => 'current');
+  releaseCurrent();
+  await expect(next).resolves.toBe('current');
+  releaseHistory();
+  await current;
+  const outcomes = await historical;
+  expect(
+    outcomes.filter((result) => result.status === 'fulfilled'),
+  ).toHaveLength(34);
+  expect(
+    outcomes.filter((result) => result.status === 'rejected'),
+  ).toHaveLength(32);
 });

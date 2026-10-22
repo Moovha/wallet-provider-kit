@@ -18,7 +18,10 @@ import {
   safeModuleSetup,
 } from '../provisioning/atomic-safe.js';
 import { moduleSetupAction, moduleSetupCallData } from './account-setup.js';
-import { bindRpcTransport } from '../execution/rpc-capacity.js';
+import {
+  bindRpcTransport,
+  runWithBackgroundRpcReads,
+} from '../execution/rpc-capacity.js';
 import { createWalletAttemptRequest } from '../providers/attempt-lifecycle.js';
 import { applicationGasBudgetId } from './budget.js';
 import { randomUUID } from 'node:crypto';
@@ -210,15 +213,18 @@ export class SafeWalletRuntime {
         });
       this.walletRuns.set(driver, running);
     }
-    // One provider-wide finality observer avoids a restart burst from every retained wallet.
+    // Share overlapping historical reads in a bounded batch; endpoint priority preserves admission capacity.
     if (!this.settlement) {
       const drivers = [...this.drivers.values()];
-      const running = (async () => {
-        for (let i = 0; i < drivers.length; i++) {
-          const index = this.settlementCursor++ % drivers.length;
-          if (await drivers[index].settleOnce(snapshot)) break;
-        }
-      })()
+      const cohort = Array.from(
+        { length: Math.min(10, drivers.length) },
+        () => drivers[this.settlementCursor++ % drivers.length],
+      );
+      const running = runWithBackgroundRpcReads(async () => {
+        await Promise.allSettled(
+          cohort.map((driver) => driver.settleOnce(snapshot)),
+        );
+      })
         .catch(() => undefined)
         .finally(() => {
           if (this.settlement === running) this.settlement = undefined;

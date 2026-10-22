@@ -173,6 +173,36 @@ infeasible submissions and their receipt polling. Historical-observer isolation
 addresses a separate queue wait. Read aggregation is secondary and must be
 justified by attributed call counts.
 
+## Preserve read sharing while separating admission
+
+A completed 80-offer crossover compared `3d6bb2f` with the admission-isolation
+candidate at `0aa3031`. All transfers were independently verified and the
+candidate reduced observed inclusion latency, but its four workload windows
+used 1,825 external RPC method calls against the baseline’s 1,641. That 11.2%
+increase fails performance acceptance. Each window lasted 60 seconds; the
+separate idle windows also remained part of the evidence.
+
+The serialized observer separated related checks by about one scheduling tick.
+The latest-head feed lasts 250 milliseconds, and canonical block checks share
+only overlapping requests. Serial observation therefore loses sharing that a
+concurrent group can retain. An offline counterexample uses the actual RPC
+reader: ten observations spaced one second apart make twenty latest-head and
+canonical-block reads; ten overlapping observations make two. Neither experiment
+caches completed canonical-block checks.
+
+The correction groups up to ten due historical observers into one rotating
+batch. Historical reads carry a background scheduling priority through the
+existing endpoint capacity gate. At most two background reads can be active per
+endpoint, within the unchanged shared ceiling of eight; queued current reads
+receive available slots first. Read sharing occurs before capacity admission,
+so matching requests still share their work. Waiting requests retain their
+three-second bound and the queue remains bounded at 64, with at most 32 waiting historical reads to preserve room for current work.
+
+This changes scheduling rather than receipt validity. Canonicality checks,
+current authority checks, per-wallet observation cadence and existing feed
+lifetimes remain required. A new controlled comparison is needed to establish
+whether the correction improves both latency and total RPC usage.
+
 ## Make the execution visible before benchmarking
 
 HTTP response timing primarily measures acknowledgement. Existing durable phase

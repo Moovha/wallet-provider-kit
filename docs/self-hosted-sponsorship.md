@@ -65,3 +65,5 @@ See [deployment](operator-deployment.md), [gas](assets-and-gas.md), [wallet call
 See [execution scheduling and performance design](execution-performance-design.md) for the execution paths, funding constraints and controlled comparison protocol. The gas-funding endpoint’s `execution_funding` field reports the most recent background check without making a chain request for each page refresh. `needs-funding` means the funding account cannot restore the configured targets; `limit-reached` means the infrastructure limit needs review. Observations expire after 30 seconds and do not authorize a transfer.
 
 A `ready` funding observation reports balances and refill constraints. Check executor availability and transaction progress separately; funding readiness does not establish inclusion or recovery from a process crash.
+
+Historical receipt checks run separately from admission in rotating batches of up to ten observers. Their external reads use at most two of each endpoint’s eight shared read slots, and queued current reads receive slots first. Overlapping checks share reads while retaining fresh canonicality and current authority checks.
