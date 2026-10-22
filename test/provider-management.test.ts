@@ -787,3 +787,209 @@ it('keeps user-check settings readable after live applications enable matching f
     }),
   ).toEqual(saved);
 });
+
+it('paginates application-scoped users and protects private KYC and wallet detail', async () => {
+  const f = await fixture(),
+    secret = password();
+  await f.service.claim({
+    claim: f.claim,
+    username: 'admin',
+    password: secret,
+  });
+  const operator = await f.service.verifyCredentials(
+    'operator-admin',
+    secret,
+    managementScopes,
+  );
+  const { userOwner } = await import('../src/onboarding/wallets.js');
+  const profiles = ['first', 'second', 'third']
+    .map((clientId) => ({
+      id: userOwner({ issuer: operator.issuer, clientId }, 'same-user'),
+      issuer: operator.issuer,
+      clientId,
+      userId: 'same-user',
+      identity: {
+        reference: 'offline-check',
+        level: 'verified',
+        verified_at: '2025-01-01T00:00:00.000Z',
+        fields: { country: 'ZA' },
+      },
+      acceptedUntil: 1,
+      evidenceHash: 'private-evidence-hash',
+      revision: 'old-policy',
+    }))
+    .sort((a, b) => a.id.localeCompare(b.id));
+  const accountId = randomUUID();
+  await f.store.transaction((state) => {
+    state.verifiedUsers = Object.fromEntries(profiles.map((p) => [p.id, p]));
+    state.accounts = {
+      [accountId]: {
+        id: accountId,
+        owner: profiles[0].id,
+        linkedOwners: [profiles[1].id],
+        status: 'suspended',
+        acceptedUntil: 1,
+        acceptanceRevision: 'old-policy',
+        evidenceHash: 'private',
+        members: {
+          [profiles[2].id]: {
+            id: profiles[2].id,
+            issuer: operator.issuer,
+            clientId: profiles[2].clientId,
+            userId: 'same-user',
+            permissions: ['account:read'],
+            revision: 1,
+            state: 'invited',
+          },
+        },
+      },
+    };
+  });
+  const { AuthenticationError } = await import('../src/service/auth.js');
+  const app = await createServer({
+    management: f.service,
+    authenticate: async (header) => {
+      if (!header) throw new AuthenticationError(401);
+      return header === 'Bearer operator'
+        ? operator
+        : { ...operator, clientId: 'application' };
+    },
+  });
+  try {
+    for (const url of [
+      '/v1/provider/users',
+      '/v1/provider/users/' + profiles[0].id,
+    ]) {
+      expect((await app.inject({ url })).statusCode).toBe(401);
+      expect(
+        (
+          await app.inject({
+            url,
+            headers: { authorization: 'Bearer application' },
+          })
+        ).statusCode,
+      ).toBe(403);
+    }
+    const get = (url: string) =>
+      app.inject({ url, headers: { authorization: 'Bearer operator' } });
+    const first = await get('/v1/provider/users?limit=2');
+    expect(first.statusCode).toBe(200);
+    expect(first.headers['cache-control']).toBe('no-store');
+    expect(first.json().users.map((u: { id: string }) => u.id)).toEqual(
+      profiles.slice(0, 2).map((p) => p.id),
+    );
+    expect(first.body).not.toContain('fields');
+    expect(first.body).not.toContain('private-evidence-hash');
+    const last = await get(
+      '/v1/provider/users?limit=2&after=' + first.json().next_cursor,
+    );
+    expect(last.json()).toMatchObject({
+      users: [{ id: profiles[2].id }],
+      next_cursor: null,
+    });
+    expect(
+      (
+        await get('/v1/provider/users?application_id=' + profiles[1].clientId)
+      ).json().users,
+    ).toHaveLength(1);
+    expect(
+      (await get('/v1/provider/users?application_id=unknown')).json(),
+    ).toEqual({ users: [], next_cursor: null });
+    for (const query of ['limit=0', 'limit=101', 'after=invalid'])
+      expect((await get('/v1/provider/users?' + query)).statusCode).toBe(400);
+    for (const [index, role] of ['owner', 'owner', 'member'].entries()) {
+      const detail = await get('/v1/provider/users/' + profiles[index].id);
+      expect(detail.statusCode).toBe(200);
+      expect(detail.json()).toMatchObject({
+        user_id: 'same-user',
+        application_id: profiles[index].clientId,
+        kyc: { source: 'application_attestation', fields: { country: 'ZA' } },
+        wallets: [{ account_id: accountId, role, status: 'suspended' }],
+      });
+      expect(detail.body).not.toContain('evidenceHash');
+    }
+    await f.store.transaction((state) => {
+      state.accounts[accountId].members![profiles[2].id].state = 'removed';
+    });
+    expect(
+      (await get('/v1/provider/users/' + profiles[2].id)).json().wallets,
+    ).toEqual([]);
+    expect((await get('/v1/provider/users/' + '0'.repeat(64))).statusCode).toBe(
+      404,
+    );
+    expect((await get('/v1/provider/users/bad')).statusCode).toBe(400);
+    await f.store.transaction((state) => {
+      state.management!.provider.identities[operator.clientId].enabled = false;
+    });
+    expect((await get('/v1/provider/users')).statusCode).toBe(403);
+  } finally {
+    await app.close();
+  }
+});
+
+it('preserves missing-user responses and detached directory records with SQLite storage', async () => {
+  const { mkdtemp, rm } = await import('node:fs/promises');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const { openProviderDatabase } = await import('../src/storage/index.js');
+  const f = await fixture();
+  const directory = await mkdtemp(join(tmpdir(), 'wpk-user-directory-'));
+  const db = openProviderDatabase({ directory, initialize: true });
+  const service = new ManagementService(
+    db.onboardingStore,
+    () => db.managementSnapshot(),
+    f.config.oauth.issuer,
+    f.config.policy,
+  );
+  try {
+    const claim = randomBytes(48).toString('base64url'),
+      secret = password();
+    await service.initialize(claim);
+    await service.claim({ claim, username: 'admin', password: secret });
+    const principal = await service.verifyCredentials(
+      'operator-admin',
+      secret,
+      managementScopes,
+    );
+    await expect(service.user(principal, '0'.repeat(64))).rejects.toMatchObject(
+      { statusCode: 404 },
+    );
+    expect(await service.users(principal)).toEqual({
+      users: [],
+      next_cursor: null,
+    });
+    await db.onboardingStore.transaction((s) => {
+      s.verifiedUsers = {
+        ['a'.repeat(64)]: {
+          id: 'a'.repeat(64),
+          issuer: principal.issuer,
+          clientId: 'offline-app',
+          userId: 'offline-user',
+          identity: {
+            reference: 'offline-check',
+            level: 'verified',
+            verified_at: '2026-01-01T00:00:00.000Z',
+            fields: { country: 'ZA' },
+          },
+          evidenceHash: 'offline-hash',
+          acceptedUntil: 1,
+          revision: 'offline-policy',
+        },
+      };
+    });
+    const detail = await service.user(principal, 'a'.repeat(64));
+    expect(detail).toMatchObject({
+      kyc: { fields: { country: 'ZA' } },
+      wallets: [],
+    });
+    detail.kyc.fields.country = 'changed';
+    expect(
+      (await service.user(principal, 'a'.repeat(64))).kyc.fields.country,
+    ).toBe('ZA');
+    expect((await service.users(principal)).users).toHaveLength(1);
+    expect(await db.ready()).toBe(true);
+  } finally {
+    db.close();
+    await rm(directory, { recursive: true, force: true });
+  }
+});

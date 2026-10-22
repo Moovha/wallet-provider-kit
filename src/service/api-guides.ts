@@ -86,6 +86,8 @@ export const apiOperationOrder = [
   'listWalletBatches',
   'claimProviderInstallation',
   'readProviderStatus',
+  'listProviderUsers',
+  'readProviderUser',
   'listProviderIdentities',
   'createProviderIdentity',
   'readProviderUserChecks',
@@ -199,6 +201,35 @@ export const operationGuides: Record<string, OperationGuide> = {
       '200: member settings and their revisions. Invitations do not grant account or spending access. Removing or changing a member invalidates their previous grants. The provider signer and on-chain owner threshold are unchanged; issued signatures remain subject to their on-chain validity.',
   },
 
+  listProviderUsers: {
+    title: 'Browse provider users',
+    group: 'Service administration',
+    audience: 'Provider operator',
+    management: true,
+    scope: 'provider:manage',
+    purpose:
+      'Browse stored application-scoped users and their KYC evidence summaries.',
+    whenToUse:
+      'Use when building a provider user directory or reviewing users registered through application-led access.',
+    prerequisite:
+      'Authenticate as a current administrator or management tool. Use limit (1–100, default 25), optional application_id and next_cursor as after for the next page. Keep filters unchanged between pages. Concurrent changes are not a snapshot.',
+    success:
+      '200: users and next_cursor, or null at the end. Each application user remains distinct; expired evidence remains visible. Hosted compatibility identities are excluded. This read does not establish current wallet or spending authority.',
+  },
+  readProviderUser: {
+    title: 'Review a user’s KYC and wallets',
+    group: 'Service administration',
+    audience: 'Provider operator',
+    management: true,
+    scope: 'provider:manage',
+    purpose:
+      'Read an application-scoped user’s stored identity information and associated wallets.',
+    whenToUse: 'Use after selecting a provider user ID from the directory.',
+    prerequisite:
+      'Authenticate as a current administrator or management tool. Use the directory id, not the application user_id. Treat identity fields and wallet addresses as private customer data.',
+    success:
+      '200: application-attested KYC evidence and owned, linked, invited or active member wallets, including suspended accounts. Removed memberships are omitted. Stored evidence is not a fresh KYC decision or wallet authorization. Unknown IDs return 404.',
+  },
   readProviderUserChecks: {
     title: 'See required user information',
     group: 'Service administration',

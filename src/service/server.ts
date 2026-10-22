@@ -288,10 +288,11 @@ export async function createServer(options: ServerOptions = {}) {
       error &&
       'statusCode' in error &&
       typeof error.statusCode === 'number' &&
-      [400, 413, 415, 429, 503].includes(error.statusCode)
+      [400, 404, 413, 415, 429, 503].includes(error.statusCode)
     ) {
       status = error.statusCode;
       code = 'invalid_request';
+      if (status === 404) code = 'not_found';
       if (status === 503) code = 'service_unavailable';
       if (status === 429) code = 'rate_limited';
     }

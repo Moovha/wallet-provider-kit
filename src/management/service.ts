@@ -5,6 +5,7 @@ import {
   scryptSync,
   timingSafeEqual,
 } from 'node:crypto';
+import { walletDescription } from '../onboarding/wallets.js';
 import type { VerifiedPrincipal } from '../domain/principal.js';
 import type {
   ApplicationPolicy,
@@ -178,6 +179,96 @@ export class ManagementService {
   }
   currentPrincipal(principal: VerifiedPrincipal) {
     this.identity(principal);
+  }
+  async users(
+    principal: VerifiedPrincipal,
+    input: { limit?: number; after?: string; application_id?: string } = {},
+  ) {
+    const limit = input.limit ?? 25;
+    if (
+      !Number.isInteger(limit) ||
+      limit < 1 ||
+      limit > 100 ||
+      (input.after !== undefined && !/^[a-f0-9]{64}$/.test(input.after)) ||
+      (input.application_id !== undefined && !text(input.application_id))
+    )
+      invalid();
+    return this.store.transaction((state) => {
+      this.assertOperator(principal, this.state(state));
+      const ids = Object.keys(state.verifiedUsers ?? {})
+        .sort()
+        .filter(
+          (id) =>
+            (!input.after || id > input.after) &&
+            (!input.application_id ||
+              state.verifiedUsers![id].clientId === input.application_id),
+        );
+      const page = ids.slice(0, limit);
+      return {
+        users: page.map((id) => this.userSummary(state.verifiedUsers![id])),
+        next_cursor: ids.length > limit ? page.at(-1)! : null,
+      };
+    });
+  }
+  private userSummary(
+    user: import('../onboarding/types.js').VerifiedUserRecord,
+  ) {
+    return {
+      id: user.id,
+      application_id: user.clientId,
+      issuer: user.issuer,
+      user_id: user.userId,
+      kyc: {
+        source: 'application_attestation' as const,
+        level: user.identity.level,
+        verified_at: user.identity.verified_at,
+        accepted_until: new Date(user.acceptedUntil).toISOString(),
+      },
+    };
+  }
+  async user(principal: VerifiedPrincipal, id: string) {
+    if (!/^[a-f0-9]{64}$/.test(id)) invalid();
+    const result = await this.store.transaction((state) => {
+      this.assertOperator(principal, this.state(state));
+      const user = state.verifiedUsers?.[id];
+      if (!user) return null;
+      return {
+        ...this.userSummary(user),
+        kyc: {
+          ...this.userSummary(user).kyc,
+          reference: user.identity.reference,
+          fields: { ...user.identity.fields },
+        },
+        wallets: Object.values(state.accounts ?? {})
+          .flatMap((account) => {
+            const member = account.members?.[id];
+            const role =
+              account.owner === id || account.linkedOwners?.includes(id)
+                ? 'owner'
+                : member && member.state !== 'removed'
+                  ? 'member'
+                  : undefined;
+            return role
+              ? [
+                  {
+                    account_id: account.id,
+                    wallet: walletDescription(account),
+                    role,
+                    status: account.status,
+                    address: account.address,
+                    ...(role === 'member'
+                      ? { membership_state: member!.state }
+                      : {}),
+                  },
+                ]
+              : [];
+          })
+          .sort((a, b) => a.account_id.localeCompare(b.account_id)),
+      };
+    });
+    if (!result)
+      throw Object.assign(new Error('Not found'), { statusCode: 404 });
+    return result;
   }
   applications(): ApplicationPolicy[] {
     return Object.values(this.snapshot()?.identities ?? {})

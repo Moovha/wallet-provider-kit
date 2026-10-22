@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Add protected provider user detail and cursor-paginated directory endpoints for
+  stored application-attested KYC evidence and associated wallets. Records remain
+  application-scoped; directory reads grant no wallet or transaction authority.
+
 - Stop queued wallet requests after their grant loses authority and before a
   financial action is admitted. Preserve recovery of any concurrently admitted
   action instead of retrying revoked access.
