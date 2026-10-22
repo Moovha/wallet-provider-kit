@@ -219,6 +219,7 @@ async function refreshApplications() {
         'redis-key-prefix': 'safe-wallet-' + config.applicationId,
         'mempool-pop-batch-size': 10,
         'max-bundle-count': 1,
+        'max-resubmits': 3,
         'max-gas-per-bundle': '6000000',
         'max-gas-per-user-op': '1000000',
         'mempool-max-queued-ops': 10,

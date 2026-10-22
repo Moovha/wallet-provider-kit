@@ -7131,6 +7131,30 @@
                       "type": "string",
                       "enum": ["unprovisioned", "needs-funding", "provisioned"]
                     },
+                    "execution_funding": {
+                      "type": "object",
+                      "description": "Most recent background check of network fee balances and refill constraints. This observation does not authorize spending and expires after 30 seconds.",
+                      "additionalProperties": false,
+                      "required": ["status", "message"],
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "checking",
+                            "ready",
+                            "replenishing",
+                            "needs-funding",
+                            "limit-reached",
+                            "unavailable"
+                          ]
+                        },
+                        "message": { "type": "string" },
+                        "checked_at": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      }
+                    },
                     "funding_address": { "type": "string" },
                     "paymaster": { "type": "string" }
                   }

@@ -5246,6 +5246,14 @@ export interface operations {
                         profile: "safe-only-4337-v1";
                         /** @enum {string} */
                         status: "unprovisioned" | "needs-funding" | "provisioned";
+                        /** @description Most recent background check of network fee balances and refill constraints. This observation does not authorize spending and expires after 30 seconds. */
+                        execution_funding?: {
+                            /** @enum {string} */
+                            status: "checking" | "ready" | "replenishing" | "needs-funding" | "limit-reached" | "unavailable";
+                            message: string;
+                            /** Format: date-time */
+                            checked_at?: string;
+                        };
                         funding_address?: string;
                         paymaster?: string;
                     };

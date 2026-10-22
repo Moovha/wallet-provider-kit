@@ -1,4 +1,10 @@
 import {
+  infrastructureFundingPlan,
+  fundingMessages,
+  InfrastructureFundingUnavailable,
+  type FundingObservation,
+} from './infrastructure-funding.js';
+import {
   createSafeRecoveryManifest,
   predictSafeAddress,
   type SafeRecoveryManifest,
@@ -170,6 +176,7 @@ const pending = () =>
 export class SafeWalletRuntime {
   private readonly locks = new Map<string, Promise<unknown>>();
   private readonly drivers = new Map<string, UserOperationWalletCallsDriver>();
+  private readonly fundingObservations = new Map<string, FundingObservation>();
   private walletTimer?: ReturnType<typeof setTimeout>;
   private walletWakeAt = Infinity;
   private walletTick?: Promise<void>;
@@ -553,6 +560,7 @@ export class SafeWalletRuntime {
         application_id: applicationId,
         chain_id: this.network.caip,
         profile: 'safe-only-4337-v1',
+        execution_funding: this.fundingObservation(applicationId),
         status: infrastructure?.paymaster
           ? 'provisioned'
           : infrastructure
@@ -600,7 +608,7 @@ export class SafeWalletRuntime {
         spent + reserved >
         BigInt(this.config.safeWallet!.maximumSetupCostWei)
       )
-        deny();
+        throw new InfrastructureFundingUnavailable('limit-reached');
       const inflight = infra.transactions.filter((t) => !t.included);
       const limit = agreement.maximum_in_flight_per_sponsor ?? 10;
       if (
@@ -613,7 +621,7 @@ export class SafeWalletRuntime {
         0n,
       );
       if (BigInt(String(balance)) < held + reserved)
-        throw new WalletProviderError('wallet_provider_unavailable');
+        throw new InfrastructureFundingUnavailable('needs-funding');
       const observed = BigInt(String(pendingNonce));
       const tail = infra.transactions.reduce(
         (n, t) => Math.max(n, t.nonce + 1),
@@ -977,7 +985,38 @@ export class SafeWalletRuntime {
     }
   }
 
+  private fundingObservation(applicationId: string): FundingObservation {
+    const saved = this.fundingObservations.get(applicationId);
+    return saved?.checked_at &&
+      Date.now() - Date.parse(saved.checked_at) <= 30000
+      ? structuredClone(saved)
+      : { status: 'checking', message: fundingMessages.checking };
+  }
+  private fundingObserved(
+    applicationId: string,
+    status: FundingObservation['status'],
+  ) {
+    this.fundingObservations.set(applicationId, {
+      status,
+      message: fundingMessages[status],
+      checked_at: new Date().toISOString(),
+    });
+  }
   private async replenish(applicationId: string) {
+    try {
+      await this.replenishBalances(applicationId);
+      this.fundingObserved(applicationId, 'ready');
+    } catch (error) {
+      this.fundingObserved(
+        applicationId,
+        error instanceof InfrastructureFundingUnavailable
+          ? error.reason
+          : 'unavailable',
+      );
+      throw error;
+    }
+  }
+  private async replenishBalances(applicationId: string) {
     await this.recoverSetup(applicationId);
     let infrastructure = await this.current(applicationId);
     const reader = await this.reader(applicationId);
@@ -1013,7 +1052,38 @@ export class SafeWalletRuntime {
         ]),
       ),
     )[0] as bigint;
+    const executorBalance = BigInt(
+      String(
+        await reader.call('eth_getBalance', [
+          infrastructure.executor.address,
+          'latest',
+        ]),
+      ),
+    );
     const target = BigInt(this.config.safeWallet!.paymasterDepositWei);
+    const executorTarget = BigInt(this.config.safeWallet!.executorBalanceWei);
+    if (deposit >= target && executorBalance >= executorTarget) return;
+    const fundingBalance = await reader.call('eth_getBalance', [
+      infrastructure.fundingAddress,
+      'pending',
+    ]);
+    const remaining =
+      BigInt(this.config.safeWallet!.maximumSetupCostWei) -
+      infrastructure.transactions.reduce(
+        (sum, t) => sum + BigInt(t.maximumCostWei),
+        0n,
+      );
+    const plan = infrastructureFundingPlan({
+      deposit,
+      depositTarget: BigInt(this.config.safeWallet!.paymasterDepositWei),
+      executor: BigInt(String(executorBalance)),
+      executorTarget: BigInt(this.config.safeWallet!.executorBalanceWei),
+      funding: BigInt(String(fundingBalance)),
+      allowance: remaining > 0n ? remaining : 0n,
+    });
+    this.fundingObserved(applicationId, plan.status);
+    if (plan.status === 'needs-funding' || plan.status === 'limit-reached')
+      throw new InfrastructureFundingUnavailable(plan.status);
     if (deposit < target)
       await this.send(
         applicationId,
@@ -1027,15 +1097,18 @@ export class SafeWalletRuntime {
           value: (target - deposit).toString(),
         },
       );
-    const balance = BigInt(
-      String(
-        await reader.call('eth_getBalance', [
-          infrastructure.executor.address,
-          'latest',
-        ]),
-      ),
-    );
-    const executorTarget = BigInt(this.config.safeWallet!.executorBalanceWei);
+    // A deposit transaction can take several blocks while the executor spends.
+    const balance =
+      deposit < target
+        ? BigInt(
+            String(
+              await reader.call('eth_getBalance', [
+                infrastructure.executor.address,
+                'latest',
+              ]),
+            ),
+          )
+        : executorBalance;
     if (balance < executorTarget)
       await this.send(
         applicationId,
@@ -2074,10 +2147,15 @@ export class SafeWalletRuntime {
           Object.keys(r.safeWalletInfrastructure ?? {}),
         )
           .then(async (ids) => {
-            for (const id of ids)
-              await this.exclusive(id, async () => {
-                await this.replenish(id);
-              });
+            for (const id of ids) {
+              try {
+                await this.exclusive(id, async () => {
+                  await this.replenish(id);
+                });
+              } catch {
+                /* Each application's funding observation retains its own failure. */
+              }
+            }
           })
           .catch(() => undefined)
           .finally(() => {

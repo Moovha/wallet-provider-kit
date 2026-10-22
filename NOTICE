@@ -24,7 +24,8 @@ see dist/setup-ui/PROVIDER_ASSETS.txt for official sources.
 The optional private bundler runtime uses Pimlico Alto v1.2.8, source revision
 37cade5d2804a60ab30362ea27054514e1d7a7c8, under GPL-3.0. Its pinned container
 retains upstream sources, contract artifacts and license material. It operates
-as a separate process. The scheduler modification is Copyright 2026 Moovha and
-contributors and is distributed under GPL-3.0 with the modified Alto source
-and reproducible patch script in the bundler image.
+as a separate process. The scheduler and funding selection modifications are
+Copyright 2026 Moovha and contributors and are distributed under GPL-3.0 with
+the modified Alto source, reproducible patch script and funding helper in
+the bundler image.
 See https://github.com/pimlicolabs/alto/tree/37cade5d2804a60ab30362ea27054514e1d7a7c8.

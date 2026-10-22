@@ -208,6 +208,10 @@ export default defineConfig({
             link: '/docs/user-operation-execution',
           },
           {
+            text: 'Execution performance design',
+            link: '/docs/execution-performance-design',
+          },
+          {
             text: 'Signature boundaries',
             link: '/docs/durable-safe-op-signing',
           },

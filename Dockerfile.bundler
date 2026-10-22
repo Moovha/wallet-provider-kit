@@ -3,6 +3,8 @@ FROM ghcr.io/pimlicolabs/alto@sha256:f2661042aadefc6a4fc9c5826a14404f574c7ef2de7
 COPY scripts/bundled-bundler-launcher.mjs /app/wpk-bundler-launcher.mjs
 COPY scripts/bundler-rpc.mjs /app/wpk-bundler-rpc.mjs
 COPY scripts/bundler-simulations.mjs /app/wpk-bundler-simulations.mjs
+COPY scripts/bundler-funding.mjs /app/wpk-bundler-funding.mjs
+COPY scripts/bundler-funding.d.mts /app/wpk-bundler-funding.d.mts
 COPY scripts/patch-bundler-scheduling.mjs /app/wpk-patch-bundler-scheduling.mjs
 RUN node /app/wpk-patch-bundler-scheduling.mjs
 ENTRYPOINT ["node", "/app/wpk-bundler-launcher.mjs"]

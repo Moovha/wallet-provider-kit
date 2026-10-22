@@ -122,6 +122,18 @@ try {
   ]);
   await docker(['build', 'bundler'], 10 * 60 * 1000);
   await docker([
+    'run',
+    '--rm',
+    '--no-deps',
+    '--volume',
+    fileURLToPath(new URL('./check-bundler-funding.mjs', import.meta.url)) +
+      ':/check.mjs:ro',
+    '--entrypoint',
+    'node',
+    'bundler',
+    '/check.mjs',
+  ]);
+  await docker([
     'up',
     '--detach',
     '--wait',
