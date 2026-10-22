@@ -16,8 +16,10 @@ import {
 } from '../deployment/config.js';
 import { managementScopes, ManagementService } from './service.js';
 import { applicationScopes } from '../deployment/authorization-contract.js';
+import { createCognitoAdministration } from './cognito.js';
+import type { VerifiedPrincipal } from '../domain/principal.js';
 
-/** Client-credentials issuer for current durable registrations; no public registration or browser authorization flow. */
+/** Local credentials and optional Cognito sign-in use the current durable registrations. */
 export async function createManagementAuthorizationServer(
   config: ProviderConfiguration,
   service: ManagementService,
@@ -71,22 +73,7 @@ export async function createManagementAuthorizationServer(
     }
     return current;
   };
-  const token = async (id: string, secret: string, scope: string) => {
-    let principal;
-    try {
-      principal = await service.verifyCredentials(
-        id,
-        secret,
-        scope.split(' ').filter(Boolean),
-      );
-    } catch (error) {
-      if (
-        error instanceof WalletProviderError &&
-        error.code === 'wallet_provider_input'
-      )
-        throw error;
-      throw new AuthenticationError(401);
-    }
+  const issue = async (principal: VerifiedPrincipal) => {
     const access_token = await new SignJWT({
       client_id: principal.clientId,
       scope: principal.scopes.join(' '),
@@ -107,9 +94,42 @@ export async function createManagementAuthorizationServer(
       scope: principal.scopes.join(' '),
     };
   };
+  const token = async (id: string, secret: string, scope: string) => {
+    let principal;
+    try {
+      principal = await service.verifyCredentials(
+        id,
+        secret,
+        scope.split(' ').filter(Boolean),
+      );
+    } catch (error) {
+      if (
+        error instanceof WalletProviderError &&
+        error.code === 'wallet_provider_input'
+      )
+        throw error;
+      throw new AuthenticationError(401);
+    }
+    return issue(principal);
+  };
+  const cognito = config.management?.cognito
+    ? createCognitoAdministration(
+        config.management.cognito,
+        config.policy.provider.origin,
+        service,
+        issue,
+      )
+    : undefined;
   return {
     authenticate,
     register(app: FastifyInstance) {
+      if (cognito) cognito.register(app);
+      else
+        app.get(
+          '/admin/auth/options',
+          { schema: { hide: true } },
+          async () => ({ cognito: false }),
+        );
       app.get('/oauth/jwks', { schema: { hide: true } }, async () => ({
         keys: [publicKey],
       }));

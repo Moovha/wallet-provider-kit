@@ -39,6 +39,7 @@ export interface ManagedIdentity {
   credentialRevision: number;
   salt: string;
   verifier: string;
+  federation?: { issuer: string; subject: string };
   scopes: string[];
   policy?: ApplicationPolicy;
 }
@@ -69,6 +70,7 @@ const conflict = (): never => {
 export const publicIdentity = ({
   salt: _salt,
   verifier: _verifier,
+  federation: _federation,
   ...value
 }: ManagedIdentity) => value;
 
@@ -552,6 +554,7 @@ export class ManagementService {
       if (
         !state.claimed ||
         !current?.enabled ||
+        current.federation !== undefined ||
         current.verifier !== candidate?.verifier ||
         !equal(verifier, current.verifier)
       )
@@ -563,6 +566,69 @@ export class ManagementService {
         clientId: id,
         scopes,
         credentialRevision: current.credentialRevision,
+      } satisfies VerifiedPrincipal;
+    });
+  }
+  /** Called only after the configured external identity provider authenticates an approved administrator. */
+  async federatedAdministrator(
+    issuer: string,
+    subject: string,
+    bootstrap: boolean,
+  ) {
+    if (!text(issuer, 512) || !text(subject, 256)) deny();
+    const id =
+      'operator-cognito-' +
+      hash(JSON.stringify([issuer, subject])).slice(0, 32);
+    return this.store.transaction((s) => {
+      const state = this.state(s);
+      if (!state.claimed && !bootstrap) deny();
+      let identity = state.identities[id];
+      if (
+        identity &&
+        (!identity.enabled ||
+          identity.federation?.issuer !== issuer ||
+          identity.federation.subject !== subject)
+      )
+        deny();
+      if (!identity) {
+        if (Object.keys(state.identities).length >= 100) deny();
+        identity = {
+          id,
+          name: 'Cognito administrator',
+          role: 'administrator',
+          enabled: true,
+          revision: 1,
+          credentialRevision: 1,
+          salt: '',
+          verifier: '',
+          federation: { issuer, subject },
+          scopes: [...managementScopes],
+        };
+        state.identities[id] = identity;
+        s.audit.push({
+          at: this.now(),
+          event: 'federated_administrator_registered',
+          resource: hash(id),
+          revision: '1',
+        });
+      }
+      if (!state.claimed) {
+        state.claimed = true;
+        state.claimHash = '';
+        state.claimExpiresAt = 0;
+        s.audit.push({
+          at: this.now(),
+          event: 'installation_claimed',
+          resource: hash(id),
+          revision: '1',
+        });
+      }
+      return {
+        issuer: this.issuer,
+        subject: id,
+        clientId: id,
+        scopes: [...managementScopes],
+        credentialRevision: identity.credentialRevision,
       } satisfies VerifiedPrincipal;
     });
   }
@@ -692,6 +758,7 @@ export class ManagementService {
         const previousGrantAuthority = grantAuthority(),
           previousTokenAuthority = tokenAuthority();
         if (operation === 'rotate') {
+          if (identity.federation) invalid();
           Object.assign(identity, credential);
           identity.credentialRevision++;
         } else {

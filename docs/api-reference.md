@@ -2697,6 +2697,7 @@ export interface ProviderConfiguration {
   management?: {
     claim: SecretReference;
     localOrigin?: string;
+    cognito?: import('../management/cognito.js').CognitoConfiguration;
   };
   safeWallet?: import('../sponsorship/safe-wallet.js').SafeWalletConfiguration;
   network?: ProviderNetwork;

@@ -25,9 +25,9 @@ The service uses one active host. Cloud deployment requires verified persistence
 DNS, HTTPS, backup/recovery and backend acceptance. Installation does not authorize
 funds or establish production custody readiness. npm publication is disabled.
 
-For private backend acceptance testing on Ubuntu, the optional `setup-vpn.sh`
-configures one WireGuard backend peer and private DNS. Run it as the host
-administrator with `WPK_VPN_DOMAIN` and `WPK_VPN_CLIENT_PUBLIC_KEY`. Private keys
-stay on their respective hosts. End-user devices connect to the application
-backend and do not receive this profile. Review the firewall and peer routing
-before enabling the listener; the script refuses to replace existing VPN state.
+The optional `aws-cognito.json` template prepares Cognito managed sign-in for
+provider administrators. It requires authenticator-app MFA and explicit approval
+group membership. Configure its directory and client outputs under
+`management.cognito`; see the installation guide for first-time setup, revocation
+and host recovery. This directory is separate from end-user wallets and AWS
+console identities. Deploying the template alone does not authorize an administrator.

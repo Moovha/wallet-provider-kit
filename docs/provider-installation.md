@@ -110,6 +110,80 @@ Sign in again after reloading or when your session expires. The console keeps
 its short-lived access token only in page memory. Protect the console, management
 API and API explorer with the same access controls.
 
+### Sign in with Amazon Cognito
+
+For AWS installations, you can use an approved Cognito administrator account
+instead of maintaining another provider password. Cognito hosts password changes,
+multi-factor authentication and account recovery. This is separate from signing
+in to the AWS Management Console; it does not give administrators AWS credentials.
+The provider's approved-network restriction still applies after sign-in.
+
+Your infrastructure operator can deploy the optional bundle template
+`aws-cognito.json` (`packaging/aws-cognito.json` in source) in the provider's
+selected Region. Supply the existing `ProviderHostname` and a unique
+`DomainPrefix`. It creates a dedicated directory with public self-registration
+disabled, required authenticator-app MFA, a managed login page and an approval
+group named `ProviderAdministrators`. Review [Cognito pricing](https://aws.amazon.com/cognito/pricing/)
+and retain the directory during recovery or stack replacement.
+
+Create each approved administrator in that directory and add them to the
+approval group through authenticated AWS administration. Send invitations only
+to addresses approved by your organization. Each person completes their own
+password and authenticator setup on Cognito's hosted page. If their email is not
+yet verified, the provider shows a verification step before granting any
+administration session. The person requests and enters Cognito's email code,
+then signs in again to continue.
+Creating a directory user or matching an email address alone does not grant
+provider access.
+
+Add the template outputs to the private provider configuration, then restart
+the API with its existing data and secrets:
+
+```json
+{
+  "management": {
+    "claim": { "env": "WPK_INSTALLATION_CLAIM" },
+    "cognito": {
+      "userPoolId": "eu-north-1_Example",
+      "clientId": "exampleclientid",
+      "domain": "https://example-admin.auth.eu-north-1.amazoncognito.com",
+      "administratorGroup": "ProviderAdministrators",
+      "bootstrap": true
+    }
+  }
+}
+```
+
+This is a fragment of the complete configuration. Open `/admin/` and choose
+**Sign in with Amazon Cognito**. With `bootstrap: true`, the first verified member
+of the approved group can establish administration without copying a setup code.
+That setting is an explicit host authorization for the configured directory and
+group. Omit it or set it to `false` if administration must first be claimed through
+the private setup code. A claimed installation is never reopened, and a locally
+suspended administrator cannot regain access simply by signing in again.
+
+The integration uses authorization code flow with PKCE, browser-bound single-use
+state, a nonce and signature validation against the configured directory. The
+public app client has no secret; it must allow only the exact callback
+`https://<provider-hostname>/admin/auth/callback` and logout address
+`https://<provider-hostname>/admin/`, with ID tokens lasting five minutes.
+Provider tokens stay in page memory for five minutes; refresh tokens are discarded.
+The `aws.cognito.signin.user.admin` scope permits only the signed-in person's
+Cognito profile operations and is used for email verification; it is not an IAM
+permission or provider administrator approval. Unverified accounts receive no
+provider token. Their verification access token stays in server memory and expires after five
+minutes.
+Removing directory group membership prevents new provider sessions. An already
+issued provider token can remain usable for up to five minutes; suspend its local
+administrator identity through the protected management API for immediate denial.
+Sign out ends the page session and redirects to Cognito logout. A copied provider
+token remains subject to its short expiry and current local permissions.
+
+Preserve a reviewed host-access recovery path. Local administrator credentials
+continue to work when configured, and [host recovery](#recover-an-interrupted-or-expired-setup)
+does not depend on Cognito availability. Neither Cognito sign-in nor successful
+bootstrap enables wallet execution or authorizes spending.
+
 ## Connect an application after installation
 
 You can stop here until an application is ready. When it is, follow
@@ -240,7 +314,7 @@ uses an external DNS provider.
    follow your DNS provider's naming convention.
 3. Wait until public DNS resolves the hostname to that address. Allow inbound
    TCP port 80 for certificate validation and port 443 only from approved
-   backend addresses or a VPN connection through the host and AWS firewalls. The bundled Caddy
+   backend and operator networks through the host and AWS firewalls. The bundled Caddy
    gateway requests a public TLS certificate and retries while DNS is becoming
    available. Certificate issuance exposes the hostname in public certificate
    transparency logs.
@@ -284,44 +358,18 @@ provider or create administrator credentials.
 ### Restrict acceptance network access
 
 User devices communicate with the connected application's backend. That backend
-calls the wallet provider; user devices do not need a direct provider connection
-or a VPN profile. Treat a local development backend as a backend caller when
-testing from a developer computer.
+calls the wallet provider. Limit provider HTTPS and administration to approved
+backend and operator networks through your organization's access controls.
 
-Set `HTTPSAllowedCIDR` to the approved backend's public egress IPv4 range.
-The default loopback range denies remote HTTPS. The firewall keeps the API,
-bundler and storage ports private. Port 80 remains public for certificate
+Set `HTTPSAllowedCIDR` to an approved backend's public egress IPv4 range when
+using direct network admission. The default loopback range denies remote HTTPS.
+Keep API, bundler and storage ports private. Port 80 remains public for certificate
 validation and HTTPS redirects; verify it does not return provider API content.
 
-For a private backend connection, `EnableVPN=true` opens UDP 51820 for
-WireGuard's authenticated listener. This setting alone does not configure peers.
-On the prepared Ubuntu host, run the bundle's reviewed `setup-vpn.sh`
-(`packaging/setup-vpn.sh` in source) as the
-host administrator, supplying `WPK_VPN_DOMAIN` and the development host's
-`WPK_VPN_CLIENT_PUBLIC_KEY`. Generate and retain each private key on its own
-host; never pass private keys as template parameters or command output. The
-script refuses to replace an existing VPN configuration.
-
-The supplied single-peer setup uses provider address `10.66.0.1` and backend
-address `10.66.0.2`. The backend's WireGuard profile routes only `10.66.0.1/32`.
-Configure DNS for the provider hostname only; general DNS must remain independent
-of the provider host, including during maintenance. Private DNS resolves the provider hostname to
-`10.66.0.1`, preserving normal hostname and HTTPS certificate validation.
-The host firewall allows the peer's provider HTTPS and DNS traffic and blocks
-forwarding into the rest of the network. Use separate reviewed peer addresses
-and rules for additional backend hosts; do not distribute one peer key to users.
-On macOS, use a private profile without a `DNS=` line and run
-`connect-development-vpn.sh /absolute/path/profile.conf your-provider-hostname`
-with `sudo`. It creates a provider-only resolver under `/etc/resolver/`, so
-stopping the provider does not prevent AWS management or other DNS lookups.
-Disconnect with `wg-quick down /absolute/path/profile.conf`. A retained
-provider-only resolver keeps that hostname private while disconnected; remove
-only that resolver file if you intentionally return to public provider DNS.
-Operator administration also requires an approved source or private connection.
-
-Verify both an approved connection and a denied unapproved connection before
-onboarding applications. VPN admission does not replace API authentication,
-application trust or wallet-authority checks.
+Verify both approved and denied connections before onboarding applications.
+Network admission does not replace API authentication, application trust or
+wallet-authority checks. Keep deployment-specific network procedures in your
+private operational runbook.
 
 Keep wallet operations disabled during DNS, HTTPS and administrator setup. A
 working management endpoint does not establish wallet-execution readiness.
