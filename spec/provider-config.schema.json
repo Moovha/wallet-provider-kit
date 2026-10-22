@@ -1474,7 +1474,7 @@
     "network": {
       "type": "string",
       "enum": ["base", "base-sepolia", "ethereum-sepolia"],
-      "description": "Server-selected network. Omission preserves Base Sepolia. Use separate storage for each network."
+      "description": "Default network for existing integrations. Omission preserves Base Sepolia. Additional networks share verified identity and keep wallets, consent, execution and funding separate."
     },
     "safeProvisioning": {
       "type": "object",
@@ -1624,6 +1624,33 @@
           "type": "string",
           "maxLength": 100,
           "pattern": "^http://127\\.0\\.0\\.1(:[0-9]{1,5})?$"
+        }
+      }
+    },
+    "additionalNetworks": {
+      "type": "array",
+      "maxItems": 2,
+      "description": "Additional networks in this instance. Each starts disabled with separate transaction rules and funding.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["network"],
+        "properties": {
+          "network": {
+            "$ref": "#/properties/network"
+          },
+          "safeWallet": {
+            "$ref": "#/properties/safeWallet"
+          },
+          "safeProvisioning": {
+            "$ref": "#/properties/safeProvisioning"
+          },
+          "approvedCalls": {
+            "$ref": "#/properties/approvedCalls"
+          },
+          "activation": {
+            "$ref": "#/properties/activation"
+          }
         }
       }
     }

@@ -724,6 +724,7 @@ export class SafeWalletRuntime {
       this.config.policy.provider.origin,
       application.issuer,
       application.clientId,
+      this.database.networkScope,
     );
     await this.database.setBudget(
       budgetId,
@@ -1745,6 +1746,15 @@ export class SafeWalletRuntime {
       this.writeBundler(applicationId),
     );
   }
+  private bundlerApplicationId(applicationId: string) {
+    return this.database.networkScope
+      ? fingerprint([
+          'network-bundler-v1',
+          this.database.networkScope,
+          applicationId,
+        ])
+      : applicationId;
+  }
   private async writeBundler(applicationId: string) {
     const infrastructure = await this.current(applicationId),
       urls = await this.resources.rpcEndpoints(applicationId);
@@ -1768,11 +1778,14 @@ export class SafeWalletRuntime {
       this.config.safeWallet!.runtimeDirectory,
     );
     await mkdir(root, { recursive: true, mode: 0o700 });
-    const path = resolve(root, applicationId + '.json');
+    const path = resolve(
+      root,
+      this.bundlerApplicationId(applicationId) + '.json',
+    );
     await writeFile(
       path + '.tmp',
       JSON.stringify({
-        applicationId,
+        applicationId: this.bundlerApplicationId(applicationId),
         authorization: this.authorization,
         entryPoint: this.domain.entryPoint,
         paymaster: infrastructure.paymaster!.address,
@@ -1788,9 +1801,15 @@ export class SafeWalletRuntime {
   }
   private transport(applicationId: string): typeof fetch {
     return (async (url, init) => {
-      if (String(url) !== internalBundler + '/rpc/' + applicationId)
+      if (
+        String(url) !==
+        internalBundler + '/rpc/' + this.bundlerApplicationId(applicationId)
+      )
         return this.request(url, init);
-      return this.request('http://bundler:3000/rpc/' + applicationId, init);
+      return this.request(
+        'http://bundler:3000/rpc/' + this.bundlerApplicationId(applicationId),
+        init,
+      );
     }) as typeof fetch;
   }
   private configGas() {
@@ -1842,7 +1861,7 @@ export class SafeWalletRuntime {
     );
     const bundler = {
       profile: 'safe4337-bundler-v07' as const,
-      url: internalBundler + '/rpc/' + applicationId,
+      url: internalBundler + '/rpc/' + this.bundlerApplicationId(applicationId),
       maxLogRange: 1000,
     };
     let signing: Safe4337SigningService;

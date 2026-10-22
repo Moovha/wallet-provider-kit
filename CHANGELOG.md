@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Support multiple configured networks in one instance with shared verified identity
+  and application registration, wallet-specific consent, and independent execution,
+  credentials, funding keys and gas ledgers. Preserve default-network account URLs.
+  Add network discovery, SDK selection and restart-applied choices in administration.
+- Remove the browser configuration editor, its local HTTP server, frontend assets,
+  dependencies and documentation. Use `/admin/` for Networks, Applications and User
+  checks; source installation uses `init` and `local-setup` terminal commands.
+
 - Add protected provider user detail and cursor-paginated directory endpoints for
   stored application-attested KYC evidence and associated wallets. Records remain
   application-scoped; directory reads grant no wallet or transaction authority.

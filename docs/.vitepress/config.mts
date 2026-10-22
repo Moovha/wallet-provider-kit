@@ -251,10 +251,6 @@ export default defineConfig({
         collapsed: true,
         items: [
           {
-            text: 'Advanced static setup',
-            link: '/docs/setup-wizard',
-          },
-          {
             text: 'Configuration reference',
             link: '/docs/setup',
           },

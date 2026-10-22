@@ -440,6 +440,9 @@ export class Safe4337SigningService {
       Math.floor(Date.parse(source.approval.action.expires_at) / 1000),
     );
     const preparation = {
+      ...(this.database.networkScope
+        ? { budgetNetworkScope: this.database.networkScope }
+        : {}),
       providerOrigin: this.actions.onboarding.policy.provider.origin,
       principal: { issuer: principal.issuer, clientId: principal.clientId },
       runtimePolicy: source.runtimePolicy,
@@ -508,6 +511,7 @@ export class Safe4337SigningService {
       preparation.providerOrigin,
       principal.issuer,
       principal.clientId,
+      this.database.networkScope,
     );
     await this.database.setBudget(gasBudgetId, maximum, this.actions.revision);
     const record = await this.actions.withAuthorizedCalls(

@@ -7,7 +7,7 @@ connected application and the [user checks and consent agreement](application-ac
 
 The original **Personal** wallet remains the default. Existing applications that
 send `mode: "create"` without a `wallet` field keep using that account and address.
-Creating another wallet never moves assets or changes the default.
+Creating another wallet never moves assets or changes the default. An instance can offer [multiple networks](provider-guide.md#offer-multiple-networks). Each network has separate wallets and consent; the same verified profile can cover them.
 
 ## Keep the application experience simple
 
@@ -106,7 +106,7 @@ if (selected) {
 }
 ```
 
-Select the provider’s network (`base` or `base-sepolia`) and supply your token
+Select an enabled network (`base`, `base-sepolia` or `ethereum-sepolia`) and supply your token
 callback and authenticated user ID. `walletProvider(selected)`
 implements the existing [wallet calls adapter](wallet-calls.md) and automatically
 carries the selected account and grant. `requestAccess`, `provision`, `members`

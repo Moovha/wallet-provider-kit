@@ -158,7 +158,7 @@ export async function setupCommand(args: string[]): Promise<boolean> {
   if (!args.length) return false;
   if (args.length === 1 && ['help', '--help', '-h'].includes(args[0])) {
     process.stdout.write(
-      'wallet-provider-kit setup [--port number] [--no-open]\nwallet-provider-kit runtime check\nwallet-provider-kit runtime install\nwallet-provider-kit local-setup --config file [--install-runtime]\nwallet-provider-kit init [file]\nwallet-provider-kit validate --config file\nwallet-provider-kit doctor --config file\nwallet-provider-kit init-secrets --config file\nwallet-provider-kit init-storage --config file\nwallet-provider-kit renew-claim --config file\nwallet-provider-kit recover-admin --config file\nwallet-provider-kit run --config file\n',
+      'wallet-provider-kit runtime check\nwallet-provider-kit runtime install\nwallet-provider-kit local-setup --config file [--install-runtime]\nwallet-provider-kit init [file]\nwallet-provider-kit validate --config file\nwallet-provider-kit doctor --config file\nwallet-provider-kit init-secrets --config file\nwallet-provider-kit init-storage --config file\nwallet-provider-kit renew-claim --config file\nwallet-provider-kit recover-admin --config file\nwallet-provider-kit run --config file\n',
     );
     return true;
   }
@@ -204,7 +204,7 @@ export async function setupCommand(args: string[]): Promise<boolean> {
     });
     try {
       const management = new ManagementService(
-        database.onboardingStore,
+        database.managementStore,
         database.managementSnapshot,
         config.oauth.issuer,
         config.policy,
@@ -245,6 +245,18 @@ export async function setupCommand(args: string[]): Promise<boolean> {
       throw new ConfigurationError([
         'WPK_NETWORK must be base, base-sepolia or ethereum-sepolia.',
       ]);
+    const additionalNetworks = (process.env.WPK_ADDITIONAL_NETWORKS ?? '')
+      .split(',')
+      .filter(Boolean);
+    if (
+      additionalNetworks.some(
+        (network) =>
+          !['base', 'base-sepolia', 'ethereum-sepolia'].includes(network),
+      )
+    )
+      throw new ConfigurationError([
+        'WPK_ADDITIONAL_NETWORKS must be a comma-separated list of supported network names.',
+      ]);
     const { initializeInstallation } = await import('./installation.js');
     const { reused } = await initializeInstallation(
       process.env.WPK_DIRECTORY ?? '/config',
@@ -254,6 +266,8 @@ export async function setupCommand(args: string[]): Promise<boolean> {
         origin: process.env.WPK_ORIGIN ?? 'https://localhost',
         privacyUrl: process.env.WPK_PRIVACY_URL ?? 'https://localhost/privacy',
         network: selectedNetwork as import('../networks.js').ProviderNetwork,
+        additionalNetworks:
+          additionalNetworks as import('../networks.js').ProviderNetwork[],
         ...(process.env.WPK_LOCAL === 'true'
           ? { localOrigin: 'http://127.0.0.1:8080' }
           : {}),
@@ -268,22 +282,6 @@ export async function setupCommand(args: string[]): Promise<boolean> {
         ? 'Retained installation reused; identity and secrets unchanged.\n'
         : 'Installation prepared. Read the private installation-claim file to establish administrator access.\n',
     );
-    return true;
-  }
-  if (args[0] === 'setup') {
-    const remaining = args.slice(1);
-    const openBrowser = !remaining.includes('--no-open');
-    const flags = remaining.filter((arg) => arg !== '--no-open');
-    if (
-      (flags.length !== 0 && (flags.length !== 2 || flags[0] !== '--port')) ||
-      remaining.filter((arg) => arg === '--no-open').length > 1
-    )
-      throw new Error('Invalid setup command');
-    const port = flags.length ? Number(flags[1]) : 0;
-    if (!Number.isInteger(port) || port < 0 || port > 65535)
-      throw new Error('Invalid setup port');
-    const { startSetupWizard } = await import('./setup-server.js');
-    await startSetupWizard(port, openBrowser);
     return true;
   }
   if (args[0] === 'init' && args.length <= 2) {

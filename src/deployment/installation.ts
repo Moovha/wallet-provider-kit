@@ -18,6 +18,7 @@ export interface InstallationOptions {
   origin: string;
   privacyUrl: string;
   network?: ProviderConfiguration['network'];
+  additionalNetworks?: NonNullable<ProviderConfiguration['network']>[];
   localOrigin?: string;
 }
 /** Infrastructure defaults have no connected applications, trusted attestations or enabled execution. */
@@ -28,6 +29,13 @@ export function installationConfiguration(
     configVersion: 1,
     profile: 'provider-service-v1',
     network: options.network ?? 'base',
+    ...(options.additionalNetworks?.length
+      ? {
+          additionalNetworks: options.additionalNetworks.map((network) => ({
+            network,
+          })),
+        }
+      : {}),
     management: {
       claim: { env: 'WALLET_INSTALLATION_CLAIM' },
       ...(options.localOrigin ? { localOrigin: options.localOrigin } : {}),
@@ -177,6 +185,12 @@ export async function initializeInstallation(
     config.policy.provider.name === options.name &&
     config.policy.provider.privacyUrl === options.privacyUrl &&
     config.network === proposed.network &&
+    JSON.stringify(
+      (config.additionalNetworks ?? []).map((entry) => entry.network),
+    ) ===
+      JSON.stringify(
+        (proposed.additionalNetworks ?? []).map((entry) => entry.network),
+      ) &&
     config.management.localOrigin === proposed.management!.localOrigin;
   let preparation: {
     config: ProviderConfiguration;

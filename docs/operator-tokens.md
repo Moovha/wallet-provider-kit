@@ -25,8 +25,7 @@ or wallet owner. It never replaces current user approval or activates wallet use
    from wallet/identity vendor credentials. Enable client-credentials grants
    and client_secret_post authentication; do not use a public SPA/mobile client
    or a client that requires private_key_jwt/mTLS with this supplied panel.
-3. Add the exact Client ID and issuer to the wizard's **Applications** application
-   registration. Keep it enabled. Prefer an isolated staging application with
+3. Add the exact Client ID and issuer to `policy.applications` in the static configuration. Keep it enabled. Prefer an isolated staging application with
    approved test identities and its own owner access grants. The application's
    owner must authorize sharing its secret with the provider's token broker.
 4. Create or select the operator's account at the **configured staff-login issuer**. Copy its
@@ -45,25 +44,16 @@ Choose those subjects and limits accordingly.
 
 ## Configure the optional panel
 
-In the local wizard, import your saved configuration and open **Deployment**:
+Edit the saved deployment JSON:
 
-1. Check **Enable application token controls for staff**. It also enables the deployed explorer.
-2. In **Staff account IDs allowed to test (sub)**, enter one exact subject per line from the
-   configured staff-login issuer. At least one is required.
-3. For each intended application, check **Allow staff to get tokens for …**. Enter its
-   **Application client secret** variable name. The suggested name is
-   `WALLET_EXPLORER_APP_1_SECRET`, numbered by the wizard's application list.
-   This is only the deployment variable's name; do not enter the secret value.
-4. Select **Allowed API permissions (scopes)**. These are the maximum scopes the
-   GUI may request, and must also be granted at your issuer. Read scopes are
-   initially selected. Add mutation/signing scopes only for the intended tests.
-   A scope is API admission, not owner consent or permission to bypass policy.
-5. Validate and export again. The variable template now lists each selected
-   application's secret variable. Supply the actual secret privately through
-   your deployment's environment/secret store, then follow the
-   [deployment and restart guide](operator-deployment.md). Files are not hot-reloaded. Token settings participate in the service configuration
-   revision fence; follow the restart guide and reconcile any pending attempts
-   before reconfiguration.
+1. Enable `http.documentation`.
+2. Set `apiExplorer.operators` to exact allowed staff subjects from `ownerLogin.issuer`.
+3. Add each selected application to `apiExplorer.clients` with its `clientId`, a
+   `clientSecret: { "env": "EXPLORER_APPLICATION_SECRET" }` reference, and the
+   maximum allowed `scopes`. The client must also exist in `policy.applications`.
+4. Retain `ownerLogin` with its separate staff-login secret reference. Store secret
+   values only in the deployment’s private environment or secret store.
+5. Validate the JSON and follow the [restart procedure](operator-deployment.md).
 
 Validation rejects unregistered/disabled clients, duplicate clients, empty operator
 or scope lists, unsupported scopes, plaintext secrets and tokens configured while
@@ -78,9 +68,7 @@ according to your operator access policy. Use your real HTTPS origin.
 
 ## Get a token and send a request
 
-Open the wizard's **Open deployed Try it out** link, or your provider's HTTPS
-origin followed by `/docs/`. The local setup wizard remains an offline editor;
-token issuance happens only on the deployed provider.
+Open your provider’s HTTPS origin followed by `/docs/`. Token issuance happens on the provider service.
 
 1. In **Application tokens**, choose **Sign in to token controls**. Complete
    your configured login/MFA. The existing login flow returns you to Swagger.

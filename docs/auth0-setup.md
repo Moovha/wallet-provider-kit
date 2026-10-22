@@ -5,7 +5,7 @@ for an advanced static deployment. A standard API-managed installation includes
 its own issuer; [adding an application](runtime-workspace.md) does not require Auth0.
 
 For this integration, you will register the wallet API, register each calling
-application, then enter the values in [advanced setup](setup-wizard.md). Users
+application, then enter the values in [advanced setup](setup.md). Users
 continue to sign in and give permission inside the connected application.
 The recipe uses RFC 9068 access tokens and server-to-server client credentials.
 Check actual issued tokens before activation. Staff token controls need a separate
@@ -48,8 +48,7 @@ become token scopes; the kit checks the space-separated `scope` claim, not a
 
 For a product with a trusted backend, create a separate **Machine to Machine
 Application** for each connected application, authorize it for this wallet API and
-select only its needed scopes. Copy its Client ID into the wizard's application
-policy. Give its Client ID and secret securely to that product's backend operator;
+select only its needed scopes. Set its Client ID in `policy.applications[].clientId` in the static configuration. Give its Client ID and secret securely to that product's backend operator;
 do not put its secret value in provider JSON or browser code. Repeat for each app.
 For optional [GUI token controls](operator-tokens.md), an authorized operator can
 configure an environment reference to an approved M2M application secret held by
@@ -90,23 +89,21 @@ a different client with the required API scope, so its denial tests wallet
 authority rather than only token scope. You can narrow an isolated test client's
 grant after its isolation test; update its GUI token settings to match.
 
-<span id="_5-copy-the-values-into-formkit"></span>
-
 ## 3. Enter the connection settings
 
 For a tenant domain `your-tenant.us.auth0.com`, the mapping is:
 
-| Wizard field                          | Value                                                                |
-| ------------------------------------- | -------------------------------------------------------------------- |
-| Application token issuer              | Exact discovery issuer, normally `https://your-tenant.us.auth0.com/` |
-| Wallet API audience                   | API **Identifier** from step 1, not Auth0's internal API ID          |
-| Token verification keys URL (JWKS)    | `https://your-tenant.us.auth0.com/.well-known/jwks.json`             |
-| Application client ID in Applications | Calling application's ID from step 2                                 |
+| Configuration field              | Value                                                                |
+| -------------------------------- | -------------------------------------------------------------------- |
+| `oauth.issuer`                   | Exact discovery issuer, normally `https://your-tenant.us.auth0.com/` |
+| `oauth.audience`                 | API **Identifier** from step 1, not Auth0's internal API ID          |
+| `oauth.jwksUrl`                  | `https://your-tenant.us.auth0.com/.well-known/jwks.json`             |
+| `policy.applications[].clientId` | Calling application's ID from step 2                                 |
 
 If you enable staff token controls or hosted compatibility, also copy these
 values from the optional registrations below:
 
-| Optional wizard field                      | Value                                                     |
+| Optional configuration field               | Value                                                     |
 | ------------------------------------------ | --------------------------------------------------------- |
 | Login service issuer URL                   | The same exact discovery issuer                           |
 | Wallet login client ID                     | Optional Regular Web Application Client ID                |
@@ -139,8 +136,8 @@ are configured, test their Auth0 callback and session boundaries separately.
 `doctor` does not remotely test Auth0. Token issuance alone does not establish user
 permission or production readiness.
 
-Return to [Services](setup-wizard.md#_3-services), then add the clients and their
-user-check agreements in [Applications](setup-wizard.md#_4-applications).
+Return to [Services](setup.md), then add the clients and their
+user-check agreements in [Applications](setup.md).
 <span id="_1-optional-staff-or-hosted-owner-login"></span>
 
 ## Optional staff or hosted owner login
@@ -157,7 +154,7 @@ explains that application type.
 In its settings, copy the **Domain** and **Client ID**. Set **Allowed Callback URLs**
 to your exact deployed callback, for example
 `https://wallet.your-company.com/onboarding/callback`, and save. Do not use the
-wizard's `127.0.0.1` address: that is a temporary configuration tool. See
+a temporary local address. See
 [application settings](https://auth0.com/docs/get-started/applications/application-settings).
 
 In the application's **Credentials** settings, select **Client Secret (Post)**.

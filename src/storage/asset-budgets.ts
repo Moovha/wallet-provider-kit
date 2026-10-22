@@ -39,7 +39,7 @@ export function ensureAssetBudget(
   return connection.transaction(() => {
     const row = connection.get(
       'SELECT record FROM onboarding_records WHERE collection=? AND id=?',
-      'deploymentBindings',
+      connection.recordCollection('deploymentBindings'),
       'service-v1',
     );
     const binding = row && JSON.parse(String(row.record));
@@ -51,7 +51,7 @@ export function ensureAssetBudget(
       throw new WalletProviderError('wallet_authorization_denied');
     const existing = connection.get(
       'SELECT record FROM onboarding_records WHERE collection=? AND id=?',
-      'assetBudgetBindings',
+      connection.recordCollection('assetBudgetBindings'),
       id,
     );
     if (!existing) {
@@ -64,7 +64,7 @@ export function ensureAssetBudget(
           fingerprint(approval) !== row.fingerprint ||
           !connection.get(
             'SELECT id FROM onboarding_records WHERE collection=? AND id=?',
-            'assetReservations',
+            connection.recordCollection('assetReservations'),
             budgetReservationId(approval, id),
           )
         )
@@ -78,7 +78,7 @@ export function ensureAssetBudget(
     );
     connection.run(
       'INSERT INTO onboarding_records(collection,id,record) VALUES(?,?,?) ON CONFLICT(collection,id) DO UPDATE SET record=excluded.record',
-      'assetBudgetBindings',
+      connection.recordCollection('assetBudgetBindings'),
       id,
       JSON.stringify({ revision }),
     );

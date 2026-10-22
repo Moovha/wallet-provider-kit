@@ -42,7 +42,9 @@ try {
   assert.ok(paths.includes('examples/inspect-api.mjs'));
   assert.ok(paths.includes('spec/provider-config.schema.json'));
   assert.ok(paths.includes('docs/provider.config.safe.example.json'));
-  assert.ok(paths.includes('dist/setup-ui/index.html'));
+  assert.ok(
+    !paths.some((path) => /setup-ui|setup-server|setup-readiness/.test(path)),
+  );
   assert.ok(paths.includes('docs/provider.config.safe.example.json'));
   assert.ok(
     !paths.some((p) =>
@@ -51,17 +53,6 @@ try {
       ),
     ),
   );
-  assert.ok(paths.includes('dist/setup-ui/THIRD_PARTY_NOTICES.txt'));
-  for (const asset of [
-    'swagger-ui-bundle.js',
-    'swagger-ui.css',
-    'swagger-ui-bundle.js.LICENSE.txt',
-    'LICENSE',
-    'NOTICE',
-    'VERSION.txt',
-  ]) {
-    assert.ok(paths.includes('dist/setup-ui/reference/' + asset));
-  }
   for (const path of paths) {
     assert.match(path, /^(dist\/|spec\/|docs\/|examples\/|[^/]+$)/);
     assert.doesNotMatch(path, /local-adapters|atomic-vault-swap|DexAdapters/);
@@ -269,80 +260,6 @@ try {
   );
   const bin = join(temporary, 'node_modules/.bin/wallet-provider-kit');
   assert.match(await readFile(bin, 'utf8'), /^#!\/usr\/bin\/env node/);
-  const wizard = spawn(bin, ['setup', '--no-open'], {
-    cwd: temporary,
-    env: { PATH: process.env.PATH, HOST: '0.0.0.0' },
-    stdio: ['ignore', 'pipe', 'ignore'],
-  });
-  const wizardClosed = once(wizard, 'close');
-  try {
-    const localUrl = await new Promise((resolve, reject) => {
-      let output = '';
-      const timeout = setTimeout(
-        () => reject(new Error('Setup startup timed out')),
-        10000,
-      );
-      wizard.stdout.on('data', (chunk) => {
-        output += String(chunk);
-        const match = /http:\/\/127\.0\.0\.1:\d+\/#([A-Za-z0-9_-]+)/.exec(
-          output,
-        );
-        if (match) {
-          clearTimeout(timeout);
-          resolve(new URL(match[0]));
-        }
-      });
-      wizardClosed.then(() => {
-        clearTimeout(timeout);
-        reject(new Error('Setup exited before startup'));
-      });
-    });
-    const origin = localUrl.origin;
-    const token = localUrl.hash.slice(1);
-    const page = await fetch(origin);
-    assert.equal(page.status, 200);
-    const html = await page.text();
-    assert.match(html, /Set up your wallet service/);
-    const asset = /src="([^\"]+\.js)"/.exec(html)[1];
-    assert.equal((await fetch(origin + asset)).status, 200);
-    assert.equal((await fetch(origin + '/api/template')).status, 403);
-    assert.equal((await fetch(origin + '/api/openapi')).status, 403);
-    const reference = await fetch(origin + '/api/openapi', {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    assert.equal(reference.status, 200);
-    assert.equal((await reference.json()).openapi, '3.0.3');
-    for (const file of [
-      'swagger-ui-bundle.js',
-      'swagger-ui.css',
-      'swagger-ui-bundle.js.LICENSE.txt',
-      'VERSION.txt',
-    ]) {
-      assert.equal((await fetch(origin + '/reference/' + file)).status, 200);
-    }
-
-    const template = await (
-      await fetch(origin + '/api/template', {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-    ).json();
-    const checked = await fetch(origin + '/api/validate', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Origin: origin,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(template.config),
-    });
-    assert.equal(checked.status, 200);
-    assert.equal((await checked.json()).acceptance, 'not_verified');
-  } finally {
-    wizard.kill('SIGTERM');
-    const timeout = setTimeout(() => wizard.kill('SIGKILL'), 12000);
-    await wizardClosed;
-    clearTimeout(timeout);
-  }
   const child = spawn(bin, [], {
     cwd: temporary,
     env: {

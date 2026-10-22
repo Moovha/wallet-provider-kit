@@ -16,12 +16,6 @@ import {
 } from '../src/deployment/config.js';
 import { createServer } from '../src/service/server.js';
 import { createSetupExecutor } from '../src/deployment/setup-executor.js';
-import {
-  emptyConfiguration,
-  newBackend,
-  newClientId,
-  synchronizeBundledServices,
-} from '../setup-ui/model.js';
 
 let config: ProviderConfiguration;
 const closers: (() => Promise<void>)[] = [];
@@ -223,21 +217,6 @@ it('requires exact issuer binding, unique credentials and an enabled application
   }
 });
 
-it('defaults to the bundled issuer and OWS, synchronizes registrations without replacing retained secret references', () => {
-  const draft = emptyConfiguration(config);
-  expect(draft.backend.kind).toBe('ows');
-  expect(draft.safeWallet?.profile).toBe('safe-only-4337-v1');
-  expect(draft.authorizationServer).toBeDefined();
-  const secret = draft.authorizationServer!.clients[0].clientSecret;
-  draft.policy.provider.origin = 'https://wallet.example.test';
-  synchronizeBundledServices(draft);
-  expect(draft.oauth).toEqual(bundledOAuth('https://wallet.example.test'));
-  expect(draft.authorizationServer!.clients[0].clientSecret).toEqual(secret);
-  expect(draft.authorizationServer!.clients[0].scopes).toContain(
-    'wallet:provision',
-  );
-});
-
 it('creates a private retained vault and generated secrets without returning secrets in plans, progress or command arguments', async () => {
   const root = await mkdtemp(join(tmpdir(), 'wpk-bundle-'));
   closers.push(() => rm(root, { recursive: true, force: true }));
@@ -419,15 +398,4 @@ it('issues administration tokens only to separately configured provider service 
   config.authorizationServer!.operatorClients[0].clientId =
     config.authorizationServer!.clients[0].clientId;
   expect(() => validateProviderConfiguration(config)).toThrow();
-});
-
-it('exports an idle Safe-only deployment without executor keys, funded accounts or provider RPC subscriptions', async () => {
-  const draft = emptyConfiguration(config);
-  draft.policy.provider = { ...config.policy.provider };
-  draft.policy.applications[0].name = 'Offline application';
-  draft.policy.applications[0].assertionTrust!.agreement = 'offline-agreement';
-  synchronizeBundledServices(draft);
-  expect(validateProviderConfiguration(draft)).toEqual(draft);
-  expect(draft.safeWallet?.profile).toBe('safe-only-4337-v1');
-  expect(draft.approvedCalls?.policy.accounts).toEqual([]);
 });

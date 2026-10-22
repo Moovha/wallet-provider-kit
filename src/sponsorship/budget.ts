@@ -5,11 +5,12 @@ export interface ApplicationGasAllowance {
   lifetimeBudgetWei: string;
 }
 
-/** One application gas ledger across execution mechanisms and payer pool members. */
+/** One application gas ledger per network across execution mechanisms and payer pool members. Omitted scope retains default-network ledger IDs. */
 export function applicationGasBudgetId(
   origin: string,
   issuer: string,
   clientId: string,
+  networkScope?: import('../networks.js').ProviderNetwork,
 ): string {
   if (
     ![origin, issuer, clientId].every(
@@ -17,7 +18,13 @@ export function applicationGasBudgetId(
     )
   )
     throw new WalletProviderError('wallet_provider_configuration');
-  return fingerprint(['execution-gas', origin, issuer, clientId]);
+  return fingerprint([
+    'execution-gas',
+    origin,
+    issuer,
+    clientId,
+    ...(networkScope ? [networkScope] : []),
+  ]);
 }
 
 /** Pool members cannot multiply the application's configured lifetime allowance. */

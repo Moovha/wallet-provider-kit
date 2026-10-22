@@ -49,7 +49,7 @@ async function follow<T>(
   }
 }
 
-/** Shared terminal orchestration uses the same runtime and deployment executors as the wizard. */
+/** Terminal installation prepares a disabled provider and its administration console. */
 export async function runLocalSetup(options: {
   config?: ProviderConfiguration;
   installRuntime: boolean;

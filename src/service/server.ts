@@ -1,3 +1,9 @@
+import { providerNetwork } from '../networks.js';
+import {
+  usesNetworkContext,
+  type NetworkContext,
+  type ResolveNetwork,
+} from './network-context.js';
 import { selectWalletGrant } from './wallet-grant.js';
 import {
   apiTasks,
@@ -54,6 +60,8 @@ import {
 } from './schemas.js';
 
 export interface ServerOptions {
+  networkContexts?: readonly NetworkContext[];
+  resolveNetwork?: ResolveNetwork;
   management?: ManagementService;
   managementReady?: () => Promise<boolean>;
   providerOrigin?: string;
@@ -113,6 +121,23 @@ export async function createServer(options: ServerOptions = {}) {
     throw new Error('Invalid request limit');
   await app.register(rateLimit, { max: requestLimit, timeWindow: '1 minute' });
   app.addHook('onRoute', (route) => {
+    if (route.schema && usesNetworkContext(route.url)) {
+      const headers = route.schema.headers as
+        { properties?: Record<string, unknown> } | undefined;
+      route.schema.headers = {
+        type: 'object',
+        ...headers,
+        properties: {
+          ...headers?.properties,
+          'wallet-network': {
+            type: 'string',
+            enum: ['base', 'base-sepolia', 'ethereum-sepolia'],
+            description:
+              'Choose a configured network. Omit to use the default; existing wallet, request and grant IDs select their stored network automatically. A conflicting selection is rejected.',
+          },
+        },
+      };
+    }
     if (route.schema && route.url.startsWith('/v1/accounts/')) {
       const headers = (route.schema.headers ?? {}) as {
         properties?: Record<string, unknown>;
@@ -231,17 +256,31 @@ export async function createServer(options: ServerOptions = {}) {
       },
     });
   }
-  const isReady = async () => {
-    if (!options.service || !options.authenticate || !options.ready)
+  const selected = (request: FastifyRequest) =>
+    options.resolveNetwork?.(request) ?? options;
+  const isReady = async (request?: FastifyRequest) => {
+    const services = request ? selected(request) : options;
+    if (!services.service || !options.authenticate || !services.ready)
       return false;
     try {
-      return await options.ready();
+      return await services.ready!();
     } catch {
       return false;
     }
   };
   app.addHook('onRequest', async (_request, reply) => {
     reply.header('cache-control', 'no-store');
+  });
+  app.addHook('preSerialization', async (request, reply, payload) => {
+    if (
+      options.resolveNetwork &&
+      reply.statusCode < 400 &&
+      usesNetworkContext(request.routeOptions.url ?? '')
+    ) {
+      const network = options.resolveNetwork(request).network;
+      if (network) reply.header('Wallet-Network', network);
+    }
+    return payload;
   });
   app.addHook('onResponse', async (request, reply) => {
     // Only registered templates and methods; unknown raw URLs/methods never enter telemetry.
@@ -349,6 +388,53 @@ export async function createServer(options: ServerOptions = {}) {
     app.swagger(),
   );
   app.get(
+    '/v1/networks',
+    {
+      schema: {
+        operationId: 'listNetworks',
+        summary: 'Choose a wallet network',
+        description:
+          'Discover enabled network configurations. Identity and application registrations are shared; each network has separate wallets, approvals and fee funding. Configured means execution is enabled and current, not that an application has funded it.',
+        response: {
+          200: {
+            type: 'object',
+            required: ['default_network', 'networks'],
+            properties: {
+              default_network: { type: 'string' },
+              networks: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  required: ['network', 'name', 'chain_id', 'configured'],
+                  properties: {
+                    network: { type: 'string' },
+                    name: { type: 'string' },
+                    chain_id: { type: 'string' },
+                    configured: { type: 'boolean' },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    async () => ({
+      default_network:
+        options.networkContexts?.[0]?.network ??
+        options.onboarding?.network ??
+        'base-sepolia',
+      networks: await Promise.all(
+        (options.networkContexts ?? []).map(async (entry) => ({
+          network: entry.network,
+          name: providerNetwork(entry.network).label,
+          chain_id: providerNetwork(entry.network).caip,
+          configured: await entry.ready!(),
+        })),
+      ),
+    }),
+  );
+  app.get(
     '/v1/execution-capabilities',
     {
       schema: {
@@ -367,10 +453,10 @@ export async function createServer(options: ServerOptions = {}) {
         },
       },
     },
-    async () => ({
+    async (request) => ({
       profile: 'safe-only-4337-v1',
       revision: '1',
-      configured: !!options.safeWallet && (await isReady()),
+      configured: !!selected(request).safeWallet && (await isReady(request)),
     }),
   );
   app.get(
@@ -403,10 +489,10 @@ export async function createServer(options: ServerOptions = {}) {
         },
       },
     },
-    async () => ({
+    async (request) => ({
       profile: 'safe-wallet-service',
       status: 'experimental',
-      configured: await isReady(),
+      configured: await isReady(request),
       ...(options.configurationProfile
         ? {
             configuration_profile: options.configurationProfile,
@@ -576,38 +662,35 @@ export async function createServer(options: ServerOptions = {}) {
       onRequest: (request) => authorize(request, 'wallet:provision'),
     },
     async (request) => {
-      if (!(await isReady()) || !options.safeWallet)
+      const { service, safeWallet, onboarding } = selected(request);
+      if (!(await isReady(request)) || !safeWallet || !service)
         throw Object.assign(new Error('Unavailable'), { statusCode: 503 });
       const context = {
         principal: principals.get(request)!,
         idempotencyKey: request.headers['idempotency-key'] as string,
       };
-      const account = options.enrollment
-        ? await options.enrollment.provision(
-            options.service!,
-            context,
-            request.params.accountId,
-          )
-        : await options.service!.provision(
-            context,
-            request.params.accountId,
-            options.onboarding
-              ? async (owner) => {
-                  const grant =
-                    await options.onboarding!.service.authorizeCurrent(
-                      context.principal,
-                      request.params.accountId,
-                    );
-                  if (grant.owner !== owner)
-                    throw new WalletProviderError(
-                      'wallet_authorization_denied',
-                    );
-                }
-              : undefined,
-          );
-      if (options.safeWallet)
-        return options.safeWallet.provision(context, request.params.accountId);
-      throw Object.assign(new Error('Unavailable'), { statusCode: 503 });
+      if (options.enrollment)
+        await options.enrollment.provision(
+          service,
+          context,
+          request.params.accountId,
+        );
+      else
+        await service.provision(
+          context,
+          request.params.accountId,
+          onboarding
+            ? async (owner) => {
+                const grant = await onboarding.service.authorizeCurrent(
+                  context.principal,
+                  request.params.accountId,
+                );
+                if (grant.owner !== owner)
+                  throw new WalletProviderError('wallet_authorization_denied');
+              }
+            : undefined,
+        );
+      return safeWallet.provision(context, request.params.accountId);
     },
   );
   app.get<{ Params: { applicationId: string } }>(
@@ -649,7 +732,7 @@ export async function createServer(options: ServerOptions = {}) {
     },
     (request) =>
       (
-        options.safeWallet ??
+        selected(request).safeWallet ??
         (() => {
           throw Object.assign(new Error('Unavailable'), { statusCode: 503 });
         })()
@@ -700,7 +783,7 @@ export async function createServer(options: ServerOptions = {}) {
     },
     (request) =>
       (
-        options.safeWallet ??
+        selected(request).safeWallet ??
         (() => {
           throw Object.assign(new Error('Unavailable'), { statusCode: 503 });
         })()
@@ -718,12 +801,14 @@ export async function createServer(options: ServerOptions = {}) {
     options.onboarding,
     options.authenticate,
     isReady,
+    options.resolveNetwork,
   );
   await registerWalletCallsRoutes(
     app,
     options.walletCalls,
     options.authenticate,
     isReady,
+    options.resolveNetwork,
   );
   await registerRuntimeConfigurationRoutes(
     app,
@@ -731,6 +816,7 @@ export async function createServer(options: ServerOptions = {}) {
     options.authenticate,
     options.walletCalls,
     options.safeWallet,
+    options.resolveNetwork,
   );
   if (options.documentation !== false && options.documentationTokens)
     await registerDocumentationTokens(app, options.documentationTokens);
@@ -741,6 +827,13 @@ export async function createServer(options: ServerOptions = {}) {
     options.ready,
     options.providerOrigin,
     options.localManagementOrigin,
+    options.networkContexts?.map((context) => context.network),
+    options.networkContexts
+      ? async (network) =>
+          (await options
+            .networkContexts!.find((context) => context.network === network)
+            ?.ready?.()) ?? false
+      : undefined,
   );
   options.authorizationServer?.register(app);
   await app.ready();

@@ -1,5 +1,9 @@
 import { copyFile } from 'node:fs/promises';
-await copyFile(
-  new URL('../src/management/console.mjs', import.meta.url),
-  new URL('../dist/management/console.mjs', import.meta.url),
-);
+for (const path of [
+  'management/console.mjs',
+  'service/documentation-token-ui.mjs',
+])
+  await copyFile(
+    new URL('../src/' + path, import.meta.url),
+    new URL('../dist/' + path, import.meta.url),
+  );

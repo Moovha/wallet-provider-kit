@@ -1,3 +1,4 @@
+import type { ResolveNetwork } from '../service/network-context.js';
 import { selectWalletGrant } from '../service/wallet-grant.js';
 import { setAuthenticatedResponseTimeout } from '../service/response-timeout.js';
 import type { VerifiedPrincipal } from '../domain/principal.js';
@@ -208,7 +209,8 @@ export async function registerOnboardingRoutes(
   app: FastifyInstance,
   options: OnboardingHttpOptions | undefined,
   authenticate: Authenticate | undefined,
-  ready: () => Promise<boolean>,
+  ready: (request?: FastifyRequest) => Promise<boolean>,
+  resolveNetwork?: ResolveNetwork,
 ) {
   const unavailable = () => {
     throw Object.assign(new Error('Unavailable'), { statusCode: 503 });
@@ -218,15 +220,19 @@ export async function registerOnboardingRoutes(
   );
   if (options?.actions && options.actions.network.name !== network.name)
     throw new WalletProviderError('wallet_provider_configuration');
-  const service = () => options?.service ?? unavailable();
+  const selected = (request: FastifyRequest) =>
+    resolveNetwork ? resolveNetwork(request).onboarding : options;
+  const service = (request: FastifyRequest) =>
+    selected(request)?.service ?? unavailable();
   async function context(request: FastifyRequest, scope: string) {
-    if (!authenticate || !options || !(await ready())) return unavailable();
+    if (!authenticate || !options || !(await ready(request)))
+      return unavailable();
     const principal = selectWalletGrant(
       await authenticate(request.headers.authorization, scope),
       request.headers['wallet-grant-id'],
     );
     setAuthenticatedResponseTimeout(request);
-    if (!(await ready())) return unavailable();
+    if (!(await ready(request))) return unavailable();
     return {
       principal,
       idempotencyKey:
@@ -263,7 +269,8 @@ export async function registerOnboardingRoutes(
       },
     };
   }
-  const actions = () => options?.actions ?? unavailable();
+  const actions = (request: FastifyRequest) =>
+    selected(request)?.actions ?? unavailable();
   const requestParams = {
     type: 'object',
     additionalProperties: false,
@@ -391,7 +398,10 @@ export async function registerOnboardingRoutes(
       }),
     },
     async (request) =>
-      service().request(await context(request, 'wallet:access'), request.body),
+      service(request).request(
+        await context(request, 'wallet:access'),
+        request.body,
+      ),
   );
   app.get<{ Querystring: { source_application_id?: string } }>(
     '/v1/access-policy',
@@ -471,7 +481,7 @@ export async function registerOnboardingRoutes(
     async (request) => {
       const principal = (await context(request, 'wallet:access:read'))
         .principal;
-      const terms = await service().applicationAccessPolicy(
+      const terms = await service(request).applicationAccessPolicy(
         principal,
         request.query.source_application_id,
       );
@@ -479,10 +489,11 @@ export async function registerOnboardingRoutes(
         'runtime_contract_terms' in terms
           ? terms.runtime_contract_terms
           : undefined;
-      const calls = options?.actions?.callConsentTerms(snapshot);
+      const calls = selected(request)?.actions?.callConsentTerms(snapshot);
       return {
         ...terms,
-        chain_id: network.caip,
+        chain_id: providerNetwork(selected(request)?.network ?? network.name)
+          .caip,
         ...(calls ? { contract_call_terms: calls } : {}),
       };
     },
@@ -567,6 +578,11 @@ export async function registerOnboardingRoutes(
                   additionalProperties: false,
                   properties: {
                     account_id: uuidSchema,
+                    network: {
+                      type: 'string',
+                      enum: ['base', 'base-sepolia', 'ethereum-sepolia'],
+                    },
+                    chain_id: { type: 'string' },
                     is_default: { type: 'boolean' },
                     wallet: walletDescriptionSchema,
                     grant_id: uuidSchema,
@@ -584,11 +600,22 @@ export async function registerOnboardingRoutes(
         },
       },
     },
-    async (request) =>
-      service().wallets(
+    async (request) => {
+      const result = await service(request).wallets(
         await context(request, 'wallet:account:read'),
         request.body.user_id,
-      ),
+      );
+      const current = providerNetwork(
+        selected(request)?.network ?? network.name,
+      );
+      return {
+        accounts: result.accounts.map((account) => ({
+          ...account,
+          network: current.name,
+          chain_id: current.caip,
+        })),
+      };
+    },
   );
   app.get<{ Params: { accountId: string } }>(
     '/v1/accounts/:accountId/members',
@@ -602,7 +629,7 @@ export async function registerOnboardingRoutes(
       },
     },
     async (request) =>
-      service().members(
+      service(request).members(
         (await context(request, 'wallet:access')).principal,
         request.params.accountId,
       ),
@@ -642,7 +669,7 @@ export async function registerOnboardingRoutes(
       },
     },
     async (request) =>
-      service().saveMember(
+      service(request).saveMember(
         await context(request, 'wallet:access'),
         request.params.accountId,
         request.body,
@@ -680,7 +707,7 @@ export async function registerOnboardingRoutes(
       },
     },
     async (request) =>
-      service().revokeApplicationGrant(
+      service(request).revokeApplicationGrant(
         await context(request, 'wallet:access'),
         request.params.grantId,
       ),
@@ -733,7 +760,7 @@ export async function registerOnboardingRoutes(
       },
     },
     async (request) =>
-      service().submitRecords(
+      service(request).submitRecords(
         await context(request, 'wallet:access'),
         request.body.records,
       ),
@@ -742,7 +769,7 @@ export async function registerOnboardingRoutes(
     '/v1/access-requests/:requestId',
     { schema: schema('getAccountAccessRequest', undefined, requestParams) },
     async (request) =>
-      service().read(
+      service(request).read(
         await context(request, 'wallet:access:read'),
         request.params.requestId,
       ),
@@ -769,7 +796,7 @@ export async function registerOnboardingRoutes(
       ),
     },
     async (request) =>
-      service().importIdentity(
+      service(request).importIdentity(
         await context(request, 'wallet:access'),
         request.params.requestId,
         request.body.vendor,
@@ -821,7 +848,7 @@ export async function registerOnboardingRoutes(
       },
     },
     async (request) =>
-      service().account(
+      service(request).account(
         (await context(request, 'wallet:account:read')).principal,
         request.params.accountId,
       ),
@@ -931,7 +958,7 @@ export async function registerOnboardingRoutes(
     async function formSession(request: FastifyRequest, csrf: string) {
       if (!options) return unavailable();
       if (
-        request.headers.origin !== service().policy.provider.origin ||
+        request.headers.origin !== service(request).policy.provider.origin ||
         request.headers['sec-fetch-site'] === 'cross-site'
       )
         deny();
@@ -961,7 +988,10 @@ export async function registerOnboardingRoutes(
       { schema: { hide: true } },
       async (request, reply) => {
         if (!options) return unavailable();
-        const url = new URL(request.raw.url!, service().policy.provider.origin);
+        const url = new URL(
+          request.raw.url!,
+          service(request).policy.provider.origin,
+        );
         const result = await options.login!.finish(
           url,
           cookie(request, '__Host-wpk-browser'),
@@ -985,8 +1015,8 @@ export async function registerOnboardingRoutes(
       async (request, reply) => {
         const current = await session(request, reply, 'access');
         if (!current) return;
-        const grants = await service().ownerGrants(current.identity);
-        const pending = await service().ownerRequests(current.identity);
+        const grants = await service(request).ownerGrants(current.identity);
+        const pending = await service(request).ownerRequests(current.identity);
         return html(
           reply,
           'Your application access',
@@ -1026,7 +1056,7 @@ export async function registerOnboardingRoutes(
       },
       async (request, reply) => {
         const current = await formSession(request, request.body.csrf);
-        await service().cancelPending(
+        await service(request).cancelPending(
           request.params.requestId,
           current.identity,
         );
@@ -1059,7 +1089,7 @@ export async function registerOnboardingRoutes(
       },
       async (request, reply) => {
         const current = await formSession(request, request.body.csrf);
-        await service().changeGrant(
+        await service(request).changeGrant(
           request.params.grantId,
           request.body.decision,
           current.identity,
@@ -1073,14 +1103,14 @@ export async function registerOnboardingRoutes(
       async (request, reply) => {
         const current = await session(request, reply, 'review');
         if (!current) return;
-        const pending = await service().reviews(staff(current.identity));
-        const accounts = await service().providerAccounts(
+        const pending = await service(request).reviews(staff(current.identity));
+        const accounts = await service(request).providerAccounts(
           staff(current.identity),
         );
         return html(
           reply,
           'Help people connect their wallets',
-          `<p>${service().policy.identity.records ? 'Check that the information shared by the application belongs to this person. Accept it only for a test without funds; filled-in fields are not independently verified identity checks.' : 'Open your identity-checking service’s dashboard and confirm that its results belong to the person below. An import code or application sign-in alone does not prove this match.'}</p>${
+          `<p>${service(request).policy.identity.records ? 'Check that the information shared by the application belongs to this person. Accept it only for a test without funds; filled-in fields are not independently verified identity checks.' : 'Open your identity-checking service’s dashboard and confirm that its results belong to the person below. An import code or application sign-in alone does not prove this match.'}</p>${
             pending.length
               ? pending
                   .map(
@@ -1164,10 +1194,13 @@ ${
         const current = await formSession(request, request.body.csrf);
         const principal = staff(current.identity);
         if (request.body.decision === 'suspend') {
-          await service().suspendAccount(principal, request.params.accountId);
+          await service(request).suspendAccount(
+            principal,
+            request.params.accountId,
+          );
           return reply.redirect('/onboarding/review');
         }
-        const result = await service().reconcileAccount(
+        const result = await service(request).reconcileAccount(
           principal,
           request.params.accountId,
         );
@@ -1212,7 +1245,7 @@ ${
       },
       async (request, reply) => {
         const current = await formSession(request, request.body.csrf);
-        await service().review(
+        await service(request).review(
           staff(current.identity),
           request.params.requestId,
           {
@@ -1237,7 +1270,7 @@ ${
       async (request, reply) => {
         const current = await session(request, reply, request.params.requestId);
         if (!current) return;
-        const view = await service().consentView(
+        const view = await service(request).consentView(
           request.params.requestId,
           current.identity,
         );
@@ -1248,7 +1281,7 @@ ${
 <ul>${view.permissions.map((p) => `<li>${escape(permissionLabels[p])}</li>`).join('')}</ul>
 ${
   view.permissions.includes('contracts:request')
-    ? `<p>You allow this application to request approved transactions on ${escape(actions().network.label)}, within the limits below. Withdrawing access stops new requests through this service. It cannot undo a transaction or recall an authorization already issued.</p><details><summary>Review the exact transaction limits</summary><p>The technical rules below identify allowed contracts, recipients and operation limits. Safe signatures have no native expiry; revocation stops new service dispatch but cannot recall an already submitted authorization.</p><code>${escape(JSON.stringify(actions().callConsentTerms()))}</code></details>`
+    ? `<p>You allow this application to request approved transactions on ${escape(actions(request).network.label)}, within the limits below. Withdrawing access stops new requests through this service. It cannot undo a transaction or recall an authorization already issued.</p><details><summary>Review the exact transaction limits</summary><p>The technical rules below identify allowed contracts, recipients and operation limits. Safe signatures have no native expiry; revocation stops new service dispatch but cannot recall an already submitted authorization.</p><code>${escape(JSON.stringify(actions(request).callConsentTerms()))}</code></details>`
     : ''
 }
 <p>Access lasts up to ${view.durationDays} days. You can pause or remove it at any time. Your wallet service still checks each financial request before allowing it.</p>
@@ -1267,7 +1300,7 @@ ${
                   ? `<p>Your application can share an identity check you have already completed. If you need a new check, choose a service below. It starts only when the cost has been agreed and covered.</p>
 <form method="post" action="/onboarding/${request.params.requestId}/verify">
 <input type="hidden" name="csrf" value="${escape(current.csrf)}">
-<select name="vendor">${service()
+<select name="vendor">${service(request)
                       .verificationVendors()
                       .map((v) => `<option>${v}</option>`)
                       .join('')}</select>
@@ -1300,7 +1333,7 @@ ${
       },
       async (request, reply) => {
         const current = await formSession(request, request.body.csrf);
-        await service().consent(
+        await service(request).consent(
           request.params.requestId,
           current.identity,
           request.body.decision === 'approve',
@@ -1330,8 +1363,8 @@ ${
       },
       async (request, reply) => {
         const current = await formSession(request, request.body.csrf);
-        if (!(await ready())) return unavailable();
-        const result = await service().startVerification(
+        if (!(await ready(request))) return unavailable();
+        const result = await service(request).startVerification(
           request.params.requestId,
           current.identity,
           request.body.vendor,

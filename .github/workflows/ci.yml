@@ -52,7 +52,7 @@ jobs:
         if: steps.scope.outputs.full == 'true'
       - run: npx --no-install playwright install --with-deps chromium
         if: steps.scope.outputs.full == 'true'
-      - run: npx --no-install playwright test --config setup-ui/playwright.config.ts
+      - run: npx --no-install playwright test --config test/browser/playwright.config.ts
         if: steps.scope.outputs.full == 'true'
       - name: Check documentation sources
         if: steps.scope.outputs.full == 'false'

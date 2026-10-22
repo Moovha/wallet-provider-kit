@@ -1,3 +1,4 @@
+import { setupCommand } from '../src/deployment/cli.js';
 import { spawnSync } from 'node:child_process';
 import { expect, it } from 'vitest';
 
@@ -36,3 +37,9 @@ it.each([
     );
   },
 );
+
+it('rejects the removed browser configuration entry point', async () => {
+  await expect(setupCommand(['setup', '--no-open'])).rejects.toThrow(
+    'Invalid command',
+  );
+});

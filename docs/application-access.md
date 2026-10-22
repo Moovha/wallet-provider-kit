@@ -42,7 +42,7 @@ administration. `GET /v1/provider/user-checks` reads the settings and their revi
 installation defaults and persist across restarts. Changed settings revoke all
 wallet approvals and deny pending access requests; identical saves preserve them.
 Static installations use the advanced
-[Applications screen](setup-wizard.md#_4-applications) or those configuration fields. Static registrations use
+[Applications screen](setup.md) or those configuration fields. Static registrations use
 `policy.applications[].assertionTrust.agreement`; API-managed registrations use
 the application’s identity/consent agreement instead. Do not combine registration
 authorities in one deployment.

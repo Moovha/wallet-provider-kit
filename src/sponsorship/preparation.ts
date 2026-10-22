@@ -46,6 +46,7 @@ export function safeUserOperationCallData(intent: ApprovedCallIntent): string {
 }
 export interface RuntimeUserOperationPreparationOptions {
   providerOrigin: string;
+  budgetNetworkScope?: import('../networks.js').ProviderNetwork;
   principal: Pick<VerifiedPrincipal, 'issuer' | 'clientId'>;
   runtimePolicy: RuntimePolicySnapshot;
   basePolicy: ApprovedCallPolicy;
@@ -123,6 +124,7 @@ export function prepareRuntimeUserOperationV07(
         options.providerOrigin,
         options.principal.issuer,
         options.principal.clientId,
+        options.budgetNetworkScope,
       ),
       maximum,
       maximumCostWei,

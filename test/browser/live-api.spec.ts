@@ -38,7 +38,7 @@ test.beforeAll(async () => {
     },
     service: {
       provision: async () => {
-        throw new WalletProviderError('service_unavailable');
+        throw new WalletProviderError('wallet_provider_unavailable');
       },
     } as unknown as EmbeddedWalletService,
   });
@@ -87,7 +87,7 @@ test('deployed Swagger executes same-origin HTTP and displays real success/auth/
   await page
     .getByLabel('Browse requests by task', { exact: true })
     .selectOption('Service status');
-  await expect(page.locator('.opblock')).toHaveCount(2);
+  await expect(page.locator('.opblock')).toHaveCount(3);
   expect(calls).toHaveLength(0);
   await page
     .getByLabel('Browse requests by task', { exact: true })

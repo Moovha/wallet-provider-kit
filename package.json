@@ -77,9 +77,9 @@
   ],
   "scripts": {
     "dev": "tsx src/main.ts",
-    "build": "node scripts/clean-build.mjs && tsc -p tsconfig.json && npm run build:setup && node scripts/copy-management-assets.mjs",
+    "build": "node scripts/clean-build.mjs && tsc -p tsconfig.json && node scripts/copy-management-assets.mjs",
     "start": "node dist/main.js",
-    "typecheck": "tsc --noEmit -p tsconfig.json && tsc -p tsconfig.test.json && vue-tsc -p setup-ui/tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc -p tsconfig.test.json",
     "test": "vitest run",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
@@ -95,13 +95,12 @@
     "docs:dev": "vitepress dev docs --host 127.0.0.1",
     "docs:build": "vitepress build docs",
     "docs:preview": "vitepress preview docs --host 127.0.0.1",
-    "build:setup": "vite build --config setup-ui/vite.config.ts && node scripts/setup-notices.mjs",
-    "test:setup": "npm run build && playwright test --config setup-ui/playwright.config.ts",
     "check:paymaster": "node scripts/local-paymaster-contract.mjs",
     "generate:paymaster": "node scripts/local-paymaster-contract.mjs --write",
     "check:read-helper": "node scripts/safe-state-reader.mjs",
     "generate:read-helper": "node scripts/safe-state-reader.mjs --write",
-    "check:safe-surface": "node scripts/check-safe-surface.mjs"
+    "check:safe-surface": "node scripts/check-safe-surface.mjs",
+    "test:browser": "npm run build && playwright test --config test/browser/playwright.config.ts"
   },
   "dependencies": {
     "@fastify/helmet": "13.2.0",
@@ -123,16 +122,11 @@
     "openid-client": "6.8.8"
   },
   "devDependencies": {
-    "@formkit/addons": "2.1.2",
-    "@formkit/icons": "2.1.2",
-    "@formkit/themes": "2.1.2",
-    "@formkit/vue": "2.1.2",
     "@foundry-rs/anvil": "1.7.1",
     "@playwright/test": "1.64.1",
     "@secretlint/secretlint-rule-preset-recommend": "13.0.7",
     "@types/node": "24.19.2",
     "@types/oidc-provider": "9.12.1",
-    "@vitejs/plugin-vue": "6.0.10",
     "ajv-formats": "3.0.1",
     "mermaid": "12.2.0",
     "openapi-typescript": "7.13.0",
@@ -143,11 +137,8 @@
     "tsx": "4.23.15",
     "typescript": "5.9.3",
     "viem": "2.57.7",
-    "vite": "8.3.4",
     "vitepress": "1.6.4",
-    "vitest": "5.0.5",
-    "vue": "3.5.44",
-    "vue-tsc": "3.3.13"
+    "vitest": "5.0.5"
   },
   "repository": {
     "type": "git",

@@ -1,3 +1,4 @@
+import { providerNetwork, type ProviderNetwork } from '../networks.js';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { AuthenticationError, type Authenticate } from '../service/auth.js';
 import { problemSchema, uuidSchema } from '../service/schemas.js';
@@ -150,6 +151,8 @@ export async function registerManagementRoutes(
   executionReady?: () => Promise<boolean>,
   origin?: string,
   localOrigin?: string,
+  networks: readonly ProviderNetwork[] = ['base-sepolia'],
+  networkReady?: (network: ProviderNetwork) => Promise<boolean>,
 ) {
   const configured = () => {
     if (!service)
@@ -197,6 +200,89 @@ export async function registerManagementRoutes(
       reply.type('text/html').send(consoleHtml),
     );
   }
+  const networkSettingsSchema = {
+    type: 'object',
+    additionalProperties: false,
+    required: [
+      'revision',
+      'default_network',
+      'networks',
+      'running_networks',
+      'restart_required',
+      'available',
+    ],
+    properties: {
+      revision: { type: 'integer' },
+      default_network: { type: 'string' },
+      networks: { type: 'array', items: { type: 'string' } },
+      running_networks: { type: 'array', items: { type: 'string' } },
+      restart_required: { type: 'boolean' },
+      available: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: { network: { type: 'string' }, name: { type: 'string' } },
+        },
+      },
+    },
+  };
+  const networkView = (value: {
+    revision: number;
+    networks: ProviderNetwork[];
+  }) => ({
+    ...value,
+    default_network: networks[0],
+    running_networks: networks,
+    restart_required:
+      JSON.stringify([...value.networks].sort()) !==
+      JSON.stringify([...networks].sort()),
+    available: (['base', 'base-sepolia', 'ethereum-sepolia'] as const).map(
+      (network) => ({
+        network,
+        name:
+          providerNetwork(network).label +
+          (providerNetwork(network).testnet ? ' · test network' : ' · mainnet'),
+      }),
+    ),
+  });
+  app.get(
+    '/v1/provider/networks',
+    { schema: schema('readProviderNetworks', networkSettingsSchema) },
+    async (request) =>
+      networkView(
+        configured().networkSettings(await operator(request), networks),
+      ),
+  );
+  app.post<{
+    Body: { expected_revision: number; networks: ProviderNetwork[] };
+  }>(
+    '/v1/provider/networks',
+    {
+      schema: schema('saveProviderNetworks', networkSettingsSchema, {
+        headers: keyHeaders,
+        body: body(['expected_revision', 'networks'], {
+          expected_revision: { type: 'integer', minimum: 1 },
+          networks: {
+            type: 'array',
+            minItems: 1,
+            maxItems: 3,
+            uniqueItems: true,
+            items: { enum: ['base', 'base-sepolia', 'ethereum-sepolia'] },
+          },
+        }),
+      }),
+    },
+    async (request) => {
+      sameOrigin(request);
+      const saved = await configured().saveNetworks(
+        await operator(request),
+        String(request.headers['idempotency-key'] ?? ''),
+        request.body,
+        networks,
+      );
+      return networkView(saved);
+    },
+  );
   app.get<{
     Querystring: { limit?: string; after?: string; application_id?: string };
   }>(
@@ -253,6 +339,10 @@ export async function registerManagementRoutes(
               type: 'array',
               items: body(['account_id', 'wallet', 'role', 'status'], {
                 account_id: uuidSchema,
+                network: {
+                  type: 'string',
+                  enum: ['base', 'base-sepolia', 'ethereum-sepolia'],
+                },
                 wallet: body(['reference', 'name', 'kind'], {
                   reference: { type: 'string' },
                   name: { type: 'string' },
@@ -354,15 +444,50 @@ export async function registerManagementRoutes(
           claimed: { const: true },
           applications: { type: 'array', items: identity },
           management_available: { const: true },
+          management_identities: { type: 'array', items: identity },
+          user_checks: userChecks,
+          network_settings: networkSettingsSchema,
+          network_status: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                network: { type: 'string' },
+                name: { type: 'string' },
+                configured: { type: 'boolean' },
+              },
+            },
+          },
           wallet_operations_enabled: { type: 'boolean' },
         },
       }),
     },
-    async (request) => ({
-      ...(await configured().status(await operator(request))),
-      management_available: true,
-      wallet_operations_enabled: (await executionReady?.()) ?? false,
-    }),
+    async (request) => {
+      const principal = await operator(request);
+      const fallbackReady = networkReady
+        ? false
+        : ((await executionReady?.()) ?? false);
+      const networkStatus = await Promise.all(
+        networks.map(async (network) => ({
+          network,
+          name: providerNetwork(network).label,
+          configured: networkReady
+            ? await networkReady(network)
+            : fallbackReady,
+        })),
+      );
+      return {
+        ...(await configured().status(principal)),
+        network_settings: networkView(
+          configured().networkSettings(principal, networks),
+        ),
+        network_status: networkStatus,
+        management_available: true,
+        wallet_operations_enabled: networkStatus.some(
+          (network) => network.configured,
+        ),
+      };
+    },
   );
   app.get(
     '/v1/provider/identities',

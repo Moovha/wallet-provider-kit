@@ -459,6 +459,8 @@ See the [HTTP reference](http-reference.md).
 
 ```ts
 export interface ServerOptions {
+  networkContexts?: readonly NetworkContext[];
+  resolveNetwork?: ResolveNetwork;
   management?: ManagementService;
   managementReady?: () => Promise<boolean>;
   providerOrigin?: string;
@@ -929,6 +931,7 @@ export declare class OnboardingService {
         principal: VerifiedPrincipal,
       ): import('./types.js').ApplicationPolicy;
     },
+    consentNetwork?: import('../networks.js').ProviderNetwork,
   );
   applicationAccessPolicy(
     principal: VerifiedPrincipal,
@@ -1498,6 +1501,7 @@ export interface ProviderState {
       network?: import('../networks.js').ProviderNetwork;
       activeRevision?: string;
       transportRevision?: string;
+      networkSetRevision?: string;
       managementInstallationId?: string;
       accessMode?: 'application' | 'hosted';
       runtimeConfiguration?: import('../runtime-configuration/service.js').RuntimeConfigurationState;
@@ -2087,6 +2091,11 @@ export interface FinancialAuthorization {
 export declare function openProviderDatabase(
   options: ProviderDatabaseOptions,
 ): {
+  networkScope: ProviderNetwork | undefined;
+  hasResource(id: string): boolean;
+  /** Operator transactions can revoke grants atomically across retained networks. */
+  managementStore: import('../index.js').OnboardingStore;
+  accountNetwork(id: string): ProviderNetwork | undefined;
   managementSnapshot():
     import('../management/service.js').ManagementState | undefined;
   onboardingStore: import('../index.js').OnboardingStore;
@@ -2224,6 +2233,9 @@ export type ProviderDatabase = ReturnType<typeof openProviderDatabase>;
 
 ```ts
 export interface ProviderDatabaseOptions {
+  /** Additional network state shares identity and management in the same verified schema. */
+  networkScope?: ProviderNetwork;
+  expectedNetworkSetRevision?: string;
   /** Dedicated private directory on persistent local POSIX storage. */
   directory: string;
   /** Explicitly initialize an empty toolkit database. Never upgrades an existing schema. */
@@ -2253,6 +2265,7 @@ Import from `@moovha/wallet-provider-kit/deployment`. [Integration guide](setup.
 - [defaultSafeProvisioning](#defaultsafeprovisioning)
 - [inspectSafeRecovery](#inspectsaferecovery)
 - [loadProviderConfiguration](#loadproviderconfiguration)
+- [networkConfigurations](#networkconfigurations)
 - [OperationAdapters](#operationadapters)
 - [OperationAdapterTerms](#operationadapterterms)
 - [PinnedContract](#pinnedcontract)
@@ -2507,7 +2520,7 @@ export declare class ConfigurationError extends Error {
 [Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/deployment/provider.ts).
 
 ```ts
-/** Compose the supported configured service with built-in authority and journals; activation remains explicit. */
+/** One identity and application registry with independently authorized network runtimes. */
 export declare function createConfiguredProvider(
   input: unknown,
   directory?: string,
@@ -2609,6 +2622,17 @@ export declare function loadProviderConfiguration(path: string): Promise<{
 }>;
 ```
 
+### networkConfigurations
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/deployment/network-configuration.ts).
+
+```ts
+/** Shared identity/authentication, explicit independent network execution settings. */
+export declare function networkConfigurations(
+  config: ProviderConfiguration,
+): ProviderConfiguration[];
+```
+
 ### OperationAdapters
 
 [Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/operation-adapters.ts).
@@ -2676,6 +2700,13 @@ export interface ProviderConfiguration {
   };
   safeWallet?: import('../sponsorship/safe-wallet.js').SafeWalletConfiguration;
   network?: ProviderNetwork;
+  additionalNetworks?: {
+    network: ProviderNetwork;
+    safeWallet?: ProviderConfiguration['safeWallet'];
+    safeProvisioning?: ProviderConfiguration['safeProvisioning'];
+    approvedCalls?: ProviderConfiguration['approvedCalls'];
+    activation?: ProviderConfiguration['activation'];
+  }[];
   safeProvisioning?: import('../provisioning/safe.js').SafeProvisioningConfiguration;
   runtimeConfiguration?: RuntimeConfigurationOptions;
   configVersion: 1;
@@ -3405,11 +3436,12 @@ export interface ApplicationGasAllowance {
 [Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/sponsorship/budget.ts).
 
 ```ts
-/** One application gas ledger across execution mechanisms and payer pool members. */
+/** One application gas ledger per network across execution mechanisms and payer pool members. Omitted scope retains default-network ledger IDs. */
 export declare function applicationGasBudgetId(
   origin: string,
   issuer: string,
   clientId: string,
+  networkScope?: import('../networks.js').ProviderNetwork,
 ): string;
 ```
 
@@ -3708,6 +3740,7 @@ export declare function prepareRuntimeUserOperationV07(
 ```ts
 export interface RuntimeUserOperationPreparationOptions {
   providerOrigin: string;
+  budgetNetworkScope?: import('../networks.js').ProviderNetwork;
   principal: Pick<VerifiedPrincipal, 'issuer' | 'clientId'>;
   runtimePolicy: RuntimePolicySnapshot;
   basePolicy: ApprovedCallPolicy;
@@ -4337,6 +4370,24 @@ export declare function createWalletsClient(options: {
   authorization(): Promise<string>;
   fetch?: typeof fetch;
 }): {
+  networks(): Promise<{
+    default_network: ProviderNetwork;
+    networks: {
+      network: ProviderNetwork;
+      name: string;
+      chain_id: string;
+      configured: boolean;
+    }[];
+  }>;
+  accessPolicy(): Promise<{
+    policy_revision: string;
+    action_policy_revision?: string;
+    chain_id: string;
+    required_fields: string[];
+    verification_level: string;
+    max_identity_age_days: number;
+    max_access_days: number;
+  }>;
   requestAccess(
     input: AccessRequestInput,
     idempotencyKey: string,
@@ -4453,6 +4504,8 @@ export interface WalletDescription {
 
 ```ts
 export interface WalletSummary {
+  network?: ProviderNetwork;
+  chain_id?: string;
   account_id: string;
   is_default: boolean;
   wallet: WalletDescription;

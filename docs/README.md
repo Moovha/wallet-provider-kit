@@ -55,7 +55,7 @@ funded mainnet acceptance remain pending.
 | Connect an application               | [Connection guide](runtime-workspace.md)                               |
 | Change permitted transactions        | [Application rules](runtime-configuration.md)                          |
 | Keep the service running             | [Monitoring](operations.md) and [maintenance](provider-maintenance.md) |
-| Use an existing static configuration | [Advanced setup](setup-wizard.md)                                      |
+| Use an existing static configuration | [Static configuration](setup.md)                                       |
 | Embed the toolkit in my own server   | [TypeScript integration](api.md)                                       |
 
 You only need the advanced references when your task calls for them. The standard

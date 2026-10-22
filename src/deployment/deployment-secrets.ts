@@ -6,6 +6,9 @@ import type { ProviderConfiguration } from './config.js';
 /** Names eligible for generation during explicit new-deployment setup, never service startup. */
 export function generatedSecretNames(config: ProviderConfiguration): string[] {
   return [
+    ...(config.additionalNetworks ?? []).flatMap((entry) =>
+      entry.safeWallet ? [entry.safeWallet.bundlerAuthorization.env] : [],
+    ),
     ...(config.management ? [config.management.claim.env] : []),
     ...(config.safeWallet ? [config.safeWallet.bundlerAuthorization.env] : []),
     ...(config.runtimeConfiguration?.credentialKey

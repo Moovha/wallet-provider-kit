@@ -24,6 +24,5 @@ variables or the deployment’s secret store, outside JSON. Review the selected
 chain’s pinned Safe, module, handler, EntryPoint and contract addresses. Applications
 need accepted rules, services and bounded network-fee sponsorship before use.
 
-Use the [advanced editor](setup-wizard.md) for a guided static configuration, or
-[application management](runtime-workspace.md) for a running API-managed service.
+Edit static configuration as JSON, validate it with `node dist/main.js validate --config provider.config.json`, or use [administration](runtime-workspace.md) for a running API-managed service.
 Complete [launch checks](conformance.md), including backup and recovery, before activation.

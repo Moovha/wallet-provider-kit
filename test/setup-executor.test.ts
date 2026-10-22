@@ -248,7 +248,9 @@ describe('explicit local container executor with offline command fixtures', () =
           recoveryAcceptance: 'reviewed',
         },
       }),
-    ).rejects.toMatchObject({ issues: [expect.stringContaining('Turn off')] });
+    ).rejects.toMatchObject({
+      issues: [expect.stringContaining('activation.enabled to false')],
+    });
     await expect(
       run.prepare({
         ...config,

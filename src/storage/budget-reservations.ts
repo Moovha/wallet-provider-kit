@@ -49,7 +49,7 @@ export function reserveAdditionalBudget(
   const id = budgetReservationId(approval, charge.budgetId),
     row = connection.get(
       'SELECT record FROM onboarding_records WHERE collection=? AND id=?',
-      'assetReservations',
+      connection.recordCollection('assetReservations'),
       id,
     );
   if (row) {
@@ -77,7 +77,7 @@ export function reserveAdditionalBudget(
   );
   connection.run(
     'INSERT INTO onboarding_records(collection,id,record) VALUES(?,?,?)',
-    'assetReservations',
+    connection.recordCollection('assetReservations'),
     id,
     JSON.stringify({ budgetId: charge.budgetId, units: charge.units }),
   );

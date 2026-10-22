@@ -16,11 +16,6 @@ and Solady source material. Their source revisions and licenses are recorded in
 contracts/vendor/README.md and docs/licenses. Generated paymaster bytecode retains
 those upstream licenses.
 
-The bundled FormKit/Vue operator interface includes MIT-licensed components;
-see dist/setup-ui/THIRD_PARTY_NOTICES.txt in built packages. Provider marks
-identify integrations, remain their owners' property and imply no endorsement;
-see dist/setup-ui/PROVIDER_ASSETS.txt for official sources.
-
 The optional private bundler runtime uses Pimlico Alto v1.2.8, source revision
 37cade5d2804a60ab30362ea27054514e1d7a7c8, under GPL-3.0. Its pinned container
 retains upstream sources, contract artifacts and license material. It operates

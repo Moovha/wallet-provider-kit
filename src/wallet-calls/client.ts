@@ -72,6 +72,7 @@ export function createWalletCallsProvider(options: WalletCallsClientOptions) {
         headers: {
           'content-type': 'application/json',
           authorization: await options.authorization(),
+          ...(options.network ? { 'Wallet-Network': options.network } : {}),
           ...(options.accessGrantId
             ? { 'Wallet-Grant-Id': options.accessGrantId }
             : {}),
@@ -161,6 +162,7 @@ export function createWalletCallsProvider(options: WalletCallsClientOptions) {
       {
         headers: {
           authorization: await options.authorization(),
+          ...(options.network ? { 'Wallet-Network': options.network } : {}),
           accept: 'text/event-stream',
           ...(options.accessGrantId
             ? { 'Wallet-Grant-Id': options.accessGrantId }

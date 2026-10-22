@@ -1,5 +1,5 @@
 import { createWalletCallsProvider } from '../wallet-calls/client.js';
-import type { ProviderNetwork } from '../networks.js';
+import { providerNetwork, type ProviderNetwork } from '../networks.js';
 import type {
   AccessRequestInput,
   Permission,
@@ -11,6 +11,8 @@ export type {
 } from '../onboarding/types.js';
 
 export interface WalletSummary {
+  network?: ProviderNetwork;
+  chain_id?: string;
   account_id: string;
   is_default: boolean;
   wallet: WalletDescription;
@@ -45,6 +47,7 @@ export function createWalletsClient(options: {
   authorization(): Promise<string>;
   fetch?: typeof fetch;
 }) {
+  if (options.network) providerNetwork(options.network);
   const origin = new URL(options.url);
   if (
     origin.protocol !== 'https:' ||
@@ -77,6 +80,7 @@ export function createWalletsClient(options: {
       method,
       headers: {
         authorization: await options.authorization(),
+        ...(options.network ? { 'Wallet-Network': options.network } : {}),
         'content-type': 'application/json',
         ...(key ? { 'Idempotency-Key': key } : {}),
         ...(grantId ? { 'Wallet-Grant-Id': grantId } : {}),
@@ -90,6 +94,28 @@ export function createWalletsClient(options: {
     return (await response.json()) as T;
   }
   return {
+    networks() {
+      return request<{
+        default_network: ProviderNetwork;
+        networks: {
+          network: ProviderNetwork;
+          name: string;
+          chain_id: string;
+          configured: boolean;
+        }[];
+      }>('/v1/networks', 'GET');
+    },
+    accessPolicy() {
+      return request<{
+        policy_revision: string;
+        action_policy_revision?: string;
+        chain_id: string;
+        required_fields: string[];
+        verification_level: string;
+        max_identity_age_days: number;
+        max_access_days: number;
+      }>('/v1/access-policy', 'GET');
+    },
     requestAccess(input: AccessRequestInput, idempotencyKey: string) {
       return request<{
         request_id: string;
@@ -168,7 +194,7 @@ export function createWalletsClient(options: {
     },
     walletProvider(wallet: WalletSummary) {
       return createWalletCallsProvider({
-        network: options.network,
+        network: wallet.network ?? options.network,
         url: new URL(accountPath(wallet.account_id) + '/wallet', origin).href,
         authorization: options.authorization,
         fetch: send,

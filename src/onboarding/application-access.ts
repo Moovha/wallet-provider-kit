@@ -91,7 +91,8 @@ export function checkApplicationAssertion(
     consentAt < now - policy.access.maxAgeDays * day ||
     consentExpiry <= now ||
     consentExpiry > consentAt + policy.access.maxAgeDays * day ||
-    user.consent.policy_revision !== policy.revision ||
+    user.consent.policy_revision !==
+      (policy.consentRevision ?? policy.revision) ||
     user.consent.action_policy_revision !== actionRevision
   )
     deny();
