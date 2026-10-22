@@ -36,7 +36,10 @@ export const accountSchema = {
       required: ['profile', 'chain_id', 'address', 'status'],
       properties: {
         profile: { type: 'string', const: 'safe-1.4.1' },
-        chain_id: { type: 'string', enum: ['eip155:8453', 'eip155:84532'] },
+        chain_id: {
+          type: 'string',
+          enum: ['eip155:8453', 'eip155:84532', 'eip155:11155111'],
+        },
         address: { type: 'string', pattern: '^0x[0-9a-fA-F]{40}$' },
         status: {
           type: 'string',

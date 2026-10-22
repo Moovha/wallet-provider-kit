@@ -20,3 +20,7 @@ export function reservePaymasterPrefund(input: {
 export function privateOperationExpired(operation: {
   signature: string;
 }): boolean;
+export function readBundleParameter<T>(
+  read: () => Promise<T>,
+  wait?: (milliseconds: number) => Promise<void>,
+): Promise<T>;

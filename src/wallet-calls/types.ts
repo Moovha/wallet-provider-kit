@@ -10,7 +10,7 @@ export interface WalletCallsReceipt {
 export interface WalletCallsStatus {
   version: '2.0.0';
   id: string;
-  chainId: '0x14a34' | '0x2105';
+  chainId: '0x14a34' | '0x2105' | '0xaa36a7';
   status: 100 | 200 | 400 | 500;
   atomic: true;
   capabilities?: {

@@ -99,7 +99,21 @@ export function patchBundlerFundingLease(source, expectedHash) {
       'const wallet = await this.senderManager.getWallet()',
       'const wallet = executor ?? (await this.senderManager.getWallet())',
     );
-  return patched.slice(0, start) + body;
+  // TypeScript and emitted JavaScript retain different indentation.
+  const reads =
+    /this\.gasPriceManager\.tryGetNetworkGasPrice\(\{\s*forExecutor: true\s*\}\),\s*this\.getBaseFee\(\),\s*this\.config\.publicClient\.getTransactionCount\(\{\s*address: wallet\.address,\s*blockTag: "latest"\s*\}\)/;
+  if (!reads.test(body)) throw Error('Unexpected bundle parameter layout');
+  const bounded = body.replace(
+    reads,
+    `readBundleParameter(() => this.gasPriceManager.tryGetNetworkGasPrice({ forExecutor: true })),
+    readBundleParameter(() => this.getBaseFee()),
+    readBundleParameter(() => this.config.publicClient.getTransactionCount({ address: wallet.address, blockTag: "latest" }))`,
+  );
+  return (
+    `import { readBundleParameter } from "/app/wpk-bundler-funding.mjs";\n` +
+    patched.slice(0, start) +
+    bounded
+  );
 }
 
 /** Register an acquired executor immediately; delay only when no executor is available. */

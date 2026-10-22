@@ -84,3 +84,18 @@ export function privateOperationExpired(operation) {
   const until = BigInt('0x' + operation.signature.slice(14, 26));
   return until !== 0n && until <= BigInt(Math.floor(Date.now() / 1000));
 }
+
+/** Retry only a pre-broadcast read; successful reads are never repeated. */
+export async function readBundleParameter(
+  read,
+  wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await read();
+    } catch (error) {
+      if (attempt === 3) throw error;
+      await wait(1000 * 2 ** attempt);
+    }
+  }
+}

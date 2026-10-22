@@ -1,3 +1,12 @@
+/** Select fee accounting from the server-bound chain, never from an application request. */
+export function bundlerNetworkProfile(chainId) {
+  if (chainId === '0xaa36a7')
+    return { 'chain-type': 'default', 'block-time': 12000 };
+  if (chainId === '0x14a34' || chainId === '0x2105')
+    return { 'chain-type': 'op-stack', 'block-time': 2000 };
+  throw Error('Unsupported private bundler chain');
+}
+
 /** Application-scoped read distribution. Broadcasts are sent once, without transport failover. */
 export function createBundlerRpc(configuration, request = fetch) {
   const states = new Map(),

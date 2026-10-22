@@ -1473,7 +1473,7 @@
     },
     "network": {
       "type": "string",
-      "enum": ["base", "base-sepolia"],
+      "enum": ["base", "base-sepolia", "ethereum-sepolia"],
       "description": "Server-selected network. Omission preserves Base Sepolia. Use separate storage for each network."
     },
     "safeProvisioning": {

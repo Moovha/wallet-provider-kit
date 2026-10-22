@@ -1095,7 +1095,11 @@
                         "profile": { "type": "string", "enum": ["safe-1.4.1"] },
                         "chain_id": {
                           "type": "string",
-                          "enum": ["eip155:8453", "eip155:84532"]
+                          "enum": [
+                            "eip155:8453",
+                            "eip155:84532",
+                            "eip155:11155111"
+                          ]
                         },
                         "address": {
                           "type": "string",
@@ -2134,7 +2138,7 @@
                   "properties": {
                     "chain_id": {
                       "type": "string",
-                      "enum": ["eip155:8453", "eip155:84532"]
+                      "enum": ["eip155:8453", "eip155:84532", "eip155:11155111"]
                     },
                     "source": {
                       "type": "string",
@@ -2947,7 +2951,11 @@
                             "enabled": { "type": "boolean" },
                             "chain_id": {
                               "type": "string",
-                              "enum": ["eip155:84532", "eip155:8453"]
+                              "enum": [
+                                "eip155:84532",
+                                "eip155:8453",
+                                "eip155:11155111"
+                              ]
                             },
                             "contracts": {
                               "type": "array",
@@ -7004,6 +7012,46 @@
                                   }
                                 }
                               }
+                            },
+                            "0xaa36a7": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": ["atomic"],
+                              "properties": {
+                                "applicationAction": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "required": ["supported"],
+                                  "properties": {
+                                    "supported": {
+                                      "type": "boolean",
+                                      "enum": [true]
+                                    }
+                                  }
+                                },
+                                "paymasterService": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "required": ["supported"],
+                                  "properties": {
+                                    "supported": {
+                                      "type": "boolean",
+                                      "enum": [true]
+                                    }
+                                  }
+                                },
+                                "atomic": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "required": ["status"],
+                                  "properties": {
+                                    "status": {
+                                      "type": "string",
+                                      "enum": ["supported"]
+                                    }
+                                  }
+                                }
+                              }
                             }
                           }
                         }
@@ -8465,7 +8513,11 @@
                                 "properties": {
                                   "chain_id": {
                                     "type": "string",
-                                    "enum": ["eip155:8453", "eip155:84532"]
+                                    "enum": [
+                                      "eip155:8453",
+                                      "eip155:84532",
+                                      "eip155:11155111"
+                                    ]
                                   },
                                   "funding_agreement": {
                                     "type": "string",
@@ -8966,7 +9018,11 @@
                                 "properties": {
                                   "chain_id": {
                                     "type": "string",
-                                    "enum": ["eip155:8453", "eip155:84532"]
+                                    "enum": [
+                                      "eip155:8453",
+                                      "eip155:84532",
+                                      "eip155:11155111"
+                                    ]
                                   },
                                   "funding_agreement": {
                                     "type": "string",
@@ -9518,7 +9574,11 @@
                           "properties": {
                             "chain_id": {
                               "type": "string",
-                              "enum": ["eip155:8453", "eip155:84532"]
+                              "enum": [
+                                "eip155:8453",
+                                "eip155:84532",
+                                "eip155:11155111"
+                              ]
                             },
                             "funding_agreement": {
                               "type": "string",
@@ -10024,7 +10084,11 @@
                           "properties": {
                             "chain_id": {
                               "type": "string",
-                              "enum": ["eip155:8453", "eip155:84532"]
+                              "enum": [
+                                "eip155:8453",
+                                "eip155:84532",
+                                "eip155:11155111"
+                              ]
                             },
                             "funding_agreement": {
                               "type": "string",
@@ -10555,7 +10619,11 @@
                           "properties": {
                             "chain_id": {
                               "type": "string",
-                              "enum": ["eip155:8453", "eip155:84532"]
+                              "enum": [
+                                "eip155:8453",
+                                "eip155:84532",
+                                "eip155:11155111"
+                              ]
                             },
                             "funding_agreement": {
                               "type": "string",
@@ -11061,7 +11129,11 @@
                           "properties": {
                             "chain_id": {
                               "type": "string",
-                              "enum": ["eip155:8453", "eip155:84532"]
+                              "enum": [
+                                "eip155:8453",
+                                "eip155:84532",
+                                "eip155:11155111"
+                              ]
                             },
                             "funding_agreement": {
                               "type": "string",
@@ -11402,7 +11474,11 @@
                     "properties": {
                       "chain_id": {
                         "type": "string",
-                        "enum": ["eip155:8453", "eip155:84532"]
+                        "enum": [
+                          "eip155:8453",
+                          "eip155:84532",
+                          "eip155:11155111"
+                        ]
                       },
                       "funding_agreement": {
                         "type": "string",
@@ -11621,7 +11697,11 @@
                           "properties": {
                             "chain_id": {
                               "type": "string",
-                              "enum": ["eip155:8453", "eip155:84532"]
+                              "enum": [
+                                "eip155:8453",
+                                "eip155:84532",
+                                "eip155:11155111"
+                              ]
                             },
                             "funding_agreement": {
                               "type": "string",
@@ -12127,7 +12207,11 @@
                           "properties": {
                             "chain_id": {
                               "type": "string",
-                              "enum": ["eip155:8453", "eip155:84532"]
+                              "enum": [
+                                "eip155:8453",
+                                "eip155:84532",
+                                "eip155:11155111"
+                              ]
                             },
                             "funding_agreement": {
                               "type": "string",
@@ -12467,7 +12551,7 @@
                   "properties": {
                     "network": {
                       "type": "string",
-                      "enum": ["base", "base-sepolia"]
+                      "enum": ["base", "base-sepolia", "ethereum-sepolia"]
                     },
                     "role": {
                       "type": "string",
@@ -12606,7 +12690,11 @@
                                   "enabled": { "type": "boolean" },
                                   "chain_id": {
                                     "type": "string",
-                                    "enum": ["eip155:84532", "eip155:8453"]
+                                    "enum": [
+                                      "eip155:84532",
+                                      "eip155:8453",
+                                      "eip155:11155111"
+                                    ]
                                   },
                                   "contracts": {
                                     "type": "array",
@@ -13234,7 +13322,11 @@
                                     "enabled": { "type": "boolean" },
                                     "chain_id": {
                                       "type": "string",
-                                      "enum": ["eip155:84532", "eip155:8453"]
+                                      "enum": [
+                                        "eip155:84532",
+                                        "eip155:8453",
+                                        "eip155:11155111"
+                                      ]
                                     },
                                     "contracts": {
                                       "type": "array",
@@ -13885,7 +13977,11 @@
                                     "enabled": { "type": "boolean" },
                                     "chain_id": {
                                       "type": "string",
-                                      "enum": ["eip155:84532", "eip155:8453"]
+                                      "enum": [
+                                        "eip155:84532",
+                                        "eip155:8453",
+                                        "eip155:11155111"
+                                      ]
                                     },
                                     "contracts": {
                                       "type": "array",
@@ -14716,7 +14812,7 @@
                           "version": { "type": "string", "enum": ["2.0.0"] },
                           "chainId": {
                             "type": "string",
-                            "enum": ["0x14a34", "0x2105"]
+                            "enum": ["0x14a34", "0x2105", "0xaa36a7"]
                           },
                           "status": {
                             "type": "integer",
@@ -15469,7 +15565,11 @@
                             "enabled": { "type": "boolean" },
                             "chain_id": {
                               "type": "string",
-                              "enum": ["eip155:84532", "eip155:8453"]
+                              "enum": [
+                                "eip155:84532",
+                                "eip155:8453",
+                                "eip155:11155111"
+                              ]
                             },
                             "contracts": {
                               "type": "array",
@@ -16327,7 +16427,11 @@
                             "enabled": { "type": "boolean" },
                             "chain_id": {
                               "type": "string",
-                              "enum": ["eip155:84532", "eip155:8453"]
+                              "enum": [
+                                "eip155:84532",
+                                "eip155:8453",
+                                "eip155:11155111"
+                              ]
                             },
                             "contracts": {
                               "type": "array",
@@ -17185,7 +17289,11 @@
                             "enabled": { "type": "boolean" },
                             "chain_id": {
                               "type": "string",
-                              "enum": ["eip155:84532", "eip155:8453"]
+                              "enum": [
+                                "eip155:84532",
+                                "eip155:8453",
+                                "eip155:11155111"
+                              ]
                             },
                             "contracts": {
                               "type": "array",
@@ -17987,7 +18095,11 @@
                       "enabled": { "type": "boolean" },
                       "chain_id": {
                         "type": "string",
-                        "enum": ["eip155:84532", "eip155:8453"]
+                        "enum": [
+                          "eip155:84532",
+                          "eip155:8453",
+                          "eip155:11155111"
+                        ]
                       },
                       "contracts": {
                         "type": "array",
@@ -18565,7 +18677,11 @@
                         "enabled": { "type": "boolean" },
                         "chain_id": {
                           "type": "string",
-                          "enum": ["eip155:84532", "eip155:8453"]
+                          "enum": [
+                            "eip155:84532",
+                            "eip155:8453",
+                            "eip155:11155111"
+                          ]
                         },
                         "contracts": {
                           "type": "array",
@@ -19386,7 +19502,11 @@
                         "enabled": { "type": "boolean" },
                         "chain_id": {
                           "type": "string",
-                          "enum": ["eip155:84532", "eip155:8453"]
+                          "enum": [
+                            "eip155:84532",
+                            "eip155:8453",
+                            "eip155:11155111"
+                          ]
                         },
                         "contracts": {
                           "type": "array",
@@ -20235,7 +20355,11 @@
                         "enabled": { "type": "boolean" },
                         "chain_id": {
                           "type": "string",
-                          "enum": ["eip155:84532", "eip155:8453"]
+                          "enum": [
+                            "eip155:84532",
+                            "eip155:8453",
+                            "eip155:11155111"
+                          ]
                         },
                         "contracts": {
                           "type": "array",
@@ -21028,7 +21152,11 @@
                       "enabled": { "type": "boolean" },
                       "chain_id": {
                         "type": "string",
-                        "enum": ["eip155:84532", "eip155:8453"]
+                        "enum": [
+                          "eip155:84532",
+                          "eip155:8453",
+                          "eip155:11155111"
+                        ]
                       },
                       "contracts": {
                         "type": "array",
@@ -21613,7 +21741,11 @@
                         "enabled": { "type": "boolean" },
                         "chain_id": {
                           "type": "string",
-                          "enum": ["eip155:84532", "eip155:8453"]
+                          "enum": [
+                            "eip155:84532",
+                            "eip155:8453",
+                            "eip155:11155111"
+                          ]
                         },
                         "contracts": {
                           "type": "array",

@@ -1854,7 +1854,7 @@ export class SafeWalletRuntime {
         maximumVerificationGas: '0x186a0',
         maximumPostOpGas: '0xc350',
         maximumCostWei: agreement.maximum_gas_budget_wei,
-        l1FeeReserveWei: '1000000000000',
+        l1FeeReserveWei: sponsorshipGas(agreement).l1FeeReserveWei,
         authorize: (request) => signing.authorizeLocalPaymaster(request),
         sign: async (hash, request) => {
           await signing.authorizeLocalPaymaster(request);
@@ -1888,7 +1888,7 @@ export class SafeWalletRuntime {
           url: localPaymasterUrl,
           maximumVerificationGas: '0x186a0',
           maximumPostOpGas: '0xc350',
-          l1FeeReserveWei: '1000000000000',
+          l1FeeReserveWei: sponsorshipGas(agreement).l1FeeReserveWei,
         },
       },
       {

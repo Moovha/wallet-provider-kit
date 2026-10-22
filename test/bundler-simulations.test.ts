@@ -66,3 +66,101 @@ it('preserves tracer settings and rejects batch RPC requests at the simulation b
     applyBundlerSimulationOverrides([] as never, { [address]: '0x6000' }),
   ).toThrow();
 });
+
+it('bounds unsigned gas against the deployed EntryPoint without signing, broadcasting or changing operation inputs', async () => {
+  const { estimateNativeUserOperationGas } =
+    await import('../scripts/bundler-simulations.mjs');
+  const { Interface } = await import('ethers');
+  const abi = new Interface([
+    'error FailedOp(uint256,string)',
+    'function handleOps((address,uint256,bytes,bytes,bytes32,uint256,bytes32,bytes,bytes)[],address)',
+  ]);
+  const operation = {
+    sender: '0x1111111111111111111111111111111111111111',
+    nonce: '0x0',
+    callData: '0x1234',
+    verificationGasLimit: '0x493e0',
+    callGasLimit: '0x493e0',
+    preVerificationGas: '0x10000',
+    maxFeePerGas: '0x2',
+    maxPriorityFeePerGas: '0x1',
+    paymaster: '0x2222222222222222222222222222222222222222',
+    paymasterVerificationGasLimit: '0x186a0',
+    paymasterPostOpGasLimit: '0xc350',
+    paymasterData: '0x' + '11'.repeat(77),
+    signature: '0x' + '11'.repeat(77),
+  };
+  const before = structuredClone(operation),
+    block = { number: '0x64', hash: '0x' + '11'.repeat(32) };
+  let calls = 0,
+    reorg = false,
+    unexpected = false;
+  const request = async (
+    method: string,
+    params: unknown[],
+  ): Promise<Record<string, unknown>> => {
+    if (method === 'eth_getBlockByNumber')
+      return {
+        result: {
+          ...block,
+          ...(reorg && params[0] === block.number
+            ? { hash: '0x' + '22'.repeat(32) }
+            : {}),
+        },
+      };
+    if (method === 'eth_estimateGas') {
+      expect(params[1]).toBe(block.number);
+      expect(params).toHaveLength(2);
+      return { result: '0x30000' };
+    }
+    expect(method).toBe('eth_call');
+    calls++;
+    const tx = params[0] as { to: string; data: string };
+    expect(tx.to).toBe(address);
+    expect(params[1]).toBe(block.number);
+    expect(params).toHaveLength(2);
+    const gas =
+      BigInt(abi.decodeFunctionData('handleOps', tx.data)[0][0][4]) >> 128n;
+    return {
+      error: {
+        code: 3,
+        data: abi.encodeErrorResult('FailedOp', [
+          0,
+          unexpected
+            ? 'AA25 invalid nonce'
+            : gas >= 124000n
+              ? 'AA24 signature error'
+              : 'AA26 over verificationGasLimit',
+        ]),
+      },
+    };
+  };
+  const input = {
+    operation,
+    estimate: { verificationGasLimit: '0x115fd', callGasLimit: '0x10000' },
+    entryPoint: address,
+    request,
+  };
+  const result = await estimateNativeUserOperationGas(input);
+  expect(BigInt(result.verificationGasLimit)).toBeGreaterThanOrEqual(124000n);
+  expect(BigInt(result.verificationGasLimit)).toBeLessThan(126048n);
+  expect(result.callGasLimit).toBe('0x30000');
+  expect(calls).toBeLessThanOrEqual(10);
+  expect(operation).toEqual(before);
+  reorg = true;
+  await expect(estimateNativeUserOperationGas(input)).rejects.toThrow(
+    'Verification block changed',
+  );
+  reorg = false;
+  unexpected = true;
+  await expect(estimateNativeUserOperationGas(input)).rejects.toThrow(
+    'EntryPoint estimate unavailable',
+  );
+  unexpected = false;
+  await expect(
+    estimateNativeUserOperationGas({
+      ...input,
+      operation: { ...operation, verificationGasLimit: '0x186a0' },
+    }),
+  ).rejects.toThrow('Verification gas exceeds ceiling');
+});

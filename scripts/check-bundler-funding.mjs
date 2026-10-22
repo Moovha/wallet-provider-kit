@@ -291,3 +291,130 @@ console.log(
     externalRequests: 0,
   }),
 );
+
+// Exercise the pinned calculator: Ethereum has no OP Stack L1 fee oracle.
+const { createRequire } = await import('node:module');
+const { createPublicClient, custom } = createRequire('/app/src/package.json')(
+  'viem',
+);
+const { calcL2PvgComponent } =
+  await import('/app/src/esm/rpc/estimation/preVerificationGasCalculator.js');
+const { bundlerNetworkProfile } = await import('/app/wpk-bundler-rpc.mjs');
+let oracleReads = 0;
+const publicClient = createPublicClient({
+  chain: {
+    id: 11155111,
+    name: 'Offline Ethereum Sepolia',
+    nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+    rpcUrls: { default: { http: ['https://offline.example.test'] } },
+  },
+  transport: custom({
+    request: async ({ method }) => {
+      assert.equal(method, 'eth_call');
+      oracleReads++;
+      return '0x';
+    },
+  }),
+});
+const pvgInput = {
+  config: {
+    chainType: bundlerNetworkProfile('0xaa36a7')['chain-type'],
+    publicClient,
+  },
+  userOp: original[0].userOp,
+  entryPoint,
+  gasPriceManager: {
+    getBaseFee: async () => 1n,
+    getGasPrice: async () => ({ maxFeePerGas: 2n, maxPriorityFeePerGas: 1n }),
+  },
+  validate: false,
+};
+assert.equal(await calcL2PvgComponent(pvgInput), 0n);
+assert.equal(oracleReads, 0);
+await assert.rejects(
+  calcL2PvgComponent({
+    ...pvgInput,
+    config: { ...pvgInput.config, chainType: 'op-stack' },
+  }),
+);
+assert.equal(oracleReads, 1);
+console.log(
+  JSON.stringify({
+    pinnedEthereumFeeAccountingPassed: true,
+    ethereumOracleReads: 0,
+    wrongProfileReproduced: true,
+    externalRequests: 0,
+  }),
+);
+
+{
+  const worker = Object.create(ExecutorManager.prototype),
+    wallet = { address: '0x' + '11'.repeat(20) },
+    counts = { fees: 0, nonce: 0, base: 0, submitted: 0, resubmitted: 0 },
+    userOpBundle = {
+      entryPoint: '0x' + '22'.repeat(20),
+      userOps: [{ userOp: {} }],
+      version: '0.7',
+    };
+  Object.assign(worker, {
+    config: {
+      publicClient: {
+        async getTransactionCount() {
+          counts.nonce++;
+          return 0;
+        },
+      },
+    },
+    gasPriceManager: {
+      async tryGetNetworkGasPrice() {
+        if (++counts.fees < 4) throw Error('Offline transient outage');
+        return { maxFeePerGas: 1n, maxPriorityFeePerGas: 1n };
+      },
+    },
+    getBaseFee: async () => {
+      counts.base++;
+      return 1n;
+    },
+    senderManager: {
+      getWallet: async () => wallet,
+      markWalletProcessed: async () => {},
+    },
+    mempool: {
+      resubmitUserOps: async () => {
+        counts.resubmitted++;
+      },
+      dropUserOps: async () => {},
+      markUserOpsAsSubmitted: async () => {},
+    },
+    executor: {
+      bundle: async () => {
+        counts.submitted++;
+        return {
+          success: true,
+          userOpsBundled: [],
+          rejectedUserOps: [],
+          transactionRequest: {},
+          transactionHash: '0x' + '33'.repeat(32),
+        };
+      },
+    },
+    bundleManager: { trackBundle() {} },
+    startWatchingBlocks() {},
+    metrics: { bundlesSubmitted: { labels: () => ({ inc() {} }) } },
+  });
+  await worker.sendBundleToExecutor(userOpBundle, wallet);
+  assert.deepEqual(counts, {
+    fees: 4,
+    nonce: 1,
+    base: 1,
+    submitted: 1,
+    resubmitted: 0,
+  });
+  console.log(
+    JSON.stringify({
+      pinnedParameterReadRetryPassed: true,
+      counts,
+      noBroadcasts: true,
+    }),
+  );
+}

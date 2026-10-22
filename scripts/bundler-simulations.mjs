@@ -14,6 +14,8 @@ const {
   bytesToHex,
   encodeFunctionData,
   decodeFunctionResult,
+  decodeErrorResult,
+  parseAbi,
 } = viem;
 
 export const simulationAddresses = {
@@ -145,4 +147,127 @@ export function applyBundlerSimulationOverrides(body, code) {
       ? { ...current, stateOverrides: overrides }
       : overrides;
   return { ...body, params };
+}
+
+const entryPointVerificationAbi = parseAbi([
+  'function handleOps((address sender,uint256 nonce,bytes initCode,bytes callData,bytes32 accountGasLimits,uint256 preVerificationGas,bytes32 gasFees,bytes paymasterAndData,bytes signature)[] ops,address beneficiary)',
+  'error FailedOp(uint256 opIndex,string reason)',
+]);
+/** Bound unsigned validation and execution estimates against deployed contracts before any real signature exists. */
+export async function estimateNativeUserOperationGas({
+  operation,
+  estimate,
+  entryPoint,
+  request,
+}) {
+  const quantity = (value) => {
+    if (typeof value !== 'string' || !/^0x[0-9a-f]+$/i.test(value))
+      throw Error('Invalid gas estimate');
+    return BigInt(value);
+  };
+  let low = quantity(estimate.verificationGasLimit);
+  const ceiling = quantity(operation.verificationGasLimit);
+  if (low <= 0n || ceiling < low || ceiling > 1000000n)
+    throw Error('Invalid verification ceiling');
+  const blockResponse = await request('eth_getBlockByNumber', [
+    'latest',
+    false,
+  ]);
+  const block = blockResponse.result;
+  if (!block?.number || !/^0x[0-9a-f]{64}$/i.test(block.hash))
+    throw Error('Verification block unavailable');
+  const pair = (a, b) =>
+    pad('0x' + quantity(a).toString(16), { size: 16 }) +
+    pad('0x' + quantity(b).toString(16), { size: 16 }).slice(2);
+  const probe = async (gas) => {
+    const packed = {
+      sender: operation.sender,
+      nonce: quantity(operation.nonce),
+      initCode: '0x',
+      callData: operation.callData,
+      accountGasLimits: pair('0x' + gas.toString(16), operation.callGasLimit),
+      preVerificationGas: quantity(operation.preVerificationGas),
+      gasFees: pair(operation.maxPriorityFeePerGas, operation.maxFeePerGas),
+      paymasterAndData:
+        operation.paymaster +
+        pair(
+          operation.paymasterVerificationGasLimit,
+          operation.paymasterPostOpGasLimit,
+        ).slice(2) +
+        operation.paymasterData.slice(2),
+      signature: operation.signature,
+    };
+    const result = await request('eth_call', [
+      {
+        from: operation.sender,
+        to: entryPoint,
+        gas: '0x5b8d80',
+        value: '0x0',
+        data: encodeFunctionData({
+          abi: entryPointVerificationAbi,
+          functionName: 'handleOps',
+          args: [[packed], operation.sender],
+        }),
+      },
+      block.number,
+    ]);
+    const data =
+      typeof result.error?.data === 'string'
+        ? result.error.data
+        : result.error?.data?.data;
+    let failure;
+    try {
+      failure = decodeErrorResult({ abi: entryPointVerificationAbi, data });
+    } catch {
+      throw Error('Unclassified EntryPoint estimate');
+    }
+    if (failure.errorName !== 'FailedOp' || failure.args[0] !== 0n)
+      throw Error('Unclassified EntryPoint estimate');
+    const code = failure.args[1].slice(0, 4);
+    if (code === 'AA24') return true;
+    if (code === 'AA26' || code === 'AA23') return false;
+    throw Error('EntryPoint estimate unavailable');
+  };
+  const verification = async () => {
+    let high = low;
+    if (!(await probe(low))) {
+      high = ceiling;
+      if (!(await probe(high))) throw Error('Verification gas exceeds ceiling');
+      for (let attempt = 0; attempt < 10 && high - low > 2048n; attempt++) {
+        const middle = (high + low) / 2n;
+        if (await probe(middle)) high = middle;
+        else low = middle;
+      }
+    }
+    return high;
+  };
+  const [high, callEstimate] = await Promise.all([
+    verification(),
+    request('eth_estimateGas', [
+      {
+        from: entryPoint,
+        to: operation.sender,
+        data: operation.callData,
+        value: '0x0',
+        gas: '0x5b8d80',
+      },
+      block.number,
+    ]),
+  ]);
+  const callGas = quantity(callEstimate.result);
+  if (callEstimate.error || callGas <= 0n || callGas > 1000000n)
+    throw Error('Call gas estimate unavailable');
+  const after = await request('eth_getBlockByNumber', [block.number, false]);
+  if (after.result?.hash !== block.hash)
+    throw Error('Verification block changed');
+  return {
+    ...estimate,
+    verificationGasLimit: '0x' + high.toString(16),
+    callGasLimit:
+      '0x' +
+      (callGas > quantity(estimate.callGasLimit)
+        ? callGas
+        : quantity(estimate.callGasLimit)
+      ).toString(16),
+  };
 }

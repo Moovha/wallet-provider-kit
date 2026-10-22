@@ -661,42 +661,48 @@ it('reads only the selected wallet grant when unrelated people have active grant
   ).rejects.toThrow();
 });
 
-it('keeps the configured network when the wallets client creates a transaction adapter', async () => {
-  const grantId = randomUUID(),
-    accountId = randomUUID();
-  const client = createWalletsClient({
-    url: 'https://wallet.example.test',
-    network: 'base',
-    authorization: async () => 'Bearer offline',
-    fetch: async (_url, init) => {
-      expect(new Headers(init?.headers).get('Wallet-Grant-Id')).toBe(grantId);
-      const body = JSON.parse(String(init?.body));
-      return Response.json({
-        jsonrpc: '2.0',
-        id: body.id,
-        result: {
-          version: '2.0.0',
-          id: 'batch',
-          chainId: '0x2105',
-          status: 100,
-          atomic: true,
-        },
-      });
-    },
-  });
-  const provider = client.walletProvider({
-    account_id: accountId,
-    grant_id: grantId,
-    is_default: true,
-    wallet: { reference: 'personal', name: 'Personal', kind: 'personal' },
-    role: 'owner',
-    permissions: ['account:read', 'contracts:request'],
-    expires_at: new Date(Date.now() + 60000).toISOString(),
-  });
-  expect(
-    await provider.request({
-      method: 'wallet_getCallsStatus',
-      params: ['batch'],
-    }),
-  ).toMatchObject({ chainId: '0x2105', status: 100 });
-});
+it.each([
+  ['base', '0x2105'],
+  ['ethereum-sepolia', '0xaa36a7'],
+] as const)(
+  'keeps %s when the wallets client creates a transaction adapter',
+  async (network, chainId) => {
+    const grantId = randomUUID(),
+      accountId = randomUUID();
+    const client = createWalletsClient({
+      url: 'https://wallet.example.test',
+      network,
+      authorization: async () => 'Bearer offline',
+      fetch: async (_url, init) => {
+        expect(new Headers(init?.headers).get('Wallet-Grant-Id')).toBe(grantId);
+        const body = JSON.parse(String(init?.body));
+        return Response.json({
+          jsonrpc: '2.0',
+          id: body.id,
+          result: {
+            version: '2.0.0',
+            id: 'batch',
+            chainId,
+            status: 100,
+            atomic: true,
+          },
+        });
+      },
+    });
+    const provider = client.walletProvider({
+      account_id: accountId,
+      grant_id: grantId,
+      is_default: true,
+      wallet: { reference: 'personal', name: 'Personal', kind: 'personal' },
+      role: 'owner',
+      permissions: ['account:read', 'contracts:request'],
+      expires_at: new Date(Date.now() + 60000).toISOString(),
+    });
+    expect(
+      await provider.request({
+        method: 'wallet_getCallsStatus',
+        params: ['batch'],
+      }),
+    ).toMatchObject({ chainId, status: 100 });
+  },
+);

@@ -124,3 +124,39 @@ it('patches only the pinned successful-acquisition delay and rejects source drif
     'source mismatch',
   );
 });
+
+it('recovers a bounded pre-broadcast read outage without repeating healthy reads', async () => {
+  const { readBundleParameter } =
+    await import('../scripts/bundler-funding.mjs');
+  let healthy = 0;
+  let failing = 0;
+  const delays: number[] = [];
+  const result = await Promise.all([
+    readBundleParameter(async () => ++healthy),
+    readBundleParameter(
+      async () => {
+        if (++failing < 4) throw Error('Offline transient read');
+        return 7;
+      },
+      async (ms) => {
+        delays.push(ms);
+      },
+    ),
+  ]);
+  expect(result).toEqual([1, 7]);
+  expect(healthy).toBe(1);
+  expect(failing).toBe(4);
+  expect(delays).toEqual([1000, 2000, 4000]);
+  const error = Error('Offline persistent failure');
+  let calls = 0;
+  await expect(
+    readBundleParameter(
+      async () => {
+        calls++;
+        throw error;
+      },
+      async () => {},
+    ),
+  ).rejects.toBe(error);
+  expect(calls).toBe(4);
+});

@@ -214,3 +214,22 @@ test('mobile controls stay within the viewport', async ({ page }) => {
     fullPage: true,
   });
 });
+
+test('exports Ethereum Sepolia with matching network identity and disabled execution', async ({
+  page,
+}) => {
+  await imported(page);
+  await step(page, 'Provider');
+  await page
+    .getByLabel('Blockchain network', { exact: true })
+    .selectOption('ethereum-sepolia');
+  await expect(
+    page.getByText('Ethereum Sepolia · experimental', { exact: true }),
+  ).toBeVisible();
+  const saved = await exported(page);
+  expect(saved.network).toBe('ethereum-sepolia');
+  expect(saved.safeWallet.genesisHash).toBe(
+    '0x25a5cc106eea7138acab33231d7160d69cb777ee0c2c553fcddf5138993e6dd9',
+  );
+  expect(saved.activation.enabled).toBe(false);
+});

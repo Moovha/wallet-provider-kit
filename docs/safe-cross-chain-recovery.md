@@ -7,9 +7,9 @@ separately authorised transaction and is not guaranteed.
 USDC sent to a Safe address remains on the network where the transfer occurred.
 A matching hexadecimal address does not establish ownership on another chain.
 The toolkit provides deployment recipes and read-only recovery inspection for
-operators. The supplied application transaction runtime remains limited to Base
-and Base Sepolia; these utilities do not enable application execution on other
-networks or automatically bridge assets.
+operators. The supplied application transaction runtime supports Base, Base Sepolia and Ethereum Sepolia through separate
+network-bound deployments. Recovery utilities do not enable other networks or
+automatically bridge assets.
 
 ## Preserve the original deployment
 
