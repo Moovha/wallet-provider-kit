@@ -72,7 +72,7 @@
           {
             "schema": {
               "type": "string",
-              "enum": ["base", "base-sepolia", "ethereum-sepolia"]
+              "enum": ["base", "base-sepolia", "ethereum", "ethereum-sepolia"]
             },
             "in": "header",
             "name": "wallet-network",
@@ -115,7 +115,7 @@
           {
             "schema": {
               "type": "string",
-              "enum": ["base", "base-sepolia", "ethereum-sepolia"]
+              "enum": ["base", "base-sepolia", "ethereum", "ethereum-sepolia"]
             },
             "in": "header",
             "name": "wallet-network",
@@ -1130,7 +1130,7 @@
           {
             "schema": {
               "type": "string",
-              "enum": ["base", "base-sepolia", "ethereum-sepolia"]
+              "enum": ["base", "base-sepolia", "ethereum", "ethereum-sepolia"]
             },
             "in": "header",
             "name": "wallet-network",
@@ -1178,6 +1178,7 @@
                           "enum": [
                             "eip155:8453",
                             "eip155:84532",
+                            "eip155:1",
                             "eip155:11155111"
                           ]
                         },
@@ -1449,7 +1450,7 @@
           {
             "schema": {
               "type": "string",
-              "enum": ["base", "base-sepolia", "ethereum-sepolia"]
+              "enum": ["base", "base-sepolia", "ethereum", "ethereum-sepolia"]
             },
             "in": "header",
             "name": "wallet-network",
@@ -1571,7 +1572,7 @@
           {
             "schema": {
               "type": "string",
-              "enum": ["base", "base-sepolia", "ethereum-sepolia"]
+              "enum": ["base", "base-sepolia", "ethereum", "ethereum-sepolia"]
             },
             "in": "header",
             "name": "wallet-network",
@@ -1884,7 +1885,7 @@
           {
             "schema": {
               "type": "string",
-              "enum": ["base", "base-sepolia", "ethereum-sepolia"]
+              "enum": ["base", "base-sepolia", "ethereum", "ethereum-sepolia"]
             },
             "in": "header",
             "name": "wallet-network",
@@ -2226,7 +2227,7 @@
           {
             "schema": {
               "type": "string",
-              "enum": ["base", "base-sepolia", "ethereum-sepolia"]
+              "enum": ["base", "base-sepolia", "ethereum", "ethereum-sepolia"]
             },
             "in": "header",
             "name": "wallet-network",
@@ -2258,7 +2259,12 @@
                   "properties": {
                     "chain_id": {
                       "type": "string",
-                      "enum": ["eip155:8453", "eip155:84532", "eip155:11155111"]
+                      "enum": [
+                        "eip155:8453",
+                        "eip155:84532",
+                        "eip155:1",
+                        "eip155:11155111"
+                      ]
                     },
                     "source": {
                       "type": "string",
@@ -3074,6 +3080,7 @@
                               "enum": [
                                 "eip155:84532",
                                 "eip155:8453",
+                                "eip155:1",
                                 "eip155:11155111"
                               ]
                             },
@@ -3827,7 +3834,7 @@
           {
             "schema": {
               "type": "string",
-              "enum": ["base", "base-sepolia", "ethereum-sepolia"]
+              "enum": ["base", "base-sepolia", "ethereum", "ethereum-sepolia"]
             },
             "in": "header",
             "name": "wallet-network",
@@ -3881,7 +3888,12 @@
                           },
                           "network": {
                             "type": "string",
-                            "enum": ["base", "base-sepolia", "ethereum-sepolia"]
+                            "enum": [
+                              "base",
+                              "base-sepolia",
+                              "ethereum",
+                              "ethereum-sepolia"
+                            ]
                           },
                           "chain_id": { "type": "string" },
                           "is_default": { "type": "boolean" },
@@ -4179,7 +4191,7 @@
           {
             "schema": {
               "type": "string",
-              "enum": ["base", "base-sepolia", "ethereum-sepolia"]
+              "enum": ["base", "base-sepolia", "ethereum", "ethereum-sepolia"]
             },
             "in": "header",
             "name": "wallet-network",
@@ -4561,7 +4573,7 @@
           {
             "schema": {
               "type": "string",
-              "enum": ["base", "base-sepolia", "ethereum-sepolia"]
+              "enum": ["base", "base-sepolia", "ethereum", "ethereum-sepolia"]
             },
             "in": "header",
             "name": "wallet-network",
@@ -4920,7 +4932,7 @@
           {
             "schema": {
               "type": "string",
-              "enum": ["base", "base-sepolia", "ethereum-sepolia"]
+              "enum": ["base", "base-sepolia", "ethereum", "ethereum-sepolia"]
             },
             "in": "header",
             "name": "wallet-network",
@@ -5175,7 +5187,7 @@
           {
             "schema": {
               "type": "string",
-              "enum": ["base", "base-sepolia", "ethereum-sepolia"]
+              "enum": ["base", "base-sepolia", "ethereum", "ethereum-sepolia"]
             },
             "in": "header",
             "name": "wallet-network",
@@ -5552,7 +5564,7 @@
           {
             "schema": {
               "type": "string",
-              "enum": ["base", "base-sepolia", "ethereum-sepolia"]
+              "enum": ["base", "base-sepolia", "ethereum", "ethereum-sepolia"]
             },
             "in": "header",
             "name": "wallet-network",
@@ -5926,7 +5938,7 @@
           {
             "schema": {
               "type": "string",
-              "enum": ["base", "base-sepolia", "ethereum-sepolia"]
+              "enum": ["base", "base-sepolia", "ethereum", "ethereum-sepolia"]
             },
             "in": "header",
             "name": "wallet-network",
@@ -6271,7 +6283,7 @@
           {
             "schema": {
               "type": "string",
-              "enum": ["base", "base-sepolia", "ethereum-sepolia"]
+              "enum": ["base", "base-sepolia", "ethereum", "ethereum-sepolia"]
             },
             "in": "header",
             "name": "wallet-network",
@@ -6532,7 +6544,7 @@
           {
             "schema": {
               "type": "string",
-              "enum": ["base", "base-sepolia", "ethereum-sepolia"]
+              "enum": ["base", "base-sepolia", "ethereum", "ethereum-sepolia"]
             },
             "in": "header",
             "name": "wallet-network",
@@ -6676,7 +6688,7 @@
           {
             "schema": {
               "type": "string",
-              "enum": ["base", "base-sepolia", "ethereum-sepolia"]
+              "enum": ["base", "base-sepolia", "ethereum", "ethereum-sepolia"]
             },
             "in": "header",
             "name": "wallet-network",
@@ -7012,7 +7024,7 @@
           {
             "schema": {
               "type": "string",
-              "enum": ["base", "base-sepolia", "ethereum-sepolia"]
+              "enum": ["base", "base-sepolia", "ethereum", "ethereum-sepolia"]
             },
             "in": "header",
             "name": "wallet-network",
@@ -7248,6 +7260,46 @@
                                 }
                               }
                             },
+                            "0x1": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": ["atomic"],
+                              "properties": {
+                                "applicationAction": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "required": ["supported"],
+                                  "properties": {
+                                    "supported": {
+                                      "type": "boolean",
+                                      "enum": [true]
+                                    }
+                                  }
+                                },
+                                "paymasterService": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "required": ["supported"],
+                                  "properties": {
+                                    "supported": {
+                                      "type": "boolean",
+                                      "enum": [true]
+                                    }
+                                  }
+                                },
+                                "atomic": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "required": ["status"],
+                                  "properties": {
+                                    "status": {
+                                      "type": "string",
+                                      "enum": ["supported"]
+                                    }
+                                  }
+                                }
+                              }
+                            },
                             "0xaa36a7": {
                               "type": "object",
                               "additionalProperties": false,
@@ -7388,7 +7440,7 @@
           {
             "schema": {
               "type": "string",
-              "enum": ["base", "base-sepolia", "ethereum-sepolia"]
+              "enum": ["base", "base-sepolia", "ethereum", "ethereum-sepolia"]
             },
             "in": "header",
             "name": "wallet-network",
@@ -7700,7 +7752,7 @@
           {
             "schema": {
               "type": "string",
-              "enum": ["base", "base-sepolia", "ethereum-sepolia"]
+              "enum": ["base", "base-sepolia", "ethereum", "ethereum-sepolia"]
             },
             "in": "header",
             "name": "wallet-network",
@@ -8004,7 +8056,7 @@
           {
             "schema": {
               "type": "string",
-              "enum": ["base", "base-sepolia", "ethereum-sepolia"]
+              "enum": ["base", "base-sepolia", "ethereum", "ethereum-sepolia"]
             },
             "in": "header",
             "name": "wallet-network",
@@ -8341,7 +8393,7 @@
           {
             "schema": {
               "type": "string",
-              "enum": ["base", "base-sepolia", "ethereum-sepolia"]
+              "enum": ["base", "base-sepolia", "ethereum", "ethereum-sepolia"]
             },
             "in": "header",
             "name": "wallet-network",
@@ -8635,7 +8687,7 @@
           {
             "schema": {
               "type": "string",
-              "enum": ["base", "base-sepolia", "ethereum-sepolia"]
+              "enum": ["base", "base-sepolia", "ethereum", "ethereum-sepolia"]
             },
             "in": "header",
             "name": "wallet-network",
@@ -8807,6 +8859,7 @@
                                     "enum": [
                                       "eip155:8453",
                                       "eip155:84532",
+                                      "eip155:1",
                                       "eip155:11155111"
                                     ]
                                   },
@@ -9150,7 +9203,7 @@
           {
             "schema": {
               "type": "string",
-              "enum": ["base", "base-sepolia", "ethereum-sepolia"]
+              "enum": ["base", "base-sepolia", "ethereum", "ethereum-sepolia"]
             },
             "in": "header",
             "name": "wallet-network",
@@ -9322,6 +9375,7 @@
                                     "enum": [
                                       "eip155:8453",
                                       "eip155:84532",
+                                      "eip155:1",
                                       "eip155:11155111"
                                     ]
                                   },
@@ -9733,7 +9787,7 @@
           {
             "schema": {
               "type": "string",
-              "enum": ["base", "base-sepolia", "ethereum-sepolia"]
+              "enum": ["base", "base-sepolia", "ethereum", "ethereum-sepolia"]
             },
             "in": "header",
             "name": "wallet-network",
@@ -9888,6 +9942,7 @@
                               "enum": [
                                 "eip155:8453",
                                 "eip155:84532",
+                                "eip155:1",
                                 "eip155:11155111"
                               ]
                             },
@@ -10253,7 +10308,7 @@
           {
             "schema": {
               "type": "string",
-              "enum": ["base", "base-sepolia", "ethereum-sepolia"]
+              "enum": ["base", "base-sepolia", "ethereum", "ethereum-sepolia"]
             },
             "in": "header",
             "name": "wallet-network",
@@ -10408,6 +10463,7 @@
                               "enum": [
                                 "eip155:8453",
                                 "eip155:84532",
+                                "eip155:1",
                                 "eip155:11155111"
                               ]
                             },
@@ -10798,7 +10854,7 @@
           {
             "schema": {
               "type": "string",
-              "enum": ["base", "base-sepolia", "ethereum-sepolia"]
+              "enum": ["base", "base-sepolia", "ethereum", "ethereum-sepolia"]
             },
             "in": "header",
             "name": "wallet-network",
@@ -10953,6 +11009,7 @@
                               "enum": [
                                 "eip155:8453",
                                 "eip155:84532",
+                                "eip155:1",
                                 "eip155:11155111"
                               ]
                             },
@@ -11318,7 +11375,7 @@
           {
             "schema": {
               "type": "string",
-              "enum": ["base", "base-sepolia", "ethereum-sepolia"]
+              "enum": ["base", "base-sepolia", "ethereum", "ethereum-sepolia"]
             },
             "in": "header",
             "name": "wallet-network",
@@ -11473,6 +11530,7 @@
                               "enum": [
                                 "eip155:8453",
                                 "eip155:84532",
+                                "eip155:1",
                                 "eip155:11155111"
                               ]
                             },
@@ -11818,6 +11876,7 @@
                         "enum": [
                           "eip155:8453",
                           "eip155:84532",
+                          "eip155:1",
                           "eip155:11155111"
                         ]
                       },
@@ -11896,7 +11955,7 @@
           {
             "schema": {
               "type": "string",
-              "enum": ["base", "base-sepolia", "ethereum-sepolia"]
+              "enum": ["base", "base-sepolia", "ethereum", "ethereum-sepolia"]
             },
             "in": "header",
             "name": "wallet-network",
@@ -12051,6 +12110,7 @@
                               "enum": [
                                 "eip155:8453",
                                 "eip155:84532",
+                                "eip155:1",
                                 "eip155:11155111"
                               ]
                             },
@@ -12416,7 +12476,7 @@
           {
             "schema": {
               "type": "string",
-              "enum": ["base", "base-sepolia", "ethereum-sepolia"]
+              "enum": ["base", "base-sepolia", "ethereum", "ethereum-sepolia"]
             },
             "in": "header",
             "name": "wallet-network",
@@ -12571,6 +12631,7 @@
                               "enum": [
                                 "eip155:8453",
                                 "eip155:84532",
+                                "eip155:1",
                                 "eip155:11155111"
                               ]
                             },
@@ -12897,7 +12958,7 @@
           {
             "schema": {
               "type": "string",
-              "enum": ["base", "base-sepolia", "ethereum-sepolia"]
+              "enum": ["base", "base-sepolia", "ethereum", "ethereum-sepolia"]
             },
             "in": "header",
             "name": "wallet-network",
@@ -12922,7 +12983,12 @@
                   "properties": {
                     "network": {
                       "type": "string",
-                      "enum": ["base", "base-sepolia", "ethereum-sepolia"]
+                      "enum": [
+                        "base",
+                        "base-sepolia",
+                        "ethereum",
+                        "ethereum-sepolia"
+                      ]
                     },
                     "role": {
                       "type": "string",
@@ -13064,6 +13130,7 @@
                                     "enum": [
                                       "eip155:84532",
                                       "eip155:8453",
+                                      "eip155:1",
                                       "eip155:11155111"
                                     ]
                                   },
@@ -13696,6 +13763,7 @@
                                       "enum": [
                                         "eip155:84532",
                                         "eip155:8453",
+                                        "eip155:1",
                                         "eip155:11155111"
                                       ]
                                     },
@@ -14351,6 +14419,7 @@
                                       "enum": [
                                         "eip155:84532",
                                         "eip155:8453",
+                                        "eip155:1",
                                         "eip155:11155111"
                                       ]
                                     },
@@ -15117,7 +15186,7 @@
           {
             "schema": {
               "type": "string",
-              "enum": ["base", "base-sepolia", "ethereum-sepolia"]
+              "enum": ["base", "base-sepolia", "ethereum", "ethereum-sepolia"]
             },
             "in": "header",
             "name": "wallet-network",
@@ -15195,7 +15264,7 @@
                           "version": { "type": "string", "enum": ["2.0.0"] },
                           "chainId": {
                             "type": "string",
-                            "enum": ["0x14a34", "0x2105", "0xaa36a7"]
+                            "enum": ["0x14a34", "0x2105", "0x1", "0xaa36a7"]
                           },
                           "status": {
                             "type": "integer",
@@ -15545,7 +15614,7 @@
           {
             "schema": {
               "type": "string",
-              "enum": ["base", "base-sepolia", "ethereum-sepolia"]
+              "enum": ["base", "base-sepolia", "ethereum", "ethereum-sepolia"]
             },
             "in": "header",
             "name": "wallet-network",
@@ -15828,7 +15897,7 @@
           {
             "schema": {
               "type": "string",
-              "enum": ["base", "base-sepolia", "ethereum-sepolia"]
+              "enum": ["base", "base-sepolia", "ethereum", "ethereum-sepolia"]
             },
             "in": "header",
             "name": "wallet-network",
@@ -15973,6 +16042,7 @@
                               "enum": [
                                 "eip155:84532",
                                 "eip155:8453",
+                                "eip155:1",
                                 "eip155:11155111"
                               ]
                             },
@@ -16700,7 +16770,7 @@
           {
             "schema": {
               "type": "string",
-              "enum": ["base", "base-sepolia", "ethereum-sepolia"]
+              "enum": ["base", "base-sepolia", "ethereum", "ethereum-sepolia"]
             },
             "in": "header",
             "name": "wallet-network",
@@ -16845,6 +16915,7 @@
                               "enum": [
                                 "eip155:84532",
                                 "eip155:8453",
+                                "eip155:1",
                                 "eip155:11155111"
                               ]
                             },
@@ -17572,7 +17643,7 @@
           {
             "schema": {
               "type": "string",
-              "enum": ["base", "base-sepolia", "ethereum-sepolia"]
+              "enum": ["base", "base-sepolia", "ethereum", "ethereum-sepolia"]
             },
             "in": "header",
             "name": "wallet-network",
@@ -17717,6 +17788,7 @@
                               "enum": [
                                 "eip155:84532",
                                 "eip155:8453",
+                                "eip155:1",
                                 "eip155:11155111"
                               ]
                             },
@@ -18523,6 +18595,7 @@
                         "enum": [
                           "eip155:84532",
                           "eip155:8453",
+                          "eip155:1",
                           "eip155:11155111"
                         ]
                       },
@@ -18993,7 +19066,7 @@
           {
             "schema": {
               "type": "string",
-              "enum": ["base", "base-sepolia", "ethereum-sepolia"]
+              "enum": ["base", "base-sepolia", "ethereum", "ethereum-sepolia"]
             },
             "in": "header",
             "name": "wallet-network",
@@ -19115,6 +19188,7 @@
                           "enum": [
                             "eip155:84532",
                             "eip155:8453",
+                            "eip155:1",
                             "eip155:11155111"
                           ]
                         },
@@ -19828,7 +19902,7 @@
           {
             "schema": {
               "type": "string",
-              "enum": ["base", "base-sepolia", "ethereum-sepolia"]
+              "enum": ["base", "base-sepolia", "ethereum", "ethereum-sepolia"]
             },
             "in": "header",
             "name": "wallet-network",
@@ -19950,6 +20024,7 @@
                           "enum": [
                             "eip155:84532",
                             "eip155:8453",
+                            "eip155:1",
                             "eip155:11155111"
                           ]
                         },
@@ -20690,7 +20765,7 @@
           {
             "schema": {
               "type": "string",
-              "enum": ["base", "base-sepolia", "ethereum-sepolia"]
+              "enum": ["base", "base-sepolia", "ethereum", "ethereum-sepolia"]
             },
             "in": "header",
             "name": "wallet-network",
@@ -20813,6 +20888,7 @@
                           "enum": [
                             "eip155:84532",
                             "eip155:8453",
+                            "eip155:1",
                             "eip155:11155111"
                           ]
                         },
@@ -21610,6 +21686,7 @@
                         "enum": [
                           "eip155:84532",
                           "eip155:8453",
+                          "eip155:1",
                           "eip155:11155111"
                         ]
                       },
@@ -22086,7 +22163,7 @@
           {
             "schema": {
               "type": "string",
-              "enum": ["base", "base-sepolia", "ethereum-sepolia"]
+              "enum": ["base", "base-sepolia", "ethereum", "ethereum-sepolia"]
             },
             "in": "header",
             "name": "wallet-network",
@@ -22209,6 +22286,7 @@
                           "enum": [
                             "eip155:84532",
                             "eip155:8453",
+                            "eip155:1",
                             "eip155:11155111"
                           ]
                         },
@@ -23215,10 +23293,15 @@
                   "networks": {
                     "type": "array",
                     "minItems": 1,
-                    "maxItems": 3,
+                    "maxItems": 4,
                     "uniqueItems": true,
                     "items": {
-                      "enum": ["base", "base-sepolia", "ethereum-sepolia"]
+                      "enum": [
+                        "base",
+                        "base-sepolia",
+                        "ethereum",
+                        "ethereum-sepolia"
+                      ]
                     }
                   }
                 }
@@ -23937,7 +24020,12 @@
                           },
                           "network": {
                             "type": "string",
-                            "enum": ["base", "base-sepolia", "ethereum-sepolia"]
+                            "enum": [
+                              "base",
+                              "base-sepolia",
+                              "ethereum",
+                              "ethereum-sepolia"
+                            ]
                           },
                           "wallet": {
                             "type": "object",

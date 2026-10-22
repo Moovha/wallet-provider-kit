@@ -525,7 +525,7 @@ export declare class WalletCallsService {
     accountId: string,
   ): Promise<{
     address: string;
-    chainId: '0x2105' | '0x14a34' | '0xaa36a7';
+    chainId: '0x2105' | '0x14a34' | '0x1' | '0xaa36a7';
   }>;
   constructor(actions: SupportedActions, driver: WalletCallsDriver);
   list(
@@ -2880,7 +2880,7 @@ export declare class RuntimeConfigurationService {
     principal: VerifiedPrincipal,
     applicationId?: string,
   ): Promise<{
-    network: 'base' | 'base-sepolia' | 'ethereum-sepolia';
+    network: 'base' | 'base-sepolia' | 'ethereum' | 'ethereum-sepolia';
     role: 'provider' | 'application';
     applications: {
       active_revision: string;
@@ -3220,7 +3220,7 @@ export declare class WalletCallsService {
     accountId: string,
   ): Promise<{
     address: string;
-    chainId: '0x2105' | '0x14a34' | '0xaa36a7';
+    chainId: '0x2105' | '0x14a34' | '0x1' | '0xaa36a7';
   }>;
   constructor(actions: SupportedActions, driver: WalletCallsDriver);
   list(
@@ -3254,7 +3254,7 @@ export declare class WalletCallsService {
 export interface WalletCallsStatus {
   version: '2.0.0';
   id: string;
-  chainId: '0x14a34' | '0x2105' | '0xaa36a7';
+  chainId: '0x14a34' | '0x2105' | '0x1' | '0xaa36a7';
   status: 100 | 200 | 400 | 500;
   atomic: true;
   capabilities?: {
@@ -3355,7 +3355,7 @@ export declare class WalletCallsRpcError extends Error {
 export interface WalletCallsStatus {
   version: '2.0.0';
   id: string;
-  chainId: '0x14a34' | '0x2105' | '0xaa36a7';
+  chainId: '0x14a34' | '0x2105' | '0x1' | '0xaa36a7';
   status: 100 | 200 | 400 | 500;
   atomic: true;
   capabilities?: {
@@ -4070,7 +4070,7 @@ export interface SponsorshipConsentTerms {
 export interface UserOperationDomainV07 {
   entryPointVersion: '0.7';
   entryPoint: string;
-  chainId: '0x14a34' | '0x2105' | '0xaa36a7';
+  chainId: '0x14a34' | '0x2105' | '0x1' | '0xaa36a7';
 }
 ```
 

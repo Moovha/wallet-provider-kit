@@ -435,7 +435,12 @@ export async function registerOnboardingRoutes(
             properties: {
               chain_id: {
                 type: 'string',
-                enum: ['eip155:8453', 'eip155:84532', 'eip155:11155111'],
+                enum: [
+                  'eip155:8453',
+                  'eip155:84532',
+                  'eip155:1',
+                  'eip155:11155111',
+                ],
               },
               source: {
                 type: 'string',
@@ -580,7 +585,12 @@ export async function registerOnboardingRoutes(
                     account_id: uuidSchema,
                     network: {
                       type: 'string',
-                      enum: ['base', 'base-sepolia', 'ethereum-sepolia'],
+                      enum: [
+                        'base',
+                        'base-sepolia',
+                        'ethereum',
+                        'ethereum-sepolia',
+                      ],
                     },
                     chain_id: { type: 'string' },
                     is_default: { type: 'boolean' },

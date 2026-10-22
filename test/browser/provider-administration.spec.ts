@@ -111,6 +111,9 @@ test('claims, registers and manages applications through the real protected mana
       })
       .check();
     await page
+      .getByRole('checkbox', { name: 'Ethereum · mainnet', exact: true })
+      .check();
+    await page
       .getByRole('button', { name: 'Save network choices', exact: true })
       .click();
     await expect(page.getByRole('status')).toContainText(
@@ -118,6 +121,7 @@ test('claims, registers and manages applications through the real protected mana
     );
     expect(service.storedNetworks()).toEqual([
       'base-sepolia',
+      'ethereum',
       'ethereum-sepolia',
     ]);
     await page.screenshot({

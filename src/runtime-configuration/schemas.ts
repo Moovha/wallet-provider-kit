@@ -67,7 +67,7 @@ export const runtimePolicySchema = {
     enabled: { type: 'boolean' },
     chain_id: {
       type: 'string',
-      enum: ['eip155:84532', 'eip155:8453', 'eip155:11155111'],
+      enum: ['eip155:84532', 'eip155:8453', 'eip155:1', 'eip155:11155111'],
     },
     contracts: {
       type: 'array',

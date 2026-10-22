@@ -1,8 +1,10 @@
 import { defaultSafeWallet } from '../sponsorship/defaults.js';
 import type { ProviderConfiguration } from './config.js';
 import { defaultSafeProvisioning } from '../provisioning/defaults.js';
-/** Genesis identities from superchain-registry 720185c32b0599fa31b14f101cbc990ec39c0a36; Ethereum Sepolia genesis verified against chain metadata; contract pins from safe-deployments v1.37.40. */
+/** Genesis identities from superchain-registry 720185c32b0599fa31b14f101cbc990ec39c0a36; Ethereum genesis identities from go-ethereum params/config.go; contract pins from safe-deployments v1.37.40. */
 export function applicationGenesis(network: ProviderConfiguration['network']) {
+  if (network === 'ethereum')
+    return '0xd4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3';
   if (network === 'ethereum-sepolia')
     return '0x25a5cc106eea7138acab33231d7160d69cb777ee0c2c553fcddf5138993e6dd9';
   return network === 'base'

@@ -12,7 +12,7 @@ it('accepts only the bounded official explorer URL and excludes signing, submiss
   for (const value of [
     endpoint + '&action=anything',
     endpoint.replace('api.etherscan.io', 'evil.example'),
-    endpoint.replace('84532', '1'),
+    endpoint.replace('84532', '2'),
     endpoint + '#fragment',
   ])
     expect(etherscanEndpoint(value)).toBeUndefined();

@@ -131,7 +131,7 @@ export async function createServer(options: ServerOptions = {}) {
           ...headers?.properties,
           'wallet-network': {
             type: 'string',
-            enum: ['base', 'base-sepolia', 'ethereum-sepolia'],
+            enum: ['base', 'base-sepolia', 'ethereum', 'ethereum-sepolia'],
             description:
               'Choose a configured network. Omit to use the default; existing wallet, request and grant IDs select their stored network automatically. A conflicting selection is rejected.',
           },

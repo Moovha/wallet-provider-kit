@@ -241,9 +241,13 @@ export async function setupCommand(args: string[]): Promise<boolean> {
         'Installation settings are supplied through non-secret environment variables.',
       ]);
     const selectedNetwork = process.env.WPK_NETWORK ?? 'base';
-    if (!['base', 'base-sepolia', 'ethereum-sepolia'].includes(selectedNetwork))
+    if (
+      !['base', 'base-sepolia', 'ethereum', 'ethereum-sepolia'].includes(
+        selectedNetwork,
+      )
+    )
       throw new ConfigurationError([
-        'WPK_NETWORK must be base, base-sepolia or ethereum-sepolia.',
+        'WPK_NETWORK must be base, base-sepolia, ethereum or ethereum-sepolia.',
       ]);
     const additionalNetworks = (process.env.WPK_ADDITIONAL_NETWORKS ?? '')
       .split(',')
@@ -251,7 +255,9 @@ export async function setupCommand(args: string[]): Promise<boolean> {
     if (
       additionalNetworks.some(
         (network) =>
-          !['base', 'base-sepolia', 'ethereum-sepolia'].includes(network),
+          !['base', 'base-sepolia', 'ethereum', 'ethereum-sepolia'].includes(
+            network,
+          ),
       )
     )
       throw new ConfigurationError([

@@ -79,9 +79,9 @@ Operation: `getExecutionCapabilities`.
 
 **Result and next step:** 200: the Safe ERC-4337 contract and configuration availability.
 
-| Parameter        | Location | Required | Schema                                                                |
-| ---------------- | -------- | -------- | --------------------------------------------------------------------- |
-| `wallet-network` | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum-sepolia"]}` |
+| Parameter        | Location | Required | Schema                                                                           |
+| ---------------- | -------- | -------- | -------------------------------------------------------------------------------- |
+| `wallet-network` | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum","ethereum-sepolia"]}` |
 
 | Status | Content type     | Description      |
 | ------ | ---------------- | ---------------- |
@@ -122,9 +122,9 @@ Operation: `getCapabilities`.
 
 **Result and next step:** 200: the service profile and configured status. A 200 response confirms that discovery works; check configured before trying wallet operations.
 
-| Parameter        | Location | Required | Schema                                                                |
-| ---------------- | -------- | -------- | --------------------------------------------------------------------- |
-| `wallet-network` | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum-sepolia"]}` |
+| Parameter        | Location | Required | Schema                                                                           |
+| ---------------- | -------- | -------- | -------------------------------------------------------------------------------- |
+| `wallet-network` | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum","ethereum-sepolia"]}` |
 
 | Status | Content type     | Description      |
 | ------ | ---------------- | ---------------- |
@@ -437,7 +437,7 @@ Operation: `provisionAccount`.
 | ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
 | `accountId`       | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
 | `idempotency-key` | header   | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
-| `wallet-network`  | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum-sepolia"]}`                                 |
+| `wallet-network`  | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum","ethereum-sepolia"]}`                      |
 | `wallet-grant-id` | header   | no       | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
 
 Request body (application/json):
@@ -487,7 +487,7 @@ Success response schema:
         },
         "chain_id": {
           "type": "string",
-          "enum": ["eip155:8453", "eip155:84532", "eip155:11155111"]
+          "enum": ["eip155:8453", "eip155:84532", "eip155:1", "eip155:11155111"]
         },
         "address": {
           "type": "string",
@@ -521,10 +521,10 @@ Operation: `readSafeWalletInfrastructure`.
 
 **Result and next step:** 200: the retained funding address, paymaster and setup status. Private signer credentials are never returned.
 
-| Parameter        | Location | Required | Schema                                                                |
-| ---------------- | -------- | -------- | --------------------------------------------------------------------- |
-| `applicationId`  | path     | yes      | `{"type":"string","pattern":"^[a-f0-9]{64}$"}`                        |
-| `wallet-network` | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum-sepolia"]}` |
+| Parameter        | Location | Required | Schema                                                                           |
+| ---------------- | -------- | -------- | -------------------------------------------------------------------------------- |
+| `applicationId`  | path     | yes      | `{"type":"string","pattern":"^[a-f0-9]{64}$"}`                                   |
+| `wallet-network` | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum","ethereum-sepolia"]}` |
 
 | Status | Content type     | Description      |
 | ------ | ---------------- | ---------------- |
@@ -581,7 +581,7 @@ Operation: `provisionSafeWalletInfrastructure`.
 | ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
 | `applicationId`   | path     | yes      | `{"type":"string","pattern":"^[a-f0-9]{64}$"}`                                                        |
 | `idempotency-key` | header   | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
-| `wallet-network`  | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum-sepolia"]}`                                 |
+| `wallet-network`  | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum","ethereum-sepolia"]}`                      |
 
 Request body (application/json):
 
@@ -646,7 +646,7 @@ Operation: `requestAccountAccess`.
 | Parameter         | Location | Required | Schema                                                                                                |
 | ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
 | `idempotency-key` | header   | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
-| `wallet-network`  | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum-sepolia"]}`                                 |
+| `wallet-network`  | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum","ethereum-sepolia"]}`                      |
 
 Request body (application/json):
 
@@ -959,10 +959,10 @@ Operation: `getAccountAccessPolicy`.
 
 **Result and next step:** 200: required_fields lists the identity field names; verification_level is the agreed check label. max_identity_age_days limits check age and max_access_days limits permission duration. Show the requested actions and terms, record the person’s consent to policy_revision (and action_policy_revision for transactions), then submit POST /v1/access-requests. For cross-application access, supply source_application_id as a query parameter to receive wallet_sharing.matching_fields and wallet_sharing.revision. Record consent to that revision and source application. Reading these requirements does not grant wallet access.
 
-| Parameter               | Location | Required | Schema                                                                |
-| ----------------------- | -------- | -------- | --------------------------------------------------------------------- |
-| `source_application_id` | query    | no       | `{"type":"string","minLength":1,"maxLength":256}`                     |
-| `wallet-network`        | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum-sepolia"]}` |
+| Parameter               | Location | Required | Schema                                                                           |
+| ----------------------- | -------- | -------- | -------------------------------------------------------------------------------- |
+| `source_application_id` | query    | no       | `{"type":"string","minLength":1,"maxLength":256}`                                |
+| `wallet-network`        | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum","ethereum-sepolia"]}` |
 
 | Status | Content type             | Description      |
 | ------ | ------------------------ | ---------------- |
@@ -995,7 +995,7 @@ Success response schema:
   "properties": {
     "chain_id": {
       "type": "string",
-      "enum": ["eip155:8453", "eip155:84532", "eip155:11155111"]
+      "enum": ["eip155:8453", "eip155:84532", "eip155:1", "eip155:11155111"]
     },
     "source": {
       "type": "string",
@@ -1808,7 +1808,12 @@ Success response schema:
             },
             "chain_id": {
               "type": "string",
-              "enum": ["eip155:84532", "eip155:8453", "eip155:11155111"]
+              "enum": [
+                "eip155:84532",
+                "eip155:8453",
+                "eip155:1",
+                "eip155:11155111"
+              ]
             },
             "contracts": {
               "type": "array",
@@ -2298,7 +2303,7 @@ Operation: `listUserWallets`.
 | Parameter         | Location | Required | Schema                                                                                                |
 | ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
 | `idempotency-key` | header   | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
-| `wallet-network`  | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum-sepolia"]}`                                 |
+| `wallet-network`  | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum","ethereum-sepolia"]}`                      |
 | `wallet-grant-id` | header   | no       | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
 
 Request body (application/json):
@@ -2361,7 +2366,7 @@ Success response schema:
           },
           "network": {
             "type": "string",
-            "enum": ["base", "base-sepolia", "ethereum-sepolia"]
+            "enum": ["base", "base-sepolia", "ethereum", "ethereum-sepolia"]
           },
           "chain_id": {
             "type": "string"
@@ -2433,7 +2438,7 @@ Operation: `readWalletMembers`.
 | Parameter         | Location | Required | Schema                                                                                                |
 | ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
 | `accountId`       | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
-| `wallet-network`  | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum-sepolia"]}`                                 |
+| `wallet-network`  | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum","ethereum-sepolia"]}`                      |
 | `wallet-grant-id` | header   | no       | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
 
 | Status | Content type             | Description      |
@@ -2548,7 +2553,7 @@ Operation: `saveWalletMember`.
 | ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
 | `accountId`       | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
 | `idempotency-key` | header   | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
-| `wallet-network`  | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum-sepolia"]}`                                 |
+| `wallet-network`  | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum","ethereum-sepolia"]}`                      |
 | `wallet-grant-id` | header   | no       | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
 
 Request body (application/json):
@@ -2705,7 +2710,7 @@ Operation: `revokeAccountAccess`.
 | ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
 | `grantId`         | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
 | `idempotency-key` | header   | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
-| `wallet-network`  | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum-sepolia"]}`                                 |
+| `wallet-network`  | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum","ethereum-sepolia"]}`                      |
 
 Request body (application/json):
 
@@ -2763,7 +2768,7 @@ Operation: `submitAccountAccessRecords`.
 | Parameter         | Location | Required | Schema                                                                                                |
 | ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
 | `idempotency-key` | header   | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
-| `wallet-network`  | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum-sepolia"]}`                                 |
+| `wallet-network`  | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum","ethereum-sepolia"]}`                      |
 
 Request body (application/json):
 
@@ -2950,7 +2955,7 @@ Operation: `getAccountAccessRequest`.
 | Parameter        | Location | Required | Schema                                                                                                |
 | ---------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
 | `requestId`      | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
-| `wallet-network` | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum-sepolia"]}`                                 |
+| `wallet-network` | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum","ethereum-sepolia"]}`                      |
 
 | Status | Content type             | Description      |
 | ------ | ------------------------ | ---------------- |
@@ -3069,7 +3074,7 @@ Operation: `importAccessIdentity`.
 | ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
 | `requestId`       | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
 | `idempotency-key` | header   | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
-| `wallet-network`  | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum-sepolia"]}`                                 |
+| `wallet-network`  | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum","ethereum-sepolia"]}`                      |
 
 Request body (application/json):
 
@@ -3208,7 +3213,7 @@ Operation: `readGrantedAccount`.
 | Parameter         | Location | Required | Schema                                                                                                |
 | ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
 | `accountId`       | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
-| `wallet-network`  | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum-sepolia"]}`                                 |
+| `wallet-network`  | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum","ethereum-sepolia"]}`                      |
 | `wallet-grant-id` | header   | no       | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
 
 | Status | Content type             | Description      |
@@ -3292,7 +3297,7 @@ Operation: `streamWalletCallsStatus`.
 | ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
 | `accountId`       | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
 | `batchId`         | path     | yes      | `{"type":"string","maxLength":8194}`                                                                  |
-| `wallet-network`  | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum-sepolia"]}`                                 |
+| `wallet-network`  | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum","ethereum-sepolia"]}`                      |
 | `wallet-grant-id` | header   | no       | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
 
 | Status | Content type      | Description                                    |
@@ -3320,7 +3325,7 @@ Operation: `readWalletExecutionAccount`.
 | Parameter         | Location | Required | Schema                                                                                                |
 | ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
 | `accountId`       | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
-| `wallet-network`  | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum-sepolia"]}`                                 |
+| `wallet-network`  | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum","ethereum-sepolia"]}`                      |
 | `wallet-grant-id` | header   | no       | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
 
 | Status | Content type     | Description      |
@@ -3367,7 +3372,7 @@ Operation: `walletCallsRpc`.
 | Parameter         | Location | Required | Schema                                                                                                |
 | ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
 | `accountId`       | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
-| `wallet-network`  | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum-sepolia"]}`                                 |
+| `wallet-network`  | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum","ethereum-sepolia"]}`                      |
 | `wallet-grant-id` | header   | no       | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
 
 Request body (application/json):
@@ -3866,6 +3871,46 @@ Success response schema:
                 }
               }
             },
+            "0x1": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["atomic"],
+              "properties": {
+                "applicationAction": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["supported"],
+                  "properties": {
+                    "supported": {
+                      "type": "boolean",
+                      "enum": [true]
+                    }
+                  }
+                },
+                "paymasterService": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["supported"],
+                  "properties": {
+                    "supported": {
+                      "type": "boolean",
+                      "enum": [true]
+                    }
+                  }
+                },
+                "atomic": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["status"],
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": ["supported"]
+                    }
+                  }
+                }
+              }
+            },
             "0xaa36a7": {
               "type": "object",
               "additionalProperties": false,
@@ -3943,9 +3988,9 @@ Operation: `readApplicationGasFunding`.
 
 **Request details:** Optional runtime configuration control plane. Application proposals and provider publications are configuration records, not wallet grants, signing authority or execution activation. Publications become readable immediately without restarting the service. Immutable historical revisions remain available. Requires the documented scope and configured application or operator identity.
 
-| Parameter        | Location | Required | Schema                                                                |
-| ---------------- | -------- | -------- | --------------------------------------------------------------------- |
-| `wallet-network` | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum-sepolia"]}` |
+| Parameter        | Location | Required | Schema                                                                           |
+| ---------------- | -------- | -------- | -------------------------------------------------------------------------------- |
+| `wallet-network` | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum","ethereum-sepolia"]}` |
 
 | Status | Content type             | Description      |
 | ------ | ------------------------ | ---------------- |
@@ -4035,9 +4080,9 @@ Operation: `readApplicationCredentials`.
 
 **Request details:** Optional runtime configuration control plane. Application proposals and provider publications are configuration records, not wallet grants, signing authority or execution activation. Publications become readable immediately without restarting the service. Immutable historical revisions remain available. Requires the documented scope and configured application or operator identity.
 
-| Parameter        | Location | Required | Schema                                                                |
-| ---------------- | -------- | -------- | --------------------------------------------------------------------- |
-| `wallet-network` | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum-sepolia"]}` |
+| Parameter        | Location | Required | Schema                                                                           |
+| ---------------- | -------- | -------- | -------------------------------------------------------------------------------- |
+| `wallet-network` | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum","ethereum-sepolia"]}` |
 
 | Status | Content type             | Description      |
 | ------ | ------------------------ | ---------------- |
@@ -4104,10 +4149,10 @@ Operation: `readProviderApplicationCredentials`.
 
 **Request details:** Optional runtime configuration control plane. Application proposals and provider publications are configuration records, not wallet grants, signing authority or execution activation. Publications become readable immediately without restarting the service. Immutable historical revisions remain available. Requires the documented scope and configured application or operator identity.
 
-| Parameter        | Location | Required | Schema                                                                |
-| ---------------- | -------- | -------- | --------------------------------------------------------------------- |
-| `applicationId`  | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{64}$"}`                        |
-| `wallet-network` | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum-sepolia"]}` |
+| Parameter        | Location | Required | Schema                                                                           |
+| ---------------- | -------- | -------- | -------------------------------------------------------------------------------- |
+| `applicationId`  | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{64}$"}`                                   |
+| `wallet-network` | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum","ethereum-sepolia"]}` |
 
 | Status | Content type             | Description      |
 | ------ | ------------------------ | ---------------- |
@@ -4178,7 +4223,7 @@ Operation: `writeApplicationCredential`.
 | ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
 | `reference`       | path     | yes      | `{"type":"string","pattern":"^[A-Za-z0-9_-]{1,128}$"}`                                                |
 | `idempotency-key` | header   | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
-| `wallet-network`  | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum-sepolia"]}`                                 |
+| `wallet-network`  | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum","ethereum-sepolia"]}`                      |
 
 Request body (application/json):
 
@@ -4263,9 +4308,9 @@ Operation: `readApplicationObligations`.
 
 **Request details:** Protected, application-scoped declarations and provider decisions. Accepted actions constrain off-chain payloads. Accepted service declarations permit resolving application-owned verifier credentials when credential storage is configured. Acceptance does not fund gas, provision a user Safe, activate execution or authorize spending. User assets remain in individual user wallets. Secrets and actual user payloads must not be submitted here.
 
-| Parameter        | Location | Required | Schema                                                                |
-| ---------------- | -------- | -------- | --------------------------------------------------------------------- |
-| `wallet-network` | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum-sepolia"]}` |
+| Parameter        | Location | Required | Schema                                                                           |
+| ---------------- | -------- | -------- | -------------------------------------------------------------------------------- |
+| `wallet-network` | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum","ethereum-sepolia"]}` |
 
 | Status | Content type             | Description      |
 | ------ | ------------------------ | ---------------- |
@@ -4433,7 +4478,12 @@ Success response schema:
                 "properties": {
                   "chain_id": {
                     "type": "string",
-                    "enum": ["eip155:8453", "eip155:84532", "eip155:11155111"]
+                    "enum": [
+                      "eip155:8453",
+                      "eip155:84532",
+                      "eip155:1",
+                      "eip155:11155111"
+                    ]
                   },
                   "funding_agreement": {
                     "type": "string",
@@ -4541,10 +4591,10 @@ Operation: `readProviderApplicationObligations`.
 
 **Request details:** Protected, application-scoped declarations and provider decisions. Accepted actions constrain off-chain payloads. Accepted service declarations permit resolving application-owned verifier credentials when credential storage is configured. Acceptance does not fund gas, provision a user Safe, activate execution or authorize spending. User assets remain in individual user wallets. Secrets and actual user payloads must not be submitted here.
 
-| Parameter        | Location | Required | Schema                                                                |
-| ---------------- | -------- | -------- | --------------------------------------------------------------------- |
-| `applicationId`  | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{64}$"}`                        |
-| `wallet-network` | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum-sepolia"]}` |
+| Parameter        | Location | Required | Schema                                                                           |
+| ---------------- | -------- | -------- | -------------------------------------------------------------------------------- |
+| `applicationId`  | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{64}$"}`                                   |
+| `wallet-network` | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum","ethereum-sepolia"]}` |
 
 | Status | Content type             | Description      |
 | ------ | ------------------------ | ---------------- |
@@ -4712,7 +4762,12 @@ Success response schema:
                 "properties": {
                   "chain_id": {
                     "type": "string",
-                    "enum": ["eip155:8453", "eip155:84532", "eip155:11155111"]
+                    "enum": [
+                      "eip155:8453",
+                      "eip155:84532",
+                      "eip155:1",
+                      "eip155:11155111"
+                    ]
                   },
                   "funding_agreement": {
                     "type": "string",
@@ -4823,7 +4878,7 @@ Operation: `submitApplicationActions`.
 | Parameter         | Location | Required | Schema                                                                                                |
 | ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
 | `idempotency-key` | header   | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
-| `wallet-network`  | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum-sepolia"]}`                                 |
+| `wallet-network`  | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum","ethereum-sepolia"]}`                      |
 
 Request body (application/json):
 
@@ -5039,7 +5094,12 @@ Success response schema:
           "properties": {
             "chain_id": {
               "type": "string",
-              "enum": ["eip155:8453", "eip155:84532", "eip155:11155111"]
+              "enum": [
+                "eip155:8453",
+                "eip155:84532",
+                "eip155:1",
+                "eip155:11155111"
+              ]
             },
             "funding_agreement": {
               "type": "string",
@@ -5140,7 +5200,7 @@ Operation: `decideApplicationActions`.
 | ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
 | `applicationId`   | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{64}$"}`                                                        |
 | `idempotency-key` | header   | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
-| `wallet-network`  | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum-sepolia"]}`                                 |
+| `wallet-network`  | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum","ethereum-sepolia"]}`                      |
 
 Request body (application/json):
 
@@ -5315,7 +5375,12 @@ Success response schema:
           "properties": {
             "chain_id": {
               "type": "string",
-              "enum": ["eip155:8453", "eip155:84532", "eip155:11155111"]
+              "enum": [
+                "eip155:8453",
+                "eip155:84532",
+                "eip155:1",
+                "eip155:11155111"
+              ]
             },
             "funding_agreement": {
               "type": "string",
@@ -5415,7 +5480,7 @@ Operation: `submitApplicationServices`.
 | Parameter         | Location | Required | Schema                                                                                                |
 | ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
 | `idempotency-key` | header   | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
-| `wallet-network`  | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum-sepolia"]}`                                 |
+| `wallet-network`  | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum","ethereum-sepolia"]}`                      |
 
 Request body (application/json):
 
@@ -5625,7 +5690,12 @@ Success response schema:
           "properties": {
             "chain_id": {
               "type": "string",
-              "enum": ["eip155:8453", "eip155:84532", "eip155:11155111"]
+              "enum": [
+                "eip155:8453",
+                "eip155:84532",
+                "eip155:1",
+                "eip155:11155111"
+              ]
             },
             "funding_agreement": {
               "type": "string",
@@ -5726,7 +5796,7 @@ Operation: `decideApplicationServices`.
 | ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
 | `applicationId`   | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{64}$"}`                                                        |
 | `idempotency-key` | header   | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
-| `wallet-network`  | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum-sepolia"]}`                                 |
+| `wallet-network`  | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum","ethereum-sepolia"]}`                      |
 
 Request body (application/json):
 
@@ -5901,7 +5971,12 @@ Success response schema:
           "properties": {
             "chain_id": {
               "type": "string",
-              "enum": ["eip155:8453", "eip155:84532", "eip155:11155111"]
+              "enum": [
+                "eip155:8453",
+                "eip155:84532",
+                "eip155:1",
+                "eip155:11155111"
+              ]
             },
             "funding_agreement": {
               "type": "string",
@@ -6001,7 +6076,7 @@ Operation: `submitApplicationSponsorship`.
 | Parameter         | Location | Required | Schema                                                                                                |
 | ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
 | `idempotency-key` | header   | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
-| `wallet-network`  | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum-sepolia"]}`                                 |
+| `wallet-network`  | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum","ethereum-sepolia"]}`                      |
 
 Request body (application/json):
 
@@ -6028,7 +6103,7 @@ Request body (application/json):
       "properties": {
         "chain_id": {
           "type": "string",
-          "enum": ["eip155:8453", "eip155:84532", "eip155:11155111"]
+          "enum": ["eip155:8453", "eip155:84532", "eip155:1", "eip155:11155111"]
         },
         "funding_agreement": {
           "type": "string",
@@ -6240,7 +6315,12 @@ Success response schema:
           "properties": {
             "chain_id": {
               "type": "string",
-              "enum": ["eip155:8453", "eip155:84532", "eip155:11155111"]
+              "enum": [
+                "eip155:8453",
+                "eip155:84532",
+                "eip155:1",
+                "eip155:11155111"
+              ]
             },
             "funding_agreement": {
               "type": "string",
@@ -6341,7 +6421,7 @@ Operation: `decideApplicationSponsorship`.
 | ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
 | `applicationId`   | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{64}$"}`                                                        |
 | `idempotency-key` | header   | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
-| `wallet-network`  | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum-sepolia"]}`                                 |
+| `wallet-network`  | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum","ethereum-sepolia"]}`                      |
 
 Request body (application/json):
 
@@ -6516,7 +6596,12 @@ Success response schema:
           "properties": {
             "chain_id": {
               "type": "string",
-              "enum": ["eip155:8453", "eip155:84532", "eip155:11155111"]
+              "enum": [
+                "eip155:8453",
+                "eip155:84532",
+                "eip155:1",
+                "eip155:11155111"
+              ]
             },
             "funding_agreement": {
               "type": "string",
@@ -6613,10 +6698,10 @@ Operation: `listApplicationConfigurations`.
 
 **Request details:** Optional runtime configuration control plane. Application proposals and provider publications are configuration records, not wallet grants, signing authority or execution activation. Publications become readable immediately without restarting the service. Immutable historical revisions remain available. Requires the documented scope and configured application or operator identity.
 
-| Parameter        | Location | Required | Schema                                                                |
-| ---------------- | -------- | -------- | --------------------------------------------------------------------- |
-| `application_id` | query    | no       | `{"type":"string","pattern":"^[0-9a-f]{64}$"}`                        |
-| `wallet-network` | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum-sepolia"]}` |
+| Parameter        | Location | Required | Schema                                                                           |
+| ---------------- | -------- | -------- | -------------------------------------------------------------------------------- |
+| `application_id` | query    | no       | `{"type":"string","pattern":"^[0-9a-f]{64}$"}`                                   |
+| `wallet-network` | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum","ethereum-sepolia"]}` |
 
 | Status | Content type             | Description      |
 | ------ | ------------------------ | ---------------- |
@@ -6642,7 +6727,7 @@ Success response schema:
   "properties": {
     "network": {
       "type": "string",
-      "enum": ["base", "base-sepolia", "ethereum-sepolia"]
+      "enum": ["base", "base-sepolia", "ethereum", "ethereum-sepolia"]
     },
     "role": {
       "type": "string",
@@ -6779,7 +6864,12 @@ Success response schema:
                   },
                   "chain_id": {
                     "type": "string",
-                    "enum": ["eip155:84532", "eip155:8453", "eip155:11155111"]
+                    "enum": [
+                      "eip155:84532",
+                      "eip155:8453",
+                      "eip155:1",
+                      "eip155:11155111"
+                    ]
                   },
                   "contracts": {
                     "type": "array",
@@ -7344,7 +7434,12 @@ Success response schema:
                     },
                     "chain_id": {
                       "type": "string",
-                      "enum": ["eip155:84532", "eip155:8453", "eip155:11155111"]
+                      "enum": [
+                        "eip155:84532",
+                        "eip155:8453",
+                        "eip155:1",
+                        "eip155:11155111"
+                      ]
                     },
                     "contracts": {
                       "type": "array",
@@ -7943,7 +8038,12 @@ Success response schema:
                     },
                     "chain_id": {
                       "type": "string",
-                      "enum": ["eip155:84532", "eip155:8453", "eip155:11155111"]
+                      "enum": [
+                        "eip155:84532",
+                        "eip155:8453",
+                        "eip155:1",
+                        "eip155:11155111"
+                      ]
                     },
                     "contracts": {
                       "type": "array",
@@ -8428,9 +8528,9 @@ Operation: `listWalletBatches`.
 
 **Request details:** Optional runtime configuration control plane. Application proposals and provider publications are configuration records, not wallet grants, signing authority or execution activation. Publications become readable immediately without restarting the service. Immutable historical revisions remain available. Requires the documented scope and configured application or operator identity.
 
-| Parameter        | Location | Required | Schema                                                                |
-| ---------------- | -------- | -------- | --------------------------------------------------------------------- |
-| `wallet-network` | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum-sepolia"]}` |
+| Parameter        | Location | Required | Schema                                                                           |
+| ---------------- | -------- | -------- | -------------------------------------------------------------------------------- |
+| `wallet-network` | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum","ethereum-sepolia"]}` |
 
 | Status | Content type             | Description      |
 | ------ | ------------------------ | ---------------- |
@@ -8519,7 +8619,7 @@ Success response schema:
           },
           "chainId": {
             "type": "string",
-            "enum": ["0x14a34", "0x2105", "0xaa36a7"]
+            "enum": ["0x14a34", "0x2105", "0x1", "0xaa36a7"]
           },
           "status": {
             "type": "integer",
@@ -8614,7 +8714,7 @@ Operation: `setRuntimeReviewMode`.
 | ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
 | `applicationId`   | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{64}$"}`                                                        |
 | `idempotency-key` | header   | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
-| `wallet-network`  | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum-sepolia"]}`                                 |
+| `wallet-network`  | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum","ethereum-sepolia"]}`                      |
 
 Request body (application/json):
 
@@ -8694,9 +8794,9 @@ Operation: `readRuntimeConfiguration`.
 
 **Request details:** Optional runtime configuration control plane. Application proposals and provider publications are configuration records, not wallet grants, signing authority or execution activation. Publications become readable immediately without restarting the service. Immutable historical revisions remain available. Requires the documented scope and configured application or operator identity.
 
-| Parameter        | Location | Required | Schema                                                                |
-| ---------------- | -------- | -------- | --------------------------------------------------------------------- |
-| `wallet-network` | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum-sepolia"]}` |
+| Parameter        | Location | Required | Schema                                                                           |
+| ---------------- | -------- | -------- | -------------------------------------------------------------------------------- |
+| `wallet-network` | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum","ethereum-sepolia"]}` |
 
 | Status | Content type             | Description      |
 | ------ | ------------------------ | ---------------- |
@@ -8842,7 +8942,12 @@ Success response schema:
             },
             "chain_id": {
               "type": "string",
-              "enum": ["eip155:84532", "eip155:8453", "eip155:11155111"]
+              "enum": [
+                "eip155:84532",
+                "eip155:8453",
+                "eip155:1",
+                "eip155:11155111"
+              ]
             },
             "contracts": {
               "type": "array",
@@ -9319,10 +9424,10 @@ Operation: `readRuntimeApplicationConfiguration`.
 
 **Request details:** Optional runtime configuration control plane. Application proposals and provider publications are configuration records, not wallet grants, signing authority or execution activation. Publications become readable immediately without restarting the service. Immutable historical revisions remain available. Requires the documented scope and configured application or operator identity.
 
-| Parameter        | Location | Required | Schema                                                                |
-| ---------------- | -------- | -------- | --------------------------------------------------------------------- |
-| `applicationId`  | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{64}$"}`                        |
-| `wallet-network` | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum-sepolia"]}` |
+| Parameter        | Location | Required | Schema                                                                           |
+| ---------------- | -------- | -------- | -------------------------------------------------------------------------------- |
+| `applicationId`  | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{64}$"}`                                   |
+| `wallet-network` | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum","ethereum-sepolia"]}` |
 
 | Status | Content type             | Description      |
 | ------ | ------------------------ | ---------------- |
@@ -9468,7 +9573,12 @@ Success response schema:
             },
             "chain_id": {
               "type": "string",
-              "enum": ["eip155:84532", "eip155:8453", "eip155:11155111"]
+              "enum": [
+                "eip155:84532",
+                "eip155:8453",
+                "eip155:1",
+                "eip155:11155111"
+              ]
             },
             "contracts": {
               "type": "array",
@@ -9945,10 +10055,10 @@ Operation: `readRuntimeConfigurationRevision`.
 
 **Request details:** Optional runtime configuration control plane. Application proposals and provider publications are configuration records, not wallet grants, signing authority or execution activation. Publications become readable immediately without restarting the service. Immutable historical revisions remain available. Requires the documented scope and configured application or operator identity.
 
-| Parameter        | Location | Required | Schema                                                                |
-| ---------------- | -------- | -------- | --------------------------------------------------------------------- |
-| `revision`       | path     | yes      | `{"type":"string","pattern":"^(0\|[1-9][0-9]{0,19})$"}`               |
-| `wallet-network` | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum-sepolia"]}` |
+| Parameter        | Location | Required | Schema                                                                           |
+| ---------------- | -------- | -------- | -------------------------------------------------------------------------------- |
+| `revision`       | path     | yes      | `{"type":"string","pattern":"^(0\|[1-9][0-9]{0,19})$"}`                          |
+| `wallet-network` | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum","ethereum-sepolia"]}` |
 
 | Status | Content type             | Description      |
 | ------ | ------------------------ | ---------------- |
@@ -10094,7 +10204,12 @@ Success response schema:
             },
             "chain_id": {
               "type": "string",
-              "enum": ["eip155:84532", "eip155:8453", "eip155:11155111"]
+              "enum": [
+                "eip155:84532",
+                "eip155:8453",
+                "eip155:1",
+                "eip155:11155111"
+              ]
             },
             "contracts": {
               "type": "array",
@@ -10574,7 +10689,7 @@ Operation: `proposeRuntimeConfiguration`.
 | Parameter         | Location | Required | Schema                                                                                                |
 | ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
 | `idempotency-key` | header   | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
-| `wallet-network`  | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum-sepolia"]}`                                 |
+| `wallet-network`  | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum","ethereum-sepolia"]}`                      |
 
 Request body (application/json):
 
@@ -10664,7 +10779,7 @@ Request body (application/json):
         },
         "chain_id": {
           "type": "string",
-          "enum": ["eip155:84532", "eip155:8453", "eip155:11155111"]
+          "enum": ["eip155:84532", "eip155:8453", "eip155:1", "eip155:11155111"]
         },
         "contracts": {
           "type": "array",
@@ -11222,7 +11337,7 @@ Success response schema:
         },
         "chain_id": {
           "type": "string",
-          "enum": ["eip155:84532", "eip155:8453", "eip155:11155111"]
+          "enum": ["eip155:84532", "eip155:8453", "eip155:1", "eip155:11155111"]
         },
         "contracts": {
           "type": "array",
@@ -11682,7 +11797,7 @@ Operation: `readRuntimeConfigurationProposal`.
 | Parameter        | Location | Required | Schema                                                                                                |
 | ---------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
 | `proposalId`     | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
-| `wallet-network` | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum-sepolia"]}`                                 |
+| `wallet-network` | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum","ethereum-sepolia"]}`                      |
 
 | Status | Content type             | Description      |
 | ------ | ------------------------ | ---------------- |
@@ -11805,7 +11920,7 @@ Success response schema:
         },
         "chain_id": {
           "type": "string",
-          "enum": ["eip155:84532", "eip155:8453", "eip155:11155111"]
+          "enum": ["eip155:84532", "eip155:8453", "eip155:1", "eip155:11155111"]
         },
         "contracts": {
           "type": "array",
@@ -12266,7 +12381,7 @@ Operation: `publishRuntimeConfiguration`.
 | ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
 | `proposalId`      | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
 | `idempotency-key` | header   | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
-| `wallet-network`  | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum-sepolia"]}`                                 |
+| `wallet-network`  | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum","ethereum-sepolia"]}`                      |
 
 Request body (application/json):
 
@@ -12406,7 +12521,7 @@ Success response schema:
         },
         "chain_id": {
           "type": "string",
-          "enum": ["eip155:84532", "eip155:8453", "eip155:11155111"]
+          "enum": ["eip155:84532", "eip155:8453", "eip155:1", "eip155:11155111"]
         },
         "contracts": {
           "type": "array",
@@ -12875,7 +12990,7 @@ Operation: `updateRuntimeConfiguration`.
 | ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
 | `applicationId`   | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{64}$"}`                                                        |
 | `idempotency-key` | header   | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
-| `wallet-network`  | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum-sepolia"]}`                                 |
+| `wallet-network`  | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum","ethereum-sepolia"]}`                      |
 
 Request body (application/json):
 
@@ -12965,7 +13080,7 @@ Request body (application/json):
         },
         "chain_id": {
           "type": "string",
-          "enum": ["eip155:84532", "eip155:8453", "eip155:11155111"]
+          "enum": ["eip155:84532", "eip155:8453", "eip155:1", "eip155:11155111"]
         },
         "contracts": {
           "type": "array",
@@ -13524,7 +13639,7 @@ Success response schema:
         },
         "chain_id": {
           "type": "string",
-          "enum": ["eip155:84532", "eip155:8453", "eip155:11155111"]
+          "enum": ["eip155:84532", "eip155:8453", "eip155:1", "eip155:11155111"]
         },
         "contracts": {
           "type": "array",
@@ -14092,10 +14207,10 @@ Request body (application/json):
     "networks": {
       "type": "array",
       "minItems": 1,
-      "maxItems": 3,
+      "maxItems": 4,
       "uniqueItems": true,
       "items": {
-        "enum": ["base", "base-sepolia", "ethereum-sepolia"]
+        "enum": ["base", "base-sepolia", "ethereum", "ethereum-sepolia"]
       }
     }
   }
@@ -14376,7 +14491,7 @@ Success response schema:
           },
           "network": {
             "type": "string",
-            "enum": ["base", "base-sepolia", "ethereum-sepolia"]
+            "enum": ["base", "base-sepolia", "ethereum", "ethereum-sepolia"]
           },
           "wallet": {
             "type": "object",

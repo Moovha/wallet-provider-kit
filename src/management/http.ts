@@ -236,14 +236,14 @@ export async function registerManagementRoutes(
     restart_required:
       JSON.stringify([...value.networks].sort()) !==
       JSON.stringify([...networks].sort()),
-    available: (['base', 'base-sepolia', 'ethereum-sepolia'] as const).map(
-      (network) => ({
-        network,
-        name:
-          providerNetwork(network).label +
-          (providerNetwork(network).testnet ? ' · test network' : ' · mainnet'),
-      }),
-    ),
+    available: (
+      ['base', 'base-sepolia', 'ethereum', 'ethereum-sepolia'] as const
+    ).map((network) => ({
+      network,
+      name:
+        providerNetwork(network).label +
+        (providerNetwork(network).testnet ? ' · test network' : ' · mainnet'),
+    })),
   });
   app.get(
     '/v1/provider/networks',
@@ -265,9 +265,11 @@ export async function registerManagementRoutes(
           networks: {
             type: 'array',
             minItems: 1,
-            maxItems: 3,
+            maxItems: 4,
             uniqueItems: true,
-            items: { enum: ['base', 'base-sepolia', 'ethereum-sepolia'] },
+            items: {
+              enum: ['base', 'base-sepolia', 'ethereum', 'ethereum-sepolia'],
+            },
           },
         }),
       }),
@@ -341,7 +343,12 @@ export async function registerManagementRoutes(
                 account_id: uuidSchema,
                 network: {
                   type: 'string',
-                  enum: ['base', 'base-sepolia', 'ethereum-sepolia'],
+                  enum: [
+                    'base',
+                    'base-sepolia',
+                    'ethereum',
+                    'ethereum-sepolia',
+                  ],
                 },
                 wallet: body(['reference', 'name', 'kind'], {
                   reference: { type: 'string' },

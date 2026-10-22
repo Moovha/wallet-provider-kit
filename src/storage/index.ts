@@ -61,11 +61,12 @@ export function openProviderDatabase(options: ProviderDatabaseOptions) {
     managementStore: sqliteOnboardingStore(connection, undefined, true),
     accountNetwork(id: string): ProviderNetwork | undefined {
       const rows = connection.all(
-        'SELECT collection FROM onboarding_records WHERE id=? AND collection IN (?,?,?,?)',
+        'SELECT collection FROM onboarding_records WHERE id=? AND collection IN (?,?,?,?,?)',
         id,
         'accounts',
         'base:accounts',
         'base-sepolia:accounts',
+        'ethereum:accounts',
         'ethereum-sepolia:accounts',
       );
       if (rows.length > 1)

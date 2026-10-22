@@ -78,13 +78,15 @@ const policy: OnboardingPolicy = {
   },
   access: { mode: 'application', maxAgeDays: 7 },
 };
-async function fixture() {
+async function fixture(
+  secondNetwork: 'ethereum' | 'ethereum-sepolia' = 'ethereum-sepolia',
+) {
   const directory = await mkdtemp(join(tmpdir(), 'wpk-networks-'));
   cleanup.push(() => rm(directory, { recursive: true, force: true }));
   const root = openProviderDatabase({ directory, initialize: true });
   const eth = openProviderDatabase({
     directory,
-    networkScope: 'ethereum-sepolia',
+    networkScope: secondNetwork,
   });
   cleanup.push(async () => {
     root.close();
@@ -92,7 +94,7 @@ async function fixture() {
   });
   const contexts: NetworkContext[] = [];
   for (const [index, database] of [root, eth].entries()) {
-    const network = index === 0 ? 'base-sepolia' : 'ethereum-sepolia';
+    const network = index === 0 ? 'base-sepolia' : secondNetwork;
     await database.onboardingStore.transaction((state) => {
       (state.deploymentBindings ??= {})['service-v1'] = {
         origin: policy.provider.origin,
@@ -188,94 +190,101 @@ async function fixture() {
     });
   return { directory, root, eth, contexts, app, input, request };
 }
-it('verifies the existing SQLite schema and shares identity while retaining independent personal wallets, grants and consent', async () => {
-  const f = await fixture();
-  const evidence = new StorageConnection({ directory: f.directory });
-  expect(evidence.get('PRAGMA user_version')?.user_version).toBe(schemaVersion);
-  expect(
-    evidence
-      .all('PRAGMA table_info(onboarding_records)')
-      .map((row) => row.name),
-  ).toEqual(['collection', 'id', 'record']);
-  evidence.close();
-  const firstInput = f.input(0);
-  const first = await f.request(0, firstInput);
-  expect(first.statusCode).toBe(200);
-  const a = first.json();
-  expect(a.status).toBe('granted');
-  // The same identity can be reused, but its previous network's consent cannot.
-  expect((await f.request(1, firstInput)).statusCode).toBe(403);
-  const next = await f.request(1, f.input(1, true));
-  expect(next.statusCode).toBe(200);
-  const b = next.json();
-  expect(b.account_id).not.toBe(a.account_id);
-  expect(b.grant_id).not.toBe(a.grant_id);
-  const profiles = await f.root.onboardingStore.transaction((state) =>
-    Object.keys(state.verifiedUsers!),
-  );
-  expect(profiles).toHaveLength(1);
-  expect(
-    await f.eth.onboardingStore.transaction((state) =>
+it.each(['ethereum', 'ethereum-sepolia'] as const)(
+  'shares identity with %s while retaining independent personal wallets, grants and consent',
+  async (network) => {
+    const f = await fixture(network);
+    const evidence = new StorageConnection({ directory: f.directory });
+    expect(evidence.get('PRAGMA user_version')?.user_version).toBe(
+      schemaVersion,
+    );
+    expect(
+      evidence
+        .all('PRAGMA table_info(onboarding_records)')
+        .map((row) => row.name),
+    ).toEqual(['collection', 'id', 'record']);
+    evidence.close();
+    const firstInput = f.input(0);
+    const first = await f.request(0, firstInput);
+    expect(first.statusCode).toBe(200);
+    const a = first.json();
+    expect(a.status).toBe('granted');
+    // The same identity can be reused, but its previous network's consent cannot.
+    expect((await f.request(1, firstInput)).statusCode).toBe(403);
+    const next = await f.request(1, f.input(1, true));
+    expect(next.statusCode).toBe(200);
+    const b = next.json();
+    expect(b.account_id).not.toBe(a.account_id);
+    expect(b.grant_id).not.toBe(a.grant_id);
+    const profiles = await f.root.onboardingStore.transaction((state) =>
       Object.keys(state.verifiedUsers!),
-    ),
-  ).toEqual(profiles);
-  for (const [index, receipt] of [a, b].entries()) {
-    const selected = f.contexts[index];
+    );
+    expect(profiles).toHaveLength(1);
     expect(
-      await selected.database.onboardingStore.transaction(
-        (state) => state.accounts[receipt.account_id].owner,
+      await f.eth.onboardingStore.transaction((state) =>
+        Object.keys(state.verifiedUsers!),
       ),
-    ).toBe(profiles[0]);
-    const list = await f.app.inject({
-      method: 'POST',
-      url: '/v1/accounts/query',
-      headers: {
-        'wallet-network': selected.network,
-        'idempotency-key': randomUUID(),
-      },
-      payload: { user_id: 'offline-user' },
-    });
-    expect(list.statusCode).toBe(200);
-    expect(list.json().accounts).toEqual([
-      expect.objectContaining({
-        account_id: receipt.account_id,
-        is_default: true,
-      }),
-    ]);
-    // Existing account and request URLs route by their stored IDs, without a selector.
-    expect(
-      (await f.app.inject({ url: '/v1/accounts/' + receipt.account_id }))
-        .statusCode,
-    ).toBe(200);
+    ).toEqual(profiles);
+    for (const [index, receipt] of [a, b].entries()) {
+      const selected = f.contexts[index];
+      expect(
+        await selected.database.onboardingStore.transaction(
+          (state) => state.accounts[receipt.account_id].owner,
+        ),
+      ).toBe(profiles[0]);
+      const list = await f.app.inject({
+        method: 'POST',
+        url: '/v1/accounts/query',
+        headers: {
+          'wallet-network': selected.network,
+          'idempotency-key': randomUUID(),
+        },
+        payload: { user_id: 'offline-user' },
+      });
+      expect(list.statusCode).toBe(200);
+      expect(list.json().accounts).toEqual([
+        expect.objectContaining({
+          account_id: receipt.account_id,
+          is_default: true,
+        }),
+      ]);
+      // Existing account and request URLs route by their stored IDs, without a selector.
+      expect(
+        (await f.app.inject({ url: '/v1/accounts/' + receipt.account_id }))
+          .statusCode,
+      ).toBe(200);
+      expect(
+        (
+          await f.app.inject({
+            url: '/v1/access-requests/' + receipt.request_id,
+          })
+        ).json().account_id,
+      ).toBe(receipt.account_id);
+    }
     expect(
       (
-        await f.app.inject({ url: '/v1/access-requests/' + receipt.request_id })
-      ).json().account_id,
-    ).toBe(receipt.account_id);
-  }
-  expect(
-    (
-      await f.app.inject({
-        url: '/v1/accounts/' + b.account_id,
-        headers: { 'wallet-network': 'base-sepolia' },
-      })
-    ).statusCode,
-  ).toBe(403);
-  await expect(
-    f.contexts[0].onboarding!.service.account(principal, b.account_id),
-  ).rejects.toThrow();
-  await expect(
-    f.contexts[1].onboarding!.service.account(
-      { ...principal, accessGrantId: a.grant_id },
-      b.account_id,
-    ),
-  ).rejects.toThrow();
-  const same = f.input(1, true),
-    key = randomUUID();
-  expect((await f.request(1, same, key)).json()).toEqual(
-    (await f.request(1, same, key)).json(),
-  );
-});
+        await f.app.inject({
+          url: '/v1/accounts/' + b.account_id,
+          headers: { 'wallet-network': 'base-sepolia' },
+        })
+      ).statusCode,
+    ).toBe(403);
+    await expect(
+      f.contexts[0].onboarding!.service.account(principal, b.account_id),
+    ).rejects.toThrow();
+    await expect(
+      f.contexts[1].onboarding!.service.account(
+        { ...principal, accessGrantId: a.grant_id },
+        b.account_id,
+      ),
+    ).rejects.toThrow();
+    const same = f.input(1, true),
+      key = randomUUID();
+    expect((await f.request(1, same, key)).json()).toEqual(
+      (await f.request(1, same, key)).json(),
+    );
+  },
+);
 it('discovers networks and selects independent runtime policies without duplicating application registration', async () => {
   const f = await fixture();
   const discovered = (await f.app.inject({ url: '/v1/networks' })).json();
@@ -444,7 +453,11 @@ it('starts and restarts one configured instance with independent disabled networ
   input.network = 'base-sepolia';
   input.safeWallet.runtimeDirectory = '.provider-data/private-bundler';
   input.safeWallet.bundlerAuthorization = { env: 'OFFLINE_MULTI_BUNDLER' };
-  input.additionalNetworks = [{ network: 'ethereum-sepolia' }];
+  input.additionalNetworks = [
+    { network: 'ethereum-sepolia' },
+    { network: 'ethereum' },
+    { network: 'base' },
+  ];
   input.storage.directory = join(directory, 'data');
   input.backend.vaultDirectory = join(directory, 'vault');
   await mkdir(input.backend.vaultDirectory, { mode: 0o700 });
@@ -475,6 +488,12 @@ it('starts and restarts one configured instance with independent disabled networ
       expect(response.statusCode).toBe(200);
       expect(response.json().networks).toEqual([
         expect.objectContaining({ network: 'base-sepolia', configured: false }),
+        expect.objectContaining({ network: 'base', configured: false }),
+        expect.objectContaining({
+          network: 'ethereum',
+          chain_id: 'eip155:1',
+          configured: false,
+        }),
         expect.objectContaining({
           network: 'ethereum-sepolia',
           configured: false,
@@ -512,111 +531,118 @@ it('starts and restarts one configured instance with independent disabled networ
   expect(fetch).not.toHaveBeenCalled();
 });
 
-it('retains distinct funding, executor and paymaster keys and publishes separate private bundler routes for one application', async () => {
-  const f = await fixture();
-  const input = JSON.parse(
-    await readFile('docs/provider.config.safe.example.json', 'utf8'),
-  );
-  input.network = 'base-sepolia';
-  input.additionalNetworks = [{ network: 'ethereum-sepolia' }];
-  const configurations = networkConfigurations(input);
-  const applicationId = runtimeApplicationId(
-    principal.issuer,
-    principal.clientId,
-  );
-  const fundingAddresses: string[] = [],
-    executors: string[] = [],
-    signers: string[] = [];
-  const urls: string[] = [];
-  for (const [index, context] of f.contexts.entries()) {
-    configurations[index].activation.enabled = true;
-    const resources = context.runtimeConfiguration!;
-    vi.spyOn(resources, 'assertOperator').mockImplementation(() => {});
-    vi.spyOn(resources, 'acceptedSponsorship').mockResolvedValue({
-      value: { account_model: 'provider-controlled-user-safe' },
-    } as Awaited<ReturnType<typeof resources.acceptedSponsorship>>);
-    const rpc = vi
-      .spyOn(resources, 'rpcEndpoints')
-      .mockRejectedValue(Error('Offline boundary'));
-    const cipher = new ApplicationCredentialCipher(
-      Buffer.alloc(32, 3).toString('base64'),
-      context.database.networkScope,
+it.each(['ethereum', 'ethereum-sepolia'] as const)(
+  'retains distinct funding, executor and paymaster keys and private bundler routes on %s',
+  async (network) => {
+    const f = await fixture(network);
+    const input = JSON.parse(
+      await readFile('docs/provider.config.safe.example.json', 'utf8'),
     );
-    const actions = new SupportedActions(
-      context.onboarding!.service,
-      context.database,
-      context.network,
-      configurations[index].approvedCalls,
-      context.network,
+    input.network = 'base-sepolia';
+    input.additionalNetworks = [{ network }];
+    const configurations = networkConfigurations(input);
+    const applicationId = runtimeApplicationId(
+      principal.issuer,
+      principal.clientId,
     );
-    const request = vi.fn<typeof fetch>().mockResolvedValue(new Response('{}'));
-    const runtime = new SafeWalletRuntime(
-      configurations[index],
-      context.database,
-      resources,
-      context.onboarding!.service,
-      actions,
-      {} as WalletSigningProvider,
-      cipher,
-      f.directory,
-      'offline-bundler',
-      request,
-    );
-    // Stop before RPC or contract creation; inspect only the durable local key allocation.
-    await expect(
-      runtime.ensure(
-        { principal, idempotencyKey: randomUUID() },
-        applicationId,
-      ),
-    ).rejects.toThrow('Offline boundary');
-    const infrastructure = await context.database.onboardingStore.transaction(
-      (state) => {
-        const infra =
-          state.deploymentBindings!['service-v1'].runtimeConfiguration!
-            .safeWalletInfrastructure![applicationId];
-        infra.paymaster = {
-          address: '0x' + '1'.repeat(40),
-          codeHash: '0x' + '2'.repeat(64),
-        };
-        return infra;
-      },
-    );
-    fundingAddresses.push(infrastructure.fundingAddress);
-    executors.push(infrastructure.executor.address);
-    signers.push(infrastructure.paymasterSigner.address);
-    rpc.mockResolvedValue(['https://offline-rpc.example.test']);
-    await (
-      runtime as unknown as { writeBundler(id: string): Promise<void> }
-    ).writeBundler(applicationId);
-    const scopedId = index
-      ? fingerprint(['network-bundler-v1', context.network, applicationId])
-      : applicationId;
-    const document = JSON.parse(
-      await readFile(
-        join(
-          f.directory,
-          configurations[index].safeWallet!.runtimeDirectory,
-          scopedId + '.json',
+    const fundingAddresses: string[] = [],
+      executors: string[] = [],
+      signers: string[] = [];
+    const urls: string[] = [];
+    for (const [index, context] of f.contexts.entries()) {
+      configurations[index].activation.enabled = true;
+      const resources = context.runtimeConfiguration!;
+      vi.spyOn(resources, 'assertOperator').mockImplementation(() => {});
+      vi.spyOn(resources, 'acceptedSponsorship').mockResolvedValue({
+        value: { account_model: 'provider-controlled-user-safe' },
+      } as Awaited<ReturnType<typeof resources.acceptedSponsorship>>);
+      const rpc = vi
+        .spyOn(resources, 'rpcEndpoints')
+        .mockRejectedValue(Error('Offline boundary'));
+      const cipher = new ApplicationCredentialCipher(
+        Buffer.alloc(32, 3).toString('base64'),
+        context.database.networkScope,
+      );
+      const actions = new SupportedActions(
+        context.onboarding!.service,
+        context.database,
+        context.network,
+        configurations[index].approvedCalls,
+        context.network,
+      );
+      const request = vi
+        .fn<typeof fetch>()
+        .mockResolvedValue(new Response('{}'));
+      const runtime = new SafeWalletRuntime(
+        configurations[index],
+        context.database,
+        resources,
+        context.onboarding!.service,
+        actions,
+        {} as WalletSigningProvider,
+        cipher,
+        f.directory,
+        'offline-bundler',
+        request,
+      );
+      // Stop before RPC or contract creation; inspect only the durable local key allocation.
+      await expect(
+        runtime.ensure(
+          { principal, idempotencyKey: randomUUID() },
+          applicationId,
         ),
-        'utf8',
-      ),
-    );
-    expect(document.applicationId).toBe(scopedId);
-    expect(document.chainId).toBe(index ? '0xaa36a7' : '0x14a34');
-    const transport = (
-      runtime as unknown as { transport(id: string): typeof fetch }
-    ).transport(applicationId);
-    await transport('https://bundled-bundler.invalid/rpc/' + scopedId, {
-      method: 'POST',
-    });
-    expect(request.mock.calls[0][0]).toBe(
-      'http://bundler:3000/rpc/' + scopedId,
-    );
-    urls.push(scopedId);
-  }
-  for (const values of [fundingAddresses, executors, signers, urls])
-    expect(new Set(values).size).toBe(2);
-});
+      ).rejects.toThrow('Offline boundary');
+      const infrastructure = await context.database.onboardingStore.transaction(
+        (state) => {
+          const infra =
+            state.deploymentBindings!['service-v1'].runtimeConfiguration!
+              .safeWalletInfrastructure![applicationId];
+          infra.paymaster = {
+            address: '0x' + '1'.repeat(40),
+            codeHash: '0x' + '2'.repeat(64),
+          };
+          return infra;
+        },
+      );
+      fundingAddresses.push(infrastructure.fundingAddress);
+      executors.push(infrastructure.executor.address);
+      signers.push(infrastructure.paymasterSigner.address);
+      rpc.mockResolvedValue(['https://offline-rpc.example.test']);
+      await (
+        runtime as unknown as { writeBundler(id: string): Promise<void> }
+      ).writeBundler(applicationId);
+      const scopedId = index
+        ? fingerprint(['network-bundler-v1', context.network, applicationId])
+        : applicationId;
+      const document = JSON.parse(
+        await readFile(
+          join(
+            f.directory,
+            configurations[index].safeWallet!.runtimeDirectory,
+            scopedId + '.json',
+          ),
+          'utf8',
+        ),
+      );
+      expect(document.applicationId).toBe(scopedId);
+      expect(document.chainId).toBe(
+        index ? (network === 'ethereum' ? '0x1' : '0xaa36a7') : '0x14a34',
+      );
+      const transport = (
+        runtime as unknown as { transport(id: string): typeof fetch }
+      ).transport(applicationId);
+      await transport('https://bundled-bundler.invalid/rpc/' + scopedId, {
+        method: 'POST',
+      });
+      expect(request.mock.calls[0][0]).toBe(
+        'http://bundler:3000/rpc/' + scopedId,
+      );
+      urls.push(scopedId);
+    }
+    for (const values of [fundingAddresses, executors, signers, urls])
+      expect(new Set(values).size).toBe(2);
+  },
+);
 
 it('lists every network wallet for one verified user and revokes all retained grants when shared user checks change', async () => {
   const f = await fixture();
@@ -748,7 +774,7 @@ it('uses one durable application registration and OAuth identity on both configu
   const saveKey = randomUUID();
   const selected = {
     expected_revision: choices.revision,
-    networks: ['base', 'base-sepolia'] as const,
+    networks: ['base', 'base-sepolia', 'ethereum', 'ethereum-sepolia'] as const,
   };
   const saved = await management.saveNetworks(
     admin,
@@ -793,6 +819,8 @@ it('uses one durable application registration and OAuth identity on both configu
   ).toEqual([
     expect.objectContaining({ network: 'base', configured: false }),
     expect.objectContaining({ network: 'base-sepolia', configured: false }),
+    expect.objectContaining({ network: 'ethereum', configured: false }),
+    expect.objectContaining({ network: 'ethereum-sepolia', configured: false }),
   ]);
   await management.mutate(admin, randomUUID(), 'update', {
     id: created.id,

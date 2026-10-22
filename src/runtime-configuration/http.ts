@@ -83,7 +83,7 @@ const applicationsSchema = {
   properties: {
     network: {
       type: 'string',
-      enum: ['base', 'base-sepolia', 'ethereum-sepolia'],
+      enum: ['base', 'base-sepolia', 'ethereum', 'ethereum-sepolia'],
     },
     role: { type: 'string', enum: ['provider', 'application'] },
     applications: {
@@ -174,7 +174,10 @@ const batchesSchema = {
           expires_at: { type: 'string', format: 'date-time' },
           application_id: applicationIdSchema,
           version: { type: 'string', enum: ['2.0.0'] },
-          chainId: { type: 'string', enum: ['0x14a34', '0x2105', '0xaa36a7'] },
+          chainId: {
+            type: 'string',
+            enum: ['0x14a34', '0x2105', '0x1', '0xaa36a7'],
+          },
           status: { type: 'integer', enum: [100, 200, 400, 500] },
           atomic: { type: 'boolean', enum: [true] },
           receipts: { type: 'array', items: walletCallsReceiptSchema },

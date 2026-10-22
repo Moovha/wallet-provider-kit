@@ -1473,7 +1473,7 @@
     },
     "network": {
       "type": "string",
-      "enum": ["base", "base-sepolia", "ethereum-sepolia"],
+      "enum": ["base", "base-sepolia", "ethereum", "ethereum-sepolia"],
       "description": "Default network for existing integrations. Omission preserves Base Sepolia. Additional networks share verified identity and keep wallets, consent, execution and funding separate."
     },
     "safeProvisioning": {
@@ -1629,7 +1629,7 @@
     },
     "additionalNetworks": {
       "type": "array",
-      "maxItems": 2,
+      "maxItems": 3,
       "description": "Additional networks in this instance. Each starts disabled with separate transaction rules and funding.",
       "items": {
         "type": "object",

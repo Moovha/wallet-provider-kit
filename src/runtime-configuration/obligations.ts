@@ -24,7 +24,7 @@ export interface ApplicationObligations {
     billing_owner: 'application';
   }[];
   sponsorship: {
-    chain_id: 'eip155:8453' | 'eip155:84532' | 'eip155:11155111';
+    chain_id: 'eip155:8453' | 'eip155:84532' | 'eip155:1' | 'eip155:11155111';
     funding_agreement: string;
     maximum_gas_budget_wei: string;
     gas_limits?: {
@@ -68,7 +68,7 @@ const object = (properties: Record<string, unknown>) => ({
 const sponsorshipProperties = {
   chain_id: {
     type: 'string',
-    enum: ['eip155:8453', 'eip155:84532', 'eip155:11155111'],
+    enum: ['eip155:8453', 'eip155:84532', 'eip155:1', 'eip155:11155111'],
   },
   funding_agreement: boundedText,
   maximum_gas_budget_wei: {
@@ -215,7 +215,8 @@ export function normalizeObligation<K extends ObligationKind>(
         (value) => BigInt(value) > BigInt(Number.MAX_SAFE_INTEGER),
       ) ||
       (BigInt(gas.l1FeeReserveWei) === 0n &&
-        sponsorship.chain_id !== 'eip155:11155111') ||
+        sponsorship.chain_id !== 'eip155:11155111' &&
+        sponsorship.chain_id !== 'eip155:1') ||
       BigInt(gas.l1FeeReserveWei) >= 2n ** 256n ||
       (sponsorship.gas_limits !== undefined &&
         BigInt(sponsorship.maximum_gas_budget_wei) < minimumSponsorFunding(gas))
@@ -238,7 +239,7 @@ export function sponsorshipGas(value: ApplicationObligations['sponsorship']) {
         maxFeePerGas: defaultSponsorGas.maxFeePerGas,
         maxPriorityFeePerGas: defaultSponsorGas.maxPriorityFeePerGas,
         l1FeeReserveWei:
-          value.chain_id === 'eip155:11155111'
+          value.chain_id === 'eip155:11155111' || value.chain_id === 'eip155:1'
             ? '0'
             : defaultSponsorGas.l1FeeReserveWei,
       };

@@ -440,7 +440,7 @@ export class ManagementService {
       input.expected_revision < 1 ||
       !Array.isArray(input.networks) ||
       input.networks.length < 1 ||
-      input.networks.length > 3 ||
+      input.networks.length > 4 ||
       new Set(input.networks).size !== input.networks.length ||
       !input.networks.includes(current[0])
     )

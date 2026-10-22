@@ -16,8 +16,8 @@ For deposits sent on another EVM network, see [cross-chain Safe recovery](safe-c
 
 ## Offer multiple networks
 
-One provider instance can offer **Base mainnet**, **Base Sepolia** and **Ethereum
-Sepolia**. Ethereum mainnet is not supported. Installation fixes the default network
+One provider instance can offer **Base mainnet**, **Base Sepolia**, **Ethereum mainnet** and **Ethereum
+Sepolia**. Installation fixes the default network
 for existing integrations and preserves its original Personal wallet.
 
 Open **Networks** in administration to select additional networks, save, then restart
@@ -25,7 +25,7 @@ the provider. Choices are retained in the database and applied at startup. Each
 network has its own Personal wallet and can also hold named personal or shared wallets.
 
 For a release installation, set `WPK_NETWORK` to the default and, optionally,
-`WPK_ADDITIONAL_NETWORKS=base-sepolia,ethereum-sepolia` before running the installer.
+`WPK_ADDITIONAL_NETWORKS=base-sepolia,ethereum,ethereum-sepolia` before running the installer.
 Do not repeat the default in the additional list.
 
 The instance shares application registration, provider administration and verified

@@ -106,7 +106,7 @@ if (selected) {
 }
 ```
 
-Select an enabled network (`base`, `base-sepolia` or `ethereum-sepolia`) and supply your token
+Select an enabled network (`base`, `base-sepolia`, `ethereum` or `ethereum-sepolia`) and supply your token
 callback and authenticated user ID. `walletProvider(selected)`
 implements the existing [wallet calls adapter](wallet-calls.md) and automatically
 carries the selected account and grant. `requestAccess`, `provision`, `members`

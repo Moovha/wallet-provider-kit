@@ -245,7 +245,7 @@ execution flow. Each user receives their own Safe address for deposits and calls
 
 The current version, **0.1.0**, is experimental and available from source rather
 than npm. You can configure account access and provisioning, and execute approved
-Safe contract calls, swaps and vault deposits on **Base mainnet, Base Sepolia or Ethereum Sepolia**.
+Safe contract calls, swaps and vault deposits on **Base mainnet, Base Sepolia, Ethereum mainnet or Ethereum Sepolia**.
 Start with the [setup guide](docs/README.md); application connection follows deployment.
 
 Your first deployment stays disabled while you test your backend, application
@@ -283,7 +283,7 @@ helps you test it with your own services.
 An authorization signature, transaction submission, verified chain result and
 business settlement describe different outcomes. Applications fund the verifying
 paymaster and private bundler for the [Safe execution flow](docs/user-operation-execution.md).
-One instance can offer Base mainnet, Base Sepolia and Ethereum Sepolia. Choose a default network and optional additional networks in setup. Verified identity and application registration are shared; wallets, consent, transaction rules, execution and fee funding remain separate for each network. Existing integrations keep their default network and account URLs. See [network setup and selection](docs/provider-guide.md#offer-multiple-networks).
+One instance can offer Base mainnet, Base Sepolia, Ethereum mainnet and Ethereum Sepolia. Choose a default network during installation and additional networks in administration. Verified identity and application registration are shared; wallets, consent, transaction rules, execution and fee funding remain separate for each network. Existing integrations keep their default network and account URLs. See [network setup and selection](docs/provider-guide.md#offer-multiple-networks).
 Applications use the account wallet endpoint; no raw-signature endpoint is exposed.
 
 ## Extend the service
