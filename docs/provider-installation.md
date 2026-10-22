@@ -218,7 +218,7 @@ signing in again.
 
 The release’s `aws-cloudformation.json` starts an Ubuntu 24.04 VM and runs the
 same installer. Have your infrastructure operator review the VPC, public subnet,
-SSH key, restricted administrator CIDR, domain, privacy URL, release version and
+management access, domain, privacy URL, release version and
 verified archive SHA-256. Internet access is needed for packages, images and the
 release. Put no cloud credentials or wallet secrets in template parameters.
 
@@ -230,7 +230,7 @@ an address. The template does not create DNS records, including when your domain
 uses an external DNS provider.
 
 1. Create the stack with the chosen hostname in `DomainName`. Wait for the
-   `PublicIP` output, then confirm over restricted SSH that the host installer
+   `PublicIP` output, then confirm through Systems Manager or restricted SSH that the host installer
    and containers have started. Stack completion alone does not confirm that
    the installer finished successfully.
 2. At your authoritative DNS provider, create an **A record** for the hostname
@@ -239,27 +239,89 @@ uses an external DNS provider.
    subdomain such as `wallet.example.com`, the record name is commonly `wallet`;
    follow your DNS provider's naming convention.
 3. Wait until public DNS resolves the hostname to that address. Allow inbound
-   TCP ports 80 and 443 through the host and AWS firewalls. The bundled Caddy
+   TCP port 80 for certificate validation and port 443 only from approved
+   backend addresses or a VPN connection through the host and AWS firewalls. The bundled Caddy
    gateway requests a public TLS certificate and retries while DNS is becoming
    available. Certificate issuance exposes the hostname in public certificate
    transparency logs.
 4. Open `https://<your-hostname>/health/management` and confirm a successful
    response with a valid HTTPS certificate, then open `/admin/`. Check that the
    configured privacy-notice URL is reachable before onboarding users.
-5. Read the private claim file at the stack's `ClaimLocation` over SSH and
+5. Read the private claim file at the stack's `ClaimLocation` through a private host session and
    [claim administrator access](#claim-administrator-access). The 30-minute
    claim lifetime starts when the service initializes, independently of DNS.
    If it expired while DNS or HTTPS was being prepared, use
    [claim renewal](#recover-an-interrupted-or-expired-setup) with the existing
    installation; do not delete its data or reinstall with a different identity.
 
-The template's `PublicIP` is automatically assigned and can change after an EC2
-stop/start. An ordinary operating-system reboot does not release it. For a stable
-DNS destination, arrange an Elastic IP or another reviewed stable endpoint before
-publishing the A record. An Elastic IP requires separate allocation and association;
-it is not included in this template. If you keep the automatic address, check and
-update DNS after stop/start. Public IPv4 addresses incur charges, including retained
-Elastic IPs. See [EC2 public IPv4 address behavior](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-instance-addressing.html#concepts-public-addresses).
+The template associates a stable Elastic IP with the host. By default it allocates
+an address and retains it when the stack is deleted or replaced. To use an address
+you already control in the selected Region, supply its allocation ID in
+`ElasticIPAllocationId`; that allocation remains under your management. The
+`PublicIP` output is the DNS destination after association. Public IPv4 addresses
+incur charges while allocated, including when the host is stopped. Release retained
+allocations only after checking DNS, recovery and replacement plans.
+
+`AccessMethod=ssm` is the default: the host receives the AWS-managed Systems
+Manager core permissions, with no inbound SSH rule or key pair. Use a private
+Systems Manager session for administration. Application containers do not receive
+those host permissions. For SSH instead, select `AccessMethod=ssh`, supply an
+existing `KeyName` and set `AdminCIDR` to your trusted operator IPv4 range.
+
+Select an instance type your AWS plan permits. The default `t3.medium` requires
+a plan that supports it; `c7i-flex.large` and `m7i-flex.large` are additional
+choices for the new Free plan. Credits cover eligible usage while available;
+Free-plan eligibility does not mean there is no hourly charge. The installer
+requires at least 2 GiB of available runtime memory, so a nominal 2 GiB instance
+may not satisfy its check after operating-system overhead.
+
+For a staged installation, set `InstallOnBoot=false` to prepare the host without
+fetching a release. Install a verified release separately before checking the
+provider endpoints. With the default `InstallOnBoot=true`, both `ReleaseVersion`
+and `ReleaseArchiveSHA256` are required. Host preparation alone does not run a
+provider or create administrator credentials.
+
+### Restrict acceptance network access
+
+User devices communicate with the connected application's backend. That backend
+calls the wallet provider; user devices do not need a direct provider connection
+or a VPN profile. Treat a local development backend as a backend caller when
+testing from a developer computer.
+
+Set `HTTPSAllowedCIDR` to the approved backend's public egress IPv4 range.
+The default loopback range denies remote HTTPS. The firewall keeps the API,
+bundler and storage ports private. Port 80 remains public for certificate
+validation and HTTPS redirects; verify it does not return provider API content.
+
+For a private backend connection, `EnableVPN=true` opens UDP 51820 for
+WireGuard's authenticated listener. This setting alone does not configure peers.
+On the prepared Ubuntu host, run the bundle's reviewed `setup-vpn.sh`
+(`packaging/setup-vpn.sh` in source) as the
+host administrator, supplying `WPK_VPN_DOMAIN` and the development host's
+`WPK_VPN_CLIENT_PUBLIC_KEY`. Generate and retain each private key on its own
+host; never pass private keys as template parameters or command output. The
+script refuses to replace an existing VPN configuration.
+
+The supplied single-peer setup uses provider address `10.66.0.1` and backend
+address `10.66.0.2`. The backend's WireGuard profile routes only `10.66.0.1/32`.
+Configure DNS for the provider hostname only; general DNS must remain independent
+of the provider host, including during maintenance. Private DNS resolves the provider hostname to
+`10.66.0.1`, preserving normal hostname and HTTPS certificate validation.
+The host firewall allows the peer's provider HTTPS and DNS traffic and blocks
+forwarding into the rest of the network. Use separate reviewed peer addresses
+and rules for additional backend hosts; do not distribute one peer key to users.
+On macOS, use a private profile without a `DNS=` line and run
+`connect-development-vpn.sh /absolute/path/profile.conf your-provider-hostname`
+with `sudo`. It creates a provider-only resolver under `/etc/resolver/`, so
+stopping the provider does not prevent AWS management or other DNS lookups.
+Disconnect with `wg-quick down /absolute/path/profile.conf`. A retained
+provider-only resolver keeps that hostname private while disconnected; remove
+only that resolver file if you intentionally return to public provider DNS.
+Operator administration also requires an approved source or private connection.
+
+Verify both an approved connection and a denied unapproved connection before
+onboarding applications. VPN admission does not replace API authentication,
+application trust or wallet-authority checks.
 
 Keep wallet operations disabled during DNS, HTTPS and administrator setup. A
 working management endpoint does not establish wallet-execution readiness.

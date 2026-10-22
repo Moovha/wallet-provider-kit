@@ -9,12 +9,16 @@
       "Type": "AWS::EC2::Subnet::Id"
     },
     "KeyName": {
-      "Type": "AWS::EC2::KeyPair::KeyName"
+      "Type": "String",
+      "Default": "",
+      "AllowedPattern": "^[-A-Za-z0-9._ ]*$",
+      "Description": "Existing EC2 key pair; required only for SSH access."
     },
     "AdminCIDR": {
       "Type": "String",
       "Description": "Trusted operator IPv4 CIDR for SSH. Do not use a public catch-all range.",
-      "AllowedPattern": "^(\\d{1,3}\\.){3}\\d{1,3}/(1[6-9]|2[0-9]|3[0-2])$"
+      "AllowedPattern": "^(\\d{1,3}\\.){3}\\d{1,3}/(1[6-9]|2[0-9]|3[0-2])$",
+      "Default": "127.0.0.1/32"
     },
     "DomainName": {
       "Type": "String",
@@ -26,12 +30,14 @@
     },
     "ReleaseVersion": {
       "Type": "String",
-      "AllowedPattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(-[A-Za-z0-9.-]+)?$"
+      "AllowedPattern": "^$|^[0-9]+\\.[0-9]+\\.[0-9]+(-[A-Za-z0-9.-]+)?$",
+      "Default": ""
     },
     "ReleaseArchiveSHA256": {
       "Type": "String",
-      "AllowedPattern": "^[a-f0-9]{64}$",
-      "Description": "Verified SHA-256 of provider-release.tgz from the selected release."
+      "AllowedPattern": "^$|^[a-f0-9]{64}$",
+      "Description": "Verified SHA-256 of provider-release.tgz from the selected release.",
+      "Default": ""
     },
     "ImageId": {
       "Type": "AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>",
@@ -40,13 +46,48 @@
     "InstanceType": {
       "Type": "String",
       "Default": "t3.medium",
-      "AllowedValues": ["t3.medium", "t3.large"]
+      "AllowedValues": [
+        "t3.medium",
+        "t3.large",
+        "c7i-flex.large",
+        "m7i-flex.large"
+      ]
     },
     "DiskGiB": {
       "Type": "Number",
       "Default": 40,
       "MinValue": 30,
       "MaxValue": 1024
+    },
+    "AccessMethod": {
+      "Type": "String",
+      "Default": "ssm",
+      "AllowedValues": ["ssm", "ssh"],
+      "Description": "Use Systems Manager without inbound SSH, or supply an SSH key and restricted administrator CIDR."
+    },
+    "ElasticIPAllocationId": {
+      "Type": "String",
+      "Default": "",
+      "AllowedPattern": "^$|^eipalloc-[a-f0-9]+$",
+      "Description": "Optional existing Elastic IP allocation in the selected Region. Its owner retains lifecycle responsibility. Otherwise the stack creates and retains an address."
+    },
+    "InstallOnBoot": {
+      "Type": "String",
+      "Default": "true",
+      "AllowedValues": ["true", "false"],
+      "Description": "Install a verified release during boot, or prepare the host for a separate reviewed installation."
+    },
+    "HTTPSAllowedCIDR": {
+      "Type": "String",
+      "Default": "127.0.0.1/32",
+      "AllowedPattern": "^(\\d{1,3}\\.){3}\\d{1,3}/([0-9]|[12][0-9]|3[0-2])$",
+      "Description": "Approved IPv4 network for HTTPS. The default denies remote HTTPS; use the testing operator network during acceptance."
+    },
+    "EnableVPN": {
+      "Type": "String",
+      "Default": "false",
+      "AllowedValues": ["true", "false"],
+      "Description": "Allow the authenticated WireGuard listener. Configure host keys and peers separately before use."
     }
   },
   "Resources": {
@@ -59,10 +100,20 @@
         },
         "SecurityGroupIngress": [
           {
-            "IpProtocol": "tcp",
-            "FromPort": 443,
-            "ToPort": 443,
-            "CidrIp": "0.0.0.0/0"
+            "Fn::If": [
+              "AllowHTTPSFromInternet",
+              {
+                "IpProtocol": "tcp",
+                "FromPort": 443,
+                "ToPort": 443,
+                "CidrIp": {
+                  "Ref": "HTTPSAllowedCIDR"
+                }
+              },
+              {
+                "Ref": "AWS::NoValue"
+              }
+            ]
           },
           {
             "IpProtocol": "tcp",
@@ -71,14 +122,45 @@
             "CidrIp": "0.0.0.0/0"
           },
           {
-            "IpProtocol": "tcp",
-            "FromPort": 22,
-            "ToPort": 22,
-            "CidrIp": {
-              "Ref": "AdminCIDR"
-            }
+            "Fn::If": [
+              "UseSSH",
+              {
+                "IpProtocol": "tcp",
+                "FromPort": 22,
+                "ToPort": 22,
+                "CidrIp": {
+                  "Ref": "AdminCIDR"
+                }
+              },
+              {
+                "Ref": "AWS::NoValue"
+              }
+            ]
+          },
+          {
+            "Fn::If": [
+              "UseVPN",
+              {
+                "IpProtocol": "udp",
+                "FromPort": 51820,
+                "ToPort": 51820,
+                "CidrIp": "0.0.0.0/0"
+              },
+              {
+                "Ref": "AWS::NoValue"
+              }
+            ]
           }
         ]
+      },
+      "Metadata": {
+        "com.aws.cloudformation.Context": {
+          "why": "Public HTTPS gateway; operator shell access uses SSM unless SSH is selected.",
+          "must": [
+            "Never expose internal API, database, bundler or cache ports.",
+            "SSH ingress requires the operator CIDR and SSH access selection."
+          ]
+        }
       }
     },
     "Provider": {
@@ -91,7 +173,15 @@
           "Ref": "InstanceType"
         },
         "KeyName": {
-          "Ref": "KeyName"
+          "Fn::If": [
+            "UseSSH",
+            {
+              "Ref": "KeyName"
+            },
+            {
+              "Ref": "AWS::NoValue"
+            }
+          ]
         },
         "MetadataOptions": {
           "HttpTokens": "required",
@@ -127,13 +217,136 @@
         "Tags": [
           {
             "Key": "Name",
-            "Value": "wallet-provider"
+            "Value": {
+              "Fn::Sub": "${AWS::StackName}-provider"
+            }
           }
         ],
         "UserData": {
           "Fn::Base64": {
-            "Fn::Sub": "#!/bin/bash\nset -eu\nexport DEBIAN_FRONTEND=noninteractive\napt-get update\napt-get install -y docker.io docker-compose-v2 curl ca-certificates\nsystemctl enable --now docker\nuseradd --create-home --shell /bin/bash wallet-provider\nusermod -aG docker wallet-provider\ninstall -d -m 700 -o wallet-provider -g wallet-provider /home/wallet-provider/.wallet-provider\ninstall -d -m 700 -o wallet-provider -g wallet-provider /home/wallet-provider/release\ncurl --fail --location --proto '=https' --tlsv1.2 'https://github.com/Moovha/wallet-provider-kit/releases/download/provider-v${ReleaseVersion}/provider-release.tgz' -o /home/wallet-provider/release.tgz\nprintf '%s  %s\\n' '${ReleaseArchiveSHA256}' /home/wallet-provider/release.tgz | sha256sum --check\ntar --extract --gzip --file /home/wallet-provider/release.tgz --directory /home/wallet-provider/release\nchown -R wallet-provider:wallet-provider /home/wallet-provider/release\nsudo -u wallet-provider env WPK_LOCAL=false WPK_ORIGIN='https://${DomainName}' WPK_PRIVACY_URL='${PrivacyURL}' WPK_ACCEPT_PLAN=true bash /home/wallet-provider/release/install.sh\n"
+            "Fn::If": [
+              "InstallRelease",
+              {
+                "Fn::Sub": "#!/bin/bash\nset -eu\nexport DEBIAN_FRONTEND=noninteractive\napt-get -o Acquire::Retries=5 update\napt-get -o Acquire::Retries=5 install -y docker.io docker-compose-v2 curl ca-certificates\nsystemctl enable --now docker\nuseradd --create-home --shell /bin/bash wallet-provider\nusermod -aG docker wallet-provider\ninstall -d -m 700 -o wallet-provider -g wallet-provider /home/wallet-provider/.wallet-provider\ninstall -d -m 700 -o wallet-provider -g wallet-provider /home/wallet-provider/release\ncurl --fail --retry 5 --location --proto '=https' --tlsv1.2 'https://github.com/Moovha/wallet-provider-kit/releases/download/provider-v${ReleaseVersion}/provider-release.tgz' -o /home/wallet-provider/release.tgz\nprintf '%s  %s\\n' '${ReleaseArchiveSHA256}' /home/wallet-provider/release.tgz | sha256sum --check\ntar --extract --gzip --file /home/wallet-provider/release.tgz --directory /home/wallet-provider/release\nchown -R wallet-provider:wallet-provider /home/wallet-provider/release\nsudo -u wallet-provider env WPK_LOCAL=false WPK_ORIGIN='https://${DomainName}' WPK_PRIVACY_URL='${PrivacyURL}' WPK_ACCEPT_PLAN=true bash /home/wallet-provider/release/install.sh\n"
+              },
+              "#!/bin/bash\nset -eu\nexport DEBIAN_FRONTEND=noninteractive\napt-get -o Acquire::Retries=5 update\napt-get -o Acquire::Retries=5 install -y docker.io docker-compose-v2 curl ca-certificates\nsystemctl enable --now docker\nuseradd --create-home --shell /bin/bash wallet-provider\nusermod -aG docker wallet-provider\ninstall -d -m 700 -o wallet-provider -g wallet-provider /home/wallet-provider/.wallet-provider\ninstall -d -m 700 -o wallet-provider -g wallet-provider /home/wallet-provider/release\n"
+            ]
           }
+        },
+        "IamInstanceProfile": {
+          "Fn::If": [
+            "UseSSM",
+            {
+              "Ref": "ManagementProfile"
+            },
+            {
+              "Ref": "AWS::NoValue"
+            }
+          ]
+        }
+      },
+      "Metadata": {
+        "com.aws.cloudformation.Context": {
+          "why": "One active POSIX host for SQLite and the private owner-signer vault.",
+          "must": [
+            "Retain encrypted storage; never start competing copies of provider data.",
+            "IMDSv2 and hop limit one isolate host credentials from bridge containers.",
+            "Wallet execution remains disabled after installation."
+          ]
+        }
+      }
+    },
+    "ManagementRole": {
+      "Type": "AWS::IAM::Role",
+      "Condition": "UseSSM",
+      "Metadata": {
+        "com.aws.cloudformation.Context": {
+          "why": "EC2 host management through SSM; wallet containers cannot reach the instance profile through IMDS.",
+          "must": [
+            "Grant host management only; no wallet or application authority."
+          ]
+        }
+      },
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "ec2.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "ManagedPolicyArns": [
+          {
+            "Fn::Sub": "arn:${AWS::Partition}:iam::aws:policy/AmazonSSMManagedInstanceCore"
+          }
+        ]
+      }
+    },
+    "ManagementProfile": {
+      "Type": "AWS::IAM::InstanceProfile",
+      "Condition": "UseSSM",
+      "Properties": {
+        "Roles": [
+          {
+            "Ref": "ManagementRole"
+          }
+        ]
+      }
+    },
+    "StableAddress": {
+      "Type": "AWS::EC2::EIP",
+      "Condition": "CreateElasticIP",
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+      "Metadata": {
+        "com.aws.cloudformation.Context": {
+          "why": "Stable DNS destination independent of host stop/start and replacement.",
+          "must": [
+            "Retain allocation on stack removal; retained addresses continue to incur charges."
+          ]
+        }
+      },
+      "Properties": {
+        "Domain": "vpc",
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${AWS::StackName}-public"
+            }
+          }
+        ]
+      }
+    },
+    "AddressAssociation": {
+      "Type": "AWS::EC2::EIPAssociation",
+      "Metadata": {
+        "com.aws.cloudformation.Context": {
+          "why": "Binds the stable destination to the active single host.",
+          "must": [
+            "Use an allocation in the same Region; only one active provider host."
+          ]
+        }
+      },
+      "Properties": {
+        "AllocationId": {
+          "Fn::If": [
+            "CreateElasticIP",
+            {
+              "Fn::GetAtt": ["StableAddress", "AllocationId"]
+            },
+            {
+              "Ref": "ElasticIPAllocationId"
+            }
+          ]
+        },
+        "InstanceId": {
+          "Ref": "Provider"
         }
       }
     }
@@ -143,7 +356,7 @@
       "Value": {
         "Fn::GetAtt": ["Provider", "PublicIp"]
       },
-      "Description": "Point the selected domain to this address; stack creation alone does not prove service readiness."
+      "Description": "Stable public IPv4 address. Create the selected hostname A record after association; verify HTTPS separately."
     },
     "Administration": {
       "Value": {
@@ -152,10 +365,183 @@
     },
     "ClaimLocation": {
       "Value": "/home/wallet-provider/.wallet-provider/installation-claim",
-      "Description": "Read privately over SSH. Never put the claim into stack outputs or logs."
+      "Description": "Read privately on the host through Systems Manager or restricted SSH. Never print the claim in command output or logs."
     },
     "Persistence": {
       "Value": "Encrypted root EBS is retained when the instance is deleted. Retained volumes continue to incur charges. Backups and tested restore are still required."
+    },
+    "ElasticIPAllocationId": {
+      "Value": {
+        "Fn::If": [
+          "CreateElasticIP",
+          {
+            "Fn::GetAtt": ["StableAddress", "AllocationId"]
+          },
+          {
+            "Ref": "ElasticIPAllocationId"
+          }
+        ]
+      },
+      "Description": "Retained stable allocation. Existing allocations remain managed by their owner; release only after DNS and recovery review."
+    },
+    "ProviderInstanceId": {
+      "Value": {
+        "Ref": "Provider"
+      },
+      "Description": "Managed host for Systems Manager access, or restricted SSH when selected."
+    }
+  },
+  "Metadata": {
+    "AWSToolsMetrics": {
+      "AWSAgentToolkit": "aws-cloudformation@3"
+    },
+    "com.aws.cloudformation.Context": {
+      "ref": [
+        {
+          "at": "docs/provider-installation.md",
+          "has": "Single-host installation, DNS, administrator recovery and retained storage"
+        }
+      ]
+    }
+  },
+  "Conditions": {
+    "UseSSH": {
+      "Fn::Equals": [
+        {
+          "Ref": "AccessMethod"
+        },
+        "ssh"
+      ]
+    },
+    "UseSSM": {
+      "Fn::Equals": [
+        {
+          "Ref": "AccessMethod"
+        },
+        "ssm"
+      ]
+    },
+    "CreateElasticIP": {
+      "Fn::Equals": [
+        {
+          "Ref": "ElasticIPAllocationId"
+        },
+        ""
+      ]
+    },
+    "InstallRelease": {
+      "Fn::Equals": [
+        {
+          "Ref": "InstallOnBoot"
+        },
+        "true"
+      ]
+    },
+    "UseVPN": {
+      "Fn::Equals": [
+        {
+          "Ref": "EnableVPN"
+        },
+        "true"
+      ]
+    },
+    "AllowHTTPSFromInternet": {
+      "Fn::Not": [
+        {
+          "Fn::Equals": [
+            {
+              "Ref": "HTTPSAllowedCIDR"
+            },
+            "127.0.0.1/32"
+          ]
+        }
+      ]
+    }
+  },
+  "Rules": {
+    "SSHParameters": {
+      "RuleCondition": {
+        "Fn::Equals": [
+          {
+            "Ref": "AccessMethod"
+          },
+          "ssh"
+        ]
+      },
+      "Assertions": [
+        {
+          "Assert": {
+            "Fn::Not": [
+              {
+                "Fn::Equals": [
+                  {
+                    "Ref": "KeyName"
+                  },
+                  ""
+                ]
+              }
+            ]
+          },
+          "AssertDescription": "SSH access requires an existing key pair."
+        },
+        {
+          "Assert": {
+            "Fn::Not": [
+              {
+                "Fn::Equals": [
+                  {
+                    "Ref": "AdminCIDR"
+                  },
+                  "127.0.0.1/32"
+                ]
+              }
+            ]
+          },
+          "AssertDescription": "SSH access requires a restricted administrator CIDR."
+        }
+      ]
+    },
+    "ReleaseParameters": {
+      "RuleCondition": {
+        "Fn::Equals": [
+          {
+            "Ref": "InstallOnBoot"
+          },
+          "true"
+        ]
+      },
+      "Assertions": [
+        {
+          "Assert": {
+            "Fn::Not": [
+              {
+                "Fn::Equals": [
+                  {
+                    "Ref": "ReleaseVersion"
+                  },
+                  ""
+                ]
+              }
+            ]
+          },
+          "AssertDescription": "Boot installation requires ReleaseVersion."
+        },
+        {
+          "Assert": {
+            "Fn::Not": [
+              {
+                "Fn::Equals": [
+                  {
+                    "Ref": "ReleaseArchiveSHA256"
+                  },
+                  ""
+                ]
+              }
+            ]
+          },
+          "AssertDescription": "Boot installation requires ReleaseArchiveSHA256."
+        }
+      ]
     }
   }
 }

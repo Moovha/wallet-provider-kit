@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Add stable AWS Elastic IP association, keyless Systems Manager administration,
+  staged host preparation and instance choices for the new AWS Free plan.
+- Restrict acceptance HTTPS to an approved backend network or a WireGuard peer.
+  Include single-peer Ubuntu VPN setup and provider-only macOS DNS; end-user
+  devices continue to use the connected application backend.
+- Apply available OS security updates when building runtime images, and keep
+  release identity scratch files outside the checkout so formatting checks can pass.
+
 - Support multiple configured networks in one instance with shared verified identity
   and application registration, wallet-specific consent, and independent execution,
   credentials, funding keys and gas ledgers. Preserve default-network account URLs.

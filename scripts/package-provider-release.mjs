@@ -13,6 +13,8 @@ await mkdir(root, { recursive: true });
 for (const file of [
   'install.sh',
   'backup.sh',
+  'setup-vpn.sh',
+  'connect-development-vpn.sh',
   'README.md',
   'aws-cloudformation.json',
 ])
@@ -28,6 +30,8 @@ const entries = [];
 for (const name of [
   'install.sh',
   'backup.sh',
+  'setup-vpn.sh',
+  'connect-development-vpn.sh',
   'README.md',
   'aws-cloudformation.json',
   'release.env',
