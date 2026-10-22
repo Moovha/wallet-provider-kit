@@ -748,6 +748,129 @@ describe('application obligations', () => {
       ],
     },
   ];
+  it('requires the target application to accept each exact provider fee revision', async () => {
+    const { service, db } = await fixture();
+    const appId = runtimeApplicationId(issuer, 'first');
+    const value = {
+      chain_id: 'eip155:84532' as const,
+      funding_agreement: 'Provider fee terms',
+      funding_mode: 'balance' as const,
+      maximum_transaction_fee_wei: '1000',
+      maximum_pending_fees_wei: '2000',
+      account_model: 'provider-controlled-user-safe' as const,
+      asset_model: 'individual-user-wallets' as const,
+      maximum_execution_accounts: 10,
+    };
+    const proposalContext = context(operator);
+    const proposal = await service.proposeSponsorship(proposalContext, appId, {
+      expected_revision: '0',
+      value,
+    });
+    expect(proposal).toMatchObject({
+      proposed_by: 'provider',
+      decision: 'pending',
+      revision: '1',
+    });
+    expect(
+      await service.proposeSponsorship(proposalContext, appId, {
+        expected_revision: '0',
+        value,
+      }),
+    ).toEqual(proposal);
+    await expect(service.acceptedSponsorship(appId)).rejects.toMatchObject(
+      denied,
+    );
+    const decision = {
+      expected_revision: '1',
+      expected_decision_revision: '0',
+      decision: 'accepted' as const,
+    };
+    await expect(
+      service.decideObligation(
+        context(operator),
+        appId,
+        'sponsorship',
+        decision,
+      ),
+    ).rejects.toMatchObject(denied);
+    await expect(
+      service.acceptSponsorship(context(operator), decision),
+    ).rejects.toMatchObject(denied);
+    await expect(
+      service.proposeSponsorship(context(), appId, {
+        expected_revision: '1',
+        value,
+      }),
+    ).rejects.toMatchObject(denied);
+    await expect(
+      service.acceptSponsorship(context(application('second')), decision),
+    ).rejects.toMatchObject(conflicted);
+    const acceptContext = context();
+    const accepted = await service.acceptSponsorship(acceptContext, decision);
+    expect(accepted.decision).toBe('accepted');
+    expect(await service.acceptSponsorship(acceptContext, decision)).toEqual(
+      accepted,
+    );
+    expect(await service.acceptedSponsorship(appId)).toEqual(accepted);
+    await service.proposeSponsorship(context(operator), appId, {
+      expected_revision: '1',
+      value: { ...value, maximum_transaction_fee_wei: '500' },
+    });
+    await expect(service.acceptedSponsorship(appId)).rejects.toMatchObject(
+      denied,
+    );
+    await expect(
+      service.acceptSponsorship(context(), decision),
+    ).rejects.toMatchObject(conflicted);
+    const restarted = new RuntimeConfigurationService(
+      policy,
+      db.onboardingStore,
+      options,
+      'deployment-1',
+    );
+    expect(
+      (await restarted.readObligations(application())).resources[0],
+    ).toMatchObject({
+      proposed_by: 'provider',
+      decision: 'pending',
+      revision: '2',
+    });
+    await restarted.decideObligation(context(operator), appId, 'sponsorship', {
+      ...decision,
+      expected_revision: '2',
+      decision: 'rejected',
+    });
+    await expect(
+      restarted.acceptSponsorship(context(), {
+        ...decision,
+        expected_revision: '2',
+        expected_decision_revision: '1',
+      }),
+    ).rejects.toMatchObject(denied);
+    await service.proposeSponsorship(context(operator), appId, {
+      expected_revision: '2',
+      value,
+    });
+    const declined = await restarted.acceptSponsorship(context(), {
+      ...decision,
+      expected_revision: '3',
+      decision: 'rejected',
+    });
+    expect(declined.decision).toBe('rejected');
+    await expect(restarted.acceptedSponsorship(appId)).rejects.toMatchObject(
+      denied,
+    );
+    await service.submitObligation(context(), 'sponsorship', {
+      expected_revision: '3',
+      value,
+    });
+    await expect(
+      service.acceptSponsorship(context(), {
+        ...decision,
+        expected_revision: '4',
+      }),
+    ).rejects.toMatchObject(denied);
+  });
   it('isolates declarations, retains retry results and requires provider decisions on exact revisions', async () => {
     const { service, db } = await fixture();
     const caller = context();
@@ -968,6 +1091,53 @@ describe('application obligations', () => {
         runtimeApplicationId(issuer, 'first') +
         '/obligations',
       headers: { authorization: 'Bearer operator' },
+    });
+    const offered = await server.inject({
+      method: 'PUT',
+      url:
+        '/v1/provider/applications/' +
+        runtimeApplicationId(issuer, 'first') +
+        '/obligations/sponsorship',
+      headers: {
+        authorization: 'Bearer operator',
+        'idempotency-key': randomUUID(),
+      },
+      payload: {
+        expected_revision: '0',
+        value: {
+          chain_id: 'eip155:84532',
+          funding_agreement: 'Provider terms',
+          funding_mode: 'balance',
+          maximum_transaction_fee_wei: '1000',
+          maximum_pending_fees_wei: '2000',
+          account_model: 'provider-controlled-user-safe',
+          asset_model: 'individual-user-wallets',
+          maximum_execution_accounts: 10,
+        },
+      },
+    });
+    expect(offered.statusCode).toBe(200);
+    expect(offered.json()).toMatchObject({
+      proposed_by: 'provider',
+      decision: 'pending',
+    });
+    const acceptance = await server.inject({
+      method: 'POST',
+      url: '/v1/application/obligations/sponsorship/decision',
+      headers: {
+        authorization: 'Bearer application',
+        'idempotency-key': randomUUID(),
+      },
+      payload: {
+        expected_revision: '1',
+        expected_decision_revision: '0',
+        decision: 'accepted',
+      },
+    });
+    expect(acceptance.statusCode).toBe(200);
+    expect(acceptance.json()).toMatchObject({
+      proposed_by: 'provider',
+      decision: 'accepted',
     });
     expect(providerRead.statusCode).toBe(200);
     expect(providerRead.json()).toMatchObject({

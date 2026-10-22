@@ -210,6 +210,7 @@ async function bootstrap(
     );
   return {
     f,
+    config,
     runtime,
     createRuntime,
     applicationId,
@@ -225,6 +226,75 @@ async function bootstrap(
     },
   };
 }
+it('prepares a stable encrypted fee address while execution is disabled without chain access or spending', async () => {
+  const t = await bootstrap('10000000');
+  t.config.activation.enabled = false;
+  const rpc = vi
+    .spyOn(t.f.runtime, 'rpcEndpoints')
+    .mockRejectedValue(new Error('No chain access permitted'));
+  const first = await t.runtime.prepareFundingAddress(
+    t.f.operatorContext,
+    t.applicationId,
+  );
+  const retry = await t
+    .createRuntime()
+    .prepareFundingAddress(
+      { ...t.f.operatorContext, idempotencyKey: randomUUID() },
+      t.applicationId,
+    );
+  expect(first.status).toBe('needs-funding');
+  expect(first.funding_address).toMatch(/^0x[0-9a-fA-F]{40}$/);
+  expect(retry.funding_address).toBe(first.funding_address);
+  const saved = (await t.stored())!;
+  expect(saved.transactions).toEqual([]);
+  expect(saved.fundingKey).not.toContain('privateKey');
+  expect(JSON.stringify(first)).not.toContain(saved.fundingKey);
+  expect(rpc).not.toHaveBeenCalled();
+  expect(t.broadcasts).toBe(0);
+  expect(t.config.activation.enabled).toBe(false);
+});
+it('denies fee-address creation for an application caller or without accepted sponsorship', async () => {
+  const t = await bootstrap('10000000');
+  await expect(
+    t.runtime.prepareFundingAddress(t.f.context, t.applicationId),
+  ).rejects.toMatchObject({ code: 'wallet_authorization_denied' });
+  await t.f.db.onboardingStore.transaction((s) => {
+    s.deploymentBindings![
+      'service-v1'
+    ].runtimeConfiguration!.obligations!.records[
+      t.applicationId + ':sponsorship'
+    ].decision = 'pending';
+  });
+  await expect(
+    t.runtime.prepareFundingAddress(t.f.operatorContext, t.applicationId),
+  ).rejects.toMatchObject({ code: 'wallet_authorization_denied' });
+  expect(await t.stored()).toBeUndefined();
+  expect(t.broadcasts).toBe(0);
+});
+it('prepares provider-offered funding before application acceptance but blocks setup and spending', async () => {
+  const t = await bootstrap('10000000');
+  await t.f.db.onboardingStore.transaction((s) => {
+    const terms =
+      s.deploymentBindings!['service-v1'].runtimeConfiguration!.obligations!
+        .records[t.applicationId + ':sponsorship'];
+    terms.proposed_by = 'provider';
+    terms.decision = 'pending';
+  });
+  const rpc = vi
+    .spyOn(t.f.runtime, 'rpcEndpoints')
+    .mockRejectedValue(new Error('No chain access permitted'));
+  const first = await t.runtime.prepareFundingAddress(
+    t.f.operatorContext,
+    t.applicationId,
+  );
+  expect(first.funding_address).toMatch(/^0x[0-9a-fA-F]{40}$/);
+  await expect(
+    t.runtime.ensure(t.f.operatorContext, t.applicationId),
+  ).rejects.toMatchObject({ code: 'wallet_authorization_denied' });
+  expect(rpc).not.toHaveBeenCalled();
+  expect(t.broadcasts).toBe(0);
+  expect((await t.stored())!.transactions).toEqual([]);
+});
 it('retains an unsigned setup plan and stable infrastructure identities when the shared allowance cannot cover setup', async () => {
   const t = await bootstrap('1');
   await expect(

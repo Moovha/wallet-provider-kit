@@ -680,17 +680,40 @@ export class RuntimeConfigurationService {
       activates_execution: false as const,
     }));
   }
+  async proposeSponsorship(
+    context: AuthorityContext,
+    applicationId: string,
+    input: {
+      expected_revision: string;
+      value: ApplicationObligations['sponsorship'];
+    },
+  ) {
+    this.assertOperator(context.principal);
+    this.target(applicationId);
+    return this.writeObligation(context, 'sponsorship', input, applicationId);
+  }
   async submitObligation<K extends ObligationKind>(
     context: AuthorityContext,
     kind: K,
     input: { expected_revision: string; value: ApplicationObligations[K] },
   ): Promise<ObligationRecord> {
+    return this.writeObligation(context, kind, input);
+  }
+  private async writeObligation<K extends ObligationKind>(
+    context: AuthorityContext,
+    kind: K,
+    input: { expected_revision: string; value: ApplicationObligations[K] },
+    providerApplicationId?: string,
+  ): Promise<ObligationRecord> {
     context = structuredClone(context);
-    const applicationId = this.application(context.principal);
+    const applicationId =
+      providerApplicationId ?? this.application(context.principal);
     const key = this.key(
       context,
-      'wallet:configuration:propose',
-      'obligation-' + kind,
+      providerApplicationId
+        ? 'wallet:configuration:write'
+        : 'wallet:configuration:propose',
+      (providerApplicationId ? 'provider-' : '') + 'obligation-' + kind,
       applicationId,
     );
     if (
@@ -725,6 +748,7 @@ export class RuntimeConfigurationService {
       const record: ObligationRecord = {
         application_id: applicationId,
         kind,
+        ...(providerApplicationId ? { proposed_by: 'provider' as const } : {}),
         revision: String(BigInt(expected) + 1n),
         value,
         submitted_at: new Date().toISOString(),
@@ -736,6 +760,23 @@ export class RuntimeConfigurationService {
       return structuredClone(record);
     });
   }
+  async acceptSponsorship(
+    context: AuthorityContext,
+    input: {
+      expected_revision: string;
+      expected_decision_revision: string;
+      decision: 'accepted' | 'rejected';
+    },
+  ) {
+    const applicationId = this.application(context.principal);
+    return this.recordObligationDecision(
+      context,
+      applicationId,
+      'sponsorship',
+      input,
+      true,
+    );
+  }
   async decideObligation(
     context: AuthorityContext,
     applicationId: string,
@@ -746,9 +787,22 @@ export class RuntimeConfigurationService {
       decision: 'accepted' | 'rejected';
     },
   ): Promise<ObligationRecord> {
+    return this.recordObligationDecision(context, applicationId, kind, input);
+  }
+  private async recordObligationDecision(
+    context: AuthorityContext,
+    applicationId: string,
+    kind: ObligationKind,
+    input: {
+      expected_revision: string;
+      expected_decision_revision: string;
+      decision: 'accepted' | 'rejected';
+    },
+    applicationDecision = false,
+  ): Promise<ObligationRecord> {
     context = structuredClone(context);
     input = structuredClone(input);
-    this.assertOperator(context.principal);
+    if (!applicationDecision) this.assertOperator(context.principal);
     this.target(applicationId);
     if (
       !['actions', 'services', 'sponsorship'].includes(kind) ||
@@ -762,8 +816,10 @@ export class RuntimeConfigurationService {
       invalid();
     const key = this.key(
       context,
-      'wallet:configuration:write',
-      'decide-obligation-' + kind,
+      applicationDecision
+        ? 'wallet:configuration:propose'
+        : 'wallet:configuration:write',
+      (applicationDecision ? 'application-' : '') + 'decide-obligation-' + kind,
       applicationId,
     );
     const hash = canonicalHash(input);
@@ -784,7 +840,20 @@ export class RuntimeConfigurationService {
         BigInt(record.decision_revision) >= 16n
       )
         conflict();
+      if (applicationDecision) {
+        if (
+          kind !== 'sponsorship' ||
+          record.proposed_by !== 'provider' ||
+          record.decision_by === 'provider'
+        )
+          deny();
+      } else if (
+        record.proposed_by === 'provider' &&
+        input.decision === 'accepted'
+      )
+        deny();
       record.decision = input.decision;
+      record.decision_by = applicationDecision ? 'application' : 'provider';
       record.decision_revision = String(BigInt(record.decision_revision) + 1n);
       record.decided_at = new Date().toISOString();
       obligations.receipts[key] = { hash, record: structuredClone(record) };

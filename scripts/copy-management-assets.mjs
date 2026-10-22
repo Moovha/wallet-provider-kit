@@ -1,9 +1,9 @@
-import { copyFile } from 'node:fs/promises';
+import { copyFile, chmod } from 'node:fs/promises';
 for (const path of [
   'management/console.mjs',
   'service/documentation-token-ui.mjs',
-])
-  await copyFile(
-    new URL('../src/' + path, import.meta.url),
-    new URL('../dist/' + path, import.meta.url),
-  );
+]) {
+  const target = new URL('../dist/' + path, import.meta.url);
+  await copyFile(new URL('../src/' + path, import.meta.url), target);
+  await chmod(target, 0o644);
+}

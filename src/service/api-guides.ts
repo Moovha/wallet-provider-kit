@@ -101,6 +101,8 @@ export const apiOperationOrder = [
   'submitApplicationActions',
   'submitApplicationServices',
   'submitApplicationSponsorship',
+  'proposeProviderSponsorship',
+  'acceptProviderSponsorship',
   'readProviderApplicationObligations',
   'decideApplicationActions',
   'decideApplicationServices',
@@ -118,6 +120,7 @@ export const apiOperationOrder = [
   'readProviderApplicationCredentials',
   'readSafeWalletInfrastructure',
   'provisionSafeWalletInfrastructure',
+  'prepareApplicationFundingAddress',
   'readApplicationGasFunding',
   'listNetworks',
   'getCapabilities',
@@ -376,6 +379,21 @@ export const operationGuides: Record<string, OperationGuide> = {
     success:
       '200: the retained funding address, paymaster and setup status. Private signer credentials are never returned.',
   },
+  prepareApplicationFundingAddress: {
+    scope: 'wallet:configuration:write',
+    safeWallet: true,
+    title: 'Prepare an application fee-funding address',
+    group: 'Network connections and fees',
+    audience: 'Service operator',
+    purpose:
+      'Create or retrieve the retained address used to fund an application’s accepted network-fee infrastructure.',
+    whenToUse:
+      'Use after offering provider fee terms or approving application-submitted terms, including while wallet execution is disabled.',
+    prerequisite:
+      'Authenticate as a current provider operator. The application must be active with pending provider-offered terms or accepted fee terms on the selected network.',
+    success:
+      '200: the stable application funding address and infrastructure status. No chain access, contract deployment, transfer or wallet activation occurs. Complete infrastructure acceptance separately before funding or wallet use.',
+  },
   provisionSafeWalletInfrastructure: {
     title: 'Prepare an application to pay network fees',
     group: 'Network connections and fees',
@@ -525,6 +543,36 @@ export const operationGuides: Record<string, OperationGuide> = {
       'Save application-owned service connections first. Use your application token, the current service-declaration revision and a UUIDv4 idempotency key. Submit opaque saved references rather than secrets.',
     success:
       '200: saved service declarations awaiting provider review. Changes require a new provider decision before eligible connections can be used.',
+  },
+  proposeProviderSponsorship: {
+    title: 'Offer application network-fee terms',
+    group: 'Application agreements',
+    audience: 'Service operator',
+    purpose:
+      'Set the network, fee limits and wallet limits the provider offers to a connected application.',
+    whenToUse:
+      'Use to create or replace fee terms before the application accepts and funds its dedicated address.',
+    scope: 'wallet:configuration:write',
+    runtimeConfiguration: true,
+    prerequisite:
+      'Use a current operator token, application ID, expected fee-agreement revision and UUIDv4 idempotency key.',
+    success:
+      '200: pending provider-offered terms. The application must accept the exact revision before infrastructure spending or sponsorship; saving does not activate execution.',
+  },
+  acceptProviderSponsorship: {
+    title: 'Accept or decline provider network-fee terms',
+    group: 'Application agreements',
+    audience: 'Application developer',
+    purpose:
+      'Record whether this application agrees to the provider’s current network-fee limits and funding terms.',
+    whenToUse:
+      'Read the offered terms first, then accept the exact revision before funding or requesting infrastructure preparation.',
+    scope: 'wallet:configuration:propose',
+    runtimeConfiguration: true,
+    prerequisite:
+      'Use the target application token, current agreement and decision revisions, and UUIDv4 idempotency key. Only provider-offered sponsorship can be accepted here.',
+    success:
+      '200: the application’s decision on the exact provider-offered revision. Funding, readiness and current transaction authority remain separate requirements.',
   },
   submitApplicationSponsorship: {
     title: 'Submit who pays network fees and the limits',

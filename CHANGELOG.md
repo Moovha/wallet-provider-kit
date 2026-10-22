@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+- Let providers offer fee limits and prepare funding addresses from administration.
+  Require the connected application to accept each exact provider-offered revision
+  before sponsorship or infrastructure spending; preserve application-submitted
+  agreements and provider review.
+
+- Make public browser assets readable by restricted deployment users, including
+  builds prepared under a private file-creation mask.
+
+- Add application network-fee review and funding-address setup to administration.
+  Show plain-language fee limits and network-specific addresses; address preparation
+  retains encrypted infrastructure identities without chain access, transfers or
+  wallet activation. Application fee terms still require separate provider approval.
+- Add explicitly approved balance-funded sponsorship with per-operation and pending
+  fee ceilings and an optional cumulative budget. Keep unknown outcomes reserved,
+  recheck current funding before sponsorship and retain existing agreement limits
+  until replacement terms are approved.
+
 - Accept Cognito token responses without optional scope metadata so invited
   administrators can reach email verification after signing in. Preserve signed
   identity, group approval and verification checks; log only fixed failure stages.

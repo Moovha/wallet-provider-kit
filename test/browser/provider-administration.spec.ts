@@ -259,6 +259,171 @@ test('claims, registers and manages applications through the real protected mana
     await expect(
       page.getByText('User checks: agreement saved', { exact: false }),
     ).toBeVisible();
+    // Offline fee services exercise the console without chain access or funding.
+    let approvedFees = false,
+      preparedAddress = false,
+      wrongNetwork = false,
+      providerOffered = false;
+    const offlineAddress = '0x' + '12'.repeat(20);
+    const calls: {
+      method: string;
+      path: string;
+      network: string;
+      body: unknown;
+    }[] = [];
+    await page.route(
+      '**/v1/provider/applications/*/obligations**',
+      async (route) => {
+        const request = route.request();
+        const path = new URL(request.url()).pathname;
+        const applicationId = path.split('/')[4];
+        const network = request.headers()['wallet-network'];
+        if (request.method() === 'PUT') {
+          const offered = request.postDataJSON();
+          expect(offered.value.maximum_transaction_fee_wei).toBe(
+            '2000000000000000',
+          );
+          expect(offered.value).not.toHaveProperty('maximum_gas_budget_wei');
+          providerOffered = true;
+          approvedFees = false;
+          preparedAddress = false;
+        }
+        if (request.method() === 'POST') {
+          calls.push({
+            method: request.method(),
+            path,
+            network,
+            body: request.postDataJSON(),
+          });
+          approvedFees = true;
+        }
+        await route.fulfill({
+          json: {
+            application_id: applicationId,
+            resources: [
+              {
+                kind: 'sponsorship',
+                ...(providerOffered ? { proposed_by: 'provider' } : {}),
+                revision: '2',
+                decision_revision: approvedFees ? '1' : '0',
+                decision: approvedFees ? 'accepted' : 'pending',
+                value: {
+                  chain_id: {
+                    base: 'eip155:8453',
+                    'base-sepolia': 'eip155:84532',
+                    ethereum: 'eip155:1',
+                    'ethereum-sepolia': 'eip155:11155111',
+                  }[network],
+                  funding_agreement: 'Offline fee agreement',
+                  funding_mode: 'balance',
+                  maximum_transaction_fee_wei: '1000000000000000',
+                  maximum_pending_fees_wei: '10000000000000000',
+                },
+              },
+            ],
+          },
+        });
+      },
+    );
+    await page.route(
+      '**/v1/configuration/applications/*/safe-wallet**',
+      async (route) => {
+        const request = route.request();
+        const path = new URL(request.url()).pathname;
+        const applicationId = path.split('/')[4];
+        const network = request.headers()['wallet-network'];
+        const chains: Record<string, string> = {
+          base: 'eip155:8453',
+          'base-sepolia': 'eip155:84532',
+          ethereum: 'eip155:1',
+          'ethereum-sepolia': 'eip155:11155111',
+        };
+        if (request.method() === 'POST') {
+          expect(path).toMatch(/safe-wallet\/funding-address$/);
+          calls.push({
+            method: request.method(),
+            path,
+            network,
+            body: request.postDataJSON(),
+          });
+          preparedAddress = true;
+        }
+        await route.fulfill({
+          json: {
+            application_id: applicationId,
+            chain_id: wrongNetwork ? 'eip155:1' : chains[network],
+            profile: 'safe-only-4337-v1',
+            status: preparedAddress ? 'needs-funding' : 'unprovisioned',
+            ...(preparedAddress ? { funding_address: offlineAddress } : {}),
+          },
+        });
+      },
+    );
+    const fees = page
+      .locator('#application-list article details')
+      .filter({ has: page.getByText('Network fees', { exact: true }) });
+    await fees.locator('summary').click();
+    await expect(
+      fees.getByText('Per-transaction limit: 0.001 ETH', { exact: false }),
+    ).toBeVisible();
+    await expect(
+      fees.getByRole('button', {
+        name: 'Prepare funding address',
+        exact: true,
+      }),
+    ).toHaveCount(0);
+    page.once('dialog', (dialog) => dialog.accept());
+    await fees
+      .getByRole('button', { name: 'Approve fee terms', exact: true })
+      .click();
+    await fees
+      .getByRole('button', { name: 'Prepare funding address', exact: true })
+      .click();
+    await expect(fees.getByText(offlineAddress, { exact: true })).toBeVisible();
+    expect(calls).toHaveLength(2);
+    expect(calls[0].body).toEqual({
+      expected_revision: '2',
+      expected_decision_revision: '0',
+      decision: 'accepted',
+    });
+    expect(calls[1].body).toEqual({});
+    expect(calls[0].network).toBe(calls[1].network);
+    await page.screenshot({
+      path: 'artifacts/provider-installation/application-fees.png',
+      fullPage: true,
+    });
+    await fees.getByText('Change fee limits', { exact: true }).click();
+    await fees
+      .getByLabel('Per-transaction limit (ETH)', { exact: true })
+      .fill('0.002');
+    await fees
+      .getByLabel('Maximum wallets covered', { exact: true })
+      .fill('100');
+    await fees
+      .getByRole('button', { name: 'Save fee terms', exact: true })
+      .click();
+    await fees
+      .getByRole('button', { name: 'Prepare funding address', exact: true })
+      .click();
+    await expect(
+      fees.getByText('Approval: Awaiting application acceptance', {
+        exact: true,
+      }),
+    ).toBeVisible();
+    await expect(
+      fees.getByRole('button', { name: 'Approve fee terms', exact: true }),
+    ).toHaveCount(0);
+    await expect(fees.getByText(offlineAddress, { exact: true })).toBeVisible();
+    wrongNetwork = true;
+    await fees
+      .getByRole('button', { name: 'Refresh fee setup', exact: true })
+      .click();
+    await expect(fees.getByText(offlineAddress, { exact: true })).toHaveCount(
+      0,
+    );
+    await expect(page.getByRole('status')).toContainText(
+      'do not match this application and network',
+    );
     await page
       .getByRole('button', { name: 'Pause connection', exact: true })
       .click();

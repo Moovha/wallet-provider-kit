@@ -2103,6 +2103,10 @@ export declare function openProviderDatabase(
     load: (
       id: string,
     ) => import('../sponsorship/admission.js').SponsorshipAdmission | null;
+    assertFunding(
+      id: string,
+      snapshot: import('../sponsorship/funding.js').FundingSnapshot,
+    ): void;
     reserve(
       input: Omit<
         import('../sponsorship/admission.js').SponsorshipAdmission,
@@ -2855,12 +2859,28 @@ export declare class RuntimeConfigurationService {
     authorizes_spending: false;
     activates_execution: false;
   }>;
+  proposeSponsorship(
+    context: AuthorityContext,
+    applicationId: string,
+    input: {
+      expected_revision: string;
+      value: ApplicationObligations['sponsorship'];
+    },
+  ): Promise<ObligationRecord>;
   submitObligation<K extends ObligationKind>(
     context: AuthorityContext,
     kind: K,
     input: {
       expected_revision: string;
       value: ApplicationObligations[K];
+    },
+  ): Promise<ObligationRecord>;
+  acceptSponsorship(
+    context: AuthorityContext,
+    input: {
+      expected_revision: string;
+      expected_decision_revision: string;
+      decision: 'accepted' | 'rejected';
     },
   ): Promise<ObligationRecord>;
   decideObligation(
@@ -3428,7 +3448,12 @@ Import from `@moovha/wallet-provider-kit/sponsorship`. [Integration guide](accou
 ```ts
 export interface ApplicationGasAllowance {
   clientId: string;
-  lifetimeBudgetWei: string;
+  lifetimeBudgetWei?: string;
+  funding?: {
+    maximumOperationCostWei: string;
+    maximumPendingWei: string;
+    maximumPendingOperations: number;
+  };
 }
 ```
 
@@ -3451,7 +3476,7 @@ export declare function applicationGasBudgetId(
 [Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/sponsorship/budget.ts).
 
 ```ts
-/** Pool members cannot multiply the application's configured lifetime allowance. */
+/** Pool members cannot multiply a configured fee ceiling. */
 export declare function applicationGasBudgetLimit(
   sponsors: readonly ApplicationGasAllowance[],
   clientId: string,
@@ -3812,6 +3837,7 @@ export interface Safe4337SigningOptions {
   ): Promise<{
     termsHash: string;
     consentReference: string;
+    funding?: import('./funding.js').FundingSnapshot;
   } | null>;
 }
 ```

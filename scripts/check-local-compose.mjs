@@ -77,6 +77,20 @@ try {
   await writeFile(join(directory, 'compose.json'), JSON.stringify(compose), {
     mode: 0o600,
   });
+  await execute('docker', [
+    'run',
+    '--rm',
+    '--network',
+    'none',
+    '--read-only',
+    '--user',
+    '65534:65534',
+    '--entrypoint',
+    'node',
+    'wallet-provider-kit:verify',
+    '-e',
+    "for(const p of ['/app/dist/management/console.mjs','/app/dist/service/documentation-token-ui.mjs'])require('node:fs').accessSync(p,require('node:fs').constants.R_OK)",
+  ]);
   await docker(['config', '--quiet']);
   await docker([
     'run',

@@ -12,6 +12,7 @@ export interface SponsorshipAdmission {
   consentReference: string;
   termsHash: string;
   gasBudgetId: string;
+  funding?: import('./funding.js').FundingReservation;
   maximumCostWei: string;
   validAfter: string;
   validUntil: string;

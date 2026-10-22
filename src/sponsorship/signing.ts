@@ -24,6 +24,8 @@ import {
 } from './user-operation.js';
 import {
   applicationGasBudgetLimit,
+  applicationGasFunding,
+  applicationGasLifetimeBudget,
   applicationGasBudgetId,
   type ApplicationGasAllowance,
 } from './budget.js';
@@ -76,7 +78,11 @@ export interface Safe4337SigningOptions {
   authorizeSponsorship(
     context: AuthorityContext,
     terms: SponsorshipConsentTerms,
-  ): Promise<{ termsHash: string; consentReference: string } | null>;
+  ): Promise<{
+    termsHash: string;
+    consentReference: string;
+    funding?: import('./funding.js').FundingSnapshot;
+  } | null>;
 }
 /** Advanced embedded-host AS2 adapter. Signs only admitted exact SafeOps; never broadcasts or installs modules. */
 export class Safe4337SigningService {
@@ -392,6 +398,12 @@ export class Safe4337SigningService {
         record.source.account.address,
         record.preparation.operation.nonce,
       );
+    if (record.funding) {
+      if (!consent.funding) deny();
+      await this.actions.withAuthorizedCalls(context.principal, record.id, () =>
+        this.database.sponsorship.assertFunding(record.id, consent!.funding!),
+      );
+    }
     // Re-read current owner, claims, grant, publication and deployment after external reads.
     await this.source(context, record.id);
     return terms;
@@ -513,7 +525,21 @@ export class Safe4337SigningService {
       principal.clientId,
       this.database.networkScope,
     );
-    await this.database.setBudget(gasBudgetId, maximum, this.actions.revision);
+    const fundingPolicy = applicationGasFunding(
+      config.sponsors,
+      principal.clientId,
+    );
+    const lifetimeBudget = applicationGasLifetimeBudget(
+      config.sponsors,
+      principal.clientId,
+    );
+    if (fundingPolicy && !consent.funding) deny();
+    if (lifetimeBudget !== undefined)
+      await this.database.setBudget(
+        gasBudgetId,
+        lifetimeBudget,
+        this.actions.revision,
+      );
     const record = await this.actions.withAuthorizedCalls(
       principal,
       id,
@@ -529,6 +555,17 @@ export class Safe4337SigningService {
           consentReference: consent!.consentReference,
           termsHash,
           gasBudgetId,
+          ...(fundingPolicy
+            ? {
+                funding: {
+                  ...consent!.funding!,
+                  maximumPendingWei: fundingPolicy.maximumPendingWei,
+                  maximumPendingOperations:
+                    fundingPolicy.maximumPendingOperations,
+                  accountingOnly: lifetimeBudget === undefined,
+                },
+              }
+            : {}),
           maximumCostWei,
           validAfter: '0',
           validUntil,
