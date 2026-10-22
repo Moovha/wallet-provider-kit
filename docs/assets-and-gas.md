@@ -20,6 +20,25 @@ your developer. A provider operator provisions the accepted infrastructure; the
 application funds its returned gas address within the agreed limits. Use an
 isolated testnet deployment for the [first test](staging-walkthrough.md).
 
+## Review fee funding in administration
+
+Open **Applications → Network fees** and select a network.
+
+1. Review the application’s fee agreement, per-transaction limit and pending-fee limit. **Developer details** shows
+   the complete submitted terms.
+2. Choose **Approve fee terms** if they match your agreement.
+3. Choose **Prepare funding address**, then share it with the application team.
+   Preparing it sends no funds and leaves wallet operations disabled.
+
+The application funds this address with ETH on the displayed network, separately
+from user deposits. In balance-funded mode, available funding and pending fee
+reservations govern ongoing use. A total budget is optional; it is a cumulative
+limit rather than a deposit requirement. Complete infrastructure checks before
+requesting funding; use a testnet first.
+
+If no terms appear, the application team must submit them through its protected
+API. Service API keys provide blockchain connectivity, not fee funding.
+
 ## Know which balance needs attention
 
 | Balance                     | Purpose                                                                    |

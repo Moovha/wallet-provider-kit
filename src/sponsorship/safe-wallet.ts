@@ -446,47 +446,58 @@ export class SafeWalletRuntime {
       (r) => r.safeWalletInfrastructure?.[applicationId] ?? deny(),
     );
   }
+  private async retainFundingAddress(applicationId: string) {
+    await this.transaction((r) => {
+      const records = (r.safeWalletInfrastructure ??= {});
+      if (records[applicationId]) {
+        if (!records[applicationId].fundingAccountId) deny();
+        return;
+      }
+      const funding = Wallet.createRandom(),
+        executor = Wallet.createRandom(),
+        signer = Wallet.createRandom();
+      records[applicationId] = {
+        applicationId,
+        fundingAddress: funding.address,
+        fundingAccountId: randomUUID(),
+        fundingKey: this.seal(
+          applicationId,
+          'safe-wallet-funding',
+          funding.privateKey,
+        ),
+        executor: {
+          address: executor.address,
+          key: this.seal(
+            applicationId,
+            'bundler-executor',
+            executor.privateKey,
+          ),
+        },
+        paymasterSigner: {
+          address: signer.address,
+          key: this.seal(applicationId, 'paymaster-signer', signer.privateKey),
+        },
+        transactions: [],
+      };
+    });
+  }
+  /** Prepare encrypted infrastructure identities without chain reads, dispatch or activation. */
+  async prepareFundingAddress(
+    context: AuthorityContext,
+    applicationId: string,
+  ) {
+    this.resources.assertOperator(context.principal);
+    await this.agreement(applicationId);
+    return this.exclusive(applicationId, async () => {
+      await this.retainFundingAddress(applicationId);
+      return this.read(context.principal, applicationId);
+    });
+  }
   async ensure(context: AuthorityContext, applicationId: string) {
     this.resources.assertOperator(context.principal);
     await this.agreement(applicationId);
     return this.exclusive(applicationId, async () => {
-      await this.transaction((r) => {
-        const records = (r.safeWalletInfrastructure ??= {});
-        if (records[applicationId]) {
-          if (!records[applicationId].fundingAccountId) deny();
-          return;
-        }
-        const funding = Wallet.createRandom(),
-          executor = Wallet.createRandom(),
-          signer = Wallet.createRandom();
-        records[applicationId] = {
-          applicationId,
-          fundingAddress: funding.address,
-          fundingAccountId: randomUUID(),
-          fundingKey: this.seal(
-            applicationId,
-            'safe-wallet-funding',
-            funding.privateKey,
-          ),
-          executor: {
-            address: executor.address,
-            key: this.seal(
-              applicationId,
-              'bundler-executor',
-              executor.privateKey,
-            ),
-          },
-          paymasterSigner: {
-            address: signer.address,
-            key: this.seal(
-              applicationId,
-              'paymaster-signer',
-              signer.privateKey,
-            ),
-          },
-          transactions: [],
-        };
-      });
+      await this.retainFundingAddress(applicationId);
       const reader = await this.reader(applicationId);
       await Promise.all([
         this.pin(reader, this.config.safeWallet!.entryPoint),
@@ -606,10 +617,9 @@ export class SafeWalletRuntime {
         gas * BigInt(fees.maxFeePerGas) +
         BigInt(transaction.value) +
         BigInt(sponsorshipGas(agreement).l1FeeReserveWei);
-      const spent = infra.transactions.reduce(
-        (sum, t) => sum + BigInt(t.maximumCostWei),
-        0n,
-      );
+      const spent = infra.transactions
+        .filter((t) => agreement.funding_mode !== 'balance' || !t.included)
+        .reduce((sum, t) => sum + BigInt(t.maximumCostWei), 0n);
       if (
         spent + reserved >
         BigInt(this.config.safeWallet!.maximumSetupCostWei)
@@ -686,10 +696,9 @@ export class SafeWalletRuntime {
         )
           deny();
         if (
-          current.transactions.reduce(
-            (sum, t) => sum + BigInt(t.maximumCostWei),
-            0n,
-          ) +
+          current.transactions
+            .filter((t) => agreement.funding_mode !== 'balance' || !t.included)
+            .reduce((sum, t) => sum + BigInt(t.maximumCostWei), 0n) +
             reserved >
           BigInt(this.config.safeWallet!.maximumSetupCostWei)
         )
@@ -720,15 +729,24 @@ export class SafeWalletRuntime {
       this.config.policy.applications.find(
         (a) => runtimeApplicationId(a.issuer, a.clientId) === applicationId,
       ) ?? deny();
-    const budgetId = applicationGasBudgetId(
+    let budgetId = applicationGasBudgetId(
       this.config.policy.provider.origin,
       application.issuer,
       application.clientId,
       this.database.networkScope,
     );
+    let budgetMaximum = agreement.maximum_gas_budget_wei;
+    if (budgetMaximum === undefined) {
+      if (agreement.funding_mode !== 'balance') deny();
+      budgetId += ':infrastructure';
+      const previous = await this.database.budget(budgetId);
+      budgetMaximum = (
+        BigInt(previous?.reserved ?? '0') + BigInt(saved.feeReserveWei)
+      ).toString();
+    }
     await this.database.setBudget(
       budgetId,
-      agreement.maximum_gas_budget_wei,
+      budgetMaximum,
       this.actions.revision,
     );
     await this.database.admitAttempt({
@@ -1074,12 +1092,12 @@ export class SafeWalletRuntime {
       infrastructure.fundingAddress,
       'pending',
     ]);
+    const agreement = await this.agreement(applicationId);
     const remaining =
       BigInt(this.config.safeWallet!.maximumSetupCostWei) -
-      infrastructure.transactions.reduce(
-        (sum, t) => sum + BigInt(t.maximumCostWei),
-        0n,
-      );
+      infrastructure.transactions
+        .filter((t) => agreement.funding_mode !== 'balance' || !t.included)
+        .reduce((sum, t) => sum + BigInt(t.maximumCostWei), 0n);
     const plan = infrastructureFundingPlan({
       deposit,
       depositTarget: BigInt(this.config.safeWallet!.paymasterDepositWei),
@@ -1812,6 +1830,48 @@ export class SafeWalletRuntime {
       );
     }) as typeof fetch;
   }
+  private async readFundingSnapshot(
+    applicationId: string,
+  ): Promise<import('./funding.js').FundingSnapshot> {
+    const infrastructure = await this.current(applicationId);
+    if (!infrastructure.paymaster) deny();
+    const reader = await this.reader(applicationId);
+    const block = (await reader.call('eth_getBlockByNumber', [
+      'latest',
+      false,
+    ])) as { number?: string; hash?: string };
+    if (
+      !block?.number ||
+      !/^0x[0-9a-fA-F]+$/.test(block.number) ||
+      !block.hash ||
+      !/^0x[0-9a-fA-F]{64}$/.test(block.hash)
+    )
+      deny();
+    const value = entryAbi.decodeFunctionResult(
+      'balanceOf',
+      String(
+        await reader.call('eth_call', [
+          {
+            to: this.domain.entryPoint,
+            data: entryAbi.encodeFunctionData('balanceOf', [
+              infrastructure.paymaster.address,
+            ]),
+          },
+          block.number,
+        ]),
+      ),
+    )[0] as bigint;
+    const current = (await reader.call('eth_getBlockByNumber', [
+      block.number,
+      false,
+    ])) as { hash?: string };
+    if (current?.hash !== block.hash) deny();
+    return {
+      balanceWei: value.toString(),
+      blockNumber: block.number,
+      checkedAt: new Date().toISOString(),
+    };
+  }
   private configGas() {
     return {
       callGasLimit: '0x493e0',
@@ -1872,7 +1932,10 @@ export class SafeWalletRuntime {
         signer: infra.paymasterSigner.address,
         maximumVerificationGas: '0x186a0',
         maximumPostOpGas: '0xc350',
-        maximumCostWei: agreement.maximum_gas_budget_wei,
+        maximumCostWei:
+          agreement.maximum_transaction_fee_wei ??
+          agreement.maximum_gas_budget_wei ??
+          deny(),
         l1FeeReserveWei: sponsorshipGas(agreement).l1FeeReserveWei,
         authorize: (request) => signing.authorizeLocalPaymaster(request),
         sign: async (hash, request) => {
@@ -1896,7 +1959,20 @@ export class SafeWalletRuntime {
         sponsors: [
           {
             clientId: application.clientId,
-            lifetimeBudgetWei: agreement.maximum_gas_budget_wei,
+            ...(agreement.maximum_gas_budget_wei !== undefined
+              ? { lifetimeBudgetWei: agreement.maximum_gas_budget_wei }
+              : {}),
+            ...(agreement.funding_mode === 'balance'
+              ? {
+                  funding: {
+                    maximumOperationCostWei:
+                      agreement.maximum_transaction_fee_wei!,
+                    maximumPendingWei: agreement.maximum_pending_fees_wei!,
+                    maximumPendingOperations:
+                      agreement.maximum_in_flight_per_sponsor ?? 10,
+                  },
+                }
+              : {}),
           },
         ],
         maxValiditySeconds: Math.min(
@@ -1916,18 +1992,21 @@ export class SafeWalletRuntime {
         authorizeSponsorship: async (context, terms) => {
           const current = await this.agreement(applicationId);
           if (
-            current.funding_agreement !== agreement.funding_agreement ||
-            current.maximum_gas_budget_wei !==
-              agreement.maximum_gas_budget_wei ||
+            fingerprint(current) !== fingerprint(agreement) ||
             terms.preparation.runtimePolicy.application_id !== applicationId
           )
             return null;
+          const funding =
+            current.funding_mode === 'balance'
+              ? await this.readFundingSnapshot(applicationId)
+              : undefined;
           return this.actions.withAuthorizedCalls(
             context.principal,
             terms.operationId,
             (_state, record) => ({
               termsHash: fingerprint(terms),
               consentReference: record.approval.consentReference,
+              ...(funding ? { funding } : {}),
             }),
           );
         },

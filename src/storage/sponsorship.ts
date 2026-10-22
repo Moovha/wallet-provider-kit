@@ -1,3 +1,4 @@
+import { assertFundingCapacity } from './funding.js';
 import { reserveAdditionalBudgets } from './budget-reservations.js';
 import { randomUUID } from 'node:crypto';
 import { WalletProviderError } from '../domain/signing.js';
@@ -43,6 +44,21 @@ export function sqliteSponsorshipStore(connection: StorageConnection) {
   }
   return {
     load,
+    assertFunding(
+      id: string,
+      snapshot: import('../sponsorship/funding.js').FundingSnapshot,
+    ) {
+      connection.requireTransaction();
+      const record = load(id) ?? unavailable();
+      if (!record.funding)
+        throw new WalletProviderError('wallet_authorization_denied');
+      assertFundingCapacity(connection, record.gasBudgetId, {
+        ...record.funding,
+        balanceWei: snapshot.balanceWei,
+        blockNumber: snapshot.blockNumber,
+        checkedAt: snapshot.checkedAt,
+      });
+    },
     /** Invoke synchronously inside SupportedActions.withAuthorizedCalls on this database. */
     reserve(
       input: Omit<SponsorshipAdmission, 'phases' | 'signingActionId'>,
@@ -63,6 +79,28 @@ export function sqliteSponsorshipStore(connection: StorageConnection) {
           fingerprint(proposed.source)
       )
         throw new WalletProviderError('wallet_authorization_denied');
+      if (proposed.funding) {
+        assertFundingCapacity(
+          connection,
+          proposed.gasBudgetId,
+          proposed.funding,
+          proposed.maximumCostWei,
+        );
+        if (proposed.funding.accountingOnly) {
+          const previous = connection.get(
+            'SELECT reserved FROM budgets WHERE id=?',
+            proposed.gasBudgetId,
+          );
+          const maximum =
+            (previous ? units(String(previous.reserved)) : 0n) +
+            units(proposed.maximumCostWei);
+          connection.run(
+            'INSERT INTO budgets(id,maximum) VALUES(?,?) ON CONFLICT(id) DO UPDATE SET maximum=excluded.maximum',
+            proposed.gasBudgetId,
+            maximum.toString(),
+          );
+        }
+      }
       bindExecutionMechanism(connection, proposed.source, 'safe-4337-v07');
       // Both counters and mechanism selection commit together, before any usable sponsorship.
       reserveBudget(proposed.source.budgetId, proposed.source.units);

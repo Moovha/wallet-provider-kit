@@ -38,7 +38,17 @@ it('reports infeasible refills before fee estimates or dispatch and keeps fundin
   const calls: string[] = [];
   const send = vi.fn();
   let targetsMet = false;
+  let fundingMode: 'balance' | undefined;
+  let fundingBalance = '27';
   Object.assign(runtime, {
+    resources: {
+      acceptedSponsorship: async () => ({
+        value: {
+          account_model: 'provider-controlled-user-safe',
+          funding_mode: fundingMode,
+        },
+      }),
+    },
     config: {
       safeWallet: {
         maximumSetupCostWei: '100',
@@ -53,7 +63,13 @@ it('reports infeasible refills before fee estimates or dispatch and keeps fundin
       paymaster: { address: '0x' + '22'.repeat(20) },
       executor: { address: 'executor' },
       fundingAddress: 'funding',
-      transactions: [{ included: true, maximumCostWei: '98' }],
+      transactions: [
+        {
+          included: true,
+          maximumCostWei: '98',
+          purpose: 'paymaster-deposit-0',
+        },
+      ],
     }),
     reader: async () => ({
       call: async (method: string, parameters: unknown[]) => {
@@ -67,7 +83,7 @@ it('reports infeasible refills before fee estimates or dispatch and keeps fundin
             ? targetsMet
               ? '30'
               : '19'
-            : '27';
+            : fundingBalance;
         throw Error('Unexpected financial preparation');
       },
     }),
@@ -85,6 +101,15 @@ it('reports infeasible refills before fee estimates or dispatch and keeps fundin
   // Reading an observation performs no RPC and cannot initiate a refill.
   runtime.fundingObservation('application-a');
   expect(calls).toHaveLength(3);
+  fundingMode = 'balance';
+  await expect(runtime.replenish('application-c')).rejects.toMatchObject({
+    reason: 'needs-funding',
+  });
+  fundingBalance = '100';
+  await runtime.replenish('application-c');
+  expect(send).toHaveBeenCalledTimes(2);
+  expect(runtime.fundingObservation('application-c').status).toBe('ready');
+  send.mockClear();
   targetsMet = true;
   calls.length = 0;
   await runtime.replenish('application-b');

@@ -795,6 +795,65 @@ export async function createServer(options: ServerOptions = {}) {
         request.params.applicationId,
       ),
   );
+  app.post<{ Params: { applicationId: string } }>(
+    '/v1/configuration/applications/:applicationId/safe-wallet/funding-address',
+    {
+      onRequest: (request) => authorize(request, 'wallet:configuration:write'),
+      schema: {
+        operationId: 'prepareApplicationFundingAddress',
+        description:
+          'Retain a stable application funding address after provider acceptance of fee terms. Operator-only; does not contact the chain, deploy contracts, transfer funds or enable execution.',
+        headers: {
+          type: 'object',
+          required: ['idempotency-key'],
+          properties: { 'idempotency-key': uuidSchema },
+        },
+        response: {
+          200: {
+            type: 'object',
+            additionalProperties: false,
+            required: ['application_id', 'chain_id', 'profile', 'status'],
+            properties: {
+              application_id: { type: 'string' },
+              chain_id: { type: 'string' },
+              profile: { const: 'safe-only-4337-v1' },
+              status: {
+                type: 'string',
+                enum: ['unprovisioned', 'needs-funding', 'provisioned'],
+              },
+              funding_address: { type: 'string' },
+              paymaster: { type: 'string' },
+            },
+          },
+          403: problemSchema,
+          503: problemSchema,
+        },
+        security: [{ accessToken: [] }],
+        params: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['applicationId'],
+          properties: {
+            applicationId: { type: 'string', pattern: '^[a-f0-9]{64}$' },
+          },
+        },
+        body: { type: 'object', additionalProperties: false },
+      },
+    },
+    (request) =>
+      (
+        selected(request).safeWallet ??
+        (() => {
+          throw Object.assign(new Error('Unavailable'), { statusCode: 503 });
+        })()
+      ).prepareFundingAddress(
+        {
+          principal: principals.get(request)!,
+          idempotencyKey: String(request.headers['idempotency-key'] ?? ''),
+        },
+        request.params.applicationId,
+      ),
+  );
 
   await registerOnboardingRoutes(
     app,

@@ -26,7 +26,10 @@ export interface ApplicationObligations {
   sponsorship: {
     chain_id: 'eip155:8453' | 'eip155:84532' | 'eip155:1' | 'eip155:11155111';
     funding_agreement: string;
-    maximum_gas_budget_wei: string;
+    maximum_gas_budget_wei?: string;
+    funding_mode?: 'balance';
+    maximum_transaction_fee_wei?: string;
+    maximum_pending_fees_wei?: string;
     gas_limits?: {
       gas_limit: string;
       max_fee_per_gas: string;
@@ -72,6 +75,8 @@ const sponsorshipProperties = {
   },
   funding_agreement: boundedText,
   maximum_gas_budget_wei: {
+    description:
+      'Optional cumulative sponsorship allowance in balance mode; required for legacy agreements. Additional ETH does not raise a configured allowance.',
     type: 'string',
     pattern: '^[1-9][0-9]{0,77}$',
   },
@@ -131,8 +136,48 @@ export const obligationSchemas = {
   },
   sponsorship: {
     ...object(sponsorshipProperties),
+    required: Object.keys(sponsorshipProperties).filter(
+      (key) => key !== 'maximum_gas_budget_wei',
+    ),
+    anyOf: [
+      {
+        required: [
+          'funding_mode',
+          'maximum_transaction_fee_wei',
+          'maximum_pending_fees_wei',
+        ],
+        properties: {
+          funding_mode: { const: 'balance' },
+          maximum_transaction_fee_wei: {},
+          maximum_pending_fees_wei: {},
+        },
+      },
+      {
+        required: ['maximum_gas_budget_wei'],
+        properties: { maximum_gas_budget_wei: {} },
+        not: { required: ['funding_mode'], properties: { funding_mode: {} } },
+      },
+    ],
     properties: {
       ...sponsorshipProperties,
+      funding_mode: {
+        type: 'string',
+        enum: ['balance'],
+        description:
+          'Use current application funding with durable pending-cost reservations. A total budget remains optional; transaction and pending-fee ceilings are required.',
+      },
+      maximum_transaction_fee_wei: {
+        description:
+          'Maximum authorized network fee for one wallet operation, including its verification and fee reserve.',
+        type: 'string',
+        pattern: '^[1-9][0-9]{0,77}$',
+      },
+      maximum_pending_fees_wei: {
+        description:
+          'Maximum aggregate fee reservation for wallet operations without a verified final outcome. Unknown and unfinalized outcomes retain their reservations.',
+        type: 'string',
+        pattern: '^[1-9][0-9]{0,77}$',
+      },
       maximum_execution_accounts: {
         type: 'integer',
         minimum: 1,
@@ -206,7 +251,17 @@ export function normalizeObligation<K extends ObligationKind>(
     )
       invalid();
     if (
-      BigInt(sponsorship.maximum_gas_budget_wei) >= 2n ** 256n ||
+      (sponsorship.maximum_gas_budget_wei !== undefined &&
+        BigInt(sponsorship.maximum_gas_budget_wei) >= 2n ** 256n) ||
+      (sponsorship.funding_mode === 'balance' &&
+        (!sponsorship.maximum_transaction_fee_wei ||
+          !sponsorship.maximum_pending_fees_wei ||
+          BigInt(sponsorship.maximum_transaction_fee_wei) >
+            BigInt(sponsorship.maximum_pending_fees_wei) ||
+          BigInt(sponsorship.maximum_pending_fees_wei) >= 2n ** 256n ||
+          (sponsorship.maximum_gas_budget_wei !== undefined &&
+            BigInt(sponsorship.maximum_transaction_fee_wei) >
+              BigInt(sponsorship.maximum_gas_budget_wei)))) ||
       BigInt(gas.gasLimit) < 21000n ||
       BigInt(gas.gasLimit) > maximumSponsorGasLimit() ||
       BigInt(gas.maxFeePerGas) === 0n ||
@@ -219,6 +274,7 @@ export function normalizeObligation<K extends ObligationKind>(
         sponsorship.chain_id !== 'eip155:1') ||
       BigInt(gas.l1FeeReserveWei) >= 2n ** 256n ||
       (sponsorship.gas_limits !== undefined &&
+        sponsorship.maximum_gas_budget_wei !== undefined &&
         BigInt(sponsorship.maximum_gas_budget_wei) < minimumSponsorFunding(gas))
     )
       invalid();

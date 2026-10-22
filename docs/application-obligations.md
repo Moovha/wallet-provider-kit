@@ -39,4 +39,23 @@ application. Funding does not give it permission to spend user assets. Current
 user approval, identity, policy and chain checks still apply to every transaction.
 Changing policy cannot rewrite an operation that has already been signed.
 
+## Balance-funded sponsorship
+
+Applications can submit `funding_mode: "balance"` with
+`maximum_transaction_fee_wei` and `maximum_pending_fees_wei`. Both are required
+positive limits in wei. The pending limit must cover at least one transaction’s
+maximum fee. The provider reviews these terms before they apply.
+
+`maximum_gas_budget_wei` is optional in this mode. When supplied, it remains a
+cumulative ceiling; depositing more ETH does not raise it. Existing agreements
+without `funding_mode` retain their required cumulative ceiling until replaced
+and approved.
+
+The provider checks the accepted paymaster deposit at a fixed blockchain block
+and atomically reserves pending wallet fees before usable sponsorship. Unknown
+and unfinalized operations keep their reservations. Verified finalization or
+verified expiry releases pending capacity only when covered by the funding
+snapshot. Infrastructure setup and refill transactions retain their separate
+provider limits and funding-account balance checks.
+
 Once the agreements and infrastructure are ready, [test the full connection](staging-walkthrough.md).

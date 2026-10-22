@@ -42,9 +42,10 @@ function message(value, error = false) {
   el('message').textContent = value;
   el('message').dataset.kind = error ? 'error' : 'status';
 }
-async function api(path, method = 'GET', data, authorized = true) {
+async function api(path, method = 'GET', data, authorized = true, network) {
   const started = generation;
   const headers = { 'content-type': 'application/json' };
+  if (network) headers['wallet-network'] = network;
   if (authorized) {
     if (!token || Date.now() >= expiresAt) {
       logout();
@@ -543,6 +544,236 @@ function renderNetworks(settings) {
     message('Network choices saved. Restart the provider to apply changes.');
   });
 }
+async function renderNetworkFees(parent, record, networks) {
+  const section = node('details', undefined, parent);
+  node('summary', 'Network fees', section);
+  node(
+    'p',
+    'The application pays network fees. Review its terms, then share its funding address.',
+    section,
+  );
+  if (!record.enabled || !record.policy?.assertionTrust) {
+    node(
+      'p',
+      'Save the user-check agreement and enable this connection first.',
+      section,
+    );
+    return;
+  }
+  const label = node('label', 'Funding network', section);
+  const selector = node('select', undefined, label);
+  for (const network of networks.networks) {
+    const option = node('option', network.name, selector);
+    option.value = network.network;
+  }
+  selector.value = networks.default_network;
+  const content = node('div', undefined, section);
+  const applicationId = [
+    ...new Uint8Array(
+      await crypto.subtle.digest(
+        'SHA-256',
+        new TextEncoder().encode(
+          JSON.stringify([
+            'runtime-application-v1',
+            record.policy.issuer,
+            record.id,
+          ]),
+        ),
+      ),
+    ),
+  ]
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('');
+  const chains = {
+    base: 'eip155:8453',
+    'base-sepolia': 'eip155:84532',
+    ethereum: 'eip155:1',
+    'ethereum-sepolia': 'eip155:11155111',
+  };
+  let loadVersion = 0;
+  async function load() {
+    const version = ++loadVersion;
+    const network = selector.value;
+    const networkName = networks.networks.find(
+      (entry) => entry.network === network,
+    )?.name;
+    const request = (path, method = 'GET', data) =>
+      api(path, method, data, true, network);
+    content.replaceChildren();
+    node('p', 'Checking fee setup…', content);
+    try {
+      const [obligations, funding] = await Promise.all([
+        request('/v1/provider/applications/' + applicationId + '/obligations'),
+        request(
+          '/v1/configuration/applications/' + applicationId + '/safe-wallet',
+        ),
+      ]);
+      if (version !== loadVersion || !token) return;
+      content.replaceChildren();
+      if (
+        funding.chain_id !== chains[network] ||
+        funding.application_id !== applicationId
+      )
+        throw new Error(
+          'The funding details do not match this application and network. Check the setup before sharing the address.',
+        );
+      const terms = obligations.resources.find(
+        (entry) => entry.kind === 'sponsorship',
+      );
+      if (terms && terms.value.chain_id !== chains[network])
+        throw new Error(
+          'The fee terms belong to another network. Ask the application team to correct them.',
+        );
+      node('h4', 'Fee terms', content);
+      if (!terms) {
+        node(
+          'p',
+          'Waiting for the application’s fee terms. Review them here once submitted.',
+          content,
+        );
+      } else {
+        node('p', 'Agreement: ' + terms.value.funding_agreement, content);
+        const eth = (value) => {
+          const amount = BigInt(value);
+          return (
+            (amount / 10n ** 18n).toString() +
+            '.' +
+            (amount % 10n ** 18n).toString().padStart(18, '0')
+          ).replace(/\.?0+$/, '');
+        };
+        if (terms.value.funding_mode === 'balance') {
+          node('p', 'Funding: Application’s available ETH', content);
+          node(
+            'p',
+            'Per-transaction limit: ' +
+              eth(terms.value.maximum_transaction_fee_wei) +
+              ' ETH',
+            content,
+          );
+          node(
+            'p',
+            'Pending-fee limit: ' +
+              eth(terms.value.maximum_pending_fees_wei) +
+              ' ETH',
+            content,
+          );
+        }
+        if (terms.value.maximum_gas_budget_wei !== undefined)
+          node(
+            'p',
+            'Total network-fee budget: ' +
+              eth(terms.value.maximum_gas_budget_wei) +
+              ' ETH (optional cumulative limit)',
+            content,
+          );
+        node(
+          'p',
+          'Approval: ' +
+            ({
+              pending: 'Awaiting your review',
+              accepted: 'Approved',
+              rejected: 'Declined',
+            }[terms.decision] ?? 'Unavailable'),
+          content,
+        );
+        if (terms.value.maximum_execution_accounts !== undefined)
+          node(
+            'p',
+            'Maximum wallets covered: ' +
+              terms.value.maximum_execution_accounts,
+            content,
+          );
+        if (terms.value.maximum_in_flight_per_sponsor !== undefined)
+          node(
+            'p',
+            'Pending-operation limit: ' +
+              terms.value.maximum_in_flight_per_sponsor,
+            content,
+          );
+        const developer = node('details', undefined, content);
+        node('summary', 'Developer details', developer);
+        node('pre', JSON.stringify(terms.value, null, 2), developer);
+        if (terms.decision !== 'accepted') {
+          action(content, 'Approve fee terms', async () => {
+            if (
+              !confirm(
+                'Approve these fee terms on ' +
+                  networkName +
+                  '? No funds will be sent.',
+              )
+            )
+              return;
+            await request(
+              '/v1/provider/applications/' +
+                applicationId +
+                '/obligations/sponsorship/decision',
+              'POST',
+              {
+                expected_revision: terms.revision,
+                expected_decision_revision: terms.decision_revision,
+                decision: 'accepted',
+              },
+            );
+            await load();
+          });
+        }
+      }
+      node('h4', 'Application funding address', content);
+      if (
+        funding.funding_address &&
+        /^0x[0-9a-fA-F]{40}$/.test(funding.funding_address)
+      ) {
+        node('p', 'Network: ' + networkName + ' · Asset: ETH', content);
+        node('code', funding.funding_address, content);
+        node(
+          'p',
+          'Share this address with the application team for ETH funding on this network. It is separate from user deposits.',
+          content,
+        );
+        node(
+          'p',
+          funding.status === 'provisioned'
+            ? 'Infrastructure prepared. Verify funding and wallet readiness separately.'
+            : 'Address prepared. Complete infrastructure checks before requesting funding.',
+          content,
+        );
+      } else {
+        node(
+          'p',
+          'Prepare a dedicated address after approving the terms. No funds are sent.',
+          content,
+        );
+        if (terms?.decision === 'accepted')
+          action(content, 'Prepare funding address', async () => {
+            await request(
+              '/v1/configuration/applications/' +
+                applicationId +
+                '/safe-wallet/funding-address',
+              'POST',
+              {},
+            );
+            await load();
+          });
+        else node('p', 'Approve the fee terms first.', content);
+      }
+    } catch (error) {
+      if (version !== loadVersion || !token) return;
+      content.replaceChildren();
+      node(
+        'p',
+        'Fee setup is unavailable. Check the network and application agreement, then refresh.',
+        content,
+      );
+      message(error.message, true);
+    }
+  }
+  selector.onchange = run(load);
+  action(section, 'Refresh fee setup', load);
+  section.ontoggle = run(async () => {
+    if (section.open) await load();
+  });
+}
+
 async function refresh() {
   const status = await api('/v1/provider/status');
   const identities = [...status.applications, ...status.management_identities];
@@ -658,6 +889,7 @@ async function refresh() {
           'Pausing this connection blocks access and ends existing wallet approvals. Resuming it does not restore those approvals.',
           article,
         );
+        await renderNetworkFees(article, record, networks);
         const form = node('form', undefined, article);
         node('h4', 'User checks and permissions', form);
         node(
@@ -738,7 +970,7 @@ async function refresh() {
           });
         node(
           'p',
-          'Review the shared requirements under User checks. Next, your developer can use the API to set up allowed transactions, network connections and who pays network fees. You’ll need to approve those settings separately before wallet use.',
+          'Review user checks, transaction rules, service connections and network fees before enabling wallet use.',
           article,
         );
       }

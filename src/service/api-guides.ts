@@ -118,6 +118,7 @@ export const apiOperationOrder = [
   'readProviderApplicationCredentials',
   'readSafeWalletInfrastructure',
   'provisionSafeWalletInfrastructure',
+  'prepareApplicationFundingAddress',
   'readApplicationGasFunding',
   'listNetworks',
   'getCapabilities',
@@ -375,6 +376,21 @@ export const operationGuides: Record<string, OperationGuide> = {
       'Use a configured provider operator and an accepted application ID.',
     success:
       '200: the retained funding address, paymaster and setup status. Private signer credentials are never returned.',
+  },
+  prepareApplicationFundingAddress: {
+    scope: 'wallet:configuration:write',
+    safeWallet: true,
+    title: 'Prepare an application fee-funding address',
+    group: 'Network connections and fees',
+    audience: 'Service operator',
+    purpose:
+      'Create or retrieve the retained address used to fund an application’s accepted network-fee infrastructure.',
+    whenToUse:
+      'Use after approving fee sponsorship, including while wallet execution is disabled.',
+    prerequisite:
+      'Authenticate as a current provider operator. The application must be active with accepted fee terms on the selected network.',
+    success:
+      '200: the stable application funding address and infrastructure status. No chain access, contract deployment, transfer or wallet activation occurs. Complete infrastructure acceptance separately before funding or wallet use.',
   },
   provisionSafeWalletInfrastructure: {
     title: 'Prepare an application to pay network fees',

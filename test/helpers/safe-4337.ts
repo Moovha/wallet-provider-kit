@@ -85,6 +85,7 @@ export async function fixture(
   };
   const context: AuthorityContext = { principal, idempotencyKey: randomUUID() };
   const state = {
+    nonce: 0,
     posts: 0,
     signs: 0,
     consent: true,
@@ -430,7 +431,7 @@ export async function fixture(
       else if (
         data.startsWith(entryInterface.getFunction('getNonce')!.selector)
       )
-        result = entryInterface.encodeFunctionResult('getNonce', [0]);
+        result = entryInterface.encodeFunctionResult('getNonce', [state.nonce]);
       else if (data === safeInterface.encodeFunctionData('getOwners'))
         result = safeInterface.encodeFunctionResult('getOwners', [
           [wallet.address],

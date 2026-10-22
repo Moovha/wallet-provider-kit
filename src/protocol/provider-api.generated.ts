@@ -245,6 +245,36 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/configuration/applications/{applicationId}/safe-wallet/funding-address": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Prepare an application fee-funding address
+         * @description **Why this exists:** Create or retrieve the retained address used to fund an application’s accepted network-fee infrastructure.
+         *
+         *     **Who uses it:** Service operator.
+         *
+         *     **When you need it:** Use after approving fee sponsorship, including while wallet execution is disabled.
+         *
+         *     **Before you start:** Authenticate as a current provider operator. The application must be active with accepted fee terms on the selected network.
+         *
+         *     **Result and next step:** 200: the stable application funding address and infrastructure status. No chain access, contract deployment, transfer or wallet activation occurs. Complete infrastructure acceptance separately before funding or wallet use.
+         *
+         *     **Request details:** Retain a stable application funding address after provider acceptance of fee terms. Operator-only; does not contact the chain, deploy contracts, transfer funds or enable execution.
+         */
+        post: operations["prepareApplicationFundingAddress"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/access-requests": {
         parameters: {
             query?: never;
@@ -2548,6 +2578,79 @@ export interface operations {
         };
     };
     provisionSafeWalletInfrastructure: {
+        parameters: {
+            query?: never;
+            header: {
+                "idempotency-key": string;
+                /** @description Choose a configured network. Omit to use the default; existing wallet, request and grant IDs select their stored network automatically. A conflicting selection is rejected. */
+                "wallet-network"?: "base" | "base-sepolia" | "ethereum" | "ethereum-sepolia";
+            };
+            path: {
+                applicationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        application_id: string;
+                        chain_id: string;
+                        /** @enum {unknown} */
+                        profile: "safe-only-4337-v1";
+                        /** @enum {string} */
+                        status: "unprovisioned" | "needs-funding" | "provisioned";
+                        funding_address?: string;
+                        paymaster?: string;
+                    };
+                };
+            };
+            /** @description Default Response */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+        };
+    };
+    prepareApplicationFundingAddress: {
         parameters: {
             query?: never;
             header: {
@@ -6322,15 +6425,25 @@ export interface operations {
                                 credential_reference: string;
                                 /** @enum {string} */
                                 billing_owner: "application";
-                            }[] | {
+                            }[] | ({
                                 /** @enum {string} */
                                 chain_id: "eip155:8453" | "eip155:84532" | "eip155:1" | "eip155:11155111";
                                 funding_agreement: string;
-                                maximum_gas_budget_wei: string;
+                                /** @description Optional cumulative sponsorship allowance in balance mode; required for legacy agreements. Additional ETH does not raise a configured allowance. */
+                                maximum_gas_budget_wei?: string;
                                 /** @enum {string} */
                                 account_model: "provider-controlled-user-safe";
                                 /** @enum {string} */
                                 asset_model: "individual-user-wallets";
+                                /**
+                                 * @description Use current application funding with durable pending-cost reservations. A total budget remains optional; transaction and pending-fee ceilings are required.
+                                 * @enum {string}
+                                 */
+                                funding_mode?: "balance";
+                                /** @description Maximum authorized network fee for one wallet operation, including its verification and fee reserve. */
+                                maximum_transaction_fee_wei?: string;
+                                /** @description Maximum aggregate fee reservation for wallet operations without a verified final outcome. Unknown and unfinalized outcomes retain their reservations. */
+                                maximum_pending_fees_wei?: string;
                                 maximum_execution_accounts?: number;
                                 maximum_in_flight_per_sponsor?: number;
                                 gas_limits?: {
@@ -6339,7 +6452,14 @@ export interface operations {
                                     max_priority_fee_per_gas: string;
                                     l1_fee_reserve_wei: string;
                                 };
-                            };
+                            } | {
+                                /** @enum {unknown} */
+                                funding_mode: "balance";
+                                maximum_transaction_fee_wei: unknown;
+                                maximum_pending_fees_wei: unknown;
+                            } | {
+                                maximum_gas_budget_wei: unknown;
+                            });
                             /** Format: date-time */
                             submitted_at: string;
                             /** @enum {string} */
@@ -6571,15 +6691,25 @@ export interface operations {
                                 credential_reference: string;
                                 /** @enum {string} */
                                 billing_owner: "application";
-                            }[] | {
+                            }[] | ({
                                 /** @enum {string} */
                                 chain_id: "eip155:8453" | "eip155:84532" | "eip155:1" | "eip155:11155111";
                                 funding_agreement: string;
-                                maximum_gas_budget_wei: string;
+                                /** @description Optional cumulative sponsorship allowance in balance mode; required for legacy agreements. Additional ETH does not raise a configured allowance. */
+                                maximum_gas_budget_wei?: string;
                                 /** @enum {string} */
                                 account_model: "provider-controlled-user-safe";
                                 /** @enum {string} */
                                 asset_model: "individual-user-wallets";
+                                /**
+                                 * @description Use current application funding with durable pending-cost reservations. A total budget remains optional; transaction and pending-fee ceilings are required.
+                                 * @enum {string}
+                                 */
+                                funding_mode?: "balance";
+                                /** @description Maximum authorized network fee for one wallet operation, including its verification and fee reserve. */
+                                maximum_transaction_fee_wei?: string;
+                                /** @description Maximum aggregate fee reservation for wallet operations without a verified final outcome. Unknown and unfinalized outcomes retain their reservations. */
+                                maximum_pending_fees_wei?: string;
                                 maximum_execution_accounts?: number;
                                 maximum_in_flight_per_sponsor?: number;
                                 gas_limits?: {
@@ -6588,7 +6718,14 @@ export interface operations {
                                     max_priority_fee_per_gas: string;
                                     l1_fee_reserve_wei: string;
                                 };
-                            };
+                            } | {
+                                /** @enum {unknown} */
+                                funding_mode: "balance";
+                                maximum_transaction_fee_wei: unknown;
+                                maximum_pending_fees_wei: unknown;
+                            } | {
+                                maximum_gas_budget_wei: unknown;
+                            });
                             /** Format: date-time */
                             submitted_at: string;
                             /** @enum {string} */
@@ -6832,15 +6969,25 @@ export interface operations {
                             credential_reference: string;
                             /** @enum {string} */
                             billing_owner: "application";
-                        }[] | {
+                        }[] | ({
                             /** @enum {string} */
                             chain_id: "eip155:8453" | "eip155:84532" | "eip155:1" | "eip155:11155111";
                             funding_agreement: string;
-                            maximum_gas_budget_wei: string;
+                            /** @description Optional cumulative sponsorship allowance in balance mode; required for legacy agreements. Additional ETH does not raise a configured allowance. */
+                            maximum_gas_budget_wei?: string;
                             /** @enum {string} */
                             account_model: "provider-controlled-user-safe";
                             /** @enum {string} */
                             asset_model: "individual-user-wallets";
+                            /**
+                             * @description Use current application funding with durable pending-cost reservations. A total budget remains optional; transaction and pending-fee ceilings are required.
+                             * @enum {string}
+                             */
+                            funding_mode?: "balance";
+                            /** @description Maximum authorized network fee for one wallet operation, including its verification and fee reserve. */
+                            maximum_transaction_fee_wei?: string;
+                            /** @description Maximum aggregate fee reservation for wallet operations without a verified final outcome. Unknown and unfinalized outcomes retain their reservations. */
+                            maximum_pending_fees_wei?: string;
                             maximum_execution_accounts?: number;
                             maximum_in_flight_per_sponsor?: number;
                             gas_limits?: {
@@ -6849,7 +6996,14 @@ export interface operations {
                                 max_priority_fee_per_gas: string;
                                 l1_fee_reserve_wei: string;
                             };
-                        };
+                        } | {
+                            /** @enum {unknown} */
+                            funding_mode: "balance";
+                            maximum_transaction_fee_wei: unknown;
+                            maximum_pending_fees_wei: unknown;
+                        } | {
+                            maximum_gas_budget_wei: unknown;
+                        });
                         /** Format: date-time */
                         submitted_at: string;
                         /** @enum {string} */
@@ -7084,15 +7238,25 @@ export interface operations {
                             credential_reference: string;
                             /** @enum {string} */
                             billing_owner: "application";
-                        }[] | {
+                        }[] | ({
                             /** @enum {string} */
                             chain_id: "eip155:8453" | "eip155:84532" | "eip155:1" | "eip155:11155111";
                             funding_agreement: string;
-                            maximum_gas_budget_wei: string;
+                            /** @description Optional cumulative sponsorship allowance in balance mode; required for legacy agreements. Additional ETH does not raise a configured allowance. */
+                            maximum_gas_budget_wei?: string;
                             /** @enum {string} */
                             account_model: "provider-controlled-user-safe";
                             /** @enum {string} */
                             asset_model: "individual-user-wallets";
+                            /**
+                             * @description Use current application funding with durable pending-cost reservations. A total budget remains optional; transaction and pending-fee ceilings are required.
+                             * @enum {string}
+                             */
+                            funding_mode?: "balance";
+                            /** @description Maximum authorized network fee for one wallet operation, including its verification and fee reserve. */
+                            maximum_transaction_fee_wei?: string;
+                            /** @description Maximum aggregate fee reservation for wallet operations without a verified final outcome. Unknown and unfinalized outcomes retain their reservations. */
+                            maximum_pending_fees_wei?: string;
                             maximum_execution_accounts?: number;
                             maximum_in_flight_per_sponsor?: number;
                             gas_limits?: {
@@ -7101,7 +7265,14 @@ export interface operations {
                                 max_priority_fee_per_gas: string;
                                 l1_fee_reserve_wei: string;
                             };
-                        };
+                        } | {
+                            /** @enum {unknown} */
+                            funding_mode: "balance";
+                            maximum_transaction_fee_wei: unknown;
+                            maximum_pending_fees_wei: unknown;
+                        } | {
+                            maximum_gas_budget_wei: unknown;
+                        });
                         /** Format: date-time */
                         submitted_at: string;
                         /** @enum {string} */
@@ -7341,15 +7512,25 @@ export interface operations {
                             credential_reference: string;
                             /** @enum {string} */
                             billing_owner: "application";
-                        }[] | {
+                        }[] | ({
                             /** @enum {string} */
                             chain_id: "eip155:8453" | "eip155:84532" | "eip155:1" | "eip155:11155111";
                             funding_agreement: string;
-                            maximum_gas_budget_wei: string;
+                            /** @description Optional cumulative sponsorship allowance in balance mode; required for legacy agreements. Additional ETH does not raise a configured allowance. */
+                            maximum_gas_budget_wei?: string;
                             /** @enum {string} */
                             account_model: "provider-controlled-user-safe";
                             /** @enum {string} */
                             asset_model: "individual-user-wallets";
+                            /**
+                             * @description Use current application funding with durable pending-cost reservations. A total budget remains optional; transaction and pending-fee ceilings are required.
+                             * @enum {string}
+                             */
+                            funding_mode?: "balance";
+                            /** @description Maximum authorized network fee for one wallet operation, including its verification and fee reserve. */
+                            maximum_transaction_fee_wei?: string;
+                            /** @description Maximum aggregate fee reservation for wallet operations without a verified final outcome. Unknown and unfinalized outcomes retain their reservations. */
+                            maximum_pending_fees_wei?: string;
                             maximum_execution_accounts?: number;
                             maximum_in_flight_per_sponsor?: number;
                             gas_limits?: {
@@ -7358,7 +7539,14 @@ export interface operations {
                                 max_priority_fee_per_gas: string;
                                 l1_fee_reserve_wei: string;
                             };
-                        };
+                        } | {
+                            /** @enum {unknown} */
+                            funding_mode: "balance";
+                            maximum_transaction_fee_wei: unknown;
+                            maximum_pending_fees_wei: unknown;
+                        } | {
+                            maximum_gas_budget_wei: unknown;
+                        });
                         /** Format: date-time */
                         submitted_at: string;
                         /** @enum {string} */
@@ -7593,15 +7781,25 @@ export interface operations {
                             credential_reference: string;
                             /** @enum {string} */
                             billing_owner: "application";
-                        }[] | {
+                        }[] | ({
                             /** @enum {string} */
                             chain_id: "eip155:8453" | "eip155:84532" | "eip155:1" | "eip155:11155111";
                             funding_agreement: string;
-                            maximum_gas_budget_wei: string;
+                            /** @description Optional cumulative sponsorship allowance in balance mode; required for legacy agreements. Additional ETH does not raise a configured allowance. */
+                            maximum_gas_budget_wei?: string;
                             /** @enum {string} */
                             account_model: "provider-controlled-user-safe";
                             /** @enum {string} */
                             asset_model: "individual-user-wallets";
+                            /**
+                             * @description Use current application funding with durable pending-cost reservations. A total budget remains optional; transaction and pending-fee ceilings are required.
+                             * @enum {string}
+                             */
+                            funding_mode?: "balance";
+                            /** @description Maximum authorized network fee for one wallet operation, including its verification and fee reserve. */
+                            maximum_transaction_fee_wei?: string;
+                            /** @description Maximum aggregate fee reservation for wallet operations without a verified final outcome. Unknown and unfinalized outcomes retain their reservations. */
+                            maximum_pending_fees_wei?: string;
                             maximum_execution_accounts?: number;
                             maximum_in_flight_per_sponsor?: number;
                             gas_limits?: {
@@ -7610,7 +7808,14 @@ export interface operations {
                                 max_priority_fee_per_gas: string;
                                 l1_fee_reserve_wei: string;
                             };
-                        };
+                        } | {
+                            /** @enum {unknown} */
+                            funding_mode: "balance";
+                            maximum_transaction_fee_wei: unknown;
+                            maximum_pending_fees_wei: unknown;
+                        } | {
+                            maximum_gas_budget_wei: unknown;
+                        });
                         /** Format: date-time */
                         submitted_at: string;
                         /** @enum {string} */
@@ -7812,11 +8017,21 @@ export interface operations {
                         /** @enum {string} */
                         chain_id: "eip155:8453" | "eip155:84532" | "eip155:1" | "eip155:11155111";
                         funding_agreement: string;
-                        maximum_gas_budget_wei: string;
+                        /** @description Optional cumulative sponsorship allowance in balance mode; required for legacy agreements. Additional ETH does not raise a configured allowance. */
+                        maximum_gas_budget_wei?: string;
                         /** @enum {string} */
                         account_model: "provider-controlled-user-safe";
                         /** @enum {string} */
                         asset_model: "individual-user-wallets";
+                        /**
+                         * @description Use current application funding with durable pending-cost reservations. A total budget remains optional; transaction and pending-fee ceilings are required.
+                         * @enum {string}
+                         */
+                        funding_mode?: "balance";
+                        /** @description Maximum authorized network fee for one wallet operation, including its verification and fee reserve. */
+                        maximum_transaction_fee_wei?: string;
+                        /** @description Maximum aggregate fee reservation for wallet operations without a verified final outcome. Unknown and unfinalized outcomes retain their reservations. */
+                        maximum_pending_fees_wei?: string;
                         maximum_execution_accounts?: number;
                         maximum_in_flight_per_sponsor?: number;
                         gas_limits?: {
@@ -7825,6 +8040,13 @@ export interface operations {
                             max_priority_fee_per_gas: string;
                             l1_fee_reserve_wei: string;
                         };
+                    } | {
+                        /** @enum {unknown} */
+                        funding_mode: "balance";
+                        maximum_transaction_fee_wei: unknown;
+                        maximum_pending_fees_wei: unknown;
+                    } | {
+                        maximum_gas_budget_wei: unknown;
                     };
                 };
             };
@@ -7858,15 +8080,25 @@ export interface operations {
                             credential_reference: string;
                             /** @enum {string} */
                             billing_owner: "application";
-                        }[] | {
+                        }[] | ({
                             /** @enum {string} */
                             chain_id: "eip155:8453" | "eip155:84532" | "eip155:1" | "eip155:11155111";
                             funding_agreement: string;
-                            maximum_gas_budget_wei: string;
+                            /** @description Optional cumulative sponsorship allowance in balance mode; required for legacy agreements. Additional ETH does not raise a configured allowance. */
+                            maximum_gas_budget_wei?: string;
                             /** @enum {string} */
                             account_model: "provider-controlled-user-safe";
                             /** @enum {string} */
                             asset_model: "individual-user-wallets";
+                            /**
+                             * @description Use current application funding with durable pending-cost reservations. A total budget remains optional; transaction and pending-fee ceilings are required.
+                             * @enum {string}
+                             */
+                            funding_mode?: "balance";
+                            /** @description Maximum authorized network fee for one wallet operation, including its verification and fee reserve. */
+                            maximum_transaction_fee_wei?: string;
+                            /** @description Maximum aggregate fee reservation for wallet operations without a verified final outcome. Unknown and unfinalized outcomes retain their reservations. */
+                            maximum_pending_fees_wei?: string;
                             maximum_execution_accounts?: number;
                             maximum_in_flight_per_sponsor?: number;
                             gas_limits?: {
@@ -7875,7 +8107,14 @@ export interface operations {
                                 max_priority_fee_per_gas: string;
                                 l1_fee_reserve_wei: string;
                             };
-                        };
+                        } | {
+                            /** @enum {unknown} */
+                            funding_mode: "balance";
+                            maximum_transaction_fee_wei: unknown;
+                            maximum_pending_fees_wei: unknown;
+                        } | {
+                            maximum_gas_budget_wei: unknown;
+                        });
                         /** Format: date-time */
                         submitted_at: string;
                         /** @enum {string} */
@@ -8110,15 +8349,25 @@ export interface operations {
                             credential_reference: string;
                             /** @enum {string} */
                             billing_owner: "application";
-                        }[] | {
+                        }[] | ({
                             /** @enum {string} */
                             chain_id: "eip155:8453" | "eip155:84532" | "eip155:1" | "eip155:11155111";
                             funding_agreement: string;
-                            maximum_gas_budget_wei: string;
+                            /** @description Optional cumulative sponsorship allowance in balance mode; required for legacy agreements. Additional ETH does not raise a configured allowance. */
+                            maximum_gas_budget_wei?: string;
                             /** @enum {string} */
                             account_model: "provider-controlled-user-safe";
                             /** @enum {string} */
                             asset_model: "individual-user-wallets";
+                            /**
+                             * @description Use current application funding with durable pending-cost reservations. A total budget remains optional; transaction and pending-fee ceilings are required.
+                             * @enum {string}
+                             */
+                            funding_mode?: "balance";
+                            /** @description Maximum authorized network fee for one wallet operation, including its verification and fee reserve. */
+                            maximum_transaction_fee_wei?: string;
+                            /** @description Maximum aggregate fee reservation for wallet operations without a verified final outcome. Unknown and unfinalized outcomes retain their reservations. */
+                            maximum_pending_fees_wei?: string;
                             maximum_execution_accounts?: number;
                             maximum_in_flight_per_sponsor?: number;
                             gas_limits?: {
@@ -8127,7 +8376,14 @@ export interface operations {
                                 max_priority_fee_per_gas: string;
                                 l1_fee_reserve_wei: string;
                             };
-                        };
+                        } | {
+                            /** @enum {unknown} */
+                            funding_mode: "balance";
+                            maximum_transaction_fee_wei: unknown;
+                            maximum_pending_fees_wei: unknown;
+                        } | {
+                            maximum_gas_budget_wei: unknown;
+                        });
                         /** Format: date-time */
                         submitted_at: string;
                         /** @enum {string} */

@@ -6,6 +6,7 @@ import {
   cp,
   mkdtemp,
   readFile,
+  stat,
   copyFile,
   rm,
   writeFile,
@@ -36,6 +37,15 @@ try {
     ),
   );
   const paths = candidate.files.map(({ path }) => path);
+  for (const path of [
+    'dist/management/console.mjs',
+    'dist/service/documentation-token-ui.mjs',
+  ])
+    assert.equal(
+      (await stat(join(root, path))).mode & 0o444,
+      0o444,
+      'Public browser assets must be readable by the deployment user',
+    );
   assert.ok(paths.includes('dist/providers/ows-worker.js'));
   assert.ok(paths.includes('dist/management/console.mjs'));
   assert.ok(paths.includes('dist/service/documentation-token-ui.mjs'));

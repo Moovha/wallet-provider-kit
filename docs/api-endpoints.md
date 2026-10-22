@@ -524,6 +524,16 @@ Prepare the private transaction submission service and fee-paying contract neede
 
 [`POST /v1/configuration/applications/{applicationId}/safe-wallet`](http-reference.md#post-v1-configuration-applications-applicationid-safe-wallet) — request body, permissions, effects and response details.
 
+### Prepare an application fee-funding address
+
+Create or retrieve the retained address used to fund an application’s accepted network-fee infrastructure.
+
+**Who uses it:** Service operator.
+
+**When you need it:** Use after approving fee sponsorship, including while wallet execution is disabled.
+
+[`POST /v1/configuration/applications/{applicationId}/safe-wallet/funding-address`](http-reference.md#post-v1-configuration-applications-applicationid-safe-wallet-funding-address) — request body, permissions, effects and response details.
+
 ### Find where to fund application network fees
 
 Get the application’s stable funding address and setup status so its operator knows where eligible network fees are funded.
