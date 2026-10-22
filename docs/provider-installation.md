@@ -222,6 +222,48 @@ SSH key, restricted administrator CIDR, domain, privacy URL, release version and
 verified archive SHA-256. Internet access is needed for packages, images and the
 release. Put no cloud credentials or wallet secrets in template parameters.
 
+### Point your domain to the deployed host
+
+Choose your final hostname before creating the stack so installation records the
+correct HTTPS identity. Its DNS record can be created after AWS assigns the host
+an address. The template does not create DNS records, including when your domain
+uses an external DNS provider.
+
+1. Create the stack with the chosen hostname in `DomainName`. Wait for the
+   `PublicIP` output, then confirm over restricted SSH that the host installer
+   and containers have started. Stack completion alone does not confirm that
+   the installer finished successfully.
+2. At your authoritative DNS provider, create an **A record** for the hostname
+   pointing to `PublicIP`. Remove conflicting address records. Do not add an
+   AAAA record unless IPv6 is configured and reachable on this host. For a
+   subdomain such as `wallet.example.com`, the record name is commonly `wallet`;
+   follow your DNS provider's naming convention.
+3. Wait until public DNS resolves the hostname to that address. Allow inbound
+   TCP ports 80 and 443 through the host and AWS firewalls. The bundled Caddy
+   gateway requests a public TLS certificate and retries while DNS is becoming
+   available. Certificate issuance exposes the hostname in public certificate
+   transparency logs.
+4. Open `https://<your-hostname>/health/management` and confirm a successful
+   response with a valid HTTPS certificate, then open `/admin/`. Check that the
+   configured privacy-notice URL is reachable before onboarding users.
+5. Read the private claim file at the stack's `ClaimLocation` over SSH and
+   [claim administrator access](#claim-administrator-access). The 30-minute
+   claim lifetime starts when the service initializes, independently of DNS.
+   If it expired while DNS or HTTPS was being prepared, use
+   [claim renewal](#recover-an-interrupted-or-expired-setup) with the existing
+   installation; do not delete its data or reinstall with a different identity.
+
+The template's `PublicIP` is automatically assigned and can change after an EC2
+stop/start. An ordinary operating-system reboot does not release it. For a stable
+DNS destination, arrange an Elastic IP or another reviewed stable endpoint before
+publishing the A record. An Elastic IP requires separate allocation and association;
+it is not included in this template. If you keep the automatic address, check and
+update DNS after stop/start. Public IPv4 addresses incur charges, including retained
+Elastic IPs. See [EC2 public IPv4 address behavior](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-instance-addressing.html#concepts-public-addresses).
+
+Keep wallet operations disabled during DNS, HTTPS and administrator setup. A
+working management endpoint does not establish wallet-execution readiness.
+
 The encrypted root EBS volume is retained after instance deletion and continues
 to incur charges. Keep independent tested backups. Stack creation does not prove
 DNS, HTTPS or wallet readiness; check the endpoint and private setup-code path.
