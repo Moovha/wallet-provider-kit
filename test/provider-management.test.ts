@@ -926,3 +926,70 @@ it('paginates application-scoped users and protects private KYC and wallet detai
     await app.close();
   }
 });
+
+it('preserves missing-user responses and detached directory records with SQLite storage', async () => {
+  const { mkdtemp, rm } = await import('node:fs/promises');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const { openProviderDatabase } = await import('../src/storage/index.js');
+  const f = await fixture();
+  const directory = await mkdtemp(join(tmpdir(), 'wpk-user-directory-'));
+  const db = openProviderDatabase({ directory, initialize: true });
+  const service = new ManagementService(
+    db.onboardingStore,
+    () => db.managementSnapshot(),
+    f.config.oauth.issuer,
+    f.config.policy,
+  );
+  try {
+    const claim = randomBytes(48).toString('base64url'),
+      secret = password();
+    await service.initialize(claim);
+    await service.claim({ claim, username: 'admin', password: secret });
+    const principal = await service.verifyCredentials(
+      'operator-admin',
+      secret,
+      managementScopes,
+    );
+    await expect(service.user(principal, '0'.repeat(64))).rejects.toMatchObject(
+      { statusCode: 404 },
+    );
+    expect(await service.users(principal)).toEqual({
+      users: [],
+      next_cursor: null,
+    });
+    await db.onboardingStore.transaction((s) => {
+      s.verifiedUsers = {
+        ['a'.repeat(64)]: {
+          id: 'a'.repeat(64),
+          issuer: principal.issuer,
+          clientId: 'offline-app',
+          userId: 'offline-user',
+          identity: {
+            reference: 'offline-check',
+            level: 'verified',
+            verified_at: '2026-01-01T00:00:00.000Z',
+            fields: { country: 'ZA' },
+          },
+          evidenceHash: 'offline-hash',
+          acceptedUntil: 1,
+          revision: 'offline-policy',
+        },
+      };
+    });
+    const detail = await service.user(principal, 'a'.repeat(64));
+    expect(detail).toMatchObject({
+      kyc: { fields: { country: 'ZA' } },
+      wallets: [],
+    });
+    detail.kyc.fields.country = 'changed';
+    expect(
+      (await service.user(principal, 'a'.repeat(64))).kyc.fields.country,
+    ).toBe('ZA');
+    expect((await service.users(principal)).users).toHaveLength(1);
+    expect(await db.ready()).toBe(true);
+  } finally {
+    db.close();
+    await rm(directory, { recursive: true, force: true });
+  }
+});

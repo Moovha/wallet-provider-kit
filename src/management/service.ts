@@ -228,11 +228,10 @@ export class ManagementService {
   }
   async user(principal: VerifiedPrincipal, id: string) {
     if (!/^[a-f0-9]{64}$/.test(id)) invalid();
-    return this.store.transaction((state) => {
+    const result = await this.store.transaction((state) => {
       this.assertOperator(principal, this.state(state));
       const user = state.verifiedUsers?.[id];
-      if (!user)
-        throw Object.assign(new Error('Not found'), { statusCode: 404 });
+      if (!user) return null;
       return {
         ...this.userSummary(user),
         kyc: {
@@ -267,6 +266,9 @@ export class ManagementService {
           .sort((a, b) => a.account_id.localeCompare(b.account_id)),
       };
     });
+    if (!result)
+      throw Object.assign(new Error('Not found'), { statusCode: 404 });
+    return result;
   }
   applications(): ApplicationPolicy[] {
     return Object.values(this.snapshot()?.identities ?? {})
