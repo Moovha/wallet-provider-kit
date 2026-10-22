@@ -346,6 +346,26 @@ Declare the application’s agreement to pay eligible network fees, with bounded
 
 [`PUT /v1/application/obligations/sponsorship`](http-reference.md#put-v1-application-obligations-sponsorship) — request body, permissions, effects and response details.
 
+### Offer application network-fee terms
+
+Set the network, fee limits and wallet limits the provider offers to a connected application.
+
+**Who uses it:** Service operator.
+
+**When you need it:** Use to create or replace fee terms before the application accepts and funds its dedicated address.
+
+[`PUT /v1/provider/applications/{applicationId}/obligations/sponsorship`](http-reference.md#put-v1-provider-applications-applicationid-obligations-sponsorship) — request body, permissions, effects and response details.
+
+### Accept or decline provider network-fee terms
+
+Record whether this application agrees to the provider’s current network-fee limits and funding terms.
+
+**Who uses it:** Application developer.
+
+**When you need it:** Read the offered terms first, then accept the exact revision before funding or requesting infrastructure preparation.
+
+[`POST /v1/application/obligations/sponsorship/decision`](http-reference.md#post-v1-application-obligations-sponsorship-decision) — request body, permissions, effects and response details.
+
 ### Review an application’s submitted agreements
 
 See one application’s proposed transactions, network services and fee terms before deciding whether to accept them.
@@ -530,7 +550,7 @@ Create or retrieve the retained address used to fund an application’s accepted
 
 **Who uses it:** Service operator.
 
-**When you need it:** Use after approving fee sponsorship, including while wallet execution is disabled.
+**When you need it:** Use after offering provider fee terms or approving application-submitted terms, including while wallet execution is disabled.
 
 [`POST /v1/configuration/applications/{applicationId}/safe-wallet/funding-address`](http-reference.md#post-v1-configuration-applications-applicationid-safe-wallet-funding-address) — request body, permissions, effects and response details.
 

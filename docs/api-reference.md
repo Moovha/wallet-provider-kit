@@ -2859,12 +2859,28 @@ export declare class RuntimeConfigurationService {
     authorizes_spending: false;
     activates_execution: false;
   }>;
+  proposeSponsorship(
+    context: AuthorityContext,
+    applicationId: string,
+    input: {
+      expected_revision: string;
+      value: ApplicationObligations['sponsorship'];
+    },
+  ): Promise<ObligationRecord>;
   submitObligation<K extends ObligationKind>(
     context: AuthorityContext,
     kind: K,
     input: {
       expected_revision: string;
       value: ApplicationObligations[K];
+    },
+  ): Promise<ObligationRecord>;
+  acceptSponsorship(
+    context: AuthorityContext,
+    input: {
+      expected_revision: string;
+      expected_decision_revision: string;
+      decision: 'accepted' | 'rejected';
     },
   ): Promise<ObligationRecord>;
   decideObligation(

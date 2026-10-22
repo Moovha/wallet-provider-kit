@@ -637,13 +637,13 @@ Operation: `prepareApplicationFundingAddress`.
 
 **Who uses it:** Service operator.
 
-**When you need it:** Use after approving fee sponsorship, including while wallet execution is disabled.
+**When you need it:** Use after offering provider fee terms or approving application-submitted terms, including while wallet execution is disabled.
 
-**Before you start:** Authenticate as a current provider operator. The application must be active with accepted fee terms on the selected network.
+**Before you start:** Authenticate as a current provider operator. The application must be active with pending provider-offered terms or accepted fee terms on the selected network.
 
 **Result and next step:** 200: the stable application funding address and infrastructure status. No chain access, contract deployment, transfer or wallet activation occurs. Complete infrastructure acceptance separately before funding or wallet use.
 
-**Request details:** Retain a stable application funding address after provider acceptance of fee terms. Operator-only; does not contact the chain, deploy contracts, transfer funds or enable execution.
+**Request details:** Retain a stable application funding address after the provider offers fee terms or accepts application-submitted terms. Application acceptance is required before provider-offered terms permit sponsorship. Operator-only; does not contact the chain, deploy contracts, transfer funds or enable execution.
 
 | Parameter         | Location | Required | Schema                                                                                                |
 | ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
@@ -4659,6 +4659,13 @@ Success response schema:
             "type": "string",
             "format": "date-time"
           },
+          "proposed_by": {
+            "enum": ["provider"]
+          },
+          "decision_by": {
+            "type": "string",
+            "enum": ["provider", "application"]
+          },
           "decision": {
             "type": "string",
             "enum": ["pending", "accepted", "rejected"]
@@ -4986,6 +4993,13 @@ Success response schema:
             "type": "string",
             "format": "date-time"
           },
+          "proposed_by": {
+            "enum": ["provider"]
+          },
+          "decision_by": {
+            "type": "string",
+            "enum": ["provider", "application"]
+          },
           "decision": {
             "type": "string",
             "enum": ["pending", "accepted", "rejected"]
@@ -5008,6 +5022,774 @@ Success response schema:
     "activates_execution": {
       "type": "boolean",
       "enum": [false]
+    }
+  }
+}
+```
+
+## PUT `/v1/provider/applications/{applicationId}/obligations/sponsorship`
+
+Operation: `proposeProviderSponsorship`.
+
+**Why this exists:** Set the network, fee limits and wallet limits the provider offers to a connected application.
+
+**Who uses it:** Service operator.
+
+**When you need it:** Use to create or replace fee terms before the application accepts and funds its dedicated address.
+
+**Before you start:** Use a current operator token, application ID, expected fee-agreement revision and UUIDv4 idempotency key.
+
+**Result and next step:** 200: pending provider-offered terms. The application must accept the exact revision before infrastructure spending or sponsorship; saving does not activate execution.
+
+**Request details:** Protected, application-scoped declarations and provider decisions. Accepted actions constrain off-chain payloads. Accepted service declarations permit resolving application-owned verifier credentials when credential storage is configured. Acceptance does not fund gas, provision a user Safe, activate execution or authorize spending. User assets remain in individual user wallets. Secrets and actual user payloads must not be submitted here.
+
+| Parameter         | Location | Required | Schema                                                                                                |
+| ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
+| `applicationId`   | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{64}$"}`                                                        |
+| `idempotency-key` | header   | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+| `wallet-network`  | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum","ethereum-sepolia"]}`                      |
+
+Request body (application/json):
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["expected_revision", "value"],
+  "properties": {
+    "expected_revision": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,19})$"
+    },
+    "value": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "chain_id",
+        "funding_agreement",
+        "account_model",
+        "asset_model"
+      ],
+      "properties": {
+        "chain_id": {
+          "type": "string",
+          "enum": ["eip155:8453", "eip155:84532", "eip155:1", "eip155:11155111"]
+        },
+        "funding_agreement": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "maximum_gas_budget_wei": {
+          "description": "Optional cumulative sponsorship allowance in balance mode; required for legacy agreements. Additional ETH does not raise a configured allowance.",
+          "type": "string",
+          "pattern": "^[1-9][0-9]{0,77}$"
+        },
+        "account_model": {
+          "type": "string",
+          "enum": ["provider-controlled-user-safe"]
+        },
+        "asset_model": {
+          "type": "string",
+          "enum": ["individual-user-wallets"]
+        },
+        "funding_mode": {
+          "type": "string",
+          "enum": ["balance"],
+          "description": "Use current application funding with durable pending-cost reservations. A total budget remains optional; transaction and pending-fee ceilings are required."
+        },
+        "maximum_transaction_fee_wei": {
+          "description": "Maximum authorized network fee for one wallet operation, including its verification and fee reserve.",
+          "type": "string",
+          "pattern": "^[1-9][0-9]{0,77}$"
+        },
+        "maximum_pending_fees_wei": {
+          "description": "Maximum aggregate fee reservation for wallet operations without a verified final outcome. Unknown and unfinalized outcomes retain their reservations.",
+          "type": "string",
+          "pattern": "^[1-9][0-9]{0,77}$"
+        },
+        "maximum_execution_accounts": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100000
+        },
+        "maximum_in_flight_per_sponsor": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16
+        },
+        "gas_limits": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "gas_limit",
+            "max_fee_per_gas",
+            "max_priority_fee_per_gas",
+            "l1_fee_reserve_wei"
+          ],
+          "properties": {
+            "gas_limit": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]{0,77})$"
+            },
+            "max_fee_per_gas": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]{0,77})$"
+            },
+            "max_priority_fee_per_gas": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]{0,77})$"
+            },
+            "l1_fee_reserve_wei": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]{0,77})$"
+            }
+          }
+        }
+      },
+      "anyOf": [
+        {
+          "required": [
+            "funding_mode",
+            "maximum_transaction_fee_wei",
+            "maximum_pending_fees_wei"
+          ],
+          "properties": {
+            "funding_mode": {
+              "enum": ["balance"]
+            },
+            "maximum_transaction_fee_wei": {},
+            "maximum_pending_fees_wei": {}
+          }
+        },
+        {
+          "required": ["maximum_gas_budget_wei"],
+          "properties": {
+            "maximum_gas_budget_wei": {}
+          },
+          "not": {
+            "required": ["funding_mode"],
+            "properties": {
+              "funding_mode": {}
+            }
+          }
+        }
+      ]
+    }
+  }
+}
+```
+
+| Status | Content type             | Description      |
+| ------ | ------------------------ | ---------------- |
+| 200    | application/json         | Default Response |
+| 400    | application/problem+json | Problem response |
+| 401    | application/problem+json | Problem response |
+| 403    | application/problem+json | Problem response |
+| 409    | application/problem+json | Problem response |
+| 413    | application/problem+json | Problem response |
+| 415    | application/problem+json | Problem response |
+| 422    | application/problem+json | Problem response |
+| 429    | application/problem+json | Problem response |
+| 500    | application/problem+json | Problem response |
+| 503    | application/problem+json | Problem response |
+
+Success response schema:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "application_id",
+    "kind",
+    "revision",
+    "value",
+    "submitted_at",
+    "decision",
+    "decision_revision"
+  ],
+  "properties": {
+    "application_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "kind": {
+      "type": "string",
+      "enum": ["actions", "services", "sponsorship"]
+    },
+    "revision": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,19})$"
+    },
+    "value": {
+      "anyOf": [
+        {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "description", "fields"],
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+              },
+              "description": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "fields": {
+                "type": "array",
+                "maxItems": 32,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["name", "required", "allowed_values"],
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+                    },
+                    "required": {
+                      "type": "boolean"
+                    },
+                    "allowed_values": {
+                      "type": "array",
+                      "minItems": 1,
+                      "maxItems": 64,
+                      "uniqueItems": true,
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "kind",
+              "vendor",
+              "credential_reference",
+              "billing_owner"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "rpc-verification",
+                  "rpc-submission",
+                  "rpc-observation",
+                  "other"
+                ]
+              },
+              "vendor": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+              },
+              "credential_reference": {
+                "type": "string",
+                "pattern": "^[a-zA-Z0-9_-]{1,128}$",
+                "description": "Opaque application-local secret-store reference. Never a credential, URL, environment-variable lookup or authority to read another application’s secret. Runtime resolution is not enabled by registration."
+              },
+              "billing_owner": {
+                "type": "string",
+                "enum": ["application"]
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "chain_id",
+            "funding_agreement",
+            "account_model",
+            "asset_model"
+          ],
+          "properties": {
+            "chain_id": {
+              "type": "string",
+              "enum": [
+                "eip155:8453",
+                "eip155:84532",
+                "eip155:1",
+                "eip155:11155111"
+              ]
+            },
+            "funding_agreement": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "maximum_gas_budget_wei": {
+              "description": "Optional cumulative sponsorship allowance in balance mode; required for legacy agreements. Additional ETH does not raise a configured allowance.",
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,77}$"
+            },
+            "account_model": {
+              "type": "string",
+              "enum": ["provider-controlled-user-safe"]
+            },
+            "asset_model": {
+              "type": "string",
+              "enum": ["individual-user-wallets"]
+            },
+            "funding_mode": {
+              "type": "string",
+              "enum": ["balance"],
+              "description": "Use current application funding with durable pending-cost reservations. A total budget remains optional; transaction and pending-fee ceilings are required."
+            },
+            "maximum_transaction_fee_wei": {
+              "description": "Maximum authorized network fee for one wallet operation, including its verification and fee reserve.",
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,77}$"
+            },
+            "maximum_pending_fees_wei": {
+              "description": "Maximum aggregate fee reservation for wallet operations without a verified final outcome. Unknown and unfinalized outcomes retain their reservations.",
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,77}$"
+            },
+            "maximum_execution_accounts": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100000
+            },
+            "maximum_in_flight_per_sponsor": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 16
+            },
+            "gas_limits": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "gas_limit",
+                "max_fee_per_gas",
+                "max_priority_fee_per_gas",
+                "l1_fee_reserve_wei"
+              ],
+              "properties": {
+                "gas_limit": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,77})$"
+                },
+                "max_fee_per_gas": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,77})$"
+                },
+                "max_priority_fee_per_gas": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,77})$"
+                },
+                "l1_fee_reserve_wei": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,77})$"
+                }
+              }
+            }
+          },
+          "anyOf": [
+            {
+              "required": [
+                "funding_mode",
+                "maximum_transaction_fee_wei",
+                "maximum_pending_fees_wei"
+              ],
+              "properties": {
+                "funding_mode": {
+                  "enum": ["balance"]
+                },
+                "maximum_transaction_fee_wei": {},
+                "maximum_pending_fees_wei": {}
+              }
+            },
+            {
+              "required": ["maximum_gas_budget_wei"],
+              "properties": {
+                "maximum_gas_budget_wei": {}
+              },
+              "not": {
+                "required": ["funding_mode"],
+                "properties": {
+                  "funding_mode": {}
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "submitted_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "proposed_by": {
+      "enum": ["provider"]
+    },
+    "decision_by": {
+      "type": "string",
+      "enum": ["provider", "application"]
+    },
+    "decision": {
+      "type": "string",
+      "enum": ["pending", "accepted", "rejected"]
+    },
+    "decision_revision": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,19})$"
+    },
+    "decided_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}
+```
+
+## POST `/v1/application/obligations/sponsorship/decision`
+
+Operation: `acceptProviderSponsorship`.
+
+**Why this exists:** Record whether this application agrees to the provider’s current network-fee limits and funding terms.
+
+**Who uses it:** Application developer.
+
+**When you need it:** Read the offered terms first, then accept the exact revision before funding or requesting infrastructure preparation.
+
+**Before you start:** Use the target application token, current agreement and decision revisions, and UUIDv4 idempotency key. Only provider-offered sponsorship can be accepted here.
+
+**Result and next step:** 200: the application’s decision on the exact provider-offered revision. Funding, readiness and current transaction authority remain separate requirements.
+
+**Request details:** Protected, application-scoped declarations and provider decisions. Accepted actions constrain off-chain payloads. Accepted service declarations permit resolving application-owned verifier credentials when credential storage is configured. Acceptance does not fund gas, provision a user Safe, activate execution or authorize spending. User assets remain in individual user wallets. Secrets and actual user payloads must not be submitted here.
+
+| Parameter         | Location | Required | Schema                                                                                                |
+| ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
+| `idempotency-key` | header   | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+| `wallet-network`  | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum","ethereum-sepolia"]}`                      |
+
+Request body (application/json):
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["expected_revision", "expected_decision_revision", "decision"],
+  "properties": {
+    "expected_revision": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,19})$"
+    },
+    "expected_decision_revision": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,19})$"
+    },
+    "decision": {
+      "type": "string",
+      "enum": ["accepted", "rejected"]
+    }
+  }
+}
+```
+
+| Status | Content type             | Description      |
+| ------ | ------------------------ | ---------------- |
+| 200    | application/json         | Default Response |
+| 400    | application/problem+json | Problem response |
+| 401    | application/problem+json | Problem response |
+| 403    | application/problem+json | Problem response |
+| 409    | application/problem+json | Problem response |
+| 413    | application/problem+json | Problem response |
+| 415    | application/problem+json | Problem response |
+| 422    | application/problem+json | Problem response |
+| 429    | application/problem+json | Problem response |
+| 500    | application/problem+json | Problem response |
+| 503    | application/problem+json | Problem response |
+
+Success response schema:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "application_id",
+    "kind",
+    "revision",
+    "value",
+    "submitted_at",
+    "decision",
+    "decision_revision"
+  ],
+  "properties": {
+    "application_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "kind": {
+      "type": "string",
+      "enum": ["actions", "services", "sponsorship"]
+    },
+    "revision": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,19})$"
+    },
+    "value": {
+      "anyOf": [
+        {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "description", "fields"],
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+              },
+              "description": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "fields": {
+                "type": "array",
+                "maxItems": 32,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["name", "required", "allowed_values"],
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+                    },
+                    "required": {
+                      "type": "boolean"
+                    },
+                    "allowed_values": {
+                      "type": "array",
+                      "minItems": 1,
+                      "maxItems": 64,
+                      "uniqueItems": true,
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "kind",
+              "vendor",
+              "credential_reference",
+              "billing_owner"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "rpc-verification",
+                  "rpc-submission",
+                  "rpc-observation",
+                  "other"
+                ]
+              },
+              "vendor": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+              },
+              "credential_reference": {
+                "type": "string",
+                "pattern": "^[a-zA-Z0-9_-]{1,128}$",
+                "description": "Opaque application-local secret-store reference. Never a credential, URL, environment-variable lookup or authority to read another application’s secret. Runtime resolution is not enabled by registration."
+              },
+              "billing_owner": {
+                "type": "string",
+                "enum": ["application"]
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "chain_id",
+            "funding_agreement",
+            "account_model",
+            "asset_model"
+          ],
+          "properties": {
+            "chain_id": {
+              "type": "string",
+              "enum": [
+                "eip155:8453",
+                "eip155:84532",
+                "eip155:1",
+                "eip155:11155111"
+              ]
+            },
+            "funding_agreement": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "maximum_gas_budget_wei": {
+              "description": "Optional cumulative sponsorship allowance in balance mode; required for legacy agreements. Additional ETH does not raise a configured allowance.",
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,77}$"
+            },
+            "account_model": {
+              "type": "string",
+              "enum": ["provider-controlled-user-safe"]
+            },
+            "asset_model": {
+              "type": "string",
+              "enum": ["individual-user-wallets"]
+            },
+            "funding_mode": {
+              "type": "string",
+              "enum": ["balance"],
+              "description": "Use current application funding with durable pending-cost reservations. A total budget remains optional; transaction and pending-fee ceilings are required."
+            },
+            "maximum_transaction_fee_wei": {
+              "description": "Maximum authorized network fee for one wallet operation, including its verification and fee reserve.",
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,77}$"
+            },
+            "maximum_pending_fees_wei": {
+              "description": "Maximum aggregate fee reservation for wallet operations without a verified final outcome. Unknown and unfinalized outcomes retain their reservations.",
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,77}$"
+            },
+            "maximum_execution_accounts": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100000
+            },
+            "maximum_in_flight_per_sponsor": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 16
+            },
+            "gas_limits": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "gas_limit",
+                "max_fee_per_gas",
+                "max_priority_fee_per_gas",
+                "l1_fee_reserve_wei"
+              ],
+              "properties": {
+                "gas_limit": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,77})$"
+                },
+                "max_fee_per_gas": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,77})$"
+                },
+                "max_priority_fee_per_gas": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,77})$"
+                },
+                "l1_fee_reserve_wei": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,77})$"
+                }
+              }
+            }
+          },
+          "anyOf": [
+            {
+              "required": [
+                "funding_mode",
+                "maximum_transaction_fee_wei",
+                "maximum_pending_fees_wei"
+              ],
+              "properties": {
+                "funding_mode": {
+                  "enum": ["balance"]
+                },
+                "maximum_transaction_fee_wei": {},
+                "maximum_pending_fees_wei": {}
+              }
+            },
+            {
+              "required": ["maximum_gas_budget_wei"],
+              "properties": {
+                "maximum_gas_budget_wei": {}
+              },
+              "not": {
+                "required": ["funding_mode"],
+                "properties": {
+                  "funding_mode": {}
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "submitted_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "proposed_by": {
+      "enum": ["provider"]
+    },
+    "decision_by": {
+      "type": "string",
+      "enum": ["provider", "application"]
+    },
+    "decision": {
+      "type": "string",
+      "enum": ["pending", "accepted", "rejected"]
+    },
+    "decision_revision": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,19})$"
+    },
+    "decided_at": {
+      "type": "string",
+      "format": "date-time"
     }
   }
 }
@@ -5361,6 +6143,13 @@ Success response schema:
       "type": "string",
       "format": "date-time"
     },
+    "proposed_by": {
+      "enum": ["provider"]
+    },
+    "decision_by": {
+      "type": "string",
+      "enum": ["provider", "application"]
+    },
     "decision": {
       "type": "string",
       "enum": ["pending", "accepted", "rejected"]
@@ -5684,6 +6473,13 @@ Success response schema:
     "submitted_at": {
       "type": "string",
       "format": "date-time"
+    },
+    "proposed_by": {
+      "enum": ["provider"]
+    },
+    "decision_by": {
+      "type": "string",
+      "enum": ["provider", "application"]
     },
     "decision": {
       "type": "string",
@@ -6043,6 +6839,13 @@ Success response schema:
       "type": "string",
       "format": "date-time"
     },
+    "proposed_by": {
+      "enum": ["provider"]
+    },
+    "decision_by": {
+      "type": "string",
+      "enum": ["provider", "application"]
+    },
     "decision": {
       "type": "string",
       "enum": ["pending", "accepted", "rejected"]
@@ -6366,6 +7169,13 @@ Success response schema:
     "submitted_at": {
       "type": "string",
       "format": "date-time"
+    },
+    "proposed_by": {
+      "enum": ["provider"]
+    },
+    "decision_by": {
+      "type": "string",
+      "enum": ["provider", "application"]
     },
     "decision": {
       "type": "string",
@@ -6797,6 +7607,13 @@ Success response schema:
       "type": "string",
       "format": "date-time"
     },
+    "proposed_by": {
+      "enum": ["provider"]
+    },
+    "decision_by": {
+      "type": "string",
+      "enum": ["provider", "application"]
+    },
     "decision": {
       "type": "string",
       "enum": ["pending", "accepted", "rejected"]
@@ -7120,6 +7937,13 @@ Success response schema:
     "submitted_at": {
       "type": "string",
       "format": "date-time"
+    },
+    "proposed_by": {
+      "enum": ["provider"]
+    },
+    "decision_by": {
+      "type": "string",
+      "enum": ["provider", "application"]
     },
     "decision": {
       "type": "string",

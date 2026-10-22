@@ -487,7 +487,17 @@ export class SafeWalletRuntime {
     applicationId: string,
   ) {
     this.resources.assertOperator(context.principal);
-    await this.agreement(applicationId);
+    const terms = (
+      await this.resources.readObligations(context.principal, applicationId)
+    ).resources.find((record) => record.kind === 'sponsorship');
+    if (
+      !terms ||
+      (terms.decision !== 'accepted' &&
+        !(terms.proposed_by === 'provider' && terms.decision === 'pending')) ||
+      (terms.value as ApplicationObligations['sponsorship']).chain_id !==
+        this.network.caip
+    )
+      deny();
     return this.exclusive(applicationId, async () => {
       await this.retainFundingAddress(applicationId);
       return this.read(context.principal, applicationId);

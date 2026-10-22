@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Let providers offer fee limits and prepare funding addresses from administration.
+  Require the connected application to accept each exact provider-offered revision
+  before sponsorship or infrastructure spending; preserve application-submitted
+  agreements and provider review.
+
 - Make public browser assets readable by restricted deployment users, including
   builds prepared under a private file-creation mask.
 

@@ -53,7 +53,7 @@ async function api(path, method = 'GET', data, authorized = true, network) {
     }
     headers.authorization = 'Bearer ' + token;
   }
-  if (['POST', 'PATCH'].includes(method))
+  if (['POST', 'PATCH', 'PUT'].includes(method))
     headers['idempotency-key'] = crypto.randomUUID();
   const response = await fetch(path, {
     method,
@@ -549,7 +549,7 @@ async function renderNetworkFees(parent, record, networks) {
   node('summary', 'Network fees', section);
   node(
     'p',
-    'The application pays network fees. Review its terms, then share its funding address.',
+    'Set fee limits and prepare an address. The application accepts the terms and supplies ETH.',
     section,
   );
   if (!record.enabled || !record.policy?.assertionTrust) {
@@ -628,11 +628,12 @@ async function renderNetworkFees(parent, record, networks) {
       if (!terms) {
         node(
           'p',
-          'Waiting for the application’s fee terms. Review them here once submitted.',
+          'Set the fee limits below to offer terms to this application.',
           content,
         );
       } else {
         node('p', 'Agreement: ' + terms.value.funding_agreement, content);
+        node('p', 'Revision: ' + terms.revision, content);
         const eth = (value) => {
           const amount = BigInt(value);
           return (
@@ -670,8 +671,14 @@ async function renderNetworkFees(parent, record, networks) {
           'p',
           'Approval: ' +
             ({
-              pending: 'Awaiting your review',
-              accepted: 'Approved',
+              pending:
+                terms.proposed_by === 'provider'
+                  ? 'Awaiting application acceptance'
+                  : 'Awaiting your review',
+              accepted:
+                terms.proposed_by === 'provider'
+                  ? 'Application accepted'
+                  : 'Approved',
               rejected: 'Declined',
             }[terms.decision] ?? 'Unavailable'),
           content,
@@ -692,8 +699,8 @@ async function renderNetworkFees(parent, record, networks) {
           );
         const developer = node('details', undefined, content);
         node('summary', 'Developer details', developer);
-        node('pre', JSON.stringify(terms.value, null, 2), developer);
-        if (terms.decision !== 'accepted') {
+        node('pre', JSON.stringify(terms, null, 2), developer);
+        if (terms.proposed_by !== 'provider' && terms.decision !== 'accepted') {
           action(content, 'Approve fee terms', async () => {
             if (
               !confirm(
@@ -718,6 +725,111 @@ async function renderNetworkFees(parent, record, networks) {
           });
         }
       }
+      const editor = node('details', undefined, content);
+      node('summary', terms ? 'Change fee limits' : 'Set fee limits', editor);
+      if (!terms) editor.open = true;
+      const form = node('form', undefined, editor);
+      const input = (title, value = '', required = true) => {
+        const label = node('label', title, form);
+        const control = node('input', undefined, label);
+        control.value = value;
+        control.required = required;
+        return control;
+      };
+      const toEth = (value) =>
+        value === undefined
+          ? ''
+          : (BigInt(value) / 10n ** 18n).toString() +
+            '.' +
+            (BigInt(value) % 10n ** 18n).toString().padStart(18, '0');
+      const fromEth = (value) => {
+        if (!/^(0|[1-9][0-9]*)(\.[0-9]{1,18})?$/.test(value))
+          throw new Error(
+            'Enter a positive ETH amount with at most 18 decimal places.',
+          );
+        const [whole, fraction = ''] = value.split('.');
+        const amount =
+          BigInt(whole) * 10n ** 18n + BigInt(fraction.padEnd(18, '0'));
+        if (amount <= 0n || amount >= 2n ** 256n)
+          throw new Error(
+            'Enter a positive ETH amount within the supported range.',
+          );
+        return amount.toString();
+      };
+      const agreement = input(
+        'Agreement reference',
+        terms?.value.funding_agreement,
+      );
+      agreement.maxLength = 256;
+      const perTransaction = input(
+        'Per-transaction limit (ETH)',
+        toEth(terms?.value.maximum_transaction_fee_wei),
+      );
+      const pending = input(
+        'Pending-fee limit (ETH)',
+        toEth(terms?.value.maximum_pending_fees_wei),
+      );
+      node(
+        'p',
+        'Pending fees cover transactions whose final result is not yet confirmed.',
+        form,
+      );
+      const total = input(
+        'Total budget (ETH, optional)',
+        toEth(terms?.value.maximum_gas_budget_wei),
+        false,
+      );
+      const wallets = input(
+        'Maximum wallets covered',
+        String(terms?.value.maximum_execution_accounts ?? ''),
+      );
+      const operations = input(
+        'Maximum pending transactions',
+        String(terms?.value.maximum_in_flight_per_sponsor ?? '1'),
+      );
+      for (const [control, max] of [
+        [wallets, 100000],
+        [operations, 16],
+      ]) {
+        control.type = 'number';
+        control.min = '1';
+        control.max = String(max);
+        control.step = '1';
+      }
+      node(
+        'p',
+        'Saving replaces the current fee terms and requires fresh application acceptance. No funds are sent.',
+        form,
+      );
+      const save = node('button', 'Save fee terms', form);
+      save.type = 'submit';
+      form.onsubmit = run(async () => {
+        const value = {
+          chain_id: chains[network],
+          funding_agreement: agreement.value.trim(),
+          funding_mode: 'balance',
+          maximum_transaction_fee_wei: fromEth(perTransaction.value.trim()),
+          maximum_pending_fees_wei: fromEth(pending.value.trim()),
+          ...(total.value.trim()
+            ? { maximum_gas_budget_wei: fromEth(total.value.trim()) }
+            : {}),
+          account_model: 'provider-controlled-user-safe',
+          asset_model: 'individual-user-wallets',
+          maximum_execution_accounts: Number(wallets.value),
+          maximum_in_flight_per_sponsor: Number(operations.value),
+          ...(terms?.value.gas_limits
+            ? { gas_limits: terms.value.gas_limits }
+            : {}),
+        };
+        await request(
+          '/v1/provider/applications/' +
+            applicationId +
+            '/obligations/sponsorship',
+          'PUT',
+          { expected_revision: terms?.revision ?? '0', value },
+        );
+        await load();
+      });
       node('h4', 'Application funding address', content);
       if (
         funding.funding_address &&
@@ -734,16 +846,19 @@ async function renderNetworkFees(parent, record, networks) {
           'p',
           funding.status === 'provisioned'
             ? 'Infrastructure prepared. Verify funding and wallet readiness separately.'
-            : 'Address prepared. Complete infrastructure checks before requesting funding.',
+            : 'The application must accept the current terms before funding this address. Infrastructure preparation and readiness checks are required before use.',
           content,
         );
       } else {
         node(
           'p',
-          'Prepare a dedicated address after approving the terms. No funds are sent.',
+          'Prepare a dedicated address after saving the terms. No funds are sent.',
           content,
         );
-        if (terms?.decision === 'accepted')
+        if (
+          terms?.decision === 'accepted' ||
+          (terms?.proposed_by === 'provider' && terms.decision === 'pending')
+        )
           action(content, 'Prepare funding address', async () => {
             await request(
               '/v1/configuration/applications/' +
@@ -754,7 +869,7 @@ async function renderNetworkFees(parent, record, networks) {
             );
             await load();
           });
-        else node('p', 'Approve the fee terms first.', content);
+        else node('p', 'Save or approve the fee terms first.', content);
       }
     } catch (error) {
       if (version !== loadVersion || !token) return;

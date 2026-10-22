@@ -5,7 +5,7 @@ import {
 } from '../execution/defaults.js';
 import { invalid } from '../onboarding/policy.js';
 
-/** Application declarations require provider acceptance; they never grant spending authority. */
+/** Fee terms require acceptance by the other party; declarations never grant spending authority. */
 export interface ApplicationObligations {
   actions: {
     name: string;
@@ -49,6 +49,8 @@ export interface ObligationRecord {
   revision: string;
   value: ApplicationObligations[ObligationKind];
   submitted_at: string;
+  proposed_by?: 'provider';
+  decision_by?: 'provider' | 'application';
   decision: 'pending' | 'accepted' | 'rejected';
   decision_revision: string;
   decided_at?: string;

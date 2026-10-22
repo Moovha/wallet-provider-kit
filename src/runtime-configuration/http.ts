@@ -420,6 +420,8 @@ export async function registerRuntimeConfigurationRoutes(
       revision: revisionSchema,
       value: { anyOf: Object.values(obligationSchemas) },
       submitted_at: { type: 'string', format: 'date-time' },
+      proposed_by: { const: 'provider' },
+      decision_by: { type: 'string', enum: ['provider', 'application'] },
       decision: { type: 'string', enum: ['pending', 'accepted', 'rejected'] },
       decision_revision: revisionSchema,
       decided_at: { type: 'string', format: 'date-time' },
@@ -479,6 +481,77 @@ export async function registerRuntimeConfigurationRoutes(
       configured(request).readObligations(
         await principal(request, 'wallet:configuration:write'),
         request.params.applicationId,
+      ),
+  );
+  app.put<{
+    Params: { applicationId: string };
+    Body: {
+      expected_revision: string;
+      value: ApplicationObligations['sponsorship'];
+    };
+  }>(
+    '/v1/provider/applications/:applicationId/obligations/sponsorship',
+    {
+      schema: obligationSchema(
+        'proposeProviderSponsorship',
+        obligationRecordSchema,
+        {
+          headers,
+          params: params('applicationId', applicationIdSchema),
+          body: {
+            type: 'object',
+            additionalProperties: false,
+            required: ['expected_revision', 'value'],
+            properties: {
+              expected_revision: revisionSchema,
+              value: obligationSchemas.sponsorship,
+            },
+          },
+        },
+      ),
+    },
+    async (request) =>
+      configured(request).proposeSponsorship(
+        await context(request, 'wallet:configuration:write'),
+        request.params.applicationId,
+        request.body,
+      ),
+  );
+  app.post<{
+    Body: {
+      expected_revision: string;
+      expected_decision_revision: string;
+      decision: 'accepted' | 'rejected';
+    };
+  }>(
+    '/v1/application/obligations/sponsorship/decision',
+    {
+      schema: obligationSchema(
+        'acceptProviderSponsorship',
+        obligationRecordSchema,
+        {
+          headers,
+          body: {
+            type: 'object',
+            additionalProperties: false,
+            required: [
+              'expected_revision',
+              'expected_decision_revision',
+              'decision',
+            ],
+            properties: {
+              expected_revision: revisionSchema,
+              expected_decision_revision: revisionSchema,
+              decision: { type: 'string', enum: ['accepted', 'rejected'] },
+            },
+          },
+        },
+      ),
+    },
+    async (request) =>
+      configured(request).acceptSponsorship(
+        await context(request, 'wallet:configuration:propose'),
+        request.body,
       ),
   );
   for (const kind of Object.keys(obligationSchemas) as ObligationKind[]) {

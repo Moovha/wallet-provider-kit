@@ -271,6 +271,30 @@ it('denies fee-address creation for an application caller or without accepted sp
   expect(await t.stored()).toBeUndefined();
   expect(t.broadcasts).toBe(0);
 });
+it('prepares provider-offered funding before application acceptance but blocks setup and spending', async () => {
+  const t = await bootstrap('10000000');
+  await t.f.db.onboardingStore.transaction((s) => {
+    const terms =
+      s.deploymentBindings!['service-v1'].runtimeConfiguration!.obligations!
+        .records[t.applicationId + ':sponsorship'];
+    terms.proposed_by = 'provider';
+    terms.decision = 'pending';
+  });
+  const rpc = vi
+    .spyOn(t.f.runtime, 'rpcEndpoints')
+    .mockRejectedValue(new Error('No chain access permitted'));
+  const first = await t.runtime.prepareFundingAddress(
+    t.f.operatorContext,
+    t.applicationId,
+  );
+  expect(first.funding_address).toMatch(/^0x[0-9a-fA-F]{40}$/);
+  await expect(
+    t.runtime.ensure(t.f.operatorContext, t.applicationId),
+  ).rejects.toMatchObject({ code: 'wallet_authorization_denied' });
+  expect(rpc).not.toHaveBeenCalled();
+  expect(t.broadcasts).toBe(0);
+  expect((await t.stored())!.transactions).toEqual([]);
+});
 it('retains an unsigned setup plan and stable infrastructure identities when the shared allowance cannot cover setup', async () => {
   const t = await bootstrap('1');
   await expect(

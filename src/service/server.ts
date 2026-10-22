@@ -802,7 +802,7 @@ export async function createServer(options: ServerOptions = {}) {
       schema: {
         operationId: 'prepareApplicationFundingAddress',
         description:
-          'Retain a stable application funding address after provider acceptance of fee terms. Operator-only; does not contact the chain, deploy contracts, transfer funds or enable execution.',
+          'Retain a stable application funding address after the provider offers fee terms or accepts application-submitted terms. Application acceptance is required before provider-offered terms permit sponsorship. Operator-only; does not contact the chain, deploy contracts, transfer funds or enable execution.',
         headers: {
           type: 'object',
           required: ['idempotency-key'],

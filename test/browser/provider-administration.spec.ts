@@ -262,7 +262,8 @@ test('claims, registers and manages applications through the real protected mana
     // Offline fee services exercise the console without chain access or funding.
     let approvedFees = false,
       preparedAddress = false,
-      wrongNetwork = false;
+      wrongNetwork = false,
+      providerOffered = false;
     const offlineAddress = '0x' + '12'.repeat(20);
     const calls: {
       method: string;
@@ -277,6 +278,16 @@ test('claims, registers and manages applications through the real protected mana
         const path = new URL(request.url()).pathname;
         const applicationId = path.split('/')[4];
         const network = request.headers()['wallet-network'];
+        if (request.method() === 'PUT') {
+          const offered = request.postDataJSON();
+          expect(offered.value.maximum_transaction_fee_wei).toBe(
+            '2000000000000000',
+          );
+          expect(offered.value).not.toHaveProperty('maximum_gas_budget_wei');
+          providerOffered = true;
+          approvedFees = false;
+          preparedAddress = false;
+        }
         if (request.method() === 'POST') {
           calls.push({
             method: request.method(),
@@ -292,6 +303,7 @@ test('claims, registers and manages applications through the real protected mana
             resources: [
               {
                 kind: 'sponsorship',
+                ...(providerOffered ? { proposed_by: 'provider' } : {}),
                 revision: '2',
                 decision_revision: approvedFees ? '1' : '0',
                 decision: approvedFees ? 'accepted' : 'pending',
@@ -380,6 +392,28 @@ test('claims, registers and manages applications through the real protected mana
       path: 'artifacts/provider-installation/application-fees.png',
       fullPage: true,
     });
+    await fees.getByText('Change fee limits', { exact: true }).click();
+    await fees
+      .getByLabel('Per-transaction limit (ETH)', { exact: true })
+      .fill('0.002');
+    await fees
+      .getByLabel('Maximum wallets covered', { exact: true })
+      .fill('100');
+    await fees
+      .getByRole('button', { name: 'Save fee terms', exact: true })
+      .click();
+    await fees
+      .getByRole('button', { name: 'Prepare funding address', exact: true })
+      .click();
+    await expect(
+      fees.getByText('Approval: Awaiting application acceptance', {
+        exact: true,
+      }),
+    ).toBeVisible();
+    await expect(
+      fees.getByRole('button', { name: 'Approve fee terms', exact: true }),
+    ).toHaveCount(0);
+    await expect(fees.getByText(offlineAddress, { exact: true })).toBeVisible();
     wrongNetwork = true;
     await fees
       .getByRole('button', { name: 'Refresh fee setup', exact: true })
