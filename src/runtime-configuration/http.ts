@@ -80,7 +80,10 @@ const applicationsSchema = {
   additionalProperties: false,
   required: ['role', 'applications'],
   properties: {
-    network: { type: 'string', enum: ['base', 'base-sepolia'] },
+    network: {
+      type: 'string',
+      enum: ['base', 'base-sepolia', 'ethereum-sepolia'],
+    },
     role: { type: 'string', enum: ['provider', 'application'] },
     applications: {
       type: 'array',
@@ -170,7 +173,7 @@ const batchesSchema = {
           expires_at: { type: 'string', format: 'date-time' },
           application_id: applicationIdSchema,
           version: { type: 'string', enum: ['2.0.0'] },
-          chainId: { type: 'string', enum: ['0x14a34', '0x2105'] },
+          chainId: { type: 'string', enum: ['0x14a34', '0x2105', '0xaa36a7'] },
           status: { type: 'integer', enum: [100, 200, 400, 500] },
           atomic: { type: 'boolean', enum: [true] },
           receipts: { type: 'array', items: walletCallsReceiptSchema },
@@ -271,6 +274,28 @@ export async function registerRuntimeConfigurationRoutes(
           status: {
             type: 'string',
             enum: ['unprovisioned', 'needs-funding', 'provisioned'],
+          },
+          execution_funding: {
+            type: 'object',
+            description:
+              'Most recent background check of network fee balances and refill constraints. This observation does not authorize spending and expires after 30 seconds.',
+            additionalProperties: false,
+            required: ['status', 'message'],
+            properties: {
+              status: {
+                type: 'string',
+                enum: [
+                  'checking',
+                  'ready',
+                  'replenishing',
+                  'needs-funding',
+                  'limit-reached',
+                  'unavailable',
+                ],
+              },
+              message: { type: 'string' },
+              checked_at: { type: 'string', format: 'date-time' },
+            },
           },
           funding_address: { type: 'string' },
           paymaster: { type: 'string' },

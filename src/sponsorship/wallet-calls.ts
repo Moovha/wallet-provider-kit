@@ -58,6 +58,7 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
   private cursor = 0;
   private settlementCursor = 0;
   private nextSettlementAt = 0;
+  private settling?: Promise<boolean>;
   constructor(
     private readonly actions: SupportedActions,
     private readonly database: ProviderDatabase,
@@ -595,7 +596,10 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
         current.stage = stage;
     });
   }
-  async runOnce(snapshot?: readonly UserOperationBatch[]): Promise<void> {
+  async runOnce(
+    snapshot?: readonly UserOperationBatch[],
+    settlement = true,
+  ): Promise<void> {
     const entries = (
       snapshot ??
       (await this.actions.onboarding.store.transaction((s) =>
@@ -693,25 +697,38 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
       return running;
     });
     await Promise.allSettled(work);
-    // Settlement is independent of account admission and receives one bounded rotating slot.
+    if (settlement) await this.settleOnce(entries);
+  }
+  /** Observe historical inclusion separately so finality reads cannot hold an admission worker. */
+  async settleOnce(snapshot?: readonly UserOperationBatch[]): Promise<boolean> {
+    if (this.settling || Date.now() < this.nextSettlementAt) return false;
+    const running = this.settle(snapshot).finally(() => {
+      if (this.settling === running) this.settling = undefined;
+    });
+    this.settling = running;
+    return running;
+  }
+  private async settle(snapshot?: readonly UserOperationBatch[]) {
+    const entries =
+      snapshot ??
+      (await this.actions.onboarding.store.transaction((state) =>
+        Object.values(state.userOperationBatches ?? {}),
+      ));
     const included = entries.filter(
-      (e) =>
-        e.stage === 'included' &&
-        !selected.some(
-          (head) =>
-            head.entry.metadata.sender.toLowerCase() ===
-            e.metadata.sender.toLowerCase(),
-        ),
+      (entry) =>
+        entry.configurationHash === this.configurationHash &&
+        entry.stage === 'included' &&
+        !this.lanes.has(entry.metadata.sender.toLowerCase()),
     );
-    if (included.length && Date.now() >= this.nextSettlementAt) {
-      this.nextSettlementAt = Date.now() + 15000;
-      const entry = included[this.settlementCursor++ % included.length];
-      try {
-        await this.process(entry);
-      } catch {
-        /* A read failure retains the historical inclusion and reservations. */
-      }
+    if (!included.length) return false;
+    this.nextSettlementAt = Date.now() + 15000;
+    const entry = included[this.settlementCursor++ % included.length];
+    try {
+      await this.process(entry);
+    } catch {
+      /* A read failure retains the historical inclusion and reservations. */
     }
+    return true;
   }
   private schedule(delay: number) {
     if (this.stopped) return;
@@ -746,6 +763,7 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
     if (this.timer) clearTimeout(this.timer);
     this.timer = undefined;
     await this.running;
+    await this.settling;
     await Promise.allSettled([...this.lanes.values()]);
   }
 }

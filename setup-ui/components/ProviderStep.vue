@@ -48,11 +48,14 @@ const model = defineModel<ProviderConfiguration>({ required: true });
     :value="model.network ?? 'base-sepolia'"
     @change="
       model.network = ($event.target as HTMLSelectElement).value as
-        'base' | 'base-sepolia'
+        'base' | 'base-sepolia' | 'ethereum-sepolia'
     "
   >
     <option value="base">Base mainnet (8453)</option>
     <option value="base-sepolia">Base Sepolia testnet (84532)</option>
+    <option value="ethereum-sepolia">
+      Ethereum Sepolia testnet (11155111)
+    </option>
   </select>
   <p class="help-text">
     Keep test and live networks in separate installations. Mainnet uses real

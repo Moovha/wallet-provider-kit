@@ -1,5 +1,8 @@
-import { createBundlerRpc } from './wpk-bundler-rpc.mjs';
-import { createBundlerSimulations } from './wpk-bundler-simulations.mjs';
+import { createBundlerRpc, bundlerNetworkProfile } from './wpk-bundler-rpc.mjs';
+import {
+  createBundlerSimulations,
+  estimateNativeUserOperationGas,
+} from './wpk-bundler-simulations.mjs';
 import { createServer } from 'node:http';
 import { readFile, readdir, writeFile, rename } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
@@ -83,8 +86,25 @@ const server = createServer(async (request, response) => {
         body: data,
         signal: AbortSignal.timeout(15000),
       });
-      const payload = await reply.text();
+      let payload = await reply.text();
       if (payload.length > 262144) throw Error();
+      if (
+        app.config.chainId === '0xaa36a7' &&
+        body.method === 'eth_estimateUserOperationGas' &&
+        reply.ok
+      ) {
+        const result = JSON.parse(payload);
+        if (result.result && !result.error) {
+          result.result = await estimateNativeUserOperationGas({
+            operation: body.params[0],
+            estimate: result.result,
+            entryPoint: app.config.entryPoint,
+            request: (method, params) =>
+              app.rpc({ jsonrpc: '2.0', id: body.id, method, params }),
+          });
+          payload = JSON.stringify(result);
+        }
+      }
       response.writeHead(reply.status).end(payload);
     } finally {
       app.inFlight--;
@@ -207,8 +227,7 @@ async function refreshApplications() {
         port,
         'safe-mode': false,
         'refilling-wallets': false,
-        'chain-type': 'op-stack',
-        'block-time': 2000,
+        ...bundlerNetworkProfile(config.chainId),
         'min-bundle-interval': 25,
         'max-bundle-interval': 100,
         'block-polling-interval': 250,
@@ -219,6 +238,7 @@ async function refreshApplications() {
         'redis-key-prefix': 'safe-wallet-' + config.applicationId,
         'mempool-pop-batch-size': 10,
         'max-bundle-count': 1,
+        'max-resubmits': 3,
         'max-gas-per-bundle': '6000000',
         'max-gas-per-user-op': '1000000',
         'mempool-max-queued-ops': 10,
@@ -233,7 +253,7 @@ async function refreshApplications() {
         ['/app/src/esm/cli/alto.js', 'run', '--config', path],
         { stdio: 'ignore' },
       );
-      const application = { config, port, proxy, child, inFlight: 0 };
+      const application = { config, port, proxy, child, rpc, inFlight: 0 };
       applications.set(config.applicationId, application);
       const failed = () => {
         applications.delete(config.applicationId);

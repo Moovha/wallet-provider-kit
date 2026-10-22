@@ -16,7 +16,7 @@ const config = ref<ProviderConfiguration>();
 const origin = ref('https://localhost'),
   name = ref('Wallet service'),
   privacy = ref('https://localhost/privacy');
-const network = ref<'base' | 'base-sepolia'>('base');
+const network = ref<'base' | 'base-sepolia' | 'ethereum-sepolia'>('base');
 const valid = computed(
   () =>
     !!name.value.trim() &&
@@ -228,6 +228,7 @@ function openAdvanced() {
             >Network<select v-model="network">
               <option value="base">Base</option>
               <option value="base-sepolia">Base Sepolia</option>
+              <option value="ethereum-sepolia">Ethereum Sepolia</option>
             </select></label
           >
         </details>

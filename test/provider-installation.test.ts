@@ -97,3 +97,16 @@ it('resumes preparation using retained credentials instead of generating replace
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+it('initializes Ethereum Sepolia with its own genesis and keeps execution disabled', () => {
+  const config = installationConfiguration({
+    ...options,
+    network: 'ethereum-sepolia',
+  });
+  expect(config.network).toBe('ethereum-sepolia');
+  expect(config.safeWallet?.genesisHash).toBe(
+    '0x25a5cc106eea7138acab33231d7160d69cb777ee0c2c553fcddf5138993e6dd9',
+  );
+  expect(config.activation.enabled).toBe(false);
+  expect(config.policy.applications).toEqual([]);
+});

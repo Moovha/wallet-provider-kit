@@ -1,4 +1,16 @@
 import { WalletProviderError } from '../domain/signing.js';
+import { AsyncLocalStorage } from 'node:async_hooks';
+
+const backgroundReads = new AsyncLocalStorage<boolean>();
+export function isBackgroundRpcRead() {
+  return backgroundReads.getStore() === true;
+}
+/** Historical observation yields endpoint capacity to current requests without changing read freshness. */
+export function runWithBackgroundRpcReads<T>(
+  work: () => Promise<T>,
+): Promise<T> {
+  return backgroundReads.run(true, work);
+}
 
 const transportScopes = new WeakMap<typeof fetch, typeof fetch>();
 export function rpcTransportScope(transport: typeof fetch): typeof fetch {
@@ -86,6 +98,7 @@ export class RpcCapacity {
   retryAfter = 0;
   readonly maximumConcurrentReads = 8;
   private active = 0;
+  private backgroundActive = 0;
   private readFailures = 0;
   private lastReadFailure = -Infinity;
   recordReadFailure() {
@@ -104,17 +117,34 @@ export class RpcCapacity {
   private readonly waiting: {
     resume: () => void;
     timer: ReturnType<typeof setTimeout>;
+    background: boolean;
   }[] = [];
   get readPressure() {
-    return this.active + this.waiting.length;
+    // Historical waiters yield to current work and do not occupy its routing capacity.
+    return (
+      this.active +
+      (isBackgroundRpcRead()
+        ? this.waiting.length
+        : this.waiting.filter((entry) => !entry.background).length)
+    );
   }
   async run<T>(work: () => Promise<T>): Promise<T> {
-    if (this.active >= this.maximumConcurrentReads) {
-      if (this.waiting.length >= 64)
+    const background = isBackgroundRpcRead();
+    if (
+      this.active >= this.maximumConcurrentReads ||
+      (background && this.backgroundActive >= 2) ||
+      this.waiting.some((entry) => !entry.background)
+    ) {
+      if (
+        this.waiting.length >= 64 ||
+        (background &&
+          this.waiting.filter((entry) => entry.background).length >= 32)
+      )
         throw new WalletProviderError('wallet_provider_unavailable', 'unknown');
       await new Promise<void>((resolve, reject) => {
         const entry = {
           resume: resolve,
+          background,
           timer: setTimeout(() => {
             const index = this.waiting.indexOf(entry);
             if (index >= 0) this.waiting.splice(index, 1);
@@ -125,15 +155,30 @@ export class RpcCapacity {
         };
         this.waiting.push(entry);
       });
-    } else this.active++;
+    } else {
+      this.active++;
+      if (background) this.backgroundActive++;
+    }
     try {
       return await work();
     } finally {
-      const next = this.waiting.shift();
-      if (next) {
-        clearTimeout(next.timer);
-        next.resume();
-      } else this.active--;
+      this.active--;
+      if (background) this.backgroundActive--;
+      this.resumeWaiting();
+    }
+  }
+  private resumeWaiting() {
+    while (this.active < this.maximumConcurrentReads && this.waiting.length) {
+      let index = this.waiting.findIndex((entry) => !entry.background);
+      if (index < 0) {
+        if (this.backgroundActive >= 2) return;
+        index = 0;
+      }
+      const [next] = this.waiting.splice(index, 1);
+      clearTimeout(next.timer);
+      this.active++;
+      if (next.background) this.backgroundActive++;
+      next.resume();
     }
   }
 }

@@ -1,3 +1,4 @@
+import { readUserOperationLogs } from '../execution/user-operation-logs.js';
 import { RpcReadScheduler } from '../execution/rpc-read-scheduler.js';
 import { rpcTransportScope } from '../execution/rpc-capacity.js';
 import { RpcEndpointPool } from '../execution/rpc-pool.js';
@@ -62,17 +63,14 @@ type VerifiedReceipt = {
 };
 const verifiedReceipts = new WeakMap<
   typeof fetch,
-  Map<string, { value: VerifiedReceipt; expiresAt: number }>
+  Map<string, { value: VerifiedReceipt }>
 >();
 /** Independent canonical EntryPoint evidence, including per-operation log boundaries inside a shared bundle. */
 export class UserOperationReceiptObserver {
   private readonly readers: RpcReader[];
   private readonly pool?: RpcEndpointPool;
   private readonly acceptance: Safe4337Acceptance;
-  private readonly proofs: Map<
-    string,
-    { value: VerifiedReceipt; expiresAt: number }
-  >;
+  private readonly proofs: Map<string, { value: VerifiedReceipt }>;
   private readonly reads: RpcReadScheduler;
   constructor(
     acceptance: Safe4337Acceptance,
@@ -210,7 +208,8 @@ export class UserOperationReceiptObserver {
       this.acceptance.aggregateReads &&
       this.acceptance.rpcVerification === 'single' &&
       this.proofs.get(proofKey);
-    if (cached && cached.expiresAt > Date.now()) {
+    // Receipt contents are immutable; every reuse still verifies the canonical block hash.
+    if (cached) {
       const block = object(
         await this.reads.block(cached.value.receipt.blockNumber),
       );
@@ -437,7 +436,6 @@ export class UserOperationReceiptObserver {
         this.proofs.delete(this.proofs.keys().next().value!);
       this.proofs.set(proofKey, {
         value: structuredClone(verified),
-        expiresAt: Date.now() + 120000,
       });
     }
     return verified;
@@ -583,18 +581,19 @@ export class UserOperationReceiptObserver {
       : await Promise.all(
           readers.map(async (r) => {
             if (to < from) return [] as string[];
-            const logs = await r.call('eth_getLogs', [
-              {
-                address: this.acceptance.entryPoint.address,
-                fromBlock: toQuantity(from),
-                toBlock: toQuantity(to),
-                topics: [
-                  entryPointV07Interface.getEvent('UserOperationEvent')!
-                    .topicHash,
-                  plan.userOperationHash,
-                ],
-              },
-            ]);
+            const filter = {
+              address: this.acceptance.entryPoint.address,
+              fromBlock: toQuantity(from),
+              toBlock: toQuantity(to),
+              topics: [
+                entryPointV07Interface.getEvent('UserOperationEvent')!
+                  .topicHash,
+                plan.userOperationHash,
+              ] as [string, string],
+            };
+            const logs = await (this.acceptance.aggregateReads
+              ? readUserOperationLogs(r, filter)
+              : r.call('eth_getLogs', [filter]));
             if (!Array.isArray(logs) || logs.length > 8) unavailable();
             return logs.map((l) => hash(object(l).transactionHash));
           }),

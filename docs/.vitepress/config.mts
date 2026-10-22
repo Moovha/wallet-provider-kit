@@ -45,6 +45,7 @@ export default defineConfig({
     'dist/**',
     'coverage/**',
     'artifacts/**',
+    'internal-testing/**',
     'local-adapters/**',
   ],
   rewrites,

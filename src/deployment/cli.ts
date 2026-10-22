@@ -241,9 +241,9 @@ export async function setupCommand(args: string[]): Promise<boolean> {
         'Installation settings are supplied through non-secret environment variables.',
       ]);
     const selectedNetwork = process.env.WPK_NETWORK ?? 'base';
-    if (!['base', 'base-sepolia'].includes(selectedNetwork))
+    if (!['base', 'base-sepolia', 'ethereum-sepolia'].includes(selectedNetwork))
       throw new ConfigurationError([
-        'WPK_NETWORK must be base or base-sepolia.',
+        'WPK_NETWORK must be base, base-sepolia or ethereum-sepolia.',
       ]);
     const { initializeInstallation } = await import('./installation.js');
     const { reused } = await initializeInstallation(
@@ -253,7 +253,7 @@ export async function setupCommand(args: string[]): Promise<boolean> {
         name: process.env.WPK_NAME ?? 'Wallet provider',
         origin: process.env.WPK_ORIGIN ?? 'https://localhost',
         privacyUrl: process.env.WPK_PRIVACY_URL ?? 'https://localhost/privacy',
-        network: selectedNetwork as 'base' | 'base-sepolia',
+        network: selectedNetwork as import('../networks.js').ProviderNetwork,
         ...(process.env.WPK_LOCAL === 'true'
           ? { localOrigin: 'http://127.0.0.1:8080' }
           : {}),

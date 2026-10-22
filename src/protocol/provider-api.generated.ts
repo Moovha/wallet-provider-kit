@@ -2128,7 +2128,7 @@ export interface operations {
                             /** @enum {string} */
                             profile: "safe-1.4.1";
                             /** @enum {string} */
-                            chain_id: "eip155:8453" | "eip155:84532";
+                            chain_id: "eip155:8453" | "eip155:84532" | "eip155:11155111";
                             address: string;
                             /** @enum {string} */
                             status: "prepared" | "pending" | "ready" | "unknown";
@@ -2732,7 +2732,7 @@ export interface operations {
                 content: {
                     "application/json": {
                         /** @enum {string} */
-                        chain_id?: "eip155:8453" | "eip155:84532";
+                        chain_id?: "eip155:8453" | "eip155:84532" | "eip155:11155111";
                         /** @enum {string} */
                         source: "application_record" | "vendor_verification" | "application_attestation";
                         evaluation_only: boolean;
@@ -2928,7 +2928,7 @@ export interface operations {
                                 version: "1";
                                 enabled: boolean;
                                 /** @enum {string} */
-                                chain_id: "eip155:84532" | "eip155:8453";
+                                chain_id: "eip155:84532" | "eip155:8453" | "eip155:11155111";
                                 contracts: {
                                     address: string;
                                     code_hash: string;
@@ -5163,6 +5163,20 @@ export interface operations {
                                     status: "supported";
                                 };
                             };
+                            "0xaa36a7"?: {
+                                applicationAction?: {
+                                    /** @enum {boolean} */
+                                    supported: true;
+                                };
+                                paymasterService?: {
+                                    /** @enum {boolean} */
+                                    supported: true;
+                                };
+                                atomic: {
+                                    /** @enum {string} */
+                                    status: "supported";
+                                };
+                            };
                         };
                         error?: {
                             code: number;
@@ -5246,6 +5260,14 @@ export interface operations {
                         profile: "safe-only-4337-v1";
                         /** @enum {string} */
                         status: "unprovisioned" | "needs-funding" | "provisioned";
+                        /** @description Most recent background check of network fee balances and refill constraints. This observation does not authorize spending and expires after 30 seconds. */
+                        execution_funding?: {
+                            /** @enum {string} */
+                            status: "checking" | "ready" | "replenishing" | "needs-funding" | "limit-reached" | "unavailable";
+                            message: string;
+                            /** Format: date-time */
+                            checked_at?: string;
+                        };
                         funding_address?: string;
                         paymaster?: string;
                     };
@@ -6068,7 +6090,7 @@ export interface operations {
                                 billing_owner: "application";
                             }[] | {
                                 /** @enum {string} */
-                                chain_id: "eip155:8453" | "eip155:84532";
+                                chain_id: "eip155:8453" | "eip155:84532" | "eip155:11155111";
                                 funding_agreement: string;
                                 maximum_gas_budget_wei: string;
                                 /** @enum {string} */
@@ -6314,7 +6336,7 @@ export interface operations {
                                 billing_owner: "application";
                             }[] | {
                                 /** @enum {string} */
-                                chain_id: "eip155:8453" | "eip155:84532";
+                                chain_id: "eip155:8453" | "eip155:84532" | "eip155:11155111";
                                 funding_agreement: string;
                                 maximum_gas_budget_wei: string;
                                 /** @enum {string} */
@@ -6573,7 +6595,7 @@ export interface operations {
                             billing_owner: "application";
                         }[] | {
                             /** @enum {string} */
-                            chain_id: "eip155:8453" | "eip155:84532";
+                            chain_id: "eip155:8453" | "eip155:84532" | "eip155:11155111";
                             funding_agreement: string;
                             maximum_gas_budget_wei: string;
                             /** @enum {string} */
@@ -6823,7 +6845,7 @@ export interface operations {
                             billing_owner: "application";
                         }[] | {
                             /** @enum {string} */
-                            chain_id: "eip155:8453" | "eip155:84532";
+                            chain_id: "eip155:8453" | "eip155:84532" | "eip155:11155111";
                             funding_agreement: string;
                             maximum_gas_budget_wei: string;
                             /** @enum {string} */
@@ -7078,7 +7100,7 @@ export interface operations {
                             billing_owner: "application";
                         }[] | {
                             /** @enum {string} */
-                            chain_id: "eip155:8453" | "eip155:84532";
+                            chain_id: "eip155:8453" | "eip155:84532" | "eip155:11155111";
                             funding_agreement: string;
                             maximum_gas_budget_wei: string;
                             /** @enum {string} */
@@ -7328,7 +7350,7 @@ export interface operations {
                             billing_owner: "application";
                         }[] | {
                             /** @enum {string} */
-                            chain_id: "eip155:8453" | "eip155:84532";
+                            chain_id: "eip155:8453" | "eip155:84532" | "eip155:11155111";
                             funding_agreement: string;
                             maximum_gas_budget_wei: string;
                             /** @enum {string} */
@@ -7541,7 +7563,7 @@ export interface operations {
                     expected_revision: string;
                     value: {
                         /** @enum {string} */
-                        chain_id: "eip155:8453" | "eip155:84532";
+                        chain_id: "eip155:8453" | "eip155:84532" | "eip155:11155111";
                         funding_agreement: string;
                         maximum_gas_budget_wei: string;
                         /** @enum {string} */
@@ -7591,7 +7613,7 @@ export interface operations {
                             billing_owner: "application";
                         }[] | {
                             /** @enum {string} */
-                            chain_id: "eip155:8453" | "eip155:84532";
+                            chain_id: "eip155:8453" | "eip155:84532" | "eip155:11155111";
                             funding_agreement: string;
                             maximum_gas_budget_wei: string;
                             /** @enum {string} */
@@ -7841,7 +7863,7 @@ export interface operations {
                             billing_owner: "application";
                         }[] | {
                             /** @enum {string} */
-                            chain_id: "eip155:8453" | "eip155:84532";
+                            chain_id: "eip155:8453" | "eip155:84532" | "eip155:11155111";
                             funding_agreement: string;
                             maximum_gas_budget_wei: string;
                             /** @enum {string} */
@@ -8058,7 +8080,7 @@ export interface operations {
                 content: {
                     "application/json": {
                         /** @enum {string} */
-                        network?: "base" | "base-sepolia";
+                        network?: "base" | "base-sepolia" | "ethereum-sepolia";
                         /** @enum {string} */
                         role: "provider" | "application";
                         applications: {
@@ -8085,7 +8107,7 @@ export interface operations {
                                     version: "1";
                                     enabled: boolean;
                                     /** @enum {string} */
-                                    chain_id: "eip155:84532" | "eip155:8453";
+                                    chain_id: "eip155:84532" | "eip155:8453" | "eip155:11155111";
                                     contracts: {
                                         address: string;
                                         code_hash: string;
@@ -8210,7 +8232,7 @@ export interface operations {
                                     version: "1";
                                     enabled: boolean;
                                     /** @enum {string} */
-                                    chain_id: "eip155:84532" | "eip155:8453";
+                                    chain_id: "eip155:84532" | "eip155:8453" | "eip155:11155111";
                                     contracts: {
                                         address: string;
                                         code_hash: string;
@@ -8342,7 +8364,7 @@ export interface operations {
                                     version: "1";
                                     enabled: boolean;
                                     /** @enum {string} */
-                                    chain_id: "eip155:84532" | "eip155:8453";
+                                    chain_id: "eip155:84532" | "eip155:8453" | "eip155:11155111";
                                     contracts: {
                                         address: string;
                                         code_hash: string;
@@ -8652,7 +8674,7 @@ export interface operations {
                             /** @enum {string} */
                             version: "2.0.0";
                             /** @enum {string} */
-                            chainId: "0x14a34" | "0x2105";
+                            chainId: "0x14a34" | "0x2105" | "0xaa36a7";
                             /** @enum {integer} */
                             status: 100 | 200 | 400 | 500;
                             /** @enum {boolean} */
@@ -9093,7 +9115,7 @@ export interface operations {
                                 version: "1";
                                 enabled: boolean;
                                 /** @enum {string} */
-                                chain_id: "eip155:84532" | "eip155:8453";
+                                chain_id: "eip155:84532" | "eip155:8453" | "eip155:11155111";
                                 contracts: {
                                     address: string;
                                     code_hash: string;
@@ -9416,7 +9438,7 @@ export interface operations {
                                 version: "1";
                                 enabled: boolean;
                                 /** @enum {string} */
-                                chain_id: "eip155:84532" | "eip155:8453";
+                                chain_id: "eip155:84532" | "eip155:8453" | "eip155:11155111";
                                 contracts: {
                                     address: string;
                                     code_hash: string;
@@ -9739,7 +9761,7 @@ export interface operations {
                                 version: "1";
                                 enabled: boolean;
                                 /** @enum {string} */
-                                chain_id: "eip155:84532" | "eip155:8453";
+                                chain_id: "eip155:84532" | "eip155:8453" | "eip155:11155111";
                                 contracts: {
                                     address: string;
                                     code_hash: string;
@@ -10049,7 +10071,7 @@ export interface operations {
                         version: "1";
                         enabled: boolean;
                         /** @enum {string} */
-                        chain_id: "eip155:84532" | "eip155:8453";
+                        chain_id: "eip155:84532" | "eip155:8453" | "eip155:11155111";
                         contracts: {
                             address: string;
                             code_hash: string;
@@ -10179,7 +10201,7 @@ export interface operations {
                             version: "1";
                             enabled: boolean;
                             /** @enum {string} */
-                            chain_id: "eip155:84532" | "eip155:8453";
+                            chain_id: "eip155:84532" | "eip155:8453" | "eip155:11155111";
                             contracts: {
                                 address: string;
                                 code_hash: string;
@@ -10493,7 +10515,7 @@ export interface operations {
                             version: "1";
                             enabled: boolean;
                             /** @enum {string} */
-                            chain_id: "eip155:84532" | "eip155:8453";
+                            chain_id: "eip155:84532" | "eip155:8453" | "eip155:11155111";
                             contracts: {
                                 address: string;
                                 code_hash: string;
@@ -10815,7 +10837,7 @@ export interface operations {
                             version: "1";
                             enabled: boolean;
                             /** @enum {string} */
-                            chain_id: "eip155:84532" | "eip155:8453";
+                            chain_id: "eip155:84532" | "eip155:8453" | "eip155:11155111";
                             contracts: {
                                 address: string;
                                 code_hash: string;
@@ -11124,7 +11146,7 @@ export interface operations {
                         version: "1";
                         enabled: boolean;
                         /** @enum {string} */
-                        chain_id: "eip155:84532" | "eip155:8453";
+                        chain_id: "eip155:84532" | "eip155:8453" | "eip155:11155111";
                         contracts: {
                             address: string;
                             code_hash: string;
@@ -11254,7 +11276,7 @@ export interface operations {
                             version: "1";
                             enabled: boolean;
                             /** @enum {string} */
-                            chain_id: "eip155:84532" | "eip155:8453";
+                            chain_id: "eip155:84532" | "eip155:8453" | "eip155:11155111";
                             contracts: {
                                 address: string;
                                 code_hash: string;

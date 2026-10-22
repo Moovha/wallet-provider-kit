@@ -13,3 +13,8 @@ export function createBundlerRpc(
   configuration: () => BundlerRpcConfiguration,
   request?: typeof fetch,
 ): (body: BundlerRpcRequest) => Promise<Record<string, unknown>>;
+
+export function bundlerNetworkProfile(chainId: string): {
+  'chain-type': 'default' | 'op-stack';
+  'block-time': number;
+};

@@ -1,4 +1,10 @@
 import {
+  infrastructureFundingPlan,
+  fundingMessages,
+  InfrastructureFundingUnavailable,
+  type FundingObservation,
+} from './infrastructure-funding.js';
+import {
   createSafeRecoveryManifest,
   predictSafeAddress,
   type SafeRecoveryManifest,
@@ -12,7 +18,10 @@ import {
   safeModuleSetup,
 } from '../provisioning/atomic-safe.js';
 import { moduleSetupAction, moduleSetupCallData } from './account-setup.js';
-import { bindRpcTransport } from '../execution/rpc-capacity.js';
+import {
+  bindRpcTransport,
+  runWithBackgroundRpcReads,
+} from '../execution/rpc-capacity.js';
 import { createWalletAttemptRequest } from '../providers/attempt-lifecycle.js';
 import { applicationGasBudgetId } from './budget.js';
 import { randomUUID } from 'node:crypto';
@@ -170,9 +179,12 @@ const pending = () =>
 export class SafeWalletRuntime {
   private readonly locks = new Map<string, Promise<unknown>>();
   private readonly drivers = new Map<string, UserOperationWalletCallsDriver>();
+  private readonly fundingObservations = new Map<string, FundingObservation>();
   private walletTimer?: ReturnType<typeof setTimeout>;
   private walletWakeAt = Infinity;
   private walletTick?: Promise<void>;
+  private settlement?: Promise<void>;
+  private settlementCursor = 0;
   private readonly walletRuns = new Map<
     UserOperationWalletCallsDriver,
     Promise<void>
@@ -193,13 +205,31 @@ export class SafeWalletRuntime {
     for (const driver of this.drivers.values()) {
       if (this.walletRuns.has(driver)) continue;
       const running = driver
-        .runOnce(snapshot)
+        .runOnce(snapshot, false)
         .catch(() => undefined)
         .finally(() => {
           if (this.walletRuns.get(driver) === running)
             this.walletRuns.delete(driver);
         });
       this.walletRuns.set(driver, running);
+    }
+    // Share overlapping historical reads in a bounded batch; endpoint priority preserves admission capacity.
+    if (!this.settlement) {
+      const drivers = [...this.drivers.values()];
+      const cohort = Array.from(
+        { length: Math.min(10, drivers.length) },
+        () => drivers[this.settlementCursor++ % drivers.length],
+      );
+      const running = runWithBackgroundRpcReads(async () => {
+        await Promise.allSettled(
+          cohort.map((driver) => driver.settleOnce(snapshot)),
+        );
+      })
+        .catch(() => undefined)
+        .finally(() => {
+          if (this.settlement === running) this.settlement = undefined;
+        });
+      this.settlement = running;
     }
   }
   private scheduleWallets(delay: number) {
@@ -536,6 +566,7 @@ export class SafeWalletRuntime {
         application_id: applicationId,
         chain_id: this.network.caip,
         profile: 'safe-only-4337-v1',
+        execution_funding: this.fundingObservation(applicationId),
         status: infrastructure?.paymaster
           ? 'provisioned'
           : infrastructure
@@ -583,7 +614,7 @@ export class SafeWalletRuntime {
         spent + reserved >
         BigInt(this.config.safeWallet!.maximumSetupCostWei)
       )
-        deny();
+        throw new InfrastructureFundingUnavailable('limit-reached');
       const inflight = infra.transactions.filter((t) => !t.included);
       const limit = agreement.maximum_in_flight_per_sponsor ?? 10;
       if (
@@ -596,7 +627,7 @@ export class SafeWalletRuntime {
         0n,
       );
       if (BigInt(String(balance)) < held + reserved)
-        throw new WalletProviderError('wallet_provider_unavailable');
+        throw new InfrastructureFundingUnavailable('needs-funding');
       const observed = BigInt(String(pendingNonce));
       const tail = infra.transactions.reduce(
         (n, t) => Math.max(n, t.nonce + 1),
@@ -960,7 +991,38 @@ export class SafeWalletRuntime {
     }
   }
 
+  private fundingObservation(applicationId: string): FundingObservation {
+    const saved = this.fundingObservations.get(applicationId);
+    return saved?.checked_at &&
+      Date.now() - Date.parse(saved.checked_at) <= 30000
+      ? structuredClone(saved)
+      : { status: 'checking', message: fundingMessages.checking };
+  }
+  private fundingObserved(
+    applicationId: string,
+    status: FundingObservation['status'],
+  ) {
+    this.fundingObservations.set(applicationId, {
+      status,
+      message: fundingMessages[status],
+      checked_at: new Date().toISOString(),
+    });
+  }
   private async replenish(applicationId: string) {
+    try {
+      await this.replenishBalances(applicationId);
+      this.fundingObserved(applicationId, 'ready');
+    } catch (error) {
+      this.fundingObserved(
+        applicationId,
+        error instanceof InfrastructureFundingUnavailable
+          ? error.reason
+          : 'unavailable',
+      );
+      throw error;
+    }
+  }
+  private async replenishBalances(applicationId: string) {
     await this.recoverSetup(applicationId);
     let infrastructure = await this.current(applicationId);
     const reader = await this.reader(applicationId);
@@ -996,7 +1058,38 @@ export class SafeWalletRuntime {
         ]),
       ),
     )[0] as bigint;
+    const executorBalance = BigInt(
+      String(
+        await reader.call('eth_getBalance', [
+          infrastructure.executor.address,
+          'latest',
+        ]),
+      ),
+    );
     const target = BigInt(this.config.safeWallet!.paymasterDepositWei);
+    const executorTarget = BigInt(this.config.safeWallet!.executorBalanceWei);
+    if (deposit >= target && executorBalance >= executorTarget) return;
+    const fundingBalance = await reader.call('eth_getBalance', [
+      infrastructure.fundingAddress,
+      'pending',
+    ]);
+    const remaining =
+      BigInt(this.config.safeWallet!.maximumSetupCostWei) -
+      infrastructure.transactions.reduce(
+        (sum, t) => sum + BigInt(t.maximumCostWei),
+        0n,
+      );
+    const plan = infrastructureFundingPlan({
+      deposit,
+      depositTarget: BigInt(this.config.safeWallet!.paymasterDepositWei),
+      executor: BigInt(String(executorBalance)),
+      executorTarget: BigInt(this.config.safeWallet!.executorBalanceWei),
+      funding: BigInt(String(fundingBalance)),
+      allowance: remaining > 0n ? remaining : 0n,
+    });
+    this.fundingObserved(applicationId, plan.status);
+    if (plan.status === 'needs-funding' || plan.status === 'limit-reached')
+      throw new InfrastructureFundingUnavailable(plan.status);
     if (deposit < target)
       await this.send(
         applicationId,
@@ -1010,15 +1103,18 @@ export class SafeWalletRuntime {
           value: (target - deposit).toString(),
         },
       );
-    const balance = BigInt(
-      String(
-        await reader.call('eth_getBalance', [
-          infrastructure.executor.address,
-          'latest',
-        ]),
-      ),
-    );
-    const executorTarget = BigInt(this.config.safeWallet!.executorBalanceWei);
+    // A deposit transaction can take several blocks while the executor spends.
+    const balance =
+      deposit < target
+        ? BigInt(
+            String(
+              await reader.call('eth_getBalance', [
+                infrastructure.executor.address,
+                'latest',
+              ]),
+            ),
+          )
+        : executorBalance;
     if (balance < executorTarget)
       await this.send(
         applicationId,
@@ -1758,7 +1854,7 @@ export class SafeWalletRuntime {
         maximumVerificationGas: '0x186a0',
         maximumPostOpGas: '0xc350',
         maximumCostWei: agreement.maximum_gas_budget_wei,
-        l1FeeReserveWei: '1000000000000',
+        l1FeeReserveWei: sponsorshipGas(agreement).l1FeeReserveWei,
         authorize: (request) => signing.authorizeLocalPaymaster(request),
         sign: async (hash, request) => {
           await signing.authorizeLocalPaymaster(request);
@@ -1792,7 +1888,7 @@ export class SafeWalletRuntime {
           url: localPaymasterUrl,
           maximumVerificationGas: '0x186a0',
           maximumPostOpGas: '0xc350',
-          l1FeeReserveWei: '1000000000000',
+          l1FeeReserveWei: sponsorshipGas(agreement).l1FeeReserveWei,
         },
       },
       {
@@ -2057,10 +2153,15 @@ export class SafeWalletRuntime {
           Object.keys(r.safeWalletInfrastructure ?? {}),
         )
           .then(async (ids) => {
-            for (const id of ids)
-              await this.exclusive(id, async () => {
-                await this.replenish(id);
-              });
+            for (const id of ids) {
+              try {
+                await this.exclusive(id, async () => {
+                  await this.replenish(id);
+                });
+              } catch {
+                /* Each application's funding observation retains its own failure. */
+              }
+            }
           })
           .catch(() => undefined)
           .finally(() => {
@@ -2079,6 +2180,7 @@ export class SafeWalletRuntime {
     await this.walletTick;
     await Promise.allSettled([...this.walletRuns.values()]);
     await this.replenishing;
+    await this.settlement;
     await Promise.all(
       [...this.drivers.values()].map((driver) => driver.stop()),
     );

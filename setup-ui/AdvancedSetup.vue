@@ -8,6 +8,7 @@ import {
   shallowRef,
   watch,
 } from 'vue';
+import { providerNetwork } from '../src/networks';
 import type { FormKitNode } from '@formkit/core';
 import type { ApiContract } from './api-reference';
 
@@ -40,8 +41,13 @@ const referenceLoading = ref(false);
 const token = window.location.hash.slice(1);
 window.history.replaceState(null, '', window.location.pathname);
 const config = ref<ProviderConfiguration>();
+const networkLabel = computed(() => {
+  const network = providerNetwork(config.value?.network);
+  return network.testnet ? network.label : network.label + ' mainnet';
+});
 watch(
   () => [
+    config.value?.network,
     config.value?.policy.provider.origin,
     config.value?.authorizationServer !== undefined,
     config.value?.runtimeConfiguration?.operators.map(
@@ -341,10 +347,7 @@ function enableDocumentation() {
     </aside>
     <main>
       <header class="topbar">
-        <span class="badge"
-          >{{ config?.network === 'base' ? 'Base mainnet' : 'Base Sepolia' }} ·
-          experimental</span
-        >
+        <span class="badge">{{ networkLabel }} · experimental</span>
         <div class="topbar-actions">
           <div class="view-switch" role="group" aria-label="Workspace view">
             <button

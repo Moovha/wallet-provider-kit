@@ -44,7 +44,7 @@ experience and keeps developer requests available in expandable sections.
 
 [Test the connection](staging-walkthrough.md), arrange [backups](provider-maintenance.md)
 and complete the [launch checks](conformance.md). The toolkit is experimental:
-it supports one active host and Base or Base Sepolia. Production custody and
+it supports one active host per deployment on Base, Base Sepolia or Ethereum Sepolia. Production custody and
 funded mainnet acceptance remain pending.
 
 ## Find help for your task

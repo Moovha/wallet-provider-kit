@@ -250,7 +250,7 @@ execution flow. Each user receives their own Safe address for deposits and calls
 
 The current version, **0.1.0**, is experimental and available from source rather
 than npm. You can configure account access and provisioning, and execute approved
-Safe contract calls, swaps and vault deposits on **Base mainnet or Base Sepolia**.
+Safe contract calls, swaps and vault deposits on **Base mainnet, Base Sepolia or Ethereum Sepolia**.
 Start with the [setup guide](docs/README.md); application connection follows deployment.
 
 Your first deployment stays disabled while you test your backend, application
@@ -288,7 +288,7 @@ helps you test it with your own services.
 An authorization signature, transaction submission, verified chain result and
 business settlement describe different outcomes. Applications fund the verifying
 paymaster and private bundler for the [Safe execution flow](docs/user-operation-execution.md).
-Select Base mainnet or Base Sepolia and complete acceptance for the selected chain.
+Select Base mainnet, Base Sepolia or Ethereum Sepolia and complete acceptance for the selected chain. Use a separate deployment and storage for each network.
 Applications use the account wallet endpoint; no raw-signature endpoint is exposed.
 
 ## Extend the service

@@ -1,3 +1,4 @@
+import { currentRuntimePolicy } from '../runtime-configuration/authority.js';
 import { ManagementService } from '../management/service.js';
 import { createManagementAuthorizationServer } from '../management/authorization.js';
 import { SafeWalletRuntime } from '../sponsorship/safe-wallet.js';
@@ -227,12 +228,23 @@ export async function createConfiguredProvider(
           if (record.revision !== activeRevision) record.status = 'denied';
         }
         for (const grant of Object.values(state.grants)) {
+          let actionPolicyCurrent = true;
+          if (grant.permissions.includes('contracts:request')) {
+            try {
+              const expected = onboarding!.runtimeContracts
+                ? fingerprint([
+                    actionPolicyRevision,
+                    currentRuntimePolicy(state, grant.caller),
+                  ])
+                : actionPolicyRevision;
+              actionPolicyCurrent = grant.actionPolicyRevision === expected;
+            } catch {
+              actionPolicyCurrent = false;
+            }
+          }
           if (
             grant.revision !== onboarding!.policy.revision ||
-            (grant.permissions.some((permission) =>
-              ['contracts:request'].includes(permission),
-            ) &&
-              grant.actionPolicyRevision !== actionPolicyRevision)
+            !actionPolicyCurrent
           )
             grant.state = 'revoked';
         }

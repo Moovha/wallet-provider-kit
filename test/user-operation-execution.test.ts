@@ -184,7 +184,21 @@ async function setup(
     )
       result = { number: '0x64', hash: '0x' + 'f'.repeat(64) };
     else if (method === 'eth_getLogs')
-      result = s.included ? [{ transactionHash: txHash }] : [];
+      result = s.included
+        ? [
+            {
+              transactionHash: txHash,
+              address: f.config.acceptance.entryPoint.address,
+              topics: [
+                ep.getEvent('UserOperationEvent')!.topicHash,
+                signedUserOperationHash(
+                  s.operation!,
+                  f.config.acceptance.domain,
+                ),
+              ],
+            },
+          ]
+        : [];
     else if (method === 'eth_getTransactionReceipt')
       result = s.included ? evidence().receipt : null;
     else if (method === 'eth_getTransactionByHash')
@@ -606,6 +620,18 @@ it('reuses an exact receipt proof while checking canonicality and isolating chan
   expect(methods).not.toContain('eth_getTransactionReceipt');
   expect(methods).not.toContain('eth_getTransactionByHash');
   expect(methods).toContain('eth_getBlockByNumber');
+  const clock = vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 121000);
+  try {
+    methods.length = 0;
+    expect((await observer.observe(plan, '10000000', txHash)).receipt).toEqual(
+      first.receipt,
+    );
+    expect(methods).not.toContain('eth_getTransactionReceipt');
+    expect(methods).not.toContain('eth_getTransactionByHash');
+    expect(methods).toContain('eth_getBlockByNumber');
+  } finally {
+    clock.mockRestore();
+  }
   await expect(observer.observe(plan, '1', txHash)).rejects.toThrow();
   t.s.reorg = true;
   expect(

@@ -425,7 +425,7 @@ export async function registerOnboardingRoutes(
             properties: {
               chain_id: {
                 type: 'string',
-                enum: ['eip155:8453', 'eip155:84532'],
+                enum: ['eip155:8453', 'eip155:84532', 'eip155:11155111'],
               },
               source: {
                 type: 'string',

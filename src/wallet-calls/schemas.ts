@@ -226,6 +226,33 @@ export const rpcResponseSchema = {
                 },
               },
             },
+            '0xaa36a7': {
+              type: 'object',
+              additionalProperties: false,
+              required: ['atomic'],
+              properties: {
+                applicationAction: {
+                  type: 'object',
+                  additionalProperties: false,
+                  required: ['supported'],
+                  properties: { supported: { type: 'boolean', enum: [true] } },
+                },
+                paymasterService: {
+                  type: 'object',
+                  additionalProperties: false,
+                  required: ['supported'],
+                  properties: { supported: { type: 'boolean', enum: [true] } },
+                },
+                atomic: {
+                  type: 'object',
+                  additionalProperties: false,
+                  required: ['status'],
+                  properties: {
+                    status: { type: 'string', enum: ['supported'] },
+                  },
+                },
+              },
+            },
           },
         },
       ],

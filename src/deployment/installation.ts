@@ -17,7 +17,7 @@ export interface InstallationOptions {
   name: string;
   origin: string;
   privacyUrl: string;
-  network?: 'base' | 'base-sepolia';
+  network?: ProviderConfiguration['network'];
   localOrigin?: string;
 }
 /** Infrastructure defaults have no connected applications, trusted attestations or enabled execution. */
