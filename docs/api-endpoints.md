@@ -192,6 +192,26 @@ See whether administration is available, which applications are registered and w
 
 [`GET /v1/provider/status`](http-reference.md#get-v1-provider-status) — request body, permissions, effects and response details.
 
+### Review the networks your service offers
+
+See saved network choices and whether a restart is needed to apply them.
+
+**Who uses it:** Service operator.
+
+**When you need it:** Use the Networks page in administration, or this request for management tools.
+
+[`GET /v1/provider/networks`](http-reference.md#get-v1-provider-networks) — request body, permissions, effects and response details.
+
+### Choose the networks your service offers
+
+Save network choices while preserving the default used by existing applications.
+
+**Who uses it:** Service operator.
+
+**When you need it:** Use when adding or removing a network, then restart the provider to apply the saved choices.
+
+[`POST /v1/provider/networks`](http-reference.md#post-v1-provider-networks) — request body, permissions, effects and response details.
+
 ### Browse provider users
 
 Browse stored application-scoped users and their KYC evidence summaries.
@@ -517,6 +537,16 @@ Get the application’s stable funding address and setup status so its operator 
 ## Service status
 
 Check connectivity and supported features. These public reads report capabilities; they do not create wallets or enable transactions.
+
+### Choose a wallet network
+
+Discover the networks offered by this instance and its default for existing integrations.
+
+**Who uses it:** Application developer.
+
+**When you need it:** Read before presenting a network choice or configuring an application’s network services.
+
+[`GET /v1/networks`](http-reference.md#get-v1-networks) — request body, permissions, effects and response details.
 
 ### Check the service connection
 

@@ -196,7 +196,7 @@ describe('pinned ERC-4337 v0.7 preparation', () => {
     expect(() =>
       userOperationHashV07(operation(), {
         ...domain,
-        chainId: '0x1' as '0x14a34',
+        chainId: '0x2' as '0x14a34',
       }),
     ).toThrow();
     expect(() =>

@@ -333,17 +333,20 @@ it('does not treat a positive gateway error with malformed revert data as an EVM
   expect(f.calls.filter((c) => c.method === 'eth_call')).toHaveLength(2);
 });
 
-it('uses native Ethereum fees on Sepolia and keeps Base rollup accounting explicit', () => {
-  expect(bundlerNetworkProfile('0xaa36a7')).toEqual({
-    'chain-type': 'default',
-    'block-time': 12000,
-  });
-  for (const chain of ['0x14a34', '0x2105'])
+it.each(['0x1', '0xaa36a7'])(
+  'uses native Ethereum fees on %s and keeps Base rollup accounting explicit',
+  (chain) => {
     expect(bundlerNetworkProfile(chain)).toEqual({
-      'chain-type': 'op-stack',
-      'block-time': 2000,
+      'chain-type': 'default',
+      'block-time': 12000,
     });
-  expect(() => bundlerNetworkProfile('0x1')).toThrow(
-    'Unsupported private bundler chain',
-  );
-});
+    for (const chain of ['0x14a34', '0x2105'])
+      expect(bundlerNetworkProfile(chain)).toEqual({
+        'chain-type': 'op-stack',
+        'block-time': 2000,
+      });
+    expect(() => bundlerNetworkProfile('0x2')).toThrow(
+      'Unsupported private bundler chain',
+    );
+  },
+);

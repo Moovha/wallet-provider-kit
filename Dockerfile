@@ -5,8 +5,7 @@ COPY package.json package-lock.json .npmrc ./
 RUN npm ci --ignore-scripts
 COPY tsconfig.json ./
 COPY src ./src
-COPY setup-ui ./setup-ui
-COPY scripts/setup-notices.mjs scripts/clean-build.mjs scripts/copy-management-assets.mjs ./scripts/
+COPY scripts/clean-build.mjs scripts/copy-management-assets.mjs ./scripts/
 COPY spec/provider-config.schema.json ./spec/
 RUN npm run build
 RUN npm prune --omit=dev --ignore-scripts

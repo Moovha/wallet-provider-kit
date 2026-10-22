@@ -109,6 +109,7 @@ export interface OnboardingPolicy {
   access?: { maxAgeDays?: number; mode?: 'application' | 'hosted' };
 }
 export interface ResolvedPolicy extends OnboardingPolicy {
+  readonly consentRevision?: string;
   currentApplication?: (principal: VerifiedPrincipal) => ApplicationPolicy;
   identity: {
     maxAgeDays: number;
@@ -293,6 +294,7 @@ export interface ProviderState {
       network?: import('../networks.js').ProviderNetwork;
       activeRevision?: string;
       transportRevision?: string;
+      networkSetRevision?: string;
       managementInstallationId?: string;
       accessMode?: 'application' | 'hosted';
       runtimeConfiguration?: import('../runtime-configuration/service.js').RuntimeConfigurationState;

@@ -102,6 +102,7 @@ export class OnboardingService {
         principal: VerifiedPrincipal,
       ): import('./types.js').ApplicationPolicy;
     },
+    consentNetwork?: import('../networks.js').ProviderNetwork,
   ) {
     const resolved = defineOnboardingPolicy(input);
     if (
@@ -174,6 +175,27 @@ export class OnboardingService {
         });
       }
       this.policy = Object.freeze(livePolicy);
+    }
+    if (consentNetwork) {
+      const identityPolicy = this.policy;
+      this.policy = Object.freeze(
+        Object.defineProperty(
+          Object.defineProperties(
+            {},
+            Object.getOwnPropertyDescriptors(identityPolicy),
+          ),
+          'consentRevision',
+          {
+            enumerable: true,
+            get: () =>
+              fingerprint([
+                'network-consent-v1',
+                consentNetwork,
+                identityPolicy.revision,
+              ]),
+          },
+        ),
+      ) as import('./types.js').ResolvedPolicy;
     }
     this.adapters = new Map(
       adapters.map((a) => [
@@ -608,7 +630,7 @@ export class OnboardingService {
     application(this.policy, principal);
     return {
       flow: this.policy.access.mode,
-      policy_revision: this.policy.revision,
+      policy_revision: this.policy.consentRevision ?? this.policy.revision,
       ...(this.actionPolicyRevision
         ? {
             action_policy_revision: this.actionPolicyRevision,

@@ -27,10 +27,17 @@ export function credentialMetadata(
 /** Application and revision authenticated encryption prevents cross-application substitution. */
 export class ApplicationCredentialCipher {
   private readonly key: Buffer;
-  constructor(key: string) {
+  constructor(
+    key: string,
+    networkScope?: import('../networks.js').ProviderNetwork,
+  ) {
     this.key = Buffer.from(key, 'base64');
     if (this.key.length !== 32 || this.key.toString('base64') !== key)
       throw new WalletProviderError('wallet_provider_configuration');
+    if (networkScope)
+      this.key = createHmac('sha256', this.key)
+        .update('network-credentials-v1:' + networkScope)
+        .digest();
   }
   digest(value: unknown) {
     return createHmac('sha256', this.key)

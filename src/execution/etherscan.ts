@@ -16,7 +16,9 @@ export function etherscanEndpoint(value: string): URL | undefined {
       return;
     if (
       [...u.searchParams.keys()].sort().join(',') !== 'apikey,chainid' ||
-      !['8453', '84532', '11155111'].includes(u.searchParams.get('chainid')!) ||
+      !['8453', '84532', '1', '11155111'].includes(
+        u.searchParams.get('chainid')!,
+      ) ||
       !/^[A-Za-z0-9_-]{8,256}$/.test(u.searchParams.get('apikey')!)
     )
       return;

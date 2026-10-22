@@ -37,8 +37,9 @@ let token = '',
   expiresAt = 0,
   generation = 0;
 const el = (id) => document.getElementById(id);
-function message(value) {
+function message(value, error = false) {
   el('message').textContent = value;
+  el('message').dataset.kind = error ? 'error' : 'status';
 }
 async function api(path, method = 'GET', data, authorized = true) {
   const started = generation;
@@ -111,7 +112,7 @@ function run(action) {
     try {
       await action(event);
     } catch (error) {
-      message(error.message);
+      message(error.message, true);
     } finally {
       if (button instanceof HTMLButtonElement) button.disabled = false;
     }
@@ -471,13 +472,61 @@ function renderWalletSharing(article, record, identities, checks) {
     await refresh();
   });
 }
+function renderNetworks(settings) {
+  const root = el('network-settings');
+  root.replaceChildren();
+  const form = node('form', undefined, root);
+  const selected = new Map();
+  for (const network of settings.available) {
+    const label = node('label', undefined, form),
+      input = node('input', undefined, label);
+    input.type = 'checkbox';
+    input.checked = settings.networks.includes(network.network);
+    input.disabled = network.network === settings.default_network;
+    label.append(
+      document.createTextNode(
+        network.name + (input.disabled ? ' · default' : ''),
+      ),
+    );
+    selected.set(network.network, input);
+  }
+  node(
+    'p',
+    'Your default stays unchanged for existing applications. New networks start with wallet operations disabled and need their own transaction rules and fee funding.',
+    form,
+  );
+  node(
+    'p',
+    settings.restart_required
+      ? 'Saved changes are waiting. Ask the service operator to restart the provider to apply them. Current wallets continue using the running settings until then.'
+      : 'Saved network choices match the running service.',
+    form,
+  );
+  const button = node('button', 'Save network choices', form);
+  button.className = 'primary';
+  form.onsubmit = run(async () => {
+    const networks = [...selected]
+      .filter(([, input]) => input.checked)
+      .map(([network]) => network);
+    const saved = await api('/v1/provider/networks', 'POST', {
+      expected_revision: settings.revision,
+      networks,
+    });
+    renderNetworks(saved);
+    message('Network choices saved. Restart the provider to apply changes.');
+  });
+}
 async function refresh() {
-  const [status, identities, checks] = await Promise.all([
-    api('/v1/provider/status'),
-    api('/v1/provider/identities'),
-    api('/v1/provider/user-checks'),
-  ]);
+  const status = await api('/v1/provider/status');
+  const identities = [...status.applications, ...status.management_identities];
+  const checks = status.user_checks;
+  const networkSettings = status.network_settings;
+  const networks = {
+    default_network: networkSettings.default_network,
+    networks: status.network_status,
+  };
   renderUserChecks(checks);
+  renderNetworks(networkSettings);
   el('status-cards').replaceChildren();
   for (const [label, value] of [
     ['Service administration', 'Available'],
@@ -490,6 +539,27 @@ async function refresh() {
     const c = node('div', label, el('status-cards'));
     c.className = 'card';
     node('strong', value, c);
+  }
+  for (const network of networks.networks ?? []) {
+    const card = node(
+      'div',
+      network.name +
+        (network.network === networks.default_network ? ' · default' : ''),
+      el('status-cards'),
+    );
+    card.className = 'card';
+    node(
+      'strong',
+      network.configured
+        ? 'Wallet operations enabled'
+        : 'Wallet operations disabled',
+      card,
+    );
+    node(
+      'p',
+      'Shared user checks. Separate wallets, application approvals and fee funding.',
+      card,
+    );
   }
   for (const [container, records] of [
     ['application-list', identities.filter((i) => i.role === 'application')],

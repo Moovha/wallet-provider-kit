@@ -162,21 +162,12 @@ for code, issues and contributions. Documentation links should take readers to
 the relevant guide or heading. Check their anchors after renaming a section;
 check logos, navigation and contrast in both themes and at phone width.
 
-### Maintain wizard screenshots
+### Maintain administration screenshots
 
-The six wizard-step images and local API reference use invented Acme settings
-without secrets. The deployed explorer image uses an offline HTTP fixture with
-no backend and readiness disabled. To update these images, run `npm run build`
-and `node scripts/capture-setup-docs.mjs` after installing the repository's
-Playwright Chromium. The script uses loopback fixtures, performs no vendor calls
-and writes PNGs under ignored `artifacts/setup-docs/`.
-The local setup progress image uses injected offline command responses and
-ephemeral private files. It executes no Docker commands, database DDL or provider
-calls. Label it as an offline fixture rather than evidence of a running service.
-
-Review the images against the interface, then update the WebP copies in
-`docs/public/screenshots/`. Screenshots document the interface; they do not
-establish vendor connectivity or deployment acceptance.
+Use ephemeral offline fixtures for browser captures of the running administration
+console and API explorer. Keep captures in ignored `artifacts/` or
+`internal-testing/` until reviewed. Public screenshots may contain invented data
+only and do not establish provider connectivity or deployment acceptance.
 
 ## Submit and review
 

@@ -1,6 +1,6 @@
 /** Select fee accounting from the server-bound chain, never from an application request. */
 export function bundlerNetworkProfile(chainId) {
-  if (chainId === '0xaa36a7')
+  if (chainId === '0xaa36a7' || chainId === '0x1')
     return { 'chain-type': 'default', 'block-time': 12000 };
   if (chainId === '0x14a34' || chainId === '0x2105')
     return { 'chain-type': 'op-stack', 'block-time': 2000 };

@@ -1,3 +1,4 @@
+import { providerNetwork, type ProviderNetwork } from '../networks.js';
 import {
   createHash,
   randomBytes,
@@ -47,6 +48,7 @@ export interface ManagementState {
   claimHash: string;
   claimExpiresAt: number;
   claimed: boolean;
+  networkSettings?: { revision: number; networks: ProviderNetwork[] };
   userChecks?: { revision: number; settings: UserCheckSettings };
   identities: Record<string, ManagedIdentity>;
 }
@@ -78,6 +80,9 @@ export class ManagementService {
     readonly issuer: string,
     private readonly basePolicy: import('../onboarding/types.js').OnboardingPolicy,
     private readonly now = Date.now,
+    private readonly accountNetwork?: (
+      id: string,
+    ) => import('../networks.js').ProviderNetwork | undefined,
   ) {}
   async initialize(claim: string) {
     if (!/^[A-Za-z0-9_-]{43,128}$/.test(claim)) invalid();
@@ -252,6 +257,7 @@ export class ManagementService {
               ? [
                   {
                     account_id: account.id,
+                    network: this.accountNetwork?.(account.id),
                     wallet: walletDescription(account),
                     role,
                     status: account.status,
@@ -298,6 +304,10 @@ export class ManagementService {
       return {
         installation_id: state.installationId,
         claimed: true,
+        management_identities: Object.values(state.identities)
+          .filter((identity) => identity.role !== 'application')
+          .map(publicIdentity),
+        user_checks: this.userChecks(state),
         applications: Object.values(state.identities)
           .filter((i) => i.role === 'application')
           .map(publicIdentity),
@@ -401,6 +411,85 @@ export class ManagementService {
       const result = this.userChecks(state);
       commands[commandKey] = { hash: digest, result, at: this.now() };
       return result;
+    });
+  }
+  storedNetworks(): ProviderNetwork[] | undefined {
+    return this.snapshot()?.networkSettings?.networks.slice();
+  }
+  networkSettings(
+    principal: VerifiedPrincipal,
+    current: readonly ProviderNetwork[],
+  ) {
+    this.assertOperator(principal);
+    return structuredClone(
+      this.snapshot()?.networkSettings ?? {
+        revision: 1,
+        networks: [...current],
+      },
+    );
+  }
+  async saveNetworks(
+    principal: VerifiedPrincipal,
+    key: string,
+    input: { expected_revision: number; networks: ProviderNetwork[] },
+    current: readonly ProviderNetwork[],
+  ) {
+    if (
+      !uuid.test(key) ||
+      !Number.isInteger(input.expected_revision) ||
+      input.expected_revision < 1 ||
+      !Array.isArray(input.networks) ||
+      input.networks.length < 1 ||
+      input.networks.length > 4 ||
+      new Set(input.networks).size !== input.networks.length ||
+      !input.networks.includes(current[0])
+    )
+      invalid();
+    for (const network of input.networks) {
+      try {
+        providerNetwork(network);
+      } catch {
+        invalid();
+      }
+    }
+    const digest = hash(JSON.stringify(['networks', input]));
+    return this.store.transaction((state) => {
+      const management = this.state(state);
+      this.assertOperator(principal, management);
+      const commands = (state.managementCommands ??= {}),
+        commandKey = hash(principal.clientId + ':' + key);
+      for (const [id, command] of Object.entries(commands))
+        if (command.at + 86_400_000 <= this.now()) delete commands[id];
+      const previous = commands[commandKey];
+      if (previous) {
+        if (previous.hash !== digest) conflict();
+        return previous.result as {
+          revision: number;
+          networks: ProviderNetwork[];
+        };
+      }
+      if (Object.keys(commands).length >= 10000) conflict();
+      const before = management.networkSettings ?? {
+        revision: 1,
+        networks: [...current],
+      };
+      if (before.revision !== input.expected_revision) conflict();
+      const next = {
+        revision: before.revision + 1,
+        networks: [
+          current[0],
+          ...input.networks.filter((network) => network !== current[0]).sort(),
+        ],
+      };
+      management.networkSettings = next;
+      commands[commandKey] = { hash: digest, result: next, at: this.now() };
+      state.audit.push({
+        at: this.now(),
+        event: 'network_settings_saved',
+        resource: hash(management.installationId),
+        revision: String(next.revision),
+      });
+      return next;
     });
   }
   async claim(input: { claim: string; username: string; password: string }) {

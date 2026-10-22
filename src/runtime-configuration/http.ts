@@ -1,3 +1,4 @@
+import type { ResolveNetwork } from '../service/network-context.js';
 import { runtimeApplicationId } from './service.js';
 import { setAuthenticatedResponseTimeout } from '../service/response-timeout.js';
 import {
@@ -82,7 +83,7 @@ const applicationsSchema = {
   properties: {
     network: {
       type: 'string',
-      enum: ['base', 'base-sepolia', 'ethereum-sepolia'],
+      enum: ['base', 'base-sepolia', 'ethereum', 'ethereum-sepolia'],
     },
     role: { type: 'string', enum: ['provider', 'application'] },
     applications: {
@@ -173,7 +174,10 @@ const batchesSchema = {
           expires_at: { type: 'string', format: 'date-time' },
           application_id: applicationIdSchema,
           version: { type: 'string', enum: ['2.0.0'] },
-          chainId: { type: 'string', enum: ['0x14a34', '0x2105', '0xaa36a7'] },
+          chainId: {
+            type: 'string',
+            enum: ['0x14a34', '0x2105', '0x1', '0xaa36a7'],
+          },
           status: { type: 'integer', enum: [100, 200, 400, 500] },
           atomic: { type: 'boolean', enum: [true] },
           receipts: { type: 'array', items: walletCallsReceiptSchema },
@@ -230,15 +234,20 @@ export async function registerRuntimeConfigurationRoutes(
   authenticate?: Authenticate,
   walletCalls?: WalletCallsService,
   safeWallet?: import('../sponsorship/safe-wallet.js').SafeWalletRuntime,
+  resolveNetwork?: ResolveNetwork,
 ) {
-  function configured() {
-    if (!service)
+  function configured(request: FastifyRequest) {
+    const current = resolveNetwork
+      ? resolveNetwork(request).runtimeConfiguration
+      : service;
+    if (!current)
       throw Object.assign(new Error('Unavailable'), { statusCode: 503 });
-    return service;
+    return current;
   }
   async function principal(request: FastifyRequest, scope: string) {
-    if (!service || !authenticate)
+    if (!authenticate)
       throw Object.assign(new Error('Unavailable'), { statusCode: 503 });
+    configured(request);
     const caller = await authenticate(request.headers.authorization, scope);
     setAuthenticatedResponseTimeout(request);
     return caller;
@@ -304,8 +313,11 @@ export async function registerRuntimeConfigurationRoutes(
     },
     async (request) => {
       const caller = await principal(request, 'wallet:configuration:read');
-      if (safeWallet)
-        return safeWallet.read(
+      const selectedWallet = resolveNetwork
+        ? resolveNetwork(request).safeWallet
+        : safeWallet;
+      if (selectedWallet)
+        return selectedWallet.read(
           caller,
           runtimeApplicationId(caller.issuer, caller.clientId),
         );
@@ -334,7 +346,7 @@ export async function registerRuntimeConfigurationRoutes(
       }),
     },
     async (request) =>
-      configured().readCredentials(
+      configured(request).readCredentials(
         await principal(request, 'wallet:configuration:read'),
       ),
   );
@@ -348,7 +360,7 @@ export async function registerRuntimeConfigurationRoutes(
       ),
     },
     async (request) =>
-      configured().readCredentials(
+      configured(request).readCredentials(
         await principal(request, 'wallet:configuration:write'),
         request.params.applicationId,
       ),
@@ -384,7 +396,7 @@ export async function registerRuntimeConfigurationRoutes(
       },
     },
     async (request) =>
-      configured().writeCredential(
+      configured(request).writeCredential(
         await context(request, 'wallet:configuration:propose'),
         request.params.reference,
         request.body,
@@ -448,7 +460,7 @@ export async function registerRuntimeConfigurationRoutes(
       ),
     },
     async (request) =>
-      configured().readObligations(
+      configured(request).readObligations(
         await principal(request, 'wallet:configuration:read'),
       ),
   );
@@ -464,7 +476,7 @@ export async function registerRuntimeConfigurationRoutes(
       ),
     },
     async (request) =>
-      configured().readObligations(
+      configured(request).readObligations(
         await principal(request, 'wallet:configuration:write'),
         request.params.applicationId,
       ),
@@ -498,7 +510,7 @@ export async function registerRuntimeConfigurationRoutes(
         ),
       },
       async (request) =>
-        configured().submitObligation(
+        configured(request).submitObligation(
           await context(request, 'wallet:configuration:propose'),
           kind,
           request.body,
@@ -540,7 +552,7 @@ export async function registerRuntimeConfigurationRoutes(
         ),
       },
       async (request) =>
-        configured().decideObligation(
+        configured(request).decideObligation(
           await context(request, 'wallet:configuration:write'),
           request.params.applicationId,
           kind,
@@ -568,7 +580,7 @@ export async function registerRuntimeConfigurationRoutes(
           throw error;
         caller = await principal(request, 'wallet:configuration:write');
       }
-      return configured().listApplications(
+      return configured(request).listApplications(
         caller,
         request.query.application_id,
       );
@@ -588,14 +600,17 @@ export async function registerRuntimeConfigurationRoutes(
           throw error;
         caller = await principal(request, 'wallet:configuration:write');
       }
-      if (!walletCalls)
+      const selectedCalls = resolveNetwork
+        ? resolveNetwork(request).walletCalls
+        : walletCalls;
+      if (!selectedCalls)
         throw Object.assign(new Error('Unavailable'), { statusCode: 503 });
       const provider = caller.scopes.includes('wallet:configuration:write');
-      if (provider) configured().assertOperator(caller);
-      return walletCalls.list(
+      if (provider) configured(request).assertOperator(caller);
+      return selectedCalls.list(
         caller,
         provider
-          ? (state) => configured().assertOperatorState(caller, state)
+          ? (state) => configured(request).assertOperatorState(caller, state)
           : undefined,
       );
     },
@@ -639,7 +654,7 @@ export async function registerRuntimeConfigurationRoutes(
       ),
     },
     async (request) =>
-      configured().setReview(
+      configured(request).setReview(
         await context(request, 'wallet:configuration:write'),
         request.params.applicationId,
         request.body,
@@ -651,7 +666,9 @@ export async function registerRuntimeConfigurationRoutes(
       schema: schema('readRuntimeConfiguration', currentSchema),
     },
     async (request) =>
-      configured().read(await principal(request, 'wallet:configuration:read')),
+      configured(request).read(
+        await principal(request, 'wallet:configuration:read'),
+      ),
   );
   app.get<{ Params: { applicationId: string } }>(
     '/v1/provider/applications/:applicationId/policy',
@@ -661,7 +678,7 @@ export async function registerRuntimeConfigurationRoutes(
       }),
     },
     async (request) =>
-      configured().readApplication(
+      configured(request).readApplication(
         await principal(request, 'wallet:configuration:write'),
         request.params.applicationId,
       ),
@@ -674,7 +691,7 @@ export async function registerRuntimeConfigurationRoutes(
       }),
     },
     async (request) =>
-      configured().read(
+      configured(request).read(
         await principal(request, 'wallet:configuration:read'),
         request.params.revision,
       ),
@@ -689,7 +706,7 @@ export async function registerRuntimeConfigurationRoutes(
       }),
     },
     async (request) =>
-      configured().propose(
+      configured(request).propose(
         await context(request, 'wallet:configuration:propose'),
         request.body,
       ),
@@ -710,7 +727,7 @@ export async function registerRuntimeConfigurationRoutes(
           throw error;
         caller = await principal(request, 'wallet:configuration:write');
       }
-      return configured().proposal(caller, request.params.proposalId);
+      return configured(request).proposal(caller, request.params.proposalId);
     },
   );
   app.post<{
@@ -731,7 +748,7 @@ export async function registerRuntimeConfigurationRoutes(
       }),
     },
     async (request) =>
-      configured().publish(
+      configured(request).publish(
         await context(request, 'wallet:configuration:write'),
         request.params.proposalId,
         request.body.expected_revision,
@@ -748,7 +765,7 @@ export async function registerRuntimeConfigurationRoutes(
       }),
     },
     async (request) =>
-      configured().update(
+      configured(request).update(
         await context(request, 'wallet:configuration:write'),
         request.params.applicationId,
         request.body,

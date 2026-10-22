@@ -89,7 +89,7 @@ const server = createServer(async (request, response) => {
       let payload = await reply.text();
       if (payload.length > 262144) throw Error();
       if (
-        app.config.chainId === '0xaa36a7' &&
+        (app.config.chainId === '0xaa36a7' || app.config.chainId === '0x1') &&
         body.method === 'eth_estimateUserOperationGas' &&
         reply.ok
       ) {

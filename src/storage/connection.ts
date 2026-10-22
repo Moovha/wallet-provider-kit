@@ -1,3 +1,5 @@
+import { scopedCollection } from './network-scope.js';
+import { providerNetwork, type ProviderNetwork } from '../networks.js';
 import { constants, closeSync, lstatSync, mkdirSync, openSync } from 'node:fs';
 import { isAbsolute, join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
@@ -9,6 +11,9 @@ type StorageValue = string | number | bigint | null;
 type StorageRow = Record<string, StorageValue | Uint8Array>;
 
 export interface ProviderDatabaseOptions {
+  /** Additional network state shares identity and management in the same verified schema. */
+  networkScope?: ProviderNetwork;
+  expectedNetworkSetRevision?: string;
   /** Dedicated private directory on persistent local POSIX storage. */
   directory: string;
   /** Explicitly initialize an empty toolkit database. Never upgrades an existing schema. */
@@ -46,7 +51,7 @@ export class StorageConnection {
   private closed = false;
   private poisoned = false;
 
-  constructor(options: ProviderDatabaseOptions) {
+  constructor(private readonly options: ProviderDatabaseOptions) {
     if (
       !options ||
       typeof options.directory !== 'string' ||
@@ -57,6 +62,9 @@ export class StorageConnection {
     )
       throw new WalletProviderError('wallet_provider_configuration');
     let database: DatabaseSync | undefined;
+    if (options.networkScope !== undefined)
+      providerNetwork(options.networkScope);
+    this.options = Object.freeze({ ...options });
     try {
       if (!privatePath(options.directory, true)) {
         if (!options.initialize) throw new Error();
@@ -193,10 +201,26 @@ export class StorageConnection {
       return unavailable();
     }
   }
+  recordCollection(name: string) {
+    return scopedCollection(name, this.options.networkScope);
+  }
   transaction<T>(operation: () => T): T {
     if (this.closed || this.poisoned || this.db.isTransaction) unavailable();
     try {
       this.db.exec('BEGIN IMMEDIATE');
+      if (this.options.expectedNetworkSetRevision !== undefined) {
+        const host = this.get(
+          'SELECT record FROM onboarding_records WHERE collection=? AND id=?',
+          'deploymentBindings',
+          'service-v1',
+        );
+        if (
+          !host ||
+          JSON.parse(String(host.record)).networkSetRevision !==
+            this.options.expectedNetworkSetRevision
+        )
+          throw new WalletProviderError('wallet_authorization_denied');
+      }
       const value = operation();
       if (value && typeof (value as { then?: unknown }).then === 'function')
         throw new Error();

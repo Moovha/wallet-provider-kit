@@ -24,17 +24,10 @@ describe the maintainer's next development session.
 
 ## Follow the provider's setup journey
 
-Organize default installation around **Choose where to run → Review your setup →
-Start and sign in**. Explain application registration and trust after
-installation. Keep the six explicit static configuration screens documented as
-the Advanced configuration path. Keep navigation and walkthroughs consistent
-with their selected path. Link a concept where the operator encounters its setting, with deeper
-reference material available from that point.
-
-Treat application-led identity and consent as the normal setup throughout this
-journey. Explain trust agreements, evidence, grants and revocation within Applications
-and application integration. Keep staff login, hosted compatibility and embedded
-library composition clearly optional, with their own prerequisites.
+Organize installation around preparing a disabled service and opening its persistent
+administration console. Explain application registration, networks and user checks
+in administration. Describe terminal installation and static JSON configuration
+as developer paths. Link the setting or API where operators encounter it.
 
 Introduce a module through the problem it solves for the provider. Explain its
 role and the decision the operator makes, then show settings, commands or API

@@ -1,8 +1,9 @@
+import type { ResolveNetwork } from '../service/network-context.js';
 import { selectWalletGrant } from '../service/wallet-grant.js';
 import { Readable } from 'node:stream';
 import { setAuthenticatedResponseTimeout } from '../service/response-timeout.js';
 import { uuid } from '../onboarding/policy.js';
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { Authenticate } from '../service/auth.js';
 import { AuthenticationError } from '../service/auth.js';
 import { uuidSchema, problemSchema } from '../service/schemas.js';
@@ -14,8 +15,11 @@ export async function registerWalletCallsRoutes(
   app: FastifyInstance,
   service: WalletCallsService | undefined,
   authenticate: Authenticate | undefined,
-  ready: () => Promise<boolean>,
+  ready: (request?: FastifyRequest) => Promise<boolean>,
+  resolveNetwork?: ResolveNetwork,
 ) {
+  const serviceFor = (request: FastifyRequest) =>
+    resolveNetwork ? resolveNetwork(request).walletCalls : service;
   const streams = new Map<string, number>();
   let activeStreams = 0;
   const accountStreams = new Map<string, number>();
@@ -48,7 +52,8 @@ export async function registerWalletCallsRoutes(
       },
     },
     async (request, reply) => {
-      if (!service || !authenticate || !(await ready()))
+      const service = serviceFor(request);
+      if (!service || !authenticate || !(await ready(request)))
         throw Object.assign(new Error('Unavailable'), { statusCode: 503 });
       const principal = selectWalletGrant(
         await authenticate(
@@ -121,7 +126,7 @@ export async function registerWalletCallsRoutes(
                 request.headers.authorization,
                 'wallet:execute:read',
               );
-              if (!(await ready())) return;
+              if (!(await ready(request))) return;
               yield status
                 ? 'event: status\ndata: ' + JSON.stringify(status) + '\n\n'
                 : ': keepalive\n\n';
@@ -172,7 +177,8 @@ export async function registerWalletCallsRoutes(
       },
     },
     async (request) => {
-      if (!service || !authenticate || !(await ready()))
+      const service = serviceFor(request);
+      if (!service || !authenticate || !(await ready(request)))
         throw Object.assign(new Error('Unavailable'), { statusCode: 503 });
       const principal = selectWalletGrant(
         await authenticate(
@@ -219,7 +225,8 @@ export async function registerWalletCallsRoutes(
       },
     },
     async (request) => {
-      if (!service || !authenticate || !(await ready()))
+      const service = serviceFor(request);
+      if (!service || !authenticate || !(await ready(request)))
         throw Object.assign(new Error('Unavailable'), { statusCode: 503 });
       const principal = selectWalletGrant(
         await authenticate(request.headers.authorization, 'wallet:access:read'),

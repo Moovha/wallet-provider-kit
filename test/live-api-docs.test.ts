@@ -9,11 +9,10 @@ import {
   liveApiSpecification,
   liveRequestInterceptor,
 } from '../src/service/live-api-docs.js';
-import {
-  deployedExplorerUrl,
-  type ApiContract,
-} from '../setup-ui/api-reference.js';
-const contract: ApiContract = JSON.parse(
+const contract: {
+  info: { description: string };
+  paths: Record<string, Record<string, any>>;
+} = JSON.parse(
   await readFile(new URL('../spec/provider-api.json', import.meta.url), 'utf8'),
 );
 afterEach(() => vi.unstubAllGlobals());
@@ -129,23 +128,6 @@ describe('live API explorer boundaries', () => {
     expect(claim.description).toContain('private installation code');
     expect(claim.description).not.toContain('Discovery reports readiness');
     expect(live.paths['/v1/capabilities'].get.summary).toContain('[Public]');
-  });
-  it('never falls back to an example or unsafe live destination for incomplete drafts', () => {
-    expect(deployedExplorerUrl('https://wallet.example.test')).toBe(
-      'https://wallet.example.test/docs/',
-    );
-    const credentialOrigin = new URL('https://host.test');
-    credentialOrigin.username = 'fixture-user';
-    credentialOrigin.password = 'fixture-password';
-    expect(deployedExplorerUrl(credentialOrigin.href)).toBeUndefined();
-    for (const origin of [
-      '',
-      'https://wallet.example.test/',
-      'http://host.test',
-      'https://host.test/path',
-      'javascript:alert(1)',
-    ])
-      expect(deployedExplorerUrl(origin)).toBeUndefined();
   });
   it('restricts requests to this HTTPS provider, omits browser cookies and refuses redirects', async () => {
     vi.stubGlobal('location', new URL('https://wallet.example.test/docs/'));

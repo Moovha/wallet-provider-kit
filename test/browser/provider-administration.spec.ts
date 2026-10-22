@@ -94,6 +94,52 @@ test('claims, registers and manages applications through the real protected mana
       page.getByRole('heading', { name: 'Welcome to your service' }),
     ).toBeVisible();
     await expect(page.getByText('Disabled', { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Networks', exact: true }).click();
+    await expect(
+      page.getByRole('heading', { name: 'Choose your wallet networks' }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('checkbox', {
+        name: 'Base Sepolia · test network · default',
+        exact: true,
+      }),
+    ).toBeDisabled();
+    await page
+      .getByRole('checkbox', {
+        name: 'Ethereum Sepolia · test network',
+        exact: true,
+      })
+      .check();
+    await page
+      .getByRole('checkbox', { name: 'Ethereum · mainnet', exact: true })
+      .check();
+    await page
+      .getByRole('button', { name: 'Save network choices', exact: true })
+      .click();
+    await expect(page.getByRole('status')).toContainText(
+      'Network choices saved. Restart the provider',
+    );
+    expect(service.storedNetworks()).toEqual([
+      'base-sepolia',
+      'ethereum',
+      'ethereum-sepolia',
+    ]);
+    await page.screenshot({
+      path: 'internal-testing/multi-network/admin-networks.png',
+      fullPage: true,
+    });
+    await page.setViewportSize({ width: 390, height: 844 });
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+    await page.screenshot({
+      path: 'internal-testing/multi-network/admin-networks-mobile.png',
+      fullPage: false,
+    });
+    await page.setViewportSize({ width: 1440, height: 1000 });
+
     await page
       .getByRole('button', { name: 'User checks', exact: true })
       .click();

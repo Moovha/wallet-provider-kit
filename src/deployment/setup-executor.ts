@@ -289,7 +289,7 @@ async function privateDirectory(path: string) {
     );
 }
 
-/** Creates one new local deployment per wizard session. Existing stores are never replaced. */
+/** Creates one new local deployment per terminal installation. Existing stores are never replaced. */
 export function createSetupExecutor(options: SetupExecutorOptions = {}) {
   const root =
     options.root ?? join(homedir(), '.wallet-provider-kit-deployments');
@@ -355,7 +355,7 @@ export function createSetupExecutor(options: SetupExecutorOptions = {}) {
   async function prepare(input: unknown): Promise<SetupPlan> {
     if (preparing || job.state !== 'idle')
       failure(
-        'A setup is already prepared or running in this session. Open a new wizard session for another deployment.',
+        'A setup is already prepared or running in this session. Start a separate terminal installation for another deployment.',
       );
     preparing = true;
     plan = undefined;
@@ -365,7 +365,7 @@ export function createSetupExecutor(options: SetupExecutorOptions = {}) {
       assertSafeWalletConfiguration(config);
       if (config.activation.enabled)
         failure(
-          'Turn off Enable wallet operations in Deployment before starting a new local setup.',
+          'Set activation.enabled to false before starting a new local installation.',
         );
       if (
         !['darwin', 'linux'].includes(process.platform) ||
@@ -480,7 +480,7 @@ export function createSetupExecutor(options: SetupExecutorOptions = {}) {
     } catch (error) {
       if (error instanceof ConfigurationError) throw error;
       failure(
-        'Local Docker setup is unavailable. Install and start Docker with Compose, select its local context, and run the wizard from a source checkout. You can still download configuration.',
+        'Local Docker setup is unavailable. Install and start Docker with Compose, select its local context, and run local-setup from a built source checkout.',
       );
     } finally {
       preparing = false;
@@ -762,7 +762,7 @@ function setupInstructions(
   const command = `${shell(executable)} --host ${shell(endpoint)} compose --env-file /dev/null --file ${shell(join(plan.directory, 'compose.json'))} --project-name ${plan.project}`;
   return `# Local wallet service
 
-This deployment uses the toolkit Docker image, private host storage and a restart policy. Docker must remain running. Closing the wizard does not stop the container. Wallet operations are disabled.
+This deployment uses the toolkit Docker image, private host storage and a restart policy. Docker must remain running. Closing the terminal does not stop the container. Wallet operations are disabled.
 
 Host API: http://127.0.0.1:${plan.port}
 Configured HTTPS origin: ${plan.config.policy.provider.origin}

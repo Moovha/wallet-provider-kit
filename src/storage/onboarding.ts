@@ -1,3 +1,6 @@
+import { sharedCollections, scopedCollection } from './network-scope.js';
+export { scopedCollection } from './network-scope.js';
+import { providerNetwork, type ProviderNetwork } from '../networks.js';
 import type { OnboardingStore, ProviderState } from '../onboarding/types.js';
 import type { StorageConnection } from './connection.js';
 
@@ -24,6 +27,18 @@ const collections = [
   'sessions',
   'logins',
 ] as const;
+
+function knownCollection(value: string) {
+  if (collections.includes(value as (typeof collections)[number])) return true;
+  const [network, collection, extra] = value.split(':');
+  if (extra || sharedCollections.has(collection)) return false;
+  try {
+    providerNetwork(network as ProviderNetwork);
+  } catch {
+    return false;
+  }
+  return collections.includes(collection as (typeof collections)[number]);
+}
 
 /** Hydrate a row only when read; nested changes are compared before committing. */
 function lazyJson(target: object, key: string, load: () => string) {
@@ -62,6 +77,8 @@ function lazyJson(target: object, key: string, load: () => string) {
 
 export function sqliteOnboardingStore(
   connection: StorageConnection,
+  network?: ProviderNetwork,
+  allNetworkAccounts = false,
 ): OnboardingStore {
   return {
     async transaction<T>(operation: (state: ProviderState) => T): Promise<T> {
@@ -72,42 +89,50 @@ export function sqliteOnboardingStore(
         } as unknown as ProviderState;
         const previous = new Set<string>();
         const encode = new Map<string, ReturnType<typeof lazyJson>>();
-        for (const row of connection.all(
-          'SELECT DISTINCT collection FROM onboarding_records',
-        ))
-          if (
-            !collections.includes(
-              String(row.collection) as (typeof collections)[number],
-            )
-          )
-            throw new Error();
+        const sources = new Map<string, string>();
+        const present = connection
+          .all('SELECT DISTINCT collection FROM onboarding_records')
+          .map((row) => String(row.collection));
+        for (const collection of present)
+          if (!knownCollection(collection)) throw new Error();
         const loaded = new Set<string>();
         const loaders = new Map<string, () => void>();
         for (const collection of collections) {
+          const physicalCollections =
+            allNetworkAccounts &&
+            ['accounts', 'requests', 'grants'].includes(collection)
+              ? [
+                  collection,
+                  ...present.filter((name) => name.endsWith(':' + collection)),
+                ]
+              : [scopedCollection(collection, network)];
           let value: object;
           const load = () => {
             if (loaded.has(collection)) return;
             loaded.add(collection);
             value = Object.create(null);
-            for (const row of connection.all(
-              'SELECT id FROM onboarding_records WHERE collection=?',
-              collection,
-            )) {
-              const key = JSON.stringify([collection, row.id]);
-              encode.set(
-                key,
-                lazyJson(value, String(row.id), () => {
-                  const record = connection.get(
-                    'SELECT record FROM onboarding_records WHERE collection=? AND id=?',
-                    collection,
-                    String(row.id),
-                  );
-                  if (typeof record?.record !== 'string') throw new Error();
-                  return record.record;
-                }),
-              );
-              previous.add(key);
-            }
+            for (const physical of physicalCollections)
+              for (const row of connection.all(
+                'SELECT id FROM onboarding_records WHERE collection=?',
+                physical,
+              )) {
+                const key = JSON.stringify([collection, row.id]);
+                if (sources.has(key)) throw new Error();
+                sources.set(key, physical);
+                encode.set(
+                  key,
+                  lazyJson(value, String(row.id), () => {
+                    const record = connection.get(
+                      'SELECT record FROM onboarding_records WHERE collection=? AND id=?',
+                      physical,
+                      String(row.id),
+                    );
+                    if (typeof record?.record !== 'string') throw new Error();
+                    return record.record;
+                  }),
+                );
+                previous.add(key);
+              }
           };
           const get = () => {
             load();
@@ -219,7 +244,7 @@ export function sqliteOnboardingStore(
             if (!cell || cell.original() !== encoded)
               connection.run(
                 'INSERT INTO onboarding_records(collection,id,record) VALUES(?,?,?) ON CONFLICT(collection,id) DO UPDATE SET record=excluded.record',
-                collection,
+                sources.get(key) ?? scopedCollection(collection, network),
                 id,
                 encoded,
               );
@@ -230,7 +255,7 @@ export function sqliteOnboardingStore(
           const [collection, id] = JSON.parse(key) as string[];
           connection.run(
             'DELETE FROM onboarding_records WHERE collection=? AND id=?',
-            collection,
+            sources.get(key) ?? scopedCollection(collection, network),
             id,
           );
         }
@@ -239,7 +264,7 @@ export function sqliteOnboardingStore(
           : [])
           connection.run(
             'INSERT INTO onboarding_audit(record) VALUES(?)',
-            JSON.stringify(event),
+            JSON.stringify(network ? { ...event, network } : event),
           );
         return detached;
       });

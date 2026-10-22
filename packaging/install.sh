@@ -44,7 +44,7 @@ docker --host "$provider_endpoint" run --rm --network none --read-only --cap-dro
   --user "$(id -u):$(id -g)" --mount "type=bind,source=$provider_dir,target=/config" \
   --env "WPK_HOST_DIRECTORY=$provider_dir" --env "WPK_API_IMAGE=$api_image" --env "WPK_BUNDLER_IMAGE=$bundler_image" \
   --env "WPK_NAME=$provider_name" --env "WPK_ORIGIN=$provider_origin" --env "WPK_PRIVACY_URL=$provider_privacy" \
-  --env "WPK_LOCAL=$provider_local" --env "WPK_NETWORK=${WPK_NETWORK:-base}" \
+  --env "WPK_LOCAL=$provider_local" --env "WPK_NETWORK=${WPK_NETWORK:-base}" --env "WPK_ADDITIONAL_NETWORKS=${WPK_ADDITIONAL_NETWORKS:-}" \
   "$api_image" node dist/main.js install-init
 compose=(docker --host "$provider_endpoint" compose --env-file /dev/null --file "$provider_dir/compose.json")
 "${compose[@]}" pull

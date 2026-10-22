@@ -1,3 +1,4 @@
+import { providerNetwork, type ProviderNetwork } from '../networks.js';
 import { ensureAssetBudget } from './asset-budgets.js';
 export { assetBudgetId } from './asset-budgets.js';
 import { sqliteSponsorshipStore } from './sponsorship.js';
@@ -11,7 +12,7 @@ import {
   StorageConnection,
   type ProviderDatabaseOptions,
 } from './connection.js';
-import { sqliteOnboardingStore } from './onboarding.js';
+import { sqliteOnboardingStore, scopedCollection } from './onboarding.js';
 import {
   admission,
   reconcileAttempt,
@@ -43,8 +44,47 @@ export type { DatabaseEnrollmentOptions } from './enrollment.js';
 
 /** Opt-in toolkit-owned SQLite database. Initialization never activates a wallet backend. */
 export function openProviderDatabase(options: ProviderDatabaseOptions) {
+  options = Object.freeze({ ...options });
   const connection = new StorageConnection(options);
   return {
+    networkScope: options.networkScope,
+    hasResource(id: string) {
+      return !!connection.get(
+        'SELECT 1 FROM onboarding_records WHERE id=? AND collection IN (?,?,?) LIMIT 1',
+        id,
+        ...['accounts', 'requests', 'grants'].map((collection) =>
+          scopedCollection(collection, options.networkScope),
+        ),
+      );
+    },
+    /** Operator transactions can revoke grants atomically across retained networks. */
+    managementStore: sqliteOnboardingStore(connection, undefined, true),
+    accountNetwork(id: string): ProviderNetwork | undefined {
+      const rows = connection.all(
+        'SELECT collection FROM onboarding_records WHERE id=? AND collection IN (?,?,?,?,?)',
+        id,
+        'accounts',
+        'base:accounts',
+        'base-sepolia:accounts',
+        'ethereum:accounts',
+        'ethereum-sepolia:accounts',
+      );
+      if (rows.length > 1)
+        throw new WalletProviderError('wallet_provider_configuration');
+      if (!rows.length) return undefined;
+      if (rows[0].collection !== 'accounts')
+        return providerNetwork(
+          String(rows[0].collection).split(':')[0] as ProviderNetwork,
+        ).name;
+      const binding = connection.get(
+        'SELECT record FROM onboarding_records WHERE collection=? AND id=?',
+        'deploymentBindings',
+        'service-v1',
+      );
+      return providerNetwork(
+        binding ? JSON.parse(String(binding.record)).network : undefined,
+      ).name;
+    },
     managementSnapshot():
       import('../management/service.js').ManagementState | undefined {
       const row = connection.get(
@@ -54,13 +94,18 @@ export function openProviderDatabase(options: ProviderDatabaseOptions) {
       );
       return row ? JSON.parse(String(row.record)) : undefined;
     },
-    onboardingStore: sqliteOnboardingStore(connection),
+    onboardingStore: sqliteOnboardingStore(connection, options.networkScope),
     sponsorship: sqliteSponsorshipStore(connection),
     journal: sqliteJournal(connection),
     ready: () => connection.ready(),
     close: () => connection.close(),
     /** Read-only ownership guard before assigning an empty toolkit store to a configured service. */
     async hasStoredRecords() {
+      if (options.networkScope)
+        return !!connection.get(
+          'SELECT 1 FROM onboarding_records WHERE collection LIKE ? LIMIT 1',
+          options.networkScope + ':%',
+        );
       return !!connection.get(`SELECT 1 FROM onboarding_records UNION ALL SELECT 1 FROM onboarding_audit
         UNION ALL SELECT 1 FROM budgets UNION ALL SELECT 1 FROM approvals UNION ALL SELECT 1 FROM admissions
         UNION ALL SELECT 1 FROM attempts UNION ALL SELECT 1 FROM financial_audit UNION ALL SELECT 1 FROM enrollments LIMIT 1`);
@@ -73,7 +118,7 @@ export function openProviderDatabase(options: ProviderDatabaseOptions) {
         if (configuredRevision !== undefined) {
           const binding = connection.get(
             'SELECT record FROM onboarding_records WHERE collection=? AND id=?',
-            'deploymentBindings',
+            scopedCollection('deploymentBindings', options.networkScope),
             'service-v1',
           );
           if (

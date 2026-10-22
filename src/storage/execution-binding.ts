@@ -33,7 +33,7 @@ export function bindExecutionMechanism(
   const key = identity(approval);
   const previous = connection.get(
     'SELECT record FROM onboarding_records WHERE collection=? AND id=?',
-    'executionBindings',
+    connection.recordCollection('executionBindings'),
     key,
   );
   if (previous && JSON.parse(String(previous.record)).mechanism !== mechanism)
@@ -51,7 +51,7 @@ export function bindExecutionMechanism(
   if (!previous) {
     connection.run(
       'INSERT INTO onboarding_records(collection,id,record) VALUES(?,?,?)',
-      'executionBindings',
+      connection.recordCollection('executionBindings'),
       key,
       JSON.stringify({ mechanism }),
     );

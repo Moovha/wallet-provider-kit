@@ -1,3 +1,4 @@
+import { networkConfigurations } from './network-configuration.js';
 import type { ProviderNetwork } from '../networks.js';
 import {
   bundledOAuth,
@@ -29,6 +30,13 @@ export interface ProviderConfiguration {
   management?: { claim: SecretReference; localOrigin?: string };
   safeWallet?: import('../sponsorship/safe-wallet.js').SafeWalletConfiguration;
   network?: ProviderNetwork;
+  additionalNetworks?: {
+    network: ProviderNetwork;
+    safeWallet?: ProviderConfiguration['safeWallet'];
+    safeProvisioning?: ProviderConfiguration['safeProvisioning'];
+    approvedCalls?: ProviderConfiguration['approvedCalls'];
+    activation?: ProviderConfiguration['activation'];
+  }[];
   safeProvisioning?: import('../provisioning/safe.js').SafeProvisioningConfiguration;
   runtimeConfiguration?: RuntimeConfigurationOptions;
   configVersion: 1;
@@ -332,6 +340,26 @@ export function validateProviderConfiguration(
       '/: invalid policy, integration or activation settings',
     ]);
   }
+  if (config.additionalNetworks?.length) {
+    const expanded = networkConfigurations(config);
+    if (
+      new Set(expanded.map((entry) => entry.network ?? 'base-sepolia')).size !==
+      expanded.length
+    )
+      throw new ConfigurationError([
+        '/additionalNetworks: each network must be unique, including the default',
+      ]);
+    for (const entry of expanded.slice(1)) {
+      if (
+        entry.safeWallet?.runtimeDirectory !==
+        config.safeWallet?.runtimeDirectory
+      )
+        throw new ConfigurationError([
+          '/additionalNetworks/safeWallet/runtimeDirectory: use the shared private bundler directory',
+        ]);
+      validateProviderConfiguration(entry);
+    }
+  }
   return config;
 }
 export async function loadProviderConfiguration(path: string): Promise<{
@@ -357,6 +385,9 @@ export function secretReferences(
   config: ProviderConfiguration,
 ): SecretReference[] {
   return [
+    ...(config.additionalNetworks ?? []).flatMap((entry) =>
+      entry.safeWallet ? [entry.safeWallet.bundlerAuthorization] : [],
+    ),
     ...(config.management ? [config.management.claim] : []),
     ...(config.runtimeConfiguration?.credentialKey
       ? [config.runtimeConfiguration.credentialKey]

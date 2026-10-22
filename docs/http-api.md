@@ -20,6 +20,43 @@ External-issuer deployments use their configured token endpoint instead.
 Send the token as `Authorization: Bearer …`. Tokens identify the application;
 current user approval and provider policy determine which wallet actions it can take.
 
+## Select a network
+
+Read `GET /v1/networks` to discover this instance’s default and additional networks.
+Use `Wallet-Network: ethereum-sepolia` (or another returned network name) when
+reading access requirements, submitting access requests, listing a user’s wallets
+and configuring application policies, RPC connections and fee sponsorship.
+Omitting the header preserves the instance’s default network.
+
+Account, access-request and grant IDs select their stored network automatically,
+including existing provisioning and transaction URLs. An explicit selector that
+conflicts with a stored ID is rejected. Transaction `chainId` must also match the
+wallet. Policy revisions, proposal IDs and application IDs still require the
+network selector because application registration is shared. Successful operational
+responses include `Wallet-Network`; wallet listings also include `network` and
+`chain_id` for each wallet.
+
+The same application token works across configured networks under its current
+permissions. Read the selected network’s access policy and collect independent
+wallet consent. Existing verified identity can be reused, but a grant or consent
+from another network cannot be reused as permission. See [network setup](provider-guide.md#offer-multiple-networks).
+
+The backend client accepts the same selection:
+
+```ts
+const ethereum = createWalletsClient({
+  url: 'https://wallet.example.com',
+  network: 'ethereum-sepolia',
+  authorization: applicationAuthorization,
+});
+const requirements = await ethereum.accessPolicy();
+```
+
+Import `createWalletsClient` from `@moovha/wallet-provider-kit/wallets` and supply a
+function that returns short-lived application authorization. The client sends the
+selection on its requests. `walletProvider(wallet)` also uses the wallet listing’s
+network when constructing its transaction and status-stream transport.
+
 ## 2. Obtain the person’s permission
 
 Read `GET /v1/access-policy`, complete the agreed user checks and capture consent

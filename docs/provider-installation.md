@@ -7,7 +7,7 @@ next: { 'text': 'Connect an application', 'link': '/docs/runtime-workspace' }
 
 Let’s get your service running and give you a place to manage it. You can finish
 installation with no connected applications. User checks, transaction rules and
-network-fee funding can wait until an application is ready to connect.
+network-fee funding can wait until an application is ready to connect. In administration, choose **Networks** to offer additional supported networks from the same instance. Each starts with its own disabled wallet operations and needs separate application consent and fee funding. See [multiple networks](provider-guide.md#offer-multiple-networks).
 
 The toolkit is experimental and runs on one active host with persistent local
 storage. Installation leaves wallet operations disabled. Complete the
@@ -85,12 +85,8 @@ with restrictive permissions. Keep secrets out of URLs, messages and cloud outpu
 
 </details>
 
-Source setup uses **Choose where to run → Review your setup → Start and sign in**.
-The [advanced editor](setup-wizard.md) is available for static source integrations.
-
-![Review the name, address and storage before starting installation](public/screenshots/provider-installation.png)
-
-_Example setup screen using offline configuration._
+Source installations use the terminal [local-setup command](local-setup.md) and then the administration console.
+The [configuration reference](setup.md) covers static source integrations.
 
 ## Claim administrator access
 

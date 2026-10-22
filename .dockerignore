@@ -10,10 +10,7 @@
 !spec/
 !spec/provider-config.schema.json
 !docs/
-!setup-ui/
-!setup-ui/**
 !scripts/
-!scripts/setup-notices.mjs
 !docs/public/
 
 !scripts/bundled-bundler-launcher.mjs

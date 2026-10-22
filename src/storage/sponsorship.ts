@@ -14,7 +14,7 @@ export function sqliteSponsorshipStore(connection: StorageConnection) {
     if (!uuid.test(id)) throw new WalletProviderError('wallet_provider_input');
     const row = connection.get(
       'SELECT record FROM onboarding_records WHERE collection=? AND id=?',
-      'sponsorships',
+      connection.recordCollection('sponsorships'),
       id,
     );
     return row ? JSON.parse(String(row.record)) : null;
@@ -22,7 +22,7 @@ export function sqliteSponsorshipStore(connection: StorageConnection) {
   const save = (record: SponsorshipAdmission) =>
     connection.run(
       'INSERT INTO onboarding_records(collection,id,record) VALUES(?,?,?) ON CONFLICT(collection,id) DO UPDATE SET record=excluded.record',
-      'sponsorships',
+      connection.recordCollection('sponsorships'),
       record.id,
       JSON.stringify(record),
     );

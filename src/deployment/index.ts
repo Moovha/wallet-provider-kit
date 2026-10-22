@@ -1,3 +1,4 @@
+export { networkConfigurations } from './network-configuration.js';
 export { WalletCallsService } from '../wallet-calls/service.js';
 export {
   createWalletCallsProvider,

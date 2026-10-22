@@ -86,6 +86,8 @@ export const apiOperationOrder = [
   'listWalletBatches',
   'claimProviderInstallation',
   'readProviderStatus',
+  'readProviderNetworks',
+  'saveProviderNetworks',
   'listProviderUsers',
   'readProviderUser',
   'listProviderIdentities',
@@ -117,6 +119,7 @@ export const apiOperationOrder = [
   'readSafeWalletInfrastructure',
   'provisionSafeWalletInfrastructure',
   'readApplicationGasFunding',
+  'listNetworks',
   'getCapabilities',
   'getExecutionCapabilities',
   'submitAccountAccessRecords',
@@ -764,6 +767,49 @@ export const operationGuides: Record<string, OperationGuide> = {
     success:
       '200: a new immutable policy publication, effective without restart. Earlier publications remain available for audit. Applications still need current owner consent and approved agreements before transactions.',
   },
+  readProviderNetworks: {
+    management: true,
+    title: 'Review the networks your service offers',
+    group: 'Service administration',
+    scope: 'provider:manage',
+    audience: 'Service operator',
+    purpose:
+      'See saved network choices and whether a restart is needed to apply them.',
+    whenToUse:
+      'Use the Networks page in administration, or this request for management tools.',
+    prerequisite:
+      'Use a current provider administrator or management-tool token.',
+    success:
+      '200: the fixed default, saved choices, running choices and restart requirement. Network selection does not grant spending authority.',
+  },
+  saveProviderNetworks: {
+    management: true,
+    title: 'Choose the networks your service offers',
+    group: 'Service administration',
+    scope: 'provider:manage',
+    audience: 'Service operator',
+    purpose:
+      'Save network choices while preserving the default used by existing applications.',
+    whenToUse:
+      'Use when adding or removing a network, then restart the provider to apply the saved choices.',
+    prerequisite:
+      'Read the current revision first. Keep the default selected. Additional networks start disabled and need separate application agreements and funding.',
+    success:
+      '200: saved choices and restart requirement. Existing wallets and previously issued transactions are retained.',
+  },
+  listNetworks: {
+    title: 'Choose a wallet network',
+    group: 'Service status',
+    audience: 'Application developer',
+    purpose:
+      'Discover the networks offered by this instance and its default for existing integrations.',
+    whenToUse:
+      'Read before presenting a network choice or configuring an application’s network services.',
+    prerequisite:
+      'No token is needed. Select a network with Wallet-Network on access-policy, access-request and application-configuration calls. Stored account, request and grant IDs route automatically.',
+    success:
+      '200: network names, chain IDs and execution status. Each network needs its own wallet consent, transaction rules and fee funding.',
+  },
   getCapabilities: {
     title: 'Check the service connection',
     group: 'Service status',
@@ -962,6 +1008,7 @@ export function operationUnavailableReason(
   if (
     !guide ||
     [
+      'listNetworks',
       'getCapabilities',
       'getExecutionCapabilities',
       'readAccessPolicy',

@@ -1,4 +1,34 @@
 export interface paths {
+    "/v1/networks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Choose a wallet network
+         * @description **Why this exists:** Discover the networks offered by this instance and its default for existing integrations.
+         *
+         *     **Who uses it:** Application developer.
+         *
+         *     **When you need it:** Read before presenting a network choice or configuring an application’s network services.
+         *
+         *     **Before you start:** No token is needed. Select a network with Wallet-Network on access-policy, access-request and application-configuration calls. Stored account, request and grant IDs route automatically.
+         *
+         *     **Result and next step:** 200: network names, chain IDs and execution status. Each network needs its own wallet consent, transaction rules and fee funding.
+         *
+         *     **Request details:** Discover enabled network configurations. Identity and application registrations are shared; each network has separate wallets, approvals and fee funding. Configured means execution is enabled and current, not that an application has funded it.
+         */
+        get: operations["listNetworks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/execution-capabilities": {
         parameters: {
             query?: never;
@@ -1211,6 +1241,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/provider/networks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Review the networks your service offers
+         * @description **Why this exists:** See saved network choices and whether a restart is needed to apply them.
+         *
+         *     **Who uses it:** Service operator.
+         *
+         *     **When you need it:** Use the Networks page in administration, or this request for management tools.
+         *
+         *     **Before you start:** Use a current provider administrator or management-tool token.
+         *
+         *     **Result and next step:** 200: the fixed default, saved choices, running choices and restart requirement. Network selection does not grant spending authority.
+         *
+         *     **Request details:** Protected installation and application administration. Management credentials do not activate wallet operations or authorize spending.
+         */
+        get: operations["readProviderNetworks"];
+        put?: never;
+        /**
+         * Choose the networks your service offers
+         * @description **Why this exists:** Save network choices while preserving the default used by existing applications.
+         *
+         *     **Who uses it:** Service operator.
+         *
+         *     **When you need it:** Use when adding or removing a network, then restart the provider to apply the saved choices.
+         *
+         *     **Before you start:** Read the current revision first. Keep the default selected. Additional networks start disabled and need separate application agreements and funding.
+         *
+         *     **Result and next step:** 200: saved choices and restart requirement. Existing wallets and previously issued transactions are retained.
+         *
+         *     **Request details:** Protected installation and application administration. Management credentials do not activate wallet operations or authorize spending.
+         */
+        post: operations["saveProviderNetworks"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/provider/users": {
         parameters: {
             query?: never;
@@ -1491,10 +1565,41 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    getExecutionCapabilities: {
+    listNetworks: {
         parameters: {
             query?: never;
             header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        default_network: string;
+                        networks: {
+                            network: string;
+                            name: string;
+                            chain_id: string;
+                            configured: boolean;
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    getExecutionCapabilities: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Choose a configured network. Omit to use the default; existing wallet, request and grant IDs select their stored network automatically. A conflicting selection is rejected. */
+                "wallet-network"?: "base" | "base-sepolia" | "ethereum" | "ethereum-sepolia";
+            };
             path?: never;
             cookie?: never;
         };
@@ -1520,7 +1625,10 @@ export interface operations {
     getCapabilities: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Choose a configured network. Omit to use the default; existing wallet, request and grant IDs select their stored network automatically. A conflicting selection is rejected. */
+                "wallet-network"?: "base" | "base-sepolia" | "ethereum" | "ethereum-sepolia";
+            };
             path?: never;
             cookie?: never;
         };
@@ -2162,6 +2270,8 @@ export interface operations {
             query?: never;
             header: {
                 "idempotency-key": string;
+                /** @description Choose a configured network. Omit to use the default; existing wallet, request and grant IDs select their stored network automatically. A conflicting selection is rejected. */
+                "wallet-network"?: "base" | "base-sepolia" | "ethereum" | "ethereum-sepolia";
                 /** @description Select this person’s current grant for this wallet. Required for shared wallets; the selector alone grants no authority. */
                 "wallet-grant-id"?: string;
             };
@@ -2188,7 +2298,7 @@ export interface operations {
                             /** @enum {string} */
                             profile: "safe-1.4.1";
                             /** @enum {string} */
-                            chain_id: "eip155:8453" | "eip155:84532" | "eip155:11155111";
+                            chain_id: "eip155:8453" | "eip155:84532" | "eip155:1" | "eip155:11155111";
                             address: string;
                             /** @enum {string} */
                             status: "prepared" | "pending" | "ready" | "unknown";
@@ -2372,7 +2482,10 @@ export interface operations {
     readSafeWalletInfrastructure: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Choose a configured network. Omit to use the default; existing wallet, request and grant IDs select their stored network automatically. A conflicting selection is rejected. */
+                "wallet-network"?: "base" | "base-sepolia" | "ethereum" | "ethereum-sepolia";
+            };
             path: {
                 applicationId: string;
             };
@@ -2439,6 +2552,8 @@ export interface operations {
             query?: never;
             header: {
                 "idempotency-key": string;
+                /** @description Choose a configured network. Omit to use the default; existing wallet, request and grant IDs select their stored network automatically. A conflicting selection is rejected. */
+                "wallet-network"?: "base" | "base-sepolia" | "ethereum" | "ethereum-sepolia";
             };
             path: {
                 applicationId: string;
@@ -2510,6 +2625,8 @@ export interface operations {
             query?: never;
             header: {
                 "idempotency-key": string;
+                /** @description Choose a configured network. Omit to use the default; existing wallet, request and grant IDs select their stored network automatically. A conflicting selection is rejected. */
+                "wallet-network"?: "base" | "base-sepolia" | "ethereum" | "ethereum-sepolia";
             };
             path?: never;
             cookie?: never;
@@ -2778,7 +2895,10 @@ export interface operations {
             query?: {
                 source_application_id?: string;
             };
-            header?: never;
+            header?: {
+                /** @description Choose a configured network. Omit to use the default; existing wallet, request and grant IDs select their stored network automatically. A conflicting selection is rejected. */
+                "wallet-network"?: "base" | "base-sepolia" | "ethereum" | "ethereum-sepolia";
+            };
             path?: never;
             cookie?: never;
         };
@@ -2792,7 +2912,7 @@ export interface operations {
                 content: {
                     "application/json": {
                         /** @enum {string} */
-                        chain_id?: "eip155:8453" | "eip155:84532" | "eip155:11155111";
+                        chain_id?: "eip155:8453" | "eip155:84532" | "eip155:1" | "eip155:11155111";
                         /** @enum {string} */
                         source: "application_record" | "vendor_verification" | "application_attestation";
                         evaluation_only: boolean;
@@ -2988,7 +3108,7 @@ export interface operations {
                                 version: "1";
                                 enabled: boolean;
                                 /** @enum {string} */
-                                chain_id: "eip155:84532" | "eip155:8453" | "eip155:11155111";
+                                chain_id: "eip155:84532" | "eip155:8453" | "eip155:1" | "eip155:11155111";
                                 contracts: {
                                     address: string;
                                     code_hash: string;
@@ -3277,6 +3397,8 @@ export interface operations {
             query?: never;
             header: {
                 "idempotency-key": string;
+                /** @description Choose a configured network. Omit to use the default; existing wallet, request and grant IDs select their stored network automatically. A conflicting selection is rejected. */
+                "wallet-network"?: "base" | "base-sepolia" | "ethereum" | "ethereum-sepolia";
                 /** @description Select this person’s current grant for this wallet. Required for shared wallets; the selector alone grants no authority. */
                 "wallet-grant-id"?: string;
             };
@@ -3300,6 +3422,9 @@ export interface operations {
                     "application/json": {
                         accounts: {
                             account_id: string;
+                            /** @enum {string} */
+                            network?: "base" | "base-sepolia" | "ethereum" | "ethereum-sepolia";
+                            chain_id?: string;
                             is_default: boolean;
                             wallet: {
                                 reference: string;
@@ -3492,6 +3617,8 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
+                /** @description Choose a configured network. Omit to use the default; existing wallet, request and grant IDs select their stored network automatically. A conflicting selection is rejected. */
+                "wallet-network"?: "base" | "base-sepolia" | "ethereum" | "ethereum-sepolia";
                 /** @description Select this person’s current grant for this wallet. Required for shared wallets; the selector alone grants no authority. */
                 "wallet-grant-id"?: string;
             };
@@ -3707,6 +3834,8 @@ export interface operations {
             query?: never;
             header: {
                 "idempotency-key": string;
+                /** @description Choose a configured network. Omit to use the default; existing wallet, request and grant IDs select their stored network automatically. A conflicting selection is rejected. */
+                "wallet-network"?: "base" | "base-sepolia" | "ethereum" | "ethereum-sepolia";
                 /** @description Select this person’s current grant for this wallet. Required for shared wallets; the selector alone grants no authority. */
                 "wallet-grant-id"?: string;
             };
@@ -3933,6 +4062,8 @@ export interface operations {
             query?: never;
             header: {
                 "idempotency-key": string;
+                /** @description Choose a configured network. Omit to use the default; existing wallet, request and grant IDs select their stored network automatically. A conflicting selection is rejected. */
+                "wallet-network"?: "base" | "base-sepolia" | "ethereum" | "ethereum-sepolia";
             };
             path: {
                 grantId: string;
@@ -4084,6 +4215,8 @@ export interface operations {
             query?: never;
             header: {
                 "idempotency-key": string;
+                /** @description Choose a configured network. Omit to use the default; existing wallet, request and grant IDs select their stored network automatically. A conflicting selection is rejected. */
+                "wallet-network"?: "base" | "base-sepolia" | "ethereum" | "ethereum-sepolia";
             };
             path?: never;
             cookie?: never;
@@ -4314,7 +4447,10 @@ export interface operations {
     getAccountAccessRequest: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Choose a configured network. Omit to use the default; existing wallet, request and grant IDs select their stored network automatically. A conflicting selection is rejected. */
+                "wallet-network"?: "base" | "base-sepolia" | "ethereum" | "ethereum-sepolia";
+            };
             path: {
                 requestId: string;
             };
@@ -4529,6 +4665,8 @@ export interface operations {
             query?: never;
             header: {
                 "idempotency-key": string;
+                /** @description Choose a configured network. Omit to use the default; existing wallet, request and grant IDs select their stored network automatically. A conflicting selection is rejected. */
+                "wallet-network"?: "base" | "base-sepolia" | "ethereum" | "ethereum-sepolia";
             };
             path: {
                 requestId: string;
@@ -4751,6 +4889,8 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
+                /** @description Choose a configured network. Omit to use the default; existing wallet, request and grant IDs select their stored network automatically. A conflicting selection is rejected. */
+                "wallet-network"?: "base" | "base-sepolia" | "ethereum" | "ethereum-sepolia";
                 /** @description Select this person’s current grant for this wallet. Required for shared wallets; the selector alone grants no authority. */
                 "wallet-grant-id"?: string;
             };
@@ -4909,6 +5049,8 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
+                /** @description Choose a configured network. Omit to use the default; existing wallet, request and grant IDs select their stored network automatically. A conflicting selection is rejected. */
+                "wallet-network"?: "base" | "base-sepolia" | "ethereum" | "ethereum-sepolia";
                 /** @description Select this person’s current grant for this wallet. Required for shared wallets; the selector alone grants no authority. */
                 "wallet-grant-id"?: string;
             };
@@ -5003,6 +5145,8 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
+                /** @description Choose a configured network. Omit to use the default; existing wallet, request and grant IDs select their stored network automatically. A conflicting selection is rejected. */
+                "wallet-network"?: "base" | "base-sepolia" | "ethereum" | "ethereum-sepolia";
                 /** @description Select this person’s current grant for this wallet. Required for shared wallets; the selector alone grants no authority. */
                 "wallet-grant-id"?: string;
             };
@@ -5082,6 +5226,8 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
+                /** @description Choose a configured network. Omit to use the default; existing wallet, request and grant IDs select their stored network automatically. A conflicting selection is rejected. */
+                "wallet-network"?: "base" | "base-sepolia" | "ethereum" | "ethereum-sepolia";
                 /** @description Select this person’s current grant for this wallet. Required for shared wallets; the selector alone grants no authority. */
                 "wallet-grant-id"?: string;
             };
@@ -5223,6 +5369,20 @@ export interface operations {
                                     status: "supported";
                                 };
                             };
+                            "0x1"?: {
+                                applicationAction?: {
+                                    /** @enum {boolean} */
+                                    supported: true;
+                                };
+                                paymasterService?: {
+                                    /** @enum {boolean} */
+                                    supported: true;
+                                };
+                                atomic: {
+                                    /** @enum {string} */
+                                    status: "supported";
+                                };
+                            };
                             "0xaa36a7"?: {
                                 applicationAction?: {
                                     /** @enum {boolean} */
@@ -5301,7 +5461,10 @@ export interface operations {
     readApplicationGasFunding: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Choose a configured network. Omit to use the default; existing wallet, request and grant IDs select their stored network automatically. A conflicting selection is rejected. */
+                "wallet-network"?: "base" | "base-sepolia" | "ethereum" | "ethereum-sepolia";
+            };
             path?: never;
             cookie?: never;
         };
@@ -5508,7 +5671,10 @@ export interface operations {
     readApplicationCredentials: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Choose a configured network. Omit to use the default; existing wallet, request and grant IDs select their stored network automatically. A conflicting selection is rejected. */
+                "wallet-network"?: "base" | "base-sepolia" | "ethereum" | "ethereum-sepolia";
+            };
             path?: never;
             cookie?: never;
         };
@@ -5705,7 +5871,10 @@ export interface operations {
     readProviderApplicationCredentials: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Choose a configured network. Omit to use the default; existing wallet, request and grant IDs select their stored network automatically. A conflicting selection is rejected. */
+                "wallet-network"?: "base" | "base-sepolia" | "ethereum" | "ethereum-sepolia";
+            };
             path: {
                 applicationId: string;
             };
@@ -5906,6 +6075,8 @@ export interface operations {
             query?: never;
             header: {
                 "idempotency-key": string;
+                /** @description Choose a configured network. Omit to use the default; existing wallet, request and grant IDs select their stored network automatically. A conflicting selection is rejected. */
+                "wallet-network"?: "base" | "base-sepolia" | "ethereum" | "ethereum-sepolia";
             };
             path: {
                 reference: string;
@@ -6112,7 +6283,10 @@ export interface operations {
     readApplicationObligations: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Choose a configured network. Omit to use the default; existing wallet, request and grant IDs select their stored network automatically. A conflicting selection is rejected. */
+                "wallet-network"?: "base" | "base-sepolia" | "ethereum" | "ethereum-sepolia";
+            };
             path?: never;
             cookie?: never;
         };
@@ -6150,7 +6324,7 @@ export interface operations {
                                 billing_owner: "application";
                             }[] | {
                                 /** @enum {string} */
-                                chain_id: "eip155:8453" | "eip155:84532" | "eip155:11155111";
+                                chain_id: "eip155:8453" | "eip155:84532" | "eip155:1" | "eip155:11155111";
                                 funding_agreement: string;
                                 maximum_gas_budget_wei: string;
                                 /** @enum {string} */
@@ -6356,7 +6530,10 @@ export interface operations {
     readProviderApplicationObligations: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Choose a configured network. Omit to use the default; existing wallet, request and grant IDs select their stored network automatically. A conflicting selection is rejected. */
+                "wallet-network"?: "base" | "base-sepolia" | "ethereum" | "ethereum-sepolia";
+            };
             path: {
                 applicationId: string;
             };
@@ -6396,7 +6573,7 @@ export interface operations {
                                 billing_owner: "application";
                             }[] | {
                                 /** @enum {string} */
-                                chain_id: "eip155:8453" | "eip155:84532" | "eip155:11155111";
+                                chain_id: "eip155:8453" | "eip155:84532" | "eip155:1" | "eip155:11155111";
                                 funding_agreement: string;
                                 maximum_gas_budget_wei: string;
                                 /** @enum {string} */
@@ -6604,6 +6781,8 @@ export interface operations {
             query?: never;
             header: {
                 "idempotency-key": string;
+                /** @description Choose a configured network. Omit to use the default; existing wallet, request and grant IDs select their stored network automatically. A conflicting selection is rejected. */
+                "wallet-network"?: "base" | "base-sepolia" | "ethereum" | "ethereum-sepolia";
             };
             path?: never;
             cookie?: never;
@@ -6655,7 +6834,7 @@ export interface operations {
                             billing_owner: "application";
                         }[] | {
                             /** @enum {string} */
-                            chain_id: "eip155:8453" | "eip155:84532" | "eip155:11155111";
+                            chain_id: "eip155:8453" | "eip155:84532" | "eip155:1" | "eip155:11155111";
                             funding_agreement: string;
                             maximum_gas_budget_wei: string;
                             /** @enum {string} */
@@ -6858,6 +7037,8 @@ export interface operations {
             query?: never;
             header: {
                 "idempotency-key": string;
+                /** @description Choose a configured network. Omit to use the default; existing wallet, request and grant IDs select their stored network automatically. A conflicting selection is rejected. */
+                "wallet-network"?: "base" | "base-sepolia" | "ethereum" | "ethereum-sepolia";
             };
             path: {
                 applicationId: string;
@@ -6905,7 +7086,7 @@ export interface operations {
                             billing_owner: "application";
                         }[] | {
                             /** @enum {string} */
-                            chain_id: "eip155:8453" | "eip155:84532" | "eip155:11155111";
+                            chain_id: "eip155:8453" | "eip155:84532" | "eip155:1" | "eip155:11155111";
                             funding_agreement: string;
                             maximum_gas_budget_wei: string;
                             /** @enum {string} */
@@ -7108,6 +7289,8 @@ export interface operations {
             query?: never;
             header: {
                 "idempotency-key": string;
+                /** @description Choose a configured network. Omit to use the default; existing wallet, request and grant IDs select their stored network automatically. A conflicting selection is rejected. */
+                "wallet-network"?: "base" | "base-sepolia" | "ethereum" | "ethereum-sepolia";
             };
             path?: never;
             cookie?: never;
@@ -7160,7 +7343,7 @@ export interface operations {
                             billing_owner: "application";
                         }[] | {
                             /** @enum {string} */
-                            chain_id: "eip155:8453" | "eip155:84532" | "eip155:11155111";
+                            chain_id: "eip155:8453" | "eip155:84532" | "eip155:1" | "eip155:11155111";
                             funding_agreement: string;
                             maximum_gas_budget_wei: string;
                             /** @enum {string} */
@@ -7363,6 +7546,8 @@ export interface operations {
             query?: never;
             header: {
                 "idempotency-key": string;
+                /** @description Choose a configured network. Omit to use the default; existing wallet, request and grant IDs select their stored network automatically. A conflicting selection is rejected. */
+                "wallet-network"?: "base" | "base-sepolia" | "ethereum" | "ethereum-sepolia";
             };
             path: {
                 applicationId: string;
@@ -7410,7 +7595,7 @@ export interface operations {
                             billing_owner: "application";
                         }[] | {
                             /** @enum {string} */
-                            chain_id: "eip155:8453" | "eip155:84532" | "eip155:11155111";
+                            chain_id: "eip155:8453" | "eip155:84532" | "eip155:1" | "eip155:11155111";
                             funding_agreement: string;
                             maximum_gas_budget_wei: string;
                             /** @enum {string} */
@@ -7613,6 +7798,8 @@ export interface operations {
             query?: never;
             header: {
                 "idempotency-key": string;
+                /** @description Choose a configured network. Omit to use the default; existing wallet, request and grant IDs select their stored network automatically. A conflicting selection is rejected. */
+                "wallet-network"?: "base" | "base-sepolia" | "ethereum" | "ethereum-sepolia";
             };
             path?: never;
             cookie?: never;
@@ -7623,7 +7810,7 @@ export interface operations {
                     expected_revision: string;
                     value: {
                         /** @enum {string} */
-                        chain_id: "eip155:8453" | "eip155:84532" | "eip155:11155111";
+                        chain_id: "eip155:8453" | "eip155:84532" | "eip155:1" | "eip155:11155111";
                         funding_agreement: string;
                         maximum_gas_budget_wei: string;
                         /** @enum {string} */
@@ -7673,7 +7860,7 @@ export interface operations {
                             billing_owner: "application";
                         }[] | {
                             /** @enum {string} */
-                            chain_id: "eip155:8453" | "eip155:84532" | "eip155:11155111";
+                            chain_id: "eip155:8453" | "eip155:84532" | "eip155:1" | "eip155:11155111";
                             funding_agreement: string;
                             maximum_gas_budget_wei: string;
                             /** @enum {string} */
@@ -7876,6 +8063,8 @@ export interface operations {
             query?: never;
             header: {
                 "idempotency-key": string;
+                /** @description Choose a configured network. Omit to use the default; existing wallet, request and grant IDs select their stored network automatically. A conflicting selection is rejected. */
+                "wallet-network"?: "base" | "base-sepolia" | "ethereum" | "ethereum-sepolia";
             };
             path: {
                 applicationId: string;
@@ -7923,7 +8112,7 @@ export interface operations {
                             billing_owner: "application";
                         }[] | {
                             /** @enum {string} */
-                            chain_id: "eip155:8453" | "eip155:84532" | "eip155:11155111";
+                            chain_id: "eip155:8453" | "eip155:84532" | "eip155:1" | "eip155:11155111";
                             funding_agreement: string;
                             maximum_gas_budget_wei: string;
                             /** @enum {string} */
@@ -8126,7 +8315,10 @@ export interface operations {
             query?: {
                 application_id?: string;
             };
-            header?: never;
+            header?: {
+                /** @description Choose a configured network. Omit to use the default; existing wallet, request and grant IDs select their stored network automatically. A conflicting selection is rejected. */
+                "wallet-network"?: "base" | "base-sepolia" | "ethereum" | "ethereum-sepolia";
+            };
             path?: never;
             cookie?: never;
         };
@@ -8140,7 +8332,7 @@ export interface operations {
                 content: {
                     "application/json": {
                         /** @enum {string} */
-                        network?: "base" | "base-sepolia" | "ethereum-sepolia";
+                        network?: "base" | "base-sepolia" | "ethereum" | "ethereum-sepolia";
                         /** @enum {string} */
                         role: "provider" | "application";
                         applications: {
@@ -8167,7 +8359,7 @@ export interface operations {
                                     version: "1";
                                     enabled: boolean;
                                     /** @enum {string} */
-                                    chain_id: "eip155:84532" | "eip155:8453" | "eip155:11155111";
+                                    chain_id: "eip155:84532" | "eip155:8453" | "eip155:1" | "eip155:11155111";
                                     contracts: {
                                         address: string;
                                         code_hash: string;
@@ -8292,7 +8484,7 @@ export interface operations {
                                     version: "1";
                                     enabled: boolean;
                                     /** @enum {string} */
-                                    chain_id: "eip155:84532" | "eip155:8453" | "eip155:11155111";
+                                    chain_id: "eip155:84532" | "eip155:8453" | "eip155:1" | "eip155:11155111";
                                     contracts: {
                                         address: string;
                                         code_hash: string;
@@ -8424,7 +8616,7 @@ export interface operations {
                                     version: "1";
                                     enabled: boolean;
                                     /** @enum {string} */
-                                    chain_id: "eip155:84532" | "eip155:8453" | "eip155:11155111";
+                                    chain_id: "eip155:84532" | "eip155:8453" | "eip155:1" | "eip155:11155111";
                                     contracts: {
                                         address: string;
                                         code_hash: string;
@@ -8707,7 +8899,10 @@ export interface operations {
     listWalletBatches: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Choose a configured network. Omit to use the default; existing wallet, request and grant IDs select their stored network automatically. A conflicting selection is rejected. */
+                "wallet-network"?: "base" | "base-sepolia" | "ethereum" | "ethereum-sepolia";
+            };
             path?: never;
             cookie?: never;
         };
@@ -8734,7 +8929,7 @@ export interface operations {
                             /** @enum {string} */
                             version: "2.0.0";
                             /** @enum {string} */
-                            chainId: "0x14a34" | "0x2105" | "0xaa36a7";
+                            chainId: "0x14a34" | "0x2105" | "0x1" | "0xaa36a7";
                             /** @enum {integer} */
                             status: 100 | 200 | 400 | 500;
                             /** @enum {boolean} */
@@ -8933,6 +9128,8 @@ export interface operations {
             query?: never;
             header: {
                 "idempotency-key": string;
+                /** @description Choose a configured network. Omit to use the default; existing wallet, request and grant IDs select their stored network automatically. A conflicting selection is rejected. */
+                "wallet-network"?: "base" | "base-sepolia" | "ethereum" | "ethereum-sepolia";
             };
             path: {
                 applicationId: string;
@@ -9139,7 +9336,10 @@ export interface operations {
     readRuntimeConfiguration: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Choose a configured network. Omit to use the default; existing wallet, request and grant IDs select their stored network automatically. A conflicting selection is rejected. */
+                "wallet-network"?: "base" | "base-sepolia" | "ethereum" | "ethereum-sepolia";
+            };
             path?: never;
             cookie?: never;
         };
@@ -9175,7 +9375,7 @@ export interface operations {
                                 version: "1";
                                 enabled: boolean;
                                 /** @enum {string} */
-                                chain_id: "eip155:84532" | "eip155:8453" | "eip155:11155111";
+                                chain_id: "eip155:84532" | "eip155:8453" | "eip155:1" | "eip155:11155111";
                                 contracts: {
                                     address: string;
                                     code_hash: string;
@@ -9460,7 +9660,10 @@ export interface operations {
     readRuntimeApplicationConfiguration: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Choose a configured network. Omit to use the default; existing wallet, request and grant IDs select their stored network automatically. A conflicting selection is rejected. */
+                "wallet-network"?: "base" | "base-sepolia" | "ethereum" | "ethereum-sepolia";
+            };
             path: {
                 applicationId: string;
             };
@@ -9498,7 +9701,7 @@ export interface operations {
                                 version: "1";
                                 enabled: boolean;
                                 /** @enum {string} */
-                                chain_id: "eip155:84532" | "eip155:8453" | "eip155:11155111";
+                                chain_id: "eip155:84532" | "eip155:8453" | "eip155:1" | "eip155:11155111";
                                 contracts: {
                                     address: string;
                                     code_hash: string;
@@ -9783,7 +9986,10 @@ export interface operations {
     readRuntimeConfigurationRevision: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Choose a configured network. Omit to use the default; existing wallet, request and grant IDs select their stored network automatically. A conflicting selection is rejected. */
+                "wallet-network"?: "base" | "base-sepolia" | "ethereum" | "ethereum-sepolia";
+            };
             path: {
                 revision: string;
             };
@@ -9821,7 +10027,7 @@ export interface operations {
                                 version: "1";
                                 enabled: boolean;
                                 /** @enum {string} */
-                                chain_id: "eip155:84532" | "eip155:8453" | "eip155:11155111";
+                                chain_id: "eip155:84532" | "eip155:8453" | "eip155:1" | "eip155:11155111";
                                 contracts: {
                                     address: string;
                                     code_hash: string;
@@ -10108,6 +10314,8 @@ export interface operations {
             query?: never;
             header: {
                 "idempotency-key": string;
+                /** @description Choose a configured network. Omit to use the default; existing wallet, request and grant IDs select their stored network automatically. A conflicting selection is rejected. */
+                "wallet-network"?: "base" | "base-sepolia" | "ethereum" | "ethereum-sepolia";
             };
             path?: never;
             cookie?: never;
@@ -10131,7 +10339,7 @@ export interface operations {
                         version: "1";
                         enabled: boolean;
                         /** @enum {string} */
-                        chain_id: "eip155:84532" | "eip155:8453" | "eip155:11155111";
+                        chain_id: "eip155:84532" | "eip155:8453" | "eip155:1" | "eip155:11155111";
                         contracts: {
                             address: string;
                             code_hash: string;
@@ -10261,7 +10469,7 @@ export interface operations {
                             version: "1";
                             enabled: boolean;
                             /** @enum {string} */
-                            chain_id: "eip155:84532" | "eip155:8453" | "eip155:11155111";
+                            chain_id: "eip155:84532" | "eip155:8453" | "eip155:1" | "eip155:11155111";
                             contracts: {
                                 address: string;
                                 code_hash: string;
@@ -10541,7 +10749,10 @@ export interface operations {
     readRuntimeConfigurationProposal: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Choose a configured network. Omit to use the default; existing wallet, request and grant IDs select their stored network automatically. A conflicting selection is rejected. */
+                "wallet-network"?: "base" | "base-sepolia" | "ethereum" | "ethereum-sepolia";
+            };
             path: {
                 proposalId: string;
             };
@@ -10575,7 +10786,7 @@ export interface operations {
                             version: "1";
                             enabled: boolean;
                             /** @enum {string} */
-                            chain_id: "eip155:84532" | "eip155:8453" | "eip155:11155111";
+                            chain_id: "eip155:84532" | "eip155:8453" | "eip155:1" | "eip155:11155111";
                             contracts: {
                                 address: string;
                                 code_hash: string;
@@ -10857,6 +11068,8 @@ export interface operations {
             query?: never;
             header: {
                 "idempotency-key": string;
+                /** @description Choose a configured network. Omit to use the default; existing wallet, request and grant IDs select their stored network automatically. A conflicting selection is rejected. */
+                "wallet-network"?: "base" | "base-sepolia" | "ethereum" | "ethereum-sepolia";
             };
             path: {
                 proposalId: string;
@@ -10897,7 +11110,7 @@ export interface operations {
                             version: "1";
                             enabled: boolean;
                             /** @enum {string} */
-                            chain_id: "eip155:84532" | "eip155:8453" | "eip155:11155111";
+                            chain_id: "eip155:84532" | "eip155:8453" | "eip155:1" | "eip155:11155111";
                             contracts: {
                                 address: string;
                                 code_hash: string;
@@ -11181,6 +11394,8 @@ export interface operations {
             query?: never;
             header: {
                 "idempotency-key": string;
+                /** @description Choose a configured network. Omit to use the default; existing wallet, request and grant IDs select their stored network automatically. A conflicting selection is rejected. */
+                "wallet-network"?: "base" | "base-sepolia" | "ethereum" | "ethereum-sepolia";
             };
             path: {
                 applicationId: string;
@@ -11206,7 +11421,7 @@ export interface operations {
                         version: "1";
                         enabled: boolean;
                         /** @enum {string} */
-                        chain_id: "eip155:84532" | "eip155:8453" | "eip155:11155111";
+                        chain_id: "eip155:84532" | "eip155:8453" | "eip155:1" | "eip155:11155111";
                         contracts: {
                             address: string;
                             code_hash: string;
@@ -11336,7 +11551,7 @@ export interface operations {
                             version: "1";
                             enabled: boolean;
                             /** @enum {string} */
-                            chain_id: "eip155:84532" | "eip155:8453" | "eip155:11155111";
+                            chain_id: "eip155:84532" | "eip155:8453" | "eip155:1" | "eip155:11155111";
                             contracts: {
                                 address: string;
                                 code_hash: string;
@@ -11440,6 +11655,415 @@ export interface operations {
                         published_at: string;
                         proposal_id?: string;
                         published_by: string;
+                    };
+                };
+            };
+            /** @description Problem response */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+        };
+    };
+    readProviderNetworks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        revision: number;
+                        default_network: string;
+                        networks: string[];
+                        running_networks: string[];
+                        restart_required: boolean;
+                        available: {
+                            network?: string;
+                            name?: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Problem response */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+        };
+    };
+    saveProviderNetworks: {
+        parameters: {
+            query?: never;
+            header: {
+                "idempotency-key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    expected_revision: number;
+                    networks: ("base" | "base-sepolia" | "ethereum" | "ethereum-sepolia")[];
+                };
+            };
+        };
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        revision: number;
+                        default_network: string;
+                        networks: string[];
+                        running_networks: string[];
+                        restart_required: boolean;
+                        available: {
+                            network?: string;
+                            name?: string;
+                        }[];
                     };
                 };
             };
@@ -11868,6 +12492,8 @@ export interface operations {
                         };
                         wallets: {
                             account_id: string;
+                            /** @enum {string} */
+                            network?: "base" | "base-sepolia" | "ethereum" | "ethereum-sepolia";
                             wallet: {
                                 reference: string;
                                 name: string;
@@ -12734,6 +13360,47 @@ export interface operations {
                         }[];
                         /** @enum {unknown} */
                         management_available: true;
+                        management_identities?: {
+                            id: string;
+                            name: string;
+                            /** @enum {unknown} */
+                            role: "administrator" | "automation" | "application";
+                            enabled: boolean;
+                            revision: number;
+                            credentialRevision: number;
+                            scopes: string[];
+                            policy?: {
+                                [key: string]: unknown;
+                            };
+                            client_secret?: string;
+                            credential_replayed?: boolean;
+                        }[];
+                        user_checks?: {
+                            available: boolean;
+                            revision: number;
+                            /** @description Identity field names every application must submit. Values are nonempty strings, up to 512 characters; presence does not verify their accuracy. */
+                            required_fields: string[];
+                            /** @description Agreed verification label; empty when application user-check settings are unavailable in hosted mode. */
+                            verification_level: string;
+                            max_identity_age_days: number;
+                            max_access_days: number;
+                        };
+                        network_settings?: {
+                            revision: number;
+                            default_network: string;
+                            networks: string[];
+                            running_networks: string[];
+                            restart_required: boolean;
+                            available: {
+                                network?: string;
+                                name?: string;
+                            }[];
+                        };
+                        network_status?: {
+                            network?: string;
+                            name?: string;
+                            configured?: boolean;
+                        }[];
                         wallet_operations_enabled: boolean;
                     };
                 };

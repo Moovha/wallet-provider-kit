@@ -41,10 +41,10 @@ rail, the application's obligations and the current implementation boundary.
 
 [Documentation](https://moovha.github.io/wallet-provider-kit/) ·
 [Get started](docs/README.md) ·
-[Operator wizard](docs/setup-wizard.md) ·
+[Service administration](docs/runtime-workspace.md) ·
 [Application management](docs/runtime-workspace.md) ·
 [Services and credentials](docs/operator-services.md) ·
-[Run locally](docs/local-setup.md) · [Deploy the export](docs/operator-deployment.md)
+[Run locally](docs/local-setup.md) · [Deploy static configuration](docs/operator-deployment.md)
 
 ## Deploy first, connect applications afterward
 
@@ -67,17 +67,14 @@ git clone https://github.com/Moovha/wallet-provider-kit.git
 cd wallet-provider-kit
 npm ci
 npm run build
-npm start -- setup
+node dist/main.js init provider.config.json
+node dist/main.js local-setup --config provider.config.json
 ```
 
-The bundled graphical setup follows three stages:
-
-1. **Choose where to run:** this computer, an existing Linux server or the AWS template.
-2. **Review your setup:** provider identity, retained storage, network exposure and
-   defaults. Application configuration waits until connection.
-3. **Start and sign in:** source setup can build an isolated local
-   container service; release installers use pinned prebuilt images. Read the
-   private installation claim file to establish the administrator.
+The terminal installer prepares a disabled service. Open its `/admin/` address
+and use the private installation claim file to create the administrator. Choose
+networks, add applications and manage user checks in the console. Source users
+can inspect installation settings in JSON before running the installer.
 
 Claiming is protected, expires after 30 minutes and succeeds once. Restart does
 not reopen registration. The persistent `/admin/` console and provider API manage
@@ -93,11 +90,9 @@ accepted application sponsorship funds its execution. Registration does not gran
 identity trust or spending authority. Provider acceptance and current owner,
 grant, KYC, consent, immutable action and durable attempt checks remain required.
 
-The **Advanced configuration** editor retains the explicit static configuration
-path. Its [six configuration screens](docs/setup-wizard.md) and bundled API
-reference are available for reviewed source integrations. The default installation
-flow does not require registering a first application. Container/cloud acceptance
-and production custody acceptance remain separate from offline checks.
+The [configuration reference](docs/setup.md) covers static source integrations.
+Container/cloud acceptance and production custody acceptance remain separate
+from offline checks.
 
 ## Who takes part
 
@@ -123,7 +118,7 @@ The [approved contract-call guide](docs/approved-contract-calls.md) explains per
 ## A foundation for adopting teams
 
 Operators can run `wallet-provider-kit setup` to configure supported deployments
-through the [FormKit setup wizard](docs/setup-wizard.md), then run automated local
+through [installation settings](docs/setup.md), then run automated local
 container setup or export configuration and a deployment checklist. No application
 code is needed for this setup path.
 
@@ -250,7 +245,7 @@ execution flow. Each user receives their own Safe address for deposits and calls
 
 The current version, **0.1.0**, is experimental and available from source rather
 than npm. You can configure account access and provisioning, and execute approved
-Safe contract calls, swaps and vault deposits on **Base mainnet, Base Sepolia or Ethereum Sepolia**.
+Safe contract calls, swaps and vault deposits on **Base mainnet, Base Sepolia, Ethereum mainnet or Ethereum Sepolia**.
 Start with the [setup guide](docs/README.md); application connection follows deployment.
 
 Your first deployment stays disabled while you test your backend, application
@@ -273,7 +268,7 @@ prepare funding and bundler/paymaster infrastructure separately. User assets sta
 in individual Safes. Follow the [application setup sequence](docs/application-obligations.md).
 
 The [getting-started guide](docs/README.md) covers installation. The [advanced
-configuration reference](docs/setup-wizard.md) documents static source setup.
+configuration reference](docs/setup.md) documents static source setup.
 
 ## Connect and operate
 
@@ -288,7 +283,7 @@ helps you test it with your own services.
 An authorization signature, transaction submission, verified chain result and
 business settlement describe different outcomes. Applications fund the verifying
 paymaster and private bundler for the [Safe execution flow](docs/user-operation-execution.md).
-Select Base mainnet, Base Sepolia or Ethereum Sepolia and complete acceptance for the selected chain. Use a separate deployment and storage for each network.
+One instance can offer Base mainnet, Base Sepolia, Ethereum mainnet and Ethereum Sepolia. Choose a default network during installation and additional networks in administration. Verified identity and application registration are shared; wallets, consent, transaction rules, execution and fee funding remain separate for each network. Existing integrations keep their default network and account URLs. See [network setup and selection](docs/provider-guide.md#offer-multiple-networks).
 Applications use the account wallet endpoint; no raw-signature endpoint is exposed.
 
 ## Extend the service
@@ -296,7 +291,7 @@ Applications use the account wallet endpoint; no raw-signature endpoint is expos
 Use the [developer API guide](docs/api.md) for reviewed host composition and the
 [TypeScript declarations](docs/api-reference.md) for exact interfaces. Embedded
 hosts use the same Safe/bundler/paymaster flow. These interfaces are optional;
-they are not prerequisites for wizard setup.
+they are not prerequisites for installation.
 
 ## Contribute
 

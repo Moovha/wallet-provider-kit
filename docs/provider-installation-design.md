@@ -81,10 +81,11 @@ Adopting these patterns does not establish production custody readiness.
 
 ## Operator experience
 
-Installation has three stages: **Choose where to run → Review your setup → Start and sign in**. Destinations are this computer, an existing Linux
-server and an explicitly supported cloud template. Detect/reuse an existing
-runtime; explain privileged host changes before running them. Advanced ingress,
-storage and secret-store settings appear in their relevant context.
+Installation prepares a disabled service through a terminal installer. Its persistent
+administration console owns network choices, application registration and user checks.
+Destinations include this computer, an existing Linux server and an explicitly
+supported cloud template. Detect and reuse an existing runtime; explain host changes
+before running them. Infrastructure settings remain in reviewed installation files.
 
 Show destination, version, data location and exposure before starting. Named
 progress stages report actual work; do not invent percentages. Failed stages
@@ -96,7 +97,7 @@ requires HTTPS or an authenticated private connection. DNS and certificate
 requirements are explicit; browser certificate warnings are not an onboarding
 instruction. Existing ingress can be used without installing a second proxy.
 
-The console initially exposes Overview, Applications, Access and API reference.
+The console exposes Overview, Applications, Networks, User checks, Access and API reference.
 Operations, Maintenance and Settings are additional task areas when their working
 controls are available; do not add empty navigation to imply functionality.
 An empty application list is a valid state with actions to register through the

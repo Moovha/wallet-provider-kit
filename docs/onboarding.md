@@ -5,7 +5,7 @@ consent and staff-review experience. In the standard journey, people stay in the
 [connected application](application-access.md); you can skip this page.
 
 This integration is experimental and single-host. Your developer must explicitly
-select hosted access in [advanced Applications](setup-wizard.md#_4-applications).
+select hosted access in [advanced Applications](setup.md).
 Omitted access mode in legacy configurations also selects hosted access. An active
 store needs a reviewed ownership migration before changing modes.
 
