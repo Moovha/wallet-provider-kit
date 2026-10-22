@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Accept Cognito token responses without optional scope metadata so invited
+  administrators can reach email verification after signing in. Preserve signed
+  identity, group approval and verification checks; log only fixed failure stages.
+
 - Add optional Amazon Cognito administrator sign-in with code/PKCE login,
   explicit approval-group checks and five-minute provider sessions. Approved
   directory members can complete host-authorized first-time setup without copying

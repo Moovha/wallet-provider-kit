@@ -200,6 +200,7 @@ export function createCognitoAdministration(
           login = pending.get(key);
         pending.delete(key);
         const browser = browserCookie(request);
+        let failureStage = 'browser_binding';
         try {
           if (
             url.searchParams.getAll('state').length !== 1 ||
@@ -209,6 +210,7 @@ export function createCognitoAdministration(
             login.browser !== fingerprint(browser)
           )
             throw new AuthenticationError(401);
+          failureStage = 'code_exchange';
           const tokens = await oidc.authorizationCodeGrant(configuration, url, {
             pkceCodeVerifier: login.verifier,
             expectedState: state,
@@ -217,6 +219,7 @@ export function createCognitoAdministration(
             maxAge: 300,
           });
           const claims = tokens.claims();
+          failureStage = 'identity_checks';
           if (
             typeof tokens.id_token !== 'string' ||
             tokens.id_token.length > 16384
@@ -244,12 +247,11 @@ export function createCognitoAdministration(
           )
             throw new AuthenticationError(401);
           if (claims.email_verified !== true) {
+            // Scope metadata is optional in token responses; Cognito checks the access token on its profile API.
             if (
               typeof tokens.access_token !== 'string' ||
-              tokens.access_token.length > 16384 ||
-              !tokens.scope
-                ?.split(' ')
-                .includes('aws.cognito.signin.user.admin')
+              !tokens.access_token ||
+              tokens.access_token.length > 16384
             )
               throw new AuthenticationError(401);
             const session = randomBytes(32).toString('base64url');
@@ -260,6 +262,7 @@ export function createCognitoAdministration(
             setCookie(reply, session, 300);
             return reply.redirect('/admin/');
           }
+          failureStage = 'administrator_authorization';
           const principal = await service.federatedAdministrator(
             issuer,
             claims.sub,
@@ -273,6 +276,13 @@ export function createCognitoAdministration(
           setCookie(reply, session, 60);
           return reply.redirect('/admin/');
         } catch {
+          // Log only a fixed stage, never protocol error objects or authentication material.
+          process.stderr.write(
+            JSON.stringify({
+              event: 'administrator_signin_rejected',
+              stage: failureStage,
+            }) + '\n',
+          );
           setCookie(reply, '', 0);
           return reply.redirect('/admin/?signin=failed');
         }

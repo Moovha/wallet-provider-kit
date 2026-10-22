@@ -95,7 +95,6 @@ async function fixture(mode = 'valid', bootstrap = true) {
         mode === 'signature' ? await generateKeyPair('RS256') : key;
       return json({
         access_token: 'unused-offline-token',
-        scope: 'openid email aws.cognito.signin.user.admin',
         token_type: 'Bearer',
         expires_in: 300,
         id_token: await new SignJWT(claims)

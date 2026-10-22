@@ -8,6 +8,7 @@ test('guides email verification using a private browser session without granting
   context,
 }) => {
   const app = Fastify();
+  let expectedOrigin = '';
   let sent = 0,
     verified = 0;
   app.get('/admin/', async (_request, reply) =>
@@ -32,6 +33,8 @@ test('guides email verification using a private browser session without granting
     verifyEmail: true,
   }));
   app.post('/admin/auth/email/send', async (request, reply) => {
+    if (request.headers.origin !== expectedOrigin)
+      return reply.code(403).send({});
     if (!request.headers.cookie?.includes('offline-verification=browser-bound'))
       return reply.code(401).send({});
     sent++;
@@ -40,6 +43,8 @@ test('guides email verification using a private browser session without granting
   app.post<{ Body: { code: string } }>(
     '/admin/auth/email/verify',
     async (request, reply) => {
+      if (request.headers.origin !== expectedOrigin)
+        return reply.code(403).send({});
       if (
         !request.headers.cookie?.includes('offline-verification=browser-bound')
       )
@@ -53,6 +58,7 @@ test('guides email verification using a private browser session without granting
     reply.type('text/html').send('<h1>Continue to hosted sign-in</h1>'),
   );
   const url = await app.listen({ host: '127.0.0.1', port: 0 });
+  expectedOrigin = url;
   try {
     await context.addCookies([
       {
