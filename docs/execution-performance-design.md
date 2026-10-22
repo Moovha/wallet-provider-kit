@@ -3,8 +3,9 @@
 This design record is for developers reviewing wallet execution, resource limits
 and performance experiments. It describes the baseline at `3d6bb2f` and the
 source-pinned Alto v1.2.8 runtime. Performance acceptance of the scheduling
-candidate in [PR #83](https://github.com/Moovha/wallet-provider-kit/pull/83) remains pending. Successful offline tests do not establish a
-live latency or RPC improvement.
+candidate in [PR #83](https://github.com/Moovha/wallet-provider-kit/pull/83) is
+documented in the [controlled Base Sepolia comparison](base-sepolia-execution-performance.md).
+Successful offline tests alone do not establish a live latency or RPC improvement.
 
 ## Follow the four paths
 
@@ -200,8 +201,8 @@ three-second bound and the queue remains bounded at 64, with at most 32 waiting 
 
 This changes scheduling rather than receipt validity. Canonicality checks,
 current authority checks, per-wallet observation cadence and existing feed
-lifetimes remain required. A new controlled comparison is needed to establish
-whether the correction improves both latency and total RPC usage.
+lifetimes remain required. The controlled comparison tests whether the complete
+implementation improves both inclusion latency and total RPC usage.
 
 ## Apply priority to endpoint selection and read admission
 
@@ -226,8 +227,8 @@ offered transfers were subsequently independently verified using their original
 identities and measurement windows. Its planned final baseline pair was not
 offered. A warm candidate preparation also included a three-second secondary
 read timeout; the routing regressions explain why admission priority must be
-applied at both scheduling layers. A complete comparison of the corrected
-implementation remains required.
+applied at both scheduling layers. The complete comparison of `30641f3` retains
+all eighty offers and reports restarted, warm and idle windows separately.
 
 ## Make the execution visible before benchmarking
 

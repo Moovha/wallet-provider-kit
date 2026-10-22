@@ -56,6 +56,11 @@ second; these are workload observations, not a controlled comparison of provider
 billing, code revisions or production latency. The later run was slower despite
 its faster acknowledgement and is not evidence of an inclusion-speed improvement.
 
+A subsequent [controlled execution comparison](base-sepolia-execution-performance.md)
+alternates fixed revisions with equal measurement windows, funding checks and
+explicit historical-workload controls. Its results are reported separately from
+the observations above.
+
 A separate offline regression measured explicit grant selection against ten
 stored grants: the selected-grant path read one grant instead of ten. Live queue
 evidence established the removal of repeated revoked-request work; it does not

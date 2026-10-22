@@ -212,6 +212,10 @@ export default defineConfig({
             link: '/docs/execution-performance-design',
           },
           {
+            text: 'Base Sepolia performance evidence',
+            link: '/docs/base-sepolia-execution-performance',
+          },
+          {
             text: 'Signature boundaries',
             link: '/docs/durable-safe-op-signing',
           },
