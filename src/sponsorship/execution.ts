@@ -76,7 +76,7 @@ export class UserOperationExecutionCoordinator {
       request,
     );
   }
-  private check(plan: UserOperationExecution) {
+  private check(plan: UserOperationExecution, settlement = false) {
     const sponsorship = this.database.sponsorship.load(plan.operationId);
     if (
       plan.configurationHash !== this.configurationHash ||
@@ -88,15 +88,29 @@ export class UserOperationExecutionCoordinator {
         ) ||
       !sponsorship ||
       plan.sponsorshipHash !== sponsorship.termsHash ||
-      sponsorship.configurationHash !== this.binding.configurationHash
+      (!settlement &&
+        sponsorship.configurationHash !== this.binding.configurationHash) ||
+      (settlement &&
+        (!plan.dispatch ||
+          !this.binding.accountIds.includes(plan.intent.account.accountId) ||
+          plan.intent.input.account_id !== plan.intent.account.accountId))
     )
       throw new WalletProviderError('wallet_attempt_unavailable', 'unknown');
   }
   async load(id: string) {
-    const plan = await this.actions.onboarding.store.transaction(
-      (state) => state.userOperationExecutions?.[id] ?? null,
-    );
-    if (plan) this.check(plan);
+    return this.loadPlan(id, false);
+  }
+  private async loadPlan(id: string, settlement: boolean) {
+    const plan = await this.actions.onboarding.store.transaction((state) => {
+      if (
+        settlement &&
+        state.deploymentBindings?.['service-v1']?.activeRevision !==
+          this.actions.revision
+      )
+        deny();
+      return state.userOperationExecutions?.[id] ?? null;
+    });
+    if (plan) this.check(plan, settlement);
     return plan;
   }
   private async timestamp(id: string, field: string) {
@@ -214,16 +228,24 @@ export class UserOperationExecutionCoordinator {
     });
   }
   async refresh(id: string) {
-    const existing = this.refreshing.get(id);
+    return this.refreshObservation(id, false);
+  }
+  /** Recheck dispatched historical operations without authorizing sponsorship, signing or submission. */
+  async refreshSettlement(id: string) {
+    return this.refreshObservation(id, true);
+  }
+  private async refreshObservation(id: string, settlement: boolean) {
+    const key = settlement ? 'settlement:' + id : id;
+    const existing = this.refreshing.get(key);
     if (existing) return existing;
-    const running = this.observe(id).finally(() => {
-      if (this.refreshing.get(id) === running) this.refreshing.delete(id);
+    const running = this.observe(id, settlement).finally(() => {
+      if (this.refreshing.get(key) === running) this.refreshing.delete(key);
     });
-    this.refreshing.set(id, running);
+    this.refreshing.set(key, running);
     return running;
   }
-  private async observe(id: string) {
-    const before = await this.load(id);
+  private async observe(id: string, settlement: boolean) {
+    const before = await this.loadPlan(id, settlement);
     if (!before) return null;
     let hint: string | undefined = before.observation.receipt?.transactionHash;
     try {
@@ -239,7 +261,13 @@ export class UserOperationExecutionCoordinator {
     );
     await this.actions.onboarding.store.transaction((state) => {
       const current = state.userOperationExecutions?.[id] ?? deny();
-      this.check(current);
+      if (
+        settlement &&
+        state.deploymentBindings?.['service-v1']?.activeRevision !==
+          this.actions.revision
+      )
+        deny();
+      this.check(current, settlement);
       if (current.observationRevision !== before.observationRevision) return;
       current.observation = observation;
       current.observationRevision++;
@@ -256,7 +284,7 @@ export class UserOperationExecutionCoordinator {
       ]) !== canonicalHash([observation.state, observation.receipt ?? null])
     )
       for (const listener of this.listeners) listener(id);
-    return this.load(id);
+    return this.loadPlan(id, settlement);
   }
   async read(principal: VerifiedPrincipal, id: string) {
     await this.signing.withExecutionRead(principal, id, () => true);

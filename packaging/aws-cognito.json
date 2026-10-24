@@ -89,7 +89,7 @@
           "why": "Public OIDC client uses PKCE; the provider exchanges codes on the server.",
           "must": [
             "Exact provider callback and logout paths; no implicit grant or browser secret.",
-            "Provider discards refresh tokens and grants only five-minute administration sessions."
+            "Provider discards refresh tokens and grants administration sessions lasting at most 30 minutes."
           ]
         }
       },

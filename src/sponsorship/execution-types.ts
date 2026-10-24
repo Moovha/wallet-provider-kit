@@ -44,7 +44,7 @@ export interface UserOperationExecution {
   observationRevision: number;
 }
 export interface UserOperationBatch {
-  lastFailure?: { code: string; at: string };
+  lastFailure?: { code: string; at: string; origin?: string };
   retryCount?: number;
   timings?: Record<string, string>;
   id: string;

@@ -105,3 +105,77 @@ export const enrollmentIdentitySchema = {
     },
   },
 };
+
+export const walletSetupSchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: [
+    'phase',
+    'running',
+    'execution_enabled',
+    'verification_mode',
+    'maximum_cost_wei',
+    'transactions',
+  ],
+  properties: {
+    phase: {
+      type: 'string',
+      enum: [
+        'not-started',
+        'checking',
+        'deploying',
+        'funding',
+        'publishing',
+        'ready',
+        'attention',
+      ],
+    },
+    running: { type: 'boolean' },
+    execution_enabled: { type: 'boolean' },
+    verification_mode: { type: 'string', enum: ['single', 'quorum'] },
+    maximum_cost_wei: { type: 'string' },
+    funding_allocation: {
+      type: 'object',
+      additionalProperties: false,
+      required: [
+        'paymasterBasisPoints',
+        'bundlerBasisPoints',
+        'reserveBasisPoints',
+        'feeReserveWei',
+        'minimumRefillWei',
+      ],
+      properties: {
+        paymasterBasisPoints: { type: 'integer', minimum: 1, maximum: 9999 },
+        bundlerBasisPoints: { type: 'integer', minimum: 1, maximum: 9999 },
+        provisioningBasisPoints: { type: 'integer', minimum: 0, maximum: 9999 },
+        reserveBasisPoints: { type: 'integer', minimum: 1, maximum: 9999 },
+        feeReserveWei: { type: 'string', pattern: '^[1-9][0-9]{0,77}$' },
+        minimumRefillWei: { type: 'string', pattern: '^[1-9][0-9]{0,77}$' },
+      },
+    },
+    transactions: {
+      type: 'array',
+      maxItems: 20,
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['step', 'status'],
+        properties: {
+          step: {
+            type: 'string',
+            enum: [
+              'fee-contract',
+              'fee-deposit',
+              'submission-funding',
+              'wallet-setup',
+            ],
+          },
+          status: {
+            type: 'string',
+            enum: ['confirmed', 'submitted', 'uncertain', 'prepared'],
+          },
+        },
+      },
+    },
+  },
+} as const;

@@ -101,6 +101,7 @@ export const apiOperationOrder = [
   'submitApplicationActions',
   'submitApplicationServices',
   'submitApplicationSponsorship',
+  'configureProviderConnections',
   'proposeProviderSponsorship',
   'acceptProviderSponsorship',
   'readProviderApplicationObligations',
@@ -118,8 +119,8 @@ export const apiOperationOrder = [
   'readApplicationCredentials',
   'writeApplicationCredential',
   'readProviderApplicationCredentials',
-  'readSafeWalletInfrastructure',
-  'provisionSafeWalletInfrastructure',
+  'readWalletServices',
+  'provisionWalletServices',
   'prepareApplicationFundingAddress',
   'readApplicationGasFunding',
   'listNetworks',
@@ -364,8 +365,8 @@ export const operationGuides: Record<string, OperationGuide> = {
     prerequisite: 'No authentication required.',
     success: '200: the Safe ERC-4337 contract and configuration availability.',
   },
-  readSafeWalletInfrastructure: {
-    title: 'Check network-fee setup for an application',
+  readWalletServices: {
+    title: 'Check application wallet services',
     group: 'Network connections and fees',
     audience: 'Service operator',
     purpose:
@@ -394,12 +395,12 @@ export const operationGuides: Record<string, OperationGuide> = {
     success:
       '200: the stable application funding address and infrastructure status. No chain access, contract deployment, transfer or wallet activation occurs. Complete infrastructure acceptance separately before funding or wallet use.',
   },
-  provisionSafeWalletInfrastructure: {
-    title: 'Prepare an application to pay network fees',
+  provisionWalletServices: {
+    title: 'Provision application wallet services',
     group: 'Network connections and fees',
     audience: 'Service operator',
     purpose:
-      'Prepare the private transaction submission service and fee-paying contract needed for the application’s wallets.',
+      'Deploy the application paymaster, fund its fee deposit and transaction submitter, and configure its private bundler service.',
     whenToUse:
       'Use after accepting its network services and fee agreement. This setup may deploy contracts and consume application funding; it does not create a user wallet.',
     scope: 'wallet:configuration:write',
@@ -407,7 +408,7 @@ export const operationGuides: Record<string, OperationGuide> = {
     prerequisite:
       'Accept the application RPC and sponsorship terms. Fund the returned application address and retry with the original application identity.',
     success:
-      '200: journaled paymaster deployment and gas funding. Uncertain transactions retain their original signed payload and hash.',
+      '200: journaled paymaster deployment, fee funding and submission configuration, with preparation progress. Current operator authority and the displayed preparation-cost ceiling apply even while user execution is disabled. Uncertain transactions retain their original signed payload and hash.',
   },
   readApplicationGasFunding: {
     title: 'Find where to fund application network fees',
@@ -543,6 +544,21 @@ export const operationGuides: Record<string, OperationGuide> = {
       'Save application-owned service connections first. Use your application token, the current service-declaration revision and a UUIDv4 idempotency key. Submit opaque saved references rather than secrets.',
     success:
       '200: saved service declarations awaiting provider review. Changes require a new provider decision before eligible connections can be used.',
+  },
+  configureProviderConnections: {
+    title: 'Save and approve application blockchain connections',
+    group: 'Network connections and fees',
+    audience: 'Service operator',
+    purpose:
+      'Save encrypted application-scoped RPC URLs and approve their verification, submission and observation roles in one revision.',
+    whenToUse:
+      'Use the administration console to configure or replace the complete connection set for one application and selected network.',
+    scope: 'wallet:configuration:write',
+    runtimeConfiguration: true,
+    prerequisite:
+      'Authenticate as a current provider operator with an enabled application. Supply the expected services revision, HTTPS endpoints and a UUIDv4 idempotency key. Independent verification requires two different origins.',
+    success:
+      '200: accepted service declarations. Endpoint secrets are never returned. Connections remain subject to chain and contract checks; saving neither deploys contracts nor enables user wallets.',
   },
   proposeProviderSponsorship: {
     title: 'Offer application network-fee terms',

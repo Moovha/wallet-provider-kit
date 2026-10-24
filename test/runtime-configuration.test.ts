@@ -1148,6 +1148,169 @@ describe('application obligations', () => {
   });
 });
 
+describe('provider blockchain connections', () => {
+  it('requires operator authority, encrypts connections and preserves exact retries and revision conflicts', async () => {
+    const { db } = await fixture();
+    const cipher = new ApplicationCredentialCipher(
+      Buffer.alloc(32, 7).toString('base64'),
+    );
+    const make = () =>
+      new RuntimeConfigurationService(
+        policy,
+        db.onboardingStore,
+        options,
+        'deployment-1',
+        undefined,
+        undefined,
+        cipher,
+      );
+    const service = make();
+    const appId = runtimeApplicationId(issuer, 'first');
+    const connections = [
+      {
+        kind: 'rpc-verification' as const,
+        endpoint: 'https://first.example.test/private-first-token',
+      },
+      {
+        kind: 'rpc-verification' as const,
+        endpoint: 'https://second.example.test/private-second-token',
+      },
+      {
+        kind: 'rpc-submission' as const,
+        endpoint: 'https://first.example.test/private-submit-token',
+      },
+    ];
+    const input = { expected_revision: '0', connections };
+    await expect(
+      service.configureConnections(context(), appId, input),
+    ).rejects.toMatchObject(denied);
+    await expect(
+      service.configureConnections(
+        context({ ...application(), scopes: ['wallet:configuration:write'] }),
+        appId,
+        input,
+      ),
+    ).rejects.toMatchObject(denied);
+    const actor = context(operator);
+    const saved = await service.configureConnections(actor, appId, input);
+    expect(saved).toMatchObject({
+      decision: 'accepted',
+      revision: '1',
+      kind: 'services',
+    });
+    expect(JSON.stringify(saved)).not.toContain('private-');
+    expect(await make().configureConnections(actor, appId, input)).toEqual(
+      saved,
+    );
+    expect(await make().rpcEndpoints(appId)).toEqual(
+      connections.slice(0, 2).map((c) => c.endpoint),
+    );
+    expect(
+      (await service.readCredentials(application())).map((c) => c.origin),
+    ).toEqual([
+      'https://first.example.test',
+      'https://second.example.test',
+      'https://first.example.test',
+    ]);
+    expect(await service.readCredentials(application('second'))).toEqual([]);
+    const state = await db.onboardingStore.transaction((s) =>
+      structuredClone(s),
+    );
+    expect(JSON.stringify(state)).not.toContain('private-first-token');
+    await expect(
+      service.configureConnections(context(operator), appId, input),
+    ).rejects.toMatchObject(conflicted);
+    await expect(
+      service.configureConnections(context(operator), appId, {
+        ...input,
+        expected_revision: '1',
+        connections: [
+          connections[0],
+          {
+            ...connections[1],
+            endpoint: 'https://first.example.test/another-key',
+          },
+          connections[2],
+        ],
+      }),
+    ).rejects.toMatchObject({ code: 'wallet_provider_input' });
+    await expect(
+      service.configureConnections(context(operator), appId, {
+        ...input,
+        expected_revision: '1',
+        connections: [
+          { ...connections[0], endpoint: 'http://localhost/private' },
+          ...connections.slice(1),
+        ],
+      }),
+    ).rejects.toMatchObject({ code: 'wallet_provider_input' });
+    const changed = await service.configureConnections(
+      context(operator),
+      appId,
+      {
+        ...input,
+        expected_revision: '1',
+        connections: connections.map((c) => ({
+          ...c,
+          endpoint: c.endpoint + '-replacement',
+        })),
+      },
+    );
+    expect(changed.revision).toBe('2');
+    expect(await make().rpcEndpoints(appId)).toEqual(
+      connections.slice(0, 2).map((c) => c.endpoint + '-replacement'),
+    );
+    const server = await createServer({
+      runtimeConfiguration: service,
+      authenticate: async (authorization, scope) => {
+        const caller =
+          authorization === 'Bearer operator'
+            ? operator
+            : authorization === 'Bearer application'
+              ? application()
+              : undefined;
+        if (!caller) throw new AuthenticationError(401);
+        if (!caller.scopes.includes(scope)) throw new AuthenticationError(403);
+        return caller;
+      },
+    });
+    servers.push(server);
+    const url = '/v1/provider/applications/' + appId + '/connections';
+    const payload = { ...input, expected_revision: '2' };
+    for (const [authorization, status] of [
+      [undefined, 401],
+      ['Bearer application', 403],
+    ] as const) {
+      const response = await server.inject({
+        method: 'PUT',
+        url,
+        payload,
+        headers: {
+          ...(authorization ? { authorization } : {}),
+          'idempotency-key': randomUUID(),
+        },
+      });
+      expect(response.statusCode).toBe(status);
+    }
+    const response = await server.inject({
+      method: 'PUT',
+      url,
+      payload,
+      headers: {
+        authorization: 'Bearer operator',
+        'idempotency-key': randomUUID(),
+      },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      kind: 'services',
+      decision: 'accepted',
+      revision: '3',
+    });
+    expect(response.body).not.toContain('private-first-token');
+  });
+});
+
 describe('application credentials', () => {
   it('accepts one application RPC in single mode while preserving the quorum minimum', async () => {
     const { db } = await fixture();

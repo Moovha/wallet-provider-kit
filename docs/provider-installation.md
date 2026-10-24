@@ -106,8 +106,8 @@ initializes. Restarting does not reopen setup. If it has expired, follow
 You should now see the overview with an empty application list. Management can be
 available while **wallet operations are disabled**. That is the expected result.
 
-Sign in again after reloading or when your session expires. The console keeps
-its short-lived access token only in page memory. Protect the console, management
+Administrator sessions last 30 minutes. Sign in again after reloading or when
+your session expires. The console keeps its access token only in page memory. Protect the console, management
 API and API explorer with the same access controls.
 
 ### Sign in with Amazon Cognito
@@ -167,14 +167,14 @@ state, a nonce and signature validation against the configured directory. The
 public app client has no secret; it must allow only the exact callback
 `https://<provider-hostname>/admin/auth/callback` and logout address
 `https://<provider-hostname>/admin/`, with ID tokens lasting five minutes.
-Provider tokens stay in page memory for five minutes; refresh tokens are discarded.
+Administrator tokens stay in page memory for 30 minutes; refresh tokens are discarded.
 The `aws.cognito.signin.user.admin` scope permits only the signed-in person's
 Cognito profile operations and is used for email verification; it is not an IAM
 permission or provider administrator approval. Unverified accounts receive no
 provider token. Their verification access token stays in server memory and expires after five
 minutes.
 Removing directory group membership prevents new provider sessions. An already
-issued provider token can remain usable for up to five minutes; suspend its local
+issued administrator token can remain usable for up to 30 minutes; suspend its local
 administrator identity through the protected management API for immediate denial.
 Sign out ends the page session and redirects to Cognito logout. A copied provider
 token remains subject to its short expiry and current local permissions.

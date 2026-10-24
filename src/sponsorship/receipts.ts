@@ -12,7 +12,7 @@ import {
 } from 'ethers';
 import { RpcReader } from '../execution/chain.js';
 import {
-  implementationSlot,
+  proxyImplementationSlot,
   allowsEmptyRecipientCode,
   type PinnedContract,
 } from '../execution/approved-calls.js';
@@ -170,7 +170,7 @@ export class UserOperationReceiptObserver {
     if (pin.implementation) {
       const slot = await reader.call('eth_getStorageAt', [
         pin.address,
-        implementationSlot,
+        proxyImplementationSlot(pin),
         tag,
       ]);
       if (

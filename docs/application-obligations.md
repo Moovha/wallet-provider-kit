@@ -43,7 +43,7 @@ Changing policy cannot rewrite an operation that has already been signed.
 ## Accept provider fee terms
 
 The provider can offer network-specific sponsorship terms from **Applications →
-Network fees** or with
+Wallet services** or with
 `PUT /v1/provider/applications/{applicationId}/obligations/sponsorship`.
 The request supplies `expected_revision` and the sponsorship `value`. It creates a
 pending record with `proposed_by: "provider"`; the provider cannot accept its own
@@ -59,7 +59,7 @@ A provider rejection withdraws its offer; the application cannot accept it again
 The provider must publish a replacement offer to reopen acceptance.
 
 The provider can prepare a stable funding address while its offer awaits
-acceptance. The application reads it through its safe-wallet endpoint, accepts
+acceptance. The application reads it through `GET /v1/application/gas-funding`, accepts
 the terms, then funds it with ETH on that network. Address preparation makes no
 chain requests and permits no deployment, transfer or sponsorship. Those effects
 still require accepted terms and all current authority and readiness checks.

@@ -126,7 +126,11 @@ it('grants trusted application access without login or review and preserves one 
       accountId,
       address: '0x1111111111111111111111111111111111111111',
     })),
-    findAccount: vi.fn(async () => null),
+    findAccount: vi.fn(
+      async (): Promise<
+        import('../src/domain/signing.js').EmbeddedAccount | null
+      > => null,
+    ),
     signTypedData: vi.fn(async () => {
       throw new Error('No signing in this fixture');
     }),
@@ -157,6 +161,83 @@ it('grants trusted application access without login or review and preserves one 
   const renewed = await f.service.request(context(), renewedInput);
   expect(renewed.account_id).toBe(receipt.account_id);
   expect(renewed.status).toBe('granted');
+  const originalAdmission = await f.store.transaction((state) =>
+    structuredClone(Object.entries(state.admissions)[0]),
+  );
+  expect(
+    await f.service.canDispatchProvision(
+      originalAdmission[0],
+      receipt.account_id!,
+    ),
+  ).toBe(false);
+  raw.findAccount.mockImplementation(async () => result);
+  expect(await wallet.provision(context(), receipt.account_id!)).toEqual(
+    result,
+  );
+  expect(raw.createAccount).toHaveBeenCalledTimes(1);
+  expect(
+    await f.store.transaction((state) => Object.entries(state.admissions)[0]),
+  ).toEqual(originalAdmission);
+  raw.findAccount.mockResolvedValueOnce(null);
+  await expect(
+    wallet.provision(context(), receipt.account_id!),
+  ).rejects.toMatchObject({ code: 'wallet_provider_unavailable' });
+  raw.findAccount.mockImplementationOnce(async () => {
+    await f.service.revokeApplicationGrant(context(), renewed.grant_id!);
+    return result;
+  });
+  await expect(
+    wallet.provision(context(), receipt.account_id!),
+  ).rejects.toMatchObject({ code: 'wallet_authorization_denied' });
+  expect(raw.createAccount).toHaveBeenCalledTimes(1);
+});
+it('keeps uncertain creation bound to its original grant after permission renewal', async () => {
+  const f = await fixture();
+  const ctx = context();
+  const granted = await f.service.request(ctx, f.input());
+  const raw = {
+    provider: 'offline',
+    createAccount: vi.fn(async (): Promise<never> => {
+      throw new Error('Lost fixture response');
+    }),
+    findAccount: vi.fn(async (accountId: string) => ({
+      accountId,
+      address: '0x1111111111111111111111111111111111111111',
+    })),
+    signTypedData: vi.fn(),
+  };
+  const backend = createJournaledWalletProvider(raw, {
+    namespace: 'test-app-access',
+    journal: createOnboardingJournal(f.store),
+    authorizeAttempt: (request) =>
+      f.service.canDispatchProvision(request.attemptId, request.accountId),
+  });
+  const wallet = new EmbeddedWalletService(
+    f.service.walletAuthority(),
+    backend,
+  );
+  await expect(
+    wallet.provision(context(), granted.account_id!),
+  ).rejects.toMatchObject({ outcome: 'unknown' });
+  const before = await f.store.transaction((state) =>
+    structuredClone({ admissions: state.admissions, attempts: state.attempts }),
+  );
+  await f.service.revokeApplicationGrant(context(), granted.grant_id!);
+  const input = f.input();
+  input.user!.consent.granted_at = new Date().toISOString();
+  const renewed = await f.service.request(context(), input);
+  expect(renewed.account_id).toBe(granted.account_id);
+  await expect(
+    wallet.provision(context(), renewed.account_id!),
+  ).rejects.toMatchObject({ code: 'wallet_authorization_denied' });
+  expect(raw.createAccount).toHaveBeenCalledTimes(1);
+  expect(raw.findAccount).not.toHaveBeenCalled();
+  expect(
+    await f.store.transaction((state) => ({
+      admissions: state.admissions,
+      attempts: state.attempts,
+    })),
+  ).toEqual(before);
 });
 it('isolates application user IDs, wallet connections, evidence references and grant revocation', async () => {
   const f = await fixture();

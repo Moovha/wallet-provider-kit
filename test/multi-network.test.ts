@@ -553,6 +553,32 @@ it.each(['ethereum', 'ethereum-sepolia'] as const)(
       configurations[index].activation.enabled = true;
       const resources = context.runtimeConfiguration!;
       vi.spyOn(resources, 'assertOperator').mockImplementation(() => {});
+      vi.spyOn(resources, 'readObligations').mockResolvedValue({
+        application_id: applicationId,
+        authorizes_spending: false,
+        activates_execution: false,
+        resources: [
+          {
+            application_id: applicationId,
+            kind: 'services',
+            revision: '1',
+            value: [],
+            decision: 'accepted',
+            decision_revision: '1',
+            submitted_at: new Date().toISOString(),
+          },
+          {
+            application_id: applicationId,
+            kind: 'sponsorship',
+            revision: '1',
+            value: { account_model: 'provider-controlled-user-safe' },
+            decision: 'accepted',
+            decision_revision: '1',
+            submitted_at: new Date().toISOString(),
+          },
+        ],
+      } as Awaited<ReturnType<typeof resources.readObligations>>);
+
       vi.spyOn(resources, 'acceptedSponsorship').mockResolvedValue({
         value: { account_model: 'provider-controlled-user-safe' },
       } as Awaited<ReturnType<typeof resources.acceptedSponsorship>>);

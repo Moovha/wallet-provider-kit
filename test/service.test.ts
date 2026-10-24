@@ -281,3 +281,106 @@ describe('provider HTTP boundary', () => {
     expect(provider.createAccount).not.toHaveBeenCalled();
   });
 });
+
+it('routes protected wallet services with the selected network and confirmed cost ceiling', async () => {
+  const applicationId = 'a'.repeat(64);
+  const result = {
+    application_id: applicationId,
+    chain_id: 'eip155:84532',
+    profile: 'safe-only-4337-v1',
+    status: 'unprovisioned',
+  };
+  const read = vi.fn(async () => result);
+  const ensure = vi.fn(async () => result);
+  const prepareFundingAddress = vi.fn(async () => result);
+  const safeWallet = {
+    read,
+    ensure,
+    prepareFundingAddress,
+  } as unknown as import('../src/sponsorship/safe-wallet.js').SafeWalletRuntime;
+  const selectedNetworks: unknown[] = [];
+  const app = await createServer({
+    authenticate,
+    documentation: false,
+    resolveNetwork(request) {
+      selectedNetworks.push(request.headers['wallet-network']);
+      return { network: 'base-sepolia', safeWallet };
+    },
+  });
+  servers.push(app);
+  const path =
+    '/v1/provider/applications/' + applicationId + '/wallet-services';
+  const headers = {
+    authorization:
+      'Bearer ' + (await token({ scope: 'wallet:configuration:write' })),
+    'wallet-network': 'base-sepolia',
+    'idempotency-key': attemptId,
+  };
+  for (const [method, url] of [
+    ['GET', path],
+    ['POST', path],
+    ['POST', path + '/funding-address'],
+  ] as const) {
+    const denied = await app.inject({
+      method,
+      url,
+      payload: method === 'POST' ? {} : undefined,
+    });
+    expect(denied.statusCode).toBe(401);
+  }
+  expect(read).not.toHaveBeenCalled();
+  expect(ensure).not.toHaveBeenCalled();
+  expect(prepareFundingAddress).not.toHaveBeenCalled();
+  expect((await app.inject({ url: path, headers })).json()).toEqual(result);
+  const invalid = await app.inject({
+    method: 'POST',
+    url: path,
+    headers,
+    payload: { maximum_cost_wei: '0' },
+  });
+  expect(invalid.statusCode).toBe(400);
+  expect(ensure).not.toHaveBeenCalled();
+  const provisioned = await app.inject({
+    method: 'POST',
+    url: path,
+    headers,
+    payload: { maximum_cost_wei: '250000000000000' },
+  });
+  expect(provisioned.statusCode).toBe(200);
+  expect(ensure).toHaveBeenCalledWith(
+    expect.objectContaining({
+      idempotencyKey: attemptId,
+      principal: expect.objectContaining({ clientId: 'client-a' }),
+    }),
+    applicationId,
+    '250000000000000',
+  );
+  expect(
+    (
+      await app.inject({
+        method: 'POST',
+        url: path + '/funding-address',
+        headers,
+        payload: {},
+      })
+    ).statusCode,
+  ).toBe(200);
+  expect(prepareFundingAddress).toHaveBeenCalledWith(
+    expect.objectContaining({ idempotencyKey: attemptId }),
+    applicationId,
+  );
+  expect(selectedNetworks).toContain('base-sepolia');
+  for (const method of ['GET', 'POST'] as const) {
+    expect(
+      (
+        await app.inject({
+          method,
+          url:
+            '/v1/configuration/applications/' + applicationId + '/safe-wallet',
+          headers,
+          payload: method === 'POST' ? {} : undefined,
+        })
+      ).statusCode,
+    ).toBe(404);
+  }
+});

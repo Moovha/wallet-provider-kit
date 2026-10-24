@@ -494,6 +494,16 @@ Choose manual review or limited automatic publication for future application con
 
 Save and review application-owned network connections, prepare fee-paying infrastructure and find its funding address. These addresses and costs are separate from user assets.
 
+### Save and approve application blockchain connections
+
+Save encrypted application-scoped RPC URLs and approve their verification, submission and observation roles in one revision.
+
+**Who uses it:** Service operator.
+
+**When you need it:** Use the administration console to configure or replace the complete connection set for one application and selected network.
+
+[`PUT /v1/provider/applications/{applicationId}/connections`](http-reference.md#put-v1-provider-applications-applicationid-connections) — request body, permissions, effects and response details.
+
 ### See saved network connection details
 
 List your saved service connection references and their status without returning secret values.
@@ -524,7 +534,7 @@ Inspect the service origins and saved connection references an application wants
 
 [`GET /v1/provider/applications/{applicationId}/credentials`](http-reference.md#get-v1-provider-applications-applicationid-credentials) — request body, permissions, effects and response details.
 
-### Check network-fee setup for an application
+### Check application wallet services
 
 See whether the application’s fee-paying infrastructure is prepared and whether it needs funding.
 
@@ -532,17 +542,17 @@ See whether the application’s fee-paying infrastructure is prepared and whethe
 
 **When you need it:** Use before preparing or troubleshooting wallet creation. This concerns application fee funding, not a person’s wallet balance.
 
-[`GET /v1/configuration/applications/{applicationId}/safe-wallet`](http-reference.md#get-v1-configuration-applications-applicationid-safe-wallet) — request body, permissions, effects and response details.
+[`GET /v1/provider/applications/{applicationId}/wallet-services`](http-reference.md#get-v1-provider-applications-applicationid-wallet-services) — request body, permissions, effects and response details.
 
-### Prepare an application to pay network fees
+### Provision application wallet services
 
-Prepare the private transaction submission service and fee-paying contract needed for the application’s wallets.
+Deploy the application paymaster, fund its fee deposit and transaction submitter, and configure its private bundler service.
 
 **Who uses it:** Service operator.
 
 **When you need it:** Use after accepting its network services and fee agreement. This setup may deploy contracts and consume application funding; it does not create a user wallet.
 
-[`POST /v1/configuration/applications/{applicationId}/safe-wallet`](http-reference.md#post-v1-configuration-applications-applicationid-safe-wallet) — request body, permissions, effects and response details.
+[`POST /v1/provider/applications/{applicationId}/wallet-services`](http-reference.md#post-v1-provider-applications-applicationid-wallet-services) — request body, permissions, effects and response details.
 
 ### Prepare an application fee-funding address
 
@@ -552,7 +562,7 @@ Create or retrieve the retained address used to fund an application’s accepted
 
 **When you need it:** Use after offering provider fee terms or approving application-submitted terms, including while wallet execution is disabled.
 
-[`POST /v1/configuration/applications/{applicationId}/safe-wallet/funding-address`](http-reference.md#post-v1-configuration-applications-applicationid-safe-wallet-funding-address) — request body, permissions, effects and response details.
+[`POST /v1/provider/applications/{applicationId}/wallet-services/funding-address`](http-reference.md#post-v1-provider-applications-applicationid-wallet-services-funding-address) — request body, permissions, effects and response details.
 
 ### Find where to fund application network fees
 

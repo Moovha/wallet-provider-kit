@@ -1,3 +1,4 @@
+import { walletSetupSchema } from './schemas.js';
 import { providerNetwork } from '../networks.js';
 import {
   usesNetworkContext,
@@ -694,11 +695,11 @@ export async function createServer(options: ServerOptions = {}) {
     },
   );
   app.get<{ Params: { applicationId: string } }>(
-    '/v1/configuration/applications/:applicationId/safe-wallet',
+    '/v1/provider/applications/:applicationId/wallet-services',
     {
       onRequest: (request) => authorize(request, 'wallet:configuration:write'),
       schema: {
-        operationId: 'readSafeWalletInfrastructure',
+        operationId: 'readWalletServices',
         response: {
           200: {
             type: 'object',
@@ -714,6 +715,7 @@ export async function createServer(options: ServerOptions = {}) {
               },
               funding_address: { type: 'string' },
               paymaster: { type: 'string' },
+              setup: walletSetupSchema,
             },
           },
           403: problemSchema,
@@ -738,12 +740,15 @@ export async function createServer(options: ServerOptions = {}) {
         })()
       ).read(principals.get(request)!, request.params.applicationId),
   );
-  app.post<{ Params: { applicationId: string } }>(
-    '/v1/configuration/applications/:applicationId/safe-wallet',
+  app.post<{
+    Params: { applicationId: string };
+    Body: { maximum_cost_wei?: string };
+  }>(
+    '/v1/provider/applications/:applicationId/wallet-services',
     {
       onRequest: (request) => authorize(request, 'wallet:configuration:write'),
       schema: {
-        operationId: 'provisionSafeWalletInfrastructure',
+        operationId: 'provisionWalletServices',
         headers: {
           type: 'object',
           required: ['idempotency-key'],
@@ -764,6 +769,7 @@ export async function createServer(options: ServerOptions = {}) {
               },
               funding_address: { type: 'string' },
               paymaster: { type: 'string' },
+              setup: walletSetupSchema,
             },
           },
           403: problemSchema,
@@ -778,7 +784,18 @@ export async function createServer(options: ServerOptions = {}) {
             applicationId: { type: 'string', pattern: '^[a-f0-9]{64}$' },
           },
         },
-        body: { type: 'object', additionalProperties: false },
+        body: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            maximum_cost_wei: {
+              type: 'string',
+              pattern: '^[1-9][0-9]{0,77}$',
+              description:
+                'Optional operator-confirmed ceiling for this preparation, including ETH moved into services. Cannot raise the server ceiling.',
+            },
+          },
+        },
       },
     },
     (request) =>
@@ -793,10 +810,11 @@ export async function createServer(options: ServerOptions = {}) {
           idempotencyKey: String(request.headers['idempotency-key'] ?? ''),
         },
         request.params.applicationId,
+        request.body?.maximum_cost_wei,
       ),
   );
   app.post<{ Params: { applicationId: string } }>(
-    '/v1/configuration/applications/:applicationId/safe-wallet/funding-address',
+    '/v1/provider/applications/:applicationId/wallet-services/funding-address',
     {
       onRequest: (request) => authorize(request, 'wallet:configuration:write'),
       schema: {
@@ -823,6 +841,7 @@ export async function createServer(options: ServerOptions = {}) {
               },
               funding_address: { type: 'string' },
               paymaster: { type: 'string' },
+              setup: walletSetupSchema,
             },
           },
           403: problemSchema,

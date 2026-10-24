@@ -7,7 +7,7 @@ export interface NetworkFeeQuote {
   baseFeePerGas: string;
   quotedAt: string;
 }
-/** The accepted total fee cannot cover the current base fee and bounded tip. */
+/** The accepted fee limits cannot cover the current network quote. */
 export class NetworkFeeLimitError extends WalletProviderError {
   readonly reason = 'network_fee_limit';
   constructor() {
@@ -56,7 +56,8 @@ export async function quoteNetworkFees(
     .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
   const base = bases.at(-1)!;
   const priorityCeiling = BigInt(limits.maxPriorityFeePerGas);
-  const tip = rewards[2] > priorityCeiling ? priorityCeiling : rewards[2];
+  const tip = rewards[2];
+  if (tip > priorityCeiling) throw new NetworkFeeLimitError();
   const minimum = base + tip;
   const ceiling = BigInt(limits.maxFeePerGas);
   if (minimum > ceiling) throw new NetworkFeeLimitError();

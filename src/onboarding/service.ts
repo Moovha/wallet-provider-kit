@@ -1964,12 +1964,31 @@ export class OnboardingService {
               grantId: grant.id,
               caller: { ...grant.caller },
             };
+          const original = state.admissions[attemptId];
+          const completed =
+            original.grantId !== grant.id &&
+            state.grants[original.grantId]?.owner === grant.owner
+              ? Object.values(state.attempts).find(
+                  (attempt) =>
+                    attempt.request.attemptId === attemptId &&
+                    attempt.request.accountId === accountId &&
+                    attempt.request.kind === 'provision' &&
+                    attempt.state === 'succeeded' &&
+                    attempt.result?.kind === 'provision' &&
+                    attempt.result.account.accountId === accountId &&
+                    attempt.result.account.address ===
+                      state.accounts[accountId].address,
+                )
+              : undefined;
           return {
             sessionSubject: grant.owner,
             ownerSubject: grant.owner,
             currentUserStatus: 'ID VERIFIED',
             accountId,
             attemptId,
+            ...(completed?.result?.kind === 'provision'
+              ? { completedAccount: completed.result.account }
+              : {}),
           };
         });
       },

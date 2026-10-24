@@ -78,7 +78,16 @@ export const runtimePolicySchema = {
         required: ['address', 'code_hash', 'methods'],
         properties: {
           ...pin.properties,
-          implementation: pin,
+          implementation: {
+            ...pin,
+            properties: {
+              ...pin.properties,
+              storage_layout: {
+                type: 'string',
+                enum: ['eip1967', 'zeppelinos'],
+              },
+            },
+          },
           methods: {
             type: 'array',
             minItems: 1,

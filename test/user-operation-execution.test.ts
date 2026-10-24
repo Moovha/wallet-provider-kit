@@ -1,6 +1,7 @@
 import { WalletProviderError } from '../src/domain/signing.js';
 import type { UserOperationV07 } from '../src/sponsorship/user-operation.js';
 import { NetworkFeeLimitError } from '../src/execution/network-fees.js';
+import { pendingFunding } from '../src/sponsorship/funding.js';
 import { describe, it, expect, vi } from 'vitest';
 import { Wallet, toQuantity, ZeroAddress } from 'ethers';
 import { fixture } from './helpers/safe-4337.js';
@@ -303,6 +304,119 @@ async function setup(
 }
 
 describe('ERC-4337 wallet calls durable submission and independent receipt recovery', () => {
+  it('settles historical inclusion after fee terms change and access is revoked without new financial effects', async () => {
+    const t = await setup();
+    await t.submit();
+    await t.ports.driver.runOnce();
+    t.s.included = true;
+    await t.ports.driver.runOnce();
+    const before = await t.f.onboarding.store.transaction(
+      (s) => Object.values(s.userOperationExecutions!)[0],
+    );
+    const reservation = () => ({
+      balanceWei: '10000000',
+      blockNumber: '0x64',
+      checkedAt: new Date().toISOString(),
+      maximumPendingWei: '10000000',
+      maximumPendingOperations: 1,
+      accountingOnly: true,
+    });
+    const costWei = t.f.db.sponsorship.load(before.operationId)!.maximumCostWei;
+    expect(() =>
+      pendingFunding(
+        [{ costWei, observation: before.observation }],
+        reservation(),
+        '1',
+      ),
+    ).toThrow();
+    t.f.config.sponsors[0].lifetimeBudgetWei = '20000000';
+    await t.restart();
+    await t.f.onboarding.store.transaction((s) => {
+      s.grants[t.f.grant.grant_id!].state = 'revoked';
+    });
+    await expect(
+      t.ports.execution.load(before.operationId),
+    ).rejects.toBeDefined();
+    await expect(
+      t.ports.execution.execute(t.f.context, before.operationId),
+    ).rejects.toBeDefined();
+    t.s.finalized = true;
+    expect(await t.ports.driver.settleOnce()).toBe(true);
+    const after = await t.f.onboarding.store.transaction((s) => ({
+      plan: s.userOperationExecutions![before.operationId],
+      batch: Object.values(s.userOperationBatches!)[0],
+    }));
+    expect(after.plan.observation.state).toBe('finalized');
+    expect(after.batch.stage).toBe('complete');
+    expect(
+      pendingFunding(
+        [{ costWei, observation: after.plan.observation }],
+        reservation(),
+        '1',
+      ),
+    ).toBe(1n);
+    expect(t.s.sends).toBe(1);
+    expect(t.f.state.signs).toBe(1);
+    expect(t.f.state.posts).toBe(2);
+    await expect(t.status()).rejects.toBeDefined();
+  });
+  it.each([
+    'mismatch',
+    'reorg',
+    'badPayload',
+    'badCost',
+    'tampered-plan',
+    'no-dispatch',
+    'retired-worker',
+    'not-finalized',
+    'other-account',
+  ] as const)(
+    'retains historical funding reservations when settlement is unsafe: %s',
+    async (failure) => {
+      const t = await setup();
+      await t.submit();
+      await t.ports.driver.runOnce();
+      t.s.included = true;
+      await t.ports.driver.runOnce();
+      t.f.config.sponsors[0].lifetimeBudgetWei = '20000000';
+      if (failure === 'other-account')
+        t.f.config.basePolicy.accounts[0].accountId = 'another-account';
+      await t.restart();
+      t.s.finalized = failure !== 'not-finalized';
+      if (['mismatch', 'reorg', 'badPayload', 'badCost'].includes(failure))
+        t.s[failure as 'mismatch' | 'reorg' | 'badPayload' | 'badCost'] = true;
+      else
+        await t.f.onboarding.store.transaction((s) => {
+          const plan = Object.values(s.userOperationExecutions!)[0];
+          if (failure === 'tampered-plan') plan.operation.callData = '0x1234';
+          if (failure === 'no-dispatch') delete plan.dispatch;
+          if (failure === 'retired-worker')
+            s.deploymentBindings!['service-v1'].activeRevision = 'retired';
+        });
+      await t.ports.driver.settleOnce();
+      const plan = await t.f.onboarding.store.transaction(
+        (s) => Object.values(s.userOperationExecutions!)[0],
+      );
+      expect(plan.observation.state).not.toBe('finalized');
+      expect(() =>
+        pendingFunding(
+          [{ costWei: '1', observation: plan.observation }],
+          {
+            balanceWei: '100',
+            blockNumber: '0x64',
+            checkedAt: new Date().toISOString(),
+            maximumPendingWei: '100',
+            maximumPendingOperations: 1,
+            accountingOnly: true,
+          },
+          '1',
+        ),
+      ).toThrow();
+      expect(t.s.sends).toBe(1);
+      expect(t.f.state.signs).toBe(1);
+      expect(t.f.state.posts).toBe(2);
+    },
+  );
   it('verifies the complete operation with one explicitly configured RPC source', async () => {
     const t = await setup('10000000', false, true);
     t.s.mismatch = true;

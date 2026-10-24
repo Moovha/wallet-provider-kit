@@ -19,9 +19,10 @@ COPY --from=build --chown=node:node /app/node_modules ./node_modules
 COPY --from=build --chown=node:node /app/dist ./dist
 COPY --chown=node:node package.json LICENSE NOTICE ./
 COPY --chown=node:node spec/provider-config.schema.json ./spec/
+COPY --chown=node:node docs/provider.config.safe.example.json ./docs/provider.config.safe.example.json
+RUN chmod 0644 /app/package.json /app/LICENSE /app/NOTICE \
+    /app/spec/provider-config.schema.json /app/docs/provider.config.safe.example.json
 USER node
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=3s CMD node -e "fetch('http://127.0.0.1:8080/health/live').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 CMD ["node", "dist/main.js"]
-
-COPY --chown=node:node docs/provider.config.safe.example.json ./docs/provider.config.safe.example.json

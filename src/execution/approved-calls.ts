@@ -24,10 +24,23 @@ import { canonicalHash } from '../domain/canonical.js';
 export interface PinnedContract {
   address: string;
   codeHash: string;
-  implementation?: { address: string; codeHash: string };
+  implementation?: {
+    address: string;
+    codeHash: string;
+    storageLayout?: 'eip1967' | 'zeppelinos';
+  };
 }
 export const implementationSlot =
   '0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc';
+export const zeppelinosImplementationSlot =
+  '0x7050c9e0f4ca769c69bd3a8ef740bc37934f8e2c036e5a723fd8ee048ed3f8c3';
+/** Resolve an explicitly approved proxy layout; omitted layouts retain EIP-1967. */
+export function proxyImplementationSlot(pin: PinnedContract): string {
+  const layout = pin.implementation?.storageLayout;
+  if (layout === 'zeppelinos') return zeppelinosImplementationSlot;
+  if (layout === undefined || layout === 'eip1967') return implementationSlot;
+  throw new WalletProviderError('wallet_authorization_denied');
+}
 export interface SafeAccountBinding extends PinnedContract {
   accountId: string;
   singleton: PinnedContract;
@@ -146,7 +159,10 @@ function exact(input: object, keys: string[]) {
     denied();
 }
 function pin(value: PinnedContract) {
-  if (value.implementation) pin(value.implementation);
+  if (value.implementation) {
+    proxyImplementationSlot(value);
+    pin(value.implementation);
+  }
   if (
     getAddress(value.address) === ZeroAddress ||
     !/^0x[0-9a-f]{64}$/.test(value.codeHash) ||

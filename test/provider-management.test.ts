@@ -1,4 +1,4 @@
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import type {
@@ -266,6 +266,27 @@ it('serves protected management with execution disabled and rejects application 
       }).toString(),
     });
     expect(issued.statusCode).toBe(200);
+    expect(issued.json().expires_in).toBe(1800);
+    const tokenTime = Date.now();
+    try {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(tokenTime + 29 * 60_000);
+      await expect(
+        issuer.authenticate(
+          'Bearer ' + issued.json().access_token,
+          'provider:manage',
+        ),
+      ).resolves.toBeDefined();
+      vi.setSystemTime(tokenTime + 30 * 60_000 + 6_000);
+      await expect(
+        issuer.authenticate(
+          'Bearer ' + issued.json().access_token,
+          'provider:manage',
+        ),
+      ).rejects.toMatchObject({ status: 401 });
+    } finally {
+      vi.useRealTimers();
+    }
     const excessive = await app.inject({
       method: 'POST',
       url: '/oauth/token',
@@ -313,6 +334,19 @@ it('serves protected management with execution disabled and rejects application 
       },
     });
     expect(token.statusCode).toBe(200);
+    expect(token.json().expires_in).toBe(300);
+    try {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(Date.now() + 6 * 60_000);
+      await expect(
+        issuer.authenticate(
+          'Bearer ' + token.json().access_token,
+          'wallet:access',
+        ),
+      ).rejects.toMatchObject({ status: 401 });
+    } finally {
+      vi.useRealTimers();
+    }
     expect(
       (
         await app.inject({

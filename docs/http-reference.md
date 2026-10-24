@@ -507,9 +507,9 @@ Success response schema:
 }
 ```
 
-## GET `/v1/configuration/applications/{applicationId}/safe-wallet`
+## GET `/v1/provider/applications/{applicationId}/wallet-services`
 
-Operation: `readSafeWalletInfrastructure`.
+Operation: `readWalletServices`.
 
 **Why this exists:** See whether the application’s fee-paying infrastructure is prepared and whether it needs funding.
 
@@ -558,16 +558,120 @@ Success response schema:
     },
     "paymaster": {
       "type": "string"
+    },
+    "setup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "phase",
+        "running",
+        "execution_enabled",
+        "verification_mode",
+        "maximum_cost_wei",
+        "transactions"
+      ],
+      "properties": {
+        "phase": {
+          "type": "string",
+          "enum": [
+            "not-started",
+            "checking",
+            "deploying",
+            "funding",
+            "publishing",
+            "ready",
+            "attention"
+          ]
+        },
+        "running": {
+          "type": "boolean"
+        },
+        "execution_enabled": {
+          "type": "boolean"
+        },
+        "verification_mode": {
+          "type": "string",
+          "enum": ["single", "quorum"]
+        },
+        "maximum_cost_wei": {
+          "type": "string"
+        },
+        "funding_allocation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "paymasterBasisPoints",
+            "bundlerBasisPoints",
+            "reserveBasisPoints",
+            "feeReserveWei",
+            "minimumRefillWei"
+          ],
+          "properties": {
+            "paymasterBasisPoints": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9999
+            },
+            "bundlerBasisPoints": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9999
+            },
+            "provisioningBasisPoints": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9999
+            },
+            "reserveBasisPoints": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9999
+            },
+            "feeReserveWei": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,77}$"
+            },
+            "minimumRefillWei": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,77}$"
+            }
+          }
+        },
+        "transactions": {
+          "type": "array",
+          "maxItems": 20,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["step", "status"],
+            "properties": {
+              "step": {
+                "type": "string",
+                "enum": [
+                  "fee-contract",
+                  "fee-deposit",
+                  "submission-funding",
+                  "wallet-setup"
+                ]
+              },
+              "status": {
+                "type": "string",
+                "enum": ["confirmed", "submitted", "uncertain", "prepared"]
+              }
+            }
+          }
+        }
+      }
     }
   }
 }
 ```
 
-## POST `/v1/configuration/applications/{applicationId}/safe-wallet`
+## POST `/v1/provider/applications/{applicationId}/wallet-services`
 
-Operation: `provisionSafeWalletInfrastructure`.
+Operation: `provisionWalletServices`.
 
-**Why this exists:** Prepare the private transaction submission service and fee-paying contract needed for the application’s wallets.
+**Why this exists:** Deploy the application paymaster, fund its fee deposit and transaction submitter, and configure its private bundler service.
 
 **Who uses it:** Service operator.
 
@@ -575,7 +679,7 @@ Operation: `provisionSafeWalletInfrastructure`.
 
 **Before you start:** Accept the application RPC and sponsorship terms. Fund the returned application address and retry with the original application identity.
 
-**Result and next step:** 200: journaled paymaster deployment and gas funding. Uncertain transactions retain their original signed payload and hash.
+**Result and next step:** 200: journaled paymaster deployment, fee funding and submission configuration, with preparation progress. Current operator authority and the displayed preparation-cost ceiling apply even while user execution is disabled. Uncertain transactions retain their original signed payload and hash.
 
 | Parameter         | Location | Required | Schema                                                                                                |
 | ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
@@ -588,7 +692,14 @@ Request body (application/json):
 ```json
 {
   "type": "object",
-  "additionalProperties": false
+  "additionalProperties": false,
+  "properties": {
+    "maximum_cost_wei": {
+      "type": "string",
+      "pattern": "^[1-9][0-9]{0,77}$",
+      "description": "Optional operator-confirmed ceiling for this preparation, including ETH moved into services. Cannot raise the server ceiling."
+    }
+  }
 }
 ```
 
@@ -624,12 +735,116 @@ Success response schema:
     },
     "paymaster": {
       "type": "string"
+    },
+    "setup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "phase",
+        "running",
+        "execution_enabled",
+        "verification_mode",
+        "maximum_cost_wei",
+        "transactions"
+      ],
+      "properties": {
+        "phase": {
+          "type": "string",
+          "enum": [
+            "not-started",
+            "checking",
+            "deploying",
+            "funding",
+            "publishing",
+            "ready",
+            "attention"
+          ]
+        },
+        "running": {
+          "type": "boolean"
+        },
+        "execution_enabled": {
+          "type": "boolean"
+        },
+        "verification_mode": {
+          "type": "string",
+          "enum": ["single", "quorum"]
+        },
+        "maximum_cost_wei": {
+          "type": "string"
+        },
+        "funding_allocation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "paymasterBasisPoints",
+            "bundlerBasisPoints",
+            "reserveBasisPoints",
+            "feeReserveWei",
+            "minimumRefillWei"
+          ],
+          "properties": {
+            "paymasterBasisPoints": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9999
+            },
+            "bundlerBasisPoints": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9999
+            },
+            "provisioningBasisPoints": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9999
+            },
+            "reserveBasisPoints": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9999
+            },
+            "feeReserveWei": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,77}$"
+            },
+            "minimumRefillWei": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,77}$"
+            }
+          }
+        },
+        "transactions": {
+          "type": "array",
+          "maxItems": 20,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["step", "status"],
+            "properties": {
+              "step": {
+                "type": "string",
+                "enum": [
+                  "fee-contract",
+                  "fee-deposit",
+                  "submission-funding",
+                  "wallet-setup"
+                ]
+              },
+              "status": {
+                "type": "string",
+                "enum": ["confirmed", "submitted", "uncertain", "prepared"]
+              }
+            }
+          }
+        }
+      }
     }
   }
 }
 ```
 
-## POST `/v1/configuration/applications/{applicationId}/safe-wallet/funding-address`
+## POST `/v1/provider/applications/{applicationId}/wallet-services/funding-address`
 
 Operation: `prepareApplicationFundingAddress`.
 
@@ -692,6 +907,110 @@ Success response schema:
     },
     "paymaster": {
       "type": "string"
+    },
+    "setup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "phase",
+        "running",
+        "execution_enabled",
+        "verification_mode",
+        "maximum_cost_wei",
+        "transactions"
+      ],
+      "properties": {
+        "phase": {
+          "type": "string",
+          "enum": [
+            "not-started",
+            "checking",
+            "deploying",
+            "funding",
+            "publishing",
+            "ready",
+            "attention"
+          ]
+        },
+        "running": {
+          "type": "boolean"
+        },
+        "execution_enabled": {
+          "type": "boolean"
+        },
+        "verification_mode": {
+          "type": "string",
+          "enum": ["single", "quorum"]
+        },
+        "maximum_cost_wei": {
+          "type": "string"
+        },
+        "funding_allocation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "paymasterBasisPoints",
+            "bundlerBasisPoints",
+            "reserveBasisPoints",
+            "feeReserveWei",
+            "minimumRefillWei"
+          ],
+          "properties": {
+            "paymasterBasisPoints": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9999
+            },
+            "bundlerBasisPoints": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9999
+            },
+            "provisioningBasisPoints": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9999
+            },
+            "reserveBasisPoints": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9999
+            },
+            "feeReserveWei": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,77}$"
+            },
+            "minimumRefillWei": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,77}$"
+            }
+          }
+        },
+        "transactions": {
+          "type": "array",
+          "maxItems": 20,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["step", "status"],
+            "properties": {
+              "step": {
+                "type": "string",
+                "enum": [
+                  "fee-contract",
+                  "fee-deposit",
+                  "submission-funding",
+                  "wallet-setup"
+                ]
+              },
+              "status": {
+                "type": "string",
+                "enum": ["confirmed", "submitted", "uncertain", "prepared"]
+              }
+            }
+          }
+        }
+      }
     }
   }
 }
@@ -1911,6 +2230,10 @@ Success response schema:
                       "code_hash": {
                         "type": "string",
                         "pattern": "^0x[0-9a-f]{64}$"
+                      },
+                      "storage_layout": {
+                        "type": "string",
+                        "enum": ["eip1967", "zeppelinos"]
                       }
                     }
                   },
@@ -1986,6 +2309,10 @@ Success response schema:
                               "codeHash": {
                                 "type": "string",
                                 "pattern": "^0x[0-9a-f]{64}$"
+                              },
+                              "storageLayout": {
+                                "type": "string",
+                                "enum": ["eip1967", "zeppelinos"]
                               }
                             }
                           }
@@ -2056,6 +2383,10 @@ Success response schema:
                               "codeHash": {
                                 "type": "string",
                                 "pattern": "^0x[0-9a-f]{64}$"
+                              },
+                              "storageLayout": {
+                                "type": "string",
+                                "enum": ["eip1967", "zeppelinos"]
                               }
                             }
                           }
@@ -2086,6 +2417,10 @@ Success response schema:
                               "codeHash": {
                                 "type": "string",
                                 "pattern": "^0x[0-9a-f]{64}$"
+                              },
+                              "storageLayout": {
+                                "type": "string",
+                                "enum": ["eip1967", "zeppelinos"]
                               }
                             }
                           }
@@ -2116,6 +2451,10 @@ Success response schema:
                               "codeHash": {
                                 "type": "string",
                                 "pattern": "^0x[0-9a-f]{64}$"
+                              },
+                              "storageLayout": {
+                                "type": "string",
+                                "enum": ["eip1967", "zeppelinos"]
                               }
                             }
                           }
@@ -2176,6 +2515,10 @@ Success response schema:
                               "codeHash": {
                                 "type": "string",
                                 "pattern": "^0x[0-9a-f]{64}$"
+                              },
+                              "storageLayout": {
+                                "type": "string",
+                                "enum": ["eip1967", "zeppelinos"]
                               }
                             }
                           }
@@ -2206,6 +2549,10 @@ Success response schema:
                               "codeHash": {
                                 "type": "string",
                                 "pattern": "^0x[0-9a-f]{64}$"
+                              },
+                              "storageLayout": {
+                                "type": "string",
+                                "enum": ["eip1967", "zeppelinos"]
                               }
                             }
                           }
@@ -2236,6 +2583,10 @@ Success response schema:
                               "codeHash": {
                                 "type": "string",
                                 "pattern": "^0x[0-9a-f]{64}$"
+                              },
+                              "storageLayout": {
+                                "type": "string",
+                                "enum": ["eip1967", "zeppelinos"]
                               }
                             }
                           }
@@ -4127,6 +4478,110 @@ Success response schema:
     },
     "paymaster": {
       "type": "string"
+    },
+    "setup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "phase",
+        "running",
+        "execution_enabled",
+        "verification_mode",
+        "maximum_cost_wei",
+        "transactions"
+      ],
+      "properties": {
+        "phase": {
+          "type": "string",
+          "enum": [
+            "not-started",
+            "checking",
+            "deploying",
+            "funding",
+            "publishing",
+            "ready",
+            "attention"
+          ]
+        },
+        "running": {
+          "type": "boolean"
+        },
+        "execution_enabled": {
+          "type": "boolean"
+        },
+        "verification_mode": {
+          "type": "string",
+          "enum": ["single", "quorum"]
+        },
+        "maximum_cost_wei": {
+          "type": "string"
+        },
+        "funding_allocation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "paymasterBasisPoints",
+            "bundlerBasisPoints",
+            "reserveBasisPoints",
+            "feeReserveWei",
+            "minimumRefillWei"
+          ],
+          "properties": {
+            "paymasterBasisPoints": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9999
+            },
+            "bundlerBasisPoints": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9999
+            },
+            "provisioningBasisPoints": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9999
+            },
+            "reserveBasisPoints": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9999
+            },
+            "feeReserveWei": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,77}$"
+            },
+            "minimumRefillWei": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,77}$"
+            }
+          }
+        },
+        "transactions": {
+          "type": "array",
+          "maxItems": 20,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["step", "status"],
+            "properties": {
+              "step": {
+                "type": "string",
+                "enum": [
+                  "fee-contract",
+                  "fee-deposit",
+                  "submission-funding",
+                  "wallet-setup"
+                ]
+              },
+              "status": {
+                "type": "string",
+                "enum": ["confirmed", "submitted", "uncertain", "prepared"]
+              }
+            }
+          }
+        }
+      }
     }
   }
 }
@@ -5022,6 +5477,349 @@ Success response schema:
     "activates_execution": {
       "type": "boolean",
       "enum": [false]
+    }
+  }
+}
+```
+
+## PUT `/v1/provider/applications/{applicationId}/connections`
+
+Operation: `configureProviderConnections`.
+
+**Why this exists:** Save encrypted application-scoped RPC URLs and approve their verification, submission and observation roles in one revision.
+
+**Who uses it:** Service operator.
+
+**When you need it:** Use the administration console to configure or replace the complete connection set for one application and selected network.
+
+**Before you start:** Authenticate as a current provider operator with an enabled application. Supply the expected services revision, HTTPS endpoints and a UUIDv4 idempotency key. Independent verification requires two different origins.
+
+**Result and next step:** 200: accepted service declarations. Endpoint secrets are never returned. Connections remain subject to chain and contract checks; saving neither deploys contracts nor enables user wallets.
+
+**Request details:** Protected, application-scoped declarations and provider decisions. Accepted actions constrain off-chain payloads. Accepted service declarations permit resolving application-owned verifier credentials when credential storage is configured. Acceptance does not fund gas, provision a user Safe, activate execution or authorize spending. User assets remain in individual user wallets. Secrets and actual user payloads must not be submitted here.
+
+| Parameter         | Location | Required | Schema                                                                                                |
+| ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
+| `applicationId`   | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{64}$"}`                                                        |
+| `idempotency-key` | header   | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+| `wallet-network`  | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum","ethereum-sepolia"]}`                      |
+
+Request body (application/json):
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["expected_revision", "connections"],
+  "properties": {
+    "expected_revision": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,19})$"
+    },
+    "connections": {
+      "type": "array",
+      "maxItems": 9,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "endpoint"],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": ["rpc-verification", "rpc-submission", "rpc-observation"]
+          },
+          "endpoint": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+| Status | Content type             | Description      |
+| ------ | ------------------------ | ---------------- |
+| 200    | application/json         | Default Response |
+| 400    | application/problem+json | Problem response |
+| 401    | application/problem+json | Problem response |
+| 403    | application/problem+json | Problem response |
+| 409    | application/problem+json | Problem response |
+| 413    | application/problem+json | Problem response |
+| 415    | application/problem+json | Problem response |
+| 422    | application/problem+json | Problem response |
+| 429    | application/problem+json | Problem response |
+| 500    | application/problem+json | Problem response |
+| 503    | application/problem+json | Problem response |
+
+Success response schema:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "application_id",
+    "kind",
+    "revision",
+    "value",
+    "submitted_at",
+    "decision",
+    "decision_revision"
+  ],
+  "properties": {
+    "application_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "kind": {
+      "type": "string",
+      "enum": ["actions", "services", "sponsorship"]
+    },
+    "revision": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,19})$"
+    },
+    "value": {
+      "anyOf": [
+        {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "description", "fields"],
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+              },
+              "description": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "fields": {
+                "type": "array",
+                "maxItems": 32,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["name", "required", "allowed_values"],
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+                    },
+                    "required": {
+                      "type": "boolean"
+                    },
+                    "allowed_values": {
+                      "type": "array",
+                      "minItems": 1,
+                      "maxItems": 64,
+                      "uniqueItems": true,
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "kind",
+              "vendor",
+              "credential_reference",
+              "billing_owner"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "rpc-verification",
+                  "rpc-submission",
+                  "rpc-observation",
+                  "other"
+                ]
+              },
+              "vendor": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+              },
+              "credential_reference": {
+                "type": "string",
+                "pattern": "^[a-zA-Z0-9_-]{1,128}$",
+                "description": "Opaque application-local secret-store reference. Never a credential, URL, environment-variable lookup or authority to read another application’s secret. Runtime resolution is not enabled by registration."
+              },
+              "billing_owner": {
+                "type": "string",
+                "enum": ["application"]
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "chain_id",
+            "funding_agreement",
+            "account_model",
+            "asset_model"
+          ],
+          "properties": {
+            "chain_id": {
+              "type": "string",
+              "enum": [
+                "eip155:8453",
+                "eip155:84532",
+                "eip155:1",
+                "eip155:11155111"
+              ]
+            },
+            "funding_agreement": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "maximum_gas_budget_wei": {
+              "description": "Optional cumulative sponsorship allowance in balance mode; required for legacy agreements. Additional ETH does not raise a configured allowance.",
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,77}$"
+            },
+            "account_model": {
+              "type": "string",
+              "enum": ["provider-controlled-user-safe"]
+            },
+            "asset_model": {
+              "type": "string",
+              "enum": ["individual-user-wallets"]
+            },
+            "funding_mode": {
+              "type": "string",
+              "enum": ["balance"],
+              "description": "Use current application funding with durable pending-cost reservations. A total budget remains optional; transaction and pending-fee ceilings are required."
+            },
+            "maximum_transaction_fee_wei": {
+              "description": "Maximum authorized network fee for one wallet operation, including its verification and fee reserve.",
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,77}$"
+            },
+            "maximum_pending_fees_wei": {
+              "description": "Maximum aggregate fee reservation for wallet operations without a verified final outcome. Unknown and unfinalized outcomes retain their reservations.",
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,77}$"
+            },
+            "maximum_execution_accounts": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100000
+            },
+            "maximum_in_flight_per_sponsor": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 16
+            },
+            "gas_limits": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "gas_limit",
+                "max_fee_per_gas",
+                "max_priority_fee_per_gas",
+                "l1_fee_reserve_wei"
+              ],
+              "properties": {
+                "gas_limit": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,77})$"
+                },
+                "max_fee_per_gas": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,77})$"
+                },
+                "max_priority_fee_per_gas": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,77})$"
+                },
+                "l1_fee_reserve_wei": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,77})$"
+                }
+              }
+            }
+          },
+          "anyOf": [
+            {
+              "required": [
+                "funding_mode",
+                "maximum_transaction_fee_wei",
+                "maximum_pending_fees_wei"
+              ],
+              "properties": {
+                "funding_mode": {
+                  "enum": ["balance"]
+                },
+                "maximum_transaction_fee_wei": {},
+                "maximum_pending_fees_wei": {}
+              }
+            },
+            {
+              "required": ["maximum_gas_budget_wei"],
+              "properties": {
+                "maximum_gas_budget_wei": {}
+              },
+              "not": {
+                "required": ["funding_mode"],
+                "properties": {
+                  "funding_mode": {}
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "submitted_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "proposed_by": {
+      "enum": ["provider"]
+    },
+    "decision_by": {
+      "type": "string",
+      "enum": ["provider", "application"]
+    },
+    "decision": {
+      "type": "string",
+      "enum": ["pending", "accepted", "rejected"]
+    },
+    "decision_revision": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,19})$"
+    },
+    "decided_at": {
+      "type": "string",
+      "format": "date-time"
     }
   }
 }
@@ -8178,6 +8976,10 @@ Success response schema:
                             "code_hash": {
                               "type": "string",
                               "pattern": "^0x[0-9a-f]{64}$"
+                            },
+                            "storage_layout": {
+                              "type": "string",
+                              "enum": ["eip1967", "zeppelinos"]
                             }
                           }
                         },
@@ -8253,6 +9055,10 @@ Success response schema:
                                     "codeHash": {
                                       "type": "string",
                                       "pattern": "^0x[0-9a-f]{64}$"
+                                    },
+                                    "storageLayout": {
+                                      "type": "string",
+                                      "enum": ["eip1967", "zeppelinos"]
                                     }
                                   }
                                 }
@@ -8323,6 +9129,10 @@ Success response schema:
                                     "codeHash": {
                                       "type": "string",
                                       "pattern": "^0x[0-9a-f]{64}$"
+                                    },
+                                    "storageLayout": {
+                                      "type": "string",
+                                      "enum": ["eip1967", "zeppelinos"]
                                     }
                                   }
                                 }
@@ -8353,6 +9163,10 @@ Success response schema:
                                     "codeHash": {
                                       "type": "string",
                                       "pattern": "^0x[0-9a-f]{64}$"
+                                    },
+                                    "storageLayout": {
+                                      "type": "string",
+                                      "enum": ["eip1967", "zeppelinos"]
                                     }
                                   }
                                 }
@@ -8383,6 +9197,10 @@ Success response schema:
                                     "codeHash": {
                                       "type": "string",
                                       "pattern": "^0x[0-9a-f]{64}$"
+                                    },
+                                    "storageLayout": {
+                                      "type": "string",
+                                      "enum": ["eip1967", "zeppelinos"]
                                     }
                                   }
                                 }
@@ -8443,6 +9261,10 @@ Success response schema:
                                     "codeHash": {
                                       "type": "string",
                                       "pattern": "^0x[0-9a-f]{64}$"
+                                    },
+                                    "storageLayout": {
+                                      "type": "string",
+                                      "enum": ["eip1967", "zeppelinos"]
                                     }
                                   }
                                 }
@@ -8473,6 +9295,10 @@ Success response schema:
                                     "codeHash": {
                                       "type": "string",
                                       "pattern": "^0x[0-9a-f]{64}$"
+                                    },
+                                    "storageLayout": {
+                                      "type": "string",
+                                      "enum": ["eip1967", "zeppelinos"]
                                     }
                                   }
                                 }
@@ -8503,6 +9329,10 @@ Success response schema:
                                     "codeHash": {
                                       "type": "string",
                                       "pattern": "^0x[0-9a-f]{64}$"
+                                    },
+                                    "storageLayout": {
+                                      "type": "string",
+                                      "enum": ["eip1967", "zeppelinos"]
                                     }
                                   }
                                 }
@@ -8748,6 +9578,10 @@ Success response schema:
                               "code_hash": {
                                 "type": "string",
                                 "pattern": "^0x[0-9a-f]{64}$"
+                              },
+                              "storage_layout": {
+                                "type": "string",
+                                "enum": ["eip1967", "zeppelinos"]
                               }
                             }
                           },
@@ -8827,6 +9661,10 @@ Success response schema:
                                       "codeHash": {
                                         "type": "string",
                                         "pattern": "^0x[0-9a-f]{64}$"
+                                      },
+                                      "storageLayout": {
+                                        "type": "string",
+                                        "enum": ["eip1967", "zeppelinos"]
                                       }
                                     }
                                   }
@@ -8897,6 +9735,10 @@ Success response schema:
                                       "codeHash": {
                                         "type": "string",
                                         "pattern": "^0x[0-9a-f]{64}$"
+                                      },
+                                      "storageLayout": {
+                                        "type": "string",
+                                        "enum": ["eip1967", "zeppelinos"]
                                       }
                                     }
                                   }
@@ -8927,6 +9769,10 @@ Success response schema:
                                       "codeHash": {
                                         "type": "string",
                                         "pattern": "^0x[0-9a-f]{64}$"
+                                      },
+                                      "storageLayout": {
+                                        "type": "string",
+                                        "enum": ["eip1967", "zeppelinos"]
                                       }
                                     }
                                   }
@@ -8957,6 +9803,10 @@ Success response schema:
                                       "codeHash": {
                                         "type": "string",
                                         "pattern": "^0x[0-9a-f]{64}$"
+                                      },
+                                      "storageLayout": {
+                                        "type": "string",
+                                        "enum": ["eip1967", "zeppelinos"]
                                       }
                                     }
                                   }
@@ -9017,6 +9867,10 @@ Success response schema:
                                       "codeHash": {
                                         "type": "string",
                                         "pattern": "^0x[0-9a-f]{64}$"
+                                      },
+                                      "storageLayout": {
+                                        "type": "string",
+                                        "enum": ["eip1967", "zeppelinos"]
                                       }
                                     }
                                   }
@@ -9047,6 +9901,10 @@ Success response schema:
                                       "codeHash": {
                                         "type": "string",
                                         "pattern": "^0x[0-9a-f]{64}$"
+                                      },
+                                      "storageLayout": {
+                                        "type": "string",
+                                        "enum": ["eip1967", "zeppelinos"]
                                       }
                                     }
                                   }
@@ -9077,6 +9935,10 @@ Success response schema:
                                       "codeHash": {
                                         "type": "string",
                                         "pattern": "^0x[0-9a-f]{64}$"
+                                      },
+                                      "storageLayout": {
+                                        "type": "string",
+                                        "enum": ["eip1967", "zeppelinos"]
                                       }
                                     }
                                   }
@@ -9352,6 +10214,10 @@ Success response schema:
                               "code_hash": {
                                 "type": "string",
                                 "pattern": "^0x[0-9a-f]{64}$"
+                              },
+                              "storage_layout": {
+                                "type": "string",
+                                "enum": ["eip1967", "zeppelinos"]
                               }
                             }
                           },
@@ -9431,6 +10297,10 @@ Success response schema:
                                       "codeHash": {
                                         "type": "string",
                                         "pattern": "^0x[0-9a-f]{64}$"
+                                      },
+                                      "storageLayout": {
+                                        "type": "string",
+                                        "enum": ["eip1967", "zeppelinos"]
                                       }
                                     }
                                   }
@@ -9501,6 +10371,10 @@ Success response schema:
                                       "codeHash": {
                                         "type": "string",
                                         "pattern": "^0x[0-9a-f]{64}$"
+                                      },
+                                      "storageLayout": {
+                                        "type": "string",
+                                        "enum": ["eip1967", "zeppelinos"]
                                       }
                                     }
                                   }
@@ -9531,6 +10405,10 @@ Success response schema:
                                       "codeHash": {
                                         "type": "string",
                                         "pattern": "^0x[0-9a-f]{64}$"
+                                      },
+                                      "storageLayout": {
+                                        "type": "string",
+                                        "enum": ["eip1967", "zeppelinos"]
                                       }
                                     }
                                   }
@@ -9561,6 +10439,10 @@ Success response schema:
                                       "codeHash": {
                                         "type": "string",
                                         "pattern": "^0x[0-9a-f]{64}$"
+                                      },
+                                      "storageLayout": {
+                                        "type": "string",
+                                        "enum": ["eip1967", "zeppelinos"]
                                       }
                                     }
                                   }
@@ -9621,6 +10503,10 @@ Success response schema:
                                       "codeHash": {
                                         "type": "string",
                                         "pattern": "^0x[0-9a-f]{64}$"
+                                      },
+                                      "storageLayout": {
+                                        "type": "string",
+                                        "enum": ["eip1967", "zeppelinos"]
                                       }
                                     }
                                   }
@@ -9651,6 +10537,10 @@ Success response schema:
                                       "codeHash": {
                                         "type": "string",
                                         "pattern": "^0x[0-9a-f]{64}$"
+                                      },
+                                      "storageLayout": {
+                                        "type": "string",
+                                        "enum": ["eip1967", "zeppelinos"]
                                       }
                                     }
                                   }
@@ -9681,6 +10571,10 @@ Success response schema:
                                       "codeHash": {
                                         "type": "string",
                                         "pattern": "^0x[0-9a-f]{64}$"
+                                      },
+                                      "storageLayout": {
+                                        "type": "string",
+                                        "enum": ["eip1967", "zeppelinos"]
                                       }
                                     }
                                   }
@@ -10256,6 +11150,10 @@ Success response schema:
                       "code_hash": {
                         "type": "string",
                         "pattern": "^0x[0-9a-f]{64}$"
+                      },
+                      "storage_layout": {
+                        "type": "string",
+                        "enum": ["eip1967", "zeppelinos"]
                       }
                     }
                   },
@@ -10331,6 +11229,10 @@ Success response schema:
                               "codeHash": {
                                 "type": "string",
                                 "pattern": "^0x[0-9a-f]{64}$"
+                              },
+                              "storageLayout": {
+                                "type": "string",
+                                "enum": ["eip1967", "zeppelinos"]
                               }
                             }
                           }
@@ -10401,6 +11303,10 @@ Success response schema:
                               "codeHash": {
                                 "type": "string",
                                 "pattern": "^0x[0-9a-f]{64}$"
+                              },
+                              "storageLayout": {
+                                "type": "string",
+                                "enum": ["eip1967", "zeppelinos"]
                               }
                             }
                           }
@@ -10431,6 +11337,10 @@ Success response schema:
                               "codeHash": {
                                 "type": "string",
                                 "pattern": "^0x[0-9a-f]{64}$"
+                              },
+                              "storageLayout": {
+                                "type": "string",
+                                "enum": ["eip1967", "zeppelinos"]
                               }
                             }
                           }
@@ -10461,6 +11371,10 @@ Success response schema:
                               "codeHash": {
                                 "type": "string",
                                 "pattern": "^0x[0-9a-f]{64}$"
+                              },
+                              "storageLayout": {
+                                "type": "string",
+                                "enum": ["eip1967", "zeppelinos"]
                               }
                             }
                           }
@@ -10521,6 +11435,10 @@ Success response schema:
                               "codeHash": {
                                 "type": "string",
                                 "pattern": "^0x[0-9a-f]{64}$"
+                              },
+                              "storageLayout": {
+                                "type": "string",
+                                "enum": ["eip1967", "zeppelinos"]
                               }
                             }
                           }
@@ -10551,6 +11469,10 @@ Success response schema:
                               "codeHash": {
                                 "type": "string",
                                 "pattern": "^0x[0-9a-f]{64}$"
+                              },
+                              "storageLayout": {
+                                "type": "string",
+                                "enum": ["eip1967", "zeppelinos"]
                               }
                             }
                           }
@@ -10581,6 +11503,10 @@ Success response schema:
                               "codeHash": {
                                 "type": "string",
                                 "pattern": "^0x[0-9a-f]{64}$"
+                              },
+                              "storageLayout": {
+                                "type": "string",
+                                "enum": ["eip1967", "zeppelinos"]
                               }
                             }
                           }
@@ -10887,6 +11813,10 @@ Success response schema:
                       "code_hash": {
                         "type": "string",
                         "pattern": "^0x[0-9a-f]{64}$"
+                      },
+                      "storage_layout": {
+                        "type": "string",
+                        "enum": ["eip1967", "zeppelinos"]
                       }
                     }
                   },
@@ -10962,6 +11892,10 @@ Success response schema:
                               "codeHash": {
                                 "type": "string",
                                 "pattern": "^0x[0-9a-f]{64}$"
+                              },
+                              "storageLayout": {
+                                "type": "string",
+                                "enum": ["eip1967", "zeppelinos"]
                               }
                             }
                           }
@@ -11032,6 +11966,10 @@ Success response schema:
                               "codeHash": {
                                 "type": "string",
                                 "pattern": "^0x[0-9a-f]{64}$"
+                              },
+                              "storageLayout": {
+                                "type": "string",
+                                "enum": ["eip1967", "zeppelinos"]
                               }
                             }
                           }
@@ -11062,6 +12000,10 @@ Success response schema:
                               "codeHash": {
                                 "type": "string",
                                 "pattern": "^0x[0-9a-f]{64}$"
+                              },
+                              "storageLayout": {
+                                "type": "string",
+                                "enum": ["eip1967", "zeppelinos"]
                               }
                             }
                           }
@@ -11092,6 +12034,10 @@ Success response schema:
                               "codeHash": {
                                 "type": "string",
                                 "pattern": "^0x[0-9a-f]{64}$"
+                              },
+                              "storageLayout": {
+                                "type": "string",
+                                "enum": ["eip1967", "zeppelinos"]
                               }
                             }
                           }
@@ -11152,6 +12098,10 @@ Success response schema:
                               "codeHash": {
                                 "type": "string",
                                 "pattern": "^0x[0-9a-f]{64}$"
+                              },
+                              "storageLayout": {
+                                "type": "string",
+                                "enum": ["eip1967", "zeppelinos"]
                               }
                             }
                           }
@@ -11182,6 +12132,10 @@ Success response schema:
                               "codeHash": {
                                 "type": "string",
                                 "pattern": "^0x[0-9a-f]{64}$"
+                              },
+                              "storageLayout": {
+                                "type": "string",
+                                "enum": ["eip1967", "zeppelinos"]
                               }
                             }
                           }
@@ -11212,6 +12166,10 @@ Success response schema:
                               "codeHash": {
                                 "type": "string",
                                 "pattern": "^0x[0-9a-f]{64}$"
+                              },
+                              "storageLayout": {
+                                "type": "string",
+                                "enum": ["eip1967", "zeppelinos"]
                               }
                             }
                           }
@@ -11518,6 +12476,10 @@ Success response schema:
                       "code_hash": {
                         "type": "string",
                         "pattern": "^0x[0-9a-f]{64}$"
+                      },
+                      "storage_layout": {
+                        "type": "string",
+                        "enum": ["eip1967", "zeppelinos"]
                       }
                     }
                   },
@@ -11593,6 +12555,10 @@ Success response schema:
                               "codeHash": {
                                 "type": "string",
                                 "pattern": "^0x[0-9a-f]{64}$"
+                              },
+                              "storageLayout": {
+                                "type": "string",
+                                "enum": ["eip1967", "zeppelinos"]
                               }
                             }
                           }
@@ -11663,6 +12629,10 @@ Success response schema:
                               "codeHash": {
                                 "type": "string",
                                 "pattern": "^0x[0-9a-f]{64}$"
+                              },
+                              "storageLayout": {
+                                "type": "string",
+                                "enum": ["eip1967", "zeppelinos"]
                               }
                             }
                           }
@@ -11693,6 +12663,10 @@ Success response schema:
                               "codeHash": {
                                 "type": "string",
                                 "pattern": "^0x[0-9a-f]{64}$"
+                              },
+                              "storageLayout": {
+                                "type": "string",
+                                "enum": ["eip1967", "zeppelinos"]
                               }
                             }
                           }
@@ -11723,6 +12697,10 @@ Success response schema:
                               "codeHash": {
                                 "type": "string",
                                 "pattern": "^0x[0-9a-f]{64}$"
+                              },
+                              "storageLayout": {
+                                "type": "string",
+                                "enum": ["eip1967", "zeppelinos"]
                               }
                             }
                           }
@@ -11783,6 +12761,10 @@ Success response schema:
                               "codeHash": {
                                 "type": "string",
                                 "pattern": "^0x[0-9a-f]{64}$"
+                              },
+                              "storageLayout": {
+                                "type": "string",
+                                "enum": ["eip1967", "zeppelinos"]
                               }
                             }
                           }
@@ -11813,6 +12795,10 @@ Success response schema:
                               "codeHash": {
                                 "type": "string",
                                 "pattern": "^0x[0-9a-f]{64}$"
+                              },
+                              "storageLayout": {
+                                "type": "string",
+                                "enum": ["eip1967", "zeppelinos"]
                               }
                             }
                           }
@@ -11843,6 +12829,10 @@ Success response schema:
                               "codeHash": {
                                 "type": "string",
                                 "pattern": "^0x[0-9a-f]{64}$"
+                              },
+                              "storageLayout": {
+                                "type": "string",
+                                "enum": ["eip1967", "zeppelinos"]
                               }
                             }
                           }
@@ -12088,6 +13078,10 @@ Request body (application/json):
                   "code_hash": {
                     "type": "string",
                     "pattern": "^0x[0-9a-f]{64}$"
+                  },
+                  "storage_layout": {
+                    "type": "string",
+                    "enum": ["eip1967", "zeppelinos"]
                   }
                 }
               },
@@ -12163,6 +13157,10 @@ Request body (application/json):
                           "codeHash": {
                             "type": "string",
                             "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "storageLayout": {
+                            "type": "string",
+                            "enum": ["eip1967", "zeppelinos"]
                           }
                         }
                       }
@@ -12233,6 +13231,10 @@ Request body (application/json):
                           "codeHash": {
                             "type": "string",
                             "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "storageLayout": {
+                            "type": "string",
+                            "enum": ["eip1967", "zeppelinos"]
                           }
                         }
                       }
@@ -12263,6 +13265,10 @@ Request body (application/json):
                           "codeHash": {
                             "type": "string",
                             "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "storageLayout": {
+                            "type": "string",
+                            "enum": ["eip1967", "zeppelinos"]
                           }
                         }
                       }
@@ -12293,6 +13299,10 @@ Request body (application/json):
                           "codeHash": {
                             "type": "string",
                             "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "storageLayout": {
+                            "type": "string",
+                            "enum": ["eip1967", "zeppelinos"]
                           }
                         }
                       }
@@ -12347,6 +13357,10 @@ Request body (application/json):
                           "codeHash": {
                             "type": "string",
                             "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "storageLayout": {
+                            "type": "string",
+                            "enum": ["eip1967", "zeppelinos"]
                           }
                         }
                       }
@@ -12377,6 +13391,10 @@ Request body (application/json):
                           "codeHash": {
                             "type": "string",
                             "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "storageLayout": {
+                            "type": "string",
+                            "enum": ["eip1967", "zeppelinos"]
                           }
                         }
                       }
@@ -12407,6 +13425,10 @@ Request body (application/json):
                           "codeHash": {
                             "type": "string",
                             "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "storageLayout": {
+                            "type": "string",
+                            "enum": ["eip1967", "zeppelinos"]
                           }
                         }
                       }
@@ -12646,6 +13668,10 @@ Success response schema:
                   "code_hash": {
                     "type": "string",
                     "pattern": "^0x[0-9a-f]{64}$"
+                  },
+                  "storage_layout": {
+                    "type": "string",
+                    "enum": ["eip1967", "zeppelinos"]
                   }
                 }
               },
@@ -12721,6 +13747,10 @@ Success response schema:
                           "codeHash": {
                             "type": "string",
                             "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "storageLayout": {
+                            "type": "string",
+                            "enum": ["eip1967", "zeppelinos"]
                           }
                         }
                       }
@@ -12791,6 +13821,10 @@ Success response schema:
                           "codeHash": {
                             "type": "string",
                             "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "storageLayout": {
+                            "type": "string",
+                            "enum": ["eip1967", "zeppelinos"]
                           }
                         }
                       }
@@ -12821,6 +13855,10 @@ Success response schema:
                           "codeHash": {
                             "type": "string",
                             "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "storageLayout": {
+                            "type": "string",
+                            "enum": ["eip1967", "zeppelinos"]
                           }
                         }
                       }
@@ -12851,6 +13889,10 @@ Success response schema:
                           "codeHash": {
                             "type": "string",
                             "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "storageLayout": {
+                            "type": "string",
+                            "enum": ["eip1967", "zeppelinos"]
                           }
                         }
                       }
@@ -12905,6 +13947,10 @@ Success response schema:
                           "codeHash": {
                             "type": "string",
                             "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "storageLayout": {
+                            "type": "string",
+                            "enum": ["eip1967", "zeppelinos"]
                           }
                         }
                       }
@@ -12935,6 +13981,10 @@ Success response schema:
                           "codeHash": {
                             "type": "string",
                             "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "storageLayout": {
+                            "type": "string",
+                            "enum": ["eip1967", "zeppelinos"]
                           }
                         }
                       }
@@ -12965,6 +14015,10 @@ Success response schema:
                           "codeHash": {
                             "type": "string",
                             "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "storageLayout": {
+                            "type": "string",
+                            "enum": ["eip1967", "zeppelinos"]
                           }
                         }
                       }
@@ -13229,6 +14283,10 @@ Success response schema:
                   "code_hash": {
                     "type": "string",
                     "pattern": "^0x[0-9a-f]{64}$"
+                  },
+                  "storage_layout": {
+                    "type": "string",
+                    "enum": ["eip1967", "zeppelinos"]
                   }
                 }
               },
@@ -13304,6 +14362,10 @@ Success response schema:
                           "codeHash": {
                             "type": "string",
                             "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "storageLayout": {
+                            "type": "string",
+                            "enum": ["eip1967", "zeppelinos"]
                           }
                         }
                       }
@@ -13374,6 +14436,10 @@ Success response schema:
                           "codeHash": {
                             "type": "string",
                             "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "storageLayout": {
+                            "type": "string",
+                            "enum": ["eip1967", "zeppelinos"]
                           }
                         }
                       }
@@ -13404,6 +14470,10 @@ Success response schema:
                           "codeHash": {
                             "type": "string",
                             "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "storageLayout": {
+                            "type": "string",
+                            "enum": ["eip1967", "zeppelinos"]
                           }
                         }
                       }
@@ -13434,6 +14504,10 @@ Success response schema:
                           "codeHash": {
                             "type": "string",
                             "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "storageLayout": {
+                            "type": "string",
+                            "enum": ["eip1967", "zeppelinos"]
                           }
                         }
                       }
@@ -13488,6 +14562,10 @@ Success response schema:
                           "codeHash": {
                             "type": "string",
                             "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "storageLayout": {
+                            "type": "string",
+                            "enum": ["eip1967", "zeppelinos"]
                           }
                         }
                       }
@@ -13518,6 +14596,10 @@ Success response schema:
                           "codeHash": {
                             "type": "string",
                             "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "storageLayout": {
+                            "type": "string",
+                            "enum": ["eip1967", "zeppelinos"]
                           }
                         }
                       }
@@ -13548,6 +14630,10 @@ Success response schema:
                           "codeHash": {
                             "type": "string",
                             "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "storageLayout": {
+                            "type": "string",
+                            "enum": ["eip1967", "zeppelinos"]
                           }
                         }
                       }
@@ -13830,6 +14916,10 @@ Success response schema:
                   "code_hash": {
                     "type": "string",
                     "pattern": "^0x[0-9a-f]{64}$"
+                  },
+                  "storage_layout": {
+                    "type": "string",
+                    "enum": ["eip1967", "zeppelinos"]
                   }
                 }
               },
@@ -13905,6 +14995,10 @@ Success response schema:
                           "codeHash": {
                             "type": "string",
                             "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "storageLayout": {
+                            "type": "string",
+                            "enum": ["eip1967", "zeppelinos"]
                           }
                         }
                       }
@@ -13975,6 +15069,10 @@ Success response schema:
                           "codeHash": {
                             "type": "string",
                             "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "storageLayout": {
+                            "type": "string",
+                            "enum": ["eip1967", "zeppelinos"]
                           }
                         }
                       }
@@ -14005,6 +15103,10 @@ Success response schema:
                           "codeHash": {
                             "type": "string",
                             "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "storageLayout": {
+                            "type": "string",
+                            "enum": ["eip1967", "zeppelinos"]
                           }
                         }
                       }
@@ -14035,6 +15137,10 @@ Success response schema:
                           "codeHash": {
                             "type": "string",
                             "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "storageLayout": {
+                            "type": "string",
+                            "enum": ["eip1967", "zeppelinos"]
                           }
                         }
                       }
@@ -14089,6 +15195,10 @@ Success response schema:
                           "codeHash": {
                             "type": "string",
                             "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "storageLayout": {
+                            "type": "string",
+                            "enum": ["eip1967", "zeppelinos"]
                           }
                         }
                       }
@@ -14119,6 +15229,10 @@ Success response schema:
                           "codeHash": {
                             "type": "string",
                             "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "storageLayout": {
+                            "type": "string",
+                            "enum": ["eip1967", "zeppelinos"]
                           }
                         }
                       }
@@ -14149,6 +15263,10 @@ Success response schema:
                           "codeHash": {
                             "type": "string",
                             "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "storageLayout": {
+                            "type": "string",
+                            "enum": ["eip1967", "zeppelinos"]
                           }
                         }
                       }
@@ -14389,6 +15507,10 @@ Request body (application/json):
                   "code_hash": {
                     "type": "string",
                     "pattern": "^0x[0-9a-f]{64}$"
+                  },
+                  "storage_layout": {
+                    "type": "string",
+                    "enum": ["eip1967", "zeppelinos"]
                   }
                 }
               },
@@ -14464,6 +15586,10 @@ Request body (application/json):
                           "codeHash": {
                             "type": "string",
                             "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "storageLayout": {
+                            "type": "string",
+                            "enum": ["eip1967", "zeppelinos"]
                           }
                         }
                       }
@@ -14534,6 +15660,10 @@ Request body (application/json):
                           "codeHash": {
                             "type": "string",
                             "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "storageLayout": {
+                            "type": "string",
+                            "enum": ["eip1967", "zeppelinos"]
                           }
                         }
                       }
@@ -14564,6 +15694,10 @@ Request body (application/json):
                           "codeHash": {
                             "type": "string",
                             "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "storageLayout": {
+                            "type": "string",
+                            "enum": ["eip1967", "zeppelinos"]
                           }
                         }
                       }
@@ -14594,6 +15728,10 @@ Request body (application/json):
                           "codeHash": {
                             "type": "string",
                             "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "storageLayout": {
+                            "type": "string",
+                            "enum": ["eip1967", "zeppelinos"]
                           }
                         }
                       }
@@ -14648,6 +15786,10 @@ Request body (application/json):
                           "codeHash": {
                             "type": "string",
                             "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "storageLayout": {
+                            "type": "string",
+                            "enum": ["eip1967", "zeppelinos"]
                           }
                         }
                       }
@@ -14678,6 +15820,10 @@ Request body (application/json):
                           "codeHash": {
                             "type": "string",
                             "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "storageLayout": {
+                            "type": "string",
+                            "enum": ["eip1967", "zeppelinos"]
                           }
                         }
                       }
@@ -14708,6 +15854,10 @@ Request body (application/json):
                           "codeHash": {
                             "type": "string",
                             "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "storageLayout": {
+                            "type": "string",
+                            "enum": ["eip1967", "zeppelinos"]
                           }
                         }
                       }
@@ -14948,6 +16098,10 @@ Success response schema:
                   "code_hash": {
                     "type": "string",
                     "pattern": "^0x[0-9a-f]{64}$"
+                  },
+                  "storage_layout": {
+                    "type": "string",
+                    "enum": ["eip1967", "zeppelinos"]
                   }
                 }
               },
@@ -15023,6 +16177,10 @@ Success response schema:
                           "codeHash": {
                             "type": "string",
                             "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "storageLayout": {
+                            "type": "string",
+                            "enum": ["eip1967", "zeppelinos"]
                           }
                         }
                       }
@@ -15093,6 +16251,10 @@ Success response schema:
                           "codeHash": {
                             "type": "string",
                             "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "storageLayout": {
+                            "type": "string",
+                            "enum": ["eip1967", "zeppelinos"]
                           }
                         }
                       }
@@ -15123,6 +16285,10 @@ Success response schema:
                           "codeHash": {
                             "type": "string",
                             "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "storageLayout": {
+                            "type": "string",
+                            "enum": ["eip1967", "zeppelinos"]
                           }
                         }
                       }
@@ -15153,6 +16319,10 @@ Success response schema:
                           "codeHash": {
                             "type": "string",
                             "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "storageLayout": {
+                            "type": "string",
+                            "enum": ["eip1967", "zeppelinos"]
                           }
                         }
                       }
@@ -15207,6 +16377,10 @@ Success response schema:
                           "codeHash": {
                             "type": "string",
                             "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "storageLayout": {
+                            "type": "string",
+                            "enum": ["eip1967", "zeppelinos"]
                           }
                         }
                       }
@@ -15237,6 +16411,10 @@ Success response schema:
                           "codeHash": {
                             "type": "string",
                             "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "storageLayout": {
+                            "type": "string",
+                            "enum": ["eip1967", "zeppelinos"]
                           }
                         }
                       }
@@ -15267,6 +16445,10 @@ Success response schema:
                           "codeHash": {
                             "type": "string",
                             "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "storageLayout": {
+                            "type": "string",
+                            "enum": ["eip1967", "zeppelinos"]
                           }
                         }
                       }
