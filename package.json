@@ -87,7 +87,7 @@
     "generate:spec": "node --import tsx scripts/check-spec.mjs --write",
     "check:secrets": "secretlint \"**/*\"",
     "sbom": "npm sbom --sbom-format cyclonedx --omit=dev",
-    "verify": "npm run check:safe-surface && npm run typecheck && npm run test && npm run check:read-helper && npm run check:paymaster && npm run check:spec && npm run check:docs && npm run format:check && npm run check:secrets",
+    "verify": "npm run check:safe-surface && npm run typecheck && npm run test && npm run check:security-mutations && npm run check:read-helper && npm run check:paymaster && npm run check:spec && npm run check:docs && npm run format:check && npm run check:secrets",
     "pack:local": "npm run build && npm pack --ignore-scripts",
     "check:package": "npm run build && node scripts/check-package.mjs",
     "generate:docs": "node scripts/api-docs.mjs --write",
@@ -100,7 +100,10 @@
     "check:read-helper": "node scripts/safe-state-reader.mjs",
     "generate:read-helper": "node scripts/safe-state-reader.mjs --write",
     "check:safe-surface": "node scripts/check-safe-surface.mjs",
-    "test:browser": "npm run build && playwright test --config test/browser/playwright.config.ts"
+    "test:browser": "npm run build && playwright test --config test/browser/playwright.config.ts",
+    "check:security-mutations": "node scripts/check-security-mutations.mjs",
+    "test:integration": "vitest run --config test/integration.vitest.config.ts",
+    "prepare:integration": "node scripts/prepare-integration-contracts.mjs"
   },
   "dependencies": {
     "@fastify/helmet": "13.2.0",

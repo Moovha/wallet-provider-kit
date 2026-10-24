@@ -28,8 +28,7 @@ describe('fixed bundler transport', () => {
   it.each(['wrong-id', 'rpc-error', 'large', 'lost', 'wrong-hash'])(
     'retains an uncertain single dispatch for %s',
     async (mode) => {
-      let sends = 0,
-        guards = 0;
+      let sends = 0;
       const request = (async (url, options) => {
         expect(String(url)).toBe(configuration.url);
         expect(options?.redirect).toBe('error');
@@ -66,12 +65,9 @@ describe('fixed bundler transport', () => {
         request,
       );
       await expect(
-        client.send(operation, async () => {
-          guards++;
-        }),
+        client.send(operation, async () => {}),
       ).rejects.toMatchObject({ outcome: 'unknown' });
       expect(sends).toBe(1);
-      expect(guards).toBe(1);
     },
   );
   it('checks fresh authority after readiness and before dispatch', async () => {

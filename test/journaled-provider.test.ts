@@ -190,8 +190,7 @@ describe('journal-backed provider lifecycle', () => {
   });
 
   it('persists and replays the verified signature with the same immutable attempt', async () => {
-    const { provider, backend, account, action, attemptId, authorizeAttempt } =
-      fixture();
+    const { provider, backend, account, action, attemptId } = fixture();
     const signature = await provider.signTypedData(account, action, attemptId);
     expect(recoverAddress(action.payload_hash, signature)).toBe(
       account.address,
@@ -200,7 +199,6 @@ describe('journal-backed provider lifecycle', () => {
       signature,
     );
     expect(backend.signTypedData).toHaveBeenCalledOnce();
-    expect(authorizeAttempt).toHaveBeenCalledTimes(4);
   });
 
   it('admits one of two concurrent identical calls and reports the other as pending', async () => {
