@@ -474,7 +474,6 @@ describe('SQLite financial approvals and journals', () => {
       maximum: '2',
       reserved: '1',
     });
-    expect(f.authorize.mock.calls.length).toBeGreaterThanOrEqual(6);
   });
 
   it('rejects changed approvals, idempotency reuse, other clients, stale policy and revoked success replay', async () => {

@@ -1,0 +1,50 @@
+[
+  {
+    "file": "Safe4337Module.json",
+    "package": "@safe-global/safe-4337@0.3.0",
+    "tarballIntegrity": "sha512-PL/+GrMwfyvRru1rhDwWVMXmHqzc8afa67cUOt1CGwSmbuFzamQGSPMxt9sX4Esmoyh7ICrO5lauPWPYp1Ei1Q==",
+    "sourcePath": "build/artifacts/contracts/Safe4337Module.sol/Safe4337Module.json",
+    "sourceSha256": "807699a38e4b81ca9497bbe290194427fe5b18b210d7d6cd0855f5daa9cd0e0d",
+    "fixtureSha256": "f4f442e6a62046a1f50a0627d3e177662c1d49e922c565b6e72b1515b53421c1"
+  },
+  {
+    "file": "SafeModuleSetup.json",
+    "package": "@safe-global/safe-4337@0.3.0",
+    "tarballIntegrity": "sha512-PL/+GrMwfyvRru1rhDwWVMXmHqzc8afa67cUOt1CGwSmbuFzamQGSPMxt9sX4Esmoyh7ICrO5lauPWPYp1Ei1Q==",
+    "sourcePath": "build/artifacts/contracts/SafeModuleSetup.sol/SafeModuleSetup.json",
+    "sourceSha256": "e647983008246d35aa47f21e247adb716f4d484280613ebc8df2b42413043d94",
+    "fixtureSha256": "2c33e6651c6e98e464f457b7da8269bf38a7c9738ecd9c01181a1feb76880cab"
+  },
+  {
+    "file": "Safe.json",
+    "package": "@safe-global/safe-contracts@1.4.1-2",
+    "tarballIntegrity": "sha512-UFiqZOamt1lDbyQ16lpzBE8mDdzfnQ3OBftll1erLlwIrdfmhePicQqfLquvyXA8AlqPWQ3ktz1DzpC9UcN+JQ==",
+    "sourcePath": "build/artifacts/contracts/Safe.sol/Safe.json",
+    "sourceSha256": "c36a5e99bc3f25c2d75ac5f7920b679200b3ce617c0d26e674b1321dbc6b0bdf",
+    "fixtureSha256": "1b959af67a7992dca597e5854d78354d993120bbaa33a8b17a9133ac183f6fd1"
+  },
+  {
+    "file": "SafeProxyFactory.json",
+    "package": "@safe-global/safe-contracts@1.4.1-2",
+    "tarballIntegrity": "sha512-UFiqZOamt1lDbyQ16lpzBE8mDdzfnQ3OBftll1erLlwIrdfmhePicQqfLquvyXA8AlqPWQ3ktz1DzpC9UcN+JQ==",
+    "sourcePath": "build/artifacts/contracts/proxies/SafeProxyFactory.sol/SafeProxyFactory.json",
+    "sourceSha256": "f77ccb60e95345e6583216e82feb5430098679d62aa4aeda7388df3831476997",
+    "fixtureSha256": "a667b89aa3cf5c624be889cf27e537af17f1b1198bd9236c2b6657480cecfb0e"
+  },
+  {
+    "file": "MultiSendCallOnly.json",
+    "package": "@safe-global/safe-contracts@1.4.1-2",
+    "tarballIntegrity": "sha512-UFiqZOamt1lDbyQ16lpzBE8mDdzfnQ3OBftll1erLlwIrdfmhePicQqfLquvyXA8AlqPWQ3ktz1DzpC9UcN+JQ==",
+    "sourcePath": "build/artifacts/contracts/libraries/MultiSendCallOnly.sol/MultiSendCallOnly.json",
+    "sourceSha256": "1cdf585a317b17e50e15c2cde9a41fa5a16b1579076a8a209005924b3cc2a8f2",
+    "fixtureSha256": "835ee3557e8051de02260f1a1c6846255ee4e7c9301eeac65d305cf14432f328"
+  },
+  {
+    "file": "EntryPoint.json",
+    "package": "@account-abstraction/contracts@0.7.0",
+    "tarballIntegrity": "sha512-Bt/66ilu3u8I9+vFZ9fTd+cWs55fdb9J5YKfrhsrFafH1drkzwuCSL/xEot1GGyXXNJLQuXbMRztQPyelNbY1A==",
+    "sourcePath": "artifacts/EntryPoint.json",
+    "sourceSha256": "952e7ce1e69354b9e80d0e68e0cbcc64f9304dd25c17170c3732114ea5421b04",
+    "fixtureSha256": "5132f98b9ddf26ff69e8677da373b5dc1e19b3ec4cf12f692c5f15a84eb59854"
+  }
+]

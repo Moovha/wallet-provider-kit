@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Add offline ERC-4337 integration coverage using pinned Safe and EntryPoint
+  contracts, the Alto bundler and persistent Valkey storage. Check recovery after
+  a lost submission response and service restarts without repeated execution.
+  Require targeted security mutations to fail behavioral tests; remove authorization
+  call-count assertions already covered by revocation checks, and consolidate
+  duplicate network-domain coverage.
+
 - Add saved access-request lookup and complete access-policy response types to
   the application client, including cross-application sharing requirements.
   Retain bounded problem details and retry delays in client errors; distinguish

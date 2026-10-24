@@ -22,6 +22,8 @@ import {
   buildApprovedCallIntent,
   tokenInterface,
   type ApprovedCallPolicy,
+  type PinnedContract,
+  type SafeAccountBinding,
 } from '../../src/execution/approved-calls.js';
 import {
   Safe4337SigningService,
@@ -55,12 +57,20 @@ export async function fixture(
   selectTokenAdapter = true,
   sharing = false,
   multipleWallets = false,
+  chain?: {
+    wallet: ReturnType<typeof Wallet.createRandom>;
+    target: PinnedContract;
+    account: Omit<SafeAccountBinding, 'accountId'>;
+    multiSend: PinnedContract;
+    request: typeof fetch;
+    maximumGasBudgetWei: string;
+  },
 ) {
   const directory = await mkdtemp(join(tmpdir(), 'wpk-as2-'));
   dirs.push(directory);
   let db = openProviderDatabase({ directory, initialize: true });
   dbs.push(db);
-  const wallet = Wallet.createRandom();
+  const wallet = chain?.wallet ?? Wallet.createRandom();
   const principal = {
     issuer: 'https://issuer.example.test',
     subject: 'service',
@@ -192,7 +202,7 @@ export async function fixture(
     { operators: [operator] },
     'active-1',
   );
-  const target = pin();
+  const target = chain?.target ?? pin();
   const recipient = Wallet.createRandom().address;
   const adapters =
     assetBudget && selectTokenAdapter
@@ -288,8 +298,10 @@ export async function fixture(
   const basePolicy: ApprovedCallPolicy = {
     mechanism: 'safe-1.4.1',
     ...(adapters ? { adapters } : {}),
-    accounts: [{ ...pin(), accountId, singleton: pin() }],
-    multiSend: pin(),
+    accounts: [
+      { ...(chain?.account ?? { ...pin(), singleton: pin() }), accountId },
+    ],
+    multiSend: chain?.multiSend ?? pin(),
     contracts: [
       {
         ...target,
@@ -383,7 +395,7 @@ export async function fixture(
     maxFeePerGas: '0x14',
     maxPriorityFeePerGas: '0x2',
   };
-  const request = (async (url, options) => {
+  const fixtureRequest = (async (url, options) => {
     const body = JSON.parse(String(options?.body)),
       { method, params } = body;
     const origin = new URL(String(url)).origin;
@@ -465,6 +477,7 @@ export async function fixture(
       }),
     );
   }) as typeof fetch;
+  const request = chain?.request ?? fixtureRequest;
   await db.onboardingStore.transaction((s) => {
     const applicationId = runtimeApplicationId(
       principal.issuer,
@@ -495,7 +508,8 @@ export async function fixture(
               : {
                   chain_id: 'eip155:84532',
                   funding_agreement: 'offline',
-                  maximum_gas_budget_wei: '10000000',
+                  maximum_gas_budget_wei:
+                    chain?.maximumGasBudgetWei ?? '10000000',
                   account_model: 'provider-controlled-user-safe',
                   maximum_execution_accounts: 10,
                   asset_model: 'individual-user-wallets',
