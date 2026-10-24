@@ -36,6 +36,7 @@ export function trustedHttpsUrl(value: string): URL {
 export function createAuthenticator(
   configuration: OAuthConfiguration,
   keys?: JWTVerifyGetKey,
+  maximumTokenAgeSeconds = 600,
 ): Authenticate {
   trustedHttpsUrl(configuration.issuer);
   const jwksUrl = trustedHttpsUrl(configuration.jwksUrl);
@@ -58,7 +59,7 @@ export function createAuthenticator(
         algorithms: ['RS256', 'ES256'],
         typ: 'at+jwt',
         requiredClaims: ['iss', 'sub', 'aud', 'exp', 'iat', 'jti', 'client_id'],
-        maxTokenAge: '10m',
+        maxTokenAge: maximumTokenAgeSeconds,
         clockTolerance: 5,
       });
       if (
@@ -73,7 +74,7 @@ export function createAuthenticator(
         typeof payload.exp !== 'number' ||
         typeof payload.iat !== 'number' ||
         payload.exp <= payload.iat ||
-        payload.exp - payload.iat > 600
+        payload.exp - payload.iat > maximumTokenAgeSeconds
       ) {
         throw new Error('Invalid access token claims');
       }

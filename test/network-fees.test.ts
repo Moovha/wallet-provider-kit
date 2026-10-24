@@ -50,21 +50,22 @@ it('does not use malformed or negative RPC fee estimates', async () => {
   await expect(quoteNetworkFees(reader('-1'), limits)).rejects.toThrow();
 });
 
-it('bounds a recommended tip without treating it as a mandatory minimum', async () => {
-  expect(
-    await quoteNetworkFees(reader('0x4c4b40', '0x2faf080'), limits),
-  ).toMatchObject({
-    baseFeePerGas: '5000000',
-    maxFeePerGas: '20000000',
-    maxPriorityFeePerGas: '10000000',
-  });
+it('pauses rather than lowering a network tip to the configured limit', async () => {
   await expect(
-    quoteNetworkFees(reader('0x4c4b40', '0x2faf080'), {
-      ...limits,
-      maxFeePerGas: '14999999',
-    }),
+    quoteNetworkFees(reader('0x4c4b40', '0x2faf080'), limits),
   ).rejects.toMatchObject({
     code: 'wallet_provider_unavailable',
     outcome: 'not_dispatched',
+    reason: 'network_fee_limit',
+  });
+  expect(
+    await quoteNetworkFees(reader('0x4c4b40', '0x2faf080'), {
+      maxFeePerGas: '1000000000',
+      maxPriorityFeePerGas: '50000000',
+    }),
+  ).toMatchObject({
+    baseFeePerGas: '5000000',
+    maxFeePerGas: '60000000',
+    maxPriorityFeePerGas: '50000000',
   });
 });

@@ -56,6 +56,7 @@ export async function createManagementAuthorizationServer(
   const verify = createAuthenticator(
     config.oauth,
     createLocalJWKSet({ keys: [publicKey] }),
+    1800,
   );
   const authenticate: typeof verify = async (authorization, scope) => {
     const principal = await verify(authorization, scope);
@@ -68,12 +69,15 @@ export async function createManagementAuthorizationServer(
     };
     try {
       service.currentPrincipal(current);
+      if (payload.exp! - payload.iat! > service.tokenLifetimeSeconds(current))
+        throw new AuthenticationError(401);
     } catch {
       throw new AuthenticationError(401);
     }
     return current;
   };
   const issue = async (principal: VerifiedPrincipal) => {
+    const lifetime = service.tokenLifetimeSeconds(principal);
     const access_token = await new SignJWT({
       client_id: principal.clientId,
       scope: principal.scopes.join(' '),
@@ -84,13 +88,13 @@ export async function createManagementAuthorizationServer(
       .setAudience(config.oauth.audience)
       .setSubject(principal.subject)
       .setIssuedAt()
-      .setExpirationTime('5m')
+      .setExpirationTime(Math.floor(Date.now() / 1000) + lifetime)
       .setJti(randomUUID())
       .sign(signingKey);
     return {
       access_token,
       token_type: 'Bearer',
-      expires_in: 300,
+      expires_in: lifetime,
       scope: principal.scopes.join(' '),
     };
   };

@@ -2,6 +2,38 @@
 
 ## Unreleased
 
+- Update transitive `fast-uri` dependencies to the patched 3.1.9 and 4.2.3 releases.
+
+- Reconcile dispatched historical operations after fee terms change. Release
+  pending funding reservations only after verified finality, without signing or
+  submitting another operation.
+
+- Support explicit EIP-1967 and legacy ZeppelinOS proxy implementation layouts
+  during policy validation, signing checks and receipt verification.
+
+- Resume completed signing-account lookup under fresh owner permission while
+  retaining the original creation attempt and checking backend account identity.
+
+- Estimate refill fee reserves from current network gas and fee quotes. Pause
+  before signing when the quoted priority fee exceeds accepted terms.
+
+- Add optional per-network percentage funding targets for paymaster deposits,
+  bundler balances, wallet provisioning and protected reserves. Apply new funding
+  automatically with a fee buffer, minimum refill amount and existing authority
+  and spending checks.
+
+- Move provider infrastructure APIs to `/v1/provider/applications/{applicationId}/wallet-services`.
+  GET reports status; POST deploys and funds the paymaster and configures bundler services.
+  Move funding-address preparation beneath that resource and update the console.
+
+- Extend provider administrator sessions to 30 minutes. Keep application and
+  automation tokens at five minutes and recheck current permissions on every request.
+
+- Add provider-managed encrypted blockchain connections and wallet-service
+  preparation with progress in administration. Keep user execution disabled during
+  operator-authorized preparation; retain setup transactions across uncertain
+  outcomes and enforce a per-preparation cost ceiling and current approvals.
+
 - Let providers offer fee limits and prepare funding addresses from administration.
   Require the connected application to accept each exact provider-offered revision
   before sponsorship or infrastructure spending; preserve application-submitted
@@ -24,7 +56,7 @@
   identity, group approval and verification checks; log only fixed failure stages.
 
 - Add optional Amazon Cognito administrator sign-in with code/PKCE login,
-  explicit approval-group checks and five-minute provider sessions. Approved
+  explicit approval-group checks and 30-minute administrator sessions. Approved
   directory members can complete host-authorized first-time setup without copying
   a setup code. Include an AWS template with required authenticator-app MFA.
 

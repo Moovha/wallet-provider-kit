@@ -1,3 +1,4 @@
+import { failureOrigin } from './failure-origin.js';
 import { WalletProviderError } from '../domain/signing.js';
 import { NetworkFeeLimitError } from '../execution/network-fees.js';
 import { waitForObservation } from '../execution/read-observation.js';
@@ -668,7 +669,12 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
                 this.actions.revision
             )
               deny();
-            current.lastFailure = { code, at: new Date().toISOString() };
+            const origin = failureOrigin(error);
+            current.lastFailure = {
+              code,
+              at: new Date().toISOString(),
+              ...(origin ? { origin } : {}),
+            };
             current.retryCount = (current.retryCount ?? 0) + 1;
           });
           const rejectedBeforeAdmission =
@@ -714,9 +720,12 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
       (await this.actions.onboarding.store.transaction((state) =>
         Object.values(state.userOperationBatches ?? {}),
       ));
+    const accountIds = new Set(
+      this.execution.signing.executionBinding().accountIds,
+    );
     const included = entries.filter(
       (entry) =>
-        entry.configurationHash === this.configurationHash &&
+        accountIds.has(entry.input.account_id) &&
         entry.stage === 'included' &&
         !this.lanes.has(entry.metadata.sender.toLowerCase()),
     );
@@ -724,7 +733,22 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
     this.nextSettlementAt = Date.now() + 15000;
     const entry = included[this.settlementCursor++ % included.length];
     try {
-      await this.process(entry);
+      const plan = entry.operationId
+        ? await this.execution.refreshSettlement(entry.operationId)
+        : null;
+      if (plan?.observation.state === 'finalized')
+        await this.actions.onboarding.store.transaction((state) => {
+          const current = state.userOperationBatches?.[entry.id] ?? deny();
+          if (
+            state.deploymentBindings?.['service-v1']?.activeRevision !==
+              this.actions.revision ||
+            current.configurationHash !== entry.configurationHash ||
+            current.operationId !== plan.operationId ||
+            current.stage !== 'included'
+          )
+            deny();
+          current.stage = 'complete';
+        });
     } catch {
       /* A read failure retains the historical inclusion and reservations. */
     }

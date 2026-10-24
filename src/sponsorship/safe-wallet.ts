@@ -1,5 +1,7 @@
 import {
   infrastructureFundingPlan,
+  percentageFundingPlan,
+  type FundingAllocation,
   fundingMessages,
   InfrastructureFundingUnavailable,
   type FundingObservation,
@@ -25,6 +27,7 @@ import {
 import { createWalletAttemptRequest } from '../providers/attempt-lifecycle.js';
 import { applicationGasBudgetId } from './budget.js';
 import { randomUUID } from 'node:crypto';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { mkdir, writeFile, rename } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import {
@@ -48,7 +51,7 @@ import type {
   WalletSigningProvider,
 } from '../domain/signing.js';
 import { WalletProviderError } from '../domain/signing.js';
-import { deny, fingerprint } from '../onboarding/policy.js';
+import { deny, fingerprint, invalid } from '../onboarding/policy.js';
 import type { ProviderState } from '../onboarding/types.js';
 import type { OnboardingService } from '../onboarding/service.js';
 import type {
@@ -105,6 +108,7 @@ export interface SafeWalletConfiguration {
   maximumSetupCostWei: string;
   executorBalanceWei: string;
   paymasterDepositWei: string;
+  fundingAllocation?: FundingAllocation;
 }
 export interface SafeWalletAccount {
   applicationId: string;
@@ -146,6 +150,18 @@ export interface SafeWalletInfrastructure {
   paymasterSigner: { address: string; key: ApplicationCredential };
   paymaster?: PinnedContract;
   transactions: SetupTransaction[];
+  setup?: {
+    phase:
+      | 'checking'
+      | 'deploying'
+      | 'funding'
+      | 'publishing'
+      | 'ready'
+      | 'attention';
+    updated_at: string;
+    services_revision?: string;
+    sponsorship_revision?: string;
+  };
   setupSignatures?: Record<
     string,
     {
@@ -403,6 +419,7 @@ export class SafeWalletRuntime {
     params: unknown[],
   ) {
     const endpoints = await this.resources.rpcEndpoints(applicationId);
+    if (method === 'eth_sendRawTransaction') await this.current(applicationId);
     const id = randomUUID();
     try {
       const response = await this.request(endpoints[0], {
@@ -439,8 +456,55 @@ export class SafeWalletRuntime {
     )
       deny();
   }
+  private readonly operatorSetup = new AsyncLocalStorage<{
+    applicationId: string;
+    principal: VerifiedPrincipal;
+    active: boolean;
+    charged: Map<string, bigint>;
+    servicesRevision: string;
+    sponsorshipRevision: string;
+    maximumCostWei: bigint;
+  }>();
+  private readonly setupRunning = new Set<string>();
+  private async setupPhase(
+    applicationId: string,
+    phase: NonNullable<SafeWalletInfrastructure['setup']>['phase'],
+  ) {
+    await this.current(applicationId);
+    await this.transaction((r) => {
+      r.safeWalletInfrastructure![applicationId].setup = {
+        phase,
+        updated_at: new Date().toISOString(),
+        services_revision: this.operatorSetup.getStore()?.servicesRevision,
+        sponsorship_revision:
+          this.operatorSetup.getStore()?.sponsorshipRevision,
+      };
+    });
+  }
   private async current(applicationId: string) {
-    if (!this.config.activation.enabled) deny();
+    const setup = this.operatorSetup.getStore();
+    if (setup) {
+      if (!setup.active || setup.applicationId !== applicationId) deny();
+      this.resources.assertOperator(setup.principal);
+      const resources = (
+        await this.resources.readObligations(setup.principal, applicationId)
+      ).resources;
+      if (
+        !resources.some(
+          (r) =>
+            r.kind === 'services' &&
+            r.decision === 'accepted' &&
+            r.revision === setup.servicesRevision,
+        ) ||
+        !resources.some(
+          (r) =>
+            r.kind === 'sponsorship' &&
+            r.decision === 'accepted' &&
+            r.revision === setup.sponsorshipRevision,
+        )
+      )
+        deny();
+    } else if (!this.config.activation.enabled) deny();
     await this.agreement(applicationId);
     return this.transaction(
       (r) => r.safeWalletInfrastructure?.[applicationId] ?? deny(),
@@ -503,74 +567,136 @@ export class SafeWalletRuntime {
       return this.read(context.principal, applicationId);
     });
   }
-  async ensure(context: AuthorityContext, applicationId: string) {
+  async ensure(
+    context: AuthorityContext,
+    applicationId: string,
+    maximumCostWei?: string,
+  ) {
     this.resources.assertOperator(context.principal);
+    if (
+      maximumCostWei !== undefined &&
+      (!/^[1-9][0-9]{0,77}$/.test(maximumCostWei) ||
+        BigInt(maximumCostWei) >= 2n ** 256n)
+    )
+      invalid();
+    const configuredMaximum = BigInt(
+      this.config.safeWallet!.maximumSetupCostWei,
+    );
+    const requestedMaximum =
+      maximumCostWei === undefined ? configuredMaximum : BigInt(maximumCostWei);
     await this.agreement(applicationId);
     return this.exclusive(applicationId, async () => {
-      await this.retainFundingAddress(applicationId);
-      const reader = await this.reader(applicationId);
-      await Promise.all([
-        this.pin(reader, this.config.safeWallet!.entryPoint),
-        this.pin(reader, this.config.safeWallet!.module),
-      ]);
-      const infra = await this.current(applicationId);
-      if (!infra.paymaster) {
-        const deployment = localPaymasterDeployment(
-          this.domain.entryPoint,
-          infra.fundingAddress,
-          infra.fundingAddress,
-          infra.paymasterSigner.address,
-        );
-        const transaction = await this.send(
-          applicationId,
-          'paymaster-deployment',
-          { data: deployment.data, value: '0' },
-        );
-        const address = getCreateAddress({
-          from: infra.fundingAddress,
-          nonce: transaction.nonce,
-        });
-        await this.pin(reader, {
-          address,
-          codeHash: deployment.runtimeCodeHash,
-        });
-        const call = async (name: string, args: unknown[] = []) =>
-          paymasterAbi.decodeFunctionResult(
-            name,
-            String(
-              await reader.call('eth_call', [
-                {
-                  to: address,
-                  data: paymasterAbi.encodeFunctionData(name, args),
-                },
-                'latest',
-              ]),
-            ),
-          )[0];
-        if (
-          String(await call('entryPoint')).toLowerCase() !==
-            this.domain.entryPoint.toLowerCase() ||
-          !(await call('hasRole', [
-            await call('DEFAULT_ADMIN_ROLE'),
-            infra.fundingAddress,
-          ])) ||
-          !(await call('hasRole', [
-            await call('MANAGER_ROLE'),
-            infra.fundingAddress,
-          ])) ||
-          !(await call('signers', [infra.paymasterSigner.address]))
-        )
-          deny();
-        await this.transaction((r) => {
-          r.safeWalletInfrastructure![applicationId].paymaster = {
-            address,
-            codeHash: deployment.runtimeCodeHash,
-          };
-        });
-      }
-      await this.replenish(applicationId);
-      await this.publishBundler(applicationId);
-      return this.read(context.principal, applicationId);
+      const resources = (
+        await this.resources.readObligations(context.principal, applicationId)
+      ).resources;
+      const services = resources.find((r) => r.kind === 'services');
+      const sponsorship = resources.find((r) => r.kind === 'sponsorship');
+      if (
+        services?.decision !== 'accepted' ||
+        sponsorship?.decision !== 'accepted'
+      )
+        deny();
+      const scope = {
+        applicationId,
+        principal: structuredClone(context.principal),
+        active: true,
+        charged: new Map<string, bigint>(),
+        servicesRevision: services.revision,
+        sponsorshipRevision: sponsorship.revision,
+        maximumCostWei:
+          requestedMaximum < configuredMaximum
+            ? requestedMaximum
+            : configuredMaximum,
+      };
+      return this.operatorSetup.run(scope, async () => {
+        this.setupRunning.add(applicationId);
+        try {
+          await this.retainFundingAddress(applicationId);
+          await this.setupPhase(applicationId, 'checking');
+          const reader = await this.reader(applicationId);
+          await Promise.all([
+            this.pin(reader, this.config.safeWallet!.entryPoint),
+            this.pin(reader, this.config.safeWallet!.module),
+          ]);
+          const infra = await this.current(applicationId);
+          if (!infra.paymaster) {
+            await this.setupPhase(applicationId, 'deploying');
+            const deployment = localPaymasterDeployment(
+              this.domain.entryPoint,
+              infra.fundingAddress,
+              infra.fundingAddress,
+              infra.paymasterSigner.address,
+            );
+            const transaction = await this.send(
+              applicationId,
+              'paymaster-deployment',
+              { data: deployment.data, value: '0' },
+            );
+            const address = getCreateAddress({
+              from: infra.fundingAddress,
+              nonce: transaction.nonce,
+            });
+            await this.pin(reader, {
+              address,
+              codeHash: deployment.runtimeCodeHash,
+            });
+            const call = async (name: string, args: unknown[] = []) =>
+              paymasterAbi.decodeFunctionResult(
+                name,
+                String(
+                  await reader.call('eth_call', [
+                    {
+                      to: address,
+                      data: paymasterAbi.encodeFunctionData(name, args),
+                    },
+                    'latest',
+                  ]),
+                ),
+              )[0];
+            if (
+              String(await call('entryPoint')).toLowerCase() !==
+                this.domain.entryPoint.toLowerCase() ||
+              !(await call('hasRole', [
+                await call('DEFAULT_ADMIN_ROLE'),
+                infra.fundingAddress,
+              ])) ||
+              !(await call('hasRole', [
+                await call('MANAGER_ROLE'),
+                infra.fundingAddress,
+              ])) ||
+              !(await call('signers', [infra.paymasterSigner.address]))
+            )
+              deny();
+            await this.transaction((r) => {
+              r.safeWalletInfrastructure![applicationId].paymaster = {
+                address,
+                codeHash: deployment.runtimeCodeHash,
+              };
+            });
+          }
+          await this.setupPhase(applicationId, 'funding');
+          await this.replenish(applicationId);
+          await this.setupPhase(applicationId, 'publishing');
+          await this.publishBundler(applicationId);
+          await this.setupPhase(applicationId, 'ready');
+          const result = await this.read(context.principal, applicationId);
+          result.setup.running = false;
+          return result;
+        } catch (error) {
+          await this.transaction((r) => {
+            const infra = r.safeWalletInfrastructure?.[applicationId];
+            if (infra)
+              infra.setup = {
+                phase: 'attention',
+                updated_at: new Date().toISOString(),
+              };
+          }).catch(() => undefined);
+          throw error;
+        } finally {
+          scope.active = false;
+          this.setupRunning.delete(applicationId);
+        }
+      });
     });
   }
   async read(principal: VerifiedPrincipal, applicationId: string) {
@@ -587,6 +713,47 @@ export class SafeWalletRuntime {
         application_id: applicationId,
         chain_id: this.network.caip,
         profile: 'safe-only-4337-v1',
+        setup: {
+          phase:
+            infrastructure?.setup?.phase === 'ready' &&
+            (infrastructure.setup.services_revision !==
+              r.obligations?.records[applicationId + ':services']?.revision ||
+              infrastructure.setup.sponsorship_revision !==
+                r.obligations?.records[applicationId + ':sponsorship']
+                  ?.revision ||
+              r.obligations?.records[applicationId + ':services']?.decision !==
+                'accepted' ||
+              r.obligations?.records[applicationId + ':sponsorship']
+                ?.decision !== 'accepted')
+              ? 'attention'
+              : (infrastructure?.setup?.phase ?? 'not-started'),
+          running: this.setupRunning.has(applicationId),
+          execution_enabled: this.config.activation.enabled,
+          verification_mode: this.resources.rpcVerification,
+          maximum_cost_wei: this.config.safeWallet!.maximumSetupCostWei,
+          ...(this.config.safeWallet!.fundingAllocation
+            ? { funding_allocation: this.config.safeWallet!.fundingAllocation }
+            : {}),
+          transactions: (infrastructure?.transactions ?? [])
+            .slice(-20)
+            .map((t) => ({
+              step:
+                t.purpose === 'paymaster-deployment'
+                  ? 'fee-contract'
+                  : t.purpose.startsWith('paymaster-deposit-')
+                    ? 'fee-deposit'
+                    : t.purpose.startsWith('bundler-working-balance-')
+                      ? 'submission-funding'
+                      : 'wallet-setup',
+              status: t.included
+                ? 'confirmed'
+                : t.submitted
+                  ? 'submitted'
+                  : t.raw
+                    ? 'uncertain'
+                    : 'prepared',
+            })),
+        },
         execution_funding: this.fundingObservation(applicationId),
         status: infrastructure?.paymaster
           ? 'provisioned'
@@ -734,6 +901,17 @@ export class SafeWalletRuntime {
       });
     }
     const saved = retained;
+    const setup = this.operatorSetup.getStore();
+    if (setup) {
+      await this.current(applicationId);
+      setup.charged.set(saved.id, BigInt(saved.maximumCostWei));
+      if (
+        [...setup.charged.values()].reduce((sum, cost) => sum + cost, 0n) >
+        setup.maximumCostWei
+      )
+        deny();
+    }
+    await this.assertFundingReserve(applicationId, saved, reader);
     const agreement = await this.agreement(applicationId);
     const application =
       this.config.policy.applications.find(
@@ -801,6 +979,7 @@ export class SafeWalletRuntime {
       return { saved, claim, included: true };
     await this.agreement(applicationId);
     await beforeEffect?.();
+    await this.current(applicationId);
     try {
       const hash = await this.infrastructureRpc(
         applicationId,
@@ -1037,10 +1216,60 @@ export class SafeWalletRuntime {
       checked_at: new Date().toISOString(),
     });
   }
+  private async assertFundingReserve(
+    applicationId: string,
+    saved: SetupTransaction,
+    reader: RpcReader,
+  ) {
+    const allocation = this.config.safeWallet!.fundingAllocation;
+    if (!allocation) return;
+    const infrastructure = await this.current(applicationId);
+    const funding = BigInt(
+      String(
+        await reader.call('eth_getBalance', [
+          infrastructure.fundingAddress,
+          'latest',
+        ]),
+      ),
+    );
+    const executor = BigInt(
+      String(
+        await reader.call('eth_getBalance', [
+          infrastructure.executor.address,
+          'latest',
+        ]),
+      ),
+    );
+    const deposit = infrastructure.paymaster
+      ? (entryAbi.decodeFunctionResult(
+          'balanceOf',
+          String(
+            await reader.call('eth_call', [
+              {
+                to: this.domain.entryPoint,
+                data: entryAbi.encodeFunctionData('balanceOf', [
+                  infrastructure.paymaster.address,
+                ]),
+              },
+              'latest',
+            ]),
+          ),
+        )[0] as bigint)
+      : 0n;
+    const reserve =
+      ((funding + executor + deposit) * BigInt(allocation.reserveBasisPoints) +
+        9999n) /
+      10000n;
+    const held = infrastructure.transactions
+      .filter((t) => t.id !== saved.id && !t.included)
+      .reduce((sum, t) => sum + BigInt(t.maximumCostWei), 0n);
+    if (funding < reserve + held + BigInt(saved.maximumCostWei))
+      throw new InfrastructureFundingUnavailable('needs-funding');
+  }
   private async replenish(applicationId: string) {
     try {
-      await this.replenishBalances(applicationId);
-      this.fundingObserved(applicationId, 'ready');
+      const state = await this.replenishBalances(applicationId);
+      this.fundingObserved(applicationId, state ?? 'ready');
     } catch (error) {
       this.fundingObserved(
         applicationId,
@@ -1097,7 +1326,9 @@ export class SafeWalletRuntime {
     );
     const target = BigInt(this.config.safeWallet!.paymasterDepositWei);
     const executorTarget = BigInt(this.config.safeWallet!.executorBalanceWei);
-    if (deposit >= target && executorBalance >= executorTarget) return;
+    const allocation = this.config.safeWallet!.fundingAllocation;
+    if (!allocation && deposit >= target && executorBalance >= executorTarget)
+      return;
     const fundingBalance = await reader.call('eth_getBalance', [
       infrastructure.fundingAddress,
       'pending',
@@ -1108,18 +1339,132 @@ export class SafeWalletRuntime {
       infrastructure.transactions
         .filter((t) => agreement.funding_mode !== 'balance' || !t.included)
         .reduce((sum, t) => sum + BigInt(t.maximumCostWei), 0n);
-    const plan = infrastructureFundingPlan({
+    const balances = {
       deposit,
       depositTarget: BigInt(this.config.safeWallet!.paymasterDepositWei),
       executor: BigInt(String(executorBalance)),
       executorTarget: BigInt(this.config.safeWallet!.executorBalanceWei),
       funding: BigInt(String(fundingBalance)),
       allowance: remaining > 0n ? remaining : 0n,
-    });
+    };
+    let plan = allocation
+      ? percentageFundingPlan(
+          {
+            deposit,
+            executor: executorBalance,
+            funding: BigInt(String(fundingBalance)),
+            allowance: balances.allowance,
+          },
+          allocation,
+        )
+      : infrastructureFundingPlan(balances);
+    const pendingWallets = allocation
+      ? await this.transaction((r) =>
+          Object.values(r.safeWalletAccounts ?? {}).filter(
+            (wallet) =>
+              wallet.applicationId === applicationId &&
+              wallet.status !== 'ready' &&
+              !infrastructure.transactions.some(
+                (t) =>
+                  t.purpose === 'safe-deployment-' + wallet.accountId &&
+                  t.included,
+              ),
+          ),
+        )
+      : [];
+    if (pendingWallets.length > 32)
+      throw new WalletProviderError('wallet_provider_unavailable');
+    if (
+      allocation &&
+      (plan.deposit > 0n || plan.executor > 0n || pendingWallets.length > 0)
+    ) {
+      const fees = await this.networkFees(applicationId);
+      let feeReserve = 0n;
+      const transfers = [
+        ...(plan.deposit > 0n
+          ? [
+              {
+                to: infrastructure.paymaster!.address,
+                data: paymasterAbi.encodeFunctionData('deposit'),
+                value: toQuantity(plan.deposit),
+              },
+            ]
+          : []),
+        ...(plan.executor > 0n
+          ? [
+              {
+                to: infrastructure.executor.address,
+                value: toQuantity(plan.executor),
+              },
+            ]
+          : []),
+      ];
+      for (const wallet of pendingWallets) {
+        this.assertRecoveryRecipe(wallet);
+        const recovery = wallet.recovery;
+        if (!recovery)
+          throw new WalletProviderError('wallet_provider_unavailable');
+        transfers.push({
+          to: recovery.factory.address,
+          data: safeFactoryInterface.encodeFunctionData(
+            'createProxyWithNonce',
+            [
+              recovery.singleton.address,
+              recovery.initializer,
+              recovery.saltNonce,
+            ],
+          ),
+          value: '0x0',
+        });
+      }
+      for (const transfer of transfers) {
+        const estimate = await this.infrastructureRpc(
+          applicationId,
+          'eth_estimateGas',
+          [
+            {
+              from: infrastructure.fundingAddress,
+              ...transfer,
+            },
+          ],
+        );
+        if (
+          typeof estimate !== 'string' ||
+          !/^0x[0-9a-fA-F]+$/.test(estimate) ||
+          BigInt(estimate) <= 0n
+        )
+          throw new WalletProviderError('wallet_provider_unavailable');
+        feeReserve +=
+          ((BigInt(estimate) * 12n + 9n) / 10n) * BigInt(fees.maxFeePerGas) +
+          BigInt(sponsorshipGas(agreement).l1FeeReserveWei);
+      }
+      // The retained fee headroom must remain available outside the protected percentage reserve.
+      const spendableBasisPoints =
+        10000n - BigInt(allocation.reserveBasisPoints);
+      feeReserve =
+        (feeReserve * 10000n + spendableBasisPoints - 1n) /
+        spendableBasisPoints;
+      const minimumReserve = BigInt(allocation.feeReserveWei);
+      plan = percentageFundingPlan(
+        {
+          deposit,
+          executor: executorBalance,
+          funding: BigInt(String(fundingBalance)),
+          allowance: balances.allowance,
+        },
+        {
+          ...allocation,
+          feeReserveWei: (feeReserve > minimumReserve
+            ? feeReserve
+            : minimumReserve
+          ).toString(),
+        },
+      );
+    }
     this.fundingObserved(applicationId, plan.status);
     if (plan.status === 'needs-funding' || plan.status === 'limit-reached')
       throw new InfrastructureFundingUnavailable(plan.status);
-    if (deposit < target)
+    if (plan.deposit > 0n)
       await this.send(
         applicationId,
         'paymaster-deposit-' +
@@ -1129,12 +1474,12 @@ export class SafeWalletRuntime {
         {
           to: infrastructure.paymaster!.address,
           data: paymasterAbi.encodeFunctionData('deposit'),
-          value: (target - deposit).toString(),
+          value: plan.deposit.toString(),
         },
       );
     // A deposit transaction can take several blocks while the executor spends.
     const balance =
-      deposit < target
+      plan.deposit > 0n
         ? BigInt(
             String(
               await reader.call('eth_getBalance', [
@@ -1144,7 +1489,12 @@ export class SafeWalletRuntime {
             ),
           )
         : executorBalance;
-    if (balance < executorTarget)
+    const executorTopUp = allocation
+      ? plan.executor
+      : balance < executorTarget
+        ? executorTarget - balance
+        : 0n;
+    if (executorTopUp > 0n)
       await this.send(
         applicationId,
         'bundler-working-balance-' +
@@ -1153,9 +1503,10 @@ export class SafeWalletRuntime {
           ).length,
         {
           to: infrastructure.executor.address,
-          value: (executorTarget - balance).toString(),
+          value: executorTopUp.toString(),
         },
       );
+    if (allocation) return plan.status;
   }
   private async acceptance(applicationId: string): Promise<Safe4337Acceptance> {
     const infra = await this.current(applicationId);

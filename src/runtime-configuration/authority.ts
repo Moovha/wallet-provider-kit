@@ -167,6 +167,9 @@ export function runtimeCallPolicy(
             implementation: {
               address: contract.implementation.address,
               codeHash: contract.implementation.code_hash,
+              ...(contract.implementation.storage_layout
+                ? { storageLayout: contract.implementation.storage_layout }
+                : {}),
             },
           }
         : {}),

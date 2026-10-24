@@ -35,6 +35,17 @@ async function bootstrap(
   await f.db.onboardingStore.transaction((s) => {
     const r = s.deploymentBindings!['service-v1'].runtimeConfiguration!;
     (r.obligations ??= { records: {}, receipts: {} }).records[
+      applicationId + ':services'
+    ] = {
+      application_id: applicationId,
+      kind: 'services',
+      revision: '1',
+      value: [],
+      submitted_at: new Date().toISOString(),
+      decision: 'accepted',
+      decision_revision: '1',
+    };
+    (r.obligations ??= { records: {}, receipts: {} }).records[
       applicationId + ':sponsorship'
     ] = {
       application_id: applicationId,
@@ -120,6 +131,9 @@ async function bootstrap(
           hash: b.params[0] === '0x0' ? genesis : '0x' + '34'.repeat(32),
           number: '0x1',
         };
+        break;
+      case 'eth_call':
+        result = '0x' + 100n.toString(16).padStart(64, '0');
         break;
       case 'eth_getCode':
         result = code;
@@ -295,6 +309,96 @@ it('prepares provider-offered funding before application acceptance but blocks s
   expect(t.broadcasts).toBe(0);
   expect((await t.stored())!.transactions).toEqual([]);
 });
+it('enforces the operator-confirmed preparation ceiling before any broadcast', async () => {
+  const t = await bootstrap('10000000');
+  t.config.activation.enabled = false;
+  await expect(
+    t.runtime.ensure(t.f.operatorContext, t.applicationId, '1'),
+  ).rejects.toMatchObject({ code: 'wallet_authorization_denied' });
+  expect(t.broadcasts).toBe(0);
+  expect((await t.stored())?.transactions[0]?.raw).toBeUndefined();
+  expect((await t.stored())?.setup?.phase).toBe('attention');
+});
+it('rechecks operator authority after asynchronous connection reads before setup effects', async () => {
+  const t = await bootstrap('10000000');
+  t.config.activation.enabled = false;
+  let revoked = false,
+    reads = 0;
+  const original = t.f.runtime.assertOperator.bind(t.f.runtime);
+  vi.spyOn(t.f.runtime, 'assertOperator').mockImplementation((principal) => {
+    if (revoked)
+      throw Object.assign(new Error('Offline revoked operator'), {
+        code: 'wallet_authorization_denied',
+      });
+    original(principal);
+  });
+  vi.spyOn(t.f.runtime, 'rpcEndpoints').mockImplementation(async () => {
+    if (++reads === 2) revoked = true;
+    return ['https://rpc.example.test'];
+  });
+  await expect(
+    t.runtime.ensure(t.f.operatorContext, t.applicationId),
+  ).rejects.toMatchObject({ code: 'wallet_authorization_denied' });
+  expect(t.broadcasts).toBe(0);
+  expect(t.config.activation.enabled).toBe(false);
+  expect((await t.stored())?.setup?.phase).toBe('attention');
+});
+it('finishes preparation while execution stays disabled and invalidates success when connections change', async () => {
+  const t = await bootstrap('10000000');
+  t.config.activation.enabled = false;
+  await t.runtime.prepareFundingAddress(t.f.operatorContext, t.applicationId);
+  await t.f.db.onboardingStore.transaction((s) => {
+    s.deploymentBindings![
+      'service-v1'
+    ].runtimeConfiguration!.safeWalletInfrastructure![
+      t.applicationId
+    ].paymaster = {
+      address: Wallet.createRandom().address,
+      codeHash: t.config.safeWallet!.module.codeHash,
+    };
+  });
+  const result = await t.runtime.ensure(t.f.operatorContext, t.applicationId);
+  expect(result.setup).toMatchObject({
+    phase: 'ready',
+    running: false,
+    execution_enabled: false,
+  });
+  expect(t.config.activation.enabled).toBe(false);
+  await expect(
+    t.runtime.driver(t.applicationId, randomUUID()),
+  ).rejects.toMatchObject({ code: 'wallet_authorization_denied' });
+  await t.f.db.onboardingStore.transaction((s) => {
+    s.deploymentBindings![
+      'service-v1'
+    ].runtimeConfiguration!.obligations!.records[
+      t.applicationId + ':services'
+    ].revision = '2';
+  });
+  expect(
+    (await t.runtime.read(t.f.operatorContext.principal, t.applicationId)).setup
+      .phase,
+  ).toBe('attention');
+  expect(t.broadcasts).toBe(0);
+});
+it('denies preparation without a current operator or accepted connections while leaving user execution disabled', async () => {
+  const t = await bootstrap('10000000');
+  t.config.activation.enabled = false;
+  await expect(
+    t.runtime.ensure(t.f.context, t.applicationId),
+  ).rejects.toMatchObject({ code: 'wallet_authorization_denied' });
+  await t.f.db.onboardingStore.transaction((s) => {
+    s.deploymentBindings![
+      'service-v1'
+    ].runtimeConfiguration!.obligations!.records[
+      t.applicationId + ':services'
+    ].decision = 'pending';
+  });
+  await expect(
+    t.runtime.ensure(t.f.operatorContext, t.applicationId),
+  ).rejects.toMatchObject({ code: 'wallet_authorization_denied' });
+  expect(t.broadcasts).toBe(0);
+  expect(t.config.activation.enabled).toBe(false);
+});
 it('retains an unsigned setup plan and stable infrastructure identities when the shared allowance cannot cover setup', async () => {
   const t = await bootstrap('1');
   await expect(
@@ -320,6 +424,7 @@ it('retains an unsigned setup plan and stable infrastructure identities when the
 });
 it('reserves setup gas once and recovers an included original transaction after a lost broadcast response without another nonce or broadcast', async () => {
   const t = await bootstrap('10000000');
+  t.config.activation.enabled = false;
   vi.useFakeTimers();
   const running = t.runtime.ensure(t.f.operatorContext, t.applicationId);
   const rejected = running.then(

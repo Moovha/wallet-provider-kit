@@ -205,7 +205,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/configuration/applications/{applicationId}/safe-wallet": {
+    "/v1/provider/applications/{applicationId}/wallet-services": {
         parameters: {
             query?: never;
             header?: never;
@@ -213,7 +213,7 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Check network-fee setup for an application
+         * Check application wallet services
          * @description **Why this exists:** See whether the application’s fee-paying infrastructure is prepared and whether it needs funding.
          *
          *     **Who uses it:** Service operator.
@@ -224,11 +224,11 @@ export interface paths {
          *
          *     **Result and next step:** 200: the retained funding address, paymaster and setup status. Private signer credentials are never returned.
          */
-        get: operations["readSafeWalletInfrastructure"];
+        get: operations["readWalletServices"];
         put?: never;
         /**
-         * Prepare an application to pay network fees
-         * @description **Why this exists:** Prepare the private transaction submission service and fee-paying contract needed for the application’s wallets.
+         * Provision application wallet services
+         * @description **Why this exists:** Deploy the application paymaster, fund its fee deposit and transaction submitter, and configure its private bundler service.
          *
          *     **Who uses it:** Service operator.
          *
@@ -236,16 +236,16 @@ export interface paths {
          *
          *     **Before you start:** Accept the application RPC and sponsorship terms. Fund the returned application address and retry with the original application identity.
          *
-         *     **Result and next step:** 200: journaled paymaster deployment and gas funding. Uncertain transactions retain their original signed payload and hash.
+         *     **Result and next step:** 200: journaled paymaster deployment, fee funding and submission configuration, with preparation progress. Current operator authority and the displayed preparation-cost ceiling apply even while user execution is disabled. Uncertain transactions retain their original signed payload and hash.
          */
-        post: operations["provisionSafeWalletInfrastructure"];
+        post: operations["provisionWalletServices"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/v1/configuration/applications/{applicationId}/safe-wallet/funding-address": {
+    "/v1/provider/applications/{applicationId}/wallet-services/funding-address": {
         parameters: {
             query?: never;
             header?: never;
@@ -784,6 +784,36 @@ export interface paths {
          */
         get: operations["readProviderApplicationObligations"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/provider/applications/{applicationId}/connections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Save and approve application blockchain connections
+         * @description **Why this exists:** Save encrypted application-scoped RPC URLs and approve their verification, submission and observation roles in one revision.
+         *
+         *     **Who uses it:** Service operator.
+         *
+         *     **When you need it:** Use the administration console to configure or replace the complete connection set for one application and selected network.
+         *
+         *     **Before you start:** Authenticate as a current provider operator with an enabled application. Supply the expected services revision, HTTPS endpoints and a UUIDv4 idempotency key. Independent verification requires two different origins.
+         *
+         *     **Result and next step:** 200: accepted service declarations. Endpoint secrets are never returned. Connections remain subject to chain and contract checks; saving neither deploys contracts nor enables user wallets.
+         *
+         *     **Request details:** Protected, application-scoped declarations and provider decisions. Accepted actions constrain off-chain payloads. Accepted service declarations permit resolving application-owned verifier credentials when credential storage is configured. Acceptance does not fund gas, provision a user Safe, activate execution or authorize spending. User assets remain in individual user wallets. Secrets and actual user payloads must not be submitted here.
+         */
+        put: operations["configureProviderConnections"];
         post?: never;
         delete?: never;
         options?: never;
@@ -2569,7 +2599,7 @@ export interface operations {
             };
         };
     };
-    readSafeWalletInfrastructure: {
+    readWalletServices: {
         parameters: {
             query?: never;
             header?: {
@@ -2598,6 +2628,29 @@ export interface operations {
                         status: "unprovisioned" | "needs-funding" | "provisioned";
                         funding_address?: string;
                         paymaster?: string;
+                        setup?: {
+                            /** @enum {string} */
+                            phase: "not-started" | "checking" | "deploying" | "funding" | "publishing" | "ready" | "attention";
+                            running: boolean;
+                            execution_enabled: boolean;
+                            /** @enum {string} */
+                            verification_mode: "single" | "quorum";
+                            maximum_cost_wei: string;
+                            funding_allocation?: {
+                                paymasterBasisPoints: number;
+                                bundlerBasisPoints: number;
+                                provisioningBasisPoints?: number;
+                                reserveBasisPoints: number;
+                                feeReserveWei: string;
+                                minimumRefillWei: string;
+                            };
+                            transactions: {
+                                /** @enum {string} */
+                                step: "fee-contract" | "fee-deposit" | "submission-funding" | "wallet-setup";
+                                /** @enum {string} */
+                                status: "confirmed" | "submitted" | "uncertain" | "prepared";
+                            }[];
+                        };
                     };
                 };
             };
@@ -2637,7 +2690,7 @@ export interface operations {
             };
         };
     };
-    provisionSafeWalletInfrastructure: {
+    provisionWalletServices: {
         parameters: {
             query?: never;
             header: {
@@ -2652,7 +2705,10 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": Record<string, never>;
+                "application/json": {
+                    /** @description Optional operator-confirmed ceiling for this preparation, including ETH moved into services. Cannot raise the server ceiling. */
+                    maximum_cost_wei?: string;
+                };
             };
         };
         responses: {
@@ -2671,6 +2727,29 @@ export interface operations {
                         status: "unprovisioned" | "needs-funding" | "provisioned";
                         funding_address?: string;
                         paymaster?: string;
+                        setup?: {
+                            /** @enum {string} */
+                            phase: "not-started" | "checking" | "deploying" | "funding" | "publishing" | "ready" | "attention";
+                            running: boolean;
+                            execution_enabled: boolean;
+                            /** @enum {string} */
+                            verification_mode: "single" | "quorum";
+                            maximum_cost_wei: string;
+                            funding_allocation?: {
+                                paymasterBasisPoints: number;
+                                bundlerBasisPoints: number;
+                                provisioningBasisPoints?: number;
+                                reserveBasisPoints: number;
+                                feeReserveWei: string;
+                                minimumRefillWei: string;
+                            };
+                            transactions: {
+                                /** @enum {string} */
+                                step: "fee-contract" | "fee-deposit" | "submission-funding" | "wallet-setup";
+                                /** @enum {string} */
+                                status: "confirmed" | "submitted" | "uncertain" | "prepared";
+                            }[];
+                        };
                     };
                 };
             };
@@ -2744,6 +2823,29 @@ export interface operations {
                         status: "unprovisioned" | "needs-funding" | "provisioned";
                         funding_address?: string;
                         paymaster?: string;
+                        setup?: {
+                            /** @enum {string} */
+                            phase: "not-started" | "checking" | "deploying" | "funding" | "publishing" | "ready" | "attention";
+                            running: boolean;
+                            execution_enabled: boolean;
+                            /** @enum {string} */
+                            verification_mode: "single" | "quorum";
+                            maximum_cost_wei: string;
+                            funding_allocation?: {
+                                paymasterBasisPoints: number;
+                                bundlerBasisPoints: number;
+                                provisioningBasisPoints?: number;
+                                reserveBasisPoints: number;
+                                feeReserveWei: string;
+                                minimumRefillWei: string;
+                            };
+                            transactions: {
+                                /** @enum {string} */
+                                step: "fee-contract" | "fee-deposit" | "submission-funding" | "wallet-setup";
+                                /** @enum {string} */
+                                status: "confirmed" | "submitted" | "uncertain" | "prepared";
+                            }[];
+                        };
                     };
                 };
             };
@@ -3278,6 +3380,8 @@ export interface operations {
                                     implementation?: {
                                         address: string;
                                         code_hash: string;
+                                        /** @enum {string} */
+                                        storage_layout?: "eip1967" | "zeppelinos";
                                     };
                                     methods: {
                                         signature: string;
@@ -3293,6 +3397,8 @@ export interface operations {
                                             implementation?: {
                                                 address: string;
                                                 codeHash: string;
+                                                /** @enum {string} */
+                                                storageLayout?: "eip1967" | "zeppelinos";
                                             };
                                         };
                                         recipients: string[];
@@ -3307,6 +3413,8 @@ export interface operations {
                                             implementation?: {
                                                 address: string;
                                                 codeHash: string;
+                                                /** @enum {string} */
+                                                storageLayout?: "eip1967" | "zeppelinos";
                                             };
                                         };
                                         tokenIn: {
@@ -3315,6 +3423,8 @@ export interface operations {
                                             implementation?: {
                                                 address: string;
                                                 codeHash: string;
+                                                /** @enum {string} */
+                                                storageLayout?: "eip1967" | "zeppelinos";
                                             };
                                         };
                                         tokenOut: {
@@ -3323,6 +3433,8 @@ export interface operations {
                                             implementation?: {
                                                 address: string;
                                                 codeHash: string;
+                                                /** @enum {string} */
+                                                storageLayout?: "eip1967" | "zeppelinos";
                                             };
                                         };
                                         fee: number;
@@ -3336,6 +3448,8 @@ export interface operations {
                                             implementation?: {
                                                 address: string;
                                                 codeHash: string;
+                                                /** @enum {string} */
+                                                storageLayout?: "eip1967" | "zeppelinos";
                                             };
                                         };
                                         vault: {
@@ -3344,6 +3458,8 @@ export interface operations {
                                             implementation?: {
                                                 address: string;
                                                 codeHash: string;
+                                                /** @enum {string} */
+                                                storageLayout?: "eip1967" | "zeppelinos";
                                             };
                                         };
                                         asset: {
@@ -3352,6 +3468,8 @@ export interface operations {
                                             implementation?: {
                                                 address: string;
                                                 codeHash: string;
+                                                /** @enum {string} */
+                                                storageLayout?: "eip1967" | "zeppelinos";
                                             };
                                         };
                                         maximumAssets: string;
@@ -5656,6 +5774,29 @@ export interface operations {
                         };
                         funding_address?: string;
                         paymaster?: string;
+                        setup?: {
+                            /** @enum {string} */
+                            phase: "not-started" | "checking" | "deploying" | "funding" | "publishing" | "ready" | "attention";
+                            running: boolean;
+                            execution_enabled: boolean;
+                            /** @enum {string} */
+                            verification_mode: "single" | "quorum";
+                            maximum_cost_wei: string;
+                            funding_allocation?: {
+                                paymasterBasisPoints: number;
+                                bundlerBasisPoints: number;
+                                provisioningBasisPoints?: number;
+                                reserveBasisPoints: number;
+                                feeReserveWei: string;
+                                minimumRefillWei: string;
+                            };
+                            transactions: {
+                                /** @enum {string} */
+                                step: "fee-contract" | "fee-deposit" | "submission-funding" | "wallet-setup";
+                                /** @enum {string} */
+                                status: "confirmed" | "submitted" | "uncertain" | "prepared";
+                            }[];
+                        };
                     };
                 };
             };
@@ -6806,6 +6947,281 @@ export interface operations {
                         authorizes_spending: false;
                         /** @enum {boolean} */
                         activates_execution: false;
+                    };
+                };
+            };
+            /** @description Problem response */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+        };
+    };
+    configureProviderConnections: {
+        parameters: {
+            query?: never;
+            header: {
+                "idempotency-key": string;
+                /** @description Choose a configured network. Omit to use the default; existing wallet, request and grant IDs select their stored network automatically. A conflicting selection is rejected. */
+                "wallet-network"?: "base" | "base-sepolia" | "ethereum" | "ethereum-sepolia";
+            };
+            path: {
+                applicationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    expected_revision: string;
+                    connections: {
+                        /** @enum {string} */
+                        kind: "rpc-verification" | "rpc-submission" | "rpc-observation";
+                        endpoint: string;
+                    }[];
+                };
+            };
+        };
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        application_id: string;
+                        /** @enum {string} */
+                        kind: "actions" | "services" | "sponsorship";
+                        revision: string;
+                        value: {
+                            name: string;
+                            description: string;
+                            fields: {
+                                name: string;
+                                required: boolean;
+                                allowed_values: string[];
+                            }[];
+                        }[] | {
+                            id: string;
+                            /** @enum {string} */
+                            kind: "rpc-verification" | "rpc-submission" | "rpc-observation" | "other";
+                            vendor: string;
+                            /** @description Opaque application-local secret-store reference. Never a credential, URL, environment-variable lookup or authority to read another application’s secret. Runtime resolution is not enabled by registration. */
+                            credential_reference: string;
+                            /** @enum {string} */
+                            billing_owner: "application";
+                        }[] | ({
+                            /** @enum {string} */
+                            chain_id: "eip155:8453" | "eip155:84532" | "eip155:1" | "eip155:11155111";
+                            funding_agreement: string;
+                            /** @description Optional cumulative sponsorship allowance in balance mode; required for legacy agreements. Additional ETH does not raise a configured allowance. */
+                            maximum_gas_budget_wei?: string;
+                            /** @enum {string} */
+                            account_model: "provider-controlled-user-safe";
+                            /** @enum {string} */
+                            asset_model: "individual-user-wallets";
+                            /**
+                             * @description Use current application funding with durable pending-cost reservations. A total budget remains optional; transaction and pending-fee ceilings are required.
+                             * @enum {string}
+                             */
+                            funding_mode?: "balance";
+                            /** @description Maximum authorized network fee for one wallet operation, including its verification and fee reserve. */
+                            maximum_transaction_fee_wei?: string;
+                            /** @description Maximum aggregate fee reservation for wallet operations without a verified final outcome. Unknown and unfinalized outcomes retain their reservations. */
+                            maximum_pending_fees_wei?: string;
+                            maximum_execution_accounts?: number;
+                            maximum_in_flight_per_sponsor?: number;
+                            gas_limits?: {
+                                gas_limit: string;
+                                max_fee_per_gas: string;
+                                max_priority_fee_per_gas: string;
+                                l1_fee_reserve_wei: string;
+                            };
+                        } | {
+                            /** @enum {unknown} */
+                            funding_mode: "balance";
+                            maximum_transaction_fee_wei: unknown;
+                            maximum_pending_fees_wei: unknown;
+                        } | {
+                            maximum_gas_budget_wei: unknown;
+                        });
+                        /** Format: date-time */
+                        submitted_at: string;
+                        /** @enum {unknown} */
+                        proposed_by?: "provider";
+                        /** @enum {string} */
+                        decision_by?: "provider" | "application";
+                        /** @enum {string} */
+                        decision: "pending" | "accepted" | "rejected";
+                        decision_revision: string;
+                        /** Format: date-time */
+                        decided_at?: string;
                     };
                 };
             };
@@ -9290,6 +9706,8 @@ export interface operations {
                                         implementation?: {
                                             address: string;
                                             code_hash: string;
+                                            /** @enum {string} */
+                                            storage_layout?: "eip1967" | "zeppelinos";
                                         };
                                         methods: {
                                             signature: string;
@@ -9305,6 +9723,8 @@ export interface operations {
                                                 implementation?: {
                                                     address: string;
                                                     codeHash: string;
+                                                    /** @enum {string} */
+                                                    storageLayout?: "eip1967" | "zeppelinos";
                                                 };
                                             };
                                             recipients: string[];
@@ -9319,6 +9739,8 @@ export interface operations {
                                                 implementation?: {
                                                     address: string;
                                                     codeHash: string;
+                                                    /** @enum {string} */
+                                                    storageLayout?: "eip1967" | "zeppelinos";
                                                 };
                                             };
                                             tokenIn: {
@@ -9327,6 +9749,8 @@ export interface operations {
                                                 implementation?: {
                                                     address: string;
                                                     codeHash: string;
+                                                    /** @enum {string} */
+                                                    storageLayout?: "eip1967" | "zeppelinos";
                                                 };
                                             };
                                             tokenOut: {
@@ -9335,6 +9759,8 @@ export interface operations {
                                                 implementation?: {
                                                     address: string;
                                                     codeHash: string;
+                                                    /** @enum {string} */
+                                                    storageLayout?: "eip1967" | "zeppelinos";
                                                 };
                                             };
                                             fee: number;
@@ -9348,6 +9774,8 @@ export interface operations {
                                                 implementation?: {
                                                     address: string;
                                                     codeHash: string;
+                                                    /** @enum {string} */
+                                                    storageLayout?: "eip1967" | "zeppelinos";
                                                 };
                                             };
                                             vault: {
@@ -9356,6 +9784,8 @@ export interface operations {
                                                 implementation?: {
                                                     address: string;
                                                     codeHash: string;
+                                                    /** @enum {string} */
+                                                    storageLayout?: "eip1967" | "zeppelinos";
                                                 };
                                             };
                                             asset: {
@@ -9364,6 +9794,8 @@ export interface operations {
                                                 implementation?: {
                                                     address: string;
                                                     codeHash: string;
+                                                    /** @enum {string} */
+                                                    storageLayout?: "eip1967" | "zeppelinos";
                                                 };
                                             };
                                             maximumAssets: string;
@@ -9415,6 +9847,8 @@ export interface operations {
                                         implementation?: {
                                             address: string;
                                             code_hash: string;
+                                            /** @enum {string} */
+                                            storage_layout?: "eip1967" | "zeppelinos";
                                         };
                                         methods: {
                                             signature: string;
@@ -9430,6 +9864,8 @@ export interface operations {
                                                 implementation?: {
                                                     address: string;
                                                     codeHash: string;
+                                                    /** @enum {string} */
+                                                    storageLayout?: "eip1967" | "zeppelinos";
                                                 };
                                             };
                                             recipients: string[];
@@ -9444,6 +9880,8 @@ export interface operations {
                                                 implementation?: {
                                                     address: string;
                                                     codeHash: string;
+                                                    /** @enum {string} */
+                                                    storageLayout?: "eip1967" | "zeppelinos";
                                                 };
                                             };
                                             tokenIn: {
@@ -9452,6 +9890,8 @@ export interface operations {
                                                 implementation?: {
                                                     address: string;
                                                     codeHash: string;
+                                                    /** @enum {string} */
+                                                    storageLayout?: "eip1967" | "zeppelinos";
                                                 };
                                             };
                                             tokenOut: {
@@ -9460,6 +9900,8 @@ export interface operations {
                                                 implementation?: {
                                                     address: string;
                                                     codeHash: string;
+                                                    /** @enum {string} */
+                                                    storageLayout?: "eip1967" | "zeppelinos";
                                                 };
                                             };
                                             fee: number;
@@ -9473,6 +9915,8 @@ export interface operations {
                                                 implementation?: {
                                                     address: string;
                                                     codeHash: string;
+                                                    /** @enum {string} */
+                                                    storageLayout?: "eip1967" | "zeppelinos";
                                                 };
                                             };
                                             vault: {
@@ -9481,6 +9925,8 @@ export interface operations {
                                                 implementation?: {
                                                     address: string;
                                                     codeHash: string;
+                                                    /** @enum {string} */
+                                                    storageLayout?: "eip1967" | "zeppelinos";
                                                 };
                                             };
                                             asset: {
@@ -9489,6 +9935,8 @@ export interface operations {
                                                 implementation?: {
                                                     address: string;
                                                     codeHash: string;
+                                                    /** @enum {string} */
+                                                    storageLayout?: "eip1967" | "zeppelinos";
                                                 };
                                             };
                                             maximumAssets: string;
@@ -9547,6 +9995,8 @@ export interface operations {
                                         implementation?: {
                                             address: string;
                                             code_hash: string;
+                                            /** @enum {string} */
+                                            storage_layout?: "eip1967" | "zeppelinos";
                                         };
                                         methods: {
                                             signature: string;
@@ -9562,6 +10012,8 @@ export interface operations {
                                                 implementation?: {
                                                     address: string;
                                                     codeHash: string;
+                                                    /** @enum {string} */
+                                                    storageLayout?: "eip1967" | "zeppelinos";
                                                 };
                                             };
                                             recipients: string[];
@@ -9576,6 +10028,8 @@ export interface operations {
                                                 implementation?: {
                                                     address: string;
                                                     codeHash: string;
+                                                    /** @enum {string} */
+                                                    storageLayout?: "eip1967" | "zeppelinos";
                                                 };
                                             };
                                             tokenIn: {
@@ -9584,6 +10038,8 @@ export interface operations {
                                                 implementation?: {
                                                     address: string;
                                                     codeHash: string;
+                                                    /** @enum {string} */
+                                                    storageLayout?: "eip1967" | "zeppelinos";
                                                 };
                                             };
                                             tokenOut: {
@@ -9592,6 +10048,8 @@ export interface operations {
                                                 implementation?: {
                                                     address: string;
                                                     codeHash: string;
+                                                    /** @enum {string} */
+                                                    storageLayout?: "eip1967" | "zeppelinos";
                                                 };
                                             };
                                             fee: number;
@@ -9605,6 +10063,8 @@ export interface operations {
                                                 implementation?: {
                                                     address: string;
                                                     codeHash: string;
+                                                    /** @enum {string} */
+                                                    storageLayout?: "eip1967" | "zeppelinos";
                                                 };
                                             };
                                             vault: {
@@ -9613,6 +10073,8 @@ export interface operations {
                                                 implementation?: {
                                                     address: string;
                                                     codeHash: string;
+                                                    /** @enum {string} */
+                                                    storageLayout?: "eip1967" | "zeppelinos";
                                                 };
                                             };
                                             asset: {
@@ -9621,6 +10083,8 @@ export interface operations {
                                                 implementation?: {
                                                     address: string;
                                                     codeHash: string;
+                                                    /** @enum {string} */
+                                                    storageLayout?: "eip1967" | "zeppelinos";
                                                 };
                                             };
                                             maximumAssets: string;
@@ -10306,6 +10770,8 @@ export interface operations {
                                     implementation?: {
                                         address: string;
                                         code_hash: string;
+                                        /** @enum {string} */
+                                        storage_layout?: "eip1967" | "zeppelinos";
                                     };
                                     methods: {
                                         signature: string;
@@ -10321,6 +10787,8 @@ export interface operations {
                                             implementation?: {
                                                 address: string;
                                                 codeHash: string;
+                                                /** @enum {string} */
+                                                storageLayout?: "eip1967" | "zeppelinos";
                                             };
                                         };
                                         recipients: string[];
@@ -10335,6 +10803,8 @@ export interface operations {
                                             implementation?: {
                                                 address: string;
                                                 codeHash: string;
+                                                /** @enum {string} */
+                                                storageLayout?: "eip1967" | "zeppelinos";
                                             };
                                         };
                                         tokenIn: {
@@ -10343,6 +10813,8 @@ export interface operations {
                                             implementation?: {
                                                 address: string;
                                                 codeHash: string;
+                                                /** @enum {string} */
+                                                storageLayout?: "eip1967" | "zeppelinos";
                                             };
                                         };
                                         tokenOut: {
@@ -10351,6 +10823,8 @@ export interface operations {
                                             implementation?: {
                                                 address: string;
                                                 codeHash: string;
+                                                /** @enum {string} */
+                                                storageLayout?: "eip1967" | "zeppelinos";
                                             };
                                         };
                                         fee: number;
@@ -10364,6 +10838,8 @@ export interface operations {
                                             implementation?: {
                                                 address: string;
                                                 codeHash: string;
+                                                /** @enum {string} */
+                                                storageLayout?: "eip1967" | "zeppelinos";
                                             };
                                         };
                                         vault: {
@@ -10372,6 +10848,8 @@ export interface operations {
                                             implementation?: {
                                                 address: string;
                                                 codeHash: string;
+                                                /** @enum {string} */
+                                                storageLayout?: "eip1967" | "zeppelinos";
                                             };
                                         };
                                         asset: {
@@ -10380,6 +10858,8 @@ export interface operations {
                                             implementation?: {
                                                 address: string;
                                                 codeHash: string;
+                                                /** @enum {string} */
+                                                storageLayout?: "eip1967" | "zeppelinos";
                                             };
                                         };
                                         maximumAssets: string;
@@ -10632,6 +11112,8 @@ export interface operations {
                                     implementation?: {
                                         address: string;
                                         code_hash: string;
+                                        /** @enum {string} */
+                                        storage_layout?: "eip1967" | "zeppelinos";
                                     };
                                     methods: {
                                         signature: string;
@@ -10647,6 +11129,8 @@ export interface operations {
                                             implementation?: {
                                                 address: string;
                                                 codeHash: string;
+                                                /** @enum {string} */
+                                                storageLayout?: "eip1967" | "zeppelinos";
                                             };
                                         };
                                         recipients: string[];
@@ -10661,6 +11145,8 @@ export interface operations {
                                             implementation?: {
                                                 address: string;
                                                 codeHash: string;
+                                                /** @enum {string} */
+                                                storageLayout?: "eip1967" | "zeppelinos";
                                             };
                                         };
                                         tokenIn: {
@@ -10669,6 +11155,8 @@ export interface operations {
                                             implementation?: {
                                                 address: string;
                                                 codeHash: string;
+                                                /** @enum {string} */
+                                                storageLayout?: "eip1967" | "zeppelinos";
                                             };
                                         };
                                         tokenOut: {
@@ -10677,6 +11165,8 @@ export interface operations {
                                             implementation?: {
                                                 address: string;
                                                 codeHash: string;
+                                                /** @enum {string} */
+                                                storageLayout?: "eip1967" | "zeppelinos";
                                             };
                                         };
                                         fee: number;
@@ -10690,6 +11180,8 @@ export interface operations {
                                             implementation?: {
                                                 address: string;
                                                 codeHash: string;
+                                                /** @enum {string} */
+                                                storageLayout?: "eip1967" | "zeppelinos";
                                             };
                                         };
                                         vault: {
@@ -10698,6 +11190,8 @@ export interface operations {
                                             implementation?: {
                                                 address: string;
                                                 codeHash: string;
+                                                /** @enum {string} */
+                                                storageLayout?: "eip1967" | "zeppelinos";
                                             };
                                         };
                                         asset: {
@@ -10706,6 +11200,8 @@ export interface operations {
                                             implementation?: {
                                                 address: string;
                                                 codeHash: string;
+                                                /** @enum {string} */
+                                                storageLayout?: "eip1967" | "zeppelinos";
                                             };
                                         };
                                         maximumAssets: string;
@@ -10958,6 +11454,8 @@ export interface operations {
                                     implementation?: {
                                         address: string;
                                         code_hash: string;
+                                        /** @enum {string} */
+                                        storage_layout?: "eip1967" | "zeppelinos";
                                     };
                                     methods: {
                                         signature: string;
@@ -10973,6 +11471,8 @@ export interface operations {
                                             implementation?: {
                                                 address: string;
                                                 codeHash: string;
+                                                /** @enum {string} */
+                                                storageLayout?: "eip1967" | "zeppelinos";
                                             };
                                         };
                                         recipients: string[];
@@ -10987,6 +11487,8 @@ export interface operations {
                                             implementation?: {
                                                 address: string;
                                                 codeHash: string;
+                                                /** @enum {string} */
+                                                storageLayout?: "eip1967" | "zeppelinos";
                                             };
                                         };
                                         tokenIn: {
@@ -10995,6 +11497,8 @@ export interface operations {
                                             implementation?: {
                                                 address: string;
                                                 codeHash: string;
+                                                /** @enum {string} */
+                                                storageLayout?: "eip1967" | "zeppelinos";
                                             };
                                         };
                                         tokenOut: {
@@ -11003,6 +11507,8 @@ export interface operations {
                                             implementation?: {
                                                 address: string;
                                                 codeHash: string;
+                                                /** @enum {string} */
+                                                storageLayout?: "eip1967" | "zeppelinos";
                                             };
                                         };
                                         fee: number;
@@ -11016,6 +11522,8 @@ export interface operations {
                                             implementation?: {
                                                 address: string;
                                                 codeHash: string;
+                                                /** @enum {string} */
+                                                storageLayout?: "eip1967" | "zeppelinos";
                                             };
                                         };
                                         vault: {
@@ -11024,6 +11532,8 @@ export interface operations {
                                             implementation?: {
                                                 address: string;
                                                 codeHash: string;
+                                                /** @enum {string} */
+                                                storageLayout?: "eip1967" | "zeppelinos";
                                             };
                                         };
                                         asset: {
@@ -11032,6 +11542,8 @@ export interface operations {
                                             implementation?: {
                                                 address: string;
                                                 codeHash: string;
+                                                /** @enum {string} */
+                                                storageLayout?: "eip1967" | "zeppelinos";
                                             };
                                         };
                                         maximumAssets: string;
@@ -11270,6 +11782,8 @@ export interface operations {
                             implementation?: {
                                 address: string;
                                 code_hash: string;
+                                /** @enum {string} */
+                                storage_layout?: "eip1967" | "zeppelinos";
                             };
                             methods: {
                                 signature: string;
@@ -11285,6 +11799,8 @@ export interface operations {
                                     implementation?: {
                                         address: string;
                                         codeHash: string;
+                                        /** @enum {string} */
+                                        storageLayout?: "eip1967" | "zeppelinos";
                                     };
                                 };
                                 recipients: string[];
@@ -11299,6 +11815,8 @@ export interface operations {
                                     implementation?: {
                                         address: string;
                                         codeHash: string;
+                                        /** @enum {string} */
+                                        storageLayout?: "eip1967" | "zeppelinos";
                                     };
                                 };
                                 tokenIn: {
@@ -11307,6 +11825,8 @@ export interface operations {
                                     implementation?: {
                                         address: string;
                                         codeHash: string;
+                                        /** @enum {string} */
+                                        storageLayout?: "eip1967" | "zeppelinos";
                                     };
                                 };
                                 tokenOut: {
@@ -11315,6 +11835,8 @@ export interface operations {
                                     implementation?: {
                                         address: string;
                                         codeHash: string;
+                                        /** @enum {string} */
+                                        storageLayout?: "eip1967" | "zeppelinos";
                                     };
                                 };
                                 fee: number;
@@ -11328,6 +11850,8 @@ export interface operations {
                                     implementation?: {
                                         address: string;
                                         codeHash: string;
+                                        /** @enum {string} */
+                                        storageLayout?: "eip1967" | "zeppelinos";
                                     };
                                 };
                                 vault: {
@@ -11336,6 +11860,8 @@ export interface operations {
                                     implementation?: {
                                         address: string;
                                         codeHash: string;
+                                        /** @enum {string} */
+                                        storageLayout?: "eip1967" | "zeppelinos";
                                     };
                                 };
                                 asset: {
@@ -11344,6 +11870,8 @@ export interface operations {
                                     implementation?: {
                                         address: string;
                                         codeHash: string;
+                                        /** @enum {string} */
+                                        storageLayout?: "eip1967" | "zeppelinos";
                                     };
                                 };
                                 maximumAssets: string;
@@ -11400,6 +11928,8 @@ export interface operations {
                                 implementation?: {
                                     address: string;
                                     code_hash: string;
+                                    /** @enum {string} */
+                                    storage_layout?: "eip1967" | "zeppelinos";
                                 };
                                 methods: {
                                     signature: string;
@@ -11415,6 +11945,8 @@ export interface operations {
                                         implementation?: {
                                             address: string;
                                             codeHash: string;
+                                            /** @enum {string} */
+                                            storageLayout?: "eip1967" | "zeppelinos";
                                         };
                                     };
                                     recipients: string[];
@@ -11429,6 +11961,8 @@ export interface operations {
                                         implementation?: {
                                             address: string;
                                             codeHash: string;
+                                            /** @enum {string} */
+                                            storageLayout?: "eip1967" | "zeppelinos";
                                         };
                                     };
                                     tokenIn: {
@@ -11437,6 +11971,8 @@ export interface operations {
                                         implementation?: {
                                             address: string;
                                             codeHash: string;
+                                            /** @enum {string} */
+                                            storageLayout?: "eip1967" | "zeppelinos";
                                         };
                                     };
                                     tokenOut: {
@@ -11445,6 +11981,8 @@ export interface operations {
                                         implementation?: {
                                             address: string;
                                             codeHash: string;
+                                            /** @enum {string} */
+                                            storageLayout?: "eip1967" | "zeppelinos";
                                         };
                                     };
                                     fee: number;
@@ -11458,6 +11996,8 @@ export interface operations {
                                         implementation?: {
                                             address: string;
                                             codeHash: string;
+                                            /** @enum {string} */
+                                            storageLayout?: "eip1967" | "zeppelinos";
                                         };
                                     };
                                     vault: {
@@ -11466,6 +12006,8 @@ export interface operations {
                                         implementation?: {
                                             address: string;
                                             codeHash: string;
+                                            /** @enum {string} */
+                                            storageLayout?: "eip1967" | "zeppelinos";
                                         };
                                     };
                                     asset: {
@@ -11474,6 +12016,8 @@ export interface operations {
                                         implementation?: {
                                             address: string;
                                             codeHash: string;
+                                            /** @enum {string} */
+                                            storageLayout?: "eip1967" | "zeppelinos";
                                         };
                                     };
                                     maximumAssets: string;
@@ -11717,6 +12261,8 @@ export interface operations {
                                 implementation?: {
                                     address: string;
                                     code_hash: string;
+                                    /** @enum {string} */
+                                    storage_layout?: "eip1967" | "zeppelinos";
                                 };
                                 methods: {
                                     signature: string;
@@ -11732,6 +12278,8 @@ export interface operations {
                                         implementation?: {
                                             address: string;
                                             codeHash: string;
+                                            /** @enum {string} */
+                                            storageLayout?: "eip1967" | "zeppelinos";
                                         };
                                     };
                                     recipients: string[];
@@ -11746,6 +12294,8 @@ export interface operations {
                                         implementation?: {
                                             address: string;
                                             codeHash: string;
+                                            /** @enum {string} */
+                                            storageLayout?: "eip1967" | "zeppelinos";
                                         };
                                     };
                                     tokenIn: {
@@ -11754,6 +12304,8 @@ export interface operations {
                                         implementation?: {
                                             address: string;
                                             codeHash: string;
+                                            /** @enum {string} */
+                                            storageLayout?: "eip1967" | "zeppelinos";
                                         };
                                     };
                                     tokenOut: {
@@ -11762,6 +12314,8 @@ export interface operations {
                                         implementation?: {
                                             address: string;
                                             codeHash: string;
+                                            /** @enum {string} */
+                                            storageLayout?: "eip1967" | "zeppelinos";
                                         };
                                     };
                                     fee: number;
@@ -11775,6 +12329,8 @@ export interface operations {
                                         implementation?: {
                                             address: string;
                                             codeHash: string;
+                                            /** @enum {string} */
+                                            storageLayout?: "eip1967" | "zeppelinos";
                                         };
                                     };
                                     vault: {
@@ -11783,6 +12339,8 @@ export interface operations {
                                         implementation?: {
                                             address: string;
                                             codeHash: string;
+                                            /** @enum {string} */
+                                            storageLayout?: "eip1967" | "zeppelinos";
                                         };
                                     };
                                     asset: {
@@ -11791,6 +12349,8 @@ export interface operations {
                                         implementation?: {
                                             address: string;
                                             codeHash: string;
+                                            /** @enum {string} */
+                                            storageLayout?: "eip1967" | "zeppelinos";
                                         };
                                     };
                                     maximumAssets: string;
@@ -12041,6 +12601,8 @@ export interface operations {
                                 implementation?: {
                                     address: string;
                                     code_hash: string;
+                                    /** @enum {string} */
+                                    storage_layout?: "eip1967" | "zeppelinos";
                                 };
                                 methods: {
                                     signature: string;
@@ -12056,6 +12618,8 @@ export interface operations {
                                         implementation?: {
                                             address: string;
                                             codeHash: string;
+                                            /** @enum {string} */
+                                            storageLayout?: "eip1967" | "zeppelinos";
                                         };
                                     };
                                     recipients: string[];
@@ -12070,6 +12634,8 @@ export interface operations {
                                         implementation?: {
                                             address: string;
                                             codeHash: string;
+                                            /** @enum {string} */
+                                            storageLayout?: "eip1967" | "zeppelinos";
                                         };
                                     };
                                     tokenIn: {
@@ -12078,6 +12644,8 @@ export interface operations {
                                         implementation?: {
                                             address: string;
                                             codeHash: string;
+                                            /** @enum {string} */
+                                            storageLayout?: "eip1967" | "zeppelinos";
                                         };
                                     };
                                     tokenOut: {
@@ -12086,6 +12654,8 @@ export interface operations {
                                         implementation?: {
                                             address: string;
                                             codeHash: string;
+                                            /** @enum {string} */
+                                            storageLayout?: "eip1967" | "zeppelinos";
                                         };
                                     };
                                     fee: number;
@@ -12099,6 +12669,8 @@ export interface operations {
                                         implementation?: {
                                             address: string;
                                             codeHash: string;
+                                            /** @enum {string} */
+                                            storageLayout?: "eip1967" | "zeppelinos";
                                         };
                                     };
                                     vault: {
@@ -12107,6 +12679,8 @@ export interface operations {
                                         implementation?: {
                                             address: string;
                                             codeHash: string;
+                                            /** @enum {string} */
+                                            storageLayout?: "eip1967" | "zeppelinos";
                                         };
                                     };
                                     asset: {
@@ -12115,6 +12689,8 @@ export interface operations {
                                         implementation?: {
                                             address: string;
                                             codeHash: string;
+                                            /** @enum {string} */
+                                            storageLayout?: "eip1967" | "zeppelinos";
                                         };
                                     };
                                     maximumAssets: string;
@@ -12352,6 +12928,8 @@ export interface operations {
                             implementation?: {
                                 address: string;
                                 code_hash: string;
+                                /** @enum {string} */
+                                storage_layout?: "eip1967" | "zeppelinos";
                             };
                             methods: {
                                 signature: string;
@@ -12367,6 +12945,8 @@ export interface operations {
                                     implementation?: {
                                         address: string;
                                         codeHash: string;
+                                        /** @enum {string} */
+                                        storageLayout?: "eip1967" | "zeppelinos";
                                     };
                                 };
                                 recipients: string[];
@@ -12381,6 +12961,8 @@ export interface operations {
                                     implementation?: {
                                         address: string;
                                         codeHash: string;
+                                        /** @enum {string} */
+                                        storageLayout?: "eip1967" | "zeppelinos";
                                     };
                                 };
                                 tokenIn: {
@@ -12389,6 +12971,8 @@ export interface operations {
                                     implementation?: {
                                         address: string;
                                         codeHash: string;
+                                        /** @enum {string} */
+                                        storageLayout?: "eip1967" | "zeppelinos";
                                     };
                                 };
                                 tokenOut: {
@@ -12397,6 +12981,8 @@ export interface operations {
                                     implementation?: {
                                         address: string;
                                         codeHash: string;
+                                        /** @enum {string} */
+                                        storageLayout?: "eip1967" | "zeppelinos";
                                     };
                                 };
                                 fee: number;
@@ -12410,6 +12996,8 @@ export interface operations {
                                     implementation?: {
                                         address: string;
                                         codeHash: string;
+                                        /** @enum {string} */
+                                        storageLayout?: "eip1967" | "zeppelinos";
                                     };
                                 };
                                 vault: {
@@ -12418,6 +13006,8 @@ export interface operations {
                                     implementation?: {
                                         address: string;
                                         codeHash: string;
+                                        /** @enum {string} */
+                                        storageLayout?: "eip1967" | "zeppelinos";
                                     };
                                 };
                                 asset: {
@@ -12426,6 +13016,8 @@ export interface operations {
                                     implementation?: {
                                         address: string;
                                         codeHash: string;
+                                        /** @enum {string} */
+                                        storageLayout?: "eip1967" | "zeppelinos";
                                     };
                                 };
                                 maximumAssets: string;
@@ -12482,6 +13074,8 @@ export interface operations {
                                 implementation?: {
                                     address: string;
                                     code_hash: string;
+                                    /** @enum {string} */
+                                    storage_layout?: "eip1967" | "zeppelinos";
                                 };
                                 methods: {
                                     signature: string;
@@ -12497,6 +13091,8 @@ export interface operations {
                                         implementation?: {
                                             address: string;
                                             codeHash: string;
+                                            /** @enum {string} */
+                                            storageLayout?: "eip1967" | "zeppelinos";
                                         };
                                     };
                                     recipients: string[];
@@ -12511,6 +13107,8 @@ export interface operations {
                                         implementation?: {
                                             address: string;
                                             codeHash: string;
+                                            /** @enum {string} */
+                                            storageLayout?: "eip1967" | "zeppelinos";
                                         };
                                     };
                                     tokenIn: {
@@ -12519,6 +13117,8 @@ export interface operations {
                                         implementation?: {
                                             address: string;
                                             codeHash: string;
+                                            /** @enum {string} */
+                                            storageLayout?: "eip1967" | "zeppelinos";
                                         };
                                     };
                                     tokenOut: {
@@ -12527,6 +13127,8 @@ export interface operations {
                                         implementation?: {
                                             address: string;
                                             codeHash: string;
+                                            /** @enum {string} */
+                                            storageLayout?: "eip1967" | "zeppelinos";
                                         };
                                     };
                                     fee: number;
@@ -12540,6 +13142,8 @@ export interface operations {
                                         implementation?: {
                                             address: string;
                                             codeHash: string;
+                                            /** @enum {string} */
+                                            storageLayout?: "eip1967" | "zeppelinos";
                                         };
                                     };
                                     vault: {
@@ -12548,6 +13152,8 @@ export interface operations {
                                         implementation?: {
                                             address: string;
                                             codeHash: string;
+                                            /** @enum {string} */
+                                            storageLayout?: "eip1967" | "zeppelinos";
                                         };
                                     };
                                     asset: {
@@ -12556,6 +13162,8 @@ export interface operations {
                                         implementation?: {
                                             address: string;
                                             codeHash: string;
+                                            /** @enum {string} */
+                                            storageLayout?: "eip1967" | "zeppelinos";
                                         };
                                     };
                                     maximumAssets: string;

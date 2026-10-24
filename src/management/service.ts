@@ -184,6 +184,9 @@ export class ManagementService {
     )
       deny();
   }
+  tokenLifetimeSeconds(principal: VerifiedPrincipal) {
+    return this.identity(principal).role === 'administrator' ? 1800 : 300;
+  }
   currentPrincipal(principal: VerifiedPrincipal) {
     this.identity(principal);
   }

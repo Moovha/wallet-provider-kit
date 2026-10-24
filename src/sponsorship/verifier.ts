@@ -8,7 +8,7 @@ import { RpcReader } from '../execution/chain.js';
 import { readSafe4337State } from '../execution/safe-state-reader.js';
 import {
   safeInterface,
-  implementationSlot,
+  proxyImplementationSlot,
   type ApprovedCallIntent,
   type PinnedContract,
 } from '../execution/approved-calls.js';
@@ -284,7 +284,7 @@ export class Safe4337Verifier {
                   r
                     .call('eth_getStorageAt', [
                       pin.address,
-                      implementationSlot,
+                      proxyImplementationSlot(pin),
                       tag,
                     ])
                     .then((slot) => {
@@ -332,7 +332,7 @@ export class Safe4337Verifier {
               if (p.implementation) {
                 const slot = await r.call('eth_getStorageAt', [
                   p.address,
-                  implementationSlot,
+                  proxyImplementationSlot(p),
                   tag,
                 ]);
                 if (

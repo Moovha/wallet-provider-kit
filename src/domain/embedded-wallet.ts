@@ -12,6 +12,8 @@ interface OwnerAuthority {
   currentUserStatus: string | null;
   accountId: string;
   attemptId: string;
+  /** Provisioning only: canonical completion authorizes lookup, never a new creation. */
+  completedAccount?: EmbeddedAccount;
 }
 
 export interface SigningAuthority extends OwnerAuthority {
@@ -74,6 +76,32 @@ export class EmbeddedWalletService {
       throw new WalletProviderError('wallet_authorization_denied');
     }
     await enrollmentGuard?.(authority.ownerSubject);
+    if (authority.completedAccount) {
+      const expected = authority.completedAccount;
+      if (expected.accountId !== accountId)
+        throw new WalletProviderError('wallet_authorization_denied');
+      const existing = await this.provider.findAccount(accountId);
+      if (
+        !existing ||
+        existing.accountId !== accountId ||
+        existing.address.toLowerCase() !== expected.address.toLowerCase()
+      )
+        throw new WalletProviderError('wallet_provider_unavailable');
+      const current = structuredClone(
+        await this.authority.provision(context, accountId),
+      );
+      requireOwner(current);
+      if (
+        current.accountId !== accountId ||
+        current.ownerSubject !== authority.ownerSubject ||
+        current.completedAccount?.accountId !== accountId ||
+        current.completedAccount.address.toLowerCase() !==
+          expected.address.toLowerCase()
+      )
+        throw new WalletProviderError('wallet_authorization_denied');
+      await enrollmentGuard?.(current.ownerSubject);
+      return existing;
+    }
     return this.provider.createAccount(accountId, authority.attemptId);
   }
 

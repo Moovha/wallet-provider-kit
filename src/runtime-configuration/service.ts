@@ -65,7 +65,11 @@ export interface RuntimePolicy {
   contracts: {
     address: string;
     code_hash: string;
-    implementation?: { address: string; code_hash: string };
+    implementation?: {
+      address: string;
+      code_hash: string;
+      storage_layout?: 'eip1967' | 'zeppelinos';
+    };
     methods: {
       signature: string;
       maximum_value_wei: string;
@@ -119,6 +123,10 @@ export interface RuntimeConfigurationState {
   >;
 
   obligations?: ObligationRegistry;
+  connectionReceipts?: Record<
+    string,
+    { hash: string; record: ObligationRecord }
+  >;
   credentials?: Record<string, ApplicationCredential>;
   credentialReceipts?: Record<
     string,
@@ -532,6 +540,137 @@ export class RuntimeConfigurationService {
         .filter((entry) => entry.application_id === selected)
         .map(credentialMetadata),
     );
+  }
+  async configureConnections(
+    context: AuthorityContext,
+    applicationId: string,
+    input: {
+      expected_revision: string;
+      connections: {
+        kind: 'rpc-verification' | 'rpc-submission' | 'rpc-observation';
+        endpoint: string;
+      }[];
+    },
+  ) {
+    context = structuredClone(context);
+    input = structuredClone(input);
+    this.assertOperator(context.principal);
+    this.target(applicationId);
+    if (!this.credentialCipher) deny();
+    const key = this.key(
+      context,
+      'wallet:configuration:write',
+      'configure-connections',
+      applicationId,
+    );
+    if (
+      !input ||
+      Object.keys(input).sort().join(',') !== 'connections,expected_revision' ||
+      !/^(0|[1-9][0-9]{0,3})$/.test(input.expected_revision) ||
+      !Array.isArray(input.connections) ||
+      input.connections.length > 9
+    )
+      invalid();
+    const connections = input.connections.map((c) => {
+      if (
+        !c ||
+        Object.keys(c).sort().join(',') !== 'endpoint,kind' ||
+        !['rpc-verification', 'rpc-submission', 'rpc-observation'].includes(
+          c.kind,
+        )
+      )
+        invalid();
+      return { ...c, origin: credentialOrigin(c.endpoint) };
+    });
+    for (const kind of [
+      'rpc-verification',
+      'rpc-submission',
+      'rpc-observation',
+    ]) {
+      const selected = connections.filter((c) => c.kind === kind);
+      const minimum =
+        kind === 'rpc-observation'
+          ? 0
+          : kind === 'rpc-verification' && this.rpcVerification === 'quorum'
+            ? 2
+            : 1;
+      if (
+        selected.length < minimum ||
+        selected.length > 3 ||
+        new Set(selected.map((c) => c.origin)).size !== selected.length ||
+        (kind !== 'rpc-observation' &&
+          selected.some((c) => etherscanEndpoint(c.endpoint)))
+      )
+        invalid();
+    }
+    const hash = this.credentialCipher.digest(input);
+    return this.transaction((registry) => {
+      const receipts = (registry.connectionReceipts ??= {});
+      if (receipts[key]) {
+        if (receipts[key].hash !== hash) conflict();
+        return structuredClone(receipts[key].record);
+      }
+      const obligations = (registry.obligations ??= {
+        records: {},
+        receipts: {},
+      });
+      const id = applicationId + ':services';
+      const previous = obligations.records[id];
+      if (
+        (previous?.revision ?? '0') !== input.expected_revision ||
+        Number(input.expected_revision) >= 256
+      )
+        conflict();
+      const credentials = (registry.credentials ??= {});
+      const services: ApplicationObligations['services'] = connections.map(
+        (c, index) => {
+          const reference = 'provider-rpc-' + index;
+          const credentialId = applicationId + ':' + reference;
+          const revision =
+            Number(credentials[credentialId]?.revision ?? '0') + 1;
+          if (
+            revision > 256 ||
+            (!credentials[credentialId] &&
+              Object.values(credentials).filter(
+                (r) => r.application_id === applicationId,
+              ).length >= 32)
+          )
+            deny();
+          const metadata: CredentialMetadata = {
+            application_id: applicationId,
+            reference,
+            revision: String(revision),
+            origin: c.origin,
+            status: 'active',
+          };
+          credentials[credentialId] = this.credentialCipher!.seal(
+            metadata,
+            c.endpoint,
+          );
+          return {
+            id: reference,
+            kind: c.kind,
+            vendor: 'provider',
+            credential_reference: reference,
+            billing_owner: 'application',
+          };
+        },
+      );
+      const record: ObligationRecord = {
+        application_id: applicationId,
+        kind: 'services',
+        revision: String(Number(input.expected_revision) + 1),
+        value: services,
+        submitted_at: new Date().toISOString(),
+        decision: 'accepted',
+        decision_by: 'provider',
+        decision_revision: '1',
+        decided_at: new Date().toISOString(),
+      };
+      obligations.records[id] = record;
+      receipts[key] = { hash, record: structuredClone(record) };
+      return structuredClone(record);
+    });
   }
   async writeCredential(
     context: AuthorityContext,

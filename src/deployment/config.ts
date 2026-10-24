@@ -1,3 +1,4 @@
+import { validateFundingAllocation } from '../sponsorship/infrastructure-funding.js';
 import { networkConfigurations } from './network-configuration.js';
 import type { ProviderNetwork } from '../networks.js';
 import {
@@ -140,6 +141,12 @@ export function validateProviderConfiguration(
   const config = structuredClone(input) as unknown as ProviderConfiguration;
   try {
     assertSafeWalletConfiguration(config);
+    for (const wallet of [
+      config.safeWallet,
+      ...(config.additionalNetworks ?? []).map((n) => n.safeWallet),
+    ])
+      if (wallet?.fundingAllocation)
+        validateFundingAllocation(wallet.fundingAllocation);
     if (
       config.management &&
       (!config.authorizationServer ||

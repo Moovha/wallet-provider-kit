@@ -40,7 +40,12 @@ Set `maximum_calls: 1` and `maximum_native_value_wei: "0"`. The transfer call
 carries zero native value; it moves tokens through the token contract. Set the
 method’s `maximum_value_wei` to `"0"` too. Do not bind the recipient argument to
 the sender through `user_address_parameters`: this example sends to Wallet B.
-Verify proxy implementation pins too when applicable.
+Verify proxy implementation pins too when applicable. Select the deployed
+proxy's actual implementation layout. For legacy ZeppelinOS proxies, set
+`storageLayout: "zeppelinos"` inside the adapter token’s `implementation` pin
+and `storage_layout: "zeppelinos"` in the runtime contract rule. Omitted layouts
+use EIP-1967. Pin the current implementation address and code hash as well as
+the proxy code hash; an upgrade requires a reviewed policy update.
 
 Register and accept an action named `send_test_token` with a meaningful description
 and `fields: []`. The request below uses that exact name and an empty metadata

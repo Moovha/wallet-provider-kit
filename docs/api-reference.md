@@ -409,6 +409,7 @@ export type Authenticate = (
 export declare function createAuthenticator(
   configuration: OAuthConfiguration,
   keys?: JWTVerifyGetKey,
+  maximumTokenAgeSeconds?: number,
 ): Authenticate;
 ```
 
@@ -2675,6 +2676,7 @@ export interface PinnedContract {
   implementation?: {
     address: string;
     codeHash: string;
+    storageLayout?: 'eip1967' | 'zeppelinos';
   };
 }
 ```
@@ -2836,6 +2838,17 @@ export declare class RuntimeConfigurationService {
     principal: VerifiedPrincipal,
     applicationId?: string,
   ): Promise<CredentialMetadata[]>;
+  configureConnections(
+    context: AuthorityContext,
+    applicationId: string,
+    input: {
+      expected_revision: string;
+      connections: {
+        kind: 'rpc-verification' | 'rpc-submission' | 'rpc-observation';
+        endpoint: string;
+      }[];
+    },
+  ): Promise<ObligationRecord>;
   writeCredential(
     context: AuthorityContext,
     reference: string,
@@ -2991,6 +3004,7 @@ export interface RuntimePolicy {
     implementation?: {
       address: string;
       code_hash: string;
+      storage_layout?: 'eip1967' | 'zeppelinos';
     };
     methods: {
       signature: string;
@@ -4160,6 +4174,8 @@ export declare class UserOperationExecutionCoordinator {
     id: string,
   ): Promise<UserOperationExecution | null>;
   refresh(id: string): Promise<UserOperationExecution | null>;
+  /** Recheck dispatched historical operations without authorizing sponsorship, signing or submission. */
+  refreshSettlement(id: string): Promise<UserOperationExecution | null>;
   read(
     principal: VerifiedPrincipal,
     id: string,

@@ -1,3 +1,4 @@
+import { walletSetupSchema } from '../service/schemas.js';
 import type { ResolveNetwork } from '../service/network-context.js';
 import { runtimeApplicationId } from './service.js';
 import { setAuthenticatedResponseTimeout } from '../service/response-timeout.js';
@@ -308,6 +309,7 @@ export async function registerRuntimeConfigurationRoutes(
           },
           funding_address: { type: 'string' },
           paymaster: { type: 'string' },
+          setup: walletSetupSchema,
         },
       }),
     },
@@ -481,6 +483,63 @@ export async function registerRuntimeConfigurationRoutes(
       configured(request).readObligations(
         await principal(request, 'wallet:configuration:write'),
         request.params.applicationId,
+      ),
+  );
+  app.put<{
+    Params: { applicationId: string };
+    Body: {
+      expected_revision: string;
+      connections: {
+        kind: 'rpc-verification' | 'rpc-submission' | 'rpc-observation';
+        endpoint: string;
+      }[];
+    };
+  }>(
+    '/v1/provider/applications/:applicationId/connections',
+    {
+      bodyLimit: 49152,
+      schema: obligationSchema(
+        'configureProviderConnections',
+        obligationRecordSchema,
+        {
+          headers,
+          params: params('applicationId', applicationIdSchema),
+          body: {
+            type: 'object',
+            additionalProperties: false,
+            required: ['expected_revision', 'connections'],
+            properties: {
+              expected_revision: revisionSchema,
+              connections: {
+                type: 'array',
+                maxItems: 9,
+                items: {
+                  type: 'object',
+                  additionalProperties: false,
+                  required: ['kind', 'endpoint'],
+                  properties: {
+                    kind: {
+                      type: 'string',
+                      enum: [
+                        'rpc-verification',
+                        'rpc-submission',
+                        'rpc-observation',
+                      ],
+                    },
+                    endpoint: { type: 'string', minLength: 1, maxLength: 4096 },
+                  },
+                },
+              },
+            },
+          },
+        },
+      ),
+    },
+    async (request) =>
+      configured(request).configureConnections(
+        await context(request, 'wallet:configuration:write'),
+        request.params.applicationId,
+        request.body,
       ),
   );
   app.put<{

@@ -16,7 +16,14 @@ const pin = {
   properties: {
     address,
     codeHash: hash,
-    implementation: object({ address, codeHash: hash }),
+    implementation: object(
+      {
+        address,
+        codeHash: hash,
+        storageLayout: { type: 'string', enum: ['eip1967', 'zeppelinos'] },
+      },
+      ['storageLayout'],
+    ),
   },
 };
 const call = object({
