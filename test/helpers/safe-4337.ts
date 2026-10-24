@@ -236,7 +236,7 @@ export async function fixture(
       contracts: [
         {
           address: target.address,
-          code_hash: codeHash,
+          code_hash: target.codeHash,
           methods: [
             {
               signature: assetBudget

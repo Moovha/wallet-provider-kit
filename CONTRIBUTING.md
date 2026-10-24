@@ -75,7 +75,7 @@ behavioral test must pass before mutation and fail after mutation. A surviving
 mutation, missing test or test-loading error fails verification. These checks
 cover named security regressions rather than every possible code mutation.
 
-Run the Docker integration suite separately:
+Run the Docker integration suite separately on a Linux Docker host:
 
 ```sh
 npm run prepare:integration
@@ -85,19 +85,21 @@ npm run test:integration
 
 Preparation downloads integrity-pinned upstream contract artifacts into ignored
 `artifacts/integration-contracts`; package identities, source paths and hashes are
-recorded in `test/fixtures/contracts/provenance.json`. The artifacts retain their
-upstream licenses: Safe core is LGPL-3.0, Safe4337Module and EntryPoint are GPL-3.0.
+recorded in `test/fixtures/contracts/provenance.json`. The Safe contract sources declare
+LGPL-3.0 and EntryPoint declares GPL-3.0; upstream package notices and source
+licenses remain applicable.
 No additional runtime dependency or contract artifact is added to the package.
 
 The integration test runs a local Anvil chain, deployed Safe and EntryPoint
 contracts, the local verifying paymaster, the pinned Alto image and a dedicated
-Valkey volume. It queues a native transfer without bundling, loses the acceptance
-reply, restarts provider storage, Valkey and Alto, then enables bundling and checks
-the recipient balance, account nonce, EntryPoint hash and absence of repeated
-signing or submission. The fixture creates no live-provider accounts and uses no
+Valkey volume. It queues an atomic contract call and native transfer without
+bundling, loses the acceptance reply, restarts provider storage, Valkey and Alto, then enables bundling and checks
+the counter state, recipient balance, account nonce, EntryPoint hash, rejection
+of altered calldata and absence of repeated signing or submission. The fixture creates no live-provider accounts and uses no
 live credentials or real funds. It removes its containers, network, volume and
 temporary files on completion. Docker must reach the host's ephemeral Anvil port;
-CI runs this suite on Linux. Report this evidence separately from browser checks
+the test reaches the bundler directly on its isolated bridge network. Report this
+evidence separately from browser checks
 and live-provider acceptance.
 
 ## Documentation and examples

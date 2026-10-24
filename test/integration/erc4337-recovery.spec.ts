@@ -1,4 +1,5 @@
 import { afterAll, expect, it } from 'vitest';
+import solc from 'solc';
 import { spawn, execFile, type ChildProcess } from 'node:child_process';
 import { promisify } from 'node:util';
 import { once } from 'node:events';
@@ -101,7 +102,6 @@ async function artifact(name: string) {
 it('executes a real Safe operation through Alto and Valkey, then recovers a lost response across provider, bundler and queue restarts without repeating the effect', async () => {
   await docker('info', '--format', '{{.ServerVersion}}');
   const port = await availablePort();
-  const bundlerPort = await availablePort();
   anvil = spawn(
     process.execPath,
     [
@@ -159,6 +159,40 @@ it('executes a real Safe operation through Alto and Valkey, then recovers a lost
     await contract.waitForDeployment();
     return new Contract(await contract.getAddress(), a.abi, funder);
   }
+  const counterSource = await readFile(
+    new URL('../helpers/solidity/ExecutionCounter.sol', import.meta.url),
+    'utf8',
+  );
+  const compiled = JSON.parse(
+    solc.compile(
+      JSON.stringify({
+        language: 'Solidity',
+        sources: { 'ExecutionCounter.sol': { content: counterSource } },
+        settings: {
+          evmVersion: 'paris',
+          outputSelection: { '*': { '*': ['abi', 'evm.bytecode.object'] } },
+        },
+      }),
+    ),
+  );
+  expect(
+    (compiled.errors ?? []).filter(
+      (error: { severity: string }) => error.severity === 'error',
+    ),
+  ).toEqual([]);
+  const counterArtifact =
+    compiled.contracts['ExecutionCounter.sol'].ExecutionCounter;
+  const counterDeployment = await new ContractFactory(
+    counterArtifact.abi,
+    '0x' + counterArtifact.evm.bytecode.object,
+    funder,
+  ).deploy();
+  await counterDeployment.waitForDeployment();
+  const counter = new Contract(
+    await counterDeployment.getAddress(),
+    counterArtifact.abi,
+    funder,
+  );
   const entryPoint = await deploy('EntryPoint');
   const entryAddress = await entryPoint.getAddress();
   const singleton = await deploy('Safe');
@@ -281,8 +315,6 @@ it('executes a real Safe operation through Alto and Valkey, then recovers a lost
     prefix,
     '--add-host',
     'host.docker.internal:' + gateway.trim(),
-    '--publish',
-    '127.0.0.1:' + bundlerPort + ':3000',
     '--mount',
     'type=bind,src=' + directory + ',dst=/fixture,readonly',
     '--entrypoint',
@@ -293,7 +325,13 @@ it('executes a real Safe operation through Alto and Valkey, then recovers a lost
     '--config',
     '/fixture/alto.json',
   );
-  const bundlerUrl = 'http://127.0.0.1:' + bundlerPort;
+  const { stdout: bundlerIp } = await docker(
+    'inspect',
+    '--format',
+    '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}',
+    prefix + '-bundler',
+  );
+  const bundlerUrl = 'http://' + bundlerIp.trim() + ':3000';
   async function bundlerRpc(method: string, params: unknown[]) {
     const r = await fetch(bundlerUrl, {
       method: 'POST',
@@ -304,11 +342,23 @@ it('executes a real Safe operation through Alto and Valkey, then recovers a lost
     expect(body.error).toBeUndefined();
     return body.result;
   }
-  await eventually(async () =>
-    expect(await bundlerRpc('eth_supportedEntryPoints', [])).toContain(
-      entryAddress,
-    ),
-  );
+  try {
+    await eventually(async () =>
+      expect(await bundlerRpc('eth_supportedEntryPoints', [])).toContain(
+        entryAddress,
+      ),
+    );
+  } catch {
+    const { stdout: state } = await docker(
+      'inspect',
+      '--format',
+      '{{.State.Status}}/{{.State.ExitCode}}',
+      prefix + '-bundler',
+    );
+    throw new Error(
+      'Offline bundler did not become ready; runtime state ' + state.trim(),
+    );
+  }
   const bundler = {
     profile: 'safe4337-bundler-v07' as const,
     url: 'https://bundler.example.test/rpc',
@@ -393,7 +443,7 @@ it('executes a real Safe operation through Alto and Valkey, then recovers a lost
     false,
     {
       wallet: owner,
-      target: await pin(await multiSend.getAddress()),
+      target: await pin(await counter.getAddress()),
       account: {
         ...(await pin(safeAddress)),
         singleton: await pin(singletonAddress),
@@ -451,12 +501,22 @@ it('executes a real Safe operation through Alto and Valkey, then recovers a lost
         atomicRequired: true,
         capabilities: { applicationAction: f.input.application_action },
         chainId: '0x14a34',
-        calls: [{ to: recipient, value: '0x4', data: '0x' }],
+        calls: [
+          ...f.input.calls.map((call) => ({ ...call, value: '0x2' })),
+          { to: recipient, value: '0x4', data: '0x' },
+        ],
       },
     ],
   );
   await ports.driver.runOnce();
-  expect(sends).toBe(1);
+  const progress = await f.onboarding.store.transaction((s) =>
+    Object.values(s.userOperationBatches ?? {}).map((batch) => ({
+      stage: batch.stage,
+      code: batch.lastFailure?.code,
+      origin: batch.lastFailure?.origin,
+    })),
+  );
+  expect(sends, JSON.stringify(progress)).toBe(1);
   const executions = await f.onboarding.store.transaction((s) =>
     Object.values(s.userOperationExecutions ?? {}),
   );
@@ -506,6 +566,7 @@ it('executes a real Safe operation through Alto and Valkey, then recovers a lost
   const signs = f.state.signs;
   expect(signs).toBe(1);
   expect(await provider.getBalance(recipient)).toBe(0n);
+  expect(await counter.calls()).toBe(0n);
   expect(await entryPoint.getNonce(safeAddress, 0)).toBe(0n);
   await f.restart();
   config['bundle-mode'] = 'auto';
@@ -523,6 +584,8 @@ it('executes a real Safe operation through Alto and Valkey, then recovers a lost
     ).toMatch(/^(included|safe|finalized)$/);
   });
   expect(await provider.getBalance(recipient)).toBe(4n);
+  expect(await counter.calls()).toBe(1n);
+  expect(await counter.lastValue()).toBe(42n);
   expect(await entryPoint.getNonce(safeAddress, 0)).toBe(1n);
   for (let i = 0; i < 3; i++) await ports.driver.runOnce();
   expect(f.state.signs).toBe(signs);

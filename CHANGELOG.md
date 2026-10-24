@@ -4,7 +4,8 @@
 
 - Add offline ERC-4337 integration coverage using pinned Safe and EntryPoint
   contracts, the Alto bundler and persistent Valkey storage. Check recovery after
-  a lost submission response and service restarts without repeated execution.
+  a lost submission response and service restarts without repeated execution
+  of an atomic contract call and native transfer.
   Require targeted security mutations to fail behavioral tests; remove authorization
   call-count assertions already covered by revocation checks, and consolidate
   duplicate network-domain coverage.
