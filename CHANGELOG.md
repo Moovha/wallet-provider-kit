@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Add saved access-request lookup and complete access-policy response types to
+  the application client, including cross-application sharing requirements.
+  Retain bounded problem details and retry delays in client errors; distinguish
+  authentication, permission, rate-limit, service and transport failures.
+
+- Correct first-wallet consent instructions to require current transaction
+  permission and its action-policy revision before Safe provisioning. Preserve
+  read-only consent for opening an existing wallet.
+
 - Update transitive `fast-uri` dependencies to the patched 3.1.9 and 4.2.3 releases.
 
 - Reconcile dispatched historical operations after fee terms change. Release

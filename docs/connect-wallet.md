@@ -62,6 +62,9 @@ not a replay of withdrawn consent. Submit to `POST /v1/access-requests` with
 `wallet:access` and a new UUIDv4 idempotency key. Keep that key for identical retries.
 After withdrawal, the consent reference must be new and its grant time later than
 the withdrawal. Transaction permission also needs the current action-policy revision.
+For read-only access to an already provisioned wallet, request only
+`["account:read"]` and omit `action_policy_revision`; do not copy the first-wallet
+guide's transaction permission unless the person also approved those terms.
 
 Save the new receipt and grant. It should refer to the original account. The
 provider checks that it belongs to the asserted application-scoped person.

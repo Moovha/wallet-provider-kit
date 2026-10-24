@@ -1,5 +1,11 @@
 import { createWalletCallsProvider } from '../wallet-calls/client.js';
 import { providerNetwork, type ProviderNetwork } from '../networks.js';
+import {
+  readProviderFailure,
+  type ProviderFailureDetails,
+} from '../client-failure.js';
+import type { operations } from '../protocol/provider-api.generated.js';
+export type { ProviderFailureDetails } from '../client-failure.js';
 import type {
   AccessRequestInput,
   Permission,
@@ -35,9 +41,26 @@ export interface MemberSettings {
     status: 'invited' | 'active' | 'removed';
   }[];
 }
+export type WalletAccessPolicy =
+  operations['getAccountAccessPolicy']['responses'][200]['content']['application/json'];
+export type WalletAccessReceipt =
+  operations['getAccountAccessRequest']['responses'][200]['content']['application/json'];
+
 export class WalletAccessError extends Error {
-  constructor(readonly status: number) {
+  readonly code?: string;
+  readonly requestId?: string;
+  readonly outcome?: ProviderFailureDetails['outcome'];
+  readonly retryAfterSeconds?: number;
+  constructor(
+    readonly status: number,
+    details: ProviderFailureDetails = {},
+  ) {
     super('The wallet service could not authorize or complete this request');
+    this.name = 'WalletAccessError';
+    this.code = details.problemCode;
+    this.requestId = details.requestId;
+    this.outcome = details.outcome;
+    this.retryAfterSeconds = details.retryAfterSeconds;
   }
 }
 /** For a trusted application backend. Supply short-lived bearer authorization; never embed a client secret in a browser. */
@@ -76,22 +99,36 @@ export function createWalletsClient(options: {
       throw new Error('Keep a valid idempotency key for retries');
     if (grantId !== undefined && !uuid.test(grantId))
       throw new Error('A valid wallet grant ID is required');
-    const response = await send(new URL(path, origin), {
-      method,
-      headers: {
-        authorization: await options.authorization(),
-        ...(options.network ? { 'Wallet-Network': options.network } : {}),
-        'content-type': 'application/json',
-        ...(key ? { 'Idempotency-Key': key } : {}),
-        ...(grantId ? { 'Wallet-Grant-Id': grantId } : {}),
-      },
-      ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
-      redirect: 'error',
-      credentials: 'omit',
-      signal: AbortSignal.timeout(15000),
-    });
-    if (!response.ok) throw new WalletAccessError(response.status);
-    return (await response.json()) as T;
+    const authorization = await options.authorization();
+    let response: Response;
+    try {
+      response = await send(new URL(path, origin), {
+        method,
+        headers: {
+          authorization,
+          ...(options.network ? { 'Wallet-Network': options.network } : {}),
+          'content-type': 'application/json',
+          ...(key ? { 'Idempotency-Key': key } : {}),
+          ...(grantId ? { 'Wallet-Grant-Id': grantId } : {}),
+        },
+        ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+        redirect: 'error',
+        credentials: 'omit',
+        signal: AbortSignal.timeout(15000),
+      });
+    } catch {
+      throw new WalletAccessError(0, { outcome: 'unknown' });
+    }
+    if (!response.ok)
+      throw new WalletAccessError(
+        response.status,
+        await readProviderFailure(response),
+      );
+    try {
+      return (await response.json()) as T;
+    } catch {
+      throw new WalletAccessError(response.status, { outcome: 'unknown' });
+    }
   }
   return {
     networks() {
@@ -105,27 +142,37 @@ export function createWalletsClient(options: {
         }[];
       }>('/v1/networks', 'GET');
     },
-    accessPolicy() {
-      return request<{
-        policy_revision: string;
-        action_policy_revision?: string;
-        chain_id: string;
-        required_fields: string[];
-        verification_level: string;
-        max_identity_age_days: number;
-        max_access_days: number;
-      }>('/v1/access-policy', 'GET');
+    accessPolicy(sourceApplicationId?: string): Promise<WalletAccessPolicy> {
+      if (
+        sourceApplicationId !== undefined &&
+        (!sourceApplicationId || sourceApplicationId.length > 256)
+      )
+        throw new Error('A valid source application ID is required');
+      const query =
+        sourceApplicationId !== undefined
+          ? '?' +
+            new URLSearchParams({ source_application_id: sourceApplicationId })
+          : '';
+      return request<WalletAccessPolicy>('/v1/access-policy' + query, 'GET');
     },
-    requestAccess(input: AccessRequestInput, idempotencyKey: string) {
-      return request<{
-        request_id: string;
-        status: string;
-        account_id?: string;
-        grant_id?: string;
-        wallet?: WalletDescription;
-        permissions?: Permission[];
-        expires_at?: string;
-      }>('/v1/access-requests', 'POST', input, idempotencyKey);
+    requestAccess(
+      input: AccessRequestInput,
+      idempotencyKey: string,
+    ): Promise<WalletAccessReceipt> {
+      return request<WalletAccessReceipt>(
+        '/v1/access-requests',
+        'POST',
+        input,
+        idempotencyKey,
+      );
+    },
+    accessRequest(requestId: string): Promise<WalletAccessReceipt> {
+      if (!uuid.test(requestId))
+        throw new Error('A valid access request ID is required');
+      return request<WalletAccessReceipt>(
+        '/v1/access-requests/' + requestId,
+        'GET',
+      );
     },
     revokeAccess(grantId: string, idempotencyKey: string) {
       if (!uuid.test(grantId))

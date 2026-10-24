@@ -556,6 +556,12 @@ it('serves the app integration over HTTP, and the SDK keeps each selected wallet
     fetch: send,
   });
   try {
+    expect(await client.accessRequest(owner.request_id)).toMatchObject({
+      request_id: owner.request_id,
+      account_id: owner.account_id,
+      grant_id: owner.grant_id,
+      status: 'granted',
+    });
     const wallets = await client.listWallets('owner');
     expect(wallets.accounts).toHaveLength(2);
     expect(wallets.accounts[0].is_default).toBe(true);

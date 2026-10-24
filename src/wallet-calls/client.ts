@@ -1,4 +1,9 @@
 import { providerNetwork, type ProviderNetwork } from '../networks.js';
+import {
+  readProviderFailure,
+  type ProviderFailureDetails,
+} from '../client-failure.js';
+export type { ProviderFailureDetails } from '../client-failure.js';
 import type { WalletCallsStatus } from './types.js';
 export type { WalletCallsStatus, WalletCallsReceipt } from './types.js';
 
@@ -14,12 +19,42 @@ export interface WalletCallsClientOptions {
   showCallsStatus?: (status: WalletCallsStatus) => Promise<void>;
 }
 export class WalletCallsRpcError extends Error {
+  readonly status?: number;
+  readonly problemCode?: string;
+  readonly requestId?: string;
+  readonly outcome?: ProviderFailureDetails['outcome'];
+  readonly retryAfterSeconds?: number;
   constructor(
     readonly code: number,
     message: string,
+    details: ProviderFailureDetails = {},
   ) {
     super(message);
+    this.name = 'WalletCallsRpcError';
+    this.status = details.status;
+    this.problemCode = details.problemCode;
+    this.requestId = details.requestId;
+    this.outcome = details.outcome;
+    this.retryAfterSeconds = details.retryAfterSeconds;
   }
+}
+async function httpFailure(response: Response) {
+  const details = await readProviderFailure(response);
+  if (response.status === 401 || response.status === 403)
+    return new WalletCallsRpcError(
+      4100,
+      response.status === 401 ? 'Authentication required' : 'Permission denied',
+      details,
+    );
+  if (response.status === 429)
+    return new WalletCallsRpcError(-32005, 'Rate limited', details);
+  if (response.status >= 500)
+    return new WalletCallsRpcError(
+      -32002,
+      'Wallet service unavailable',
+      details,
+    );
+  return new WalletCallsRpcError(-32603, 'Wallet HTTP request failed', details);
 }
 /** EIP-1193-shaped request interface for EIP-5792, bound to one provider account endpoint. */
 export function createWalletCallsProvider(options: WalletCallsClientOptions) {
@@ -39,6 +74,15 @@ export function createWalletCallsProvider(options: WalletCallsClientOptions) {
   )
     throw new Error('A valid wallet grant ID is required');
   const send = options.fetch ?? fetch;
+  async function authorization() {
+    try {
+      return await options.authorization();
+    } catch {
+      throw new WalletCallsRpcError(4100, 'Authorization unavailable', {
+        outcome: 'not_dispatched',
+      });
+    }
+  }
   let sequence = 0;
   async function request(input: {
     method: string;
@@ -65,13 +109,14 @@ export function createWalletCallsProvider(options: WalletCallsClientOptions) {
       return null;
     }
     const id = ++sequence;
+    const bearer = await authorization();
     let response: Response;
     try {
       response = await send(url.href, {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
-          authorization: await options.authorization(),
+          authorization: bearer,
           ...(options.network ? { 'Wallet-Network': options.network } : {}),
           ...(options.accessGrantId
             ? { 'Wallet-Grant-Id': options.accessGrantId }
@@ -88,15 +133,11 @@ export function createWalletCallsProvider(options: WalletCallsClientOptions) {
         signal: AbortSignal.timeout(15000),
       });
     } catch {
-      throw new WalletCallsRpcError(4900, 'Disconnected');
+      throw new WalletCallsRpcError(4900, 'Disconnected', {
+        outcome: 'unknown',
+      });
     }
-    if (!response.ok)
-      throw new WalletCallsRpcError(
-        response.status === 401 || response.status === 403 ? 4100 : 4900,
-        response.status === 401 || response.status === 403
-          ? 'Unauthorized'
-          : 'Disconnected',
-      );
+    if (!response.ok) throw await httpFailure(response);
     let value: unknown;
     try {
       value = await response.json();
@@ -157,31 +198,38 @@ export function createWalletCallsProvider(options: WalletCallsClientOptions) {
   ): AsyncGenerator<WalletCallsStatus> {
     if (typeof batchId !== 'string' || !batchId || batchId.length > 8194)
       throw new WalletCallsRpcError(-32602, 'Invalid batch');
-    const response = await send(
-      url.href + '/calls/' + encodeURIComponent(batchId) + '/events',
-      {
-        headers: {
-          authorization: await options.authorization(),
-          ...(options.network ? { 'Wallet-Network': options.network } : {}),
-          accept: 'text/event-stream',
-          ...(options.accessGrantId
-            ? { 'Wallet-Grant-Id': options.accessGrantId }
-            : {}),
+    const bearer = await authorization();
+    let response: Response;
+    try {
+      response = await send(
+        url.href + '/calls/' + encodeURIComponent(batchId) + '/events',
+        {
+          headers: {
+            authorization: bearer,
+            ...(options.network ? { 'Wallet-Network': options.network } : {}),
+            accept: 'text/event-stream',
+            ...(options.accessGrantId
+              ? { 'Wallet-Grant-Id': options.accessGrantId }
+              : {}),
+          },
+          redirect: 'error',
+          credentials: 'omit',
+          signal: signal ?? AbortSignal.timeout(60000),
         },
-        redirect: 'error',
-        credentials: 'omit',
-        signal: signal ?? AbortSignal.timeout(60000),
-      },
-    );
+      );
+    } catch {
+      throw new WalletCallsRpcError(4900, 'Disconnected', {
+        outcome: 'unknown',
+      });
+    }
+    if (!response.ok) throw await httpFailure(response);
     if (
-      !response.ok ||
       !response.body ||
       !response.headers.get('content-type')?.startsWith('text/event-stream')
     )
-      throw new WalletCallsRpcError(
-        response.status === 401 || response.status === 403 ? 4100 : 4900,
-        'Status stream unavailable',
-      );
+      throw new WalletCallsRpcError(-32603, 'Invalid status stream', {
+        status: response.status,
+      });
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
