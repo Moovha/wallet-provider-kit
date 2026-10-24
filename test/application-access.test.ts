@@ -102,6 +102,8 @@ async function fixture(transferRevision?: string) {
   return { service, store, input };
 }
 it('grants trusted application access without login or review and preserves one wallet across retries and renewal', async () => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date('2026-01-01T00:00:00.000Z'));
   const f = await fixture();
   const ctx = context();
   const input = f.input();
@@ -156,6 +158,7 @@ it('grants trusted application access without login or review and preserves one 
     wallet.provision(provision, receipt.account_id!),
   ).rejects.toThrow();
   await expect(f.service.request(context(), input)).rejects.toThrow();
+  vi.advanceTimersByTime(1);
   const renewedInput = f.input();
   renewedInput.user!.consent.granted_at = new Date().toISOString();
   const renewed = await f.service.request(context(), renewedInput);
@@ -192,6 +195,8 @@ it('grants trusted application access without login or review and preserves one 
   expect(raw.createAccount).toHaveBeenCalledTimes(1);
 });
 it('keeps uncertain creation bound to its original grant after permission renewal', async () => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date('2026-01-01T00:00:00.000Z'));
   const f = await fixture();
   const ctx = context();
   const granted = await f.service.request(ctx, f.input());
@@ -223,6 +228,7 @@ it('keeps uncertain creation bound to its original grant after permission renewa
     structuredClone({ admissions: state.admissions, attempts: state.attempts }),
   );
   await f.service.revokeApplicationGrant(context(), granted.grant_id!);
+  vi.advanceTimersByTime(1);
   const input = f.input();
   input.user!.consent.granted_at = new Date().toISOString();
   const renewed = await f.service.request(context(), input);
