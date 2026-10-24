@@ -31,15 +31,20 @@ private user reference to identify them; a display name or email is not an accou
 lookup. Read the provider’s current access policy, explain the requested access
 and record the person’s permission.
 
-For a first wallet, start with permission to view the account. Request transaction
-permission separately when you can show the person the actual permitted calls
-and limits.
+Creating a new Safe currently requires permission to view the account and request
+transactions within the application's approved rules. Show the person the network,
+permitted calls, amounts, limits and who pays the fees before collecting consent.
+Read-only permission can open an existing wallet, but cannot create a new Safe.
+If the person has not approved the transaction terms, stop before provisioning.
 
 <details>
 <summary>Developer requests: identify the application and obtain access</summary>
 
 Obtain an application access token as described in the [API guide](http-api.md#_1-identify-your-application).
-Read `GET /v1/access-policy` with `wallet:access:read`. Submit
+Read `GET /v1/access-policy` with `wallet:access:read`. Present its
+`contract_call_terms` and `runtime_contract_terms`, when supplied, and retain
+the exact `action_policy_revision` the person approved. Do not request transaction
+permission when the current terms or revision are unavailable. Submit
 `POST /v1/access-requests` with `wallet:access` and a saved UUIDv4 `Idempotency-Key`.
 For a policy requiring `country`, the body has this shape:
 
@@ -58,13 +63,14 @@ For a policy requiring `country`, the body has this shape:
       "reference": "<YOUR_CONSENT_RECORD>",
       "granted_at": "<ACTUAL_UTC_CONSENT_TIME>",
       "expires_at": "<PERMITTED_UTC_EXPIRY>",
-      "policy_revision": "<CURRENT_POLICY_REVISION>"
+      "policy_revision": "<CURRENT_POLICY_REVISION>",
+      "action_policy_revision": "<APPROVED_ACTION_POLICY_REVISION>"
     }
   },
   "authorization_details": [
     {
       "type": "https://moovha.com/wallet/account-access",
-      "actions": ["account:read"]
+      "actions": ["account:read", "contracts:request"]
     }
   ]
 }
@@ -95,15 +101,22 @@ Using the same application identity with `wallet:provision`, send:
 ```http
 POST /v1/accounts/<ACCOUNT_ID>/provision
 Authorization: Bearer <APPLICATION_ACCESS_TOKEN>
+Wallet-Grant-Id: <GRANT_ID>
 Idempotency-Key: <SAVED_UUIDV4_FOR_THIS_PROVISION_REQUEST>
 Content-Type: application/json
 
 {}
 ```
 
-Use the account ID from the granted access request. This is a distinct mutation,
+Use the account and grant IDs from the granted access request. The grant must
+include current `contracts:request` permission for the approved action-policy
+revision; `wallet:provision` alone is insufficient. This is a distinct mutation,
 so its key differs from the access-request key. Read the saved outcome after an
 uncertain response. Current permission and provider readiness remain required.
+Read `GET /v1/access-requests/{requestId}` to recover the access decision, or use
+`client.accessRequest(savedRequestId)` with the TypeScript wallets client. This
+reads the access grant, not the provisioning transaction's outcome. Read the
+account and reconcile its original provisioning attempt separately.
 
 </details>
 

@@ -150,8 +150,96 @@ it('reports transport loss as disconnected without retrying a possibly admitted 
   });
   await expect(
     provider.request({ method: 'wallet_sendCalls', params: [] }),
-  ).rejects.toMatchObject({ code: 4900 });
+  ).rejects.toMatchObject({ code: 4900, outcome: 'unknown' });
   expect(request).toHaveBeenCalledTimes(1);
+});
+
+it.each([
+  [401, 4100, 'invalid_token'],
+  [403, 4100, 'wallet_authorization_denied'],
+  [429, -32005, 'rate_limited'],
+  [503, -32002, 'service_unavailable'],
+] as const)(
+  'preserves HTTP %i recovery details for RPC and status streams',
+  async (status, code, problemCode) => {
+    const fetch = vi.fn<typeof globalThis.fetch>(async () =>
+      Response.json(
+        {
+          status,
+          code: problemCode,
+          request_id: 'offline-request',
+          outcome: 'unknown',
+        },
+        { status, headers: { 'Retry-After': '5' } },
+      ),
+    );
+    const provider = createWalletCallsProvider({
+      url: 'https://wallet.example.test/v1/accounts/offline/wallet',
+      authorization: async () => 'Bearer offline',
+      fetch,
+    });
+    const expected = {
+      status,
+      code,
+      problemCode,
+      requestId: 'offline-request',
+      outcome: 'unknown',
+      retryAfterSeconds: 5,
+    };
+    await expect(
+      provider.request({ method: 'wallet_sendCalls', params: [] }),
+    ).rejects.toMatchObject(expected);
+    await expect(
+      provider.watchCallsStatus('batch').next(),
+    ).rejects.toMatchObject(expected);
+    expect(fetch).toHaveBeenCalledTimes(2);
+  },
+);
+
+it('distinguishes local authorization failure from transport loss without leaking the cause', async () => {
+  const fetch = vi.fn<typeof globalThis.fetch>();
+  const provider = createWalletCallsProvider({
+    url: 'https://wallet.example.test/v1/accounts/offline/wallet',
+    authorization: async () => {
+      throw new Error('Private credential detail');
+    },
+    fetch,
+  });
+  for (const request of [
+    () => provider.request({ method: 'wallet_sendCalls', params: [] }),
+    () => provider.watchCallsStatus('batch').next(),
+  ]) {
+    const error = await request().catch((e) => e);
+    expect(error).toMatchObject({
+      code: 4100,
+      status: undefined,
+      outcome: 'not_dispatched',
+    });
+    expect(error).toBeInstanceOf(WalletCallsRpcError);
+    if (!(error instanceof WalletCallsRpcError)) throw error;
+    expect(error.message).not.toContain('Private');
+    expect(error).not.toHaveProperty('cause');
+  }
+  expect(fetch).not.toHaveBeenCalled();
+});
+
+it('reports status stream transport loss separately from an invalid successful response', async () => {
+  const fetch = vi
+    .fn<typeof globalThis.fetch>()
+    .mockRejectedValueOnce(new Error('Private transport detail'))
+    .mockResolvedValueOnce(Response.json({}));
+  const provider = createWalletCallsProvider({
+    url: 'https://wallet.example.test/v1/accounts/offline/wallet',
+    authorization: async () => 'Bearer offline',
+    fetch,
+  });
+  await expect(provider.watchCallsStatus('batch').next()).rejects.toMatchObject(
+    { code: 4900, outcome: 'unknown' },
+  );
+  await expect(provider.watchCallsStatus('batch').next()).rejects.toMatchObject(
+    { code: -32603, status: 200 },
+  );
+  expect(fetch).toHaveBeenCalledTimes(2);
 });
 
 it('streams authenticated status without exposing tokens in URLs and cancels the stream at terminal status', async () => {

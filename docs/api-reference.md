@@ -3239,7 +3239,12 @@ export interface WalletCallsReceipt {
 ```ts
 export declare class WalletCallsRpcError extends Error {
   readonly code: number;
-  constructor(code: number, message: string);
+  readonly status?: number;
+  readonly problemCode?: string;
+  readonly requestId?: string;
+  readonly outcome?: ProviderFailureDetails['outcome'];
+  readonly retryAfterSeconds?: number;
+  constructor(code: number, message: string, details?: ProviderFailureDetails);
 }
 ```
 
@@ -3308,6 +3313,7 @@ export interface WalletCallsStatus {
 Import from `@moovha/wallet-provider-kit/wallet-calls`. [Integration guide](wallet-calls.md).
 
 - [createWalletCallsProvider](#createwalletcallsprovider)
+- [ProviderFailureDetails](#providerfailuredetails)
 - [WalletCallsClientOptions](#walletcallsclientoptions)
 - [WalletCallsReceipt](#walletcallsreceipt)
 - [WalletCallsRpcError](#walletcallsrpcerror)
@@ -3331,6 +3337,21 @@ export declare function createWalletCallsProvider(
     signal?: AbortSignal,
   ) => AsyncGenerator<WalletCallsStatus>;
 };
+```
+
+### ProviderFailureDetails
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/client-failure.ts).
+
+```ts
+/** Bounded recovery metadata; never retains response bodies or transport exceptions. */
+export interface ProviderFailureDetails {
+  status?: number;
+  problemCode?: string;
+  requestId?: string;
+  outcome?: 'not_dispatched' | 'rejected' | 'unknown';
+  retryAfterSeconds?: number;
+}
 ```
 
 ### WalletCallsClientOptions
@@ -3378,7 +3399,12 @@ export interface WalletCallsReceipt {
 ```ts
 export declare class WalletCallsRpcError extends Error {
   readonly code: number;
-  constructor(code: number, message: string);
+  readonly status?: number;
+  readonly problemCode?: string;
+  readonly requestId?: string;
+  readonly outcome?: ProviderFailureDetails['outcome'];
+  readonly retryAfterSeconds?: number;
+  constructor(code: number, message: string, details?: ProviderFailureDetails);
 }
 ```
 
@@ -4384,7 +4410,10 @@ Import from `@moovha/wallet-provider-kit/wallets`. [Integration guide](multiple-
 - [AccessRequestInput](#accessrequestinput)
 - [createWalletsClient](#createwalletsclient)
 - [MemberSettings](#membersettings)
+- [ProviderFailureDetails](#providerfailuredetails)
 - [WalletAccessError](#walletaccesserror)
+- [WalletAccessPolicy](#walletaccesspolicy)
+- [WalletAccessReceipt](#walletaccessreceipt)
 - [WalletDescription](#walletdescription)
 - [WalletSummary](#walletsummary)
 
@@ -4422,27 +4451,12 @@ export declare function createWalletsClient(options: {
       configured: boolean;
     }[];
   }>;
-  accessPolicy(): Promise<{
-    policy_revision: string;
-    action_policy_revision?: string;
-    chain_id: string;
-    required_fields: string[];
-    verification_level: string;
-    max_identity_age_days: number;
-    max_access_days: number;
-  }>;
+  accessPolicy(sourceApplicationId?: string): Promise<WalletAccessPolicy>;
   requestAccess(
     input: AccessRequestInput,
     idempotencyKey: string,
-  ): Promise<{
-    request_id: string;
-    status: string;
-    account_id?: string;
-    grant_id?: string;
-    wallet?: WalletDescription;
-    permissions?: Permission[];
-    expires_at?: string;
-  }>;
+  ): Promise<WalletAccessReceipt>;
+  accessRequest(requestId: string): Promise<WalletAccessReceipt>;
   revokeAccess(
     grantId: string,
     idempotencyKey: string,
@@ -4518,6 +4532,21 @@ export interface MemberSettings {
 }
 ```
 
+### ProviderFailureDetails
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/client-failure.ts).
+
+```ts
+/** Bounded recovery metadata; never retains response bodies or transport exceptions. */
+export interface ProviderFailureDetails {
+  status?: number;
+  problemCode?: string;
+  requestId?: string;
+  outcome?: 'not_dispatched' | 'rejected' | 'unknown';
+  retryAfterSeconds?: number;
+}
+```
+
 ### WalletAccessError
 
 [Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/wallets/client.ts).
@@ -4525,8 +4554,30 @@ export interface MemberSettings {
 ```ts
 export declare class WalletAccessError extends Error {
   readonly status: number;
-  constructor(status: number);
+  readonly code?: string;
+  readonly requestId?: string;
+  readonly outcome?: ProviderFailureDetails['outcome'];
+  readonly retryAfterSeconds?: number;
+  constructor(status: number, details?: ProviderFailureDetails);
 }
+```
+
+### WalletAccessPolicy
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/wallets/client.ts).
+
+```ts
+export type WalletAccessPolicy =
+  operations['getAccountAccessPolicy']['responses'][200]['content']['application/json'];
+```
+
+### WalletAccessReceipt
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/wallets/client.ts).
+
+```ts
+export type WalletAccessReceipt =
+  operations['getAccountAccessRequest']['responses'][200]['content']['application/json'];
 ```
 
 ### WalletDescription

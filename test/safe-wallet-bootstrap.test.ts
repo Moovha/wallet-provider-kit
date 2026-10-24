@@ -567,6 +567,18 @@ it('lets a queued account recover the included transaction after the preceding s
   expect(t.f.state.signs).toBe(0);
 });
 
+it('denies Safe provisioning under read-only consent before signing or broadcast', async () => {
+  const t = await bootstrap('1');
+  await t.f.db.onboardingStore.transaction((s) => {
+    s.grants[t.f.grant.grant_id!].permissions = ['account:read'];
+  });
+  await expect(
+    t.runtime.provision(t.f.context, t.f.grant.account_id!),
+  ).rejects.toMatchObject({ code: 'wallet_authorization_denied' });
+  expect(t.broadcasts).toBe(0);
+  expect(t.f.state.signs).toBe(0);
+});
+
 it('revalidates a ready legacy Safe without repeating setup reads or signing, and checks authority after its proof', async () => {
   const t = await bootstrap('1');
   await t.runtime

@@ -78,9 +78,27 @@ administration. Your application reads them from the access-policy endpoint.
 After requirements change, read the new policy revision and collect fresh consent
 before requesting access again.
 
+The TypeScript client supports the same reads:
+
+```ts
+const decision = await client.accessRequest(savedRequestId);
+const sharingTerms = await client.accessPolicy(sourceApplicationId);
+```
+
+`accessRequest` reads the original access decision without creating a new request.
+It does not report provisioning or transaction finality. `accessPolicy` accepts
+the optional source application ID for a cross-application connection and exposes
+`wallet_sharing`, including the matching identity fields and sharing revision.
+It also exposes the published contract terms needed for transaction consent.
+
 ## 3. Create and use their wallet
 
-Call `POST /v1/accounts/{accountId}/provision` to create the user’s Safe. Discover
+Call `POST /v1/accounts/{accountId}/provision` to create the user’s Safe. This
+currently requires `contracts:request` permission for the current action-policy
+revision as well as the application's `wallet:provision` scope. Present the
+permitted calls and limits and collect explicit consent first, as described in
+the [first-wallet guide](create-wallet.md). Read-only access can open an existing
+wallet but cannot provision a new Safe. Discover
 its address and capabilities, then send wallet requests to
 `POST /v1/accounts/{accountId}/wallet`. Use `wallet_sendCalls` for an approved
 atomic batch and `wallet_getCallsStatus` to check its saved outcome. Start with
@@ -105,7 +123,31 @@ request or batch; the action may already have reached the network.
 | 401            | Obtain current credentials or a fresh token.                                           |
 | 403            | Check scopes, current user permission and provider policy.                             |
 | 409            | Compare revisions/input and reconcile the original request.                            |
+| 429            | Respect `Retry-After` when supplied; retain the original request or batch reference.   |
 | Timeout or 503 | Read the saved outcome; do not assume dispatch failed or use a fresh key to bypass it. |
+
+The TypeScript REST client throws `WalletAccessError` with `status` and, when
+the provider supplies valid problem metadata, `code`, `requestId` and `outcome`.
+`retryAfterSeconds` exposes a valid `Retry-After` delay. A transport failure uses
+status `0` and outcome `unknown`. An unreadable successful response also has an
+unknown outcome; its HTTP status does not prove that a mutation failed.
+
+The wallet transport throws `WalletCallsRpcError`. Its numeric `code` remains the
+RPC error code; HTTP failures also expose `status`, `problemCode`, `requestId`,
+`outcome` and `retryAfterSeconds` when available. HTTP 401 and 403 both use RPC
+code `4100`; distinguish token renewal from denied permission using `status`.
+HTTP 429 maps to `-32005`, service failures to `-32002`, and transport loss to
+`4900`. These mappings follow the [provider error interface](https://eips.ethereum.org/EIPS/eip-1193)
+and [RPC error categories](https://eips.ethereum.org/EIPS/eip-1474).
+The same HTTP distinctions apply when opening a status stream. A local failure
+to obtain authorization returns `4100` with `not_dispatched`, before a request is sent.
+
+Neither client retries automatically or retains raw error bodies and transport
+exceptions. Missing outcome metadata is not evidence that nothing happened.
+Use a saved REST idempotency key or wallet batch ID to inspect and reconcile an
+uncertain mutation before deciding whether to retry. A reported `not_dispatched`
+does not replace checks on any earlier attempt. Keep request references in
+private recovery records rather than application logs.
 
 Use the [HTTP schema reference](http-reference.md) for exact request bodies,
 responses and route-specific requirements. Then [test the connection](staging-walkthrough.md).
