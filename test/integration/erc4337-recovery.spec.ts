@@ -336,6 +336,7 @@ it('executes a real Safe operation through Alto and Valkey, then recovers a lost
     throw new Error('Unexpected external transport');
   };
   const budget = '100000000000000000';
+  let sponsorshipSigns = 0;
   const localTransport = createLocalPaymasterTransport(
     {
       domain: {
@@ -350,7 +351,10 @@ it('executes a real Safe operation through Alto and Valkey, then recovers a lost
       maximumCostWei: budget,
       l1FeeReserveWei: '0',
       authorize: (request) => f.service.authorizeLocalPaymaster(request),
-      sign: (hash) => paymasterSigner.signMessage(getBytes(hash)),
+      sign: (hash) => {
+        sponsorshipSigns++;
+        return paymasterSigner.signMessage(getBytes(hash));
+      },
     },
     transport,
   );
@@ -461,6 +465,44 @@ it('executes a real Safe operation through Alto and Valkey, then recovers a lost
   expect(plan.userOperationHash).toBe(
     await entryPoint.getUserOpHash(packedUserOperation(plan.operation)),
   );
+  await entryPoint.handleOps.staticCall(
+    [packedUserOperation(plan.operation)],
+    executor.address,
+  );
+  await expect(
+    entryPoint.handleOps.staticCall(
+      [
+        packedUserOperation({
+          ...plan.operation,
+          callData: plan.operation.callData + '00',
+        }),
+      ],
+      executor.address,
+    ),
+  ).rejects.toThrow();
+  const { stdout: queueKeys } = await docker(
+    'exec',
+    prefix + '-store',
+    'valkey-cli',
+    '--raw',
+    'KEYS',
+    prefix + ':*:outstanding:userop-hash',
+  );
+  const keys = queueKeys.trim().split('\n').filter(Boolean);
+  expect(keys).toHaveLength(1);
+  const queued = async () => {
+    const { stdout } = await docker(
+      'exec',
+      prefix + '-store',
+      'valkey-cli',
+      '--raw',
+      'HEXISTS',
+      keys[0],
+      plan.userOperationHash,
+    );
+    expect(stdout.trim()).toBe('1');
+  };
+  await queued();
   const signs = f.state.signs;
   expect(signs).toBe(1);
   expect(await provider.getBalance(recipient)).toBe(0n);
@@ -471,6 +513,7 @@ it('executes a real Safe operation through Alto and Valkey, then recovers a lost
     mode: 0o600,
   });
   await docker('restart', prefix + '-store');
+  await queued();
   await docker('start', prefix + '-bundler');
   ports = compose();
   await eventually(async () => {
@@ -483,6 +526,7 @@ it('executes a real Safe operation through Alto and Valkey, then recovers a lost
   expect(await entryPoint.getNonce(safeAddress, 0)).toBe(1n);
   for (let i = 0; i < 3; i++) await ports.driver.runOnce();
   expect(f.state.signs).toBe(signs);
+  expect(sponsorshipSigns).toBe(1);
   expect(sends).toBe(1);
   expect(await provider.getBalance(recipient)).toBe(4n);
   expect(await entryPoint.balanceOf(paymasterAddress)).toBeLessThan(10n ** 17n);

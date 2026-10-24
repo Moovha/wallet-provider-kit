@@ -18,6 +18,15 @@ const execute = promisify(execFile);
 const root = fileURLToPath(new URL('../', import.meta.url));
 const mutations = [
   {
+    name: 'durable-single-dispatch',
+    file: 'src/storage/journal.ts',
+    before: 'return claimValue(previous, request);',
+    after: "return { ...claimValue(previous, request), state: 'dispatch' };",
+    test: 'test/sqlite-storage.test.ts',
+    title:
+      'allows one dispatch across two independent processes and keeps exact large integer reservations',
+  },
+  {
     name: 'durable-budget-ceiling',
     file: 'src/storage/journal.ts',
     before: 'if (reserved > units(String(budget.maximum)))',
