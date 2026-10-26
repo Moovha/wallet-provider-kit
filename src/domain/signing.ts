@@ -58,6 +58,7 @@ export class WalletProviderError extends Error {
       | 'wallet_provider_response'
       | 'wallet_authorization_denied'
       | 'wallet_attempt_conflict'
+      | 'wallet_signatures_pending'
       | 'wallet_attempt_pending'
       | 'wallet_attempt_unavailable'
       | 'wallet_identity_invalid'

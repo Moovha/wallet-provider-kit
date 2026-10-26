@@ -1,3 +1,4 @@
+import { registerOwnerRoutes } from '../sponsorship/owner-http.js';
 import { walletSetupSchema } from './schemas.js';
 import { providerNetwork } from '../networks.js';
 import {
@@ -320,7 +321,8 @@ export async function createServer(options: ServerOptions = {}) {
       if (code === 'wallet_identity_invalid') status = 422;
       if (
         code === 'wallet_attempt_conflict' ||
-        code === 'wallet_attempt_pending'
+        code === 'wallet_attempt_pending' ||
+        code === 'wallet_signatures_pending'
       )
         status = 409;
     } else if (
@@ -694,6 +696,12 @@ export async function createServer(options: ServerOptions = {}) {
       return safeWallet.provision(context, request.params.accountId);
     },
   );
+  registerOwnerRoutes(app, {
+    authorize,
+    principal: (request) => principals.get(request)!,
+    runtime: (request) => selected(request).safeWallet,
+    ready: isReady,
+  });
   app.get<{ Params: { applicationId: string } }>(
     '/v1/provider/applications/:applicationId/wallet-services',
     {

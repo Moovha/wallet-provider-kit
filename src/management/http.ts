@@ -561,6 +561,7 @@ export async function registerManagementRoutes(
         | 'contracts:request'
         | 'operations:request'
         | 'members:manage'
+        | 'owners:manage'
       )[];
     };
   }>(
@@ -623,6 +624,7 @@ export async function registerManagementRoutes(
                 'contracts:request',
                 'operations:request',
                 'members:manage',
+                'owners:manage',
               ],
             },
           },

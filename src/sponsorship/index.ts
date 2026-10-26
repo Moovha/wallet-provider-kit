@@ -25,6 +25,7 @@ export {
   safeOpPayloadV07,
   safeOpActionV07,
   safeOpSignatureV07,
+  safeOpSignaturesV07,
   safeOpTypes,
 } from './safe-op.js';
 export { Safe4337Verifier } from './verifier.js';
@@ -69,3 +70,11 @@ export type {
   LocalPaymasterAuthorization,
   LocalVerifyingPaymasterOptions,
 } from './local-paymaster.js';
+
+export {
+  initialSafeOwnerPolicy,
+  normalizeSafeOwnerPolicy,
+  prepareSafeOwnerChange,
+} from './owner-policy.js';
+export type { SafeOwnerPolicy, SafeOwnerChange } from './owner-policy.js';
+export { SafeOwnerAdministration } from './owner-administration.js';

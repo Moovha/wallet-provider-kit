@@ -15,7 +15,8 @@ export interface OperationGuide {
     | 'account:read'
     | 'operations:request'
     | 'contracts:request'
-    | 'members:manage';
+    | 'members:manage'
+    | 'owners:manage';
   audience: string;
   purpose: string;
   whenToUse: string;
@@ -32,6 +33,11 @@ export const apiTasks = [
     name: 'Wallets and members',
     description:
       'Switch between a person’s consented personal and shared wallets. Wallet owners invite members; each member gives their own wallet-specific permission.',
+  },
+  {
+    name: 'Wallet owners and signatures',
+    description:
+      'Manage on-chain owner addresses and signature thresholds, fetch exact admitted signing payloads and deliver owner signatures. Application access, custody and transaction authorization remain separate.',
   },
   {
     name: 'Transactions',
@@ -78,6 +84,12 @@ export const apiOperationOrder = [
   'readGrantedAccount',
   'revokeAccountAccess',
   'listUserWallets',
+  'getSafeOwnerPolicy',
+  'requestSafeOwnerChange',
+  'listSafeSigningRequests',
+  'getSafeSigningRequest',
+  'submitSafeOwnerSignature',
+  'cancelSafeSigningRequest',
   'readWalletMembers',
   'saveWalletMember',
   'readWalletExecutionAccount',
@@ -160,6 +172,102 @@ export function operationGuideDescription(guide: OperationGuide) {
 
 // Shared operator guidance. Runtime authentication and authority remain authoritative.
 export const operationGuides: Record<string, OperationGuide> = {
+  getSafeOwnerPolicy: {
+    title: 'Read on-chain wallet owners',
+    group: 'Wallet owners and signatures',
+    audience: 'Application backend developer',
+    safeWallet: true,
+    scope: 'wallet:access',
+    permission: 'account:read',
+    purpose:
+      'Inspect current owners and threshold, compare observed chain state with the confirmed policy and reconcile finalized owner changes.',
+    whenToUse:
+      'Read before changing ownership and after the owner-change batch reaches finality.',
+    prerequisite:
+      'Current wallet access. Unexpected chain changes suspend execution; the original address initializer remains unchanged.',
+    success:
+      '200: confirmed policy, canonical observation, pending change and supported signature capabilities.',
+  },
+  requestSafeOwnerChange: {
+    title: 'Change wallet owners or threshold',
+    group: 'Wallet owners and signatures',
+    audience: 'Application backend developer',
+    safeWallet: true,
+    scope: 'wallet:execute',
+    permission: 'owners:manage',
+    purpose:
+      'Queue an exact standard Safe owner-management transaction under the current on-chain quorum.',
+    whenToUse:
+      'Add or remove a signer address or change the number of required owner signatures.',
+    prerequisite:
+      'Owner-only owners:manage and contracts:request consent, execution scopes and current policy revision. No external-wallet onboarding or private keys are required.',
+    success:
+      '200: pending change and batch ID. Poll batch status and read owners after finality to confirm.',
+  },
+  listSafeSigningRequests: {
+    title: 'Find wallet signing requests',
+    group: 'Wallet owners and signatures',
+    audience: 'Application backend developer',
+    safeWallet: true,
+    scope: 'wallet:access',
+    permission: 'account:read',
+    purpose:
+      'List the most recent exact signing requests available to this caller and wallet.',
+    whenToUse:
+      'Discover operations awaiting signatures after normal wallet-call admission.',
+    prerequisite:
+      'Current wallet access. Preparation fixes fees and sponsorship before publishing the signing payload.',
+    success:
+      '200: up to 100 recent requests, including their payloads, owner policies and collection states.',
+  },
+  getSafeSigningRequest: {
+    title: 'Read an exact signing request',
+    group: 'Wallet owners and signatures',
+    audience: 'Application backend developer',
+    safeWallet: true,
+    scope: 'wallet:access',
+    permission: 'account:read',
+    purpose:
+      'Fetch the immutable SafeOp typed payload, signing hash and quorum progress.',
+    whenToUse:
+      'Deliver the exact payload to a local wallet or another owner-controlled signer.',
+    prerequisite:
+      'Current access for the original caller and wallet. Check the transaction independently before signing.',
+    success:
+      '200: payload revision, transaction details, expiry and collected owner addresses. Signatures are not exported.',
+  },
+  submitSafeOwnerSignature: {
+    title: 'Deliver an owner signature',
+    group: 'Wallet owners and signatures',
+    audience: 'Application backend developer',
+    safeWallet: true,
+    scope: 'wallet:sign',
+    permission: 'contracts:request',
+    purpose:
+      'Verify and retain an external owner signature for the exact admitted operation, then wake its execution worker.',
+    whenToUse:
+      'Return a signature produced by a device or another supported ECDSA signer.',
+    prerequisite:
+      'Current caller authority, operation ID, payload revision, owner address and strict EIP-712 signature. Private keys remain with the signer.',
+    success:
+      '200: quorum progress. Identical deliveries are idempotent; mismatched payloads or repeated owners with different signatures are rejected.',
+  },
+  cancelSafeSigningRequest: {
+    title: 'Cancel signature collection',
+    group: 'Wallet owners and signatures',
+    audience: 'Application backend developer',
+    safeWallet: true,
+    scope: 'wallet:actions',
+    permission: 'contracts:request',
+    purpose:
+      'Stop further toolkit signing and submission before dispatch while retaining nonce and budget evidence.',
+    whenToUse: 'Stop an operation that is still collecting signatures.',
+    prerequisite:
+      'Current original caller authority and an operation that has not been dispatched. Already issued signatures cannot be recalled.',
+    success:
+      '200: cancelled collection. Requests already dispatched conflict and require receipt reconciliation.',
+  },
+
   listUserWallets: {
     title: 'Find a person’s approved wallets',
     group: 'Wallets and members',

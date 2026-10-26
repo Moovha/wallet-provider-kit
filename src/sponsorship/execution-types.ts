@@ -61,6 +61,7 @@ export interface UserOperationBatch {
   sequence: number;
   operationId?: string;
   stage:
+    | 'awaiting-signatures'
     | 'queued'
     | 'processing'
     | 'blocked'

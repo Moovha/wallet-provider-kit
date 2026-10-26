@@ -140,6 +140,7 @@ export class UserOperationExecutionCoordinator {
       await this.timestamp(id, 'sponsorship_started_at');
       await this.signing.sponsor(context, id);
       await this.timestamp(id, 'paymaster_signed_at');
+      await this.signing.prepareSignatureRequest(context, id, anchor);
       await this.timestamp(id, 'signing_started_at');
       const operation = await this.signing.sign(context, id),
         record = this.database.sponsorship.load(id) ?? deny();
@@ -189,6 +190,11 @@ export class UserOperationExecutionCoordinator {
           (state) => {
             const current = state.userOperationExecutions?.[id] ?? deny();
             this.check(current);
+            if (
+              state.sponsorships?.[id]?.signatureCollection?.state ===
+              'cancelled'
+            )
+              deny();
             if (current.dispatch)
               throw new WalletProviderError(
                 'wallet_attempt_unavailable',
@@ -212,6 +218,60 @@ export class UserOperationExecutionCoordinator {
       // A rejected, malformed or lost response retains the dispatch claim.
     }
     return this.refresh(id);
+  }
+  /** Prove expiry from finalized chain time and an exhaustive absence-of-execution scan, without signing or submitting. */
+  async reconcileSigningExpiry(id: string) {
+    const { operation, record } = this.signing.signingExposure(id);
+    const collection = record.signatureCollection!;
+    if (collection.expiry) return true;
+    if (Number(record.validUntil) * 1000 > Date.now()) return false;
+    const intent = await this.actions.onboarding.store.transaction(
+      (state) => state.supportedActions?.[id]?.intent ?? deny(),
+    );
+    const observation = await this.observer.observe(
+      {
+        operationId: id,
+        configurationHash: this.configurationHash,
+        sponsorshipHash: record.termsHash,
+        operation,
+        intent,
+        userOperationHash: signedUserOperationHash(
+          operation,
+          this.binding.acceptance.domain,
+        ),
+        scanFromBlock: collection.scanFromBlock,
+        planHash: '',
+        observation: {
+          state: 'pending',
+          observedAt: new Date().toISOString(),
+          scanNextBlock: collection.scanFromBlock,
+        },
+        observationRevision: 0,
+      },
+      record.maximumCostWei,
+    );
+    if (observation.state !== 'expired' || !observation.expiry) return false;
+    await this.actions.onboarding.store.transaction((state) => {
+      if (
+        state.deploymentBindings?.['service-v1']?.activeRevision !==
+        this.actions.revision
+      )
+        deny();
+      const current = state.sponsorships?.[id] ?? deny();
+      if (
+        current.configurationHash !== record.configurationHash ||
+        current.termsHash !== record.termsHash ||
+        current.signatureCollection?.action.payload_hash !==
+          collection.action.payload_hash ||
+        state.userOperationExecutions?.[id]?.dispatch
+      )
+        deny();
+      current.signatureCollection!.expiry = observation.expiry;
+      const source = state.supportedActions?.[id] ?? deny();
+      source.status = 'denied';
+      source.nonceReleased = true;
+    });
+    return true;
   }
   private async finish(
     id: string,

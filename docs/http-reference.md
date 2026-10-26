@@ -507,6 +507,809 @@ Success response schema:
 }
 ```
 
+## GET `/v1/accounts/{accountId}/owners`
+
+Operation: `getSafeOwnerPolicy`.
+
+**Why this exists:** Inspect current owners and threshold, compare observed chain state with the confirmed policy and reconcile finalized owner changes.
+
+**Who uses it:** Application backend developer.
+
+**When you need it:** Read before changing ownership and after the owner-change batch reaches finality.
+
+**Before you start:** Current wallet access. Unexpected chain changes suspend execution; the original address initializer remains unchanged.
+
+**Result and next step:** 200: confirmed policy, canonical observation, pending change and supported signature capabilities.
+
+**Request details:** Read current chain ownership and reconcile a finalized toolkit owner change. Unexpected changes suspend provider execution. Application membership is independent.
+
+| Parameter         | Location | Required | Schema                                                                                                |
+| ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
+| `accountId`       | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+| `wallet-network`  | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum","ethereum-sepolia"]}`                      |
+| `wallet-grant-id` | header   | no       | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+
+| Status | Content type     | Description      |
+| ------ | ---------------- | ---------------- |
+| 200    | application/json | Default Response |
+| 400    | application/json | Default Response |
+| 403    | application/json | Default Response |
+| 409    | application/json | Default Response |
+| 422    | application/json | Default Response |
+| 503    | application/json | Default Response |
+
+Success response schema:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": true
+}
+```
+
+## POST `/v1/accounts/{accountId}/owner-changes`
+
+Operation: `requestSafeOwnerChange`.
+
+**Why this exists:** Queue an exact standard Safe owner-management transaction under the current on-chain quorum.
+
+**Who uses it:** Application backend developer.
+
+**When you need it:** Add or remove a signer address or change the number of required owner signatures.
+
+**Before you start:** Owner-only owners:manage and contracts:request consent, execution scopes and current policy revision. No external-wallet onboarding or private keys are required.
+
+**Result and next step:** 200: pending change and batch ID. Poll batch status and read owners after finality to confirm.
+
+**Request details:** Requires an owner-only owners:manage grant plus current contract and execution authority. The current on-chain quorum authorizes the exact generated Safe call. The provider signer is retained. Poll owners after batch finality to confirm the new policy.
+
+| Parameter         | Location | Required | Schema                                                                                                |
+| ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
+| `accountId`       | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+| `idempotency-key` | header   | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+| `wallet-network`  | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum","ethereum-sepolia"]}`                      |
+| `wallet-grant-id` | header   | no       | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+
+Request body (application/json):
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["expected_policy_revision", "change"],
+  "properties": {
+    "expected_policy_revision": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,19})$"
+    },
+    "change": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "threshold", "owner"],
+          "properties": {
+            "type": {
+              "enum": ["add"]
+            },
+            "threshold": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 32
+            },
+            "owner": {
+              "type": "string",
+              "pattern": "^0x[0-9a-fA-F]{40}$"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "threshold", "owner"],
+          "properties": {
+            "type": {
+              "enum": ["remove"]
+            },
+            "threshold": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 32
+            },
+            "owner": {
+              "type": "string",
+              "pattern": "^0x[0-9a-fA-F]{40}$"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "threshold"],
+          "properties": {
+            "type": {
+              "enum": ["threshold"]
+            },
+            "threshold": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 32
+            }
+          }
+        }
+      ]
+    }
+  }
+}
+```
+
+| Status | Content type     | Description      |
+| ------ | ---------------- | ---------------- |
+| 200    | application/json | Default Response |
+| 400    | application/json | Default Response |
+| 403    | application/json | Default Response |
+| 409    | application/json | Default Response |
+| 422    | application/json | Default Response |
+| 503    | application/json | Default Response |
+
+Success response schema:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": true
+}
+```
+
+## GET `/v1/accounts/{accountId}/signing-requests`
+
+Operation: `listSafeSigningRequests`.
+
+**Why this exists:** List the most recent exact signing requests available to this caller and wallet.
+
+**Who uses it:** Application backend developer.
+
+**When you need it:** Discover operations awaiting signatures after normal wallet-call admission.
+
+**Before you start:** Current wallet access. Preparation fixes fees and sponsorship before publishing the signing payload.
+
+**Result and next step:** 200: up to 100 recent requests, including their payloads, owner policies and collection states.
+
+**Request details:** Returns up to 100 most recent admitted signing requests for this caller and wallet. Typed payloads become available after final sponsorship preparation. No signatures or keys are exported.
+
+| Parameter         | Location | Required | Schema                                                                                                |
+| ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
+| `accountId`       | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+| `wallet-network`  | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum","ethereum-sepolia"]}`                      |
+| `wallet-grant-id` | header   | no       | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+
+| Status | Content type     | Description      |
+| ------ | ---------------- | ---------------- |
+| 200    | application/json | Default Response |
+| 400    | application/json | Default Response |
+| 403    | application/json | Default Response |
+| 409    | application/json | Default Response |
+| 422    | application/json | Default Response |
+| 503    | application/json | Default Response |
+
+Success response schema:
+
+```json
+{
+  "type": "object",
+  "required": ["requests"],
+  "properties": {
+    "requests": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "operation_id",
+          "batch_id",
+          "account_id",
+          "payload_revision",
+          "chain_id",
+          "safe_address",
+          "nonce",
+          "expires_at",
+          "owner_policy",
+          "signing_payload",
+          "signing_hash",
+          "calls",
+          "collected_owners",
+          "signatures_required",
+          "additional_signatures_required",
+          "state"
+        ],
+        "properties": {
+          "operation_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "batch_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "account_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "payload_revision": {
+            "type": "string"
+          },
+          "chain_id": {
+            "type": "string"
+          },
+          "safe_address": {
+            "type": "string",
+            "pattern": "^0x[0-9a-fA-F]{40}$"
+          },
+          "nonce": {
+            "type": "string"
+          },
+          "expires_at": {
+            "type": "string"
+          },
+          "owner_policy": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["owners", "threshold", "providerSigner", "revision"],
+            "properties": {
+              "owners": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 32,
+                "items": {
+                  "type": "string",
+                  "pattern": "^0x[0-9a-fA-F]{40}$"
+                }
+              },
+              "threshold": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 32
+              },
+              "providerSigner": {
+                "type": "string",
+                "pattern": "^0x[0-9a-fA-F]{40}$"
+              },
+              "revision": {
+                "type": "string",
+                "pattern": "^(0|[1-9][0-9]{0,19})$"
+              }
+            }
+          },
+          "signing_payload": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "signing_hash": {
+            "type": "string"
+          },
+          "calls": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "requested_action": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "collected_owners": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^0x[0-9a-fA-F]{40}$"
+            }
+          },
+          "signatures_required": {
+            "type": "integer"
+          },
+          "additional_signatures_required": {
+            "type": "integer"
+          },
+          "state": {
+            "enum": ["collecting", "quorum-ready", "cancelled", "expired"]
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+## GET `/v1/accounts/{accountId}/signing-requests/{operationId}`
+
+Operation: `getSafeSigningRequest`.
+
+**Why this exists:** Fetch the immutable SafeOp typed payload, signing hash and quorum progress.
+
+**Who uses it:** Application backend developer.
+
+**When you need it:** Deliver the exact payload to a local wallet or another owner-controlled signer.
+
+**Before you start:** Current access for the original caller and wallet. Check the transaction independently before signing.
+
+**Result and next step:** 200: payload revision, transaction details, expiry and collected owner addresses. Signatures are not exported.
+
+| Parameter         | Location | Required | Schema                                                                                                |
+| ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
+| `accountId`       | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+| `operationId`     | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+| `wallet-network`  | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum","ethereum-sepolia"]}`                      |
+| `wallet-grant-id` | header   | no       | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+
+| Status | Content type     | Description      |
+| ------ | ---------------- | ---------------- |
+| 200    | application/json | Default Response |
+| 400    | application/json | Default Response |
+| 403    | application/json | Default Response |
+| 409    | application/json | Default Response |
+| 422    | application/json | Default Response |
+| 503    | application/json | Default Response |
+
+Success response schema:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "operation_id",
+    "batch_id",
+    "account_id",
+    "payload_revision",
+    "chain_id",
+    "safe_address",
+    "nonce",
+    "expires_at",
+    "owner_policy",
+    "signing_payload",
+    "signing_hash",
+    "calls",
+    "collected_owners",
+    "signatures_required",
+    "additional_signatures_required",
+    "state"
+  ],
+  "properties": {
+    "operation_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "batch_id": {
+      "type": "string",
+      "nullable": true
+    },
+    "account_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "payload_revision": {
+      "type": "string"
+    },
+    "chain_id": {
+      "type": "string"
+    },
+    "safe_address": {
+      "type": "string",
+      "pattern": "^0x[0-9a-fA-F]{40}$"
+    },
+    "nonce": {
+      "type": "string"
+    },
+    "expires_at": {
+      "type": "string"
+    },
+    "owner_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["owners", "threshold", "providerSigner", "revision"],
+      "properties": {
+        "owners": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "items": {
+            "type": "string",
+            "pattern": "^0x[0-9a-fA-F]{40}$"
+          }
+        },
+        "threshold": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 32
+        },
+        "providerSigner": {
+          "type": "string",
+          "pattern": "^0x[0-9a-fA-F]{40}$"
+        },
+        "revision": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,19})$"
+        }
+      }
+    },
+    "signing_payload": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "signing_hash": {
+      "type": "string"
+    },
+    "calls": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true
+      }
+    },
+    "requested_action": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "collected_owners": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^0x[0-9a-fA-F]{40}$"
+      }
+    },
+    "signatures_required": {
+      "type": "integer"
+    },
+    "additional_signatures_required": {
+      "type": "integer"
+    },
+    "state": {
+      "enum": ["collecting", "quorum-ready", "cancelled", "expired"]
+    }
+  }
+}
+```
+
+## POST `/v1/accounts/{accountId}/signing-requests/{operationId}/signatures`
+
+Operation: `submitSafeOwnerSignature`.
+
+**Why this exists:** Verify and retain an external owner signature for the exact admitted operation, then wake its execution worker.
+
+**Who uses it:** Application backend developer.
+
+**When you need it:** Return a signature produced by a device or another supported ECDSA signer.
+
+**Before you start:** Current caller authority, operation ID, payload revision, owner address and strict EIP-712 signature. Private keys remain with the signer.
+
+**Result and next step:** 200: quorum progress. Identical deliveries are idempotent; mismatched payloads or repeated owners with different signatures are rejected.
+
+**Request details:** The authenticated application delivers an external owner signature. The owner needs no provider account. Current authority, chain ownership, immutable payload and strict EIP-712 ECDSA are verified. Duplicate delivery of the same signature is idempotent; different signatures for the same owner conflict.
+
+| Parameter         | Location | Required | Schema                                                                                                |
+| ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
+| `accountId`       | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+| `operationId`     | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+| `idempotency-key` | header   | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+| `wallet-network`  | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum","ethereum-sepolia"]}`                      |
+| `wallet-grant-id` | header   | no       | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+
+Request body (application/json):
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["payload_revision", "owner", "signature"],
+  "properties": {
+    "payload_revision": {
+      "type": "string",
+      "pattern": "^0x[0-9a-f]{64}$"
+    },
+    "owner": {
+      "type": "string",
+      "pattern": "^0x[0-9a-fA-F]{40}$"
+    },
+    "signature": {
+      "type": "string",
+      "pattern": "^0x[0-9a-fA-F]{130}$"
+    }
+  }
+}
+```
+
+| Status | Content type     | Description      |
+| ------ | ---------------- | ---------------- |
+| 200    | application/json | Default Response |
+| 400    | application/json | Default Response |
+| 403    | application/json | Default Response |
+| 409    | application/json | Default Response |
+| 422    | application/json | Default Response |
+| 503    | application/json | Default Response |
+
+Success response schema:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "operation_id",
+    "batch_id",
+    "account_id",
+    "payload_revision",
+    "chain_id",
+    "safe_address",
+    "nonce",
+    "expires_at",
+    "owner_policy",
+    "signing_payload",
+    "signing_hash",
+    "calls",
+    "collected_owners",
+    "signatures_required",
+    "additional_signatures_required",
+    "state"
+  ],
+  "properties": {
+    "operation_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "batch_id": {
+      "type": "string",
+      "nullable": true
+    },
+    "account_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "payload_revision": {
+      "type": "string"
+    },
+    "chain_id": {
+      "type": "string"
+    },
+    "safe_address": {
+      "type": "string",
+      "pattern": "^0x[0-9a-fA-F]{40}$"
+    },
+    "nonce": {
+      "type": "string"
+    },
+    "expires_at": {
+      "type": "string"
+    },
+    "owner_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["owners", "threshold", "providerSigner", "revision"],
+      "properties": {
+        "owners": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "items": {
+            "type": "string",
+            "pattern": "^0x[0-9a-fA-F]{40}$"
+          }
+        },
+        "threshold": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 32
+        },
+        "providerSigner": {
+          "type": "string",
+          "pattern": "^0x[0-9a-fA-F]{40}$"
+        },
+        "revision": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,19})$"
+        }
+      }
+    },
+    "signing_payload": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "signing_hash": {
+      "type": "string"
+    },
+    "calls": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true
+      }
+    },
+    "requested_action": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "collected_owners": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^0x[0-9a-fA-F]{40}$"
+      }
+    },
+    "signatures_required": {
+      "type": "integer"
+    },
+    "additional_signatures_required": {
+      "type": "integer"
+    },
+    "state": {
+      "enum": ["collecting", "quorum-ready", "cancelled", "expired"]
+    }
+  }
+}
+```
+
+## POST `/v1/accounts/{accountId}/signing-requests/{operationId}/cancel`
+
+Operation: `cancelSafeSigningRequest`.
+
+**Why this exists:** Stop further toolkit signing and submission before dispatch while retaining nonce and budget evidence.
+
+**Who uses it:** Application backend developer.
+
+**When you need it:** Stop an operation that is still collecting signatures.
+
+**Before you start:** Current original caller authority and an operation that has not been dispatched. Already issued signatures cannot be recalled.
+
+**Result and next step:** 200: cancelled collection. Requests already dispatched conflict and require receipt reconciliation.
+
+**Request details:** Stops further toolkit signing and submission before dispatch. Previously issued signatures cannot be recalled. Nonce and budget reservations are retained.
+
+| Parameter         | Location | Required | Schema                                                                                                |
+| ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
+| `accountId`       | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+| `operationId`     | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+| `idempotency-key` | header   | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+| `wallet-network`  | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum","ethereum-sepolia"]}`                      |
+| `wallet-grant-id` | header   | no       | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+
+Request body (application/json):
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false
+}
+```
+
+| Status | Content type     | Description      |
+| ------ | ---------------- | ---------------- |
+| 200    | application/json | Default Response |
+| 400    | application/json | Default Response |
+| 403    | application/json | Default Response |
+| 409    | application/json | Default Response |
+| 422    | application/json | Default Response |
+| 503    | application/json | Default Response |
+
+Success response schema:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "operation_id",
+    "batch_id",
+    "account_id",
+    "payload_revision",
+    "chain_id",
+    "safe_address",
+    "nonce",
+    "expires_at",
+    "owner_policy",
+    "signing_payload",
+    "signing_hash",
+    "calls",
+    "collected_owners",
+    "signatures_required",
+    "additional_signatures_required",
+    "state"
+  ],
+  "properties": {
+    "operation_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "batch_id": {
+      "type": "string",
+      "nullable": true
+    },
+    "account_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "payload_revision": {
+      "type": "string"
+    },
+    "chain_id": {
+      "type": "string"
+    },
+    "safe_address": {
+      "type": "string",
+      "pattern": "^0x[0-9a-fA-F]{40}$"
+    },
+    "nonce": {
+      "type": "string"
+    },
+    "expires_at": {
+      "type": "string"
+    },
+    "owner_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["owners", "threshold", "providerSigner", "revision"],
+      "properties": {
+        "owners": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "items": {
+            "type": "string",
+            "pattern": "^0x[0-9a-fA-F]{40}$"
+          }
+        },
+        "threshold": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 32
+        },
+        "providerSigner": {
+          "type": "string",
+          "pattern": "^0x[0-9a-fA-F]{40}$"
+        },
+        "revision": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,19})$"
+        }
+      }
+    },
+    "signing_payload": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "signing_hash": {
+      "type": "string"
+    },
+    "calls": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true
+      }
+    },
+    "requested_action": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "collected_owners": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^0x[0-9a-fA-F]{40}$"
+      }
+    },
+    "signatures_required": {
+      "type": "integer"
+    },
+    "additional_signatures_required": {
+      "type": "integer"
+    },
+    "state": {
+      "enum": ["collecting", "quorum-ready", "cancelled", "expired"]
+    }
+  }
+}
+```
+
 ## GET `/v1/provider/applications/{applicationId}/wallet-services`
 
 Operation: `readWalletServices`.
@@ -1214,7 +2017,7 @@ Request body (application/json):
           "actions": {
             "type": "array",
             "minItems": 1,
-            "maxItems": 4,
+            "maxItems": 5,
             "uniqueItems": true,
             "items": {
               "type": "string",
@@ -1222,7 +2025,8 @@ Request body (application/json):
                 "account:read",
                 "operations:request",
                 "contracts:request",
-                "members:manage"
+                "members:manage",
+                "owners:manage"
               ]
             }
           }
@@ -1320,7 +2124,8 @@ Success response schema:
           "account:read",
           "operations:request",
           "contracts:request",
-          "members:manage"
+          "members:manage",
+          "owners:manage"
         ]
       }
     },
@@ -2823,7 +3628,8 @@ Success response schema:
                 "account:read",
                 "operations:request",
                 "contracts:request",
-                "members:manage"
+                "members:manage",
+                "owners:manage"
               ]
             }
           },
@@ -3340,7 +4146,8 @@ Success response schema:
                     "account:read",
                     "operations:request",
                     "contracts:request",
-                    "members:manage"
+                    "members:manage",
+                    "owners:manage"
                   ]
                 }
               },
@@ -3463,7 +4270,8 @@ Success response schema:
           "account:read",
           "operations:request",
           "contracts:request",
-          "members:manage"
+          "members:manage",
+          "owners:manage"
         ]
       }
     },
@@ -3603,7 +4411,8 @@ Success response schema:
           "account:read",
           "operations:request",
           "contracts:request",
-          "members:manage"
+          "members:manage",
+          "owners:manage"
         ]
       }
     },
@@ -17918,7 +18727,8 @@ Request body (application/json):
           "account:read",
           "contracts:request",
           "operations:request",
-          "members:manage"
+          "members:manage",
+          "owners:manage"
         ]
       }
     }

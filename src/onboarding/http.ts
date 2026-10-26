@@ -130,6 +130,8 @@ const permissionLabels = {
   'account:read': 'Read your wallet address and account status',
   'operations:request':
     'Request wallet operations, subject to your provider’s approvals',
+  'owners:manage':
+    'Change on-chain owner addresses and the required signature threshold',
   'members:manage': 'Invite people and change their shared-wallet permissions',
   'contracts:request':
     'Request wallet transactions within the approved contract and transaction limits.',

@@ -5,6 +5,10 @@ import {
   TypedDataEncoder,
   recoverAddress,
 } from 'ethers';
+import {
+  normalizeSafeOwnerPolicy,
+  type SafeOwnerPolicy,
+} from './owner-policy.js';
 import type { EmbeddedAccount, TypedDataAction } from '../domain/signing.js';
 import { WalletProviderError } from '../domain/signing.js';
 import { uuid } from '../onboarding/policy.js';
@@ -172,4 +176,34 @@ export function safeOpSignatureV07(
   } catch {
     throw new WalletProviderError('wallet_provider_response', 'unknown');
   }
+}
+
+/** Collect strict EOA typed-data signatures in Safe owner-address order with one validity prefix. */
+export function safeOpSignaturesV07(
+  action: TypedDataAction,
+  policy: SafeOwnerPolicy,
+  signatures: { owner: string; signature: string }[],
+): string {
+  const current = normalizeSafeOwnerPolicy(policy);
+  if (!Array.isArray(signatures) || signatures.length !== current.threshold)
+    throw new WalletProviderError('wallet_provider_input');
+  const seen = new Set<string>();
+  const encoded = signatures
+    .map((item) => {
+      const owner = operationAddress(item.owner).toLowerCase();
+      if (!current.owners.includes(owner) || seen.has(owner))
+        throw new WalletProviderError('wallet_provider_input');
+      seen.add(owner);
+      const prefixed = safeOpSignatureV07(action, owner, item.signature);
+      return { owner, signature: '0x' + prefixed.slice(26) };
+    })
+    .sort((a, b) => a.owner.localeCompare(b.owner));
+  return solidityPacked(
+    ['uint48', 'uint48', 'bytes'],
+    [
+      action.payload.message.validAfter,
+      action.payload.message.validUntil,
+      concat(encoded.map((item) => item.signature)),
+    ],
+  ).toLowerCase();
 }

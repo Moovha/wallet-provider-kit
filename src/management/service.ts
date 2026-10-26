@@ -831,6 +831,7 @@ export class ManagementService {
                       'contracts:request',
                       'operations:request',
                       'members:manage',
+                      'owners:manage',
                     ].includes(p),
                 ))
             )

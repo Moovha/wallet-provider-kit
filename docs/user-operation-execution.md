@@ -13,3 +13,9 @@ Accepted deployments use Safe 1.4.1, Safe4337Module 0.3.0 and EntryPoint v0.7 on
 The driver persists a batch, prepares nonce/fees and exact gas estimates, reserves bounded sponsorship, signs the SafeOp and dispatches its exact bytes. Account lanes serialize conflicting nonces while separate accounts can progress concurrently. A submission timeout retains the signed identity and anchor for read-only reconciliation.
 
 Success requires the canonical bundle transaction, exact packed operation and signature, individual successful operation event and required effects. Finality is tracked independently. Expiry releases a lane only after a bounded finalized absence proof; missing evidence leaves uncertainty intact. See [signing](durable-safe-op-signing.md) and [sponsorship](account-abstraction-sponsorship.md).
+
+When an account requires additional owners, the driver publishes an exact
+[signing request](wallet-owners.md) after final sponsorship preparation and pauses
+until signatures can satisfy quorum. It retains the same operation across
+signature delivery and restart. Finalized expiry and an exhaustive absence proof
+are required before an exposed nonce can be reused.

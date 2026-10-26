@@ -332,6 +332,7 @@ export declare class WalletProviderError extends Error {
     | 'wallet_provider_response'
     | 'wallet_authorization_denied'
     | 'wallet_attempt_conflict'
+    | 'wallet_signatures_pending'
     | 'wallet_attempt_pending'
     | 'wallet_attempt_unavailable'
     | 'wallet_identity_invalid'
@@ -348,6 +349,7 @@ export declare class WalletProviderError extends Error {
       | 'wallet_provider_response'
       | 'wallet_authorization_denied'
       | 'wallet_attempt_conflict'
+      | 'wallet_signatures_pending'
       | 'wallet_attempt_pending'
       | 'wallet_attempt_unavailable'
       | 'wallet_identity_invalid'
@@ -994,6 +996,7 @@ export declare class OnboardingService {
           | 'operations:request'
           | 'contracts:request'
           | 'members:manage'
+          | 'owners:manage'
         )[]
       | undefined;
     expires_at?: string | undefined;
@@ -1015,6 +1018,7 @@ export declare class OnboardingService {
           | 'operations:request'
           | 'contracts:request'
           | 'members:manage'
+          | 'owners:manage'
         )[]
       | undefined;
     expires_at?: string | undefined;
@@ -1072,6 +1076,7 @@ export declare class OnboardingService {
       | 'operations:request'
       | 'contracts:request'
       | 'members:manage'
+      | 'owners:manage'
     )[];
     mode: 'create' | 'connect' | 'connect_from_application';
     durationDays: number;
@@ -1088,6 +1093,7 @@ export declare class OnboardingService {
           | 'operations:request'
           | 'contracts:request'
           | 'members:manage'
+          | 'owners:manage'
         )[]
       | undefined;
     expires_at?: string | undefined;
@@ -1111,6 +1117,7 @@ export declare class OnboardingService {
           | 'operations:request'
           | 'contracts:request'
           | 'members:manage'
+          | 'owners:manage'
         )[]
       | undefined;
     expires_at?: string | undefined;
@@ -1182,6 +1189,7 @@ export declare class OnboardingService {
           | 'operations:request'
           | 'contracts:request'
           | 'members:manage'
+          | 'owners:manage'
         )[]
       | undefined;
     expires_at?: string | undefined;
@@ -1238,6 +1246,7 @@ export declare class OnboardingService {
         | 'operations:request'
         | 'contracts:request'
         | 'members:manage'
+        | 'owners:manage'
       )[];
       expires_at: string;
       role: string;
@@ -1256,6 +1265,7 @@ export declare class OnboardingService {
         | 'operations:request'
         | 'contracts:request'
         | 'members:manage'
+        | 'owners:manage'
       )[];
       membership_revision: number;
       status: 'active' | 'invited' | 'removed';
@@ -1286,6 +1296,7 @@ export declare class OnboardingService {
         | 'operations:request'
         | 'contracts:request'
         | 'members:manage'
+        | 'owners:manage'
       )[];
       membership_revision: number;
       status: 'active' | 'invited' | 'removed';
@@ -1319,6 +1330,7 @@ export declare class OnboardingService {
           | 'operations:request'
           | 'contracts:request'
           | 'members:manage'
+          | 'owners:manage'
         )[]
       | undefined;
     expires_at?: string | undefined;
@@ -1339,8 +1351,9 @@ export declare class OnboardingService {
         | 'operations:request'
         | 'contracts:request'
         | 'members:manage'
+        | 'owners:manage'
       )[];
-      state: 'active' | 'revoked' | 'suspended';
+      state: 'active' | 'suspended' | 'revoked';
       expiresAt: number;
     }[]
   >;
@@ -1350,7 +1363,7 @@ export declare class OnboardingService {
     identity: OwnerIdentity | VerifiedPrincipal,
   ): Promise<{
     grant_id: string;
-    status: 'revoked' | 'suspended';
+    status: 'suspended' | 'revoked';
   }>;
   /** Use on an existing financial authority; exact-action approval still belongs to that authority. */
   bindWalletAuthority(
@@ -2111,7 +2124,7 @@ export declare function openProviderDatabase(
     reserve(
       input: Omit<
         import('../sponsorship/admission.js').SponsorshipAdmission,
-        'phases' | 'signingActionId'
+        'phases' | 'signingActionId' | 'signatureCollection'
       >,
     ): import('../sponsorship/admission.js').SponsorshipAdmission;
     claim(
@@ -2325,6 +2338,12 @@ export type AdapterInput =
 
 ```ts
 export type ApprovedCallInput =
+  | {
+      account_id: string;
+      kind: 'owner-change';
+      expected_policy_revision: string;
+      change: SafeOwnerChange;
+    }
   | {
       account_id: string;
       kind: 'contract-call';
@@ -3098,6 +3117,7 @@ export interface RuntimeReview {
 
 ```ts
 export interface SafeAccountBinding extends PinnedContract {
+  ownerPolicy?: SafeOwnerPolicy;
   accountId: string;
   singleton: PinnedContract;
 }
@@ -3441,12 +3461,14 @@ Import from `@moovha/wallet-provider-kit/sponsorship`. [Integration guide](accou
 - [createBundlerClientV07](#createbundlerclientv07)
 - [createLocalPaymasterTransport](#createlocalpaymastertransport)
 - [createPaymasterClientV07](#createpaymasterclientv07)
+- [initialSafeOwnerPolicy](#initialsafeownerpolicy)
 - [LocalPaymasterAuthorization](#localpaymasterauthorization)
 - [localPaymasterDeployment](#localpaymasterdeployment)
 - [localPaymasterHashV07](#localpaymasterhashv07)
 - [localPaymasterUrl](#localpaymasterurl)
 - [LocalVerifyingPaymasterOptions](#localverifyingpaymasteroptions)
 - [maximumUserOperationCostV07](#maximumuseroperationcostv07)
+- [normalizeSafeOwnerPolicy](#normalizesafeownerpolicy)
 - [normalizeUserOperationV07](#normalizeuseroperationv07)
 - [packedUserOperation](#packeduseroperation)
 - [PaymasterClientOptionsV07](#paymasterclientoptionsv07)
@@ -3454,6 +3476,7 @@ Import from `@moovha/wallet-provider-kit/sponsorship`. [Integration guide](accou
 - [PaymasterDataV07](#paymasterdatav07)
 - [PaymasterStubV07](#paymasterstubv07)
 - [prepareRuntimeUserOperationV07](#prepareruntimeuseroperationv07)
+- [prepareSafeOwnerChange](#preparesafeownerchange)
 - [RuntimeUserOperationPreparationOptions](#runtimeuseroperationpreparationoptions)
 - [Safe4337Acceptance](#safe4337acceptance)
 - [Safe4337SigningConfiguration](#safe4337signingconfiguration)
@@ -3462,8 +3485,12 @@ Import from `@moovha/wallet-provider-kit/sponsorship`. [Integration guide](accou
 - [Safe4337Verifier](#safe4337verifier)
 - [safeOpActionV07](#safeopactionv07)
 - [safeOpPayloadV07](#safeoppayloadv07)
+- [safeOpSignaturesV07](#safeopsignaturesv07)
 - [safeOpSignatureV07](#safeopsignaturev07)
 - [safeOpTypes](#safeoptypes)
+- [SafeOwnerAdministration](#safeowneradministration)
+- [SafeOwnerChange](#safeownerchange)
+- [SafeOwnerPolicy](#safeownerpolicy)
 - [safeUserOperationCallData](#safeuseroperationcalldata)
 - [signedUserOperationHash](#signeduseroperationhash)
 - [SignedUserOperationV07](#signeduseroperationv07)
@@ -3589,6 +3616,16 @@ export declare function createPaymasterClientV07(
 };
 ```
 
+### initialSafeOwnerPolicy
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/sponsorship/owner-policy.ts).
+
+```ts
+export declare function initialSafeOwnerPolicy(
+  providerSigner: string,
+): SafeOwnerPolicy;
+```
+
 ### LocalPaymasterAuthorization
 
 [Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/sponsorship/local-paymaster.ts).
@@ -3675,6 +3712,16 @@ export declare function maximumUserOperationCostV07(
   input: UserOperationV07,
   l1FeeReserveWei?: string,
 ): string;
+```
+
+### normalizeSafeOwnerPolicy
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/sponsorship/owner-policy.ts).
+
+```ts
+export declare function normalizeSafeOwnerPolicy(
+  policy: SafeOwnerPolicy,
+): SafeOwnerPolicy;
 ```
 
 ### normalizeUserOperationV07
@@ -3796,6 +3843,21 @@ export declare function prepareRuntimeUserOperationV07(
     maximum: string;
     maximumCostWei: string;
   };
+};
+```
+
+### prepareSafeOwnerChange
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/sponsorship/owner-policy.ts).
+
+```ts
+/** Pure narrow Safe administration. Current quorum must authorize the resulting operation. */
+export declare function prepareSafeOwnerChange(
+  current: SafeOwnerPolicy,
+  change: SafeOwnerChange,
+): {
+  requested: SafeOwnerPolicy;
+  data: string;
 };
 ```
 
@@ -3975,6 +4037,164 @@ export declare class Safe4337SigningService {
     maxFeePerGas: string;
     maxPriorityFeePerGas: string;
   }>;
+  /** Publish only the immutable admitted SafeOp after final sponsorship fields are fixed. */
+  prepareSignatureRequest(
+    context: AuthorityContext,
+    id: string,
+    anchor?: string,
+  ): Promise<{
+    operation_id: string;
+    batch_id: string | null;
+    account_id: string;
+    payload_revision: string;
+    chain_id: string;
+    safe_address: string;
+    nonce: string;
+    expires_at: string;
+    owner_policy: import('./owner-policy.js').SafeOwnerPolicy;
+    signing_payload: {
+      domain: Record<string, import('../domain/signing.js').TypedValue>;
+      types: Record<
+        string,
+        {
+          name: string;
+          type: string;
+        }[]
+      >;
+      message: Record<string, import('../domain/signing.js').TypedValue>;
+      primaryType: string;
+    };
+    signing_hash: string;
+    calls: import('../execution/approved-calls.js').ApprovedContractCall[];
+    requested_action: ApprovedCallInput;
+    collected_owners: string[];
+    signatures_required: number;
+    additional_signatures_required: number;
+    state: string;
+  }>;
+  /** Observation-only operation identity; placeholder signatures can never be dispatched through this port. */
+  signingExposure(id: string): {
+    operation: {
+      signature: string;
+      paymaster: string;
+      paymasterData: string;
+      paymasterVerificationGasLimit: string;
+      paymasterPostOpGasLimit: string;
+      sender: string;
+      nonce: string;
+      callData: string;
+      callGasLimit: string;
+      verificationGasLimit: string;
+      preVerificationGas: string;
+      maxFeePerGas: string;
+      maxPriorityFeePerGas: string;
+    };
+    record: SponsorshipAdmission;
+  };
+  signatureRequest(
+    principal: import('../domain/principal.js').VerifiedPrincipal,
+    id: string,
+  ): Promise<{
+    operation_id: string;
+    batch_id: string | null;
+    account_id: string;
+    payload_revision: string;
+    chain_id: string;
+    safe_address: string;
+    nonce: string;
+    expires_at: string;
+    owner_policy: import('./owner-policy.js').SafeOwnerPolicy;
+    signing_payload: {
+      domain: Record<string, import('../domain/signing.js').TypedValue>;
+      types: Record<
+        string,
+        {
+          name: string;
+          type: string;
+        }[]
+      >;
+      message: Record<string, import('../domain/signing.js').TypedValue>;
+      primaryType: string;
+    };
+    signing_hash: string;
+    calls: import('../execution/approved-calls.js').ApprovedContractCall[];
+    requested_action: ApprovedCallInput;
+    collected_owners: string[];
+    signatures_required: number;
+    additional_signatures_required: number;
+    state: string;
+  }>;
+  submitOwnerSignature(
+    context: AuthorityContext,
+    id: string,
+    input: {
+      payload_revision: string;
+      owner: string;
+      signature: string;
+    },
+  ): Promise<{
+    operation_id: string;
+    batch_id: string | null;
+    account_id: string;
+    payload_revision: string;
+    chain_id: string;
+    safe_address: string;
+    nonce: string;
+    expires_at: string;
+    owner_policy: import('./owner-policy.js').SafeOwnerPolicy;
+    signing_payload: {
+      domain: Record<string, import('../domain/signing.js').TypedValue>;
+      types: Record<
+        string,
+        {
+          name: string;
+          type: string;
+        }[]
+      >;
+      message: Record<string, import('../domain/signing.js').TypedValue>;
+      primaryType: string;
+    };
+    signing_hash: string;
+    calls: import('../execution/approved-calls.js').ApprovedContractCall[];
+    requested_action: ApprovedCallInput;
+    collected_owners: string[];
+    signatures_required: number;
+    additional_signatures_required: number;
+    state: string;
+  }>;
+  cancelSignatureRequest(
+    context: AuthorityContext,
+    id: string,
+  ): Promise<{
+    operation_id: string;
+    batch_id: string | null;
+    account_id: string;
+    payload_revision: string;
+    chain_id: string;
+    safe_address: string;
+    nonce: string;
+    expires_at: string;
+    owner_policy: import('./owner-policy.js').SafeOwnerPolicy;
+    signing_payload: {
+      domain: Record<string, import('../domain/signing.js').TypedValue>;
+      types: Record<
+        string,
+        {
+          name: string;
+          type: string;
+        }[]
+      >;
+      message: Record<string, import('../domain/signing.js').TypedValue>;
+      primaryType: string;
+    };
+    signing_hash: string;
+    calls: import('../execution/approved-calls.js').ApprovedContractCall[];
+    requested_action: ApprovedCallInput;
+    collected_owners: string[];
+    signatures_required: number;
+    additional_signatures_required: number;
+    state: string;
+  }>;
   sign(
     context: AuthorityContext,
     id: string,
@@ -4004,6 +4224,13 @@ export declare class Safe4337SigningService {
 /** Independent chain reads at a common block. Checks only the accepted ERC-4337 account configuration. */
 export declare class Safe4337Verifier {
   constructor(config: Safe4337Acceptance, request?: typeof fetch);
+  /** Read owners at a common canonical block; this observation alone authorizes no effects. */
+  observeOwners(account: string): Promise<{
+    blockNumber: string;
+    blockHash: string;
+    owners: string[];
+    threshold: number;
+  }>;
   /** Advisory nonce preparation only. Admission must still verify the complete account proof. */
   prepareNonce(account: string): Promise<string>;
   verify(
@@ -4011,7 +4238,7 @@ export declare class Safe4337Verifier {
       ApprovedCallIntent,
       'account' | 'multiSend' | 'calls' | 'contracts' | 'nativeRecipients'
     > &
-      Partial<Pick<ApprovedCallIntent, 'adapterInput' | 'effects'>>,
+      Partial<Pick<ApprovedCallIntent, 'adapterInput' | 'effects' | 'input'>>,
     owner: string,
     nonce?: string,
   ): Promise<string>;
@@ -4045,6 +4272,22 @@ export declare function safeOpPayloadV07(
 ): TypedDataAction['payload'];
 ```
 
+### safeOpSignaturesV07
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/sponsorship/safe-op.ts).
+
+```ts
+/** Collect strict EOA typed-data signatures in Safe owner-address order with one validity prefix. */
+export declare function safeOpSignaturesV07(
+  action: TypedDataAction,
+  policy: SafeOwnerPolicy,
+  signatures: {
+    owner: string;
+    signature: string;
+  }[],
+): string;
+```
+
 ### safeOpSignatureV07
 
 [Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/sponsorship/safe-op.ts).
@@ -4070,6 +4313,105 @@ export declare const safeOpTypes: {
     type: string;
   }[];
 };
+```
+
+### SafeOwnerAdministration
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/sponsorship/owner-administration.ts).
+
+```ts
+/** On-chain administration is separate from application membership and contract-call delegation. */
+export declare class SafeOwnerAdministration {
+  constructor(
+    actions: SupportedActions,
+    database: ProviderDatabase,
+    multiSend: PinnedContract,
+    acceptance: (applicationId: string) => Promise<Safe4337Acceptance>,
+    driver: (
+      applicationId: string,
+      accountId: string,
+    ) => Promise<UserOperationWalletCallsDriver>,
+    request?: typeof fetch,
+  );
+  read(
+    principal: VerifiedPrincipal,
+    accountId: string,
+  ): Promise<{
+    capabilities: {
+      owner_address_management: boolean;
+      signature_collection: boolean;
+      signature_scheme: string;
+      maximum_owners: number;
+      automatic_signing: string;
+    };
+    pending?:
+      | {
+          batchId: string;
+          requestHash: string;
+          requested: SafeOwnerPolicy;
+        }
+      | undefined;
+    account_id: string;
+    safe_address: string;
+    confirmed: SafeOwnerPolicy;
+    observed: {
+      blockNumber: string;
+      blockHash: string;
+      owners: string[];
+      threshold: number;
+    };
+    status: string;
+  }>;
+  change(
+    context: AuthorityContext,
+    accountId: string,
+    input: {
+      expected_policy_revision: string;
+      change: SafeOwnerChange;
+    },
+  ): Promise<{
+    account_id: string;
+    batch_id: string;
+    requested: SafeOwnerPolicy;
+    status: 'pending';
+  }>;
+}
+```
+
+### SafeOwnerChange
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/sponsorship/owner-policy.ts).
+
+```ts
+export type SafeOwnerChange =
+  | {
+      type: 'add';
+      owner: string;
+      threshold: number;
+    }
+  | {
+      type: 'remove';
+      owner: string;
+      threshold: number;
+    }
+  | {
+      type: 'threshold';
+      threshold: number;
+    };
+```
+
+### SafeOwnerPolicy
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/sponsorship/owner-policy.ts).
+
+```ts
+export interface SafeOwnerPolicy {
+  /** Confirmed chain state, independent of the original deployment initializer. */
+  owners: string[];
+  threshold: number;
+  providerSigner: string;
+  revision: string;
+}
 ```
 
 ### safeUserOperationCallData
@@ -4199,6 +4541,8 @@ export declare class UserOperationExecutionCoordinator {
     context: AuthorityContext,
     id: string,
   ): Promise<UserOperationExecution | null>;
+  /** Prove expiry from finalized chain time and an exhaustive absence-of-execution scan, without signing or submitting. */
+  reconcileSigningExpiry(id: string): Promise<boolean>;
   refresh(id: string): Promise<UserOperationExecution | null>;
   /** Recheck dispatched historical operations without authorizing sponsorship, signing or submission. */
   refreshSettlement(id: string): Promise<UserOperationExecution | null>;
@@ -4332,6 +4676,148 @@ export declare class UserOperationWalletCallsDriver implements WalletCallsDriver
   subscribe(listener: (batchId: string) => void): () => void;
   handles(accountId: string): boolean;
   capabilities(principal: VerifiedPrincipal, accountId: string): Promise<void>;
+  signingRequests(
+    principal: VerifiedPrincipal,
+    accountId: string,
+  ): Promise<{
+    requests: {
+      operation_id: string;
+      batch_id: string | null;
+      account_id: string;
+      payload_revision: string;
+      chain_id: string;
+      safe_address: string;
+      nonce: string;
+      expires_at: string;
+      owner_policy: import('./owner-policy.js').SafeOwnerPolicy;
+      signing_payload: {
+        domain: Record<string, import('../domain/signing.js').TypedValue>;
+        types: Record<
+          string,
+          {
+            name: string;
+            type: string;
+          }[]
+        >;
+        message: Record<string, import('../domain/signing.js').TypedValue>;
+        primaryType: string;
+      };
+      signing_hash: string;
+      calls: import('../execution/approved-calls.js').ApprovedContractCall[];
+      requested_action: ApprovedCallInput;
+      collected_owners: string[];
+      signatures_required: number;
+      additional_signatures_required: number;
+      state: string;
+    }[];
+  }>;
+  signingRequest(
+    principal: VerifiedPrincipal,
+    accountId: string,
+    id: string,
+  ): Promise<{
+    operation_id: string;
+    batch_id: string | null;
+    account_id: string;
+    payload_revision: string;
+    chain_id: string;
+    safe_address: string;
+    nonce: string;
+    expires_at: string;
+    owner_policy: import('./owner-policy.js').SafeOwnerPolicy;
+    signing_payload: {
+      domain: Record<string, import('../domain/signing.js').TypedValue>;
+      types: Record<
+        string,
+        {
+          name: string;
+          type: string;
+        }[]
+      >;
+      message: Record<string, import('../domain/signing.js').TypedValue>;
+      primaryType: string;
+    };
+    signing_hash: string;
+    calls: import('../execution/approved-calls.js').ApprovedContractCall[];
+    requested_action: ApprovedCallInput;
+    collected_owners: string[];
+    signatures_required: number;
+    additional_signatures_required: number;
+    state: string;
+  }>;
+  submitSignature(
+    context: AuthorityContext,
+    accountId: string,
+    id: string,
+    input: {
+      payload_revision: string;
+      owner: string;
+      signature: string;
+    },
+  ): Promise<{
+    operation_id: string;
+    batch_id: string | null;
+    account_id: string;
+    payload_revision: string;
+    chain_id: string;
+    safe_address: string;
+    nonce: string;
+    expires_at: string;
+    owner_policy: import('./owner-policy.js').SafeOwnerPolicy;
+    signing_payload: {
+      domain: Record<string, import('../domain/signing.js').TypedValue>;
+      types: Record<
+        string,
+        {
+          name: string;
+          type: string;
+        }[]
+      >;
+      message: Record<string, import('../domain/signing.js').TypedValue>;
+      primaryType: string;
+    };
+    signing_hash: string;
+    calls: import('../execution/approved-calls.js').ApprovedContractCall[];
+    requested_action: ApprovedCallInput;
+    collected_owners: string[];
+    signatures_required: number;
+    additional_signatures_required: number;
+    state: string;
+  }>;
+  cancelSigning(
+    context: AuthorityContext,
+    accountId: string,
+    id: string,
+  ): Promise<{
+    operation_id: string;
+    batch_id: string | null;
+    account_id: string;
+    payload_revision: string;
+    chain_id: string;
+    safe_address: string;
+    nonce: string;
+    expires_at: string;
+    owner_policy: import('./owner-policy.js').SafeOwnerPolicy;
+    signing_payload: {
+      domain: Record<string, import('../domain/signing.js').TypedValue>;
+      types: Record<
+        string,
+        {
+          name: string;
+          type: string;
+        }[]
+      >;
+      message: Record<string, import('../domain/signing.js').TypedValue>;
+      primaryType: string;
+    };
+    signing_hash: string;
+    calls: import('../execution/approved-calls.js').ApprovedContractCall[];
+    requested_action: ApprovedCallInput;
+    collected_owners: string[];
+    signatures_required: number;
+    additional_signatures_required: number;
+    state: string;
+  }>;
   acceptPaymaster(value: unknown): void;
   assertSize(
     principal: VerifiedPrincipal,
@@ -4411,6 +4897,8 @@ Import from `@moovha/wallet-provider-kit/wallets`. [Integration guide](multiple-
 - [createWalletsClient](#createwalletsclient)
 - [MemberSettings](#membersettings)
 - [ProviderFailureDetails](#providerfailuredetails)
+- [SafeOwnerPolicyReceipt](#safeownerpolicyreceipt)
+- [SafeSigningRequest](#safesigningrequest)
 - [WalletAccessError](#walletaccesserror)
 - [WalletAccessPolicy](#walletaccesspolicy)
 - [WalletAccessReceipt](#walletaccessreceipt)
@@ -4442,6 +4930,164 @@ export declare function createWalletsClient(options: {
   authorization(): Promise<string>;
   fetch?: typeof fetch;
 }): {
+  ownerPolicy(
+    accountId: string,
+    grantId?: string,
+  ): Promise<{
+    capabilities: {
+      owner_address_management: boolean;
+      signature_collection: boolean;
+      signature_scheme: string;
+      maximum_owners: number;
+      automatic_signing: string;
+    };
+    pending?:
+      | {
+          batchId: string;
+          requestHash: string;
+          requested: import('../sponsorship/owner-policy.js').SafeOwnerPolicy;
+        }
+      | undefined;
+    account_id: string;
+    safe_address: string;
+    confirmed: import('../sponsorship/owner-policy.js').SafeOwnerPolicy;
+    observed: {
+      blockNumber: string;
+      blockHash: string;
+      owners: string[];
+      threshold: number;
+    };
+    status: string;
+  }>;
+  changeOwners(
+    accountId: string,
+    input: {
+      expected_policy_revision: string;
+      change: SafeOwnerChange;
+    },
+    idempotencyKey: string,
+    grantId?: string,
+  ): Promise<{
+    account_id: string;
+    batch_id: string;
+    requested: import('../sponsorship/owner-policy.js').SafeOwnerPolicy;
+    status: 'pending';
+  }>;
+  signingRequests(
+    accountId: string,
+    grantId?: string,
+  ): Promise<{
+    requests: SafeSigningRequest[];
+  }>;
+  signingRequest(
+    accountId: string,
+    operationId: string,
+    grantId?: string,
+  ): Promise<{
+    operation_id: string;
+    batch_id: string | null;
+    account_id: string;
+    payload_revision: string;
+    chain_id: string;
+    safe_address: string;
+    nonce: string;
+    expires_at: string;
+    owner_policy: import('../sponsorship/owner-policy.js').SafeOwnerPolicy;
+    signing_payload: {
+      domain: Record<string, import('../domain/signing.js').TypedValue>;
+      types: Record<
+        string,
+        {
+          name: string;
+          type: string;
+        }[]
+      >;
+      message: Record<string, import('../domain/signing.js').TypedValue>;
+      primaryType: string;
+    };
+    signing_hash: string;
+    calls: import('../index.js').ApprovedContractCall[];
+    requested_action: import('../index.js').ApprovedCallInput;
+    collected_owners: string[];
+    signatures_required: number;
+    additional_signatures_required: number;
+    state: string;
+  }>;
+  submitOwnerSignature(
+    accountId: string,
+    operationId: string,
+    input: {
+      payload_revision: string;
+      owner: string;
+      signature: string;
+    },
+    idempotencyKey: string,
+    grantId?: string,
+  ): Promise<{
+    operation_id: string;
+    batch_id: string | null;
+    account_id: string;
+    payload_revision: string;
+    chain_id: string;
+    safe_address: string;
+    nonce: string;
+    expires_at: string;
+    owner_policy: import('../sponsorship/owner-policy.js').SafeOwnerPolicy;
+    signing_payload: {
+      domain: Record<string, import('../domain/signing.js').TypedValue>;
+      types: Record<
+        string,
+        {
+          name: string;
+          type: string;
+        }[]
+      >;
+      message: Record<string, import('../domain/signing.js').TypedValue>;
+      primaryType: string;
+    };
+    signing_hash: string;
+    calls: import('../index.js').ApprovedContractCall[];
+    requested_action: import('../index.js').ApprovedCallInput;
+    collected_owners: string[];
+    signatures_required: number;
+    additional_signatures_required: number;
+    state: string;
+  }>;
+  cancelSigningRequest(
+    accountId: string,
+    operationId: string,
+    idempotencyKey: string,
+    grantId?: string,
+  ): Promise<{
+    operation_id: string;
+    batch_id: string | null;
+    account_id: string;
+    payload_revision: string;
+    chain_id: string;
+    safe_address: string;
+    nonce: string;
+    expires_at: string;
+    owner_policy: import('../sponsorship/owner-policy.js').SafeOwnerPolicy;
+    signing_payload: {
+      domain: Record<string, import('../domain/signing.js').TypedValue>;
+      types: Record<
+        string,
+        {
+          name: string;
+          type: string;
+        }[]
+      >;
+      message: Record<string, import('../domain/signing.js').TypedValue>;
+      primaryType: string;
+    };
+    signing_hash: string;
+    calls: import('../index.js').ApprovedContractCall[];
+    requested_action: import('../index.js').ApprovedCallInput;
+    collected_owners: string[];
+    signatures_required: number;
+    additional_signatures_required: number;
+    state: string;
+  }>;
   networks(): Promise<{
     default_network: ProviderNetwork;
     networks: {
@@ -4545,6 +5191,26 @@ export interface ProviderFailureDetails {
   outcome?: 'not_dispatched' | 'rejected' | 'unknown';
   retryAfterSeconds?: number;
 }
+```
+
+### SafeOwnerPolicyReceipt
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/wallets/client.ts).
+
+```ts
+export type SafeOwnerPolicyReceipt = Awaited<
+  ReturnType<SafeOwnerAdministration['read']>
+>;
+```
+
+### SafeSigningRequest
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/wallets/client.ts).
+
+```ts
+export type SafeSigningRequest = Awaited<
+  ReturnType<Safe4337SigningService['signatureRequest']>
+>;
 ```
 
 ### WalletAccessError

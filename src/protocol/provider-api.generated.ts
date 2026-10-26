@@ -205,6 +205,184 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/accounts/{accountId}/owners": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read on-chain wallet owners
+         * @description **Why this exists:** Inspect current owners and threshold, compare observed chain state with the confirmed policy and reconcile finalized owner changes.
+         *
+         *     **Who uses it:** Application backend developer.
+         *
+         *     **When you need it:** Read before changing ownership and after the owner-change batch reaches finality.
+         *
+         *     **Before you start:** Current wallet access. Unexpected chain changes suspend execution; the original address initializer remains unchanged.
+         *
+         *     **Result and next step:** 200: confirmed policy, canonical observation, pending change and supported signature capabilities.
+         *
+         *     **Request details:** Read current chain ownership and reconcile a finalized toolkit owner change. Unexpected changes suspend provider execution. Application membership is independent.
+         */
+        get: operations["getSafeOwnerPolicy"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/accounts/{accountId}/owner-changes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Change wallet owners or threshold
+         * @description **Why this exists:** Queue an exact standard Safe owner-management transaction under the current on-chain quorum.
+         *
+         *     **Who uses it:** Application backend developer.
+         *
+         *     **When you need it:** Add or remove a signer address or change the number of required owner signatures.
+         *
+         *     **Before you start:** Owner-only owners:manage and contracts:request consent, execution scopes and current policy revision. No external-wallet onboarding or private keys are required.
+         *
+         *     **Result and next step:** 200: pending change and batch ID. Poll batch status and read owners after finality to confirm.
+         *
+         *     **Request details:** Requires an owner-only owners:manage grant plus current contract and execution authority. The current on-chain quorum authorizes the exact generated Safe call. The provider signer is retained. Poll owners after batch finality to confirm the new policy.
+         */
+        post: operations["requestSafeOwnerChange"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/accounts/{accountId}/signing-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Find wallet signing requests
+         * @description **Why this exists:** List the most recent exact signing requests available to this caller and wallet.
+         *
+         *     **Who uses it:** Application backend developer.
+         *
+         *     **When you need it:** Discover operations awaiting signatures after normal wallet-call admission.
+         *
+         *     **Before you start:** Current wallet access. Preparation fixes fees and sponsorship before publishing the signing payload.
+         *
+         *     **Result and next step:** 200: up to 100 recent requests, including their payloads, owner policies and collection states.
+         *
+         *     **Request details:** Returns up to 100 most recent admitted signing requests for this caller and wallet. Typed payloads become available after final sponsorship preparation. No signatures or keys are exported.
+         */
+        get: operations["listSafeSigningRequests"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/accounts/{accountId}/signing-requests/{operationId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read an exact signing request
+         * @description **Why this exists:** Fetch the immutable SafeOp typed payload, signing hash and quorum progress.
+         *
+         *     **Who uses it:** Application backend developer.
+         *
+         *     **When you need it:** Deliver the exact payload to a local wallet or another owner-controlled signer.
+         *
+         *     **Before you start:** Current access for the original caller and wallet. Check the transaction independently before signing.
+         *
+         *     **Result and next step:** 200: payload revision, transaction details, expiry and collected owner addresses. Signatures are not exported.
+         */
+        get: operations["getSafeSigningRequest"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/accounts/{accountId}/signing-requests/{operationId}/signatures": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Deliver an owner signature
+         * @description **Why this exists:** Verify and retain an external owner signature for the exact admitted operation, then wake its execution worker.
+         *
+         *     **Who uses it:** Application backend developer.
+         *
+         *     **When you need it:** Return a signature produced by a device or another supported ECDSA signer.
+         *
+         *     **Before you start:** Current caller authority, operation ID, payload revision, owner address and strict EIP-712 signature. Private keys remain with the signer.
+         *
+         *     **Result and next step:** 200: quorum progress. Identical deliveries are idempotent; mismatched payloads or repeated owners with different signatures are rejected.
+         *
+         *     **Request details:** The authenticated application delivers an external owner signature. The owner needs no provider account. Current authority, chain ownership, immutable payload and strict EIP-712 ECDSA are verified. Duplicate delivery of the same signature is idempotent; different signatures for the same owner conflict.
+         */
+        post: operations["submitSafeOwnerSignature"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/accounts/{accountId}/signing-requests/{operationId}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel signature collection
+         * @description **Why this exists:** Stop further toolkit signing and submission before dispatch while retaining nonce and budget evidence.
+         *
+         *     **Who uses it:** Application backend developer.
+         *
+         *     **When you need it:** Stop an operation that is still collecting signatures.
+         *
+         *     **Before you start:** Current original caller authority and an operation that has not been dispatched. Already issued signatures cannot be recalled.
+         *
+         *     **Result and next step:** 200: cancelled collection. Requests already dispatched conflict and require receipt reconciliation.
+         *
+         *     **Request details:** Stops further toolkit signing and submission before dispatch. Previously issued signatures cannot be recalled. Nonce and budget reservations are retained.
+         */
+        post: operations["cancelSafeSigningRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/provider/applications/{applicationId}/wallet-services": {
         parameters: {
             query?: never;
@@ -2599,6 +2777,843 @@ export interface operations {
             };
         };
     };
+    getSafeOwnerPolicy: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Choose a configured network. Omit to use the default; existing wallet, request and grant IDs select their stored network automatically. A conflicting selection is rejected. */
+                "wallet-network"?: "base" | "base-sepolia" | "ethereum" | "ethereum-sepolia";
+                /** @description Select this person’s current grant for this wallet. Required for shared wallets; the selector alone grants no authority. */
+                "wallet-grant-id"?: string;
+            };
+            path: {
+                accountId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Default Response */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+        };
+    };
+    requestSafeOwnerChange: {
+        parameters: {
+            query?: never;
+            header: {
+                "idempotency-key": string;
+                /** @description Choose a configured network. Omit to use the default; existing wallet, request and grant IDs select their stored network automatically. A conflicting selection is rejected. */
+                "wallet-network"?: "base" | "base-sepolia" | "ethereum" | "ethereum-sepolia";
+                /** @description Select this person’s current grant for this wallet. Required for shared wallets; the selector alone grants no authority. */
+                "wallet-grant-id"?: string;
+            };
+            path: {
+                accountId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    expected_policy_revision: string;
+                    change: {
+                        /** @enum {unknown} */
+                        type: "add";
+                        threshold: number;
+                        owner: string;
+                    } | {
+                        /** @enum {unknown} */
+                        type: "remove";
+                        threshold: number;
+                        owner: string;
+                    } | {
+                        /** @enum {unknown} */
+                        type: "threshold";
+                        threshold: number;
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Default Response */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+        };
+    };
+    listSafeSigningRequests: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Choose a configured network. Omit to use the default; existing wallet, request and grant IDs select their stored network automatically. A conflicting selection is rejected. */
+                "wallet-network"?: "base" | "base-sepolia" | "ethereum" | "ethereum-sepolia";
+                /** @description Select this person’s current grant for this wallet. Required for shared wallets; the selector alone grants no authority. */
+                "wallet-grant-id"?: string;
+            };
+            path: {
+                accountId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        requests: {
+                            operation_id: string;
+                            batch_id: string | null;
+                            account_id: string;
+                            payload_revision: string;
+                            chain_id: string;
+                            safe_address: string;
+                            nonce: string;
+                            expires_at: string;
+                            owner_policy: {
+                                owners: string[];
+                                threshold: number;
+                                providerSigner: string;
+                                revision: string;
+                            };
+                            signing_payload: {
+                                [key: string]: unknown;
+                            };
+                            signing_hash: string;
+                            calls: {
+                                [key: string]: unknown;
+                            }[];
+                            requested_action?: {
+                                [key: string]: unknown;
+                            };
+                            collected_owners: string[];
+                            signatures_required: number;
+                            additional_signatures_required: number;
+                            /** @enum {unknown} */
+                            state: "collecting" | "quorum-ready" | "cancelled" | "expired";
+                        }[];
+                    };
+                };
+            };
+            /** @description Default Response */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+        };
+    };
+    getSafeSigningRequest: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Choose a configured network. Omit to use the default; existing wallet, request and grant IDs select their stored network automatically. A conflicting selection is rejected. */
+                "wallet-network"?: "base" | "base-sepolia" | "ethereum" | "ethereum-sepolia";
+                /** @description Select this person’s current grant for this wallet. Required for shared wallets; the selector alone grants no authority. */
+                "wallet-grant-id"?: string;
+            };
+            path: {
+                accountId: string;
+                operationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        operation_id: string;
+                        batch_id: string | null;
+                        account_id: string;
+                        payload_revision: string;
+                        chain_id: string;
+                        safe_address: string;
+                        nonce: string;
+                        expires_at: string;
+                        owner_policy: {
+                            owners: string[];
+                            threshold: number;
+                            providerSigner: string;
+                            revision: string;
+                        };
+                        signing_payload: {
+                            [key: string]: unknown;
+                        };
+                        signing_hash: string;
+                        calls: {
+                            [key: string]: unknown;
+                        }[];
+                        requested_action?: {
+                            [key: string]: unknown;
+                        };
+                        collected_owners: string[];
+                        signatures_required: number;
+                        additional_signatures_required: number;
+                        /** @enum {unknown} */
+                        state: "collecting" | "quorum-ready" | "cancelled" | "expired";
+                    };
+                };
+            };
+            /** @description Default Response */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+        };
+    };
+    submitSafeOwnerSignature: {
+        parameters: {
+            query?: never;
+            header: {
+                "idempotency-key": string;
+                /** @description Choose a configured network. Omit to use the default; existing wallet, request and grant IDs select their stored network automatically. A conflicting selection is rejected. */
+                "wallet-network"?: "base" | "base-sepolia" | "ethereum" | "ethereum-sepolia";
+                /** @description Select this person’s current grant for this wallet. Required for shared wallets; the selector alone grants no authority. */
+                "wallet-grant-id"?: string;
+            };
+            path: {
+                accountId: string;
+                operationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    payload_revision: string;
+                    owner: string;
+                    signature: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        operation_id: string;
+                        batch_id: string | null;
+                        account_id: string;
+                        payload_revision: string;
+                        chain_id: string;
+                        safe_address: string;
+                        nonce: string;
+                        expires_at: string;
+                        owner_policy: {
+                            owners: string[];
+                            threshold: number;
+                            providerSigner: string;
+                            revision: string;
+                        };
+                        signing_payload: {
+                            [key: string]: unknown;
+                        };
+                        signing_hash: string;
+                        calls: {
+                            [key: string]: unknown;
+                        }[];
+                        requested_action?: {
+                            [key: string]: unknown;
+                        };
+                        collected_owners: string[];
+                        signatures_required: number;
+                        additional_signatures_required: number;
+                        /** @enum {unknown} */
+                        state: "collecting" | "quorum-ready" | "cancelled" | "expired";
+                    };
+                };
+            };
+            /** @description Default Response */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+        };
+    };
+    cancelSafeSigningRequest: {
+        parameters: {
+            query?: never;
+            header: {
+                "idempotency-key": string;
+                /** @description Choose a configured network. Omit to use the default; existing wallet, request and grant IDs select their stored network automatically. A conflicting selection is rejected. */
+                "wallet-network"?: "base" | "base-sepolia" | "ethereum" | "ethereum-sepolia";
+                /** @description Select this person’s current grant for this wallet. Required for shared wallets; the selector alone grants no authority. */
+                "wallet-grant-id"?: string;
+            };
+            path: {
+                accountId: string;
+                operationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        operation_id: string;
+                        batch_id: string | null;
+                        account_id: string;
+                        payload_revision: string;
+                        chain_id: string;
+                        safe_address: string;
+                        nonce: string;
+                        expires_at: string;
+                        owner_policy: {
+                            owners: string[];
+                            threshold: number;
+                            providerSigner: string;
+                            revision: string;
+                        };
+                        signing_payload: {
+                            [key: string]: unknown;
+                        };
+                        signing_hash: string;
+                        calls: {
+                            [key: string]: unknown;
+                        }[];
+                        requested_action?: {
+                            [key: string]: unknown;
+                        };
+                        collected_owners: string[];
+                        signatures_required: number;
+                        additional_signatures_required: number;
+                        /** @enum {unknown} */
+                        state: "collecting" | "quorum-ready" | "cancelled" | "expired";
+                    };
+                };
+            };
+            /** @description Default Response */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+        };
+    };
     readWalletServices: {
         parameters: {
             query?: never;
@@ -2947,7 +3962,7 @@ export interface operations {
                     authorization_details: {
                         /** @enum {string} */
                         type: "https://moovha.com/wallet/account-access";
-                        actions: ("account:read" | "operations:request" | "contracts:request" | "members:manage")[];
+                        actions: ("account:read" | "operations:request" | "contracts:request" | "members:manage" | "owners:manage")[];
                     }[];
                 };
             };
@@ -2977,7 +3992,7 @@ export interface operations {
                         consent_url?: string;
                         grant_id?: string;
                         account_id?: string;
-                        permissions?: ("account:read" | "operations:request" | "contracts:request" | "members:manage")[];
+                        permissions?: ("account:read" | "operations:request" | "contracts:request" | "members:manage" | "owners:manage")[];
                         /** Format: date-time */
                         expires_at?: string;
                     };
@@ -3714,7 +4729,7 @@ export interface operations {
                                 kind: "personal" | "shared";
                             };
                             grant_id: string;
-                            permissions: ("account:read" | "operations:request" | "contracts:request" | "members:manage")[];
+                            permissions: ("account:read" | "operations:request" | "contracts:request" | "members:manage" | "owners:manage")[];
                             expires_at: string;
                             /** @enum {unknown} */
                             role: "owner" | "member";
@@ -4545,7 +5560,7 @@ export interface operations {
                                 consent_url?: string;
                                 grant_id?: string;
                                 account_id?: string;
-                                permissions?: ("account:read" | "operations:request" | "contracts:request" | "members:manage")[];
+                                permissions?: ("account:read" | "operations:request" | "contracts:request" | "members:manage" | "owners:manage")[];
                                 /** Format: date-time */
                                 expires_at?: string;
                             };
@@ -4763,7 +5778,7 @@ export interface operations {
                         consent_url?: string;
                         grant_id?: string;
                         account_id?: string;
-                        permissions?: ("account:read" | "operations:request" | "contracts:request" | "members:manage")[];
+                        permissions?: ("account:read" | "operations:request" | "contracts:request" | "members:manage" | "owners:manage")[];
                         /** Format: date-time */
                         expires_at?: string;
                     };
@@ -4988,7 +6003,7 @@ export interface operations {
                         consent_url?: string;
                         grant_id?: string;
                         account_id?: string;
-                        permissions?: ("account:read" | "operations:request" | "contracts:request" | "members:manage")[];
+                        permissions?: ("account:read" | "operations:request" | "contracts:request" | "members:manage" | "owners:manage")[];
                         /** Format: date-time */
                         expires_at?: string;
                     };
@@ -15554,7 +16569,7 @@ export interface operations {
                         matchingFields: string[];
                         agreement: string;
                     } | null;
-                    permissions?: ("account:read" | "contracts:request" | "operations:request" | "members:manage")[];
+                    permissions?: ("account:read" | "contracts:request" | "operations:request" | "members:manage" | "owners:manage")[];
                 };
             };
         };

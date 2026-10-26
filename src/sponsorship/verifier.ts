@@ -1,3 +1,10 @@
+import {
+  initialSafeOwnerPolicy,
+  normalizeSafeOwnerPolicy,
+  normalizeSafeOwners,
+  sameSafeOwners,
+  prepareSafeOwnerChange,
+} from './owner-policy.js';
 import { etherscanEndpoint } from '../execution/etherscan.js';
 import { canonicalHash } from '../domain/canonical.js';
 import { RpcEndpointPool } from '../execution/rpc-pool.js';
@@ -101,6 +108,82 @@ export class Safe4337Verifier {
       throw new WalletProviderError('wallet_provider_configuration');
     }
   }
+  /** Read owners at a common canonical block; this observation alone authorizes no effects. */
+  async observeOwners(account: string) {
+    operationAddress(account);
+    if (this.pool)
+      return this.pool.run(
+        (endpoint) =>
+          this.observeOwnersAt(account, [
+            this.readers[this.config.rpcUrls.indexOf(endpoint)],
+          ]),
+        ['genesis'],
+      );
+    return this.observeOwnersAt(account, this.readers);
+  }
+  private async observeOwnersAt(account: string, readers: RpcReader[]) {
+    const heads = await Promise.all(
+      readers.map(async (r) => {
+        const chain = await r.call('eth_chainId', []);
+        const genesis = (await r.call('eth_getBlockByNumber', [
+          '0x0',
+          false,
+        ])) as { hash: string };
+        const head = (await r.call('eth_getBlockByNumber', [
+          'latest',
+          false,
+        ])) as { number: string; hash: string };
+        if (
+          BigInt(String(chain)) !== BigInt(this.config.domain.chainId) ||
+          genesis.hash !== this.config.genesisHash
+        )
+          throw new WalletProviderError('wallet_authorization_denied');
+        return BigInt(operationQuantity(head.number, 256));
+      }),
+    );
+    const tag = toQuantity(heads.reduce((a, b) => (a < b ? a : b)));
+    const values = await Promise.all(
+      readers.map(async (r) => {
+        const block = (await r.call('eth_getBlockByNumber', [tag, false])) as {
+          hash: string;
+        };
+        const call = async (name: string) =>
+          safeInterface.decodeFunctionResult(
+            name,
+            String(
+              await r.call('eth_call', [
+                { to: account, data: safeInterface.encodeFunctionData(name) },
+                tag,
+              ]),
+            ),
+          )[0];
+        const [owners, threshold] = await Promise.all([
+          call('getOwners'),
+          call('getThreshold'),
+        ]);
+        const state = normalizeSafeOwners(
+          Array.from(owners, String),
+          Number(threshold),
+        );
+        const after = (await r.call('eth_getBlockByNumber', [tag, false])) as {
+          hash: string;
+        };
+        if (!/^0x[0-9a-f]{64}$/.test(block.hash) || after.hash !== block.hash)
+          throw new WalletProviderError('wallet_authorization_denied');
+        return { ...state, blockNumber: tag, blockHash: block.hash };
+      }),
+    );
+    if (
+      values.some(
+        (v) =>
+          v.blockHash !== values[0].blockHash ||
+          !sameSafeOwners(v, values[0]) ||
+          v.owners.join(',') !== values[0].owners.join(','),
+      )
+    )
+      throw new WalletProviderError('wallet_authorization_denied');
+    return values[0];
+  }
   /** Advisory nonce preparation only. Admission must still verify the complete account proof. */
   async prepareNonce(account: string): Promise<string> {
     operationAddress(account);
@@ -138,7 +221,7 @@ export class Safe4337Verifier {
       ApprovedCallIntent,
       'account' | 'multiSend' | 'calls' | 'contracts' | 'nativeRecipients'
     > &
-      Partial<Pick<ApprovedCallIntent, 'adapterInput' | 'effects'>>,
+      Partial<Pick<ApprovedCallIntent, 'adapterInput' | 'effects' | 'input'>>,
     owner: string,
     nonce?: string,
   ) {
@@ -198,6 +281,27 @@ export class Safe4337Verifier {
         a.number < b.number ? a : b,
       ).number;
       const tag = toQuantity(height);
+      const ownerPolicy = normalizeSafeOwnerPolicy(
+        intent.account.ownerPolicy ?? initialSafeOwnerPolicy(owner),
+      );
+      if (ownerPolicy.providerSigner !== owner.toLowerCase()) throw new Error();
+      const administration = intent.input?.kind === 'owner-change';
+      if (administration) {
+        const input = intent.input! as Extract<
+          ApprovedCallIntent['input'],
+          { kind: 'owner-change' }
+        >;
+        const expected = prepareSafeOwnerChange(ownerPolicy, input.change);
+        if (
+          input.expected_policy_revision !== ownerPolicy.revision ||
+          intent.calls.length !== 1 ||
+          intent.calls[0].to.toLowerCase() !==
+            intent.account.address.toLowerCase() ||
+          intent.calls[0].value !== '0' ||
+          intent.calls[0].data !== expected.data
+        )
+          throw new Error();
+      }
       const protectedAddresses = [
         config.entryPoint,
         config.module,
@@ -207,8 +311,13 @@ export class Safe4337Verifier {
         intent.multiSend,
       ].map((p) => p.address.toLowerCase());
       if (
-        intent.calls.some((c) =>
-          protectedAddresses.includes(c.to.toLowerCase()),
+        intent.calls.some(
+          (c) =>
+            protectedAddresses.includes(c.to.toLowerCase()) &&
+            !(
+              administration &&
+              c.to.toLowerCase() === intent.account.address.toLowerCase()
+            ),
         )
       )
         throw new Error();
@@ -263,7 +372,11 @@ export class Safe4337Verifier {
             )
               throw new Error();
           }
-          if (config.aggregateReads) {
+          if (
+            config.aggregateReads &&
+            ownerPolicy.owners.length === 1 &&
+            ownerPolicy.threshold === 1
+          ) {
             const roots = [
               config.entryPoint,
               config.module,
@@ -421,10 +534,13 @@ export class Safe4337Verifier {
               ]),
             ]);
             if (
-              owners[0].length !== 1 ||
-              owners[0][0].toLowerCase() !==
-                operationAddress(owner).toLowerCase() ||
-              threshold[0] !== 1n ||
+              !sameSafeOwners(
+                normalizeSafeOwners(
+                  Array.from(owners[0], String),
+                  Number(threshold[0]),
+                ),
+                ownerPolicy,
+              ) ||
               version[0] !== '1.4.1' ||
               singleton[0].toLowerCase() !==
                 intent.account.singleton.address.toLowerCase() ||

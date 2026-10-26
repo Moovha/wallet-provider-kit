@@ -134,6 +134,7 @@ export class SupportedActions {
           wallet.accountId,
         )) ||
       wallet.status !== 'ready' ||
+      wallet.ownerAdministration?.status === 'suspended' ||
       wallet.owner !== state.accounts[wallet.accountId]?.owner ||
       deployment?.activeRevision !== this.revision ||
       ['actions', 'services', 'sponsorship'].some(
@@ -144,6 +145,21 @@ export class SupportedActions {
     )
       deny();
     return { signer: wallet.signer, binding: wallet.binding };
+  }
+  private async administrationAuthority(
+    principal: VerifiedPrincipal,
+    input: ApprovedCallInput,
+  ) {
+    if (input.kind !== 'owner-change') return;
+    await this.onboarding.withAccountAccess(
+      principal,
+      input.account_id,
+      'owners:manage',
+      (state, grant) => {
+        const request = state.requests[grant.requestId];
+        if (!request || request.membership || request.sharing) deny();
+      },
+    );
   }
   private async callAuthority(principal: VerifiedPrincipal, accountId: string) {
     const configuration = this.callConfiguration ?? deny();
@@ -169,6 +185,27 @@ export class SupportedActions {
   }
   private currentRuntime(state: ProviderState, record: ApprovedCallsRecord) {
     if (record.intent) {
+      if (record.intent.input.kind === 'owner-change') {
+        const grant = state.grants[record.approval.grantId];
+        const request = grant && state.requests[grant.requestId];
+        if (
+          !grant?.permissions.includes('owners:manage') ||
+          !request ||
+          request.membership ||
+          request.sharing ||
+          !request.input.authorization_details[0].actions.includes(
+            'owners:manage',
+          ) ||
+          !this.onboarding.policy.applications
+            .find(
+              (a) =>
+                a.issuer === grant.caller.issuer &&
+                a.clientId === grant.caller.clientId,
+            )
+            ?.permissions?.includes('owners:manage')
+        )
+          deny();
+      }
       const wallet = this.walletAuthority(
         state,
         record.approval.caller,
@@ -350,6 +387,7 @@ export class SupportedActions {
       input.account_id,
       'contracts:request',
     );
+    await this.administrationAuthority(principal, input);
     const authority = await this.callAuthority(principal, input.account_id);
     if (authority.snapshot) validateRuntimeCalls(authority.snapshot, input);
     validateSafeAddressParameters(
@@ -406,6 +444,7 @@ export class SupportedActions {
       input.account_id,
       'contracts:request',
     );
+    await this.administrationAuthority(principal, input);
     const authority = await this.callAuthority(principal, input.account_id);
     const snapshot = authority.snapshot ?? deny();
     validateRuntimeCalls(snapshot, input);
@@ -479,6 +518,7 @@ export class SupportedActions {
       input.account_id,
       'contracts:request',
     );
+    await this.administrationAuthority(context.principal, input);
     const authority = await this.callAuthority(
       context.principal,
       input.account_id,
@@ -555,7 +595,11 @@ export class SupportedActions {
           continue;
         if (
           Date.parse(record.approval.action.expires_at) > Date.now() ||
-          this.database.hasActionAttempts(record.approval.action.action_id)
+          this.database.hasActionAttempts(record.approval.action.action_id) ||
+          Object.keys(
+            state.sponsorships?.[record.approval.action.action_id]
+              ?.signatureCollection?.signatures ?? {},
+          ).length > 0
         )
           throw new WalletProviderError('wallet_attempt_conflict');
         record.status = 'denied';

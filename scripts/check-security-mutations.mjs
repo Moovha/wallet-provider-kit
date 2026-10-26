@@ -90,6 +90,33 @@ const mutations = [
     title:
       'matches frozen independent viem 2.57.7 UserOperation hash vectors with and without a paymaster',
   },
+  {
+    name: 'safe-owner-quorum-before-provider-signing',
+    file: 'src/sponsorship/signing.ts',
+    before: 'external.length < policy.threshold - 1',
+    after: 'false',
+    test: 'test/safe-owner-coordination.test.ts',
+    title:
+      'collects signatures through the HTTP client, survives restart and submits one complete sorted quorum',
+  },
+  {
+    name: 'safe-owner-signature-payload-revision',
+    file: 'src/sponsorship/signing.ts',
+    before: 'input.payload_revision !== collection.action.payload_hash',
+    after: 'false',
+    test: 'test/safe-owner-coordination.test.ts',
+    title:
+      'rejects wrong domains, duplicate signers, unknown owners and changed payload revisions',
+  },
+  {
+    name: 'safe-owner-administration-consent-revocation',
+    file: 'src/deployment/actions.ts',
+    before: "!grant?.permissions.includes('owners:manage')",
+    after: 'false',
+    test: 'test/safe-owner-coordination.test.ts',
+    title:
+      'rechecks owner-administration consent after queue admission before collecting signatures',
+  },
 ];
 const directory = await mkdtemp(join(tmpdir(), 'wpk-security-mutations-'));
 try {

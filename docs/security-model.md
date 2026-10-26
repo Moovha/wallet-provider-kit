@@ -15,3 +15,12 @@ Durable claims serialize external effects. Unknown outcomes preserve reservation
 Protect the OWS vault, retained passphrase, encrypted application credentials, SQLite database and backups as one recovery boundary. Do not log secrets, raw requests, signatures, credential URLs or owner identifiers. The public API has no arbitrary signing or key export endpoint.
 
 Local setup is an explicit operator tool. It pins a local Docker context, retains private deployment storage and requires acceptance before enabling operations. See [provider responsibilities](provider-guide.md) and [acceptance](conformance.md).
+
+## On-chain co-owners
+
+[Owner management](wallet-owners.md) requires separate owner-administration
+consent and the current Safe quorum. Signature intake accepts only exact admitted
+SafeOps, with current chain ownership and strict EIP-712 ECDSA verification.
+Application membership and bearer scopes cannot replace an owner's signature.
+The application must validate signing intent independently before automatically
+signing with a device key. Cancellation cannot revoke a signature already issued.

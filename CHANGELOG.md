@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Add on-chain Safe owner-address management and configurable thresholds with
+  separate owner-administration consent. Collect strict EIP-712 owner signatures
+  for exact admitted SafeOps through authenticated signing-request APIs and the
+  wallet client. Preserve original deployment recipes, pause incomplete quorums
+  and reject stale chain ownership. Co-owned cross-network recovery and
+  contract-owner signature collection remain unsupported.
+
 - Add offline ERC-4337 integration coverage using pinned Safe and EntryPoint
   contracts, the Alto bundler and persistent Valkey storage. Check recovery after
   a lost submission response and service restarts without repeated execution

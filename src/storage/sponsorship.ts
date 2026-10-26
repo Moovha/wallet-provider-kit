@@ -61,13 +61,21 @@ export function sqliteSponsorshipStore(connection: StorageConnection) {
     },
     /** Invoke synchronously inside SupportedActions.withAuthorizedCalls on this database. */
     reserve(
-      input: Omit<SponsorshipAdmission, 'phases' | 'signingActionId'>,
+      input: Omit<
+        SponsorshipAdmission,
+        'phases' | 'signingActionId' | 'signatureCollection'
+      >,
     ): SponsorshipAdmission {
       connection.requireTransaction();
       const proposed = structuredClone(input),
         previous = load(proposed.id);
       if (previous) {
-        const { phases: _, signingActionId: __, ...terms } = previous;
+        const {
+          phases: _,
+          signingActionId: __,
+          signatureCollection: ___,
+          ...terms
+        } = previous;
         if (fingerprint(terms) !== fingerprint(proposed))
           throw new WalletProviderError('wallet_attempt_conflict');
         return previous;

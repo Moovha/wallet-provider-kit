@@ -124,6 +124,70 @@ Invite a verified application user to a shared wallet, limit their permissions o
 
 [`POST /v1/accounts/{accountId}/members`](http-reference.md#post-v1-accounts-accountid-members) — request body, permissions, effects and response details.
 
+## Wallet owners and signatures
+
+Manage on-chain owner addresses and signature thresholds, fetch exact admitted signing payloads and deliver owner signatures. Application access, custody and transaction authorization remain separate.
+
+### Read on-chain wallet owners
+
+Inspect current owners and threshold, compare observed chain state with the confirmed policy and reconcile finalized owner changes.
+
+**Who uses it:** Application backend developer.
+
+**When you need it:** Read before changing ownership and after the owner-change batch reaches finality.
+
+[`GET /v1/accounts/{accountId}/owners`](http-reference.md#get-v1-accounts-accountid-owners) — request body, permissions, effects and response details.
+
+### Change wallet owners or threshold
+
+Queue an exact standard Safe owner-management transaction under the current on-chain quorum.
+
+**Who uses it:** Application backend developer.
+
+**When you need it:** Add or remove a signer address or change the number of required owner signatures.
+
+[`POST /v1/accounts/{accountId}/owner-changes`](http-reference.md#post-v1-accounts-accountid-owner-changes) — request body, permissions, effects and response details.
+
+### Find wallet signing requests
+
+List the most recent exact signing requests available to this caller and wallet.
+
+**Who uses it:** Application backend developer.
+
+**When you need it:** Discover operations awaiting signatures after normal wallet-call admission.
+
+[`GET /v1/accounts/{accountId}/signing-requests`](http-reference.md#get-v1-accounts-accountid-signing-requests) — request body, permissions, effects and response details.
+
+### Read an exact signing request
+
+Fetch the immutable SafeOp typed payload, signing hash and quorum progress.
+
+**Who uses it:** Application backend developer.
+
+**When you need it:** Deliver the exact payload to a local wallet or another owner-controlled signer.
+
+[`GET /v1/accounts/{accountId}/signing-requests/{operationId}`](http-reference.md#get-v1-accounts-accountid-signing-requests-operationid) — request body, permissions, effects and response details.
+
+### Deliver an owner signature
+
+Verify and retain an external owner signature for the exact admitted operation, then wake its execution worker.
+
+**Who uses it:** Application backend developer.
+
+**When you need it:** Return a signature produced by a device or another supported ECDSA signer.
+
+[`POST /v1/accounts/{accountId}/signing-requests/{operationId}/signatures`](http-reference.md#post-v1-accounts-accountid-signing-requests-operationid-signatures) — request body, permissions, effects and response details.
+
+### Cancel signature collection
+
+Stop further toolkit signing and submission before dispatch while retaining nonce and budget evidence.
+
+**Who uses it:** Application backend developer.
+
+**When you need it:** Stop an operation that is still collecting signatures.
+
+[`POST /v1/accounts/{accountId}/signing-requests/{operationId}/cancel`](http-reference.md#post-v1-accounts-accountid-signing-requests-operationid-cancel) — request body, permissions, effects and response details.
+
 ## Transactions
 
 Send approved transactions and track their outcomes after wallet access, transaction rules and fee funding are ready.

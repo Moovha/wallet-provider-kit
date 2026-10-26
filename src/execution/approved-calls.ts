@@ -1,3 +1,9 @@
+import {
+  normalizeSafeOwnerPolicy,
+  prepareSafeOwnerChange,
+  type SafeOwnerPolicy,
+  type SafeOwnerChange,
+} from '../sponsorship/owner-policy.js';
 import { providerNetwork, type ProviderNetwork } from '../networks.js';
 import {
   compileOperationAdapter,
@@ -42,6 +48,7 @@ export function proxyImplementationSlot(pin: PinnedContract): string {
   throw new WalletProviderError('wallet_authorization_denied');
 }
 export interface SafeAccountBinding extends PinnedContract {
+  ownerPolicy?: SafeOwnerPolicy;
   accountId: string;
   singleton: PinnedContract;
 }
@@ -85,6 +92,12 @@ export interface ApprovedContractCall {
   data: string;
 }
 export type ApprovedCallInput =
+  | {
+      account_id: string;
+      kind: 'owner-change';
+      expected_policy_revision: string;
+      change: SafeOwnerChange;
+    }
   | {
       account_id: string;
       kind: 'contract-call';
@@ -192,6 +205,7 @@ export function validateApprovedCallPolicy(
     accounts = new Set<string>();
   for (const account of policy.accounts) {
     pin(account);
+    if (account.ownerPolicy) normalizeSafeOwnerPolicy(account.ownerPolicy);
     pin(account.singleton);
     if (account.implementation || account.singleton.implementation) denied();
     if (
@@ -276,6 +290,24 @@ export function buildApprovedCallIntent(
   uint(nonce);
   const account = policy.accounts.find((a) => a.accountId === input.account_id);
   if (!account) denied();
+  if (input.kind === 'owner-change') {
+    exact(input, ['account_id', 'kind', 'expected_policy_revision', 'change']);
+    const current = normalizeSafeOwnerPolicy(account.ownerPolicy ?? denied());
+    if (input.expected_policy_revision !== current.revision) denied();
+    const { data, requested } = prepareSafeOwnerChange(current, input.change);
+    if (requested.owners.includes(account.address.toLowerCase())) denied();
+    return structuredClone({
+      version: '1',
+      mechanism: 'safe-1.4.1',
+      input,
+      account,
+      multiSend: policy.multiSend,
+      calls: [{ to: account.address, value: '0', data }],
+      contracts: [],
+      effects: [],
+      nonce,
+    });
+  }
   const calls: ApprovedContractCall[] = [],
     contracts: PinnedContract[] = [],
     effects: ApprovedCallIntent['effects'] = [];

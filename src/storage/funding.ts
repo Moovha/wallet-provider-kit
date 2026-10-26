@@ -29,10 +29,19 @@ export function assertFundingCapacity(
       );
       return {
         costWei: record.maximumCostWei,
-        observation: execution
-          ? (JSON.parse(String(execution.record)) as UserOperationExecution)
-              .observation
-          : undefined,
+        observation: record.signatureCollection?.expiry
+          ? {
+              state: 'expired' as const,
+              expiry: record.signatureCollection.expiry,
+              observedAt: new Date().toISOString(),
+              scanNextBlock: (
+                BigInt(record.signatureCollection.expiry.finalizedBlock) + 1n
+              ).toString(),
+            }
+          : execution
+            ? (JSON.parse(String(execution.record)) as UserOperationExecution)
+                .observation
+            : undefined,
       };
     });
   return pendingFunding(records, funding, additionalCost);
