@@ -1,4 +1,9 @@
 import {
+  SafeOwnerAdministration,
+  type SafeOwnerAdministrationState,
+} from './owner-administration.js';
+import type { SafeOwnerChange } from './owner-policy.js';
+import {
   infrastructureFundingPlan,
   percentageFundingPlan,
   type FundingAllocation,
@@ -111,6 +116,7 @@ export interface SafeWalletConfiguration {
   fundingAllocation?: FundingAllocation;
 }
 export interface SafeWalletAccount {
+  ownerAdministration?: SafeOwnerAdministrationState;
   applicationId: string;
   accountId: string;
   owner: string;
@@ -195,6 +201,7 @@ const pending = () =>
 export class SafeWalletRuntime {
   private readonly locks = new Map<string, Promise<unknown>>();
   private readonly drivers = new Map<string, UserOperationWalletCallsDriver>();
+  private readonly driverOwnerPolicies = new Map<string, string>();
   private readonly fundingObservations = new Map<string, FundingObservation>();
   private walletTimer?: ReturnType<typeof setTimeout>;
   private walletWakeAt = Infinity;
@@ -1905,6 +1912,26 @@ export class SafeWalletRuntime {
       !wallet.initialization
     )
       deny();
+    if (
+      wallet.ownerAdministration?.pending ||
+      wallet.ownerAdministration?.status === 'suspended' ||
+      (wallet.binding.ownerPolicy &&
+        (wallet.binding.ownerPolicy.owners.length !== 1 ||
+          wallet.binding.ownerPolicy.threshold !== 1))
+    )
+      deny();
+    await new Safe4337Verifier(
+      await this.acceptance(applicationId),
+      this.request,
+    ).verify(
+      {
+        account: wallet.binding,
+        multiSend: this.config.approvedCalls!.policy.multiSend,
+        calls: [],
+        contracts: [],
+      },
+      wallet.signer.address,
+    );
     if (wallet.recovery) return structuredClone(wallet.recovery);
     const original = (await this.current(applicationId)).transactions.find(
       (t) => t.purpose === 'safe-deployment-' + accountId,
@@ -2240,6 +2267,40 @@ export class SafeWalletRuntime {
       preVerificationGas: '0x493e0',
     };
   }
+  private ownersService() {
+    return new SafeOwnerAdministration(
+      this.actions,
+      this.database,
+      this.config.approvedCalls!.policy.multiSend,
+      (applicationId) => this.acceptance(applicationId),
+      (applicationId, accountId) => this.driver(applicationId, accountId),
+      this.request,
+    );
+  }
+  async ownerPolicy(principal: VerifiedPrincipal, accountId: string) {
+    return this.ownersService().read(principal, accountId);
+  }
+  async changeOwners(
+    context: AuthorityContext,
+    accountId: string,
+    input: { expected_policy_revision: string; change: SafeOwnerChange },
+  ) {
+    return this.exclusive('owners:' + accountId, () =>
+      this.ownersService().change(context, accountId, input),
+    );
+  }
+  async signingDriver(principal: VerifiedPrincipal, accountId: string) {
+    await this.onboarding.withAccountAccess(
+      principal,
+      accountId,
+      'account:read',
+      () => true,
+    );
+    return this.driver(
+      runtimeApplicationId(principal.issuer, principal.clientId),
+      accountId,
+    );
+  }
   async driver(applicationId: string, accountId: string) {
     await this.transaction((r, state) => {
       const wallet = r.safeWalletAccounts?.[accountId];
@@ -2256,6 +2317,21 @@ export class SafeWalletRuntime {
         deny();
     });
     const driverKey = applicationId + ':' + accountId;
+    const currentOwnerPolicy = fingerprint(
+      await this.transaction(
+        (r) => r.safeWalletAccounts?.[accountId]?.binding.ownerPolicy ?? null,
+      ),
+    );
+    const ownerDriver = this.drivers.get(driverKey);
+    if (
+      ownerDriver &&
+      this.driverOwnerPolicies.get(driverKey) !== currentOwnerPolicy
+    ) {
+      this.drivers.delete(driverKey);
+      this.driverOwnerPolicies.delete(driverKey);
+      await ownerDriver.stop();
+      await this.walletRuns.get(ownerDriver);
+    }
     const existing = this.drivers.get(driverKey);
     if (existing) return existing;
     await this.publishBundler(applicationId);
@@ -2414,7 +2490,12 @@ export class SafeWalletRuntime {
         );
         const signature = solidityPacked(
           ['uint48', 'uint48', 'bytes'],
-          [0, Math.floor(Date.now() / 1000) + 120, dummy],
+          [
+            0,
+            Math.floor(Date.now() / 1000) + 120,
+            '0x' +
+              dummy.slice(2).repeat(accounts[0].ownerPolicy?.threshold ?? 1),
+          ],
         );
         const paymasterData = solidityPacked(
           ['uint8', 'uint48', 'uint48', 'bytes'],
@@ -2456,6 +2537,16 @@ export class SafeWalletRuntime {
           ceilings.callGasLimit = toQuantity(
             BigInt(accepted.gas_limits.gas_limit),
           );
+        const threshold = accounts[0].ownerPolicy?.threshold ?? 1;
+        // Unsigned simulation may stop at the first invalid owner; reserve validation work for every remaining ECDSA signer.
+        if (
+          threshold > 1 &&
+          /^0x[0-9a-f]{1,30}$/.test(estimate.verificationGasLimit)
+        )
+          estimate.verificationGasLimit = toQuantity(
+            BigInt(estimate.verificationGasLimit) +
+              BigInt(threshold - 1) * 15000n,
+          );
         return applyEstimatedUserOperationGas(
           operation,
           estimate,
@@ -2469,6 +2560,7 @@ export class SafeWalletRuntime {
       for (const listener of this.listeners) listener(batchId);
     });
     this.drivers.set(driverKey, driver);
+    this.driverOwnerPolicies.set(driverKey, currentOwnerPolicy);
     if (!this.stopped) driver.start();
     return driver;
   }

@@ -13,3 +13,11 @@ The provider records a single immutable operation identity before financial admi
 OWS returns only the signature through its protected signing port. The public wallet API returns durable batch state. Native Safe signatures are used solely by fixed infrastructure bootstrap calls that install the ERC-4337 module and handler before activation. No public arbitrary-signature route exists.
 
 See [storage](storage.md) and [execution](user-operation-execution.md).
+
+## Additional owners
+
+The [owner and signature APIs](wallet-owners.md) publish only exact admitted
+SafeOps after final sponsorship preparation. The application delivers them to
+external signers and returns strict EIP-712 signatures. Durable collection verifies
+current owners and distinct signatures before assembling the required quorum.
+These routes do not sign arbitrary messages or export retained signatures.

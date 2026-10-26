@@ -1,3 +1,12 @@
+import type { SafeOwnerChange } from '../sponsorship/owner-policy.js';
+import type { Safe4337SigningService } from '../sponsorship/signing.js';
+import type { SafeOwnerAdministration } from '../sponsorship/owner-administration.js';
+export type SafeSigningRequest = Awaited<
+  ReturnType<Safe4337SigningService['signatureRequest']>
+>;
+export type SafeOwnerPolicyReceipt = Awaited<
+  ReturnType<SafeOwnerAdministration['read']>
+>;
 import { createWalletCallsProvider } from '../wallet-calls/client.js';
 import { providerNetwork, type ProviderNetwork } from '../networks.js';
 import {
@@ -131,6 +140,90 @@ export function createWalletsClient(options: {
     }
   }
   return {
+    ownerPolicy(accountId: string, grantId?: string) {
+      return request<SafeOwnerPolicyReceipt>(
+        accountPath(accountId) + '/owners',
+        'GET',
+        undefined,
+        undefined,
+        grantId,
+      );
+    },
+    changeOwners(
+      accountId: string,
+      input: { expected_policy_revision: string; change: SafeOwnerChange },
+      idempotencyKey: string,
+      grantId?: string,
+    ) {
+      return request<{
+        account_id: string;
+        batch_id: string;
+        requested: import('../sponsorship/owner-policy.js').SafeOwnerPolicy;
+        status: 'pending';
+      }>(
+        accountPath(accountId) + '/owner-changes',
+        'POST',
+        input,
+        idempotencyKey,
+        grantId,
+      );
+    },
+    signingRequests(accountId: string, grantId?: string) {
+      return request<{ requests: SafeSigningRequest[] }>(
+        accountPath(accountId) + '/signing-requests',
+        'GET',
+        undefined,
+        undefined,
+        grantId,
+      );
+    },
+    signingRequest(accountId: string, operationId: string, grantId?: string) {
+      if (!uuid.test(operationId))
+        throw new Error('A valid operation ID is required');
+      return request<SafeSigningRequest>(
+        accountPath(accountId) + '/signing-requests/' + operationId,
+        'GET',
+        undefined,
+        undefined,
+        grantId,
+      );
+    },
+    submitOwnerSignature(
+      accountId: string,
+      operationId: string,
+      input: { payload_revision: string; owner: string; signature: string },
+      idempotencyKey: string,
+      grantId?: string,
+    ) {
+      if (!uuid.test(operationId))
+        throw new Error('A valid operation ID is required');
+      return request<SafeSigningRequest>(
+        accountPath(accountId) +
+          '/signing-requests/' +
+          operationId +
+          '/signatures',
+        'POST',
+        input,
+        idempotencyKey,
+        grantId,
+      );
+    },
+    cancelSigningRequest(
+      accountId: string,
+      operationId: string,
+      idempotencyKey: string,
+      grantId?: string,
+    ) {
+      if (!uuid.test(operationId))
+        throw new Error('A valid operation ID is required');
+      return request<SafeSigningRequest>(
+        accountPath(accountId) + '/signing-requests/' + operationId + '/cancel',
+        'POST',
+        {},
+        idempotencyKey,
+        grantId,
+      );
+    },
     networks() {
       return request<{
         default_network: ProviderNetwork;

@@ -17,6 +17,16 @@ export interface SponsorshipAdmission {
   validAfter: string;
   validUntil: string;
   signingActionId: string;
+  signatureCollection?: {
+    batchId?: string;
+    calls: import('../execution/approved-calls.js').ApprovedContractCall[];
+    scanFromBlock: string;
+    expiry?: import('./execution-types.js').UserOperationObservation['expiry'];
+    action: import('../domain/signing.js').TypedDataAction;
+    policy: import('./owner-policy.js').SafeOwnerPolicy;
+    state: 'collecting' | 'cancelled';
+    signatures: Record<string, string>;
+  };
   phases: Partial<
     Record<
       'stub' | 'final',

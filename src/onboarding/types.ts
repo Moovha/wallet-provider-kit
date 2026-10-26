@@ -12,6 +12,7 @@ export const permissions = [
   'operations:request',
   'contracts:request',
   'members:manage',
+  'owners:manage',
 ] as const;
 /** Contract delegation must be explicitly enabled; it is never a default permission. */
 export const defaultPermissions: readonly Permission[] = [

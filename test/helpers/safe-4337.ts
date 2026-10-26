@@ -51,7 +51,10 @@ const entryInterface = new Interface([
 ]);
 const pin = () => ({ address: Wallet.createRandom().address, codeHash });
 export async function fixture(
-  configure?: (config: Safe4337SigningConfiguration) => void,
+  configure?: (
+    config: Safe4337SigningConfiguration,
+    wallet: ReturnType<typeof Wallet.createRandom>,
+  ) => void,
   nativeRecipient?: string,
   assetBudget?: { maximumAmount: string; lifetimeAmount?: string },
   selectTokenAdapter = true,
@@ -65,6 +68,7 @@ export async function fixture(
     request: typeof fetch;
     maximumGasBudgetWei: string;
   },
+  ownerAdministration = false,
 ) {
   const directory = await mkdtemp(join(tmpdir(), 'wpk-as2-'));
   dirs.push(directory);
@@ -152,12 +156,15 @@ export async function fixture(
         clientId: principal.clientId,
         name: 'Offline application',
         assertionTrust: { agreement: 'offline' },
-        permissions: ['account:read', 'contracts:request'] as (
-          'account:read' | 'contracts:request'
-        )[],
+        permissions: [
+          'account:read',
+          'contracts:request',
+        ] as import('../../src/onboarding/types.js').Permission[],
       },
     ],
   };
+  if (ownerAdministration)
+    policy.applications[0].permissions!.push('owners:manage');
   if (multipleWallets)
     policy.applications[0].permissions!.push('members:manage');
   if (sharing) {
@@ -261,7 +268,11 @@ export async function fixture(
       authorization_details: [
         {
           type: 'https://moovha.com/wallet/account-access',
-          actions: ['account:read', 'contracts:request'],
+          actions: [
+            'account:read',
+            'contracts:request',
+            ...(ownerAdministration ? ['owners:manage' as const] : []),
+          ],
         },
       ],
       user: {
@@ -361,7 +372,7 @@ export async function fixture(
       l1FeeReserveWei: '10',
     },
   };
-  configure?.(config);
+  configure?.(config, wallet);
   const input = {
     application_action: { name: 'work', payload: {} },
     account_id: accountId,

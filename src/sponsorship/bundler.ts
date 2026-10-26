@@ -16,7 +16,10 @@ export function checkedSignedUserOperation(
   input: SignedUserOperationV07,
 ): SignedUserOperationV07 {
   const { signature, ...unsigned } = input;
-  if (typeof signature !== 'string' || !/^0x[0-9a-f]{154}$/.test(signature))
+  if (
+    typeof signature !== 'string' ||
+    !/^0x[0-9a-f]{24}(?:[0-9a-f]{130}){1,32}$/.test(signature)
+  )
     throw new WalletProviderError('wallet_provider_input');
   return { ...normalizeUserOperationV07(unsigned), signature };
 }

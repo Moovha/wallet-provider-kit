@@ -1542,6 +1542,21 @@ async function refresh() {
           'Owners must give separate permission for this. Invited people still verify their identity and approve access to the specific wallet. Existing personal wallets remain the default.',
           form,
         );
+        const ownersLabel = node('label', undefined, form);
+        const manageOwners = node('input', undefined, ownersLabel);
+        manageOwners.type = 'checkbox';
+        manageOwners.checked =
+          record.policy?.permissions?.includes('owners:manage') ?? false;
+        ownersLabel.append(
+          document.createTextNode(
+            'Let wallet owners change on-chain signers and approval thresholds',
+          ),
+        );
+        node(
+          'small',
+          'Requires separate owner consent and the current on-chain signature threshold. This permission changes control of wallet assets.',
+          form,
+        );
         node('button', 'Save access settings', form).className = 'primary';
         node(
           'p',
@@ -1557,6 +1572,7 @@ async function refresh() {
                 ? ['account:read', 'contracts:request']
                 : ['account:read']),
               ...(manageMembers.checked ? ['members:manage'] : []),
+              ...(manageOwners.checked ? ['owners:manage'] : []),
             ],
           });
           await refresh();

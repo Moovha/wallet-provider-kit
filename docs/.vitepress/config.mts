@@ -118,6 +118,10 @@ export default defineConfig({
             text: 'Personal and shared wallets',
             link: '/docs/multiple-wallets',
           },
+          {
+            text: 'On-chain owners and signatures',
+            link: '/docs/wallet-owners',
+          },
           { text: 'Send a small transfer', link: '/docs/send-transfer' },
           {
             text: 'User checks and permission',

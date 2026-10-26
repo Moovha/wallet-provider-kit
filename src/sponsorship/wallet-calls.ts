@@ -134,6 +134,81 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
   async capabilities(principal: VerifiedPrincipal, accountId: string) {
     await this.execution.signing.assertAccepted(principal, accountId);
   }
+  async signingRequests(principal: VerifiedPrincipal, accountId: string) {
+    await this.actions.onboarding.withAccountAccess(
+      principal,
+      accountId,
+      'account:read',
+      () => true,
+    );
+    const ids = await this.actions.onboarding.store.transaction((state) =>
+      Object.values(state.userOperationBatches ?? {})
+        .filter(
+          (b) =>
+            b.input.account_id === accountId &&
+            b.context.principal.issuer === principal.issuer &&
+            b.context.principal.subject === principal.subject &&
+            b.context.principal.clientId === principal.clientId &&
+            b.operationId &&
+            state.sponsorships?.[b.operationId]?.signatureCollection,
+        )
+        .sort((a, b) => b.sequence - a.sequence)
+        .slice(0, 100)
+        .map((b) => b.operationId!),
+    );
+    return {
+      requests: await Promise.all(
+        ids.map((id) => this.execution.signing.signatureRequest(principal, id)),
+      ),
+    };
+  }
+  async signingRequest(
+    principal: VerifiedPrincipal,
+    accountId: string,
+    id: string,
+  ) {
+    const result = await this.execution.signing.signatureRequest(principal, id);
+    if (result.account_id !== accountId) deny();
+    return result;
+  }
+  async submitSignature(
+    context: AuthorityContext,
+    accountId: string,
+    id: string,
+    input: { payload_revision: string; owner: string; signature: string },
+  ) {
+    await this.signingRequest(context.principal, accountId, id);
+    const result = await this.execution.signing.submitOwnerSignature(
+      context,
+      id,
+      input,
+    );
+    if (!['cancelled', 'expired'].includes(result.state)) {
+      await this.actions.onboarding.store.transaction((state) => {
+        for (const batch of Object.values(state.userOperationBatches ?? {}))
+          if (batch.operationId === id && batch.stage === 'awaiting-signatures')
+            batch.stage = 'processing';
+      });
+      this.schedule(0);
+    }
+    return result;
+  }
+  async cancelSigning(
+    context: AuthorityContext,
+    accountId: string,
+    id: string,
+  ) {
+    await this.signingRequest(context.principal, accountId, id);
+    const result = await this.execution.signing.cancelSignatureRequest(
+      context,
+      id,
+    );
+    await this.actions.onboarding.store.transaction((state) => {
+      for (const batch of Object.values(state.userOperationBatches ?? {}))
+        if (batch.operationId === id) batch.stage = 'awaiting-signatures';
+    });
+    return result;
+  }
   acceptPaymaster(value: unknown) {
     if (value === undefined) return;
     if (!value || typeof value !== 'object' || Array.isArray(value))
@@ -392,11 +467,13 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
         account_id: entry.input.account_id,
         sender: entry.metadata.sender,
         queue_stage:
-          entry.stage === 'processing'
-            ? 'executing'
-            : entry.stage === 'included' || entry.stage === 'complete'
-              ? 'succeeded'
-              : entry.stage,
+          entry.stage === 'awaiting-signatures'
+            ? 'blocked'
+            : entry.stage === 'processing'
+              ? 'executing'
+              : entry.stage === 'included' || entry.stage === 'complete'
+                ? 'succeeded'
+                : entry.stage,
         policy_revision: entry.metadata.policyRevision,
         expires_at: entry.expiresAt,
         application_id: runtimeApplicationId(
@@ -507,6 +584,15 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
     } else if (Date.parse(entry.expiresAt) <= Date.now()) {
       const sponsorship =
         entry.operationId && this.database.sponsorship.load(entry.operationId);
+      if (
+        entry.operationId &&
+        sponsorship &&
+        sponsorship.signatureCollection &&
+        (await this.execution.reconcileSigningExpiry(entry.operationId))
+      ) {
+        await this.update(entry, 'expired');
+        return;
+      }
       const exposed =
         entry.operationId &&
         (this.database.hasActionAttempts(entry.operationId) ||
@@ -632,6 +718,10 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
     const available = heads.filter(
       (head) =>
         !this.lanes.has(head.entry.metadata.sender.toLowerCase()) &&
+        !(
+          head.entry.stage === 'awaiting-signatures' &&
+          Date.parse(head.entry.expiresAt) > Date.now()
+        ) &&
         (this.stopped || (this.retryAt.get(head.entry.id) ?? 0) <= Date.now()),
     );
     const limit = Math.max(
@@ -655,6 +745,13 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
             await this.prepareWork(() => this.process(entry, predecessor));
           else await this.process(entry, predecessor);
         } catch (error) {
+          if (
+            error instanceof WalletProviderError &&
+            error.code === 'wallet_signatures_pending'
+          ) {
+            await this.update(entry, 'awaiting-signatures');
+            return;
+          }
           const code =
             error instanceof NetworkFeeLimitError
               ? error.reason

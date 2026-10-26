@@ -1,3 +1,8 @@
+import { solidityPacked } from 'ethers';
+import {
+  initialSafeOwnerPolicy,
+  normalizeSafeOwnerPolicy,
+} from './owner-policy.js';
 import { safeUserOperationCallData } from './preparation.js';
 import { fingerprint, deny, uuid } from '../onboarding/policy.js';
 import type { AuthorityContext } from '../domain/principal.js';
@@ -39,6 +44,7 @@ import {
   safeOpPayloadV07,
   safeOpActionV07,
   safeOpSignatureV07,
+  safeOpSignaturesV07,
 } from './safe-op.js';
 import type { SponsorshipAdmission } from './admission.js';
 import {
@@ -115,6 +121,8 @@ export class Safe4337SigningService {
     )
       throw new WalletProviderError('wallet_provider_configuration');
     const financialConfiguration = structuredClone(this.config);
+    for (const account of financialConfiguration.basePolicy.accounts)
+      delete account.ownerPolicy;
     delete financialConfiguration.acceptance.aggregateReads;
     delete financialConfiguration.acceptance.observationRpcUrls;
     this.configurationHash = fingerprint([
@@ -355,6 +363,7 @@ export class Safe4337SigningService {
     record: SponsorshipAdmission,
     verifyChain = true,
   ) {
+    if (record.signatureCollection?.state === 'cancelled') deny();
     if (
       !context.principal.scopes.includes('wallet:actions') ||
       !uuid.test(context.idempotencyKey) ||
@@ -458,7 +467,7 @@ export class Safe4337SigningService {
       providerOrigin: this.actions.onboarding.policy.provider.origin,
       principal: { issuer: principal.issuer, clientId: principal.clientId },
       runtimePolicy: source.runtimePolicy,
-      basePolicy: config.basePolicy,
+      basePolicy: { ...config.basePolicy, accounts: [source.intent.account] },
       input: source.intent.input,
       operation,
       domain: config.acceptance.domain,
@@ -734,11 +743,211 @@ export class Safe4337SigningService {
       expiresAt: action.expires_at,
     };
   }
+  private collectionView(record: SponsorshipAdmission) {
+    const collection = record.signatureCollection ?? deny();
+    const received = Object.keys(collection.signatures).sort();
+    const expired = Number(record.validUntil) * 1000 <= Date.now();
+    return {
+      operation_id: record.id,
+      batch_id: collection.batchId ?? null,
+      account_id: record.preparation.input.account_id,
+      payload_revision: collection.action.payload_hash,
+      chain_id: collection.action.chain_id,
+      safe_address: record.preparation.operation.sender,
+      nonce: record.preparation.operation.nonce,
+      expires_at: collection.action.expires_at,
+      owner_policy: collection.policy,
+      signing_payload: collection.action.payload,
+      signing_hash: collection.action.payload_hash,
+      calls: collection.calls,
+      requested_action: record.preparation.input,
+      collected_owners: received,
+      signatures_required: collection.policy.threshold,
+      additional_signatures_required: Math.max(
+        0,
+        collection.policy.threshold -
+          received.length -
+          (received.includes(collection.policy.providerSigner) ? 0 : 1),
+      ),
+      state:
+        collection.state === 'cancelled'
+          ? 'cancelled'
+          : expired
+            ? 'expired'
+            : received.length >= collection.policy.threshold
+              ? 'quorum-ready'
+              : 'collecting',
+    };
+  }
+  /** Publish only the immutable admitted SafeOp after final sponsorship fields are fixed. */
+  async prepareSignatureRequest(
+    context: AuthorityContext,
+    id: string,
+    anchor?: string,
+  ) {
+    const record = this.load(id);
+    await this.current(context, record);
+    const approval = this.approval(record);
+    const account = this.terms(record).preparation.intent.account;
+    const scanFromBlock =
+      record.signatureCollection?.scanFromBlock ??
+      anchor ??
+      (await this.verifier.observeOwners(account.address)).blockNumber;
+    const policy = normalizeSafeOwnerPolicy(
+      account.ownerPolicy ??
+        initialSafeOwnerPolicy(record.source.account.address),
+    );
+    await this.actions.withAuthorizedCalls(context.principal, id, (state) => {
+      const latest = state.sponsorships?.[id] ?? deny();
+      if (latest.signatureCollection) {
+        if (
+          fingerprint(latest.signatureCollection.action) !==
+            fingerprint(approval.action) ||
+          fingerprint(latest.signatureCollection.policy) !== fingerprint(policy)
+        )
+          deny();
+      } else
+        latest.signatureCollection = {
+          batchId: Object.values(state.userOperationBatches ?? {}).find(
+            (batch) => batch.operationId === id,
+          )?.metadata.id,
+          scanFromBlock,
+          calls: this.terms(record).preparation.intent.calls,
+          action:
+            approval.action as import('../domain/signing.js').TypedDataAction,
+          policy,
+          signatures: {},
+          state: 'collecting',
+        };
+    });
+    return this.collectionView(this.load(id));
+  }
+  /** Observation-only operation identity; placeholder signatures can never be dispatched through this port. */
+  signingExposure(id: string) {
+    const record = this.load(id),
+      collection = record.signatureCollection ?? deny();
+    if (record.configurationHash !== this.configurationHash) deny();
+    return {
+      operation: {
+        ...this.finalOperation(record),
+        signature: solidityPacked(
+          ['uint48', 'uint48', 'bytes'],
+          [
+            record.validAfter,
+            record.validUntil,
+            '0x' + '00'.repeat(collection.policy.threshold * 65),
+          ],
+        ),
+      },
+      record,
+    };
+  }
+  async signatureRequest(
+    principal: import('../domain/principal.js').VerifiedPrincipal,
+    id: string,
+  ) {
+    await this.withExecutionRead(principal, id, () => true);
+    return this.collectionView(this.load(id));
+  }
+  async submitOwnerSignature(
+    context: AuthorityContext,
+    id: string,
+    input: { payload_revision: string; owner: string; signature: string },
+  ) {
+    context = structuredClone(context);
+    input = structuredClone(input);
+    const record = this.load(id);
+    const collection = record.signatureCollection ?? deny();
+    const owner = input.owner.toLowerCase();
+    if (
+      input.payload_revision === collection.action.payload_hash &&
+      collection.signatures[owner] === input.signature.toLowerCase()
+    ) {
+      await this.withExecutionRead(context.principal, id, () => true);
+      return this.collectionView(record);
+    }
+    await this.current(context, record);
+    if (
+      input.payload_revision !== collection.action.payload_hash ||
+      collection.state !== 'collecting' ||
+      !collection.policy.owners.includes(owner) ||
+      owner === collection.policy.providerSigner
+    )
+      deny();
+    try {
+      safeOpSignatureV07(collection.action, owner, input.signature);
+    } catch {
+      throw new WalletProviderError('wallet_provider_input');
+    }
+    await this.actions.withAuthorizedCalls(context.principal, id, (state) => {
+      const current = state.sponsorships?.[id]?.signatureCollection ?? deny();
+      if (
+        current.state !== 'collecting' ||
+        fingerprint(current.action) !== fingerprint(collection.action) ||
+        fingerprint(current.policy) !== fingerprint(collection.policy)
+      )
+        deny();
+      const previous = current.signatures[owner];
+      if (previous && previous !== input.signature.toLowerCase())
+        throw new WalletProviderError('wallet_attempt_conflict');
+      current.signatures[owner] = input.signature.toLowerCase();
+    });
+    return this.collectionView(this.load(id));
+  }
+  async cancelSignatureRequest(context: AuthorityContext, id: string) {
+    const record = this.load(id);
+    if (record.signatureCollection?.state === 'cancelled') {
+      await this.withExecutionRead(context.principal, id, () => true);
+      return this.collectionView(record);
+    }
+    await this.current(context, record);
+    await this.actions.withAuthorizedCalls(context.principal, id, (state) => {
+      if (state.userOperationExecutions?.[id]?.dispatch)
+        throw new WalletProviderError('wallet_attempt_conflict');
+      const collection =
+        state.sponsorships?.[id]?.signatureCollection ?? deny();
+      collection.state = 'cancelled';
+    });
+    return this.collectionView(this.load(id));
+  }
   async sign(context: AuthorityContext, id: string) {
     context = structuredClone(context);
     const record = this.load(id);
     await this.current(context, record);
     const approval = this.approval(record);
+    const policy = normalizeSafeOwnerPolicy(
+      record.preparation.basePolicy.accounts.find(
+        (a) => a.accountId === record.preparation.input.account_id,
+      )?.ownerPolicy ?? initialSafeOwnerPolicy(record.source.account.address),
+    );
+    const collection = record.signatureCollection;
+    if (collection?.state === 'cancelled') deny();
+    const external = Object.entries(collection?.signatures ?? {})
+      .filter(([owner]) => owner !== policy.providerSigner)
+      .map(([owner, signature]) => ({ owner, signature }));
+    if (
+      policy.threshold > 1 &&
+      (!collection || external.length < policy.threshold - 1)
+    )
+      throw new WalletProviderError('wallet_signatures_pending');
+    if (
+      collection &&
+      (fingerprint(collection.policy) !== fingerprint(policy) ||
+        collection.action.payload_hash !== approval.action.payload_hash)
+    )
+      deny();
+    if (external.length >= policy.threshold) {
+      return {
+        ...this.finalOperation(record),
+        signature: safeOpSignaturesV07(
+          approval.action as import('../domain/signing.js').TypedDataAction,
+          policy,
+          external
+            .sort((a, b) => a.owner.localeCompare(b.owner))
+            .slice(0, policy.threshold),
+        ),
+      };
+    }
     await this.database.approveAction(approval);
     const authority = await this.financial.authority.sign(
       context,
@@ -751,13 +960,20 @@ export class Safe4337SigningService {
       authority.attemptId,
     );
     await this.current(context, this.load(id), false);
+    const members = [
+      ...external
+        .sort((a, b) => a.owner.localeCompare(b.owner))
+        .slice(0, policy.threshold - 1),
+      { owner: authority.account.address, signature },
+    ];
+    await this.actions.withAuthorizedCalls(context.principal, id, (state) => {
+      const current = state.sponsorships?.[id]?.signatureCollection;
+      if (current?.state === 'cancelled') deny();
+      if (current) current.signatures[policy.providerSigner] = signature;
+    });
     return {
       ...this.finalOperation(record),
-      signature: safeOpSignatureV07(
-        authority.action,
-        authority.account.address,
-        signature,
-      ),
+      signature: safeOpSignaturesV07(authority.action, policy, members),
     };
   }
 }

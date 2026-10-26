@@ -190,3 +190,10 @@ owner checks still apply to a shared wallet, alongside each member’s checks.
 Membership is enforced by the provider. This feature keeps the existing Safe
 owner signer and threshold. It does not add on-chain owners, device co-signers,
 threshold signatures, key export, ownership transfer or recovery keys.
+
+## On-chain signers
+
+Shared-wallet members describe application access. They are separate from Safe
+owners and the on-chain approval threshold. Use [on-chain owners and additional
+signatures](wallet-owners.md) to add signer addresses, change thresholds and
+collect signatures without granting provider API access to those addresses.

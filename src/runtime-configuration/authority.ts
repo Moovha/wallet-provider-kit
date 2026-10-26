@@ -215,6 +215,8 @@ export function validateRuntimeCalls(
   input: ApprovedCallInput,
 ): void {
   validateRuntimeSnapshot(snapshot);
+  // Owner administration has a separate owner-only grant and exact Safe call compiler.
+  if (input.kind === 'owner-change') return;
   if (
     input.kind !== 'contract-call' ||
     !Array.isArray(input.calls) ||

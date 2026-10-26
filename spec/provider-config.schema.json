@@ -96,7 +96,8 @@
                     "account:read",
                     "operations:request",
                     "contracts:request",
-                    "members:manage"
+                    "members:manage",
+                    "owners:manage"
                   ]
                 }
               },
