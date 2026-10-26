@@ -18,6 +18,9 @@ const {
   parseAbi,
 } = viem;
 
+/** Matches the provider's hard sponsorship configuration ceiling. */
+export const maximumBundlerUserOperationGas = 5_000_000n;
+
 export const simulationAddresses = {
   entryPoint: '0x0000000000000000000000000000000000007707',
   wrapper: '0x0000000000000000000000000000000000007708',
@@ -254,8 +257,17 @@ export async function estimateNativeUserOperationGas({
       block.number,
     ]),
   ]);
-  const callGas = quantity(callEstimate.result);
-  if (callEstimate.error || callGas <= 0n || callGas > 1000000n)
+  if (callEstimate.error) throw Error('Call gas estimate unavailable');
+  const nativeCallGas = quantity(callEstimate.result);
+  if (nativeCallGas <= 0n) throw Error('Call gas estimate unavailable');
+  const estimatedCallGas = quantity(estimate.callGasLimit);
+  const callGas =
+    nativeCallGas > estimatedCallGas ? nativeCallGas : estimatedCallGas;
+  if (
+    callGas <= 0n ||
+    callGas > maximumBundlerUserOperationGas ||
+    callGas > quantity(operation.callGasLimit)
+  )
     throw Error('Call gas estimate unavailable');
   const after = await request('eth_getBlockByNumber', [block.number, false]);
   if (after.result?.hash !== block.hash)
@@ -263,11 +275,6 @@ export async function estimateNativeUserOperationGas({
   return {
     ...estimate,
     verificationGasLimit: '0x' + high.toString(16),
-    callGasLimit:
-      '0x' +
-      (callGas > quantity(estimate.callGasLimit)
-        ? callGas
-        : quantity(estimate.callGasLimit)
-      ).toString(16),
+    callGasLimit: '0x' + callGas.toString(16),
   };
 }

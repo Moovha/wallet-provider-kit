@@ -46,6 +46,9 @@ jobs:
           JS
       - run: npm install --global npm@11.11.1 --ignore-scripts
       - run: npm ci
+      - name: Install offline recovery test tools
+        if: steps.scope.outputs.full == 'true'
+        run: sudo apt-get update && sudo apt-get install --yes age python3
       - run: npm run verify
         if: steps.scope.outputs.full == 'true'
       - run: npm run build

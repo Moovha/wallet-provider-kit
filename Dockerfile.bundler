@@ -8,5 +8,6 @@ COPY scripts/bundler-simulations.mjs /app/wpk-bundler-simulations.mjs
 COPY scripts/bundler-funding.mjs /app/wpk-bundler-funding.mjs
 COPY scripts/bundler-funding.d.mts /app/wpk-bundler-funding.d.mts
 COPY scripts/patch-bundler-scheduling.mjs /app/wpk-patch-bundler-scheduling.mjs
-RUN node /app/wpk-patch-bundler-scheduling.mjs
+RUN chmod 0644 /app/wpk-*.mjs /app/wpk-*.mts \
+    && node /app/wpk-patch-bundler-scheduling.mjs
 ENTRYPOINT ["node", "/app/wpk-bundler-launcher.mjs"]

@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+- Add age-encrypted stopped-service backups, authenticated archive verification
+  and restoration into a new private directory with every network and container
+  disabled. Include the vault, retained secrets, SQLite records, configuration
+  and bundler state in one versioned recovery set. Legacy `.tgz.enc` archives
+  require their original recovery procedure.
+- Add opt-in scheduled S3 backups with configurable storage, Region, owner,
+  calendar and local retention. Resume only the unchanged original containers,
+  verify uploaded SHA-256 checksums and require conditional object creation.
+  Keep the recovery identity off the provider host; retain remote backups until
+  an operator changes their retention. Scheduled captures briefly interrupt
+  service, and interrupted capture or failed source resumption requires review.
+- Estimate composed calls within accepted sponsorship gas limits and the
+  provider's hard ceiling. Refresh wallet drivers after accepted fee terms
+  change, serialize replacement, retain bounded gas-estimation failure origins
+  and make bundled helper scripts readable under private build file permissions.
+
 - Add on-chain Safe owner-address management and configurable thresholds with
   separate owner-administration consent. Collect strict EIP-712 owner signatures
   for exact admitted SafeOps through authenticated signing-request APIs and the

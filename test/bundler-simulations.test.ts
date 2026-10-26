@@ -1,5 +1,12 @@
 import { expect, it } from 'vitest';
-import { applyBundlerSimulationOverrides } from '../scripts/bundler-simulations.mjs';
+import { maximumSponsorGasLimit } from '../src/execution/defaults.js';
+import {
+  maximumBundlerUserOperationGas,
+  applyBundlerSimulationOverrides,
+} from '../scripts/bundler-simulations.mjs';
+it('keeps the bundler ceiling aligned with accepted sponsorship configuration', () => {
+  expect(maximumBundlerUserOperationGas).toBe(maximumSponsorGasLimit());
+});
 const address = '0x0000000000000000000000000000000000007707';
 it('passes parameterless chain discovery through the private transport', () => {
   const body = { jsonrpc: '2.0', id: 1, method: 'eth_chainId' };
@@ -94,7 +101,8 @@ it('bounds unsigned gas against the deployed EntryPoint without signing, broadca
     block = { number: '0x64', hash: '0x' + '11'.repeat(32) };
   let calls = 0,
     reorg = false,
-    unexpected = false;
+    unexpected = false,
+    callGas = '0x30000';
   const request = async (
     method: string,
     params: unknown[],
@@ -111,7 +119,7 @@ it('bounds unsigned gas against the deployed EntryPoint without signing, broadca
     if (method === 'eth_estimateGas') {
       expect(params[1]).toBe(block.number);
       expect(params).toHaveLength(2);
-      return { result: '0x30000' };
+      return { result: callGas };
     }
     expect(method).toBe('eth_call');
     calls++;
@@ -147,6 +155,32 @@ it('bounds unsigned gas against the deployed EntryPoint without signing, broadca
   expect(result.callGasLimit).toBe('0x30000');
   expect(calls).toBeLessThanOrEqual(10);
   expect(operation).toEqual(before);
+  callGas = '0x124f80';
+  const composed = {
+    ...input,
+    operation: { ...operation, callGasLimit: '0x4c4b40' },
+  };
+  expect((await estimateNativeUserOperationGas(composed)).callGasLimit).toBe(
+    callGas,
+  );
+  await expect(estimateNativeUserOperationGas(input)).rejects.toThrow(
+    'Call gas estimate unavailable',
+  );
+  callGas = '0x0';
+  await expect(estimateNativeUserOperationGas(composed)).rejects.toThrow(
+    'Call gas estimate unavailable',
+  );
+  callGas = '0x4c4b41';
+  await expect(estimateNativeUserOperationGas(composed)).rejects.toThrow(
+    'Call gas estimate unavailable',
+  );
+  callGas = '0x30000';
+  await expect(
+    estimateNativeUserOperationGas({
+      ...composed,
+      estimate: { ...input.estimate, callGasLimit: '0x4c4b41' },
+    }),
+  ).rejects.toThrow('Call gas estimate unavailable');
   reorg = true;
   await expect(estimateNativeUserOperationGas(input)).rejects.toThrow(
     'Verification block changed',

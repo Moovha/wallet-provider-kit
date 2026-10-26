@@ -201,6 +201,7 @@ const pending = () =>
 export class SafeWalletRuntime {
   private readonly locks = new Map<string, Promise<unknown>>();
   private readonly drivers = new Map<string, UserOperationWalletCallsDriver>();
+  private readonly driverAgreements = new Map<string, string>();
   private readonly driverOwnerPolicies = new Map<string, string>();
   private readonly fundingObservations = new Map<string, FundingObservation>();
   private walletTimer?: ReturnType<typeof setTimeout>;
@@ -2302,6 +2303,11 @@ export class SafeWalletRuntime {
     );
   }
   async driver(applicationId: string, accountId: string) {
+    return this.exclusive('driver:' + applicationId + ':' + accountId, () =>
+      this.currentDriver(applicationId, accountId),
+    );
+  }
+  private async currentDriver(applicationId: string, accountId: string) {
     await this.transaction((r, state) => {
       const wallet = r.safeWalletAccounts?.[accountId];
       if (
@@ -2317,6 +2323,7 @@ export class SafeWalletRuntime {
         deny();
     });
     const driverKey = applicationId + ':' + accountId;
+    const currentAgreement = await this.agreement(applicationId);
     const currentOwnerPolicy = fingerprint(
       await this.transaction(
         (r) => r.safeWalletAccounts?.[accountId]?.binding.ownerPolicy ?? null,
@@ -2333,7 +2340,17 @@ export class SafeWalletRuntime {
       await this.walletRuns.get(ownerDriver);
     }
     const existing = this.drivers.get(driverKey);
-    if (existing) return existing;
+    if (
+      existing &&
+      this.driverAgreements.get(driverKey) === fingerprint(currentAgreement)
+    )
+      return existing;
+    if (existing) {
+      this.drivers.delete(driverKey);
+      this.driverAgreements.delete(driverKey);
+      await existing.stop();
+      await this.walletRuns.get(existing);
+    }
     await this.publishBundler(applicationId);
     const infra = await this.current(applicationId),
       agreement = await this.agreement(applicationId);
@@ -2501,6 +2518,12 @@ export class SafeWalletRuntime {
           ['uint8', 'uint48', 'uint48', 'bytes'],
           [1, Math.floor(Date.now() / 1000) + 120, 0, dummy],
         );
+        const accepted = await this.agreement(applicationId);
+        const ceilings = this.configGas();
+        if (accepted.gas_limits)
+          ceilings.callGasLimit = toQuantity(
+            BigInt(accepted.gas_limits.gas_limit),
+          );
         const id = randomUUID();
         const response = await this.transport(applicationId)(bundler.url, {
           method: 'POST',
@@ -2515,6 +2538,7 @@ export class SafeWalletRuntime {
             params: [
               {
                 ...operation,
+                callGasLimit: ceilings.callGasLimit,
                 paymaster: infra.paymaster!.address,
                 paymasterData,
                 paymasterVerificationGasLimit: '0x186a0',
@@ -2531,12 +2555,6 @@ export class SafeWalletRuntime {
           await response.json(),
           id,
         );
-        const accepted = await this.agreement(applicationId);
-        const ceilings = this.configGas();
-        if (accepted.gas_limits)
-          ceilings.callGasLimit = toQuantity(
-            BigInt(accepted.gas_limits.gas_limit),
-          );
         const threshold = accounts[0].ownerPolicy?.threshold ?? 1;
         // Unsigned simulation may stop at the first invalid owner; reserve validation work for every remaining ECDSA signer.
         if (
@@ -2560,6 +2578,7 @@ export class SafeWalletRuntime {
       for (const listener of this.listeners) listener(batchId);
     });
     this.drivers.set(driverKey, driver);
+    this.driverAgreements.set(driverKey, fingerprint(agreement));
     this.driverOwnerPolicies.set(driverKey, currentOwnerPolicy);
     if (!this.stopped) driver.start();
     return driver;

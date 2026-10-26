@@ -31,3 +31,32 @@ group membership. Configure its directory and client outputs under
 `management.cognito`; see the installation guide for first-time setup, revocation
 and host recovery. This directory is separate from end-user wallets and AWS
 console identities. Deploying the template alone does not authorize an administrator.
+
+## Encrypted backups and restoration
+
+Install Python 3.10+, age 1.1+ and Docker Compose v2 for host backups. Keep recovery
+private keys on a separate recovery computer; the provider needs only their public
+age recipients. Use private operator-owned directories and installation-local bind
+mounts. The backup stops all writers and leaves the installation stopped. For installations
+with administrator-owned files, an explicit privileged backup may use
+`--host-administrator`; do not widen custody-file permissions.
+
+```sh
+bash backup.sh /private-backups/provider.age --recipients /private-settings/recipients.txt
+bash verify-backup.sh /private-backups/provider.age --identity /private-recovery/provider.key
+bash restore.sh /private-backups/provider.age /private-recovery/provider --identity /private-recovery/provider.key
+```
+
+Run verification and restore on the recovery computer, using Python and age.
+Restore creates a new private directory with every network disabled and all
+containers fenced. No container starts, and no operation is signed or broadcast.
+See the [backup and restoration guide](https://moovha.github.io/wallet-provider-kit/docs/provider-maintenance)
+for identity preparation, off-site storage, snapshot limits, recovery drills and
+manual resumption after reconciliation. For scheduled S3 uploads, edit `backup.config.example.json`, grant the scoped
+permissions in `backup-iam-policy.example.json`, and use `scheduled-backup.py` with
+AWS CLI v2. The Linux system installer enables a configurable systemd timer and
+resumes only the unchanged original containers after each stopped-writer capture.
+See the guide for setup, local retention, private status files, S3 checksum checks,
+costs and failure recovery. S3 objects are retained until your bucket lifecycle expires
+them or you explicitly remove them. Newly created wallets remain outside the
+preceding backup's coverage.
