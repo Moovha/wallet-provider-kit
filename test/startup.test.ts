@@ -33,7 +33,10 @@ it.each([
     expect(result.status).toBe(1);
     expect(result.stdout).toBe('');
     expect(result.stderr).toBe(
-      'Wallet provider startup failed; check configuration\n',
+      (process.release.lts
+        ? ''
+        : 'oidc-provider WARNING: Unsupported runtime. Use Node.js v22.x LTS, or a later LTS release.\n') +
+        'Wallet provider startup failed; check configuration\n',
     );
   },
 );

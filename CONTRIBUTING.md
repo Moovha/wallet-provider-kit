@@ -51,7 +51,7 @@ the diff. After public API changes, run `npm run generate:docs` and review the
 generated declaration/HTTP references; `verify` checks them for drift. The packaged public exports and CLI are exercised by `npm run check:package`.
 Dependency changes require exact pins, lockfile and advisory/license review.
 
-Keep Node, its type definitions, CI and Docker on the supported Node 24 major.
+Keep Node, its type definitions, CI and Docker on the supported Node 26 major.
 Runtime migrations need a coordinated PR; Dependabot still proposes updates within
 that major and image digest updates. TypeScript stays on major 5 while
 `openapi-typescript` requires its compiler API: [TypeScript 7 removes that

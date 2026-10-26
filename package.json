@@ -6,7 +6,7 @@
   "description": "Provider-hosted wallet authorization, onboarding and signing adapters for Node.js",
   "license": "Apache-2.0",
   "engines": {
-    "node": ">=24.22.0 <25"
+    "node": ">=26.12.1 <27"
   },
   "packageManager": "npm@11.11.1",
   "exports": {
@@ -128,7 +128,7 @@
     "@foundry-rs/anvil": "1.7.1",
     "@playwright/test": "1.64.1",
     "@secretlint/secretlint-rule-preset-recommend": "13.0.7",
-    "@types/node": "24.19.2",
+    "@types/node": "26.6.5",
     "@types/oidc-provider": "9.12.1",
     "ajv-formats": "3.0.1",
     "mermaid": "12.2.0",

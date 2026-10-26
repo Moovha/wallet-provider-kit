@@ -60,7 +60,7 @@ and Docker Compose; operators do not need Node, npm, Git or a source build.
 Check [available releases](https://github.com/Moovha/wallet-provider-kit/releases)
 for published artifacts. The package remains experimental and unpublished to npm.
 
-For contributor evaluation from source, use Node **24.22.0**, npm **11.11.1** and Git:
+For contributor evaluation from source, use Node **26.12.1**, npm **11.11.1** and Git:
 
 ```sh
 git clone https://github.com/Moovha/wallet-provider-kit.git

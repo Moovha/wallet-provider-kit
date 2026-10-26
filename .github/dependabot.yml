@@ -6,7 +6,7 @@ updates:
       interval: weekly
     open-pull-requests-limit: 5
     ignore:
-      # Keep declarations aligned with the supported Node 24 runtime.
+      # Keep declarations aligned with the supported Node 26 runtime.
       - dependency-name: '@types/node'
         update-types: ['version-update:semver-major']
       # openapi-typescript requires the TypeScript 5 compiler API.

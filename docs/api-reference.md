@@ -424,12 +424,12 @@ export declare function createServer(
   options?: ServerOptions,
 ): Promise<
   Fastify.FastifyInstance<
-    import('http').Server<
-      typeof import('http').IncomingMessage,
-      typeof import('http').ServerResponse
+    import('node:http').Server<
+      typeof import('node:http').IncomingMessage,
+      typeof import('node:http').ServerResponse
     >,
-    import('http').IncomingMessage,
-    import('http').ServerResponse<import('http').IncomingMessage>,
+    import('node:http').IncomingMessage,
+    import('node:http').ServerResponse<import('node:http').IncomingMessage>,
     Fastify.FastifyBaseLogger,
     Fastify.FastifyTypeProviderDefault
   >
@@ -754,12 +754,12 @@ export declare function createOnboardingProvider(
   config: OnboardingProviderConfiguration,
 ): Promise<
   import('fastify').FastifyInstance<
-    import('http').Server<
-      typeof import('http').IncomingMessage,
-      typeof import('http').ServerResponse
+    import('node:http').Server<
+      typeof import('node:http').IncomingMessage,
+      typeof import('node:http').ServerResponse
     >,
-    import('http').IncomingMessage,
-    import('http').ServerResponse<import('http').IncomingMessage>,
+    import('node:http').IncomingMessage,
+    import('node:http').ServerResponse<import('node:http').IncomingMessage>,
     import('fastify').FastifyBaseLogger,
     import('fastify').FastifyTypeProviderDefault
   >
@@ -2550,12 +2550,12 @@ export declare function createConfiguredProvider(
   directory?: string,
 ): Promise<
   import('fastify').FastifyInstance<
-    import('http').Server<
-      typeof import('http').IncomingMessage,
-      typeof import('http').ServerResponse
+    import('node:http').Server<
+      typeof import('node:http').IncomingMessage,
+      typeof import('node:http').ServerResponse
     >,
-    import('http').IncomingMessage,
-    import('http').ServerResponse<import('http').IncomingMessage>,
+    import('node:http').IncomingMessage,
+    import('node:http').ServerResponse<import('node:http').IncomingMessage>,
     import('fastify').FastifyBaseLogger,
     import('fastify').FastifyTypeProviderDefault
   >

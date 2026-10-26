@@ -5,7 +5,7 @@ Use this path to evaluate or develop the toolkit from its repository. A publishe
 
 ## Prepare a disabled service
 
-Use Node 24.22.0, npm 11.11.1 and a local Linux Docker engine with Compose. From
+Use Node 26.12.1, npm 11.11.1 and a local Linux Docker engine with Compose. From
 the repository:
 
 ```sh
