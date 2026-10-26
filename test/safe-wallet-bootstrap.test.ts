@@ -804,6 +804,130 @@ it.each([
   },
 );
 
+it('estimates composed calls up to accepted gas terms and uses the buffered estimate for execution', async () => {
+  const t = await bootstrap('1');
+  await t.runtime
+    .ensure(t.f.operatorContext, t.applicationId)
+    .catch(() => undefined);
+  await t.f.db.onboardingStore.transaction((state) => {
+    const runtime =
+      state.deploymentBindings!['service-v1'].runtimeConfiguration!;
+    runtime.safeWalletInfrastructure![t.applicationId].paymaster =
+      t.f.config.acceptance.paymaster;
+    const terms = runtime.obligations!.records[t.applicationId + ':sponsorship']
+      .value as { gas_limits: { gas_limit: string } };
+    terms.gas_limits.gas_limit = '1000000';
+  });
+  const requests: Record<string, string>[] = [];
+  const transport = t.runtime as unknown as {
+    transport(applicationId: string): typeof fetch;
+  };
+  vi.spyOn(transport, 'transport').mockReturnValue((async (_url, init) => {
+    const body = JSON.parse(String(init?.body));
+    requests.push(body.params[0]);
+    return Response.json({
+      jsonrpc: '2.0',
+      id: body.id,
+      result: {
+        callGasLimit: '0x61a80',
+        verificationGasLimit: '0xc350',
+        preVerificationGas: '0xc350',
+      },
+    });
+  }) as typeof fetch);
+  try {
+    const driver = await t.runtime.driver(
+      t.applicationId,
+      t.f.grant.account_id!,
+    );
+    const estimator = driver as unknown as {
+      estimateOperation(
+        operation: import('../src/sponsorship/user-operation.js').UserOperationV07,
+      ): Promise<
+        import('../src/sponsorship/user-operation.js').UserOperationV07
+      >;
+    };
+    const operation = {
+      sender: t.f.operation.sender,
+      nonce: '0x0',
+      callData: '0x1234',
+      callGasLimit: '0x493e0',
+      verificationGasLimit: '0x493e0',
+      preVerificationGas: '0x493e0',
+      maxFeePerGas: '0x64',
+      maxPriorityFeePerGas: '0xa',
+    };
+    const before = structuredClone(operation);
+    const estimated = await estimator.estimateOperation(operation);
+    expect(BigInt(requests[0].callGasLimit)).toBe(1000000n);
+    expect(BigInt(estimated.callGasLimit)).toBe(480000n);
+    expect(estimated.callData).toBe(operation.callData);
+    expect(operation).toEqual(before);
+    expect(t.broadcasts).toBe(0);
+    expect(t.f.state.signs).toBe(0);
+  } finally {
+    await t.runtime.close();
+  }
+});
+
+it('refreshes cached wallet drivers after accepted fee terms change and serializes replacement', async () => {
+  const t = await bootstrap('1');
+  await t.runtime
+    .ensure(t.f.operatorContext, t.applicationId)
+    .catch(() => undefined);
+  await t.f.db.onboardingStore.transaction((state) => {
+    state.deploymentBindings![
+      'service-v1'
+    ].runtimeConfiguration!.safeWalletInfrastructure![
+      t.applicationId
+    ].paymaster = t.f.config.acceptance.paymaster;
+  });
+  try {
+    const first = await t.runtime.driver(
+      t.applicationId,
+      t.f.grant.account_id!,
+    );
+    expect(await t.runtime.driver(t.applicationId, t.f.grant.account_id!)).toBe(
+      first,
+    );
+    const stop = vi.spyOn(first, 'stop');
+    await t.f.db.onboardingStore.transaction((state) => {
+      const terms =
+        state.deploymentBindings!['service-v1'].runtimeConfiguration!
+          .obligations!.records[t.applicationId + ':sponsorship'];
+      terms.revision = '2';
+      const value = terms.value as {
+        gas_limits: { gas_limit: string };
+      };
+      value.gas_limits.gas_limit = '900000';
+    });
+    const replacements = await Promise.all(
+      Array.from({ length: 3 }, () =>
+        t.runtime.driver(t.applicationId, t.f.grant.account_id!),
+      ),
+    );
+    expect(replacements[0]).not.toBe(first);
+    expect(replacements.every((driver) => driver === replacements[0])).toBe(
+      true,
+    );
+    expect(stop).toHaveBeenCalledOnce();
+    await t.f.db.onboardingStore.transaction((state) => {
+      state.deploymentBindings![
+        'service-v1'
+      ].runtimeConfiguration!.obligations!.records[
+        t.applicationId + ':sponsorship'
+      ].decision = 'pending';
+    });
+    await expect(
+      t.runtime.driver(t.applicationId, t.f.grant.account_id!),
+    ).rejects.toMatchObject({ code: 'wallet_authorization_denied' });
+    expect(t.broadcasts).toBe(0);
+    expect(t.f.state.signs).toBe(0);
+  } finally {
+    await t.runtime.close();
+  }
+});
+
 it('publishes concurrent readiness updates atomically without temporary-file collisions or missing ready accounts', async () => {
   const t = await bootstrap('1');
   await t.runtime

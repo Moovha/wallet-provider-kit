@@ -1,0 +1,50 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "InspectBackupBucket",
+      "Effect": "Allow",
+      "Action": ["s3:GetBucketLocation", "s3:GetBucketPublicAccessBlock"],
+      "Resource": "arn:aws:s3:::your-private-backup-bucket",
+      "Condition": {
+        "Bool": {
+          "aws:SecureTransport": "true"
+        },
+        "StringEquals": {
+          "s3:ResourceAccount": "123456789012"
+        }
+      }
+    },
+    {
+      "Sid": "CreateEncryptedBackupsWithoutOverwrite",
+      "Effect": "Allow",
+      "Action": ["s3:PutObject"],
+      "Resource": "arn:aws:s3:::your-private-backup-bucket/wallet-provider/daily/*",
+      "Condition": {
+        "Bool": {
+          "aws:SecureTransport": "true"
+        },
+        "StringEquals": {
+          "s3:ResourceAccount": "123456789012"
+        },
+        "Null": {
+          "s3:if-none-match": "false"
+        }
+      }
+    },
+    {
+      "Sid": "VerifyEncryptedBackupVersions",
+      "Effect": "Allow",
+      "Action": ["s3:GetObject", "s3:GetObjectVersion"],
+      "Resource": "arn:aws:s3:::your-private-backup-bucket/wallet-provider/daily/*",
+      "Condition": {
+        "Bool": {
+          "aws:SecureTransport": "true"
+        },
+        "StringEquals": {
+          "s3:ResourceAccount": "123456789012"
+        }
+      }
+    }
+  ]
+}

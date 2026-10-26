@@ -37,7 +37,7 @@ authorization. See [SECURITY.md](../SECURITY.md) for support and vulnerability r
 
 The manual **Package provider release** workflow on main builds immutable amd64
 and arm64 service/bundler images, SBOM/provenance and an attested
-`provider-release.tgz`. The archive includes the installer, encrypted backup tool
+`provider-release.tgz`. The archive includes the installer, encrypted backup, verification and restoration tools
 and AWS template. It creates an experimental GitHub release with a
 `provider-v` version tag after the release checks pass. Existing tags cannot be
 replaced. Review the public release notes before dispatching it. The workflow

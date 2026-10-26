@@ -1,3 +1,4 @@
+export const maximumBundlerUserOperationGas: bigint;
 export function applyBundlerSimulationOverrides(
   body: { method: string; params?: unknown[]; [key: string]: unknown },
   code: Record<string, string>,

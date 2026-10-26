@@ -1,0 +1,17 @@
+{
+  "configVersion": 1,
+  "enabled": false,
+  "directory": "/home/wallet-provider/provider",
+  "outputDirectory": "/var/backups/wallet-provider",
+  "recipients": "/etc/wallet-provider-backup/recipients.txt",
+  "resumeSource": true,
+  "hostAdministrator": true,
+  "localKeep": 7,
+  "schedule": "*-*-* 02:00:00 UTC",
+  "s3": {
+    "bucket": "your-private-backup-bucket",
+    "prefix": "wallet-provider/daily",
+    "region": "eu-north-1",
+    "expectedOwner": "123456789012"
+  }
+}
