@@ -18,6 +18,14 @@ export interface NetworkServices extends Pick<
 export interface NetworkContext extends NetworkServices {
   network: ProviderNetwork;
   database: ProviderDatabase;
+  execution?: {
+    defaults: {
+      enabled: boolean;
+      backendAcceptance?: string;
+      recoveryAcceptance?: string;
+    };
+    sync(): Promise<void>;
+  };
   currentConfiguration(): Promise<boolean>;
   start(): Promise<void>;
   close(): Promise<void>;

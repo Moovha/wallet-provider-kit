@@ -414,6 +414,8 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
       try {
         await waitForObservation(
           this.execution.refresh(plan.operationId).then(() => undefined),
+          // Finish ordinary canonical rechecks before projecting the three-second freshness window.
+          3000,
         );
       } catch {
         return this.projection(entry, plan, false);

@@ -35,7 +35,7 @@ Open the printed administration address, read the private `installation-claim`
 file and use **First-time setup** within 30 minutes. Follow the
 [administrator steps](provider-installation.md#claim-administrator-access).
 
-In administration, choose **Networks**, **Applications** and **User checks**.
+In administration, choose **Networks & execution → Available networks**, **Applications** and **User checks**.
 Network choices apply after a provider restart. Keep the generated configuration,
 environment and storage together for later restarts and backups. Before real
 wallet use, complete the [launch checks](conformance.md).

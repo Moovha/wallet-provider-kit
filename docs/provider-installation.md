@@ -7,7 +7,7 @@ next: { 'text': 'Connect an application', 'link': '/docs/runtime-workspace' }
 
 Let’s get your service running and give you a place to manage it. You can finish
 installation with no connected applications. User checks, transaction rules and
-network-fee funding can wait until an application is ready to connect. In administration, choose **Networks** to offer additional supported networks from the same instance. Each starts with its own disabled wallet operations and needs separate application consent and fee funding. See [multiple networks](provider-guide.md#offer-multiple-networks).
+network-fee funding can wait until an application is ready to connect. In administration, choose **Networks & execution → Available networks** to offer additional supported networks from the same instance. Each starts with its own disabled wallet operations and needs separate application consent and fee funding. See [multiple networks](provider-guide.md#offer-multiple-networks).
 
 The toolkit is experimental and runs on one active host with persistent local
 storage. Installation leaves wallet operations disabled. Complete the
@@ -382,3 +382,35 @@ sizing remain separate requirements.
 
 Next, [connect an application](runtime-workspace.md) or arrange
 [backups and maintenance](provider-maintenance.md).
+
+## Manage execution and application setup
+
+In **Networks & execution → Execution**, choose a running network to see whether
+wallet execution is enabled or paused. Supply references to completed wallet
+setup and recovery checks before enabling it. Mainnet enabling also requires
+confirmation that approved applications can transact with real assets. Saved
+settings apply immediately; app-specific permissions and fee funding still apply.
+Pausing blocks new wallet requests and changes the transaction-authority revision.
+Re-enabling requires fresh transaction consent and never restores old queued
+approvals. Previously issued signatures or submitted transactions may still execute.
+
+Use **Available networks** to add or remove network runtimes; those network-list
+changes still need a service restart. Existing execution settings are retained.
+
+Under **Applications**, select one application rather than scrolling through every
+application’s forms. **Wallet setup** separates **Transactions**, **Connections**,
+**Fees** and **Readiness**. **People & permissions**, **Connection** and
+**Wallet sharing** have their own panels. Keyboard users can move between tabs
+with the arrow keys, Home and End. Connection secrets remain hidden after their
+initial display.
+
+For unattended operators, read and update
+`/v1/provider/networks/{network}/execution` with a provider management token.
+Updates require a saved UUIDv4 idempotency key and `expected_revision`. Enabling
+uses `enabled: true`, `backendAcceptance` and `recoveryAcceptance`; mainnet
+transitions also require `mainnet_confirmed: true`. Reads report the saved setting
+separately from current readiness. A failed runtime start leaves the setting
+retained and the network unavailable; inspect service health before retrying.
+Keep the matching service image with backups: older toolkit versions do not
+enforce retained execution controls and must not be used to resume an installation
+that relies on a saved pause.

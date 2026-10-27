@@ -325,6 +325,7 @@ it('checks B transaction consent independently and rechecks expiry before infras
     'account:read',
     'contracts:request',
   ];
+  shared.user!.consent.action_policy_revision = 'f'.repeat(64);
   await expect(f.service.request(context(f.b), shared)).rejects.toThrow();
   shared.user!.consent.action_policy_revision = (
     await f.service.applicationAccessPolicy(principal(f.b))

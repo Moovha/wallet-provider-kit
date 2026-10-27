@@ -828,6 +828,33 @@ export async function registerRuntimeConfigurationRoutes(
         request.params.revision,
       ),
   );
+  app.post<{
+    Params: { applicationId: string };
+    Body: { expected_revision: string; mode: 'restricted' | 'unrestricted' };
+  }>(
+    '/v1/provider/applications/:applicationId/transaction-mode',
+    {
+      schema: schema('setApplicationTransactionMode', publicationSchema, {
+        params: params('applicationId', applicationIdSchema),
+        headers,
+        body: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['expected_revision', 'mode'],
+          properties: {
+            expected_revision: revisionSchema,
+            mode: { type: 'string', enum: ['restricted', 'unrestricted'] },
+          },
+        },
+      }),
+    },
+    async (request) =>
+      configured(request).setTransactionMode(
+        await context(request, 'wallet:configuration:write'),
+        request.params.applicationId,
+        request.body,
+      ),
+  );
   app.post<{ Body: RuntimePolicyChange }>(
     '/v1/application/policy/proposals',
     {

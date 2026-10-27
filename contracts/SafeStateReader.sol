@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity 0.8.37;
+pragma solidity 0.8.38;
 
 interface IReadOnlySafe {
     function masterCopy() external view returns (address);

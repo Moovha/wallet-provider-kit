@@ -1493,3 +1493,130 @@ describe('application credentials', () => {
     expect((await snapshot()).policy_hash).not.toBe(first.policy_hash);
   });
 });
+
+describe('provider-selected unrestricted transactions', () => {
+  it('requires the provider operator, isolates applications, replays exact changes and closes on restriction', async () => {
+    const { service, db } = await fixture();
+    const id = runtimeApplicationId(issuer, 'first');
+    const input = { expected_revision: '0', mode: 'unrestricted' as const };
+    await expect(
+      service.setTransactionMode(context(), id, input),
+    ).rejects.toMatchObject(denied);
+    const write = context(operator);
+    const result = await service.setTransactionMode(write, id, input);
+    expect(result).toMatchObject({
+      revision: '1',
+      policy: {
+        transaction_mode: 'unrestricted',
+        contracts: [],
+        chain_id: 'eip155:84532',
+      },
+    });
+    expect(await service.setTransactionMode(write, id, input)).toEqual(result);
+    await expect(
+      service.setTransactionMode(write, id, { ...input, mode: 'restricted' }),
+    ).rejects.toMatchObject(conflicted);
+    await expect(
+      service.setTransactionMode(context(operator), id, input),
+    ).rejects.toMatchObject(conflicted);
+    expect((await service.read(application('second'))).active_revision).toBe(
+      '0',
+    );
+    await expect(
+      service.propose(context(), {
+        expected_revision: '1',
+        policy: { ...document(), transaction_mode: 'unrestricted' },
+      }),
+    ).rejects.toMatchObject(denied);
+    const snapshot = await db.onboardingStore.transaction((state) =>
+      currentRuntimePolicy(state, application()),
+    );
+    expect(snapshot.policy.transaction_mode).toBe('unrestricted');
+    await service.setTransactionMode(context(operator), id, {
+      expected_revision: '1',
+      mode: 'restricted',
+    });
+    const closed = await db.onboardingStore.transaction((state) =>
+      currentRuntimePolicy(state, application()),
+    );
+    expect(closed.policy.transaction_mode).toBeUndefined();
+    expect(closed.policy.contracts).toEqual([]);
+    expect(closed.policy.maximum_native_value_wei).toBe('0');
+  });
+});
+
+it('exposes transaction-mode changes only through provider authority with idempotency and strict input', async () => {
+  const { service } = await fixture();
+  const app = await createServer({
+    documentation: false,
+    runtimeConfiguration: service,
+    authenticate: async (token, scope) => {
+      if (!token) throw new AuthenticationError(401);
+      const principal = token === 'Bearer operator' ? operator : application();
+      if (!principal.scopes.includes(scope)) throw new AuthenticationError(403);
+      return principal;
+    },
+  });
+  servers.push(app);
+  const url =
+    '/v1/provider/applications/' +
+    runtimeApplicationId(issuer, 'first') +
+    '/transaction-mode';
+  const payload = { expected_revision: '0', mode: 'unrestricted' };
+  expect(
+    (
+      await app.inject({
+        method: 'POST',
+        url,
+        payload,
+        headers: { 'idempotency-key': randomUUID() },
+      })
+    ).statusCode,
+  ).toBe(401);
+  expect(
+    (
+      await app.inject({
+        method: 'POST',
+        url,
+        payload,
+        headers: {
+          authorization: 'Bearer app',
+          'idempotency-key': randomUUID(),
+        },
+      })
+    ).statusCode,
+  ).toBe(403);
+  expect(
+    (
+      await app.inject({
+        method: 'POST',
+        url,
+        payload,
+        headers: { authorization: 'Bearer operator' },
+      })
+    ).statusCode,
+  ).toBe(400);
+  const headers = {
+    authorization: 'Bearer operator',
+    'idempotency-key': randomUUID(),
+  };
+  const accepted = await app.inject({ method: 'POST', url, payload, headers });
+  expect(accepted.statusCode).toBe(200);
+  expect(accepted.json()).toMatchObject({
+    revision: '1',
+    policy: { transaction_mode: 'unrestricted' },
+  });
+  expect(
+    (await app.inject({ method: 'POST', url, payload, headers })).json(),
+  ).toEqual(accepted.json());
+  expect(
+    (
+      await app.inject({
+        method: 'POST',
+        url,
+        payload: { ...payload, mode: 'other' },
+        headers,
+      })
+    ).statusCode,
+  ).toBe(400);
+});

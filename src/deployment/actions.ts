@@ -137,7 +137,11 @@ export class SupportedActions {
       wallet.ownerAdministration?.status === 'suspended' ||
       wallet.owner !== state.accounts[wallet.accountId]?.owner ||
       deployment?.activeRevision !== this.revision ||
-      ['actions', 'services', 'sponsorship'].some(
+      (currentRuntimePolicy(state, principal).policy.transaction_mode ===
+      'unrestricted'
+        ? ['services', 'sponsorship']
+        : ['actions', 'services', 'sponsorship']
+      ).some(
         (kind) =>
           registry?.obligations?.records[applicationId + ':' + kind]
             ?.decision !== 'accepted',

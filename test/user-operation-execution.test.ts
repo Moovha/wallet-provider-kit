@@ -304,6 +304,54 @@ async function setup(
 }
 
 describe('ERC-4337 wallet calls durable submission and independent receipt recovery', () => {
+  it('reports successful inclusion after a refresh slower than 250 ms, including after a five-second polling gap', async () => {
+    const t = await setup();
+    await t.submit();
+    await t.ports.driver.runOnce();
+    t.s.included = true;
+    const refresh = t.ports.execution.refresh.bind(t.ports.execution);
+    vi.spyOn(t.ports.execution, 'refresh').mockImplementation(async (id) => {
+      await new Promise((resolve) => setTimeout(resolve, 350));
+      return refresh(id);
+    });
+    expect(await t.status()).toMatchObject({ status: 200 });
+    await t.f.onboarding.store.transaction((state) => {
+      const plan = Object.values(state.userOperationExecutions!)[0];
+      plan.observation.observedAt = new Date(Date.now() - 5000).toISOString();
+    });
+    expect(await t.status()).toMatchObject({ status: 200 });
+    expect(t.s.sends).toBe(1);
+  });
+  it('bounds a stalled status refresh and does not expose an old successful receipt', async () => {
+    const t = await setup();
+    await t.submit();
+    await t.ports.driver.runOnce();
+    t.s.included = true;
+    expect(await t.status()).toMatchObject({ status: 200 });
+    await t.f.onboarding.store.transaction((state) => {
+      Object.values(state.userOperationExecutions!)[0].observation.observedAt =
+        new Date(Date.now() - 5000).toISOString();
+    });
+    let started!: () => void;
+    const refreshing = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    vi.spyOn(t.ports.execution, 'refresh').mockImplementation(() => {
+      started();
+      return new Promise(() => undefined);
+    });
+    vi.useFakeTimers();
+    try {
+      const status = t.status();
+      await refreshing;
+      await vi.advanceTimersByTimeAsync(3000);
+      expect(await status).toMatchObject({ status: 100 });
+      expect(t.s.sends).toBe(1);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
   it('settles historical inclusion after fee terms change and access is revoked without new financial effects', async () => {
     const t = await setup();
     await t.submit();

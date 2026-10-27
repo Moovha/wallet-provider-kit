@@ -43,6 +43,12 @@ export interface ManagedIdentity {
   scopes: string[];
   policy?: ApplicationPolicy;
 }
+export interface NetworkExecutionSetting {
+  revision: number;
+  enabled: boolean;
+  backendAcceptance: string;
+  recoveryAcceptance: string;
+}
 export interface ManagementState {
   version: 1;
   installationId: string;
@@ -51,6 +57,7 @@ export interface ManagementState {
   claimed: boolean;
   networkSettings?: { revision: number; networks: ProviderNetwork[] };
   userChecks?: { revision: number; settings: UserCheckSettings };
+  execution?: Partial<Record<ProviderNetwork, NetworkExecutionSetting>>;
   identities: Record<string, ManagedIdentity>;
 }
 const hash = (value: string) =>
@@ -416,6 +423,128 @@ export class ManagementService {
       const result = this.userChecks(state);
       commands[commandKey] = { hash: digest, result, at: this.now() };
       return result;
+    });
+  }
+  storedExecution(
+    network: ProviderNetwork,
+    defaults: {
+      enabled: boolean;
+      backendAcceptance?: string;
+      recoveryAcceptance?: string;
+    },
+  ): NetworkExecutionSetting {
+    return structuredClone(
+      this.snapshot()?.execution?.[network] ?? {
+        revision: 1,
+        enabled: defaults.enabled,
+        backendAcceptance: defaults.backendAcceptance ?? '',
+        recoveryAcceptance: defaults.recoveryAcceptance ?? '',
+      },
+    );
+  }
+  executionSettings(
+    principal: VerifiedPrincipal,
+    network: ProviderNetwork,
+    defaults: {
+      enabled: boolean;
+      backendAcceptance?: string;
+      recoveryAcceptance?: string;
+    },
+  ) {
+    this.assertOperator(principal);
+    return this.storedExecution(network, defaults);
+  }
+  async saveExecution(
+    principal: VerifiedPrincipal,
+    key: string,
+    network: ProviderNetwork,
+    input: {
+      expected_revision: number;
+      enabled: boolean;
+      backendAcceptance?: string;
+      recoveryAcceptance?: string;
+      mainnet_confirmed?: boolean;
+    },
+    defaults: {
+      enabled: boolean;
+      backendAcceptance?: string;
+      recoveryAcceptance?: string;
+    },
+  ) {
+    const chain = providerNetwork(network);
+    if (
+      !uuid.test(key) ||
+      !input ||
+      Object.keys(input).some(
+        (k) =>
+          ![
+            'expected_revision',
+            'enabled',
+            'backendAcceptance',
+            'recoveryAcceptance',
+            'mainnet_confirmed',
+          ].includes(k),
+      ) ||
+      !Number.isSafeInteger(input.expected_revision) ||
+      input.expected_revision < 1 ||
+      typeof input.enabled !== 'boolean' ||
+      (input.enabled && !chain.testnet && input.mainnet_confirmed !== true)
+    )
+      invalid();
+    for (const reference of [input.backendAcceptance, input.recoveryAcceptance])
+      if (reference !== undefined && !text(reference, 256)) invalid();
+    const digest = hash(JSON.stringify(['execution', network, input]));
+    return this.store.transaction((state) => {
+      const management = this.state(state);
+      this.assertOperator(principal, management);
+      const commands = (state.managementCommands ??= {}),
+        commandKey = hash(principal.clientId + ':' + key);
+      for (const [id, command] of Object.entries(commands))
+        if (command.at + 86400000 <= this.now()) delete commands[id];
+      const previous = commands[commandKey];
+      if (previous) {
+        if (previous.hash !== digest) conflict();
+        return previous.result as NetworkExecutionSetting;
+      }
+      if (Object.keys(commands).length >= 10000) conflict();
+      const before = management.execution?.[network] ?? {
+        revision: 1,
+        enabled: defaults.enabled,
+        backendAcceptance: defaults.backendAcceptance ?? '',
+        recoveryAcceptance: defaults.recoveryAcceptance ?? '',
+      };
+      if (
+        before.revision !== input.expected_revision ||
+        before.revision >= 1000000
+      )
+        conflict();
+      const values = {
+        enabled: input.enabled,
+        backendAcceptance: input.backendAcceptance ?? before.backendAcceptance,
+        recoveryAcceptance:
+          input.recoveryAcceptance ?? before.recoveryAcceptance,
+      };
+      if (
+        values.enabled &&
+        (!values.backendAcceptance.trim() || !values.recoveryAcceptance.trim())
+      )
+        invalid();
+      const changed =
+        values.enabled !== before.enabled ||
+        values.backendAcceptance !== before.backendAcceptance ||
+        values.recoveryAcceptance !== before.recoveryAcceptance;
+      const next = { ...values, revision: before.revision + (changed ? 1 : 0) };
+      if (changed) {
+        (management.execution ??= {})[network] = next;
+        state.audit.push({
+          at: this.now(),
+          event: 'network_execution_changed',
+          resource: hash(network),
+          revision: String(next.revision),
+        });
+      }
+      commands[commandKey] = { hash: digest, result: next, at: this.now() };
+      return next;
     });
   }
   storedNetworks(): ProviderNetwork[] | undefined {

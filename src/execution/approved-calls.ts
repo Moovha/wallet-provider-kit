@@ -53,6 +53,8 @@ export interface SafeAccountBinding extends PinnedContract {
   singleton: PinnedContract;
 }
 export interface ApprovedCallPolicy {
+  /** Provider-delegated generic calls; account control and immutable execution checks still apply. */
+  unrestrictedCalls?: true;
   mechanism: 'safe-1.4.1';
   adapters?: OperationAdapters;
   nativeTransfers?: {
@@ -338,7 +340,9 @@ export function buildApprovedCallIntent(
       denied();
     let matched: ReturnType<typeof matchOperationAdapter>;
     try {
-      matched = matchOperationAdapter(policy, input, account, expiresAt);
+      matched = policy.unrestrictedCalls
+        ? undefined
+        : matchOperationAdapter(policy, input, account, expiresAt);
     } catch {
       denied();
     }
@@ -354,10 +358,25 @@ export function buildApprovedCallIntent(
     exact(entry, ['to', 'value', 'data']);
     if (
       !/^0x(?:[0-9a-f]{2}){0,4096}$/.test(entry.data) ||
-      (entry.data !== '0x' && entry.data.length < 10)
+      (!policy.unrestrictedCalls &&
+        entry.data !== '0x' &&
+        entry.data.length < 10)
     )
       denied();
     total += uint(entry.value);
+    if (policy.unrestrictedCalls) {
+      let address: string;
+      try {
+        address = getAddress(entry.to);
+      } catch {
+        denied();
+      }
+      if (address === ZeroAddress) denied();
+      calls.push({ to: address, value: entry.value, data: entry.data });
+      if (entry.data === '0x' && BigInt(entry.value) > 0n)
+        nativeRecipients.push(address.toLowerCase());
+      continue;
+    }
     if (entry.data === '0x') {
       const recipient = policy.nativeTransfers?.recipients.find(
         (r) => r.address.toLowerCase() === entry.to.toLowerCase(),

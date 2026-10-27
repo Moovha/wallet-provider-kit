@@ -153,6 +153,7 @@ export async function registerManagementRoutes(
   localOrigin?: string,
   networks: readonly ProviderNetwork[] = ['base-sepolia'],
   networkReady?: (network: ProviderNetwork) => Promise<boolean>,
+  contexts?: readonly import('../service/network-context.js').NetworkContext[],
 ) {
   const configured = () => {
     if (!service)
@@ -410,6 +411,115 @@ export async function registerManagementRoutes(
         String(request.headers['idempotency-key']),
         request.body,
       );
+    },
+  );
+  const executionSchema = {
+    type: 'object',
+    additionalProperties: false,
+    required: [
+      'network',
+      'name',
+      'testnet',
+      'revision',
+      'enabled',
+      'ready',
+      'backendAcceptance',
+      'recoveryAcceptance',
+    ],
+    properties: {
+      network: { type: 'string' },
+      name: { type: 'string' },
+      testnet: { type: 'boolean' },
+      revision: { type: 'integer' },
+      enabled: { type: 'boolean' },
+      ready: { type: 'boolean' },
+      backendAcceptance: { type: 'string' },
+      recoveryAcceptance: { type: 'string' },
+    },
+  };
+  function executionContext(network: string) {
+    const selected = contexts?.find((context) => context.network === network);
+    if (!selected?.execution)
+      throw Object.assign(new Error('Network execution controls unavailable'), {
+        statusCode: 503,
+      });
+    return selected;
+  }
+  async function executionView(
+    principal: import('../domain/principal.js').VerifiedPrincipal,
+    network: string,
+  ) {
+    const selected = executionContext(network),
+      chain = providerNetwork(selected.network);
+    return {
+      network: chain.name,
+      name: chain.label,
+      testnet: chain.testnet,
+      ...configured().executionSettings(
+        principal,
+        chain.name,
+        selected.execution!.defaults,
+      ),
+      ready: await selected.ready!(),
+    };
+  }
+  const executionParams = {
+    type: 'object',
+    additionalProperties: false,
+    required: ['network'],
+    properties: {
+      network: {
+        enum: ['base', 'base-sepolia', 'ethereum', 'ethereum-sepolia'],
+      },
+    },
+  };
+  app.get<{ Params: { network: string } }>(
+    '/v1/provider/networks/:network/execution',
+    {
+      schema: schema('readNetworkExecution', executionSchema, {
+        params: executionParams,
+      }),
+    },
+    async (request) =>
+      executionView(await operator(request), request.params.network),
+  );
+  app.post<{
+    Params: { network: string };
+    Body: {
+      expected_revision: number;
+      enabled: boolean;
+      backendAcceptance?: string;
+      recoveryAcceptance?: string;
+      mainnet_confirmed?: boolean;
+    };
+  }>(
+    '/v1/provider/networks/:network/execution',
+    {
+      schema: schema('saveNetworkExecution', executionSchema, {
+        params: executionParams,
+        headers: keyHeaders,
+        body: body(['expected_revision', 'enabled'], {
+          expected_revision: { type: 'integer', minimum: 1 },
+          enabled: { type: 'boolean' },
+          backendAcceptance: { type: 'string', minLength: 1, maxLength: 256 },
+          recoveryAcceptance: { type: 'string', minLength: 1, maxLength: 256 },
+          mainnet_confirmed: { type: 'boolean' },
+        }),
+      }),
+    },
+    async (request) => {
+      sameOrigin(request);
+      const principal = await operator(request),
+        selected = executionContext(request.params.network);
+      await configured().saveExecution(
+        principal,
+        String(request.headers['idempotency-key'] ?? ''),
+        selected.network,
+        request.body,
+        selected.execution!.defaults,
+      );
+      await selected.execution!.sync();
+      return executionView(principal, selected.network);
     },
   );
   app.post<{ Body: { claim: string; username: string; password: string } }>(

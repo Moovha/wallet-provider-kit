@@ -2,6 +2,50 @@ import type { VerifiedPrincipal } from '../domain/principal.js';
 import type { ApplicationUserAssertion, ResolvedPolicy } from './types.js';
 import { application, deny, fingerprint, invalid, text } from './policy.js';
 
+/** Omitted labels bind to the current agreement; saved assertions retain complete authority metadata. */
+export function resolveApplicationAssertion(
+  policy: ResolvedPolicy,
+  principal: VerifiedPrincipal,
+  user: ApplicationUserAssertion,
+  idempotencyKey: string,
+  actionRevision?: string,
+): ApplicationUserAssertion {
+  const rules = policy.identity.application;
+  if (!rules || !user.identity || !user.consent) invalid();
+  return {
+    ...user,
+    identity: {
+      ...user.identity,
+      level:
+        user.identity.level === undefined
+          ? rules.verificationLevel
+          : user.identity.level,
+    },
+    consent: {
+      ...user.consent,
+      reference:
+        user.consent.reference === undefined
+          ? 'provider-consent-' +
+            fingerprint([
+              principal.issuer,
+              principal.clientId,
+              principal.subject,
+              user.id,
+              idempotencyKey,
+            ])
+          : user.consent.reference,
+      policy_revision:
+        user.consent.policy_revision === undefined
+          ? (policy.consentRevision ?? policy.revision)
+          : user.consent.policy_revision,
+      ...(user.consent.action_policy_revision === undefined &&
+      actionRevision !== undefined
+        ? { action_policy_revision: actionRevision }
+        : {}),
+    },
+  };
+}
+
 const day = 86400000;
 function object(
   value: unknown,

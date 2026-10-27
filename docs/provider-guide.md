@@ -20,7 +20,7 @@ One provider instance can offer **Base mainnet**, **Base Sepolia**, **Ethereum m
 Sepolia**. Installation fixes the default network
 for existing integrations and preserves its original Personal wallet.
 
-Open **Networks** in administration to select additional networks, save, then restart
+Open **Networks & execution → Available networks** in administration to select additional networks, save, then restart
 the provider. Choices are retained in the database and applied at startup. Each
 network has its own Personal wallet and can also hold named personal or shared wallets.
 
@@ -35,7 +35,9 @@ sharing rules still apply when another application requests access. Each wallet
 and network requires fresh consent; a grant on one network cannot authorize another.
 
 Additional networks start disabled, with empty application transaction policies.
-For each network, agree its transactions, supply its RPC connections, accept its
+For each network, agree its transaction rules or explicitly enable
+[trusted-app permissions](runtime-configuration.md#trust-an-application-without-transaction-restrictions),
+supply its RPC connections, accept its
 fee agreement and prepare its application funding infrastructure. Inspect the
 network’s funding address before sending funds: balances and budgets do not carry
 between networks. A funded Base wallet does not fund Ethereum Sepolia.
@@ -57,10 +59,19 @@ settings, not partial patches. The private bundler directory is shared; its
 application files and routes are isolated by network. Authentication settings,
 backend vault and credential-storage key remain instance settings.
 
-After acceptance for an additional network, set that entry’s `activation` with
-`enabled`, `backendAcceptance` and `recoveryAcceptance`, following the same
-[launch checks](conformance.md) as the default network. Restart with the reviewed
-configuration. After restart, a removed network’s provider transaction writers are fenced and preserves its records for a later restart. Keep the default
+Open **Networks & execution → Execution** and select a running network to enable
+or pause wallet execution. Enabling requires references to completed wallet setup
+and backup/recovery checks; mainnets also require an explicit real-assets
+acknowledgement. The setting applies immediately and is retained across restarts.
+Application permissions, accepted fee terms and prepared wallet services remain
+separate requirements. Each change invalidates previous transaction consent and
+pending authority on that network. Issued signatures and submitted transactions
+may still execute; pausing is not cancellation.
+
+Static hosts can still set each network’s `activation.enabled`,
+`backendAcceptance` and `recoveryAcceptance` in configuration, following the
+[launch checks](conformance.md). For API-managed installations, a saved portal
+setting takes precedence over those startup defaults. After restart, a removed network’s provider transaction writers are fenced and preserves its records for a later restart. Keep the default
 network unchanged for an existing store; changing it requires a reviewed migration.
 Previously issued signatures and transactions may still execute. Back up the shared database and vault together for all networks.
 

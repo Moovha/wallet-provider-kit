@@ -14,7 +14,11 @@ import { EmbeddedWalletService } from '../src/domain/embedded-wallet.js';
 import { createJournaledWalletProvider } from '../src/providers/journaled.js';
 import { createOnboardingJournal } from '../src/onboarding/journal.js';
 import { validateProviderConfiguration } from '../src/deployment/config.js';
-import type { AccessInput, OnboardingPolicy } from '../src/onboarding/types.js';
+import type {
+  AccessInput,
+  AccessRequestInput,
+  OnboardingPolicy,
+} from '../src/onboarding/types.js';
 
 const folders: string[] = [];
 afterEach(async () => {
@@ -315,6 +319,7 @@ it('requires explicit application trust and binds contract delegation to the exa
   const f = await fixture('action-policy-1');
   const input = f.input();
   input.authorization_details[0].actions.push('contracts:request');
+  input.user!.consent.action_policy_revision = 'stale-action-policy';
   await expect(f.service.request(context(), input)).rejects.toThrow();
   input.user!.consent.action_policy_revision = 'action-policy-1';
   const granted = await f.service.request(context(), input);
@@ -386,14 +391,22 @@ it('serves the application-led HTTP contract without an owner login and denies h
       flow: 'application',
       provider_review_required: false,
     });
+    const minimal: AccessRequestInput = f.input();
+    delete minimal.user!.identity!.level;
+    delete minimal.user!.consent.reference;
+    delete minimal.user!.consent.policy_revision;
     const receipt = await app.inject({
       method: 'POST',
       url: '/v1/access-requests',
       headers: { 'idempotency-key': randomUUID() },
-      payload: f.input(),
+      payload: minimal,
     });
     expect(receipt.statusCode).toBe(200);
     expect(receipt.json().status).toBe('granted');
+    expect(receipt.json().consent).toMatchObject({
+      reference: expect.stringMatching(/^provider-consent-[a-f0-9]{64}$/),
+      policy_revision: f.service.policy.revision,
+    });
     expect(receipt.json()).not.toHaveProperty('consent_url');
     const revoked = await app.inject({
       method: 'POST',
@@ -505,3 +518,103 @@ it('binds contract delegation to the action-policy consent revision and rejects 
   input.user!.consent.action_policy_revision = 'b'.repeat(64);
   await expect(service.request(context(), input)).rejects.toThrow();
 });
+
+it('resolves omitted assertion labels, returns saved consent metadata and preserves retries across restart', async () => {
+  const f = await fixture('action-policy-1');
+  const input: AccessRequestInput = f.input();
+  delete input.user!.identity!.level;
+  delete input.user!.consent.reference;
+  delete input.user!.consent.policy_revision;
+  input.authorization_details[0].actions.push('contracts:request');
+  const caller = context();
+  const granted = await f.service.request(caller, input);
+  expect(granted.status).toBe('granted');
+  expect(granted.consent).toMatchObject({
+    reference: expect.stringMatching(/^provider-consent-[a-f0-9]{64}$/),
+    policy_revision: f.service.policy.revision,
+    action_policy_revision: 'action-policy-1',
+  });
+  expect(input.user!.consent.reference).toBeUndefined();
+  const saved = await f.store.transaction(
+    (state) => state.requests[granted.request_id],
+  );
+  expect(saved.input.user!.identity.level).toBe('verified');
+  expect(saved.input.user!.consent).toMatchObject(granted.consent!);
+  const restarted = new OnboardingService(
+    policy,
+    f.store,
+    [],
+    undefined,
+    'action-policy-1',
+  );
+  expect(await restarted.request(caller, input)).toEqual(granted);
+  const other: AccessRequestInput = f.input('user-2');
+  delete other.user!.consent.reference;
+  delete other.user!.consent.policy_revision;
+  const second = await restarted.request(context(), other);
+  expect(second.consent!.reference).not.toBe(granted.consent!.reference);
+});
+
+it('keeps withdrawal fences and policy changes effective when assertion labels are omitted', async () => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  const f = await fixture('action-policy-1');
+  const input: AccessRequestInput = f.input();
+  delete input.user!.identity!.level;
+  delete input.user!.consent.reference;
+  delete input.user!.consent.policy_revision;
+  input.authorization_details[0].actions.push('contracts:request');
+  const caller = context();
+  const first = await f.service.request(caller, input);
+  vi.setSystemTime(Date.now() + 1000);
+  await f.service.revokeApplicationGrant(context(), first.grant_id!);
+  await expect(f.service.request(context(), input)).rejects.toThrow(
+    'wallet_authorization_denied',
+  );
+  vi.advanceTimersByTime(1);
+  const renewed = structuredClone(input);
+  renewed.user!.consent.granted_at = new Date().toISOString();
+  const second = await f.service.request(context(), renewed);
+  expect(second.account_id).toBe(first.account_id);
+  expect(second.grant_id).not.toBe(first.grant_id);
+  const changed = new OnboardingService(
+    policy,
+    f.store,
+    [],
+    undefined,
+    'action-policy-2',
+  );
+  expect((await changed.read(context(), second.request_id)).status).toBe(
+    'policy_changed',
+  );
+  await expect(
+    changed.authorize(
+      context().principal,
+      second.account_id!,
+      'contracts:request',
+    ),
+  ).rejects.toThrow();
+});
+
+it.each([
+  'reference',
+  'policy_revision',
+  'action_policy_revision',
+  'level',
+] as const)(
+  'rejects explicit empty or conflicting %s instead of replacing it',
+  async (field) => {
+    const f = await fixture('action-policy-1');
+    for (const value of ['', null, 'conflicting-value']) {
+      const input = f.input();
+      input.authorization_details[0].actions.push('contracts:request');
+      if (field === 'level')
+        (input.user!.identity as Record<string, unknown>)[field] = value;
+      else (input.user!.consent as Record<string, unknown>)[field] = value;
+      if (field === 'reference' && value === 'conflicting-value') continue;
+      await expect(f.service.request(context(), input)).rejects.toThrow();
+    }
+    expect(
+      await f.store.transaction((state) => Object.keys(state.grants)),
+    ).toHaveLength(0);
+  },
+);

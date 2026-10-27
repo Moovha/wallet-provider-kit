@@ -58,8 +58,17 @@ export interface WalletDescription {
 }
 /** A request may reuse the caller's current stored identity evidence; consent is always supplied. */
 export type AccessRequestInput = Omit<AccessInput, 'user'> & {
-  user?: Omit<ApplicationUserAssertion, 'identity'> & {
-    identity?: ApplicationUserAssertion['identity'];
+  user?: Omit<ApplicationUserAssertion, 'identity' | 'consent'> & {
+    identity?: Omit<ApplicationUserAssertion['identity'], 'level'> & {
+      level?: string;
+    };
+    consent: Omit<
+      ApplicationUserAssertion['consent'],
+      'reference' | 'policy_revision'
+    > & {
+      reference?: string;
+      policy_revision?: string;
+    };
   };
 };
 export interface AccessInput {

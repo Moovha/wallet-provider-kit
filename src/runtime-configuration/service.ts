@@ -51,6 +51,7 @@ export interface RuntimeConfigurationOptions {
   operators: { issuer: string; clientId: string; subject: string }[];
 }
 export interface RuntimePolicy {
+  transaction_mode?: 'unrestricted';
   action_requirements?: ApplicationObligations['actions'];
   application_resources_hash?: string;
   version: '1';
@@ -1009,6 +1010,8 @@ export class RuntimeConfigurationService {
       applicationId,
     );
     const change = normalizeRuntimePolicy(input);
+    // Only the provider may delegate unrestricted transaction authority.
+    if (change.policy.transaction_mode === 'unrestricted') deny();
     if (change.policy.chain_id !== providerNetwork(this.network).caip)
       invalid();
     const hash = canonicalHash(change);
@@ -1310,6 +1313,36 @@ export class RuntimeConfigurationService {
         context.principal,
         proposalId,
       );
+    });
+  }
+  /** Publish provider-selected transaction authority without an application proposal. */
+  async setTransactionMode(
+    context: AuthorityContext,
+    applicationId: string,
+    input: { expected_revision: string; mode: 'restricted' | 'unrestricted' },
+  ) {
+    if (
+      !input ||
+      Object.keys(input).sort().join(',') !== 'expected_revision,mode' ||
+      !['restricted', 'unrestricted'].includes(input.mode)
+    )
+      invalid();
+    return this.update(context, applicationId, {
+      expected_revision: input.expected_revision,
+      policy: {
+        version: '1',
+        enabled: true,
+        chain_id: providerNetwork(this.network).caip,
+        ...(input.mode === 'unrestricted'
+          ? { transaction_mode: 'unrestricted' as const }
+          : {}),
+        contracts: [],
+        maximum_calls: 16,
+        maximum_native_value_wei:
+          input.mode === 'unrestricted' ? String(2n ** 256n - 1n) : '0',
+        max_validity_seconds: 3600,
+        claim_requirements: [],
+      },
     });
   }
   async update(

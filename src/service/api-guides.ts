@@ -100,6 +100,8 @@ export const apiOperationOrder = [
   'readProviderStatus',
   'readProviderNetworks',
   'saveProviderNetworks',
+  'readNetworkExecution',
+  'saveNetworkExecution',
   'listProviderUsers',
   'readProviderUser',
   'listProviderIdentities',
@@ -127,6 +129,7 @@ export const apiOperationOrder = [
   'publishRuntimeConfiguration',
   'updateRuntimeConfiguration',
   'readRuntimeConfigurationRevision',
+  'setApplicationTransactionMode',
   'setRuntimeReviewMode',
   'readApplicationCredentials',
   'writeApplicationCredential',
@@ -789,6 +792,21 @@ export const operationGuides: Record<string, OperationGuide> = {
     success:
       '200: up to 100 readable batch summaries, queue stages and retained finalized RPC-quorum receipts. Unfinalized observations remain pending in this list; applications can refresh individual wallet_getCallsStatus results. Listing never signs, submits or retries.',
   },
+  setApplicationTransactionMode: {
+    title: 'Choose transaction permissions for a trusted application',
+    group: 'Transaction rules',
+    audience: 'Provider operator',
+    purpose:
+      'Allow an approved application to submit arbitrary external contract calls and native transfers without transaction proposals or contract restrictions.',
+    whenToUse:
+      'Choose unrestricted mode only for an application you trust to enforce transaction rules. Restricted mode is the default.',
+    scope: 'wallet:configuration:write',
+    runtimeConfiguration: true,
+    prerequisite:
+      'Use provider operator credentials, the runtime application ID, selected Wallet-Network, expected_revision and an original UUIDv4 Idempotency-Key. The application must be active with an accepted user-check agreement.',
+    success:
+      '200: a published authority revision. Current identity, ownership, consent, Safe control checks and network-fee limits remain enforced. Mode changes require fresh transaction consent. Returning to restricted mode clears allowed contracts; publish transaction rules before execution.',
+  },
   setRuntimeReviewMode: {
     title: 'Choose how future transaction-rule changes are reviewed',
     group: 'Transaction rules',
@@ -954,6 +972,36 @@ export const operationGuides: Record<string, OperationGuide> = {
     success:
       '200: the fixed default, saved choices, running choices and restart requirement. Network selection does not grant spending authority.',
   },
+  readNetworkExecution: {
+    title: 'Check wallet execution on a network',
+    group: 'Service administration',
+    audience: 'Provider operator',
+    purpose:
+      'Read the retained execution setting, completed-check references and running readiness for one configured network.',
+    whenToUse:
+      'Use Networks & execution in the portal or read before changing a network setting.',
+    scope: 'provider:manage',
+    management: true,
+    prerequisite:
+      'Use a current provider management token and a network already running on this instance.',
+    success:
+      '200: the current revision, enabled setting and readiness. Enabled does not prove application funding or wallet readiness.',
+  },
+  saveNetworkExecution: {
+    title: 'Enable or pause wallet execution on a network',
+    group: 'Service administration',
+    audience: 'Provider operator',
+    purpose:
+      'Apply a durable network execution setting without restarting the service.',
+    whenToUse:
+      'Enable after completing wallet setup and recovery checks, or pause new requests during maintenance.',
+    scope: 'provider:manage',
+    management: true,
+    prerequisite:
+      'Supply expected_revision, an original UUIDv4 Idempotency-Key and enabled. Enabling needs backendAcceptance and recoveryAcceptance references. Mainnet enabling also requires mainnet_confirmed: true.',
+    success:
+      '200: saved setting and current readiness. Changing the setting fences prior transaction consent and pending authority on that network. Issued signatures and submitted transactions may still execute. Other networks and application permissions remain separate.',
+  },
   saveProviderNetworks: {
     management: true,
     title: 'Choose the networks your service offers',
@@ -1007,7 +1055,7 @@ export const operationGuides: Record<string, OperationGuide> = {
     prerequisite:
       'After the person completes the agreed identity checks and approves wallet access in your application, submit those records here. First read GET /v1/access-policy for the required fields and current terms. Use mode=create without wallet to preserve the default Personal account. To add a wallet, supply wallet.reference, name and kind (personal or shared), and consent.wallet_reference. A verified user can omit identity while their saved checks remain current. Each wallet needs its own consent. Use mode=connect with account_id and consent.account_id to renew a selected wallet; invited members also supply consent.membership_revision. To request a wallet from a selected source application, read GET /v1/access-policy?source_application_id=SOURCE_CONNECTION_ID, then use mode=connect_from_application and source_application_id without account_id. Omit source_account_id to connect the source Personal wallet, or select another source_account_id and include consent.account_id. Include the returned sharing revision and source application in fresh consent for the requesting application. All configured identity fields must match exactly; ambiguous matches are denied. The provider must trust your application’s checks. Hosted compatibility mode uses a separate provider login and review.',
     success:
-      '200: the access decision. A granted response includes account_id, grant_id, allowed actions and expiry. Save those IDs, then let the creating application provision the blockchain wallet. Shared-wallet account requests require Wallet-Grant-Id; use the selected person’s grant_id. List consented wallets with POST /v1/accounts/query. Reconnecting preserves the existing account. This request does not create an on-chain wallet or send money. Missing, stale or unauthorized evidence is rejected; consent_url is only for hosted compatibility mode.',
+      '200: the access decision. Application receipts include saved consent metadata. Omitted consent.reference is assigned by the provider; omitted consent policy revisions bind current terms, and omitted identity.level uses the agreed application level. Explicit mismatches are rejected. Consent times and valid identity evidence remain required. A granted response includes account_id, grant_id, allowed actions and expiry. Save those IDs, then let the creating application provision the blockchain wallet. Shared-wallet account requests require Wallet-Grant-Id; use the selected person’s grant_id. List consented wallets with POST /v1/accounts/query. Reconnecting preserves the existing account. This request does not create an on-chain wallet or send money. Missing, stale or unauthorized evidence is rejected; consent_url is only for hosted compatibility mode.',
   },
   getAccountAccessPolicy: {
     title: 'See what to collect before connecting a wallet',

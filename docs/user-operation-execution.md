@@ -12,6 +12,15 @@ Accepted deployments use Safe 1.4.1, Safe4337Module 0.3.0 and EntryPoint v0.7 on
 
 The driver persists a batch, prepares nonce/fees and exact gas estimates, reserves bounded sponsorship, signs the SafeOp and dispatches its exact bytes. Account lanes serialize conflicting nonces while separate accounts can progress concurrently. A submission timeout retains the signed identity and anchor for read-only reconciliation.
 
+Gas estimates include execution, account validation, paymaster work and
+pre-verification overhead. On rollups, pre-verification gas can include data fees
+expressed in gas units, so a larger unit estimate need not imply a larger ETH fee.
+The provider retains separate execution and validation ceilings. It bounds the
+total by any explicit accepted gas limit and its overall ceiling, and checks the
+buffered maximum cost, including the fee reserve, against the accepted sponsorship
+terms before signing. Increasing
+account funding does not change those limits.
+
 Success requires the canonical bundle transaction, exact packed operation and signature, individual successful operation event and required effects. Finality is tracked independently. Expiry releases a lane only after a bounded finalized absence proof; missing evidence leaves uncertainty intact. See [signing](durable-safe-op-signing.md) and [sponsorship](account-abstraction-sponsorship.md).
 
 When an account requires additional owners, the driver publishes an exact

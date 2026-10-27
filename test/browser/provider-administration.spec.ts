@@ -81,7 +81,46 @@ test('claims, registers and manages applications through the real protected mana
         ['ethereum', 'Ethereum'],
         ['ethereum-sepolia', 'Ethereum Sepolia'],
       ].map(([network, name]) => ({ network, name, configured: false }));
+      body.network_settings.running_networks = body.network_status.map(
+        (entry) => entry.network,
+      );
       await route.fulfill({ response, json: body });
+    });
+    const executionSettings = new Map<
+      string,
+      {
+        revision: number;
+        enabled: boolean;
+        backendAcceptance: string;
+        recoveryAcceptance: string;
+      }
+    >();
+    await page.route('**/v1/provider/networks/*/execution', async (route) => {
+      const request = route.request(),
+        network = new URL(request.url()).pathname.split('/')[4];
+      let current = executionSettings.get(network) ?? {
+        revision: 1,
+        enabled: false,
+        backendAcceptance: '',
+        recoveryAcceptance: '',
+      };
+      if (request.method() === 'POST') {
+        const body = request.postDataJSON();
+        expect(body.expected_revision).toBe(current.revision);
+        if (body.enabled && !network.includes('sepolia'))
+          expect(body.mainnet_confirmed).toBe(true);
+        current = { ...current, ...body, revision: current.revision + 1 };
+        executionSettings.set(network, current);
+      }
+      await route.fulfill({
+        json: {
+          network,
+          name: network === 'base' ? 'Base' : 'Base Sepolia',
+          testnet: network.includes('sepolia'),
+          ...current,
+          ready: current.enabled,
+        },
+      });
     });
     await page.route('**/admin/app.js', (route) => route.abort());
     await page.goto(url + '/admin/');
@@ -107,13 +146,77 @@ test('claims, registers and manages applications through the real protected mana
       .getByRole('button', { name: 'Create administrator account' })
       .click();
     await expect(
-      page.getByRole('heading', { name: 'Welcome to your service' }),
+      page.getByRole('heading', { name: 'Wallet service' }),
     ).toBeVisible();
     await expect(page.getByText('Disabled', { exact: true })).toBeVisible();
-    await page.getByRole('button', { name: 'Networks', exact: true }).click();
+    await page
+      .getByRole('button', { name: 'Networks & execution', exact: true })
+      .click();
     await expect(
-      page.getByRole('heading', { name: 'Choose your wallet networks' }),
+      page.getByRole('heading', { name: 'Networks & wallet execution' }),
     ).toBeVisible();
+    await page
+      .getByRole('combobox', {
+        name: 'Network for wallet execution',
+        exact: true,
+      })
+      .selectOption('base');
+    await expect(
+      page.getByText('Wallet execution paused', { exact: true }),
+    ).toBeVisible();
+    await page
+      .getByRole('combobox', { name: 'Execution setting', exact: true })
+      .selectOption('enabled');
+    await page
+      .getByLabel('Wallet setup check reference', { exact: true })
+      .fill('offline-wallet-check');
+    await page
+      .getByLabel('Backup and recovery test reference', { exact: true })
+      .fill('offline-recovery-check');
+    await page
+      .getByRole('button', { name: 'Save execution setting', exact: true })
+      .click();
+    expect(executionSettings.size).toBe(0);
+    await page
+      .getByRole('checkbox', {
+        name: 'I understand that enabling Base allows approved applications to provision wallets and transact with real assets.',
+        exact: true,
+      })
+      .check();
+    await page
+      .getByRole('button', { name: 'Save execution setting', exact: true })
+      .click();
+    await expect(
+      page.getByText('Wallet execution enabled', { exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByText('Execution setting saved for Base.', { exact: true }),
+    ).toBeVisible();
+    await page
+      .getByRole('combobox', { name: 'Execution setting', exact: true })
+      .selectOption('paused');
+    await page
+      .getByRole('button', { name: 'Save execution setting', exact: true })
+      .click();
+    await expect(
+      page.getByText('Wallet execution paused', { exact: true }),
+    ).toBeVisible();
+    await page
+      .getByRole('combobox', {
+        name: 'Network for wallet execution',
+        exact: true,
+      })
+      .selectOption('base-sepolia');
+    await expect(
+      page.getByRole('combobox', { name: 'Execution setting', exact: true }),
+    ).toHaveValue('paused');
+    await page.screenshot({
+      path: 'artifacts/provider-installation/network-execution.png',
+      fullPage: true,
+    });
+    await page
+      .getByRole('tab', { name: 'Available networks', exact: true })
+      .click();
     await expect(
       page.getByRole('checkbox', {
         name: 'Base Sepolia · test network · default',
@@ -203,7 +306,7 @@ test('claims, registers and manages applications through the real protected mana
       .last()
       .click();
     await expect(
-      page.getByRole('heading', { name: 'Welcome to your service' }),
+      page.getByRole('heading', { name: 'Wallet service' }),
     ).toBeVisible();
     await page
       .getByRole('button', { name: 'User checks', exact: true })
@@ -224,6 +327,9 @@ test('claims, registers and manages applications through the real protected mana
     await expect(
       page.getByText('No applications yet.', { exact: false }),
     ).toBeVisible();
+    await page
+      .getByRole('button', { name: 'New application', exact: true })
+      .click();
     await page
       .getByLabel('Application name', { exact: true })
       .fill('Offline application');
@@ -292,6 +398,63 @@ test('claims, registers and manages applications through the real protected mana
       network: string;
       body: unknown;
     }[] = [];
+    let failModeSave = true;
+    const modes = new Map<
+      string,
+      { revision: string; unrestricted: boolean }
+    >();
+    await page.route('**/v1/provider/applications/*/policy', async (route) => {
+      const request = route.request();
+      const key =
+        new URL(request.url()).pathname +
+        ':' +
+        request.headers()['wallet-network'];
+      const value = modes.get(key);
+      await route.fulfill({
+        json: {
+          active_revision: value?.revision ?? '0',
+          ...(value
+            ? {
+                publication: {
+                  policy: {
+                    ...(value.unrestricted
+                      ? { transaction_mode: 'unrestricted' }
+                      : {}),
+                  },
+                },
+              }
+            : {}),
+        },
+      });
+    });
+    await page.route(
+      '**/v1/provider/applications/*/transaction-mode',
+      async (route) => {
+        const request = route.request();
+        const key =
+          new URL(request.url()).pathname.replace(
+            '/transaction-mode',
+            '/policy',
+          ) +
+          ':' +
+          request.headers()['wallet-network'];
+        const body = request.postDataJSON();
+        if (failModeSave) {
+          failModeSave = false;
+          await route.fulfill({
+            status: 503,
+            json: { code: 'service_unavailable' },
+          });
+          return;
+        }
+        expect(body.expected_revision).toBe(modes.get(key)?.revision ?? '0');
+        modes.set(key, {
+          revision: String(BigInt(body.expected_revision) + 1n),
+          unrestricted: body.mode === 'unrestricted',
+        });
+        await route.fulfill({ json: { revision: modes.get(key)!.revision } });
+      },
+    );
     await page.route(
       '**/v1/provider/applications/*/obligations**',
       async (route) => {
@@ -513,10 +676,9 @@ test('claims, registers and manages applications through the real protected mana
         });
       },
     );
-    const fees = page
-      .locator('#application-list article details')
-      .filter({ has: page.getByText('Wallet services', { exact: true }) });
-    await fees.locator('summary').click();
+    await page.getByRole('tab', { name: 'Wallet setup', exact: true }).click();
+    const fees = page.locator('#application-list .wallet-services');
+    await fees.getByRole('tab', { name: 'Fees', exact: true }).click();
     await expect(
       fees.getByText('Per-transaction limit: 0.001 ETH', { exact: false }),
     ).toBeVisible();
@@ -530,6 +692,7 @@ test('claims, registers and manages applications through the real protected mana
     await fees
       .getByRole('button', { name: 'Approve fee terms', exact: true })
       .click();
+    await fees.getByRole('tab', { name: 'Readiness', exact: true }).click();
     await fees
       .getByRole('button', { name: 'Prepare funding address', exact: true })
       .click();
@@ -548,7 +711,7 @@ test('claims, registers and manages applications through the real protected mana
         { exact: true },
       ),
     ).toBeVisible();
-    await fees.getByText('Configure connections', { exact: true }).click();
+    await fees.getByRole('tab', { name: 'Connections', exact: true }).click();
     await expect(
       fees.getByLabel('Custom HTTPS URL', { exact: true }),
     ).toHaveCount(0);
@@ -639,13 +802,14 @@ test('claims, registers and manages applications through the real protected mana
     await expect(
       fees.getByText('Connections saved for Base Sepolia.', { exact: true }),
     ).toBeVisible();
-    await fees.getByText('Replace connections', { exact: true }).click();
+    await fees.getByRole('tab', { name: 'Connections', exact: true }).click();
     await expect(
       fees.getByLabel('Alchemy API key', { exact: true }),
     ).toHaveValue('');
     await expect(fees.getByLabel('dRPC API key', { exact: true })).toHaveValue(
       '',
     );
+    await fees.getByRole('tab', { name: 'Readiness', exact: true }).click();
     page.once('dialog', (dialog) => dialog.accept());
     await fees
       .getByRole('button', { name: 'Prepare wallet services', exact: true })
@@ -662,15 +826,111 @@ test('claims, registers and manages applications through the real protected mana
         { exact: true },
       ),
     ).toBeVisible();
+    await fees.getByRole('tab', { name: 'Transactions', exact: true }).click();
+    await expect(
+      fees.getByRole('button', { name: 'Save transaction mode', exact: true }),
+    ).toBeDisabled();
+    await expect(
+      fees.getByText('Choose a different transaction mode to enable saving.', {
+        exact: true,
+      }),
+    ).toBeVisible();
+    await expect(
+      fees.getByRole('checkbox', {
+        name: 'I trust this application to request arbitrary contract calls and native transfers for consenting users on this network.',
+        exact: true,
+      }),
+    ).toHaveCount(0);
+    await fees
+      .getByRole('combobox', { name: 'Transaction mode', exact: true })
+      .selectOption('unrestricted');
+    await fees
+      .getByRole('button', { name: 'Save transaction mode', exact: true })
+      .click();
+    await expect(
+      fees.getByText(
+        'Confirm that you trust this application before enabling unrestricted transactions.',
+        { exact: true },
+      ),
+    ).toBeVisible();
+    expect(modes.size).toBe(0);
+    await fees
+      .getByRole('checkbox', {
+        name: 'I trust this application to request arbitrary contract calls and native transfers for consenting users on this network.',
+        exact: true,
+      })
+      .check();
+    await fees
+      .getByRole('button', { name: 'Save transaction mode', exact: true })
+      .click();
+    await expect(
+      fees.getByText(
+        'The service cannot complete this request right now. Check its status before trying again.',
+        { exact: true },
+      ),
+    ).toBeVisible();
+    expect(modes.size).toBe(0);
+    await expect(
+      fees.getByRole('button', { name: 'Save transaction mode', exact: true }),
+    ).toBeEnabled();
+    await fees
+      .getByRole('button', { name: 'Save transaction mode', exact: true })
+      .click();
+    await expect(
+      fees.getByText(
+        'Trusted app: transaction proposals and contract restrictions are not required on this network.',
+        { exact: true },
+      ),
+    ).toBeVisible();
+    expect([...modes.values()]).toEqual([
+      { revision: '1', unrestricted: true },
+    ]);
+    await expect(
+      fees.getByText('Transaction mode saved for Base Sepolia.', {
+        exact: true,
+      }),
+    ).toBeVisible();
+    await expect(
+      fees.getByRole('button', { name: 'Save transaction mode', exact: true }),
+    ).toBeDisabled();
+
+    await fees
+      .getByRole('combobox', { name: 'Transaction mode', exact: true })
+      .selectOption('restricted');
+    await fees
+      .getByRole('button', { name: 'Save transaction mode', exact: true })
+      .click();
+    await expect(
+      fees.getByText(
+        'Restricted: transactions require published contract rules on this network.',
+        { exact: true },
+      ),
+    ).toBeVisible();
+    expect([...modes.values()]).toEqual([
+      { revision: '2', unrestricted: false },
+    ]);
+    await page.setViewportSize({ width: 390, height: 844 });
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+    await page.screenshot({
+      path: 'artifacts/provider-installation/application-mobile.png',
+      fullPage: true,
+    });
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await fees.getByRole('tab', { name: 'Readiness', exact: true }).click();
     await page.screenshot({
       path: 'artifacts/provider-installation/wallet-services.png',
       fullPage: true,
     });
+    await fees.getByRole('tab', { name: 'Fees', exact: true }).click();
     await page.screenshot({
       path: 'artifacts/provider-installation/application-fees.png',
       fullPage: true,
     });
-    await fees.getByText('Change fee limits', { exact: true }).click();
+    await fees.getByRole('tab', { name: 'Fees', exact: true }).click();
     await fees
       .getByLabel('Per-transaction limit (ETH)', { exact: true })
       .fill('0.002');
@@ -680,9 +940,12 @@ test('claims, registers and manages applications through the real protected mana
     await fees
       .getByRole('button', { name: 'Save fee terms', exact: true })
       .click();
+    await fees.getByRole('tab', { name: 'Readiness', exact: true }).click();
     await fees
       .getByRole('button', { name: 'Prepare funding address', exact: true })
       .click();
+    await expect(fees.getByText(offlineAddress, { exact: true })).toBeVisible();
+    await fees.getByRole('tab', { name: 'Fees', exact: true }).click();
     await expect(
       fees.getByText('Approval: Awaiting application acceptance', {
         exact: true,
@@ -691,8 +954,9 @@ test('claims, registers and manages applications through the real protected mana
     await expect(
       fees.getByRole('button', { name: 'Approve fee terms', exact: true }),
     ).toHaveCount(0);
+    await fees.getByRole('tab', { name: 'Readiness', exact: true }).click();
     await expect(fees.getByText(offlineAddress, { exact: true })).toBeVisible();
-    await fees.getByText('Replace connections', { exact: true }).click();
+    await fees.getByRole('tab', { name: 'Connections', exact: true }).click();
     await fees
       .getByRole('button', { name: 'Add custom provider', exact: true })
       .click();
@@ -721,7 +985,7 @@ test('claims, registers and manages applications through the real protected mana
       await fees
         .getByRole('combobox', { name: 'Network', exact: true })
         .selectOption(network);
-      await fees.getByText('Replace connections', { exact: true }).click();
+      await fees.getByRole('tab', { name: 'Connections', exact: true }).click();
       await fees
         .getByLabel('Alchemy API key', { exact: true })
         .fill('offline_alchemy_key');
@@ -754,6 +1018,7 @@ test('claims, registers and manages applications through the real protected mana
     await expect(page.getByRole('status')).toContainText(
       'do not match this application and network',
     );
+    await page.getByRole('tab', { name: 'Connection', exact: true }).click();
     await page
       .getByRole('button', { name: 'Pause connection', exact: true })
       .click();
@@ -766,6 +1031,9 @@ test('claims, registers and manages applications through the real protected mana
     });
     await page
       .getByRole('button', { name: 'Resume connection', exact: true })
+      .click();
+    await page
+      .getByRole('button', { name: 'New application', exact: true })
       .click();
     await page
       .getByLabel('Application name', { exact: true })
@@ -792,6 +1060,12 @@ test('claims, registers and manages applications through the real protected mana
         exact: true,
       }),
     });
+    await page
+      .getByRole('combobox', { name: 'Application', exact: true })
+      .selectOption({ label: 'Offline application' });
+    await first
+      .getByRole('tab', { name: 'Wallet sharing', exact: true })
+      .click();
     await expect(
       first.getByRole('checkbox', {
         name: 'Allow wallet sharing',

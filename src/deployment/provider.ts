@@ -453,6 +453,29 @@ async function createNetworkContext(
           resolveSecret(config.safeWallet.bundlerAuthorization),
         )
       : undefined;
+  const baselineActivation = { ...config.activation };
+  const executionSetting = () =>
+    management?.storedExecution(network.name, baselineActivation) ??
+    baselineActivation;
+  if (management)
+    Object.defineProperty(config.activation, 'enabled', {
+      enumerable: true,
+      get: () => executionSetting().enabled,
+    });
+  let workersStarted = false;
+  let workersStarting: Promise<void> | undefined;
+  const syncExecution = async () => {
+    if (!executionSetting().enabled || workersStarted) return;
+    workersStarting ??= Promise.resolve()
+      .then(async () => {
+        await safeWallet?.start();
+        workersStarted = true;
+      })
+      .finally(() => {
+        workersStarting = undefined;
+      });
+    await workersStarting;
+  };
   const currentConfiguration = () =>
     database.onboardingStore.transaction(
       (state) =>
@@ -465,6 +488,7 @@ async function createNetworkContext(
   return {
     network: network.name,
     database,
+    execution: { defaults: baselineActivation, sync: syncExecution },
     service,
     safeWallet,
     walletCalls: safeWallet
@@ -485,6 +509,7 @@ async function createNetworkContext(
       try {
         return (
           config.activation.enabled &&
+          workersStarted &&
           (await database.ready()) &&
           (await currentConfiguration())
         );
@@ -493,7 +518,7 @@ async function createNetworkContext(
       }
     },
     start: async () => {
-      if (config.activation.enabled) await safeWallet?.start();
+      await syncExecution();
     },
     close: async () => {
       await safeWallet?.close();

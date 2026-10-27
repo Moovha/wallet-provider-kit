@@ -276,6 +276,26 @@ Save network choices while preserving the default used by existing applications.
 
 [`POST /v1/provider/networks`](http-reference.md#post-v1-provider-networks) — request body, permissions, effects and response details.
 
+### Check wallet execution on a network
+
+Read the retained execution setting, completed-check references and running readiness for one configured network.
+
+**Who uses it:** Provider operator.
+
+**When you need it:** Use Networks & execution in the portal or read before changing a network setting.
+
+[`GET /v1/provider/networks/{network}/execution`](http-reference.md#get-v1-provider-networks-network-execution) — request body, permissions, effects and response details.
+
+### Enable or pause wallet execution on a network
+
+Apply a durable network execution setting without restarting the service.
+
+**Who uses it:** Provider operator.
+
+**When you need it:** Enable after completing wallet setup and recovery checks, or pause new requests during maintenance.
+
+[`POST /v1/provider/networks/{network}/execution`](http-reference.md#post-v1-provider-networks-network-execution) — request body, permissions, effects and response details.
+
 ### Browse provider users
 
 Browse stored application-scoped users and their KYC evidence summaries.
@@ -543,6 +563,16 @@ Read an immutable published rules version to understand which terms applied at t
 **When you need it:** Optional: use for audit and troubleshooting. Reading history does not reactivate those rules or restore wallet permission.
 
 [`GET /v1/application/policy/revisions/{revision}`](http-reference.md#get-v1-application-policy-revisions-revision) — request body, permissions, effects and response details.
+
+### Choose transaction permissions for a trusted application
+
+Allow an approved application to submit arbitrary external contract calls and native transfers without transaction proposals or contract restrictions.
+
+**Who uses it:** Provider operator.
+
+**When you need it:** Choose unrestricted mode only for an application you trust to enforce transaction rules. Restricted mode is the default.
+
+[`POST /v1/provider/applications/{applicationId}/transaction-mode`](http-reference.md#post-v1-provider-applications-applicationid-transaction-mode) — request body, permissions, effects and response details.
 
 ### Choose how future transaction-rule changes are reviewed
 

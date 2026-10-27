@@ -26,3 +26,7 @@ need accepted rules, services and bounded network-fee sponsorship before use.
 
 Edit static configuration as JSON, validate it with `node dist/main.js validate --config provider.config.json`, or use [administration](runtime-workspace.md) for a running API-managed service.
 Complete [launch checks](conformance.md), including backup and recovery, before activation.
+API-managed installations can then use **Networks & execution → Execution** to
+save an execution setting for each running network without restarting. Saved
+settings take precedence over JSON activation defaults and remain in the existing
+durable administration store; no database migration is required.

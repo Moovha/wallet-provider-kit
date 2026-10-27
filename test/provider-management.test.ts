@@ -1027,3 +1027,104 @@ it('preserves missing-user responses and detached directory records with SQLite 
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+it('requires current operator authority and evidence for per-network execution, fencing revisions and replay', async () => {
+  const f = await fixture();
+  const secret = password();
+  await f.service.claim({
+    claim: f.claim,
+    username: 'admin',
+    password: secret,
+  });
+  const admin = await f.service.verifyCredentials(
+    'operator-admin',
+    secret,
+    managementScopes,
+  );
+  const defaults = { enabled: false };
+  expect(f.service.executionSettings(admin, 'base', defaults)).toMatchObject({
+    enabled: false,
+    revision: 1,
+  });
+  await expect(
+    f.service.saveExecution(
+      { ...admin, clientId: 'unknown' },
+      randomUUID(),
+      'base',
+      {
+        expected_revision: 1,
+        enabled: true,
+        backendAcceptance: 'checked',
+        recoveryAcceptance: 'tested',
+        mainnet_confirmed: true,
+      },
+      defaults,
+    ),
+  ).rejects.toMatchObject({ code: 'wallet_authorization_denied' });
+  await expect(
+    f.service.saveExecution(
+      admin,
+      randomUUID(),
+      'base',
+      {
+        expected_revision: 1,
+        enabled: true,
+        backendAcceptance: 'checked',
+        recoveryAcceptance: 'tested',
+      },
+      defaults,
+    ),
+  ).rejects.toMatchObject({ code: 'wallet_provider_input' });
+  await expect(
+    f.service.saveExecution(
+      admin,
+      randomUUID(),
+      'base-sepolia',
+      { expected_revision: 1, enabled: true },
+      defaults,
+    ),
+  ).rejects.toMatchObject({ code: 'wallet_provider_input' });
+  const input = {
+    expected_revision: 1,
+    enabled: true,
+    backendAcceptance: 'checked',
+    recoveryAcceptance: 'tested',
+    mainnet_confirmed: true,
+  };
+  const key = randomUUID();
+  const saved = await f.service.saveExecution(
+    admin,
+    key,
+    'base',
+    input,
+    defaults,
+  );
+  expect(saved).toMatchObject({ revision: 2, enabled: true });
+  expect(
+    await f.service.saveExecution(admin, key, 'base', input, defaults),
+  ).toEqual(saved);
+  expect(
+    f.service.executionSettings(admin, 'base-sepolia', defaults),
+  ).toMatchObject({ revision: 1, enabled: false });
+  await expect(
+    f.service.saveExecution(admin, randomUUID(), 'base', input, defaults),
+  ).rejects.toMatchObject({ code: 'wallet_attempt_conflict' });
+  await expect(
+    f.service.saveExecution(
+      admin,
+      key,
+      'base',
+      { expected_revision: 2, enabled: false },
+      defaults,
+    ),
+  ).rejects.toMatchObject({ code: 'wallet_attempt_conflict' });
+  expect(
+    await f.service.saveExecution(
+      admin,
+      randomUUID(),
+      'base',
+      { expected_revision: 2, enabled: false },
+      defaults,
+    ),
+  ).toMatchObject({ revision: 3, enabled: false });
+});
