@@ -23,7 +23,10 @@ out of the connected application.
 | Network services | Trusted RPC connections used to read chain state and verify outcomes     | The developer supplies service configuration and private credentials |
 | Network fees     | Who pays, the chosen network, fee ceilings and limits on active accounts | The provider offers limits; the application accepts and funds them   |
 
-Start with [application rules](runtime-configuration.md). Then review
+Restricted applications start with [application rules](runtime-configuration.md).
+Provider-enabled [trusted applications](runtime-configuration.md#trust-an-application-without-transaction-restrictions)
+do not need action declarations or contract proposals; their service connections
+and network-fee agreements remain required. Then review
 [network services](operator-services.md) and [paying network fees](assets-and-gas.md)
 as you reach those decisions. Acceptance must match the current application policy.
 

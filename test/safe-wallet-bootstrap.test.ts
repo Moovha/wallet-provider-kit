@@ -815,8 +815,12 @@ it('estimates composed calls up to accepted gas terms and uses the buffered esti
     runtime.safeWalletInfrastructure![t.applicationId].paymaster =
       t.f.config.acceptance.paymaster;
     const terms = runtime.obligations!.records[t.applicationId + ':sponsorship']
-      .value as { gas_limits: { gas_limit: string } };
+      .value as {
+      gas_limits: { gas_limit: string };
+      maximum_gas_budget_wei: string;
+    };
     terms.gas_limits.gas_limit = '1000000';
+    terms.maximum_gas_budget_wei = '1000000000';
   });
   const requests: Record<string, string>[] = [];
   const transport = t.runtime as unknown as {

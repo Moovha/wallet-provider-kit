@@ -87,3 +87,85 @@ it('classifies only a correlated execution revert as terminal before dispatch', 
     ),
   ).toThrow('wallet_provider_unavailable');
 });
+
+it('accepts rollup pre-verification overhead within the unchanged monetary fee and total gas bounds', () => {
+  const priced = { ...operation, maxFeePerGas: '0xa7d8c0' };
+  const rollup = {
+    callGasLimit: '0xeb6b',
+    verificationGasLimit: '0x1320b',
+    preVerificationGas: '0x1416da',
+  };
+  const limits = { ...operation, preVerificationGas: '0x4c4b40' };
+  const fee = {
+    maximumCostWei: '1000000000000000',
+    l1FeeReserveWei: '1000000000000',
+  };
+  const result = applyEstimatedUserOperationGas(
+    priced,
+    rollup,
+    limits,
+    '5000000',
+    150000n,
+    fee,
+  );
+  expect(BigInt(result.preVerificationGas)).toBe(1579884n);
+  expect(result.maxFeePerGas).toBe(priced.maxFeePerGas);
+  expect(result.sender).toBe(priced.sender);
+  expect(result.callData).toBe(priced.callData);
+  expect(() =>
+    applyEstimatedUserOperationGas(
+      priced,
+      rollup,
+      limits,
+      '500000',
+      150000n,
+      fee,
+    ),
+  ).toThrow('wallet_authorization_denied');
+  expect(() =>
+    applyEstimatedUserOperationGas(priced, rollup, limits, '5000000', 150000n, {
+      ...fee,
+      maximumCostWei: '21858441999999',
+    }),
+  ).toThrow('wallet_authorization_denied');
+});
+it('keeps execution and validation ceilings while allowing priced rollup overhead', () => {
+  const limits = { ...operation, preVerificationGas: '0x4c4b40' };
+  const fee = { maximumCostWei: '1000000000000000000', l1FeeReserveWei: '0' };
+  for (const field of ['callGasLimit', 'verificationGasLimit'])
+    expect(() =>
+      applyEstimatedUserOperationGas(
+        operation,
+        { ...estimate, [field]: '0x7a120' },
+        limits,
+        '5000000',
+        150000n,
+        fee,
+      ),
+    ).toThrow('wallet_authorization_denied');
+  expect(() =>
+    applyEstimatedUserOperationGas(
+      operation,
+      { ...estimate, callGasLimit: '0xc350', preVerificationGas: '0x4c4b40' },
+      limits,
+      '5000000',
+      150000n,
+      fee,
+    ),
+  ).toThrow('wallet_authorization_denied');
+});
+it.each(['0x0', '0x-1', 'invalid'])(
+  'rejects an invalid operation fee %s before accepting the estimate',
+  (maxFeePerGas) => {
+    expect(() =>
+      applyEstimatedUserOperationGas(
+        { ...operation, maxFeePerGas },
+        estimate,
+        ceilings,
+        '1000000',
+        150000n,
+        { maximumCostWei: '1000000000000000', l1FeeReserveWei: '0' },
+      ),
+    ).toThrow('wallet_authorization_denied');
+  },
+);

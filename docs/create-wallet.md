@@ -16,6 +16,9 @@ test environment and an approved test identity for your first run.
 
 - The application’s connection details and the provider’s address.
 - An accepted [agreement for user checks and consent](application-access.md).
+- Published application transaction rules, or provider-enabled
+  [trusted-app transaction permissions](runtime-configuration.md#trust-an-application-without-transaction-restrictions),
+  on the selected network.
 - Accepted [application rules, services and fee funding](application-obligations.md),
   with the wallet infrastructure provisioned and the service approved for a
   controlled test. Creating a Safe requires network infrastructure even if the
@@ -42,8 +45,9 @@ If the person has not approved the transaction terms, stop before provisioning.
 
 Obtain an application access token as described in the [API guide](http-api.md#_1-identify-your-application).
 Read `GET /v1/access-policy` with `wallet:access:read`. Present its
-`contract_call_terms` and `runtime_contract_terms`, when supplied, and retain
-the exact `action_policy_revision` the person approved. Do not request transaction
+`contract_call_terms` and `runtime_contract_terms`, when supplied, and present the current transaction terms. Supply the exact
+`action_policy_revision` when you need to reject changes since the person reviewed
+them; omitted policy revisions bind to the current terms at acceptance. Do not request transaction
 permission when the current terms or revision are unavailable. Submit
 `POST /v1/access-requests` with `wallet:access` and a saved UUIDv4 `Idempotency-Key`.
 For a policy requiring `country`, the body has this shape:
@@ -76,7 +80,10 @@ For a policy requiring `country`, the body has this shape:
 }
 ```
 
-Replace every angle-bracket value with a real record or current policy value.
+Replace every supplied angle-bracket value with a real record or current policy
+value. You may omit `consent.reference`, both consent policy revisions and
+`identity.level`; the provider saves their effective values and returns consent
+metadata in the access receipt. Consent times and identity evidence remain required.
 Adapt identity fields to the service’s requirements. This template does not
 perform verification or capture consent. Times must satisfy the
 [evidence rules](application-access.md#build-the-permission-experience).

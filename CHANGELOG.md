@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+- Add persistent per-network execution controls to administration. Enabling
+  requires setup and recovery references plus a mainnet acknowledgement;
+  setting changes invalidate prior transaction consent and pending authority.
+  Issued signatures and submitted transactions may still execute.
+- Let provider operators grant trusted applications unrestricted external calls
+  on one network. Restricted mode remains the default. Identity, owner consent,
+  Safe control, immutable execution and accepted fee limits still apply;
+  returning to restricted mode clears the contract list.
+- Organize administration around a selected application with separate wallet
+  setup, permission, connection and sharing panels and keyboard-accessible tabs.
+- Return saved consent metadata in application access receipts. Omitted consent
+  references and revisions bind to current terms; omitted identity levels use
+  the application agreement. Explicit mismatches remain rejected.
+- Bound rollup pre-verification gas by accepted total gas and monetary fee
+  limits. Allow status reads up to three seconds for canonical receipt refresh
+  while retaining pending status when fresh evidence is unavailable.
 - Require Node.js 26.12.1 through the Node 26 release line for source use and
   align CI, container builds and Node type definitions. Node 26 is Current;
   the OIDC dependency's LTS-only support warning remains visible.

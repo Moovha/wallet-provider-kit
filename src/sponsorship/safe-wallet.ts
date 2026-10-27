@@ -1,3 +1,4 @@
+import { maximumSponsorGasLimit } from '../execution/defaults.js';
 import {
   SafeOwnerAdministration,
   type SafeOwnerAdministrationState,
@@ -2565,11 +2566,23 @@ export class SafeWalletRuntime {
             BigInt(estimate.verificationGasLimit) +
               BigInt(threshold - 1) * 15000n,
           );
+        // Pre-verification gas includes rollup data fees expressed in gas units.
+        // Bound it by the protocol total and accepted monetary fee, not EVM work.
+        const maximumGas = maximumSponsorGasLimit();
+        ceilings.preVerificationGas = toQuantity(maximumGas);
         return applyEstimatedUserOperationGas(
           operation,
           estimate,
           ceilings,
-          accepted.gas_limits?.gas_limit,
+          accepted.gas_limits?.gas_limit ?? maximumGas.toString(),
+          150000n,
+          {
+            maximumCostWei:
+              accepted.maximum_transaction_fee_wei ??
+              accepted.maximum_gas_budget_wei ??
+              deny(),
+            l1FeeReserveWei: sponsorshipGas(accepted).l1FeeReserveWei,
+          },
         );
       },
       (delay) => this.scheduleWallets(delay),

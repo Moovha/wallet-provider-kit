@@ -61,6 +61,7 @@ export const runtimePolicySchema = {
     'claim_requirements',
   ],
   properties: {
+    transaction_mode: { type: 'string', enum: ['unrestricted'] },
     action_requirements: obligationSchemas.actions,
     application_resources_hash: applicationIdSchema,
     version: { type: 'string', enum: ['1'] },

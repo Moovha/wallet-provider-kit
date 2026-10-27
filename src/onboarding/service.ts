@@ -18,7 +18,10 @@ import {
   validateWalletMember,
   userOwner,
 } from './wallets.js';
-import { checkApplicationAssertion } from './application-access.js';
+import {
+  checkApplicationAssertion,
+  resolveApplicationAssertion,
+} from './application-access.js';
 import { randomUUID } from 'node:crypto';
 import type {
   AuthorityContext,
@@ -380,6 +383,23 @@ export class OnboardingService {
           }
         : {}),
       ...(request.grantId ? { grant_id: request.grantId } : {}),
+      ...(request.input.user
+        ? {
+            consent: {
+              reference: request.input.user.consent.reference,
+              granted_at: request.input.user.consent.granted_at,
+              expires_at: request.input.user.consent.expires_at,
+              policy_revision: request.input.user.consent.policy_revision,
+              ...(request.input.user.consent.action_policy_revision !==
+              undefined
+                ? {
+                    action_policy_revision:
+                      request.input.user.consent.action_policy_revision,
+                  }
+                : {}),
+            },
+          }
+        : {}),
       ...(status === 'granted'
         ? {
             account_id: request.accountId,
@@ -436,6 +456,15 @@ export class OnboardingService {
       const actionRevision = delegatesTransfers
         ? this.actionRevision(state, context.principal)
         : undefined;
+      if (this.policy.access.mode === 'application' && input.user) {
+        input.user = resolveApplicationAssertion(
+          this.policy,
+          context.principal,
+          input.user,
+          context.idempotencyKey,
+          actionRevision,
+        );
+      }
       const assertion =
         this.policy.access.mode === 'application'
           ? checkApplicationAssertion(

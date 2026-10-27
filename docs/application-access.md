@@ -47,7 +47,9 @@ Static installations use the advanced
 the application’s identity/consent agreement instead. Do not combine registration
 authorities in one deployment.
 
-Verification levels must match the agreed value exactly. Nonempty required fields
+An explicitly supplied verification level must match the agreed value exactly.
+Omit `identity.level` to use the application’s configured verification level;
+this does not perform identity checks or refresh their timestamp. Nonempty required fields
 check presence, not country eligibility or arbitrary risk rules. The built-in
 age and access controls accept 1–365 days. More complex acceptance rules require
 a reviewed [host integration](provider-guide.md). Changing policy invalidates old
@@ -98,8 +100,19 @@ person is or grant permission to use their wallet by itself.
 }
 ```
 
-These are fictional values. Use the returned policy revision, actual UTC records
-and your own evidence references. Include only required identity fields. Neither
+These are fictional values. Use actual UTC records and your own identity evidence reference.
+`consent.reference`, `consent.policy_revision`, `consent.action_policy_revision`
+and `identity.level` are optional request fields. When omitted, the provider
+assigns a consent reference scoped to the caller and original idempotency key,
+binds the request to its current access and transaction policies, and uses the
+application’s agreed identity level. Explicit values must still be valid and
+match current policy. The access receipt returns the saved consent reference,
+timestamps and effective revisions in `consent`. Retain that receipt for recovery.
+
+Omitting revisions attests consent to the current terms when the request is
+accepted. Supply revisions when you need rejection if the terms changed after
+the person reviewed them. No consent, identity checks or transaction approval is
+created by defaulting these metadata fields. Include only required identity fields. Neither
 identity verification nor consent may be dated in the future. Consent expiry must
 fit `max_access_days`; identity age must fit `max_identity_age_days`. The grant
 expires at the earliest identity, consent or provider limit.

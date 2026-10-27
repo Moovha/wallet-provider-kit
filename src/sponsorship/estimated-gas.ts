@@ -14,6 +14,7 @@ export function applyEstimatedUserOperationGas(
   ceilings: GasCeilings,
   maximumTotalGas?: string,
   paymasterGas = 150000n,
+  costLimit?: { maximumCostWei: string; l1FeeReserveWei: string },
 ): UserOperationV07 {
   const gas = { ...operation };
   const denied = () => {
@@ -31,12 +32,25 @@ export function applyEstimatedUserOperationGas(
     if (bounded > BigInt(ceilings[field])) denied();
     gas[field] = toQuantity(bounded);
   }
-  if (
-    maximumTotalGas !== undefined &&
-    fields.reduce((sum, field) => sum + BigInt(gas[field]), paymasterGas) >
-      BigInt(maximumTotalGas)
-  )
+  const totalGas = fields.reduce(
+    (sum, field) => sum + BigInt(gas[field]),
+    paymasterGas,
+  );
+  if (maximumTotalGas !== undefined && totalGas > BigInt(maximumTotalGas))
     denied();
+  if (costLimit) {
+    const fee = operation.maxFeePerGas;
+    if (
+      !/^0x[0-9a-f]{1,30}$/.test(fee) ||
+      BigInt(fee) === 0n ||
+      !/^[1-9][0-9]{0,77}$/.test(costLimit.maximumCostWei) ||
+      !/^(0|[1-9][0-9]{0,77})$/.test(costLimit.l1FeeReserveWei)
+    )
+      denied();
+    const maximumCost =
+      totalGas * BigInt(fee) + BigInt(costLimit.l1FeeReserveWei);
+    if (maximumCost > BigInt(costLimit.maximumCostWei)) denied();
+  }
   return gas;
 }
 

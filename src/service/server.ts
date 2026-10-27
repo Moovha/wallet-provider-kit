@@ -920,6 +920,7 @@ export async function createServer(options: ServerOptions = {}) {
             .networkContexts!.find((context) => context.network === network)
             ?.ready?.()) ?? false
       : undefined,
+    options.networkContexts,
   );
   options.authorizationServer?.register(app);
   await app.ready();

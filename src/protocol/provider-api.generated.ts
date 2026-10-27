@@ -472,7 +472,7 @@ export interface paths {
          *
          *     **Before you start:** After the person completes the agreed identity checks and approves wallet access in your application, submit those records here. First read GET /v1/access-policy for the required fields and current terms. Use mode=create without wallet to preserve the default Personal account. To add a wallet, supply wallet.reference, name and kind (personal or shared), and consent.wallet_reference. A verified user can omit identity while their saved checks remain current. Each wallet needs its own consent. Use mode=connect with account_id and consent.account_id to renew a selected wallet; invited members also supply consent.membership_revision. To request a wallet from a selected source application, read GET /v1/access-policy?source_application_id=SOURCE_CONNECTION_ID, then use mode=connect_from_application and source_application_id without account_id. Omit source_account_id to connect the source Personal wallet, or select another source_account_id and include consent.account_id. Include the returned sharing revision and source application in fresh consent for the requesting application. All configured identity fields must match exactly; ambiguous matches are denied. The provider must trust your application’s checks. Hosted compatibility mode uses a separate provider login and review.
          *
-         *     **Result and next step:** 200: the access decision. A granted response includes account_id, grant_id, allowed actions and expiry. Save those IDs, then let the creating application provision the blockchain wallet. Shared-wallet account requests require Wallet-Grant-Id; use the selected person’s grant_id. List consented wallets with POST /v1/accounts/query. Reconnecting preserves the existing account. This request does not create an on-chain wallet or send money. Missing, stale or unauthorized evidence is rejected; consent_url is only for hosted compatibility mode.
+         *     **Result and next step:** 200: the access decision. Application receipts include saved consent metadata. Omitted consent.reference is assigned by the provider; omitted consent policy revisions bind current terms, and omitted identity.level uses the agreed application level. Explicit mismatches are rejected. Consent times and valid identity evidence remain required. A granted response includes account_id, grant_id, allowed actions and expiry. Save those IDs, then let the creating application provision the blockchain wallet. Shared-wallet account requests require Wallet-Grant-Id; use the selected person’s grant_id. List consented wallets with POST /v1/accounts/query. Reconnecting preserves the existing account. This request does not create an on-chain wallet or send money. Missing, stale or unauthorized evidence is rejected; consent_url is only for hosted compatibility mode.
          */
         post: operations["requestAccountAccess"];
         delete?: never;
@@ -1419,6 +1419,36 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/provider/applications/{applicationId}/transaction-mode": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Choose transaction permissions for a trusted application
+         * @description **Why this exists:** Allow an approved application to submit arbitrary external contract calls and native transfers without transaction proposals or contract restrictions.
+         *
+         *     **Who uses it:** Provider operator.
+         *
+         *     **When you need it:** Choose unrestricted mode only for an application you trust to enforce transaction rules. Restricted mode is the default.
+         *
+         *     **Before you start:** Use provider operator credentials, the runtime application ID, selected Wallet-Network, expected_revision and an original UUIDv4 Idempotency-Key. The application must be active with an accepted user-check agreement.
+         *
+         *     **Result and next step:** 200: a published authority revision. Current identity, ownership, consent, Safe control checks and network-fee limits remain enforced. Mode changes require fresh transaction consent. Returning to restricted mode clears allowed contracts; publish transaction rules before execution.
+         *
+         *     **Request details:** Optional runtime configuration control plane. Application proposals and provider publications are configuration records, not wallet grants, signing authority or execution activation. Publications become readable immediately without restarting the service. Immutable historical revisions remain available. Requires the documented scope and configured application or operator identity.
+         */
+        post: operations["setApplicationTransactionMode"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/application/policy/proposals": {
         parameters: {
             query?: never;
@@ -1681,6 +1711,50 @@ export interface paths {
          *     **Request details:** Save shared user-check requirements without restarting the service. Use the current revision and a UUIDv4 idempotency key. Changed settings end all current wallet approvals and pending access requests; people must give fresh permission to the new terms. Identical settings preserve approvals. This does not perform KYC, change application trust or enable transactions.
          */
         post: operations["saveProviderUserChecks"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/provider/networks/{network}/execution": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Check wallet execution on a network
+         * @description **Why this exists:** Read the retained execution setting, completed-check references and running readiness for one configured network.
+         *
+         *     **Who uses it:** Provider operator.
+         *
+         *     **When you need it:** Use Networks & execution in the portal or read before changing a network setting.
+         *
+         *     **Before you start:** Use a current provider management token and a network already running on this instance.
+         *
+         *     **Result and next step:** 200: the current revision, enabled setting and readiness. Enabled does not prove application funding or wallet readiness.
+         *
+         *     **Request details:** Protected installation and application administration. Management credentials do not activate wallet operations or authorize spending.
+         */
+        get: operations["readNetworkExecution"];
+        put?: never;
+        /**
+         * Enable or pause wallet execution on a network
+         * @description **Why this exists:** Apply a durable network execution setting without restarting the service.
+         *
+         *     **Who uses it:** Provider operator.
+         *
+         *     **When you need it:** Enable after completing wallet setup and recovery checks, or pause new requests during maintenance.
+         *
+         *     **Before you start:** Supply expected_revision, an original UUIDv4 Idempotency-Key and enabled. Enabling needs backendAcceptance and recoveryAcceptance references. Mainnet enabling also requires mainnet_confirmed: true.
+         *
+         *     **Result and next step:** 200: saved setting and current readiness. Changing the setting fences prior transaction consent and pending authority on that network. Issued signatures and submitted transactions may still execute. Other networks and application permissions remain separate.
+         *
+         *     **Request details:** Protected installation and application administration. Management credentials do not activate wallet operations or authorize spending.
+         */
+        post: operations["saveNetworkExecution"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3937,7 +4011,7 @@ export interface operations {
                         id: string;
                         identity?: {
                             reference: string;
-                            level: string;
+                            level?: string;
                             /** Format: date-time */
                             verified_at: string;
                             fields: {
@@ -3945,12 +4019,12 @@ export interface operations {
                             };
                         };
                         consent: {
-                            reference: string;
+                            reference?: string;
                             /** Format: date-time */
                             granted_at: string;
                             /** Format: date-time */
                             expires_at: string;
-                            policy_revision: string;
+                            policy_revision?: string;
                             source_application_id?: string;
                             account_id?: string;
                             wallet_reference?: string;
@@ -3991,6 +4065,15 @@ export interface operations {
                          */
                         consent_url?: string;
                         grant_id?: string;
+                        consent?: {
+                            reference: string;
+                            /** Format: date-time */
+                            granted_at: string;
+                            /** Format: date-time */
+                            expires_at: string;
+                            policy_revision: string;
+                            action_policy_revision?: string;
+                        };
                         account_id?: string;
                         permissions?: ("account:read" | "operations:request" | "contracts:request" | "members:manage" | "owners:manage")[];
                         /** Format: date-time */
@@ -4366,6 +4449,8 @@ export interface operations {
                                         maximumValueWei: string;
                                     }[];
                                 };
+                                /** @enum {unknown} */
+                                unrestrictedCalls?: true;
                             };
                             maxValiditySeconds: number;
                         };
@@ -4374,6 +4459,8 @@ export interface operations {
                             revision: string;
                             policy_hash: string;
                             policy: {
+                                /** @enum {string} */
+                                transaction_mode?: "unrestricted";
                                 action_requirements?: {
                                     name: string;
                                     description: string;
@@ -5559,6 +5646,15 @@ export interface operations {
                                  */
                                 consent_url?: string;
                                 grant_id?: string;
+                                consent?: {
+                                    reference: string;
+                                    /** Format: date-time */
+                                    granted_at: string;
+                                    /** Format: date-time */
+                                    expires_at: string;
+                                    policy_revision: string;
+                                    action_policy_revision?: string;
+                                };
                                 account_id?: string;
                                 permissions?: ("account:read" | "operations:request" | "contracts:request" | "members:manage" | "owners:manage")[];
                                 /** Format: date-time */
@@ -5777,6 +5873,15 @@ export interface operations {
                          */
                         consent_url?: string;
                         grant_id?: string;
+                        consent?: {
+                            reference: string;
+                            /** Format: date-time */
+                            granted_at: string;
+                            /** Format: date-time */
+                            expires_at: string;
+                            policy_revision: string;
+                            action_policy_revision?: string;
+                        };
                         account_id?: string;
                         permissions?: ("account:read" | "operations:request" | "contracts:request" | "members:manage" | "owners:manage")[];
                         /** Format: date-time */
@@ -6002,6 +6107,15 @@ export interface operations {
                          */
                         consent_url?: string;
                         grant_id?: string;
+                        consent?: {
+                            reference: string;
+                            /** Format: date-time */
+                            granted_at: string;
+                            /** Format: date-time */
+                            expires_at: string;
+                            policy_revision: string;
+                            action_policy_revision?: string;
+                        };
                         account_id?: string;
                         permissions?: ("account:read" | "operations:request" | "contracts:request" | "members:manage" | "owners:manage")[];
                         /** Format: date-time */
@@ -10700,6 +10814,8 @@ export interface operations {
                                 previous_revision: string;
                                 policy_hash: string;
                                 policy: {
+                                    /** @enum {string} */
+                                    transaction_mode?: "unrestricted";
                                     action_requirements?: {
                                         name: string;
                                         description: string;
@@ -10841,6 +10957,8 @@ export interface operations {
                                 previous_revision: string;
                                 policy_hash: string;
                                 policy: {
+                                    /** @enum {string} */
+                                    transaction_mode?: "unrestricted";
                                     action_requirements?: {
                                         name: string;
                                         description: string;
@@ -10989,6 +11107,8 @@ export interface operations {
                                 based_on_revision: string;
                                 policy_hash: string;
                                 policy: {
+                                    /** @enum {string} */
+                                    transaction_mode?: "unrestricted";
                                     action_requirements?: {
                                         name: string;
                                         description: string;
@@ -11764,6 +11884,8 @@ export interface operations {
                             previous_revision: string;
                             policy_hash: string;
                             policy: {
+                                /** @enum {string} */
+                                transaction_mode?: "unrestricted";
                                 action_requirements?: {
                                     name: string;
                                     description: string;
@@ -12106,6 +12228,8 @@ export interface operations {
                             previous_revision: string;
                             policy_hash: string;
                             policy: {
+                                /** @enum {string} */
+                                transaction_mode?: "unrestricted";
                                 action_requirements?: {
                                     name: string;
                                     description: string;
@@ -12448,6 +12572,8 @@ export interface operations {
                             previous_revision: string;
                             policy_hash: string;
                             policy: {
+                                /** @enum {string} */
+                                transaction_mode?: "unrestricted";
                                 action_requirements?: {
                                     name: string;
                                     description: string;
@@ -12760,6 +12886,352 @@ export interface operations {
             };
         };
     };
+    setApplicationTransactionMode: {
+        parameters: {
+            query?: never;
+            header: {
+                "idempotency-key": string;
+                /** @description Choose a configured network. Omit to use the default; existing wallet, request and grant IDs select their stored network automatically. A conflicting selection is rejected. */
+                "wallet-network"?: "base" | "base-sepolia" | "ethereum" | "ethereum-sepolia";
+            };
+            path: {
+                applicationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    expected_revision: string;
+                    /** @enum {string} */
+                    mode: "restricted" | "unrestricted";
+                };
+            };
+        };
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        application_id: string;
+                        revision: string;
+                        previous_revision: string;
+                        policy_hash: string;
+                        policy: {
+                            /** @enum {string} */
+                            transaction_mode?: "unrestricted";
+                            action_requirements?: {
+                                name: string;
+                                description: string;
+                                fields: {
+                                    name: string;
+                                    required: boolean;
+                                    allowed_values: string[];
+                                }[];
+                            }[];
+                            application_resources_hash?: string;
+                            /** @enum {string} */
+                            version: "1";
+                            enabled: boolean;
+                            /** @enum {string} */
+                            chain_id: "eip155:84532" | "eip155:8453" | "eip155:1" | "eip155:11155111";
+                            contracts: {
+                                address: string;
+                                code_hash: string;
+                                implementation?: {
+                                    address: string;
+                                    code_hash: string;
+                                    /** @enum {string} */
+                                    storage_layout?: "eip1967" | "zeppelinos";
+                                };
+                                methods: {
+                                    signature: string;
+                                    maximum_value_wei: string;
+                                    user_address_parameters?: number[];
+                                }[];
+                            }[];
+                            call_adapters?: {
+                                tokenTransfers?: {
+                                    token: {
+                                        address: string;
+                                        codeHash: string;
+                                        implementation?: {
+                                            address: string;
+                                            codeHash: string;
+                                            /** @enum {string} */
+                                            storageLayout?: "eip1967" | "zeppelinos";
+                                        };
+                                    };
+                                    recipients: string[];
+                                    maximumAmount: string;
+                                    lifetimeAmount?: string;
+                                }[];
+                                swaps?: {
+                                    id: string;
+                                    router: {
+                                        address: string;
+                                        codeHash: string;
+                                        implementation?: {
+                                            address: string;
+                                            codeHash: string;
+                                            /** @enum {string} */
+                                            storageLayout?: "eip1967" | "zeppelinos";
+                                        };
+                                    };
+                                    tokenIn: {
+                                        address: string;
+                                        codeHash: string;
+                                        implementation?: {
+                                            address: string;
+                                            codeHash: string;
+                                            /** @enum {string} */
+                                            storageLayout?: "eip1967" | "zeppelinos";
+                                        };
+                                    };
+                                    tokenOut: {
+                                        address: string;
+                                        codeHash: string;
+                                        implementation?: {
+                                            address: string;
+                                            codeHash: string;
+                                            /** @enum {string} */
+                                            storageLayout?: "eip1967" | "zeppelinos";
+                                        };
+                                    };
+                                    fee: number;
+                                    maximumInput: string;
+                                }[];
+                                vaults?: {
+                                    id: string;
+                                    router: {
+                                        address: string;
+                                        codeHash: string;
+                                        implementation?: {
+                                            address: string;
+                                            codeHash: string;
+                                            /** @enum {string} */
+                                            storageLayout?: "eip1967" | "zeppelinos";
+                                        };
+                                    };
+                                    vault: {
+                                        address: string;
+                                        codeHash: string;
+                                        implementation?: {
+                                            address: string;
+                                            codeHash: string;
+                                            /** @enum {string} */
+                                            storageLayout?: "eip1967" | "zeppelinos";
+                                        };
+                                    };
+                                    asset: {
+                                        address: string;
+                                        codeHash: string;
+                                        implementation?: {
+                                            address: string;
+                                            codeHash: string;
+                                            /** @enum {string} */
+                                            storageLayout?: "eip1967" | "zeppelinos";
+                                        };
+                                    };
+                                    maximumAssets: string;
+                                }[];
+                            };
+                            native_transfers?: {
+                                address: string;
+                                code_hash: string;
+                                maximum_value_wei: string;
+                            }[];
+                            maximum_calls: number;
+                            maximum_native_value_wei: string;
+                            max_validity_seconds: number;
+                            claim_requirements: {
+                                name: string;
+                                allowed_values: string[];
+                                max_age_seconds: number;
+                            }[];
+                        };
+                        /** Format: date-time */
+                        published_at: string;
+                        proposal_id?: string;
+                        published_by: string;
+                    };
+                };
+            };
+            /** @description Problem response */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+        };
+    };
     proposeRuntimeConfiguration: {
         parameters: {
             query?: never;
@@ -12776,6 +13248,8 @@ export interface operations {
                 "application/json": {
                     expected_revision: string;
                     policy: {
+                        /** @enum {string} */
+                        transaction_mode?: "unrestricted";
                         action_requirements?: {
                             name: string;
                             description: string;
@@ -12922,6 +13396,8 @@ export interface operations {
                         based_on_revision: string;
                         policy_hash: string;
                         policy: {
+                            /** @enum {string} */
+                            transaction_mode?: "unrestricted";
                             action_requirements?: {
                                 name: string;
                                 description: string;
@@ -13255,6 +13731,8 @@ export interface operations {
                         based_on_revision: string;
                         policy_hash: string;
                         policy: {
+                            /** @enum {string} */
+                            transaction_mode?: "unrestricted";
                             action_requirements?: {
                                 name: string;
                                 description: string;
@@ -13595,6 +14073,8 @@ export interface operations {
                         previous_revision: string;
                         policy_hash: string;
                         policy: {
+                            /** @enum {string} */
+                            transaction_mode?: "unrestricted";
                             action_requirements?: {
                                 name: string;
                                 description: string;
@@ -13922,6 +14402,8 @@ export interface operations {
                 "application/json": {
                     expected_revision: string;
                     policy: {
+                        /** @enum {string} */
+                        transaction_mode?: "unrestricted";
                         action_requirements?: {
                             name: string;
                             description: string;
@@ -14068,6 +14550,8 @@ export interface operations {
                         previous_revision: string;
                         policy_hash: string;
                         policy: {
+                            /** @enum {string} */
+                            transaction_mode?: "unrestricted";
                             action_requirements?: {
                                 name: string;
                                 description: string;
@@ -15484,6 +15968,420 @@ export interface operations {
                         verification_level: string;
                         max_identity_age_days: number;
                         max_access_days: number;
+                    };
+                };
+            };
+            /** @description Problem response */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+        };
+    };
+    readNetworkExecution: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                network: "base" | "base-sepolia" | "ethereum" | "ethereum-sepolia";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        network: string;
+                        name: string;
+                        testnet: boolean;
+                        revision: number;
+                        enabled: boolean;
+                        ready: boolean;
+                        backendAcceptance: string;
+                        recoveryAcceptance: string;
+                    };
+                };
+            };
+            /** @description Problem response */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Problem response */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+        };
+    };
+    saveNetworkExecution: {
+        parameters: {
+            query?: never;
+            header: {
+                "idempotency-key": string;
+            };
+            path: {
+                network: "base" | "base-sepolia" | "ethereum" | "ethereum-sepolia";
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    expected_revision: number;
+                    enabled: boolean;
+                    backendAcceptance?: string;
+                    recoveryAcceptance?: string;
+                    mainnet_confirmed?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        network: string;
+                        name: string;
+                        testnet: boolean;
+                        revision: number;
+                        enabled: boolean;
+                        ready: boolean;
+                        backendAcceptance: string;
+                        recoveryAcceptance: string;
                     };
                 };
             };

@@ -1,4 +1,5 @@
 import { Interface, id } from 'ethers';
+import { networkForChain } from '../networks.js';
 import type { VerifiedPrincipal } from '../domain/principal.js';
 import type {
   ApplicationUserAssertion,
@@ -65,7 +66,7 @@ export function currentRuntimePolicy(
     deny();
   const policy = structuredClone(publication.policy);
   const declared = registry?.obligations?.records[application_id + ':actions'];
-  if (declared) {
+  if (declared && policy.transaction_mode !== 'unrestricted') {
     if (declared.decision !== 'accepted') deny();
     const manifest =
       declared.value as import('./obligations.js').ApplicationObligations['actions'];
@@ -115,6 +116,15 @@ export function currentRuntimePolicy(
         .sort((a, b) => a.reference.localeCompare(b.reference)),
     ]);
   }
+  const execution =
+    state.management?.provider?.execution?.[networkForChain(policy.chain_id)];
+  if (execution) {
+    if (!execution.enabled) deny();
+    policy.application_resources_hash = canonicalHash([
+      policy.application_resources_hash ?? null,
+      { network: policy.chain_id, execution_revision: execution.revision },
+    ]);
+  }
   const snapshot = {
     application_id,
     revision,
@@ -149,16 +159,25 @@ export function runtimeCallPolicy(
   allowUnboundAccounts = false,
 ): ApprovedCallPolicy {
   validateRuntimeSnapshot(snapshot);
-  const { adapters: _staticAdapters, ...infrastructure } =
-    structuredClone(base);
+  const {
+    adapters: _staticAdapters,
+    unrestrictedCalls: _staticUnrestricted,
+    ...infrastructure
+  } = structuredClone(base);
   const policy: ApprovedCallPolicy = {
     ...infrastructure,
-    maximumNativeValueWei: String(
-      BigInt(base.maximumNativeValueWei) <
-        BigInt(snapshot.policy.maximum_native_value_wei)
-        ? BigInt(base.maximumNativeValueWei)
-        : BigInt(snapshot.policy.maximum_native_value_wei),
-    ),
+    ...(snapshot.policy.transaction_mode === 'unrestricted'
+      ? { unrestrictedCalls: true as const }
+      : {}),
+    maximumNativeValueWei:
+      snapshot.policy.transaction_mode === 'unrestricted'
+        ? snapshot.policy.maximum_native_value_wei
+        : String(
+            BigInt(base.maximumNativeValueWei) <
+              BigInt(snapshot.policy.maximum_native_value_wei)
+              ? BigInt(base.maximumNativeValueWei)
+              : BigInt(snapshot.policy.maximum_native_value_wei),
+          ),
     contracts: snapshot.policy.contracts.map((contract) => ({
       address: contract.address,
       codeHash: contract.code_hash,
@@ -223,6 +242,7 @@ export function validateRuntimeCalls(
     input.calls.length > snapshot.policy.maximum_calls
   )
     deny();
+  if (snapshot.policy.transaction_mode === 'unrestricted') return;
   const requirements = snapshot.policy.action_requirements;
   if (requirements) {
     const context = input.application_action;

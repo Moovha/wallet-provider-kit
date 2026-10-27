@@ -33,6 +33,10 @@ const identityFieldChoices = [
   ],
 ];
 
+let selectedApplicationId;
+let networkSettingsTab = 'execution';
+const applicationTabs = new Map();
+const applicationNetworks = new Map();
 let cognitoSession = false;
 let token = '',
   expiresAt = 0,
@@ -211,6 +215,58 @@ function node(tag, value, parent) {
   if (value !== undefined) n.textContent = value;
   parent?.append(n);
   return n;
+}
+function settingsTabs(parent, items, selected, onSelect) {
+  const navigation = node('div', undefined, parent);
+  navigation.className = 'settings-tabs';
+  navigation.setAttribute('role', 'tablist');
+  const panels = {},
+    buttons = {};
+  const show = (key) => {
+    for (const [id, panel] of Object.entries(panels)) {
+      const active = id === key;
+      panel.hidden = !active;
+      buttons[id].setAttribute('aria-selected', String(active));
+      buttons[id].tabIndex = active ? 0 : -1;
+    }
+  };
+  for (const [key, label] of items) {
+    const button = node('button', label, navigation),
+      panel = node('section', undefined, parent),
+      id = 'settings-' + crypto.randomUUID();
+    button.type = 'button';
+    button.id = id + '-tab';
+    button.setAttribute('role', 'tab');
+    button.setAttribute('aria-controls', id);
+    panel.id = id;
+    panel.className = 'settings-panel';
+    panel.setAttribute('role', 'tabpanel');
+    panel.setAttribute('aria-labelledby', button.id);
+    buttons[key] = button;
+    panels[key] = panel;
+    button.onclick = run(async () => {
+      show(key);
+      await onSelect?.(key);
+    });
+    button.onkeydown = (event) => {
+      const keys = items.map(([id]) => id),
+        index = keys.indexOf(key);
+      let next;
+      if (event.key === 'ArrowRight') next = keys[(index + 1) % keys.length];
+      if (event.key === 'ArrowLeft')
+        next = keys[(index + keys.length - 1) % keys.length];
+      if (event.key === 'Home') next = keys[0];
+      if (event.key === 'End') next = keys.at(-1);
+      if (next) {
+        event.preventDefault();
+        show(next);
+        buttons[next].focus();
+        void onSelect?.(next);
+      }
+    };
+  }
+  show(Object.hasOwn(panels, selected) ? selected : items[0][0]);
+  return panels;
 }
 function secret(record) {
   if (!record.client_secret) {
@@ -500,10 +556,189 @@ function renderWalletSharing(article, record, identities, checks) {
     await refresh();
   });
 }
+async function renderNetworkExecution(root, settings) {
+  node('h3', 'Wallet execution', root);
+  node(
+    'p',
+    'Turn wallet provisioning and transactions on or pause them for one network. Each application still needs its own permissions, connections and fee funding.',
+    root,
+  );
+  const label = node('label', 'Network for wallet execution', root),
+    network = node('select', undefined, label);
+  for (const name of settings.running_networks) {
+    const option = node(
+      'option',
+      settings.available.find((entry) => entry.network === name)?.name ?? name,
+      network,
+    );
+    option.value = name;
+  }
+  network.value = settings.default_network;
+  const content = node('div', undefined, root);
+  let version = 0;
+  async function load(notice = '') {
+    const current = ++version,
+      selected = network.value;
+    content.replaceChildren();
+    node('p', 'Checking execution status…', content);
+    try {
+      const data = await api(
+        '/v1/provider/networks/' + selected + '/execution',
+      );
+      if (current !== version || !token) return;
+      if (data.network !== selected)
+        throw new Error(
+          'Execution status does not match the selected network. Refresh before changing this setting.',
+        );
+      content.replaceChildren();
+      const status = node('div', undefined, content);
+      status.className =
+        'execution-status ' + (data.ready ? 'is-ready' : 'is-paused');
+      node(
+        'strong',
+        data.name + ' · ' + (data.testnet ? 'Test network' : 'Mainnet'),
+        status,
+      );
+      node(
+        'p',
+        data.ready
+          ? 'Wallet execution enabled'
+          : data.enabled
+            ? 'Enabled — service needs attention'
+            : 'Wallet execution paused',
+        status,
+      );
+      const form = node('form', undefined, content);
+      form.className = 'execution-form';
+      const modeLabel = node('label', 'Execution setting', form),
+        mode = node('select', undefined, modeLabel);
+      for (const [value, title] of [
+        ['paused', 'Paused'],
+        ['enabled', 'Enabled'],
+      ]) {
+        const option = node('option', title, mode);
+        option.value = value;
+      }
+      mode.value = data.enabled ? 'enabled' : 'paused';
+      const evidence = node('fieldset', undefined, form);
+      node('legend', 'Completed launch checks', evidence);
+      node(
+        'small',
+        'Reference your completed wallet setup and recovery tests. Keep passwords, keys and private report contents out of these fields.',
+        evidence,
+      );
+      const backendLabel = node(
+          'label',
+          'Wallet setup check reference',
+          evidence,
+        ),
+        backend = node('input', undefined, backendLabel);
+      backend.maxLength = 256;
+      backend.value = data.backendAcceptance;
+      const recoveryLabel = node(
+          'label',
+          'Backup and recovery test reference',
+          evidence,
+        ),
+        recovery = node('input', undefined, recoveryLabel);
+      recovery.maxLength = 256;
+      recovery.value = data.recoveryAcceptance;
+      const acknowledgeLabel = node('label', undefined, form),
+        acknowledge = node('input', undefined, acknowledgeLabel);
+      acknowledge.type = 'checkbox';
+      acknowledgeLabel.append(
+        document.createTextNode(
+          'I understand that enabling ' +
+            data.name +
+            ' allows approved applications to provision wallets and transact with real assets.',
+        ),
+      );
+      node(
+        'small',
+        'Pausing blocks new wallet requests. Issued signatures and submitted transactions may still execute. Changing these settings requires fresh transaction consent.',
+        form,
+      );
+      const feedback = node('p', undefined, form);
+      feedback.setAttribute('aria-live', 'polite');
+      const save = node('button', 'Save execution setting', form);
+      save.className = 'primary';
+      const changed = () =>
+        mode.value !== (data.enabled ? 'enabled' : 'paused') ||
+        backend.value !== data.backendAcceptance ||
+        recovery.value !== data.recoveryAcceptance;
+      const update = () => {
+        const enabled = mode.value === 'enabled';
+        evidence.hidden = !enabled;
+        backend.required = enabled;
+        recovery.required = enabled;
+        acknowledgeLabel.hidden = !enabled || data.testnet;
+        acknowledge.required = enabled && !data.testnet;
+        save.disabled = !changed();
+        feedback.textContent = changed()
+          ? 'Save to apply this setting to ' + data.name + '.'
+          : 'Choose a different setting to enable saving.';
+      };
+      mode.onchange = () => {
+        acknowledge.checked = false;
+        update();
+      };
+      backend.oninput = update;
+      recovery.oninput = update;
+      update();
+      if (typeof notice === 'string' && notice) feedback.textContent = notice;
+      form.onsubmit = run(async () => {
+        const enabled = mode.value === 'enabled';
+        feedback.textContent = 'Saving execution setting…';
+        save.disabled = true;
+        try {
+          await api(
+            '/v1/provider/networks/' + selected + '/execution',
+            'POST',
+            {
+              expected_revision: data.revision,
+              enabled,
+              ...(enabled
+                ? {
+                    backendAcceptance: backend.value.trim(),
+                    recoveryAcceptance: recovery.value.trim(),
+                    mainnet_confirmed: acknowledge.checked,
+                  }
+                : {}),
+            },
+          );
+          if (current === version)
+            await load('Execution setting saved for ' + data.name + '.');
+        } catch (error) {
+          feedback.textContent = error.message;
+          save.disabled = !changed();
+        }
+      });
+    } catch (error) {
+      if (current !== version) return;
+      content.replaceChildren();
+      node('p', error.message, content);
+    }
+  }
+  network.onchange = run(load);
+  action(root, 'Refresh execution status', load);
+  await load();
+}
 function renderNetworks(settings) {
   const root = el('network-settings');
   root.replaceChildren();
-  const form = node('form', undefined, root);
+  const panels = settingsTabs(
+    root,
+    [
+      ['execution', 'Execution'],
+      ['networks', 'Available networks'],
+    ],
+    networkSettingsTab,
+    (key) => {
+      networkSettingsTab = key;
+    },
+  );
+  void renderNetworkExecution(panels.execution, settings);
+  const form = node('form', undefined, panels.networks);
   const selected = new Map();
   for (const network of settings.available) {
     const label = node('label', undefined, form),
@@ -545,13 +780,9 @@ function renderNetworks(settings) {
   });
 }
 async function renderNetworkFees(parent, record, networks) {
-  const section = node('details', undefined, parent);
-  node('summary', 'Wallet services', section);
-  node(
-    'p',
-    'Configure connections, agree fee limits and prepare wallet services for this application.',
-    section,
-  );
+  const section = node('section', undefined, parent);
+  section.className = 'wallet-services';
+
   if (!record.enabled || !record.policy?.assertionTrust) {
     node(
       'p',
@@ -566,8 +797,10 @@ async function renderNetworkFees(parent, record, networks) {
     const option = node('option', network.name, selector);
     option.value = network.network;
   }
-  selector.value = networks.default_network;
-  const content = node('div', undefined, section);
+  selector.value =
+    applicationNetworks.get(record.id) ?? networks.default_network;
+  const body = node('div', undefined, section);
+  let activeStep = 'transactions';
   const applicationId = [
     ...new Uint8Array(
       await crypto.subtle.digest(
@@ -591,7 +824,7 @@ async function renderNetworkFees(parent, record, networks) {
     'ethereum-sepolia': 'eip155:11155111',
   };
   let loadVersion = 0;
-  async function load() {
+  async function load(options = {}) {
     const version = ++loadVersion;
     const network = selector.value;
     const networkName = networks.networks.find(
@@ -599,17 +832,18 @@ async function renderNetworkFees(parent, record, networks) {
     )?.name;
     const request = (path, method = 'GET', data) =>
       api(path, method, data, true, network);
-    content.replaceChildren();
-    node('p', 'Checking fee setup…', content);
+    body.replaceChildren();
+    node('p', 'Loading wallet setup…', body);
     try {
-      const [obligations, funding] = await Promise.all([
+      const [obligations, transactionPolicy, funding] = await Promise.all([
         request('/v1/provider/applications/' + applicationId + '/obligations'),
+        request('/v1/provider/applications/' + applicationId + '/policy'),
         request(
           '/v1/provider/applications/' + applicationId + '/wallet-services',
         ),
       ]);
-      if (version !== loadVersion || !token) return;
-      content.replaceChildren();
+      if (version !== loadVersion || !token || !section.isConnected) return;
+      body.replaceChildren();
       if (
         funding.chain_id !== chains[network] ||
         funding.application_id !== applicationId
@@ -624,118 +858,6 @@ async function renderNetworkFees(parent, record, networks) {
         throw new Error(
           'The fee terms belong to another network. Ask the application team to correct them.',
         );
-      node('h4', 'Fee terms', content);
-      if (!terms) {
-        node(
-          'p',
-          'Set the fee limits below to offer terms to this application.',
-          content,
-        );
-      } else {
-        node('p', 'Agreement: ' + terms.value.funding_agreement, content);
-        node('p', 'Revision: ' + terms.revision, content);
-        const eth = (value) => {
-          const amount = BigInt(value);
-          return (
-            (amount / 10n ** 18n).toString() +
-            '.' +
-            (amount % 10n ** 18n).toString().padStart(18, '0')
-          ).replace(/\.?0+$/, '');
-        };
-        if (terms.value.funding_mode === 'balance') {
-          node('p', 'Funding: Application’s available ETH', content);
-          node(
-            'p',
-            'Per-transaction limit: ' +
-              eth(terms.value.maximum_transaction_fee_wei) +
-              ' ETH',
-            content,
-          );
-          node(
-            'p',
-            'Pending-fee limit: ' +
-              eth(terms.value.maximum_pending_fees_wei) +
-              ' ETH',
-            content,
-          );
-        }
-        if (terms.value.maximum_gas_budget_wei !== undefined)
-          node(
-            'p',
-            'Total network-fee budget: ' +
-              eth(terms.value.maximum_gas_budget_wei) +
-              ' ETH (optional cumulative limit)',
-            content,
-          );
-        node(
-          'p',
-          'Approval: ' +
-            ({
-              pending:
-                terms.proposed_by === 'provider'
-                  ? 'Awaiting application acceptance'
-                  : 'Awaiting your review',
-              accepted:
-                terms.proposed_by === 'provider'
-                  ? 'Application accepted'
-                  : 'Approved',
-              rejected: 'Declined',
-            }[terms.decision] ?? 'Unavailable'),
-          content,
-        );
-        if (terms.value.maximum_execution_accounts !== undefined)
-          node(
-            'p',
-            'Maximum wallets covered: ' +
-              terms.value.maximum_execution_accounts,
-            content,
-          );
-        if (terms.value.maximum_in_flight_per_sponsor !== undefined)
-          node(
-            'p',
-            'Pending-operation limit: ' +
-              terms.value.maximum_in_flight_per_sponsor,
-            content,
-          );
-        const developer = node('details', undefined, content);
-        node('summary', 'Developer details', developer);
-        node('pre', JSON.stringify(terms, null, 2), developer);
-        if (terms.proposed_by !== 'provider' && terms.decision !== 'accepted') {
-          action(content, 'Approve fee terms', async () => {
-            if (
-              !confirm(
-                'Approve these fee terms on ' +
-                  networkName +
-                  '? No funds will be sent.',
-              )
-            )
-              return;
-            await request(
-              '/v1/provider/applications/' +
-                applicationId +
-                '/obligations/sponsorship/decision',
-              'POST',
-              {
-                expected_revision: terms.revision,
-                expected_decision_revision: terms.decision_revision,
-                decision: 'accepted',
-              },
-            );
-            await load();
-          });
-        }
-      }
-      const editor = node('details', undefined, content);
-      node('summary', terms ? 'Change fee limits' : 'Set fee limits', editor);
-      if (!terms) editor.open = true;
-      const form = node('form', undefined, editor);
-      const input = (title, value = '', required = true) => {
-        const label = node('label', title, form);
-        const control = node('input', undefined, label);
-        control.value = value;
-        control.required = required;
-        return control;
-      };
       const toEth = (value) => {
         if (value === undefined) return '';
         const amount = BigInt(value);
@@ -747,633 +869,885 @@ async function renderNetworkFees(parent, record, networks) {
           (amount / 10n ** 18n).toString() + (fraction ? '.' + fraction : '')
         );
       };
-      const fromEth = (value) => {
-        if (!/^(0|[1-9][0-9]*)(\.[0-9]{1,18})?$/.test(value))
-          throw new Error(
-            'Enter a positive ETH amount with at most 18 decimal places.',
-          );
-        const [whole, fraction = ''] = value.split('.');
-        const amount =
-          BigInt(whole) * 10n ** 18n + BigInt(fraction.padEnd(18, '0'));
-        if (amount <= 0n || amount >= 2n ** 256n)
-          throw new Error(
-            'Enter a positive ETH amount within the supported range.',
-          );
-        return amount.toString();
-      };
-      const agreement = input(
-        'Agreement reference',
-        terms?.value.funding_agreement,
-      );
-      agreement.maxLength = 256;
-      const perTransaction = input(
-        'Per-transaction limit (ETH)',
-        toEth(terms?.value.maximum_transaction_fee_wei),
-      );
-      const pending = input(
-        'Pending-fee limit (ETH)',
-        toEth(terms?.value.maximum_pending_fees_wei),
-      );
-      node(
-        'p',
-        'Pending fees cover transactions whose final result is not yet confirmed.',
-        form,
-      );
-      const total = input(
-        'Total budget (ETH, optional)',
-        toEth(terms?.value.maximum_gas_budget_wei),
-        false,
-      );
-      const wallets = input(
-        'Maximum wallets covered',
-        String(terms?.value.maximum_execution_accounts ?? ''),
-      );
-      const operations = input(
-        'Maximum pending transactions',
-        String(terms?.value.maximum_in_flight_per_sponsor ?? '1'),
-      );
-      for (const [control, max] of [
-        [wallets, 100000],
-        [operations, 16],
-      ]) {
-        control.type = 'number';
-        control.min = '1';
-        control.max = String(max);
-        control.step = '1';
-      }
-      node(
-        'p',
-        'Saving replaces the current fee terms and requires fresh application acceptance. No funds are sent.',
-        form,
-      );
-      const save = node('button', 'Save fee terms', form);
-      save.type = 'submit';
-      form.onsubmit = run(async () => {
-        const value = {
-          chain_id: chains[network],
-          funding_agreement: agreement.value.trim(),
-          funding_mode: 'balance',
-          maximum_transaction_fee_wei: fromEth(perTransaction.value.trim()),
-          maximum_pending_fees_wei: fromEth(pending.value.trim()),
-          ...(total.value.trim()
-            ? { maximum_gas_budget_wei: fromEth(total.value.trim()) }
-            : {}),
-          account_model: 'provider-controlled-user-safe',
-          asset_model: 'individual-user-wallets',
-          maximum_execution_accounts: Number(wallets.value),
-          maximum_in_flight_per_sponsor: Number(operations.value),
-          ...(terms?.value.gas_limits
-            ? { gas_limits: terms.value.gas_limits }
-            : {}),
-        };
-        await request(
-          '/v1/provider/applications/' +
-            applicationId +
-            '/obligations/sponsorship',
-          'PUT',
-          { expected_revision: terms?.revision ?? '0', value },
-        );
-        await load();
-      });
-      node('h4', 'Blockchain connections', content);
       const services = obligations.resources.find(
         (entry) => entry.kind === 'services',
       );
-      node(
-        'p',
-        services?.decision === 'accepted'
-          ? 'Connections approved for this application and network.'
-          : 'Add connections to read blockchain state and submit transactions.',
-        content,
+      const steps = settingsTabs(
+        body,
+        [
+          ['transactions', 'Transactions'],
+          ['connections', 'Connections'],
+          ['fees', 'Fees'],
+          ['readiness', 'Readiness'],
+        ],
+        activeStep,
+        (key) => {
+          activeStep = key;
+        },
       );
-      if (services?.decision === 'accepted') {
-        const saved = node('div', undefined, content);
-        saved.setAttribute('role', 'status');
-        node('strong', 'Connections saved for ' + networkName + '.', saved);
-        const purposes = [
-          ['rpc-verification', 'Blockchain checks'],
-          ['rpc-submission', 'Transaction submission'],
-          ['rpc-observation', 'Extra transaction checks'],
-        ];
-        const list = node('ul', undefined, saved);
-        for (const [kind, title] of purposes) {
-          const count = services.value.filter(
-            (entry) => entry.kind === kind,
-          ).length;
-          if (count) node('li', title + ': ' + count + ' saved', list);
-        }
+      {
+        const content = steps.transactions;
+        node('h4', 'Transaction permissions', content);
+        const unrestricted =
+          transactionPolicy.publication?.policy.transaction_mode ===
+          'unrestricted';
         node(
-          'small',
-          'API keys are hidden. Blank inputs do not mean they are missing.',
-          saved,
+          'p',
+          unrestricted
+            ? 'Trusted app: transaction proposals and contract restrictions are not required on this network.'
+            : 'Restricted: transactions require published contract rules on this network.',
+          content,
         );
-      }
-      const connections = node('details', undefined, content);
-      node(
-        'summary',
-        services ? 'Replace connections' : 'Configure connections',
-        connections,
-      );
-      const connectionForm = node('form', undefined, connections);
-      connectionForm.className = 'connection-form';
-      node(
-        'p',
-        'Add your provider API keys. We use the network selected above.',
-        connectionForm,
-      );
-      if (services)
-        node(
-          'small',
-          'Saved keys are hidden. Enter the complete set of replacement keys to change these connections.',
-          connectionForm,
-        );
-      const providerGrid = node('div', undefined, connectionForm);
-      providerGrid.className = 'provider-grid';
-      const providers = [
-        {
-          id: 'alchemy',
-          name: 'Alchemy',
-          role: 'Primary connection',
-          description: 'Reads blockchain state and submits transactions.',
-          link: 'https://dashboard.alchemy.com/',
-        },
-        {
-          id: 'drpc',
-          name: 'dRPC',
-          role: 'Independent check · backup',
-          description:
-            'Checks results independently and provides a second connection.',
-          link: 'https://drpc.org/dashboard',
-        },
-        {
-          id: 'etherscan',
-          name: 'Etherscan',
-          role: 'Transaction checks · optional',
-          description: 'Checks transaction results and contract data.',
-          link: 'https://etherscan.io/myapikey',
-        },
-      ].map((provider) => {
-        const card = node('fieldset', undefined, providerGrid);
-        card.className = 'provider-card';
-        node('legend', provider.name, card);
-        node('small', provider.role, card).className = 'provider-role';
-        node('p', provider.description, card);
-        const label = node('label', provider.name + ' API key', card);
-        const control = node('input', undefined, label);
-        control.type = 'password';
-        control.autocomplete = 'off';
-        control.spellcheck = false;
-        control.maxLength = 256;
-        control.placeholder = services
-          ? 'Enter replacement API key'
-          : 'Paste API key';
-        const link = node('a', 'Get an API key', card);
-        link.href = provider.link;
-        link.target = '_blank';
-        link.rel = 'noopener noreferrer';
-        link.referrerPolicy = 'no-referrer';
-        return { ...provider, control };
-      });
-      const custom = node('div', undefined, connectionForm);
-      const customInputs = [];
-      let customNumber = 0;
-      const addCustom = node('button', 'Add custom provider', connectionForm);
-      addCustom.type = 'button';
-      addCustom.onclick = () => {
-        if (customInputs.length >= 3) return;
-        const card = node('fieldset', undefined, custom);
-        node('legend', 'Custom provider ' + ++customNumber, card);
-        const urlLabel = node('label', 'Custom HTTPS URL', card);
-        const control = node('input', undefined, urlLabel);
-        control.type = 'password';
-        control.autocomplete = 'off';
-        control.spellcheck = false;
-        control.maxLength = 4096;
-        control.required = true;
-        control.placeholder = 'https://…';
-        const roleLabel = node('label', 'Use this connection for', card);
-        const role = node('select', undefined, roleLabel);
-        for (const [value, title] of [
-          ['full', 'Blockchain checks and submission'],
-          ['verification', 'Blockchain checks only'],
-          ['submission', 'Submission only'],
-          ['observation', 'Extra transaction checks only'],
+        const modeLabel = node('label', 'Transaction mode', content);
+        const mode = node('select', undefined, modeLabel);
+        for (const [value, name] of [
+          ['restricted', 'Restricted — approved contracts only'],
+          ['unrestricted', 'Trusted app — unrestricted transactions'],
         ]) {
-          node('option', title, role).value = value;
+          const option = node('option', name, mode);
+          option.value = value;
         }
-        const item = { control, role, card };
-        customInputs.push(item);
-        const remove = node('button', 'Remove custom provider', card);
-        remove.type = 'button';
-        remove.onclick = () => {
-          control.value = '';
-          customInputs.splice(customInputs.indexOf(item), 1);
-          card.remove();
-          addCustom.disabled = false;
-        };
-        if (customInputs.length >= 3) addCustom.disabled = true;
-        control.focus();
-      };
-      node(
-        'small',
-        funding.setup?.verification_mode === 'single'
-          ? 'Add at least one connection for blockchain checks and submission.'
-          : 'Independent verification requires two different providers, such as Alchemy and dRPC.',
-        connectionForm,
-      );
-      node(
-        'small',
-        'Keys are encrypted when saved and are never shown again. Saving approves these connections; it sends no transactions.',
-        connectionForm,
-      );
-      const saveConnections = node(
-        'button',
-        'Save and approve connections',
-        connectionForm,
-      );
-      saveConnections.type = 'submit';
-      saveConnections.className = 'primary';
-      connectionForm.onsubmit = run(async () => {
-        const selected = [];
-        const add = (endpoint, role) => {
-          if (role === 'full' || role === 'verification')
-            selected.push({ kind: 'rpc-verification', endpoint });
-          if (role === 'full' || role === 'submission')
-            selected.push({ kind: 'rpc-submission', endpoint });
-          if (role === 'observation')
-            selected.push({ kind: 'rpc-observation', endpoint });
-        };
-        const alchemyNetworks = {
-          base: 'base-mainnet',
-          'base-sepolia': 'base-sepolia',
-          ethereum: 'eth-mainnet',
-          'ethereum-sepolia': 'eth-sepolia',
-        };
-        const drpcNetworks = {
-          base: 'base',
-          'base-sepolia': 'base-sepolia',
-          ethereum: 'ethereum',
-          'ethereum-sepolia': 'sepolia',
-        };
-        for (const { id, name, control } of providers) {
-          const key = control.value.trim();
-          if (!key) continue;
-          if (
-            !/^[A-Za-z0-9_-]{1,256}$/.test(key) ||
-            (id === 'etherscan' && key.length < 8)
-          )
-            throw new Error(
-              'Enter the ' + name + ' API key, without a URL or spaces.',
-            );
-          if (id === 'alchemy')
-            add(
-              'https://' +
-                alchemyNetworks[network] +
-                '.g.alchemy.com/v2/' +
-                encodeURIComponent(key),
-              'full',
-            );
-          else if (id === 'drpc')
-            add(
-              'https://lb.drpc.live/' +
-                drpcNetworks[network] +
-                '/' +
-                encodeURIComponent(key),
-              'full',
-            );
-          else
-            add(
-              'https://api.etherscan.io/v2/api?chainid=' +
-                chains[network].split(':')[1] +
-                '&apikey=' +
-                encodeURIComponent(key),
-              'observation',
-            );
-        }
-        for (const { control, role } of customInputs) {
-          const endpoint = control.value.trim();
-          let url;
-          try {
-            url = new URL(endpoint);
-          } catch {
-            throw new Error(
-              'Enter a complete HTTPS URL for the custom provider.',
-            );
-          }
-          if (
-            url.protocol !== 'https:' ||
-            url.username ||
-            url.password ||
-            url.hash
-          )
-            throw new Error(
-              'Use an HTTPS connection without a username, password or fragment.',
-            );
-          if (url.search && url.hostname !== 'api.etherscan.io')
-            throw new Error(
-              'Use a provider HTTPS URL with the API key in its path. Query-string credentials are not supported here.',
-            );
-          if (
-            url.hostname === 'api.etherscan.io' &&
-            role.value !== 'observation'
-          )
-            throw new Error(
-              'Use Etherscan for extra transaction checks, or enter its API key in the Etherscan card.',
-            );
-          add(endpoint, role.value);
-        }
-        const checks = selected.filter((c) => c.kind === 'rpc-verification');
-        const required = funding.setup?.verification_mode === 'single' ? 1 : 2;
-        if (
-          new Set(checks.map((c) => new URL(c.endpoint).origin)).size < required
-        )
-          throw new Error(
-            required === 2
-              ? 'Add Alchemy and dRPC keys, or two different custom providers, for independent checks.'
-              : 'Add a provider for blockchain checks.',
-          );
-        if (!selected.some((c) => c.kind === 'rpc-submission'))
-          throw new Error('Add a connection that can submit transactions.');
-        for (const kind of [
-          'rpc-verification',
-          'rpc-submission',
-          'rpc-observation',
-        ])
-          if (selected.filter((c) => c.kind === kind).length > 3)
-            throw new Error('Use at most three connections for each purpose.');
-        await request(
-          '/v1/provider/applications/' + applicationId + '/connections',
-          'PUT',
-          {
-            expected_revision: services?.revision ?? '0',
-            connections: selected,
-          },
+        mode.value = unrestricted ? 'unrestricted' : 'restricted';
+        const acknowledgement = node('label', undefined, content);
+        const acknowledge = node('input', undefined, acknowledgement);
+        acknowledge.type = 'checkbox';
+        acknowledgement.append(
+          document.createTextNode(
+            'I trust this application to request arbitrary contract calls and native transfers for consenting users on this network.',
+          ),
         );
-        for (const { control } of [...providers, ...customInputs])
-          control.value = '';
-        message(
-          'Connections saved for ' + networkName + '. API keys are hidden.',
+        node(
+          'p',
+          'Identity checks, wallet consent and fee limits still apply. Changing modes requires fresh transaction consent.',
+          content,
         );
-        await load();
-      });
-      node('h4', 'Provisioning status', content);
-      const progress = node('div', undefined, content);
-      progress.setAttribute('aria-live', 'polite');
-      let preparing = false;
-      const phases = {
-        'not-started': 'Not prepared',
-        checking: 'Checking contracts and connections',
-        deploying: 'Preparing the fee-paying contract',
-        funding: 'Funding the fee deposit and transaction submitter',
-        publishing: 'Configuring transaction submission',
-        ready: 'Wallet services prepared',
-        attention: 'Setup needs attention',
-      };
-      const showSetup = (status) => {
-        progress.replaceChildren();
-        const setup = status.setup;
-        node('p', phases[setup?.phase] ?? 'Setup status unavailable', progress);
-        if (setup) {
-          node(
-            'p',
-            'Maximum cost per preparation: ' +
-              toEth(setup.maximum_cost_wei) +
-              ' ETH, including funds moved into wallet services.',
-            progress,
-          );
-          if (setup.funding_allocation) {
-            const allocation = setup.funding_allocation;
-            node(
-              'p',
-              'Automatic funding targets: ' +
-                allocation.paymasterBasisPoints / 100 +
-                '% paymaster · ' +
-                allocation.bundlerBasisPoints / 100 +
-                '% bundler · ' +
-                (allocation.provisioningBasisPoints
-                  ? allocation.provisioningBasisPoints / 100 +
-                    '% wallet provisioning · '
-                  : '') +
-                allocation.reserveBasisPoints / 100 +
-                '% reserve, after the transaction-fee buffer.',
-              progress,
-            );
-          }
-          if (!setup.execution_enabled)
-            node(
-              'p',
-              'User wallet execution is disabled. Preparing services does not enable it.',
-              progress,
-            );
-          const steps = node('ul', undefined, progress);
-          const labels = {
-            'fee-contract': 'Fee-paying contract',
-            'fee-deposit': 'Fee deposit',
-            'submission-funding': 'Transaction submitter funding',
-            'wallet-setup': 'Wallet setup',
-          };
-          const states = {
-            confirmed: 'Confirmed',
-            submitted: 'Waiting for confirmation',
-            uncertain: 'Outcome uncertain — check before retrying',
-            prepared: 'Prepared, awaiting dispatch',
-          };
-          for (const step of setup.transactions)
-            node('li', labels[step.step] + ': ' + states[step.status], steps);
-          if (
-            !setup.running &&
-            [
-              'checking',
-              'deploying',
-              'funding',
-              'publishing',
-              'attention',
-            ].includes(setup.phase)
-          )
-            node(
-              'p',
-              'Setup did not report completion. Refresh status before retrying; retries retain recorded transactions.',
-              progress,
-            );
+        const modeStatus = node('p', undefined, content);
+        modeStatus.setAttribute('aria-live', 'polite');
+        const saveMode = node('button', 'Save transaction mode', content);
+        const currentMode = unrestricted ? 'unrestricted' : 'restricted';
+        function updateModeChoice() {
+          const changed = mode.value !== currentMode;
+          acknowledgement.hidden = mode.value !== 'unrestricted' || !changed;
+          acknowledge.disabled = acknowledgement.hidden;
+          saveMode.disabled = !changed;
+          modeStatus.dataset.kind = 'status';
+          modeStatus.textContent = changed
+            ? mode.value === 'unrestricted'
+              ? 'Confirm your trust, then save the selected mode.'
+              : 'Returning to restricted mode clears the contract list. Save, then publish approved transaction rules.'
+            : 'Choose a different transaction mode to enable saving.';
         }
-        if (preparing || setup?.running)
-          node('p', 'Preparation in progress…', progress);
-        else if (terms?.decision !== 'accepted')
-          node(
-            'p',
-            'Fee terms must be accepted before preparing wallet services.',
-            progress,
-          );
-        else if (services?.decision !== 'accepted')
-          node('p', 'Save and approve blockchain connections first.', progress);
-        else if (!setup)
-          node(
-            'p',
-            'Update this service to show preparation progress before starting.',
-            progress,
-          );
-        else
-          action(
-            progress,
-            setup.phase === 'ready'
-              ? 'Check and prepare wallet services'
-              : 'Prepare wallet services',
-            async () => {
-              if (
-                !confirm(
-                  'Prepare wallet services on ' +
-                    networkName +
-                    '? This can deploy contracts and use up to ' +
-                    toEth(setup.maximum_cost_wei) +
-                    ' ETH from the application funding address. User wallet execution stays unchanged.',
-                )
-              )
-                return;
-              preparing = true;
-              showSetup(status);
-              const timer = setInterval(() => {
-                void refreshSetup().catch(() => undefined);
-              }, 2000);
-              try {
-                const result = await request(
-                  '/v1/provider/applications/' +
-                    applicationId +
-                    '/wallet-services',
-                  'POST',
-                  { maximum_cost_wei: setup.maximum_cost_wei },
-                );
-                if (version === loadVersion && token) {
-                  if (
-                    result.application_id !== applicationId ||
-                    result.chain_id !== chains[network]
-                  )
-                    throw new Error(
-                      'Setup result belongs to another application or network.',
-                    );
-                  preparing = false;
-                  showSetup(result);
-                  message(
-                    result.setup?.phase === 'ready'
-                      ? 'Wallet services prepared.'
-                      : 'Preparation returned without completion. Refresh status before retrying.',
-                  );
-                }
-              } catch (error) {
-                if (version === loadVersion && token) {
-                  preparing = false;
-                  await refreshSetup().catch(() => undefined);
-                  message(
-                    'Preparation did not report success. Check the recorded progress before retrying. ' +
-                      error.message,
-                    true,
-                  );
-                }
-              } finally {
-                clearInterval(timer);
-                preparing = false;
-              }
-            },
-          );
-      };
-      let polling = false;
-      let setupStillRunning = funding.setup?.running ?? false;
-      async function refreshSetup() {
-        if (polling || version !== loadVersion || !token) return;
-        polling = true;
-        try {
-          const latest = await request(
-            '/v1/provider/applications/' + applicationId + '/wallet-services',
-          );
-          if (version !== loadVersion || !token) return;
-          if (
-            latest.application_id !== applicationId ||
-            latest.chain_id !== chains[network]
-          )
-            throw new Error(
-              'Setup status belongs to another application or network.',
-            );
-          setupStillRunning = latest.setup?.running ?? false;
-          showSetup(latest);
-        } finally {
-          polling = false;
-        }
-      }
-      showSetup(funding);
-      if (funding.setup?.running) {
-        const timer = setInterval(async () => {
-          if (
-            version !== loadVersion ||
-            !token ||
-            !section.open ||
-            !setupStillRunning
-          ) {
-            clearInterval(timer);
+        mode.onchange = () => {
+          acknowledge.checked = false;
+          updateModeChoice();
+        };
+        updateModeChoice();
+        if (options.transactionModeNotice)
+          modeStatus.textContent = options.transactionModeNotice;
+        saveMode.onclick = run(async () => {
+          if (mode.value === 'unrestricted' && !acknowledge.checked) {
+            modeStatus.dataset.kind = 'error';
+            modeStatus.textContent =
+              'Confirm that you trust this application before enabling unrestricted transactions.';
             return;
           }
-          await refreshSetup().catch(() => undefined);
-        }, 2000);
-      }
-      action(content, 'Refresh provisioning status', refreshSetup);
-      node('h4', 'Application funding address', content);
-      if (
-        funding.funding_address &&
-        /^0x[0-9a-fA-F]{40}$/.test(funding.funding_address)
-      ) {
-        node('p', 'Network: ' + networkName + ' · Asset: ETH', content);
-        node('code', funding.funding_address, content);
-        node(
-          'p',
-          'Share this address with the application team for ETH funding on this network. It is separate from user deposits.',
-          content,
-        );
-        node(
-          'p',
-          funding.setup?.phase === 'ready'
-            ? 'Wallet services prepared. User-wallet readiness is separate.'
-            : terms?.decision === 'accepted'
-              ? 'The application can supply ETH on this network.'
-              : 'Application acceptance is required before funding.',
-          content,
-        );
-      } else {
-        node(
-          'p',
-          'Prepare a dedicated address after saving the terms. No funds are sent.',
-          content,
-        );
-        if (
-          terms?.decision === 'accepted' ||
-          (terms?.proposed_by === 'provider' && terms.decision === 'pending')
-        )
-          action(content, 'Prepare funding address', async () => {
+          mode.disabled = true;
+          acknowledge.disabled = true;
+          modeStatus.dataset.kind = 'status';
+          modeStatus.textContent = 'Saving transaction mode…';
+          try {
             await request(
               '/v1/provider/applications/' +
                 applicationId +
-                '/wallet-services/funding-address',
+                '/transaction-mode',
               'POST',
-              {},
+              {
+                expected_revision: transactionPolicy.active_revision,
+                mode: mode.value,
+              },
             );
-            await load();
-          });
-        else node('p', 'Save or approve the fee terms first.', content);
+            if (version === loadVersion && selector.value === network)
+              await load({
+                transactionModeNotice:
+                  'Transaction mode saved for ' + networkName + '.',
+              });
+          } catch (error) {
+            modeStatus.dataset.kind = 'error';
+            modeStatus.textContent = error.message;
+          } finally {
+            mode.disabled = false;
+            acknowledge.disabled = acknowledgement.hidden;
+          }
+        });
+      }
+      {
+        const content = steps.fees;
+        node('h4', 'Fee terms', content);
+        if (!terms) {
+          node(
+            'p',
+            'Set the fee limits below to offer terms to this application.',
+            content,
+          );
+        } else {
+          node('p', 'Agreement: ' + terms.value.funding_agreement, content);
+          node('p', 'Revision: ' + terms.revision, content);
+          const eth = (value) => {
+            const amount = BigInt(value);
+            return (
+              (amount / 10n ** 18n).toString() +
+              '.' +
+              (amount % 10n ** 18n).toString().padStart(18, '0')
+            ).replace(/\.?0+$/, '');
+          };
+          if (terms.value.funding_mode === 'balance') {
+            node('p', 'Funding: Application’s available ETH', content);
+            node(
+              'p',
+              'Per-transaction limit: ' +
+                eth(terms.value.maximum_transaction_fee_wei) +
+                ' ETH',
+              content,
+            );
+            node(
+              'p',
+              'Pending-fee limit: ' +
+                eth(terms.value.maximum_pending_fees_wei) +
+                ' ETH',
+              content,
+            );
+          }
+          if (terms.value.maximum_gas_budget_wei !== undefined)
+            node(
+              'p',
+              'Total network-fee budget: ' +
+                eth(terms.value.maximum_gas_budget_wei) +
+                ' ETH (optional cumulative limit)',
+              content,
+            );
+          node(
+            'p',
+            'Approval: ' +
+              ({
+                pending:
+                  terms.proposed_by === 'provider'
+                    ? 'Awaiting application acceptance'
+                    : 'Awaiting your review',
+                accepted:
+                  terms.proposed_by === 'provider'
+                    ? 'Application accepted'
+                    : 'Approved',
+                rejected: 'Declined',
+              }[terms.decision] ?? 'Unavailable'),
+            content,
+          );
+          if (terms.value.maximum_execution_accounts !== undefined)
+            node(
+              'p',
+              'Maximum wallets covered: ' +
+                terms.value.maximum_execution_accounts,
+              content,
+            );
+          if (terms.value.maximum_in_flight_per_sponsor !== undefined)
+            node(
+              'p',
+              'Pending-operation limit: ' +
+                terms.value.maximum_in_flight_per_sponsor,
+              content,
+            );
+          const developer = node('details', undefined, content);
+          node('summary', 'Developer details', developer);
+          node('pre', JSON.stringify(terms, null, 2), developer);
+          if (
+            terms.proposed_by !== 'provider' &&
+            terms.decision !== 'accepted'
+          ) {
+            action(content, 'Approve fee terms', async () => {
+              if (
+                !confirm(
+                  'Approve these fee terms on ' +
+                    networkName +
+                    '? No funds will be sent.',
+                )
+              )
+                return;
+              await request(
+                '/v1/provider/applications/' +
+                  applicationId +
+                  '/obligations/sponsorship/decision',
+                'POST',
+                {
+                  expected_revision: terms.revision,
+                  expected_decision_revision: terms.decision_revision,
+                  decision: 'accepted',
+                },
+              );
+              await load();
+            });
+          }
+        }
+        const editor = node('section', undefined, content);
+        node('h4', 'Fee limits', editor);
+        const form = node('form', undefined, editor);
+        const input = (title, value = '', required = true) => {
+          const label = node('label', title, form);
+          const control = node('input', undefined, label);
+          control.value = value;
+          control.required = required;
+          return control;
+        };
+        const fromEth = (value) => {
+          if (!/^(0|[1-9][0-9]*)(\.[0-9]{1,18})?$/.test(value))
+            throw new Error(
+              'Enter a positive ETH amount with at most 18 decimal places.',
+            );
+          const [whole, fraction = ''] = value.split('.');
+          const amount =
+            BigInt(whole) * 10n ** 18n + BigInt(fraction.padEnd(18, '0'));
+          if (amount <= 0n || amount >= 2n ** 256n)
+            throw new Error(
+              'Enter a positive ETH amount within the supported range.',
+            );
+          return amount.toString();
+        };
+        const agreement = input(
+          'Agreement reference',
+          terms?.value.funding_agreement,
+        );
+        agreement.maxLength = 256;
+        const perTransaction = input(
+          'Per-transaction limit (ETH)',
+          toEth(terms?.value.maximum_transaction_fee_wei),
+        );
+        const pending = input(
+          'Pending-fee limit (ETH)',
+          toEth(terms?.value.maximum_pending_fees_wei),
+        );
+        node(
+          'p',
+          'Pending fees cover transactions whose final result is not yet confirmed.',
+          form,
+        );
+        const total = input(
+          'Total budget (ETH, optional)',
+          toEth(terms?.value.maximum_gas_budget_wei),
+          false,
+        );
+        const wallets = input(
+          'Maximum wallets covered',
+          String(terms?.value.maximum_execution_accounts ?? ''),
+        );
+        const operations = input(
+          'Maximum pending transactions',
+          String(terms?.value.maximum_in_flight_per_sponsor ?? '1'),
+        );
+        for (const [control, max] of [
+          [wallets, 100000],
+          [operations, 16],
+        ]) {
+          control.type = 'number';
+          control.min = '1';
+          control.max = String(max);
+          control.step = '1';
+        }
+        node(
+          'p',
+          'Saving replaces the current fee terms and requires fresh application acceptance. No funds are sent.',
+          form,
+        );
+        const save = node('button', 'Save fee terms', form);
+        save.type = 'submit';
+        form.onsubmit = run(async () => {
+          const value = {
+            chain_id: chains[network],
+            funding_agreement: agreement.value.trim(),
+            funding_mode: 'balance',
+            maximum_transaction_fee_wei: fromEth(perTransaction.value.trim()),
+            maximum_pending_fees_wei: fromEth(pending.value.trim()),
+            ...(total.value.trim()
+              ? { maximum_gas_budget_wei: fromEth(total.value.trim()) }
+              : {}),
+            account_model: 'provider-controlled-user-safe',
+            asset_model: 'individual-user-wallets',
+            maximum_execution_accounts: Number(wallets.value),
+            maximum_in_flight_per_sponsor: Number(operations.value),
+            ...(terms?.value.gas_limits
+              ? { gas_limits: terms.value.gas_limits }
+              : {}),
+          };
+          await request(
+            '/v1/provider/applications/' +
+              applicationId +
+              '/obligations/sponsorship',
+            'PUT',
+            { expected_revision: terms?.revision ?? '0', value },
+          );
+          await load();
+        });
+      }
+      {
+        const content = steps.connections;
+        node('h4', 'Blockchain connections', content);
+
+        node(
+          'p',
+          services?.decision === 'accepted'
+            ? 'Connections approved for this application and network.'
+            : 'Add connections to read blockchain state and submit transactions.',
+          content,
+        );
+        if (services?.decision === 'accepted') {
+          const saved = node('div', undefined, content);
+          saved.setAttribute('role', 'status');
+          node('strong', 'Connections saved for ' + networkName + '.', saved);
+          const purposes = [
+            ['rpc-verification', 'Blockchain checks'],
+            ['rpc-submission', 'Transaction submission'],
+            ['rpc-observation', 'Extra transaction checks'],
+          ];
+          const list = node('ul', undefined, saved);
+          for (const [kind, title] of purposes) {
+            const count = services.value.filter(
+              (entry) => entry.kind === kind,
+            ).length;
+            if (count) node('li', title + ': ' + count + ' saved', list);
+          }
+          node(
+            'small',
+            'API keys are hidden. Blank inputs do not mean they are missing.',
+            saved,
+          );
+        }
+        const connections = node('section', undefined, content);
+        node(
+          'h4',
+          services ? 'Replace connections' : 'Configure connections',
+          connections,
+        );
+        const connectionForm = node('form', undefined, connections);
+        connectionForm.className = 'connection-form';
+        node(
+          'p',
+          'Add your provider API keys. We use the network selected above.',
+          connectionForm,
+        );
+        if (services)
+          node(
+            'small',
+            'Saved keys are hidden. Enter the complete set of replacement keys to change these connections.',
+            connectionForm,
+          );
+        const providerGrid = node('div', undefined, connectionForm);
+        providerGrid.className = 'provider-grid';
+        const providers = [
+          {
+            id: 'alchemy',
+            name: 'Alchemy',
+            role: 'Primary connection',
+            description: 'Reads blockchain state and submits transactions.',
+            link: 'https://dashboard.alchemy.com/',
+          },
+          {
+            id: 'drpc',
+            name: 'dRPC',
+            role: 'Independent check · backup',
+            description:
+              'Checks results independently and provides a second connection.',
+            link: 'https://drpc.org/dashboard',
+          },
+          {
+            id: 'etherscan',
+            name: 'Etherscan',
+            role: 'Transaction checks · optional',
+            description: 'Checks transaction results and contract data.',
+            link: 'https://etherscan.io/myapikey',
+          },
+        ].map((provider) => {
+          const card = node('fieldset', undefined, providerGrid);
+          card.className = 'provider-card';
+          node('legend', provider.name, card);
+          node('small', provider.role, card).className = 'provider-role';
+          node('p', provider.description, card);
+          const label = node('label', provider.name + ' API key', card);
+          const control = node('input', undefined, label);
+          control.type = 'password';
+          control.autocomplete = 'off';
+          control.spellcheck = false;
+          control.maxLength = 256;
+          control.placeholder = services
+            ? 'Enter replacement API key'
+            : 'Paste API key';
+          const link = node('a', 'Get an API key', card);
+          link.href = provider.link;
+          link.target = '_blank';
+          link.rel = 'noopener noreferrer';
+          link.referrerPolicy = 'no-referrer';
+          return { ...provider, control };
+        });
+        const custom = node('div', undefined, connectionForm);
+        const customInputs = [];
+        let customNumber = 0;
+        const addCustom = node('button', 'Add custom provider', connectionForm);
+        addCustom.type = 'button';
+        addCustom.onclick = () => {
+          if (customInputs.length >= 3) return;
+          const card = node('fieldset', undefined, custom);
+          node('legend', 'Custom provider ' + ++customNumber, card);
+          const urlLabel = node('label', 'Custom HTTPS URL', card);
+          const control = node('input', undefined, urlLabel);
+          control.type = 'password';
+          control.autocomplete = 'off';
+          control.spellcheck = false;
+          control.maxLength = 4096;
+          control.required = true;
+          control.placeholder = 'https://…';
+          const roleLabel = node('label', 'Use this connection for', card);
+          const role = node('select', undefined, roleLabel);
+          for (const [value, title] of [
+            ['full', 'Blockchain checks and submission'],
+            ['verification', 'Blockchain checks only'],
+            ['submission', 'Submission only'],
+            ['observation', 'Extra transaction checks only'],
+          ]) {
+            node('option', title, role).value = value;
+          }
+          const item = { control, role, card };
+          customInputs.push(item);
+          const remove = node('button', 'Remove custom provider', card);
+          remove.type = 'button';
+          remove.onclick = () => {
+            control.value = '';
+            customInputs.splice(customInputs.indexOf(item), 1);
+            card.remove();
+            addCustom.disabled = false;
+          };
+          if (customInputs.length >= 3) addCustom.disabled = true;
+          control.focus();
+        };
+        node(
+          'small',
+          funding.setup?.verification_mode === 'single'
+            ? 'Add at least one connection for blockchain checks and submission.'
+            : 'Independent verification requires two different providers, such as Alchemy and dRPC.',
+          connectionForm,
+        );
+        node(
+          'small',
+          'Keys are encrypted when saved and are never shown again. Saving approves these connections; it sends no transactions.',
+          connectionForm,
+        );
+        const saveConnections = node(
+          'button',
+          'Save and approve connections',
+          connectionForm,
+        );
+        saveConnections.type = 'submit';
+        saveConnections.className = 'primary';
+        connectionForm.onsubmit = run(async () => {
+          const selected = [];
+          const add = (endpoint, role) => {
+            if (role === 'full' || role === 'verification')
+              selected.push({ kind: 'rpc-verification', endpoint });
+            if (role === 'full' || role === 'submission')
+              selected.push({ kind: 'rpc-submission', endpoint });
+            if (role === 'observation')
+              selected.push({ kind: 'rpc-observation', endpoint });
+          };
+          const alchemyNetworks = {
+            base: 'base-mainnet',
+            'base-sepolia': 'base-sepolia',
+            ethereum: 'eth-mainnet',
+            'ethereum-sepolia': 'eth-sepolia',
+          };
+          const drpcNetworks = {
+            base: 'base',
+            'base-sepolia': 'base-sepolia',
+            ethereum: 'ethereum',
+            'ethereum-sepolia': 'sepolia',
+          };
+          for (const { id, name, control } of providers) {
+            const key = control.value.trim();
+            if (!key) continue;
+            if (
+              !/^[A-Za-z0-9_-]{1,256}$/.test(key) ||
+              (id === 'etherscan' && key.length < 8)
+            )
+              throw new Error(
+                'Enter the ' + name + ' API key, without a URL or spaces.',
+              );
+            if (id === 'alchemy')
+              add(
+                'https://' +
+                  alchemyNetworks[network] +
+                  '.g.alchemy.com/v2/' +
+                  encodeURIComponent(key),
+                'full',
+              );
+            else if (id === 'drpc')
+              add(
+                'https://lb.drpc.live/' +
+                  drpcNetworks[network] +
+                  '/' +
+                  encodeURIComponent(key),
+                'full',
+              );
+            else
+              add(
+                'https://api.etherscan.io/v2/api?chainid=' +
+                  chains[network].split(':')[1] +
+                  '&apikey=' +
+                  encodeURIComponent(key),
+                'observation',
+              );
+          }
+          for (const { control, role } of customInputs) {
+            const endpoint = control.value.trim();
+            let url;
+            try {
+              url = new URL(endpoint);
+            } catch {
+              throw new Error(
+                'Enter a complete HTTPS URL for the custom provider.',
+              );
+            }
+            if (
+              url.protocol !== 'https:' ||
+              url.username ||
+              url.password ||
+              url.hash
+            )
+              throw new Error(
+                'Use an HTTPS connection without a username, password or fragment.',
+              );
+            if (url.search && url.hostname !== 'api.etherscan.io')
+              throw new Error(
+                'Use a provider HTTPS URL with the API key in its path. Query-string credentials are not supported here.',
+              );
+            if (
+              url.hostname === 'api.etherscan.io' &&
+              role.value !== 'observation'
+            )
+              throw new Error(
+                'Use Etherscan for extra transaction checks, or enter its API key in the Etherscan card.',
+              );
+            add(endpoint, role.value);
+          }
+          const checks = selected.filter((c) => c.kind === 'rpc-verification');
+          const required =
+            funding.setup?.verification_mode === 'single' ? 1 : 2;
+          if (
+            new Set(checks.map((c) => new URL(c.endpoint).origin)).size <
+            required
+          )
+            throw new Error(
+              required === 2
+                ? 'Add Alchemy and dRPC keys, or two different custom providers, for independent checks.'
+                : 'Add a provider for blockchain checks.',
+            );
+          if (!selected.some((c) => c.kind === 'rpc-submission'))
+            throw new Error('Add a connection that can submit transactions.');
+          for (const kind of [
+            'rpc-verification',
+            'rpc-submission',
+            'rpc-observation',
+          ])
+            if (selected.filter((c) => c.kind === kind).length > 3)
+              throw new Error(
+                'Use at most three connections for each purpose.',
+              );
+          await request(
+            '/v1/provider/applications/' + applicationId + '/connections',
+            'PUT',
+            {
+              expected_revision: services?.revision ?? '0',
+              connections: selected,
+            },
+          );
+          for (const { control } of [...providers, ...customInputs])
+            control.value = '';
+          message(
+            'Connections saved for ' + networkName + '. API keys are hidden.',
+          );
+          await load();
+        });
+      }
+      {
+        const content = steps.readiness;
+        node('h4', 'Provisioning status', content);
+        const progress = node('div', undefined, content);
+        progress.setAttribute('aria-live', 'polite');
+        let preparing = false;
+        const phases = {
+          'not-started': 'Not prepared',
+          checking: 'Checking contracts and connections',
+          deploying: 'Preparing the fee-paying contract',
+          funding: 'Funding the fee deposit and transaction submitter',
+          publishing: 'Configuring transaction submission',
+          ready: 'Wallet services prepared',
+          attention: 'Setup needs attention',
+        };
+        const showSetup = (status) => {
+          progress.replaceChildren();
+          const setup = status.setup;
+          node(
+            'p',
+            phases[setup?.phase] ?? 'Setup status unavailable',
+            progress,
+          );
+          if (setup) {
+            node(
+              'p',
+              'Maximum cost per preparation: ' +
+                toEth(setup.maximum_cost_wei) +
+                ' ETH, including funds moved into wallet services.',
+              progress,
+            );
+            if (setup.funding_allocation) {
+              const allocation = setup.funding_allocation;
+              node(
+                'p',
+                'Automatic funding targets: ' +
+                  allocation.paymasterBasisPoints / 100 +
+                  '% paymaster · ' +
+                  allocation.bundlerBasisPoints / 100 +
+                  '% bundler · ' +
+                  (allocation.provisioningBasisPoints
+                    ? allocation.provisioningBasisPoints / 100 +
+                      '% wallet provisioning · '
+                    : '') +
+                  allocation.reserveBasisPoints / 100 +
+                  '% reserve, after the transaction-fee buffer.',
+                progress,
+              );
+            }
+            if (!setup.execution_enabled)
+              node(
+                'p',
+                'User wallet execution is disabled. Preparing services does not enable it.',
+                progress,
+              );
+            const steps = node('ul', undefined, progress);
+            const labels = {
+              'fee-contract': 'Fee-paying contract',
+              'fee-deposit': 'Fee deposit',
+              'submission-funding': 'Transaction submitter funding',
+              'wallet-setup': 'Wallet setup',
+            };
+            const states = {
+              confirmed: 'Confirmed',
+              submitted: 'Waiting for confirmation',
+              uncertain: 'Outcome uncertain — check before retrying',
+              prepared: 'Prepared, awaiting dispatch',
+            };
+            for (const step of setup.transactions)
+              node('li', labels[step.step] + ': ' + states[step.status], steps);
+            if (
+              !setup.running &&
+              [
+                'checking',
+                'deploying',
+                'funding',
+                'publishing',
+                'attention',
+              ].includes(setup.phase)
+            )
+              node(
+                'p',
+                'Setup did not report completion. Refresh status before retrying; retries retain recorded transactions.',
+                progress,
+              );
+          }
+          if (preparing || setup?.running)
+            node('p', 'Preparation in progress…', progress);
+          else if (terms?.decision !== 'accepted')
+            node(
+              'p',
+              'Fee terms must be accepted before preparing wallet services.',
+              progress,
+            );
+          else if (services?.decision !== 'accepted')
+            node(
+              'p',
+              'Save and approve blockchain connections first.',
+              progress,
+            );
+          else if (!setup)
+            node(
+              'p',
+              'Update this service to show preparation progress before starting.',
+              progress,
+            );
+          else
+            action(
+              progress,
+              setup.phase === 'ready'
+                ? 'Check and prepare wallet services'
+                : 'Prepare wallet services',
+              async () => {
+                if (
+                  !confirm(
+                    'Prepare wallet services on ' +
+                      networkName +
+                      '? This can deploy contracts and use up to ' +
+                      toEth(setup.maximum_cost_wei) +
+                      ' ETH from the application funding address. User wallet execution stays unchanged.',
+                  )
+                )
+                  return;
+                preparing = true;
+                showSetup(status);
+                const timer = setInterval(() => {
+                  void refreshSetup().catch(() => undefined);
+                }, 2000);
+                try {
+                  const result = await request(
+                    '/v1/provider/applications/' +
+                      applicationId +
+                      '/wallet-services',
+                    'POST',
+                    { maximum_cost_wei: setup.maximum_cost_wei },
+                  );
+                  if (version === loadVersion && token) {
+                    if (
+                      result.application_id !== applicationId ||
+                      result.chain_id !== chains[network]
+                    )
+                      throw new Error(
+                        'Setup result belongs to another application or network.',
+                      );
+                    preparing = false;
+                    showSetup(result);
+                    message(
+                      result.setup?.phase === 'ready'
+                        ? 'Wallet services prepared.'
+                        : 'Preparation returned without completion. Refresh status before retrying.',
+                    );
+                  }
+                } catch (error) {
+                  if (version === loadVersion && token) {
+                    preparing = false;
+                    await refreshSetup().catch(() => undefined);
+                    message(
+                      'Preparation did not report success. Check the recorded progress before retrying. ' +
+                        error.message,
+                      true,
+                    );
+                  }
+                } finally {
+                  clearInterval(timer);
+                  preparing = false;
+                }
+              },
+            );
+        };
+        let polling = false;
+        let setupStillRunning = funding.setup?.running ?? false;
+        async function refreshSetup() {
+          if (
+            polling ||
+            version !== loadVersion ||
+            !token ||
+            !section.isConnected
+          )
+            return;
+          polling = true;
+          try {
+            const latest = await request(
+              '/v1/provider/applications/' + applicationId + '/wallet-services',
+            );
+            if (version !== loadVersion || !token || !section.isConnected)
+              return;
+            if (
+              latest.application_id !== applicationId ||
+              latest.chain_id !== chains[network]
+            )
+              throw new Error(
+                'Setup status belongs to another application or network.',
+              );
+            setupStillRunning = latest.setup?.running ?? false;
+            showSetup(latest);
+          } finally {
+            polling = false;
+          }
+        }
+        showSetup(funding);
+        if (funding.setup?.running) {
+          const timer = setInterval(async () => {
+            if (
+              version !== loadVersion ||
+              !token ||
+              !section.isConnected ||
+              parent.hidden ||
+              !setupStillRunning
+            ) {
+              clearInterval(timer);
+              return;
+            }
+            await refreshSetup().catch(() => undefined);
+          }, 2000);
+        }
+        action(content, 'Refresh provisioning status', refreshSetup);
+        node('h4', 'Application funding address', content);
+        if (
+          funding.funding_address &&
+          /^0x[0-9a-fA-F]{40}$/.test(funding.funding_address)
+        ) {
+          node('p', 'Network: ' + networkName + ' · Asset: ETH', content);
+          node('code', funding.funding_address, content);
+          node(
+            'p',
+            'Share this address with the application team for ETH funding on this network. It is separate from user deposits.',
+            content,
+          );
+          node(
+            'p',
+            funding.setup?.phase === 'ready'
+              ? 'Wallet services prepared. User-wallet readiness is separate.'
+              : terms?.decision === 'accepted'
+                ? 'The application can supply ETH on this network.'
+                : 'Application acceptance is required before funding.',
+            content,
+          );
+        } else {
+          node(
+            'p',
+            'Prepare a dedicated address after saving the terms. No funds are sent.',
+            content,
+          );
+          if (
+            terms?.decision === 'accepted' ||
+            (terms?.proposed_by === 'provider' && terms.decision === 'pending')
+          )
+            action(content, 'Prepare funding address', async () => {
+              await request(
+                '/v1/provider/applications/' +
+                  applicationId +
+                  '/wallet-services/funding-address',
+                'POST',
+                {},
+              );
+              await load();
+            });
+          else node('p', 'Save or approve the fee terms first.', content);
+        }
       }
     } catch (error) {
-      if (version !== loadVersion || !token) return;
-      content.replaceChildren();
+      if (version !== loadVersion || !token || !section.isConnected) return;
+      body.replaceChildren();
       node(
         'p',
         'Wallet services are unavailable. Check the network and application agreement, then refresh.',
-        content,
+        body,
       );
       message(error.message, true);
     }
   }
-  selector.onchange = run(load);
-  action(section, 'Refresh wallet services', load);
-  section.ontoggle = run(async () => {
-    if (section.open) await load();
-    else loadVersion++;
+  selector.onchange = run(async () => {
+    applicationNetworks.set(record.id, selector.value);
+    await load();
   });
+  action(section, 'Refresh wallet services', load);
+  return load;
 }
 
 async function refresh() {
@@ -1433,14 +1807,62 @@ async function refresh() {
         'No applications yet. Add your first one above, or ask your developer to connect it using the API.',
         list,
       );
-    for (const record of records) {
+    let visibleRecords = records;
+    if (container === 'application-list' && records.length) {
+      if (!records.some((record) => record.id === selectedApplicationId))
+        selectedApplicationId = records[0].id;
+      const label = node('label', 'Application', list);
+      label.className = 'application-picker';
+      const picker = node('select', undefined, label);
+      for (const record of records) {
+        const option = node('option', record.name, picker);
+        option.value = record.id;
+      }
+      picker.value = selectedApplicationId;
+      picker.onchange = run(async () => {
+        selectedApplicationId = picker.value;
+        await refresh();
+      });
+      visibleRecords = records.filter(
+        (record) => record.id === selectedApplicationId,
+      );
+    }
+    for (const record of visibleRecords) {
       const article = node('article', undefined, list);
       node('h3', record.name, article);
-      const details = node('details', undefined, article);
-      node('summary', 'Connection details', details);
+      const initialTab =
+        applicationTabs.get(record.id) ??
+        (record.policy?.assertionTrust ? 'wallet' : 'access');
+      if (record.role === 'application')
+        applicationTabs.set(record.id, initialTab);
+      let loadWallet;
+      let walletLoaded = false;
+      const panels =
+        record.role === 'application'
+          ? settingsTabs(
+              article,
+              [
+                ['wallet', 'Wallet setup'],
+                ['access', 'People & permissions'],
+                ['connection', 'Connection'],
+                ['sharing', 'Wallet sharing'],
+              ],
+              initialTab,
+              async (key) => {
+                applicationTabs.set(record.id, key);
+                if (key === 'wallet' && loadWallet && !walletLoaded) {
+                  walletLoaded = true;
+                  await loadWallet();
+                }
+              },
+            )
+          : undefined;
+      const connection = panels?.connection ?? article;
+      const details = node('section', undefined, connection);
+      node('h4', 'Connection details', details);
       node('p', 'Connection ID (client_id): ' + record.id, details);
       node('p', 'Settings revision: ' + record.revision, details);
-      node(
+      const connectionState = node(
         'p',
         (record.enabled ? 'Connection active' : 'Connection paused') +
           (record.role === 'application'
@@ -1454,7 +1876,9 @@ async function refresh() {
                 : 'Management tool')),
         article,
       );
-      const actions = node('div', undefined, article);
+      connectionState.className = 'connection-state';
+      article.insertBefore(connectionState, article.children[1]);
+      const actions = node('div', undefined, connection);
       actions.className = 'actions';
       if (record.role !== 'administrator') {
         action(
@@ -1489,10 +1913,14 @@ async function refresh() {
         node(
           'p',
           'Pausing this connection blocks access and ends existing wallet approvals. Resuming it does not restore those approvals.',
-          article,
+          connection,
         );
-        await renderNetworkFees(article, record, networks);
-        const form = node('form', undefined, article);
+        loadWallet = await renderNetworkFees(panels.wallet, record, networks);
+        if (initialTab === 'wallet' && loadWallet) {
+          walletLoaded = true;
+          await loadWallet();
+        }
+        const form = node('form', undefined, panels.access);
         node('h4', 'User checks and permissions', form);
         node(
           'p',
@@ -1577,7 +2005,7 @@ async function refresh() {
           });
           await refresh();
         });
-        renderWalletSharing(article, record, identities, checks);
+        renderWalletSharing(panels.sharing, record, identities, checks);
         if (record.policy?.assertionTrust)
           action(actions, 'Stop accepting user checks', async () => {
             await api('/v1/provider/identities/' + record.id, 'PATCH', {
@@ -1586,23 +2014,33 @@ async function refresh() {
             });
             await refresh();
           });
-        node(
-          'p',
-          'Review user checks, transaction rules, service connections and network fees before enabling wallet use.',
-          article,
-        );
       }
     }
   }
 }
+el('show-new-application').onclick = () => {
+  el('new-application-message').textContent = '';
+  el('new-application-dialog').showModal();
+};
+el('cancel-new-application').onclick = () =>
+  el('new-application-dialog').close();
 for (const role of ['application', 'automation'])
   el('new-' + role).onsubmit = run(async () => {
     const form = el('new-' + role);
-    const result = await api('/v1/provider/identities', 'POST', {
-      name: form.elements.name.value,
-      role,
-    });
+    let result;
+    try {
+      result = await api('/v1/provider/identities', 'POST', {
+        name: form.elements.name.value,
+        role,
+      });
+    } catch (error) {
+      if (role === 'application')
+        el('new-application-message').textContent = error.message;
+      throw error;
+    }
+    if (role === 'application') el('new-application-dialog').close();
     form.reset();
+    if (role === 'application') selectedApplicationId = result.id;
     secret(result);
     await refresh();
   });

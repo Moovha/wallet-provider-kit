@@ -31,6 +31,9 @@ const callTermsSchema = structuredClone(
     policy: { required: string[]; properties: Record<string, unknown> };
   };
 };
+callTermsSchema.properties.policy.properties.unrestrictedCalls = {
+  const: true,
+};
 delete callTermsSchema.properties.policy.properties.accounts;
 callTermsSchema.properties.policy.required =
   callTermsSchema.properties.policy.required.filter(
@@ -92,6 +95,18 @@ export const accessReceiptSchema = {
         'Hosted compatibility only. Application-led grants have no provider user redirect.',
     },
     grant_id: uuidSchema,
+    consent: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['reference', 'granted_at', 'expires_at', 'policy_revision'],
+      properties: {
+        reference: { type: 'string' },
+        granted_at: { type: 'string', format: 'date-time' },
+        expires_at: { type: 'string', format: 'date-time' },
+        policy_revision: { type: 'string' },
+        action_policy_revision: { type: 'string' },
+      },
+    },
     account_id: uuidSchema,
     permissions: {
       type: 'array',
@@ -320,7 +335,7 @@ export async function registerOnboardingRoutes(
               identity: {
                 type: 'object',
                 additionalProperties: false,
-                required: ['reference', 'level', 'verified_at', 'fields'],
+                required: ['reference', 'verified_at', 'fields'],
                 properties: {
                   reference: { type: 'string', minLength: 1, maxLength: 256 },
                   level: { type: 'string', minLength: 1, maxLength: 100 },
@@ -339,12 +354,7 @@ export async function registerOnboardingRoutes(
               consent: {
                 type: 'object',
                 additionalProperties: false,
-                required: [
-                  'reference',
-                  'granted_at',
-                  'expires_at',
-                  'policy_revision',
-                ],
+                required: ['granted_at', 'expires_at'],
                 properties: {
                   reference: { type: 'string', minLength: 1, maxLength: 256 },
                   granted_at: { type: 'string', format: 'date-time' },

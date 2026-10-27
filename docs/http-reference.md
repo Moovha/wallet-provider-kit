@@ -1831,7 +1831,7 @@ Operation: `requestAccountAccess`.
 
 **Before you start:** After the person completes the agreed identity checks and approves wallet access in your application, submit those records here. First read GET /v1/access-policy for the required fields and current terms. Use mode=create without wallet to preserve the default Personal account. To add a wallet, supply wallet.reference, name and kind (personal or shared), and consent.wallet_reference. A verified user can omit identity while their saved checks remain current. Each wallet needs its own consent. Use mode=connect with account_id and consent.account_id to renew a selected wallet; invited members also supply consent.membership_revision. To request a wallet from a selected source application, read GET /v1/access-policy?source_application_id=SOURCE_CONNECTION_ID, then use mode=connect_from_application and source_application_id without account_id. Omit source_account_id to connect the source Personal wallet, or select another source_account_id and include consent.account_id. Include the returned sharing revision and source application in fresh consent for the requesting application. All configured identity fields must match exactly; ambiguous matches are denied. The provider must trust your application’s checks. Hosted compatibility mode uses a separate provider login and review.
 
-**Result and next step:** 200: the access decision. A granted response includes account_id, grant_id, allowed actions and expiry. Save those IDs, then let the creating application provision the blockchain wallet. Shared-wallet account requests require Wallet-Grant-Id; use the selected person’s grant_id. List consented wallets with POST /v1/accounts/query. Reconnecting preserves the existing account. This request does not create an on-chain wallet or send money. Missing, stale or unauthorized evidence is rejected; consent_url is only for hosted compatibility mode.
+**Result and next step:** 200: the access decision. Application receipts include saved consent metadata. Omitted consent.reference is assigned by the provider; omitted consent policy revisions bind current terms, and omitted identity.level uses the agreed application level. Explicit mismatches are rejected. Consent times and valid identity evidence remain required. A granted response includes account_id, grant_id, allowed actions and expiry. Save those IDs, then let the creating application provision the blockchain wallet. Shared-wallet account requests require Wallet-Grant-Id; use the selected person’s grant_id. List consented wallets with POST /v1/accounts/query. Reconnecting preserves the existing account. This request does not create an on-chain wallet or send money. Missing, stale or unauthorized evidence is rejected; consent_url is only for hosted compatibility mode.
 
 | Parameter         | Location | Required | Schema                                                                                                |
 | ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
@@ -1918,7 +1918,7 @@ Request body (application/json):
         "identity": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["reference", "level", "verified_at", "fields"],
+          "required": ["reference", "verified_at", "fields"],
           "properties": {
             "reference": {
               "type": "string",
@@ -1948,12 +1948,7 @@ Request body (application/json):
         "consent": {
           "type": "object",
           "additionalProperties": false,
-          "required": [
-            "reference",
-            "granted_at",
-            "expires_at",
-            "policy_revision"
-          ],
+          "required": ["granted_at", "expires_at"],
           "properties": {
             "reference": {
               "type": "string",
@@ -2111,6 +2106,30 @@ Success response schema:
     "grant_id": {
       "type": "string",
       "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "consent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reference", "granted_at", "expires_at", "policy_revision"],
+      "properties": {
+        "reference": {
+          "type": "string"
+        },
+        "granted_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "expires_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "policy_revision": {
+          "type": "string"
+        },
+        "action_policy_revision": {
+          "type": "string"
+        }
+      }
     },
     "account_id": {
       "type": "string",
@@ -2897,6 +2916,9 @@ Success response schema:
                   }
                 }
               }
+            },
+            "unrestrictedCalls": {
+              "enum": [true]
             }
           }
         },
@@ -2938,6 +2960,10 @@ Success response schema:
             "claim_requirements"
           ],
           "properties": {
+            "transaction_mode": {
+              "type": "string",
+              "enum": ["unrestricted"]
+            },
             "action_requirements": {
               "type": "array",
               "maxItems": 64,
@@ -4134,6 +4160,35 @@ Success response schema:
                 "type": "string",
                 "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
               },
+              "consent": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "reference",
+                  "granted_at",
+                  "expires_at",
+                  "policy_revision"
+                ],
+                "properties": {
+                  "reference": {
+                    "type": "string"
+                  },
+                  "granted_at": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "expires_at": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "policy_revision": {
+                    "type": "string"
+                  },
+                  "action_policy_revision": {
+                    "type": "string"
+                  }
+                }
+              },
               "account_id": {
                 "type": "string",
                 "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
@@ -4257,6 +4312,30 @@ Success response schema:
     "grant_id": {
       "type": "string",
       "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "consent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reference", "granted_at", "expires_at", "policy_revision"],
+      "properties": {
+        "reference": {
+          "type": "string"
+        },
+        "granted_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "expires_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "policy_revision": {
+          "type": "string"
+        },
+        "action_policy_revision": {
+          "type": "string"
+        }
+      }
     },
     "account_id": {
       "type": "string",
@@ -4398,6 +4477,30 @@ Success response schema:
     "grant_id": {
       "type": "string",
       "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "consent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reference", "granted_at", "expires_at", "policy_revision"],
+      "properties": {
+        "reference": {
+          "type": "string"
+        },
+        "granted_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "expires_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "policy_revision": {
+          "type": "string"
+        },
+        "action_policy_revision": {
+          "type": "string"
+        }
+      }
     },
     "account_id": {
       "type": "string",
@@ -9688,6 +9791,10 @@ Success response schema:
                   "claim_requirements"
                 ],
                 "properties": {
+                  "transaction_mode": {
+                    "type": "string",
+                    "enum": ["unrestricted"]
+                  },
                   "action_requirements": {
                     "type": "array",
                     "maxItems": 64,
@@ -10286,6 +10393,10 @@ Success response schema:
                     "claim_requirements"
                   ],
                   "properties": {
+                    "transaction_mode": {
+                      "type": "string",
+                      "enum": ["unrestricted"]
+                    },
                     "action_requirements": {
                       "type": "array",
                       "maxItems": 64,
@@ -10922,6 +11033,10 @@ Success response schema:
                     "claim_requirements"
                   ],
                   "properties": {
+                    "transaction_mode": {
+                      "type": "string",
+                      "enum": ["unrestricted"]
+                    },
                     "action_requirements": {
                       "type": "array",
                       "maxItems": 64,
@@ -11862,6 +11977,10 @@ Success response schema:
             "claim_requirements"
           ],
           "properties": {
+            "transaction_mode": {
+              "type": "string",
+              "enum": ["unrestricted"]
+            },
             "action_requirements": {
               "type": "array",
               "maxItems": 64,
@@ -12525,6 +12644,10 @@ Success response schema:
             "claim_requirements"
           ],
           "properties": {
+            "transaction_mode": {
+              "type": "string",
+              "enum": ["unrestricted"]
+            },
             "action_requirements": {
               "type": "array",
               "maxItems": 64,
@@ -13188,6 +13311,10 @@ Success response schema:
             "claim_requirements"
           ],
           "properties": {
+            "transaction_mode": {
+              "type": "string",
+              "enum": ["unrestricted"]
+            },
             "action_requirements": {
               "type": "array",
               "maxItems": 64,
@@ -13748,6 +13875,655 @@ Success response schema:
 }
 ```
 
+## POST `/v1/provider/applications/{applicationId}/transaction-mode`
+
+Operation: `setApplicationTransactionMode`.
+
+**Why this exists:** Allow an approved application to submit arbitrary external contract calls and native transfers without transaction proposals or contract restrictions.
+
+**Who uses it:** Provider operator.
+
+**When you need it:** Choose unrestricted mode only for an application you trust to enforce transaction rules. Restricted mode is the default.
+
+**Before you start:** Use provider operator credentials, the runtime application ID, selected Wallet-Network, expected_revision and an original UUIDv4 Idempotency-Key. The application must be active with an accepted user-check agreement.
+
+**Result and next step:** 200: a published authority revision. Current identity, ownership, consent, Safe control checks and network-fee limits remain enforced. Mode changes require fresh transaction consent. Returning to restricted mode clears allowed contracts; publish transaction rules before execution.
+
+**Request details:** Optional runtime configuration control plane. Application proposals and provider publications are configuration records, not wallet grants, signing authority or execution activation. Publications become readable immediately without restarting the service. Immutable historical revisions remain available. Requires the documented scope and configured application or operator identity.
+
+| Parameter         | Location | Required | Schema                                                                                                |
+| ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
+| `applicationId`   | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{64}$"}`                                                        |
+| `idempotency-key` | header   | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+| `wallet-network`  | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum","ethereum-sepolia"]}`                      |
+
+Request body (application/json):
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["expected_revision", "mode"],
+  "properties": {
+    "expected_revision": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,19})$"
+    },
+    "mode": {
+      "type": "string",
+      "enum": ["restricted", "unrestricted"]
+    }
+  }
+}
+```
+
+| Status | Content type             | Description      |
+| ------ | ------------------------ | ---------------- |
+| 200    | application/json         | Default Response |
+| 400    | application/problem+json | Problem response |
+| 401    | application/problem+json | Problem response |
+| 403    | application/problem+json | Problem response |
+| 409    | application/problem+json | Problem response |
+| 413    | application/problem+json | Problem response |
+| 415    | application/problem+json | Problem response |
+| 422    | application/problem+json | Problem response |
+| 429    | application/problem+json | Problem response |
+| 500    | application/problem+json | Problem response |
+| 503    | application/problem+json | Problem response |
+
+Success response schema:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "application_id",
+    "revision",
+    "previous_revision",
+    "policy_hash",
+    "policy",
+    "published_at",
+    "published_by"
+  ],
+  "properties": {
+    "application_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "revision": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,19})$"
+    },
+    "previous_revision": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,19})$"
+    },
+    "policy_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "enabled",
+        "chain_id",
+        "contracts",
+        "maximum_calls",
+        "maximum_native_value_wei",
+        "max_validity_seconds",
+        "claim_requirements"
+      ],
+      "properties": {
+        "transaction_mode": {
+          "type": "string",
+          "enum": ["unrestricted"]
+        },
+        "action_requirements": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "description", "fields"],
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+              },
+              "description": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "fields": {
+                "type": "array",
+                "maxItems": 32,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["name", "required", "allowed_values"],
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+                    },
+                    "required": {
+                      "type": "boolean"
+                    },
+                    "allowed_values": {
+                      "type": "array",
+                      "minItems": 1,
+                      "maxItems": 64,
+                      "uniqueItems": true,
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "application_resources_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "version": {
+          "type": "string",
+          "enum": ["1"]
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "chain_id": {
+          "type": "string",
+          "enum": ["eip155:84532", "eip155:8453", "eip155:1", "eip155:11155111"]
+        },
+        "contracts": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["address", "code_hash", "methods"],
+            "properties": {
+              "address": {
+                "type": "string",
+                "pattern": "^0x[0-9a-fA-F]{40}$"
+              },
+              "code_hash": {
+                "type": "string",
+                "pattern": "^0x[0-9a-f]{64}$"
+              },
+              "implementation": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["address", "code_hash"],
+                "properties": {
+                  "address": {
+                    "type": "string",
+                    "pattern": "^0x[0-9a-fA-F]{40}$"
+                  },
+                  "code_hash": {
+                    "type": "string",
+                    "pattern": "^0x[0-9a-f]{64}$"
+                  },
+                  "storage_layout": {
+                    "type": "string",
+                    "enum": ["eip1967", "zeppelinos"]
+                  }
+                }
+              },
+              "methods": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 32,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["signature", "maximum_value_wei"],
+                  "properties": {
+                    "signature": {
+                      "type": "string",
+                      "minLength": 3,
+                      "maxLength": 256
+                    },
+                    "maximum_value_wei": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]{0,77})$"
+                    },
+                    "user_address_parameters": {
+                      "type": "array",
+                      "minItems": 1,
+                      "maxItems": 16,
+                      "uniqueItems": true,
+                      "items": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 31
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "call_adapters": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "tokenTransfers": {
+              "type": "array",
+              "maxItems": 128,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["token", "recipients", "maximumAmount"],
+                "properties": {
+                  "token": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["address", "codeHash"],
+                    "properties": {
+                      "address": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                      },
+                      "codeHash": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-f]{64}$"
+                      },
+                      "implementation": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "storageLayout": {
+                            "type": "string",
+                            "enum": ["eip1967", "zeppelinos"]
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "recipients": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 128,
+                    "uniqueItems": true,
+                    "items": {
+                      "type": "string",
+                      "pattern": "^0x[0-9a-fA-F]{40}$"
+                    }
+                  },
+                  "maximumAmount": {
+                    "type": "string",
+                    "pattern": "^(0|[1-9][0-9]{0,77})$"
+                  },
+                  "lifetimeAmount": {
+                    "type": "string",
+                    "pattern": "^(0|[1-9][0-9]{0,77})$"
+                  }
+                }
+              }
+            },
+            "swaps": {
+              "type": "array",
+              "maxItems": 128,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "router",
+                  "tokenIn",
+                  "tokenOut",
+                  "fee",
+                  "maximumInput"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9._-]{1,64}$"
+                  },
+                  "router": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["address", "codeHash"],
+                    "properties": {
+                      "address": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                      },
+                      "codeHash": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-f]{64}$"
+                      },
+                      "implementation": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "storageLayout": {
+                            "type": "string",
+                            "enum": ["eip1967", "zeppelinos"]
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "tokenIn": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["address", "codeHash"],
+                    "properties": {
+                      "address": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                      },
+                      "codeHash": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-f]{64}$"
+                      },
+                      "implementation": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "storageLayout": {
+                            "type": "string",
+                            "enum": ["eip1967", "zeppelinos"]
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "tokenOut": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["address", "codeHash"],
+                    "properties": {
+                      "address": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                      },
+                      "codeHash": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-f]{64}$"
+                      },
+                      "implementation": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "storageLayout": {
+                            "type": "string",
+                            "enum": ["eip1967", "zeppelinos"]
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "fee": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 999999
+                  },
+                  "maximumInput": {
+                    "type": "string",
+                    "pattern": "^(0|[1-9][0-9]{0,77})$"
+                  }
+                }
+              }
+            },
+            "vaults": {
+              "type": "array",
+              "maxItems": 128,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["id", "router", "vault", "asset", "maximumAssets"],
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9._-]{1,64}$"
+                  },
+                  "router": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["address", "codeHash"],
+                    "properties": {
+                      "address": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                      },
+                      "codeHash": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-f]{64}$"
+                      },
+                      "implementation": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "storageLayout": {
+                            "type": "string",
+                            "enum": ["eip1967", "zeppelinos"]
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "vault": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["address", "codeHash"],
+                    "properties": {
+                      "address": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                      },
+                      "codeHash": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-f]{64}$"
+                      },
+                      "implementation": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "storageLayout": {
+                            "type": "string",
+                            "enum": ["eip1967", "zeppelinos"]
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "asset": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["address", "codeHash"],
+                    "properties": {
+                      "address": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                      },
+                      "codeHash": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-f]{64}$"
+                      },
+                      "implementation": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["address", "codeHash"],
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$"
+                          },
+                          "codeHash": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-f]{64}$"
+                          },
+                          "storageLayout": {
+                            "type": "string",
+                            "enum": ["eip1967", "zeppelinos"]
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "maximumAssets": {
+                    "type": "string",
+                    "pattern": "^(0|[1-9][0-9]{0,77})$"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "native_transfers": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["address", "code_hash", "maximum_value_wei"],
+            "properties": {
+              "address": {
+                "type": "string",
+                "pattern": "^0x[0-9a-fA-F]{40}$"
+              },
+              "code_hash": {
+                "type": "string",
+                "pattern": "^0x[0-9a-f]{64}$"
+              },
+              "maximum_value_wei": {
+                "type": "string",
+                "pattern": "^(0|[1-9][0-9]{0,77})$"
+              }
+            }
+          }
+        },
+        "maximum_calls": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16
+        },
+        "maximum_native_value_wei": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,77})$"
+        },
+        "max_validity_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3600
+        },
+        "claim_requirements": {
+          "type": "array",
+          "maxItems": 16,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "allowed_values", "max_age_seconds"],
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]{0,63}$"
+              },
+              "allowed_values": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 32,
+                "uniqueItems": true,
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              },
+              "max_age_seconds": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 31536000
+              }
+            }
+          }
+        }
+      }
+    },
+    "published_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "proposal_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "published_by": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}
+```
+
 ## POST `/v1/application/policy/proposals`
 
 Operation: `proposeRuntimeConfiguration`.
@@ -13795,6 +14571,10 @@ Request body (application/json):
         "claim_requirements"
       ],
       "properties": {
+        "transaction_mode": {
+          "type": "string",
+          "enum": ["unrestricted"]
+        },
         "action_requirements": {
           "type": "array",
           "maxItems": 64,
@@ -14385,6 +15165,10 @@ Success response schema:
         "claim_requirements"
       ],
       "properties": {
+        "transaction_mode": {
+          "type": "string",
+          "enum": ["unrestricted"]
+        },
         "action_requirements": {
           "type": "array",
           "maxItems": 64,
@@ -15000,6 +15784,10 @@ Success response schema:
         "claim_requirements"
       ],
       "properties": {
+        "transaction_mode": {
+          "type": "string",
+          "enum": ["unrestricted"]
+        },
         "action_requirements": {
           "type": "array",
           "maxItems": 64,
@@ -15633,6 +16421,10 @@ Success response schema:
         "claim_requirements"
       ],
       "properties": {
+        "transaction_mode": {
+          "type": "string",
+          "enum": ["unrestricted"]
+        },
         "action_requirements": {
           "type": "array",
           "maxItems": 64,
@@ -16224,6 +17016,10 @@ Request body (application/json):
         "claim_requirements"
       ],
       "properties": {
+        "transaction_mode": {
+          "type": "string",
+          "enum": ["unrestricted"]
+        },
         "action_requirements": {
           "type": "array",
           "maxItems": 64,
@@ -16815,6 +17611,10 @@ Success response schema:
         "claim_requirements"
       ],
       "properties": {
+        "transaction_mode": {
+          "type": "string",
+          "enum": ["unrestricted"]
+        },
         "action_requirements": {
           "type": "array",
           "maxItems": 64,
@@ -18005,6 +18805,197 @@ Success response schema:
       "type": "integer",
       "minimum": 1,
       "maximum": 365
+    }
+  }
+}
+```
+
+## GET `/v1/provider/networks/{network}/execution`
+
+Operation: `readNetworkExecution`.
+
+**Why this exists:** Read the retained execution setting, completed-check references and running readiness for one configured network.
+
+**Who uses it:** Provider operator.
+
+**When you need it:** Use Networks & execution in the portal or read before changing a network setting.
+
+**Before you start:** Use a current provider management token and a network already running on this instance.
+
+**Result and next step:** 200: the current revision, enabled setting and readiness. Enabled does not prove application funding or wallet readiness.
+
+**Request details:** Protected installation and application administration. Management credentials do not activate wallet operations or authorize spending.
+
+| Parameter | Location | Required | Schema                                                           |
+| --------- | -------- | -------- | ---------------------------------------------------------------- |
+| `network` | path     | yes      | `{"enum":["base","base-sepolia","ethereum","ethereum-sepolia"]}` |
+
+| Status | Content type             | Description      |
+| ------ | ------------------------ | ---------------- |
+| 200    | application/json         | Default Response |
+| 400    | application/problem+json | Problem response |
+| 401    | application/problem+json | Problem response |
+| 403    | application/problem+json | Problem response |
+| 409    | application/problem+json | Problem response |
+| 413    | application/problem+json | Problem response |
+| 415    | application/problem+json | Problem response |
+| 422    | application/problem+json | Problem response |
+| 429    | application/problem+json | Problem response |
+| 500    | application/problem+json | Problem response |
+| 503    | application/problem+json | Problem response |
+
+Success response schema:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "network",
+    "name",
+    "testnet",
+    "revision",
+    "enabled",
+    "ready",
+    "backendAcceptance",
+    "recoveryAcceptance"
+  ],
+  "properties": {
+    "network": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "testnet": {
+      "type": "boolean"
+    },
+    "revision": {
+      "type": "integer"
+    },
+    "enabled": {
+      "type": "boolean"
+    },
+    "ready": {
+      "type": "boolean"
+    },
+    "backendAcceptance": {
+      "type": "string"
+    },
+    "recoveryAcceptance": {
+      "type": "string"
+    }
+  }
+}
+```
+
+## POST `/v1/provider/networks/{network}/execution`
+
+Operation: `saveNetworkExecution`.
+
+**Why this exists:** Apply a durable network execution setting without restarting the service.
+
+**Who uses it:** Provider operator.
+
+**When you need it:** Enable after completing wallet setup and recovery checks, or pause new requests during maintenance.
+
+**Before you start:** Supply expected_revision, an original UUIDv4 Idempotency-Key and enabled. Enabling needs backendAcceptance and recoveryAcceptance references. Mainnet enabling also requires mainnet_confirmed: true.
+
+**Result and next step:** 200: saved setting and current readiness. Changing the setting fences prior transaction consent and pending authority on that network. Issued signatures and submitted transactions may still execute. Other networks and application permissions remain separate.
+
+**Request details:** Protected installation and application administration. Management credentials do not activate wallet operations or authorize spending.
+
+| Parameter         | Location | Required | Schema                                                                                                |
+| ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
+| `network`         | path     | yes      | `{"enum":["base","base-sepolia","ethereum","ethereum-sepolia"]}`                                      |
+| `idempotency-key` | header   | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+
+Request body (application/json):
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["expected_revision", "enabled"],
+  "properties": {
+    "expected_revision": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "enabled": {
+      "type": "boolean"
+    },
+    "backendAcceptance": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "recoveryAcceptance": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "mainnet_confirmed": {
+      "type": "boolean"
+    }
+  }
+}
+```
+
+| Status | Content type             | Description      |
+| ------ | ------------------------ | ---------------- |
+| 200    | application/json         | Default Response |
+| 400    | application/problem+json | Problem response |
+| 401    | application/problem+json | Problem response |
+| 403    | application/problem+json | Problem response |
+| 409    | application/problem+json | Problem response |
+| 413    | application/problem+json | Problem response |
+| 415    | application/problem+json | Problem response |
+| 422    | application/problem+json | Problem response |
+| 429    | application/problem+json | Problem response |
+| 500    | application/problem+json | Problem response |
+| 503    | application/problem+json | Problem response |
+
+Success response schema:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "network",
+    "name",
+    "testnet",
+    "revision",
+    "enabled",
+    "ready",
+    "backendAcceptance",
+    "recoveryAcceptance"
+  ],
+  "properties": {
+    "network": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "testnet": {
+      "type": "boolean"
+    },
+    "revision": {
+      "type": "integer"
+    },
+    "enabled": {
+      "type": "boolean"
+    },
+    "ready": {
+      "type": "boolean"
+    },
+    "backendAcceptance": {
+      "type": "string"
+    },
+    "recoveryAcceptance": {
+      "type": "string"
     }
   }
 }

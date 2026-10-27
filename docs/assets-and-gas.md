@@ -22,7 +22,7 @@ isolated testnet deployment for the [first test](staging-walkthrough.md).
 
 ## Review fee funding in administration
 
-Open **Applications → Wallet services** and select a network.
+Open **Applications → choose an application → Wallet setup** and select a network.
 
 1. Open **Set fee limits**. Enter an agreement reference, the per-transaction and
    pending-fee limits in ETH, the maximum wallets covered and pending transactions.
@@ -46,8 +46,7 @@ before wallet execution; use a testnet for initial acceptance.
 
 ## Configure connections and prepare wallet services
 
-Open **Applications → Wallet services** and select the network. Under **Blockchain
-connections**, add your provider API keys:
+Open **Applications → choose an application → Wallet setup** and select the network. Open **Connections**, add your provider API keys:
 
 - **Alchemy:** the primary connection for blockchain reads and transaction submission.
 - **dRPC:** an independent check and a backup connection.

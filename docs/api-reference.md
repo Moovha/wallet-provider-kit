@@ -621,8 +621,17 @@ export interface AccessInput {
 ```ts
 /** A request may reuse the caller's current stored identity evidence; consent is always supplied. */
 export type AccessRequestInput = Omit<AccessInput, 'user'> & {
-  user?: Omit<ApplicationUserAssertion, 'identity'> & {
-    identity?: ApplicationUserAssertion['identity'];
+  user?: Omit<ApplicationUserAssertion, 'identity' | 'consent'> & {
+    identity?: Omit<ApplicationUserAssertion['identity'], 'level'> & {
+      level?: string;
+    };
+    consent: Omit<
+      ApplicationUserAssertion['consent'],
+      'reference' | 'policy_revision'
+    > & {
+      reference?: string;
+      policy_revision?: string;
+    };
   };
 };
 ```
@@ -1003,6 +1012,15 @@ export declare class OnboardingService {
     membership_revision?: number | undefined;
     wallet?: import('./types.js').WalletDescription | undefined;
     account_id?: string | undefined;
+    consent?:
+      | {
+          action_policy_revision?: string | undefined;
+          reference: string;
+          granted_at: string;
+          expires_at: string;
+          policy_revision: string;
+        }
+      | undefined;
     grant_id?: string | undefined;
     consent_url?: string | undefined;
     request_id: string;
@@ -1025,6 +1043,15 @@ export declare class OnboardingService {
     membership_revision?: number | undefined;
     wallet?: import('./types.js').WalletDescription | undefined;
     account_id?: string | undefined;
+    consent?:
+      | {
+          action_policy_revision?: string | undefined;
+          reference: string;
+          granted_at: string;
+          expires_at: string;
+          policy_revision: string;
+        }
+      | undefined;
     grant_id?: string | undefined;
     consent_url?: string | undefined;
     request_id: string;
@@ -1100,6 +1127,15 @@ export declare class OnboardingService {
     membership_revision?: number | undefined;
     wallet?: import('./types.js').WalletDescription | undefined;
     account_id?: string | undefined;
+    consent?:
+      | {
+          action_policy_revision?: string | undefined;
+          reference: string;
+          granted_at: string;
+          expires_at: string;
+          policy_revision: string;
+        }
+      | undefined;
     grant_id?: string | undefined;
     consent_url?: string | undefined;
     request_id: string;
@@ -1124,6 +1160,15 @@ export declare class OnboardingService {
     membership_revision?: number | undefined;
     wallet?: import('./types.js').WalletDescription | undefined;
     account_id?: string | undefined;
+    consent?:
+      | {
+          action_policy_revision?: string | undefined;
+          reference: string;
+          granted_at: string;
+          expires_at: string;
+          policy_revision: string;
+        }
+      | undefined;
     grant_id?: string | undefined;
     consent_url?: string | undefined;
     request_id: string;
@@ -1196,6 +1241,15 @@ export declare class OnboardingService {
     membership_revision?: number | undefined;
     wallet?: import('./types.js').WalletDescription | undefined;
     account_id?: string | undefined;
+    consent?:
+      | {
+          action_policy_revision?: string | undefined;
+          reference: string;
+          granted_at: string;
+          expires_at: string;
+          policy_revision: string;
+        }
+      | undefined;
     grant_id?: string | undefined;
     consent_url?: string | undefined;
     request_id: string;
@@ -1337,6 +1391,15 @@ export declare class OnboardingService {
     membership_revision?: number | undefined;
     wallet?: import('./types.js').WalletDescription | undefined;
     account_id?: string | undefined;
+    consent?:
+      | {
+          action_policy_revision?: string | undefined;
+          reference: string;
+          granted_at: string;
+          expires_at: string;
+          policy_revision: string;
+        }
+      | undefined;
     grant_id?: string | undefined;
     consent_url?: string | undefined;
     request_id: string;
@@ -2413,6 +2476,8 @@ export declare function approvedCallPayload(
 
 ```ts
 export interface ApprovedCallPolicy {
+  /** Provider-delegated generic calls; account control and immutable execution checks still apply. */
+  unrestrictedCalls?: true;
   mechanism: 'safe-1.4.1';
   adapters?: OperationAdapters;
   nativeTransfers?: {
@@ -2992,6 +3057,15 @@ export declare class RuntimeConfigurationService {
     proposalId: string,
     expectedRevision: string,
   ): Promise<RuntimePolicyRevision>;
+  /** Publish provider-selected transaction authority without an application proposal. */
+  setTransactionMode(
+    context: AuthorityContext,
+    applicationId: string,
+    input: {
+      expected_revision: string;
+      mode: 'restricted' | 'unrestricted';
+    },
+  ): Promise<RuntimePolicyRevision>;
   update(
     context: AuthorityContext,
     applicationId: string,
@@ -3006,6 +3080,7 @@ export declare class RuntimeConfigurationService {
 
 ```ts
 export interface RuntimePolicy {
+  transaction_mode?: 'unrestricted';
   action_requirements?: ApplicationObligations['actions'];
   application_resources_hash?: string;
   version: '1';
@@ -4912,8 +4987,17 @@ Import from `@moovha/wallet-provider-kit/wallets`. [Integration guide](multiple-
 ```ts
 /** A request may reuse the caller's current stored identity evidence; consent is always supplied. */
 export type AccessRequestInput = Omit<AccessInput, 'user'> & {
-  user?: Omit<ApplicationUserAssertion, 'identity'> & {
-    identity?: ApplicationUserAssertion['identity'];
+  user?: Omit<ApplicationUserAssertion, 'identity' | 'consent'> & {
+    identity?: Omit<ApplicationUserAssertion['identity'], 'level'> & {
+      level?: string;
+    };
+    consent: Omit<
+      ApplicationUserAssertion['consent'],
+      'reference' | 'policy_revision'
+    > & {
+      reference?: string;
+      policy_revision?: string;
+    };
   };
 };
 ```
