@@ -5,6 +5,10 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    groups:
+      # SDK packages and API peers must move to compatible versions together.
+      opentelemetry:
+        patterns: ['@opentelemetry/*']
     ignore:
       # Keep declarations aligned with the supported Node 26 runtime.
       - dependency-name: '@types/node'

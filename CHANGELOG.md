@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Upgrade the OpenTelemetry API to 1.10.0 and align the SDK, resources and OTLP
+  exporters on the compatible 3.0.0/0.300.0 release family. Group future
+  OpenTelemetry dependency proposals so API peer requirements stay aligned.
+- Upgrade Solidity to 0.8.38, update exact compiler requirements and regenerate
+  the Safe state reader and local paymaster artifacts with the pinned settings.
+  Update the offline viem test dependency to 2.57.11.
 - Add persistent per-network execution controls to administration. Enabling
   requires setup and recovery references plus a mainnet acknowledgement;
   setting changes invalidate prior transaction consent and pending authority.

@@ -10,7 +10,7 @@ const manifest = JSON.parse(
     'utf8',
   ),
 );
-assert.equal(solc.version().split('+')[0], '0.8.37');
+assert.equal(solc.version().split('+')[0], '0.8.38');
 assert.equal(
   manifest.sourceRevision,
   '1e2305d1102242379b582142f62bd17add12b8c2',
@@ -67,7 +67,7 @@ const hash = createHash('sha256')
   .update(JSON.stringify(manifest))
   .digest('hex');
 const generated = await format(
-  `// Generated from pinned upstream MIT-licensed SingletonPaymasterV7 sources.\n// solc 0.8.37; optimizer 200 runs; London EVM; metadata disabled.\n// Source manifest SHA-256: ${hash}\nexport const localPaymasterCreationCode = '0x${contract.evm.bytecode.object}';\nexport const localPaymasterRuntimeTemplate = '0x${contract.evm.deployedBytecode.object}';\nexport const localPaymasterImmutableReferences = ${JSON.stringify(references)} as const;\nexport const localPaymasterAbi = ${JSON.stringify(contract.abi)} as const;\n`,
+  `// Generated from pinned upstream MIT-licensed SingletonPaymasterV7 sources.\n// solc 0.8.38; optimizer 200 runs; London EVM; metadata disabled.\n// Source manifest SHA-256: ${hash}\nexport const localPaymasterCreationCode = '0x${contract.evm.bytecode.object}';\nexport const localPaymasterRuntimeTemplate = '0x${contract.evm.deployedBytecode.object}';\nexport const localPaymasterImmutableReferences = ${JSON.stringify(references)} as const;\nexport const localPaymasterAbi = ${JSON.stringify(contract.abi)} as const;\n`,
   { parser: 'typescript', singleQuote: true, trailingComma: 'all' },
 );
 const destination = new URL(
