@@ -139,7 +139,7 @@
     "swagger-ui-dist": "5.33.3",
     "tsx": "4.23.15",
     "typescript": "5.9.3",
-    "viem": "2.57.7",
+    "viem": "2.57.11",
     "vitepress": "1.6.4",
     "vitest": "5.0.5"
   },
