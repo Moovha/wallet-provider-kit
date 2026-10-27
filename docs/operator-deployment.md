@@ -9,7 +9,19 @@ backups, restore uncertainty and reviewed image replacement.
 
 ## Deploy an advanced static configuration
 
-Build the repository with Node.js 24.22 or later in the supported Node 24 range. Validate the [Safe configuration](setup.md), retain generated secrets and mount private persistent storage. The terminal local-setup command prepares the API, bundler, cache and HTTPS ingress from the source checkout.
+The API container uses a digest-pinned minimal glibc runtime with Node.js 26.12.1.
+It contains no shell, package manager or filesystem administration commands.
+Use `docker compose exec api node ...` for reviewed Node.js diagnostics; shell
+commands such as `docker compose exec api sh` are unavailable. The container's
+health check executes Node.js directly. Run `node scripts/check-container.mjs IMAGE`
+after building an API image to verify the native wallet worker, SQLite,
+TLS and compression with isolated disposable fixtures and no host mounts.
+
+Node.js 26 is the Current release line. The OIDC dependency supports LTS releases
+and emits a warning on Current releases; toolkit compatibility tests do not
+establish upstream support for this runtime.
+
+Build the repository with Node.js 26.12.1 or later in the supported Node 26 range. Validate the [Safe configuration](setup.md), retain generated secrets and mount private persistent storage. The terminal local-setup command prepares the API, bundler, cache and HTTPS ingress from the source checkout.
 
 Keep wallet operations disabled until backend acceptance, funding limits and restore evidence are recorded. Provision application infrastructure with a separate provider operator token. Verify readiness and perform controlled zero-value testnet calls before admitting users.
 

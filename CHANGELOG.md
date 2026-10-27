@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Require Node.js 26.12.1 through the Node 26 release line for source use and
+  align CI, container builds and Node type definitions. Node 26 is Current;
+  the OIDC dependency's LTS-only support warning remains visible.
+- Use a digest-pinned minimal glibc API runtime without a shell, package manager
+  or filesystem administration tools. Preserve native wallet-engine support,
+  include the atomic runtime library's package metadata, and verify restricted
+  container execution and readable public assets in CI.
 - Add age-encrypted stopped-service backups, authenticated archive verification
   and restoration into a new private directory with every network and container
   disabled. Include the vault, retained secrets, SQLite records, configuration

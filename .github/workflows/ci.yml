@@ -77,6 +77,8 @@ jobs:
         if: steps.scope.outputs.full == 'true'
       - run: docker build -t wallet-provider-kit:verify .
         if: steps.scope.outputs.full == 'true'
+      - run: node scripts/check-container.mjs
+        if: steps.scope.outputs.full == 'true'
       - run: node scripts/check-local-compose.mjs
         if: steps.scope.outputs.full == 'true'
       - run: npm run prepare:integration
