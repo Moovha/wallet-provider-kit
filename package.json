@@ -127,7 +127,7 @@
   "devDependencies": {
     "@foundry-rs/anvil": "1.7.1",
     "@playwright/test": "1.64.1",
-    "@secretlint/secretlint-rule-preset-recommend": "13.0.7",
+    "@secretlint/secretlint-rule-preset-recommend": "13.1.0",
     "@types/node": "26.6.5",
     "@types/oidc-provider": "9.12.1",
     "ajv-formats": "3.0.1",
