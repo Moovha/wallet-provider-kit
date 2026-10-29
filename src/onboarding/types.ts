@@ -226,7 +226,19 @@ export interface AccessRequest {
   };
   grantId?: string;
 }
+export interface AccountKycInput {
+  expected_revision: number;
+  fields: Record<string, string | null>;
+}
+export interface CreateAccountInput {
+  user_id: string;
+  wallet?: WalletDescription;
+}
 export interface AccountRecord {
+  /** Creator-only setup authority; never an access grant or signing permission. */
+  deferredCreation?: { revision: string };
+  kycDraft?: { revision: number; fields: Record<string, string> };
+
   creatorApplication?: { issuer: string; clientId: string };
   wallet?: WalletDescription;
   members?: Record<string, WalletMember>;
@@ -319,7 +331,12 @@ export interface ProviderState {
   attempts: Record<string, StoredAttempt>;
   admissions: Record<
     string,
-    { accountId: string; grantId: string; caller: AccessRequest['caller'] }
+    {
+      accountId: string;
+      grantId: string;
+      caller: AccessRequest['caller'];
+      deferred?: boolean;
+    }
   >;
   sessions: Record<
     string,

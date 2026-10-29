@@ -25,6 +25,13 @@ export type {
   WalletDescription,
 } from '../onboarding/types.js';
 
+export interface AccountKycReceipt {
+  account_id: string;
+  revision: number;
+  fields: Record<string, string>;
+  missing_fields: string[];
+  status: 'draft';
+}
 export interface WalletSummary {
   network?: ProviderNetwork;
   chain_id?: string;
@@ -140,6 +147,31 @@ export function createWalletsClient(options: {
     }
   }
   return {
+    createAccount(
+      input: import('../onboarding/types.js').CreateAccountInput,
+      idempotencyKey: string,
+    ) {
+      return request<{
+        account_id: string;
+        status: 'verification_required';
+        wallet: WalletDescription;
+      }>('/v1/accounts', 'POST', input, idempotencyKey);
+    },
+    accountKyc(accountId: string) {
+      return request<AccountKycReceipt>(accountPath(accountId) + '/kyc', 'GET');
+    },
+    updateAccountKyc(
+      accountId: string,
+      input: import('../onboarding/types.js').AccountKycInput,
+      idempotencyKey: string,
+    ) {
+      return request<AccountKycReceipt>(
+        accountPath(accountId) + '/kyc',
+        'PATCH',
+        input,
+        idempotencyKey,
+      );
+    },
     ownerPolicy(accountId: string, grantId?: string) {
       return request<SafeOwnerPolicyReceipt>(
         accountPath(accountId) + '/owners',
@@ -293,7 +325,11 @@ export function createWalletsClient(options: {
         address?: string;
       }>(accountPath(accountId), 'GET', undefined, undefined, grantId);
     },
-    provision(accountId: string, grantId: string, idempotencyKey: string) {
+    provision(
+      accountId: string,
+      grantId: string | undefined,
+      idempotencyKey: string,
+    ) {
       return request<{ account_id: string; address: string }>(
         accountPath(accountId) + '/provision',
         'POST',

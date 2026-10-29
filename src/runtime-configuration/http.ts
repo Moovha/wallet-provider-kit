@@ -288,7 +288,7 @@ export async function registerRuntimeConfigurationRoutes(
           execution_funding: {
             type: 'object',
             description:
-              'Most recent background check of network fee balances and refill constraints. This observation does not authorize spending and expires after 30 seconds.',
+              'Most recent advisory funding check. Refills follow confirmed usage and a fifteen-minute recovery check. This observation does not authorize spending and expires after fifteen minutes plus a thirty-second recovery grace period.',
             additionalProperties: false,
             required: ['status', 'message'],
             properties: {

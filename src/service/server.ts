@@ -684,10 +684,11 @@ export async function createServer(options: ServerOptions = {}) {
           request.params.accountId,
           onboarding
             ? async (owner) => {
-                const grant = await onboarding.service.authorizeCurrent(
-                  context.principal,
-                  request.params.accountId,
-                );
+                const grant =
+                  await onboarding.service.authorizeProvisionCurrent(
+                    context.principal,
+                    request.params.accountId,
+                  );
                 if (grant.owner !== owner)
                   throw new WalletProviderError('wallet_authorization_denied');
               }

@@ -178,3 +178,33 @@ Accepted fee and connection terms remain required. Background allocation starts
 only when that network's wallet execution is enabled; an authorized provider can
 run the wallet-services POST before activation. Allocation does not replace
 backend, recovery, application-policy or user-consent checks.
+
+## Funding checks and refill timing
+
+Funding balances are reconciled once at startup and every fifteen minutes while
+idle. Confirmed operation receipts provide conservative estimates of gas consumed;
+when an estimate falls below half its target, the provider schedules an
+application-scoped refill check. Duplicate receipt observations are ignored and
+concurrent requests share a check. Reorgs invalidate the estimate and request a
+fresh check. Activity-triggered checks are debounced and limited to one per thirty
+seconds; an admission that needs funds can request an immediate check.
+
+The background refill low-water mark is 50% of the configured target. A refill
+restores the target rather than transferring a small amount after every operation.
+Percentage allocations use the same low-water rule and retain their fee buffer,
+provisioning allowance and protected reserve. Estimates are process-local hints,
+not balances used to approve spending. Balance-funded admission retains its fresh
+fixed-block snapshot, pending-operation reservations, current authority and fee
+limits. If an admission-triggered refill fails, the request fails closed.
+
+After sending ETH to an application's funding address, an authorized operator can
+run the existing `POST /v1/provider/applications/:applicationId/wallet-services`
+setup action to reconcile immediately. It verifies the current agreements and
+funding identity and reuses the existing paymaster. It does not deploy another
+paymaster or grant user-wallet authority. Otherwise, an external deposit is picked
+up by the next recovery check. No webhook service is required for this mode.
+
+The funding status shown by read endpoints is advisory. Reading it does not start
+RPC polling or transfer funds, and a cached status is never financial authority.
+Pending transaction receipt/reorg tracking continues independently of the funding
+recovery interval.

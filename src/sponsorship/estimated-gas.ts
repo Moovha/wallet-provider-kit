@@ -1,12 +1,29 @@
 import { WalletProviderError } from '../domain/signing.js';
 import { toQuantity } from 'ethers';
 import type { UserOperationV07 } from './user-operation.js';
+import { maximumSponsorGasLimit } from '../execution/defaults.js';
 const fields = [
   'callGasLimit',
   'verificationGasLimit',
   'preVerificationGas',
 ] as const;
 type GasCeilings = Pick<UserOperationV07, (typeof fields)[number]>;
+/** A field may use the available gas budget; the buffered sum and fee remain bounded separately. */
+export function userOperationGasCeilings(
+  maximumTotalGas = maximumSponsorGasLimit().toString(),
+): GasCeilings {
+  if (
+    !/^[1-9][0-9]{0,77}$/.test(maximumTotalGas) ||
+    BigInt(maximumTotalGas) > maximumSponsorGasLimit()
+  )
+    throw new WalletProviderError('wallet_authorization_denied');
+  const limit = toQuantity(BigInt(maximumTotalGas));
+  return {
+    callGasLimit: limit,
+    verificationGasLimit: limit,
+    preVerificationGas: limit,
+  };
+}
 /** Buffer estimates within per-field ceilings and the accepted total, including paymaster gas. */
 export function applyEstimatedUserOperationGas(
   operation: UserOperationV07,

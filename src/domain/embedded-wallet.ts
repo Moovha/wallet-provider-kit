@@ -7,6 +7,8 @@ import {
 } from './signing.js';
 
 interface OwnerAuthority {
+  /** Host-admitted creation only; this flag is never valid for signing. */
+  provisioningOnly?: true;
   sessionSubject: string;
   ownerSubject: string;
   currentUserStatus: string | null;
@@ -45,12 +47,15 @@ export interface EmbeddedWalletAuthority {
 
 function requireOwner(
   authority: OwnerAuthority | null,
+  provisioning = false,
 ): asserts authority is OwnerAuthority {
   if (
     !authority ||
+    (!provisioning && authority.provisioningOnly === true) ||
     !authority.ownerSubject ||
     authority.sessionSubject !== authority.ownerSubject ||
-    authority.currentUserStatus !== 'ID VERIFIED'
+    (authority.currentUserStatus !== 'ID VERIFIED' &&
+      !(provisioning && authority.provisioningOnly === true))
   ) {
     throw new WalletProviderError('wallet_authorization_denied');
   }
@@ -71,7 +76,7 @@ export class EmbeddedWalletService {
     const authority = structuredClone(
       await this.authority.provision(context, accountId),
     );
-    requireOwner(authority);
+    requireOwner(authority, true);
     if (authority.accountId !== accountId) {
       throw new WalletProviderError('wallet_authorization_denied');
     }
@@ -90,7 +95,7 @@ export class EmbeddedWalletService {
       const current = structuredClone(
         await this.authority.provision(context, accountId),
       );
-      requireOwner(current);
+      requireOwner(current, true);
       if (
         current.accountId !== accountId ||
         current.ownerSubject !== authority.ownerSubject ||

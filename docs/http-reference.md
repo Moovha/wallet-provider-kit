@@ -421,13 +421,13 @@ Success response schema:
 
 Operation: `provisionAccount`.
 
-**Why this exists:** Create or locate the Safe wallet for an account that already has current approved access.
+**Why this exists:** Create or locate the Safe wallet using current approved access or creator-only setup authority for an account created without KYC.
 
 **Who uses it:** Application developer.
 
-**When you need it:** Use after POST /v1/access-requests returns a granted account. Keep the original retry key if creation is pending or its outcome is uncertain.
+**When you need it:** Use after createAccountWithoutKyc returns an account ID, or after requestAccountAccess grants access. Keep the original retry key if creation is pending or its outcome is uncertain.
 
-**Before you start:** Use the accepted account_id with current owner-granted access and an empty JSON body: {}. Keep the original idempotency key when retrying. Investigate an unknown outcome before trying again.
+**Before you start:** Supply an empty JSON body and the saved account_id. Verified accounts need current transaction consent. For an account created without KYC, only its creating application can provision it, without a Wallet-Grant-Id header. Accepted fee terms, funded infrastructure and service readiness remain required. Keep the original idempotency key for retries; uncertain setup retains its durable attempt.
 
 **Result and next step:** 200: the user Safe account address and provisioning status. Deployment uses accepted application infrastructure. Pending deployment retains its original attempt; retry with the same identity. Wallet creation does not grant spending permission.
 
@@ -1814,6 +1814,285 @@ Success response schema:
           }
         }
       }
+    }
+  }
+}
+```
+
+## POST `/v1/accounts`
+
+Operation: `createAccountWithoutKyc`.
+
+**Why this exists:** Bind a new account to your application and stable user reference before identity information is available.
+
+**Who uses it:** Application developer.
+
+**When you need it:** Use when the person needs a wallet address before completing identity checks.
+
+**Before you start:** Your application must have an accepted identity trust agreement. Supply user_id and a saved idempotency key. Named wallets can include their wallet description. This endpoint does not create a grant.
+
+**Result and next step:** 200: account_id, wallet and verification_required status. Call provisionAccount as the creating application to obtain the Safe address. Submit KYC drafts through updateAccountKyc and complete verified identity and fresh consent through requestAccountAccess before transactions.
+
+**Request details:** Create an application-bound account without KYC. Only its creating application can supply KYC or provision its address. No access grant or signing authority is issued. Call provisionAccount to obtain the Safe address.
+
+| Parameter         | Location | Required | Schema                                                                                                |
+| ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
+| `idempotency-key` | header   | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+| `wallet-network`  | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum","ethereum-sepolia"]}`                      |
+
+Request body (application/json):
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["user_id"],
+  "properties": {
+    "user_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "wallet": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reference", "name", "kind"],
+      "properties": {
+        "reference": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "kind": {
+          "enum": ["personal", "shared"]
+        }
+      }
+    }
+  }
+}
+```
+
+| Status | Content type             | Description      |
+| ------ | ------------------------ | ---------------- |
+| 200    | application/json         | Default Response |
+| 400    | application/problem+json | Default Response |
+| 401    | application/problem+json | Default Response |
+| 403    | application/problem+json | Default Response |
+| 409    | application/problem+json | Default Response |
+| 413    | application/problem+json | Default Response |
+| 415    | application/problem+json | Default Response |
+| 422    | application/problem+json | Default Response |
+| 429    | application/problem+json | Default Response |
+| 500    | application/problem+json | Default Response |
+| 503    | application/problem+json | Default Response |
+
+Success response schema:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["account_id", "status", "wallet"],
+  "properties": {
+    "account_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "status": {
+      "enum": ["verification_required"]
+    },
+    "wallet": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reference", "name", "kind"],
+      "properties": {
+        "reference": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "kind": {
+          "enum": ["personal", "shared"]
+        }
+      }
+    }
+  }
+}
+```
+
+## GET `/v1/accounts/{accountId}/kyc`
+
+Operation: `getAccountKyc`.
+
+**Why this exists:** Read saved identity fields and the revision needed for the next incremental update.
+
+**Who uses it:** Application developer.
+
+**When you need it:** Use before editing KYC or to recover the current draft after a response is lost.
+
+**Before you start:** Authenticate as the original creating application. Shared wallet access does not allow reading another application’s KYC draft.
+
+**Result and next step:** 200: revision, draft fields and missing_fields. Draft completeness does not establish verified identity or transaction authority.
+
+**Request details:** Read draft KYC fields as the original creating application. Draft fields are not verified identity evidence.
+
+| Parameter         | Location | Required | Schema                                                                                                |
+| ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
+| `accountId`       | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+| `wallet-network`  | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum","ethereum-sepolia"]}`                      |
+| `wallet-grant-id` | header   | no       | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+
+| Status | Content type             | Description      |
+| ------ | ------------------------ | ---------------- |
+| 200    | application/json         | Default Response |
+| 400    | application/problem+json | Default Response |
+| 401    | application/problem+json | Default Response |
+| 403    | application/problem+json | Default Response |
+| 409    | application/problem+json | Default Response |
+| 413    | application/problem+json | Default Response |
+| 415    | application/problem+json | Default Response |
+| 422    | application/problem+json | Default Response |
+| 429    | application/problem+json | Default Response |
+| 500    | application/problem+json | Default Response |
+| 503    | application/problem+json | Default Response |
+
+Success response schema:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["account_id", "revision", "fields", "missing_fields", "status"],
+  "properties": {
+    "account_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "fields": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "missing_fields": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "status": {
+      "enum": ["draft"]
+    }
+  }
+}
+```
+
+## PATCH `/v1/accounts/{accountId}/kyc`
+
+Operation: `updateAccountKyc`.
+
+**Why this exists:** Merge configured identity fields into a draft while preserving omitted fields.
+
+**Who uses it:** Application developer.
+
+**When you need it:** Use as identity information arrives or existing facts need correction.
+
+**Before you start:** Authenticate as the original creating application. Supply expected_revision from getAccountKyc, configured fields and a saved idempotency key. Null removes a field. A changed request needs a new key.
+
+**Result and next step:** 200: the saved draft and advanced revision. Existing identity acceptance and grants across the owner’s wallets are invalidated. Fresh verified evidence and consent are required for transactions. Stale revisions and changed retries return 409.
+
+**Request details:** Add or correct configured KYC fields as the original creating application; omitted fields remain and null removes a field. Requires the current revision. Revokes existing owner grants and invalidates identity acceptance across owned wallets. Submit fresh verified identity and consent through requestAccountAccess to authorize use.
+
+| Parameter         | Location | Required | Schema                                                                                                |
+| ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
+| `accountId`       | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+| `idempotency-key` | header   | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+| `wallet-network`  | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum","ethereum-sepolia"]}`                      |
+| `wallet-grant-id` | header   | no       | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+
+Request body (application/json):
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["expected_revision", "fields"],
+  "properties": {
+    "expected_revision": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "fields": {
+      "type": "object",
+      "minProperties": 1,
+      "maxProperties": 16,
+      "additionalProperties": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 512,
+        "nullable": true
+      }
+    }
+  }
+}
+```
+
+| Status | Content type             | Description      |
+| ------ | ------------------------ | ---------------- |
+| 200    | application/json         | Default Response |
+| 400    | application/problem+json | Default Response |
+| 401    | application/problem+json | Default Response |
+| 403    | application/problem+json | Default Response |
+| 409    | application/problem+json | Default Response |
+| 413    | application/problem+json | Default Response |
+| 415    | application/problem+json | Default Response |
+| 422    | application/problem+json | Default Response |
+| 429    | application/problem+json | Default Response |
+| 500    | application/problem+json | Default Response |
+| 503    | application/problem+json | Default Response |
+
+Success response schema:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["account_id", "revision", "fields", "missing_fields", "status"],
+  "properties": {
+    "account_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "fields": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "missing_fields": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "status": {
+      "enum": ["draft"]
     }
   }
 }
@@ -5361,7 +5640,7 @@ Success response schema:
     },
     "execution_funding": {
       "type": "object",
-      "description": "Most recent background check of network fee balances and refill constraints. This observation does not authorize spending and expires after 30 seconds.",
+      "description": "Most recent advisory funding check. Refills follow confirmed usage and a fifteen-minute recovery check. This observation does not authorize spending and expires after fifteen minutes plus a thirty-second recovery grace period.",
       "additionalProperties": false,
       "required": ["status", "message"],
       "properties": {

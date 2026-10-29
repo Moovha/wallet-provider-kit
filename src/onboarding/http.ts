@@ -300,6 +300,120 @@ export async function registerOnboardingRoutes(
     required: ['actionId'],
     properties: { actionId: uuidSchema },
   };
+  const kycAccountParams = {
+    type: 'object',
+    additionalProperties: false,
+    required: ['accountId'],
+    properties: { accountId: uuidSchema },
+  };
+  const draftReceipt = {
+    type: 'object',
+    additionalProperties: false,
+    required: ['account_id', 'revision', 'fields', 'missing_fields', 'status'],
+    properties: {
+      account_id: uuidSchema,
+      revision: { type: 'integer', minimum: 0 },
+      fields: { type: 'object', additionalProperties: { type: 'string' } },
+      missing_fields: { type: 'array', items: { type: 'string' } },
+      status: { const: 'draft' },
+    },
+  };
+  app.post<{ Body: import('./types.js').CreateAccountInput }>(
+    '/v1/accounts',
+    {
+      bodyLimit: 32768,
+      schema: {
+        ...schema('createAccountWithoutKyc', {
+          type: 'object',
+          additionalProperties: false,
+          required: ['user_id'],
+          properties: {
+            user_id: { type: 'string', minLength: 1, maxLength: 256 },
+            wallet: walletDescriptionSchema,
+          },
+        }),
+        description:
+          'Create an application-bound account without KYC. Only its creating application can supply KYC or provision its address. No access grant or signing authority is issued. Call provisionAccount to obtain the Safe address.',
+        response: {
+          ...schema('').response,
+          200: {
+            type: 'object',
+            additionalProperties: false,
+            required: ['account_id', 'status', 'wallet'],
+            properties: {
+              account_id: uuidSchema,
+              status: { const: 'verification_required' },
+              wallet: walletDescriptionSchema,
+            },
+          },
+        },
+      },
+    },
+    async (request) =>
+      service(request).createAccount(
+        await context(request, 'wallet:access'),
+        request.body,
+      ),
+  );
+  app.get<{ Params: { accountId: string } }>(
+    '/v1/accounts/:accountId/kyc',
+    {
+      schema: {
+        ...schema('getAccountKyc', undefined, kycAccountParams),
+        description:
+          'Read draft KYC fields as the original creating application. Draft fields are not verified identity evidence.',
+        response: { ...schema('').response, 200: draftReceipt },
+      },
+    },
+    async (request) =>
+      service(request).accountKyc(
+        await context(request, 'wallet:access'),
+        request.params.accountId,
+      ),
+  );
+  app.patch<{
+    Params: { accountId: string };
+    Body: import('./types.js').AccountKycInput;
+  }>(
+    '/v1/accounts/:accountId/kyc',
+    {
+      bodyLimit: 32768,
+      schema: {
+        ...schema(
+          'updateAccountKyc',
+          {
+            type: 'object',
+            additionalProperties: false,
+            required: ['expected_revision', 'fields'],
+            properties: {
+              expected_revision: { type: 'integer', minimum: 0 },
+              fields: {
+                type: 'object',
+                minProperties: 1,
+                maxProperties: 16,
+                additionalProperties: {
+                  anyOf: [
+                    { type: 'string', minLength: 1, maxLength: 512 },
+                    { type: 'null' },
+                  ],
+                },
+              },
+            },
+          },
+          kycAccountParams,
+        ),
+        description:
+          'Add or correct configured KYC fields as the original creating application; omitted fields remain and null removes a field. Requires the current revision. Revokes existing owner grants and invalidates identity acceptance across owned wallets. Submit fresh verified identity and consent through requestAccountAccess to authorize use.',
+        response: { ...schema('').response, 200: draftReceipt },
+      },
+    },
+    async (request) =>
+      service(request).updateAccountKyc(
+        await context(request, 'wallet:access'),
+        request.params.accountId,
+        request.body,
+      ),
+  );
   app.post<{ Body: AccessRequestInput }>(
     '/v1/access-requests',
     {

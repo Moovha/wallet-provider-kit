@@ -1165,3 +1165,58 @@ it('bounds historical observation batches without blocking admission and rotates
     await t.runtime.close();
   }
 });
+
+it('admits creator-only Safe setup before KYC and rechecks suspension before returning an address', async () => {
+  const t = await bootstrap('1');
+  await t.runtime
+    .ensure(t.f.operatorContext, t.applicationId)
+    .catch(() => undefined);
+  const accountId = t.f.grant.account_id!;
+  const context = {
+    ...t.f.context,
+    principal: {
+      ...t.f.context.principal,
+      scopes: [...t.f.context.principal.scopes, 'wallet:provision'],
+    },
+  };
+  await t.f.db.onboardingStore.transaction((s) => {
+    const account = s.accounts[accountId];
+    account.creatorApplication = {
+      issuer: t.f.context.principal.issuer,
+      clientId: t.f.context.principal.clientId,
+    };
+    account.deferredCreation = { revision: t.f.onboarding.policy.revision };
+    account.acceptedUntil = 0;
+    for (const grant of Object.values(s.grants)) grant.state = 'revoked';
+    const infrastructure =
+      s.deploymentBindings!['service-v1'].runtimeConfiguration!
+        .safeWalletInfrastructure![t.applicationId];
+    infrastructure.transactions = [];
+    infrastructure.paymaster = t.f.config.acceptance.paymaster;
+  });
+  const internal = t.runtime as unknown as {
+    publishBundler(applicationId: string): Promise<void>;
+  };
+  vi.spyOn(internal, 'publishBundler').mockResolvedValue();
+  const verify = vi
+    .spyOn(Safe4337Verifier.prototype, 'verify')
+    .mockResolvedValue('0');
+  const result = await t.runtime.provision(context, accountId);
+  expect(result).toEqual({
+    account_id: accountId,
+    address: t.f.operation.sender,
+  });
+  await expect(
+    t.f.onboarding.authorizeCurrent(t.f.context.principal, accountId),
+  ).rejects.toMatchObject({ code: 'wallet_authorization_denied' });
+  verify.mockImplementationOnce(async () => {
+    await t.f.db.onboardingStore.transaction((s) => {
+      s.accounts[accountId].status = 'suspended';
+    });
+    return '0';
+  });
+  await expect(t.runtime.provision(context, accountId)).rejects.toMatchObject({
+    code: 'wallet_authorization_denied',
+  });
+  expect(t.broadcasts).toBe(0);
+});

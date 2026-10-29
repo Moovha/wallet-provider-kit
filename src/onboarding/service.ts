@@ -1,4 +1,11 @@
 import {
+  creatorAccount,
+  deferredAccount,
+  createDeferredAccount,
+  patchAccountKyc,
+  kycReceipt,
+} from './account-kyc.js';
+import {
   currentRuntimePolicy,
   validateRuntimeClaims,
 } from '../runtime-configuration/authority.js';
@@ -417,6 +424,66 @@ export class OnboardingService {
         : {}),
     };
   }
+  async createAccount(
+    inputContext: AuthorityContext,
+    input: import('./types.js').CreateAccountInput,
+  ) {
+    const context = this.context(inputContext, 'wallet:access');
+    return this.store.transaction((state) =>
+      createDeferredAccount(this.policy, state, context, input),
+    );
+  }
+  async accountKyc(inputContext: AuthorityContext, accountId: string) {
+    const context = this.context(inputContext, 'wallet:access');
+    return this.store.transaction((state) =>
+      kycReceipt(this.policy, state, context.principal, accountId),
+    );
+  }
+  async updateAccountKyc(
+    inputContext: AuthorityContext,
+    accountId: string,
+    input: import('./types.js').AccountKycInput,
+  ) {
+    const context = this.context(inputContext, 'wallet:access');
+    return this.store.transaction((state) =>
+      patchAccountKyc(this.policy, state, context, accountId, input),
+    );
+  }
+  async withProvisionAccess<T>(
+    principal: VerifiedPrincipal,
+    accountId: string,
+    operation: (
+      state: ProviderState,
+      grant: { owner: string; requestId?: string },
+    ) => T,
+  ): Promise<T> {
+    return this.store.transaction((state) => {
+      const account = state.accounts[accountId];
+      if (account?.deferredCreation && account.acceptedUntil <= Date.now()) {
+        const current = deferredAccount(
+          this.policy,
+          state,
+          principal,
+          accountId,
+        );
+        return operation(state, { owner: current.owner });
+      }
+      return operation(
+        state,
+        this.activeGrant(state, principal, accountId, 'contracts:request'),
+      );
+    });
+  }
+  async authorizeProvisionCurrent(
+    principal: VerifiedPrincipal,
+    accountId: string,
+  ) {
+    return this.withProvisionAccess(
+      principal,
+      accountId,
+      (_state, grant) => grant,
+    );
+  }
   async request(inputContext: AuthorityContext, value: AccessRequestInput) {
     const context = this.context(inputContext);
     const normalized = normalizeInput(
@@ -568,6 +635,8 @@ export class OnboardingService {
           matchSharedAccount(this.policy, state, request, assertion.owner);
         } else if (!request.membership) {
           const existing = state.accounts[request.accountId];
+          if (existing)
+            creatorAccount(this.policy, state, context.principal, existing.id);
           if (
             !existing &&
             Object.values(state.accounts).filter(
@@ -621,6 +690,14 @@ export class OnboardingService {
             previous.accountId !== request.accountId
           )
             deny();
+        }
+        if (!request.sharing && !request.membership) {
+          const account = state.accounts[request.accountId];
+          creatorAccount(this.policy, state, context.principal, account.id);
+          account.kycDraft = {
+            revision: (account.kycDraft?.revision ?? 0) + 1,
+            fields: structuredClone(input.user!.identity.fields),
+          };
         }
         saveVerifiedUser(
           this.policy,
@@ -1968,6 +2045,41 @@ export class OnboardingService {
       provision: async (input, accountId) => {
         const context = this.context(input, 'wallet:provision');
         return this.store.transaction((state) => {
+          const account = state.accounts[accountId];
+          if (
+            account?.deferredCreation &&
+            account.acceptedUntil <= Date.now()
+          ) {
+            const current = deferredAccount(
+              this.policy,
+              state,
+              context.principal,
+              accountId,
+            );
+            const prior = Object.entries(state.admissions).find(
+              ([, a]) => a.accountId === accountId,
+            );
+            const attemptId = prior?.[0] ?? randomUUID();
+            if (prior && !prior[1].deferred) deny();
+            state.admissions[attemptId] ??= {
+              accountId,
+              grantId: '',
+              caller: {
+                issuer: context.principal.issuer,
+                clientId: context.principal.clientId,
+                subject: context.principal.subject,
+              },
+              deferred: true,
+            };
+            return {
+              sessionSubject: current.owner,
+              ownerSubject: current.owner,
+              currentUserStatus: null,
+              provisioningOnly: true as const,
+              accountId,
+              attemptId,
+            };
+          }
           const grant = this.activeGrant(state, context.principal, accountId);
           const access = state.requests[grant.requestId];
           if (access?.membership || access?.sharing) deny();
@@ -2029,6 +2141,15 @@ export class OnboardingService {
       return await this.store.transaction((state) => {
         const admission = state.admissions[attemptId];
         if (!admission || admission.accountId !== accountId) return false;
+        if (admission.deferred) {
+          const account = creatorAccount(
+            this.policy,
+            state,
+            { ...admission.caller, scopes: [] },
+            accountId,
+          );
+          return account.deferredCreation?.revision === this.policy.revision;
+        }
         const grant = state.grants[admission.grantId];
         if (!grant) return false;
         const current = this.activeGrant(

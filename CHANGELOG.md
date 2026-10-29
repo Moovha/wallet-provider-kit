@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- Schedule application funding checks from confirmed gas usage, with a
+  fifteen-minute recovery interval and a 50% refill low-water mark. Keep fresh
+  balance snapshots and durable reservations authoritative for admission.
+- Buffer estimated operation gas within the accepted total-gas and transaction
+  cost limits instead of treating initial preparation values as per-field limits.
+
+- Allow trusted applications to create and provision a Safe address before KYC,
+  without transaction or signing permissions. Add creator-only draft KYC reads
+  and incremental updates with revision checks and idempotent retries. KYC edits
+  invalidate prior identity acceptance and grants; verified evidence and fresh
+  consent remain required before transactions.
+
 - Upgrade the OpenTelemetry API to 1.10.0 and align the SDK, resources and OTLP
   exporters on the compatible 3.0.0/0.300.0 release family. Group future
   OpenTelemetry dependency proposals so API peer requirements stay aligned.
