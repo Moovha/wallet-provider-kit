@@ -78,6 +78,9 @@ export const apiTasks = [
 
 export const apiOperationOrder = [
   'getAccountAccessPolicy',
+  'createAccountWithoutKyc',
+  'getAccountKyc',
+  'updateAccountKyc',
   'requestAccountAccess',
   'getAccountAccessRequest',
   'provisionAccount',
@@ -1043,6 +1046,51 @@ export const operationGuides: Record<string, OperationGuide> = {
     success:
       '200: the service profile and configured status. A 200 response confirms that discovery works; check configured before trying wallet operations.',
   },
+  createAccountWithoutKyc: {
+    title: 'Create an account before KYC',
+    group: 'Wallet access',
+    audience: 'Application developer',
+    applicationLed: true,
+    scope: 'wallet:access',
+    purpose:
+      'Bind a new account to your application and stable user reference before identity information is available.',
+    whenToUse:
+      'Use when the person needs a wallet address before completing identity checks.',
+    prerequisite:
+      'Your application must have an accepted identity trust agreement. Supply user_id and a saved idempotency key. Named wallets can include their wallet description. This endpoint does not create a grant.',
+    success:
+      '200: account_id, wallet and verification_required status. Call provisionAccount as the creating application to obtain the Safe address. Submit KYC drafts through updateAccountKyc and complete verified identity and fresh consent through requestAccountAccess before transactions.',
+  },
+  getAccountKyc: {
+    title: 'Read the account’s draft KYC',
+    group: 'Wallet access',
+    audience: 'Application developer',
+    applicationLed: true,
+    scope: 'wallet:access',
+    purpose:
+      'Read saved identity fields and the revision needed for the next incremental update.',
+    whenToUse:
+      'Use before editing KYC or to recover the current draft after a response is lost.',
+    prerequisite:
+      'Authenticate as the original creating application. Shared wallet access does not allow reading another application’s KYC draft.',
+    success:
+      '200: revision, draft fields and missing_fields. Draft completeness does not establish verified identity or transaction authority.',
+  },
+  updateAccountKyc: {
+    title: 'Add or correct the account’s KYC',
+    group: 'Wallet access',
+    audience: 'Application developer',
+    applicationLed: true,
+    scope: 'wallet:access',
+    purpose:
+      'Merge configured identity fields into a draft while preserving omitted fields.',
+    whenToUse:
+      'Use as identity information arrives or existing facts need correction.',
+    prerequisite:
+      'Authenticate as the original creating application. Supply expected_revision from getAccountKyc, configured fields and a saved idempotency key. Null removes a field. A changed request needs a new key.',
+    success:
+      '200: the saved draft and advanced revision. Existing identity acceptance and grants across the owner’s wallets are invalidated. Fresh verified evidence and consent are required for transactions. Stale revisions and changed retries return 409.',
+  },
   requestAccountAccess: {
     title: 'Submit a person’s checks and wallet permission',
     group: 'Wallet access',
@@ -1150,12 +1198,12 @@ export const operationGuides: Record<string, OperationGuide> = {
     group: 'Wallet access',
     audience: 'Application developer',
     purpose:
-      'Create or locate the Safe wallet for an account that already has current approved access.',
+      'Create or locate the Safe wallet using current approved access or creator-only setup authority for an account created without KYC.',
     whenToUse:
-      'Use after POST /v1/access-requests returns a granted account. Keep the original retry key if creation is pending or its outcome is uncertain.',
+      'Use after createAccountWithoutKyc returns an account ID, or after requestAccountAccess grants access. Keep the original retry key if creation is pending or its outcome is uncertain.',
     scope: 'wallet:provision',
     prerequisite:
-      'Use the accepted account_id with current owner-granted access and an empty JSON body: {}. Keep the original idempotency key when retrying. Investigate an unknown outcome before trying again.',
+      'Supply an empty JSON body and the saved account_id. Verified accounts need current transaction consent. For an account created without KYC, only its creating application can provision it, without a Wallet-Grant-Id header. Accepted fee terms, funded infrastructure and service readiness remain required. Keep the original idempotency key for retries; uncertain setup retains its durable attempt.',
     success:
       '200: the user Safe account address and provisioning status. Deployment uses accepted application infrastructure. Pending deployment retains its original attempt; retry with the same identity. Wallet creation does not grant spending permission.',
   },

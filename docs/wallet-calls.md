@@ -27,3 +27,13 @@ the response so another read can use its result.
 Next, [test the connection](staging-walkthrough.md), including retries and revoked access.
 
 For a complete request example, follow [Send a small transfer](send-transfer.md).
+
+## Gas preparation bounds
+
+The provider buffers estimated call, verification and pre-verification gas by
+20%. Each field is bounded by the application's accepted total-gas limit, or the
+protocol ceiling when that optional limit is absent. Initial preparation values
+are not independent per-field authorization ceilings. The buffered fields plus
+paymaster gas must still fit the same total, and the priced operation must fit
+the accepted transaction-cost limit including its L1 reserve. A larger call
+estimate therefore does not increase the application's gas or spending budget.

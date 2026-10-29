@@ -13,7 +13,7 @@ export interface FundingObservation {
 }
 export const fundingMessages: Record<FundingState, string> = {
   checking: 'Checking the application’s network fee funds.',
-  ready: 'The network fee balances meet their configured targets.',
+  ready: 'The network fee balances are above their refill thresholds.',
   replenishing: 'Restoring the application’s network fee balances.',
   'needs-funding':
     'Add network fee funds to the application’s funding account.',
@@ -32,22 +32,31 @@ export class InfrastructureFundingUnavailable extends WalletProviderError {
   }
 }
 /** Principal feasibility only; exact fee reserves and durable authority remain mandatory at dispatch. */
-export function infrastructureFundingPlan(input: {
-  deposit: bigint;
-  depositTarget: bigint;
-  executor: bigint;
-  executorTarget: bigint;
-  funding: bigint;
-  allowance: bigint;
-}) {
+export function infrastructureFundingPlan(
+  input: {
+    deposit: bigint;
+    depositTarget: bigint;
+    executor: bigint;
+    executorTarget: bigint;
+    funding: bigint;
+    allowance: bigint;
+  },
+  lowWatermarkBps = 10000,
+) {
   if (Object.values(input).some((value) => value < 0n))
     throw new WalletProviderError('wallet_provider_configuration');
+  if (
+    !Number.isInteger(lowWatermarkBps) ||
+    lowWatermarkBps < 1 ||
+    lowWatermarkBps > 10000
+  )
+    throw new WalletProviderError('wallet_provider_configuration');
   const deposit =
-    input.deposit < input.depositTarget
+    input.deposit * 10000n < input.depositTarget * BigInt(lowWatermarkBps)
       ? input.depositTarget - input.deposit
       : 0n;
   const executor =
-    input.executor < input.executorTarget
+    input.executor * 10000n < input.executorTarget * BigInt(lowWatermarkBps)
       ? input.executorTarget - input.executor
       : 0n;
   const principal = deposit + executor;
@@ -105,8 +114,15 @@ export function percentageFundingPlan(
     allowance: bigint;
   },
   policy: FundingAllocation,
+  lowWatermarkBps = 10000,
 ) {
   validateFundingAllocation(policy);
+  if (
+    !Number.isInteger(lowWatermarkBps) ||
+    lowWatermarkBps < 1 ||
+    lowWatermarkBps > 10000
+  )
+    throw new WalletProviderError('wallet_provider_configuration');
   if (Object.values(input).some((value) => value < 0n))
     throw new WalletProviderError('wallet_provider_configuration');
   const total = input.deposit + input.executor + input.funding;
@@ -126,7 +142,10 @@ export function percentageFundingPlan(
   const reserve = total - depositTarget - executorTarget;
   const threshold = BigInt(policy.minimumRefillWei);
   const deficit = (target: bigint, balance: bigint) =>
-    target > balance && target - balance >= threshold ? target - balance : 0n;
+    target * BigInt(lowWatermarkBps) > balance * 10000n &&
+    target - balance >= threshold
+      ? target - balance
+      : 0n;
   let deposit = deficit(depositTarget, input.deposit),
     executor = deficit(executorTarget, input.executor);
   const principal = deposit + executor;

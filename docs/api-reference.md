@@ -561,10 +561,12 @@ Import from `@moovha/wallet-provider-kit/onboarding`. [Integration guide](onboar
 - [AccessInput](#accessinput)
 - [AccessRequestInput](#accessrequestinput)
 - [accessType](#accesstype)
+- [AccountKycInput](#accountkycinput)
 - [ApplicationIdentityRecord](#applicationidentityrecord)
 - [ApplicationPolicy](#applicationpolicy)
 - [ApplicationRecordPolicy](#applicationrecordpolicy)
 - [ApplicationUserAssertion](#applicationuserassertion)
+- [CreateAccountInput](#createaccountinput)
 - [createDiditIdentityAdapter](#creatediditidentityadapter)
 - [createFileOnboardingStore](#createfileonboardingstore)
 - [createOnboardingJournal](#createonboardingjournal)
@@ -644,6 +646,17 @@ export type AccessRequestInput = Omit<AccessInput, 'user'> & {
 export declare const accessType = 'https://moovha.com/wallet/account-access';
 ```
 
+### AccountKycInput
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/onboarding/types.ts).
+
+```ts
+export interface AccountKycInput {
+  expected_revision: number;
+  fields: Record<string, string | null>;
+}
+```
+
 ### ApplicationIdentityRecord
 
 [Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/onboarding/types.ts).
@@ -716,6 +729,17 @@ export interface ApplicationUserAssertion {
     wallet_reference?: string;
     membership_revision?: number;
   };
+}
+```
+
+### CreateAccountInput
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/onboarding/types.ts).
+
+```ts
+export interface CreateAccountInput {
+  user_id: string;
+  wallet?: WalletDescription;
 }
 ```
 
@@ -995,6 +1019,53 @@ export declare class OnboardingService {
         policy_revision: string;
       }
   >;
+  createAccount(
+    inputContext: AuthorityContext,
+    input: import('./types.js').CreateAccountInput,
+  ): Promise<{
+    account_id: string;
+    status: 'verification_required';
+    wallet: import('./types.js').WalletDescription;
+  }>;
+  accountKyc(
+    inputContext: AuthorityContext,
+    accountId: string,
+  ): Promise<{
+    account_id: string;
+    revision: number;
+    fields: Record<string, string>;
+    missing_fields: string[];
+    status: 'draft';
+  }>;
+  updateAccountKyc(
+    inputContext: AuthorityContext,
+    accountId: string,
+    input: import('./types.js').AccountKycInput,
+  ): Promise<{
+    account_id: string;
+    revision: number;
+    fields: Record<string, string>;
+    missing_fields: string[];
+    status: 'draft';
+  }>;
+  withProvisionAccess<T>(
+    principal: VerifiedPrincipal,
+    accountId: string,
+    operation: (
+      state: ProviderState,
+      grant: {
+        owner: string;
+        requestId?: string;
+      },
+    ) => T,
+  ): Promise<T>;
+  authorizeProvisionCurrent(
+    principal: VerifiedPrincipal,
+    accountId: string,
+  ): Promise<{
+    owner: string;
+    requestId?: string;
+  }>;
   request(
     inputContext: AuthorityContext,
     value: AccessRequestInput,
@@ -1603,6 +1674,7 @@ export interface ProviderState {
       accountId: string;
       grantId: string;
       caller: AccessRequest['caller'];
+      deferred?: boolean;
     }
   >;
   sessions: Record<
@@ -4969,6 +5041,7 @@ export interface WalletCallsDriver {
 Import from `@moovha/wallet-provider-kit/wallets`. [Integration guide](multiple-wallets.md).
 
 - [AccessRequestInput](#accessrequestinput)
+- [AccountKycReceipt](#accountkycreceipt)
 - [createWalletsClient](#createwalletsclient)
 - [MemberSettings](#membersettings)
 - [ProviderFailureDetails](#providerfailuredetails)
@@ -5002,6 +5075,20 @@ export type AccessRequestInput = Omit<AccessInput, 'user'> & {
 };
 ```
 
+### AccountKycReceipt
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/wallets/client.ts).
+
+```ts
+export interface AccountKycReceipt {
+  account_id: string;
+  revision: number;
+  fields: Record<string, string>;
+  missing_fields: string[];
+  status: 'draft';
+}
+```
+
 ### createWalletsClient
 
 [Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/wallets/client.ts).
@@ -5014,6 +5101,20 @@ export declare function createWalletsClient(options: {
   authorization(): Promise<string>;
   fetch?: typeof fetch;
 }): {
+  createAccount(
+    input: import('../onboarding/types.js').CreateAccountInput,
+    idempotencyKey: string,
+  ): Promise<{
+    account_id: string;
+    status: 'verification_required';
+    wallet: WalletDescription;
+  }>;
+  accountKyc(accountId: string): Promise<AccountKycReceipt>;
+  updateAccountKyc(
+    accountId: string,
+    input: import('../onboarding/types.js').AccountKycInput,
+    idempotencyKey: string,
+  ): Promise<AccountKycReceipt>;
   ownerPolicy(
     accountId: string,
     grantId?: string,
@@ -5208,7 +5309,7 @@ export declare function createWalletsClient(options: {
   }>;
   provision(
     accountId: string,
-    grantId: string,
+    grantId: string | undefined,
     idempotencyKey: string,
   ): Promise<{
     account_id: string;

@@ -1,6 +1,9 @@
 import { readUserOperationGasEstimate } from '../src/sponsorship/estimated-gas.js';
 import { it, expect } from 'vitest';
-import { applyEstimatedUserOperationGas } from '../src/sponsorship/estimated-gas.js';
+import {
+  applyEstimatedUserOperationGas,
+  userOperationGasCeilings,
+} from '../src/sponsorship/estimated-gas.js';
 import type { UserOperationV07 } from '../src/sponsorship/user-operation.js';
 const operation: UserOperationV07 = {
   sender: '0x' + '1'.repeat(40),
@@ -37,7 +40,7 @@ it('counts all buffered fields and paymaster gas against the accepted limit', ()
     applyEstimatedUserOperationGas(operation, estimate, ceilings, '870000'),
   ).not.toThrow();
 });
-it('retains the default per-field bound when no application override exists', () => {
+it('enforces an explicitly supplied lower per-field bound', () => {
   expect(() =>
     applyEstimatedUserOperationGas(operation, estimate, operation),
   ).toThrow('wallet_authorization_denied');
@@ -167,5 +170,83 @@ it.each(['0x0', '0x-1', 'invalid'])(
         { maximumCostWei: '1000000000000000', l1FeeReserveWei: '0' },
       ),
     ).toThrow('wallet_authorization_denied');
+  },
+);
+
+it('prepares a swap above the former fallback without changing the gas or fee budget', () => {
+  const priced = { ...operation, maxFeePerGas: '0xa7d8c0' };
+  const swap = {
+    callGasLimit: '0x50e00',
+    verificationGasLimit: '0xc277',
+    preVerificationGas: '0xe969',
+  };
+  // The unsigned swap fixture uses 331,264 call gas before the 20% buffer.
+  expect(BigInt(swap.callGasLimit)).toBe(331264n);
+  const limits = userOperationGasCeilings();
+  const fee = {
+    maximumCostWei: '1000000000000000',
+    l1FeeReserveWei: '1000000000000',
+  };
+  const result = applyEstimatedUserOperationGas(
+    priced,
+    swap,
+    limits,
+    '5000000',
+    150000n,
+    fee,
+  );
+  expect(BigInt(result.callGasLimit)).toBe(397517n);
+  expect(result.maxFeePerGas).toBe(priced.maxFeePerGas);
+  expect(result.callData).toBe(priced.callData);
+  expect(() =>
+    applyEstimatedUserOperationGas(
+      priced,
+      swap,
+      userOperationGasCeilings('500000'),
+      '500000',
+      150000n,
+      fee,
+    ),
+  ).toThrow('wallet_authorization_denied');
+  expect(() =>
+    applyEstimatedUserOperationGas(priced, swap, limits, '5000000', 150000n, {
+      ...fee,
+      maximumCostWei: '1000000000000',
+    }),
+  ).toThrow('wallet_authorization_denied');
+});
+it('derives every field from an explicit accepted budget and keeps the buffered sum bounded', () => {
+  const limits = userOperationGasCeilings('1000000');
+  expect(Object.values(limits).map(BigInt)).toEqual([
+    1000000n,
+    1000000n,
+    1000000n,
+  ]);
+  const validation = {
+    callGasLimit: '0xc350',
+    verificationGasLimit: '0x55730',
+    preVerificationGas: '0xc350',
+  };
+  expect(
+    BigInt(
+      applyEstimatedUserOperationGas(operation, validation, limits, '1000000')
+        .verificationGasLimit,
+    ),
+  ).toBe(420000n);
+  expect(() =>
+    applyEstimatedUserOperationGas(
+      operation,
+      { ...validation, callGasLimit: '0x7a120' },
+      limits,
+      '1000000',
+    ),
+  ).toThrow('wallet_authorization_denied');
+});
+it.each(['0', '-1', '01', '1.5', 'invalid', '5000001', '9'.repeat(78)])(
+  'rejects invalid or above-protocol gas ceilings %s',
+  (value) => {
+    expect(() => userOperationGasCeilings(value)).toThrow(
+      'wallet_authorization_denied',
+    );
   },
 );

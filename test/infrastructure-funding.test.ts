@@ -382,3 +382,50 @@ it('retains a spendable provisioning allocation separately from the protected re
       ),
     ).toThrow();
 });
+
+it('refills below a low-water mark to the target without topping up after every small spend', () => {
+  const input = {
+    deposit: 40n,
+    depositTarget: 60n,
+    executor: 20n,
+    executorTarget: 30n,
+    funding: 100n,
+    allowance: 100n,
+  };
+  expect(infrastructureFundingPlan(input, 5000)).toMatchObject({
+    deposit: 0n,
+    executor: 0n,
+    status: 'ready',
+  });
+  expect(
+    infrastructureFundingPlan({ ...input, deposit: 29n }, 5000),
+  ).toMatchObject({ deposit: 31n, executor: 0n, status: 'replenishing' });
+  expect(infrastructureFundingPlan(input, 10000)).toMatchObject({
+    deposit: 20n,
+    executor: 10n,
+  });
+  expect(() => infrastructureFundingPlan(input, 0)).toThrow(
+    'wallet_provider_configuration',
+  );
+});
+it('applies the same hysteresis to percentage allocation without changing reserve protection', () => {
+  const balanced = {
+    deposit: 5000n,
+    executor: 400n,
+    funding: 4700n,
+    allowance: 10100n,
+  };
+  expect(percentageFundingPlan(balanced, allocation, 5000)).toMatchObject({
+    deposit: 0n,
+    executor: 0n,
+    status: 'ready',
+  });
+  const low = percentageFundingPlan(
+    { ...balanced, deposit: 4000n, funding: 5700n },
+    allocation,
+    5000,
+  );
+  expect(low.deposit).toBeGreaterThan(0n);
+  expect(low.executor).toBe(0n);
+  expect(low.reserve).toBeGreaterThanOrEqual(100n);
+});

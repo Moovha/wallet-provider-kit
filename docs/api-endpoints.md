@@ -40,6 +40,36 @@ Learn which identity information, check age and consent terms your application m
 
 [`GET /v1/access-policy`](http-reference.md#get-v1-access-policy) — request body, permissions, effects and response details.
 
+### Create an account before KYC
+
+Bind a new account to your application and stable user reference before identity information is available.
+
+**Who uses it:** Application developer.
+
+**When you need it:** Use when the person needs a wallet address before completing identity checks.
+
+[`POST /v1/accounts`](http-reference.md#post-v1-accounts) — request body, permissions, effects and response details.
+
+### Read the account’s draft KYC
+
+Read saved identity fields and the revision needed for the next incremental update.
+
+**Who uses it:** Application developer.
+
+**When you need it:** Use before editing KYC or to recover the current draft after a response is lost.
+
+[`GET /v1/accounts/{accountId}/kyc`](http-reference.md#get-v1-accounts-accountid-kyc) — request body, permissions, effects and response details.
+
+### Add or correct the account’s KYC
+
+Merge configured identity fields into a draft while preserving omitted fields.
+
+**Who uses it:** Application developer.
+
+**When you need it:** Use as identity information arrives or existing facts need correction.
+
+[`PATCH /v1/accounts/{accountId}/kyc`](http-reference.md#patch-v1-accounts-accountid-kyc) — request body, permissions, effects and response details.
+
 ### Submit a person’s checks and wallet permission
 
 Ask the provider to accept completed identity checks and the person’s recorded permission, then obtain account access IDs.
@@ -62,11 +92,11 @@ Look up the decision for a saved access request and recover its returned account
 
 ### Create the person’s blockchain wallet
 
-Create or locate the Safe wallet for an account that already has current approved access.
+Create or locate the Safe wallet using current approved access or creator-only setup authority for an account created without KYC.
 
 **Who uses it:** Application developer.
 
-**When you need it:** Use after POST /v1/access-requests returns a granted account. Keep the original retry key if creation is pending or its outcome is uncertain.
+**When you need it:** Use after createAccountWithoutKyc returns an account ID, or after requestAccountAccess grants access. Keep the original retry key if creation is pending or its outcome is uncertain.
 
 [`POST /v1/accounts/{accountId}/provision`](http-reference.md#post-v1-accounts-accountid-provision) — request body, permissions, effects and response details.
 

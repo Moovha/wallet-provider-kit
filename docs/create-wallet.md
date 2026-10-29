@@ -27,6 +27,68 @@ test environment and an approved test identity for your first run.
 The person does not need to supply a private key. The service creates a Safe,
 their on-chain wallet, and keeps its private signing identity in the provider’s vault.
 
+## Create an address before collecting KYC
+
+A trusted application can create a wallet before collecting identity information.
+The provider still needs configured wallet services, accepted fee terms and funded
+setup infrastructure. This creates the wallet address without issuing permission
+to sign or send transactions. Setup uses the application's accepted network-fee
+allowance.
+
+From your application backend, call `POST /v1/accounts` with `wallet:access`, a
+saved UUIDv4 `Idempotency-Key` and this body:
+
+```json
+{ "user_id": "<YOUR_STABLE_USER_REFERENCE>" }
+```
+
+Save the returned `account_id`. Then call
+`POST /v1/accounts/{accountId}/provision` with `wallet:provision`, another saved
+idempotency key and `{}`. Omit `Wallet-Grant-Id`; this account has no access grant.
+The creating application receives the Safe address after setup succeeds. Use that
+address with the selected network. Retrying the same provisioning request recovers
+the original attempt; an uncertain result does not authorize a second deployment.
+
+The account stays bound to the creating application's issuer, client ID and stable
+user reference. A different application cannot provision an unverified account or
+read or update its KYC, even if it later obtains a shared-wallet grant. Accounts
+without a recorded creating application cannot use the KYC update API.
+
+### Add or correct KYC in stages
+
+Read `GET /v1/accounts/{accountId}/kyc` with `wallet:access` to obtain the current
+`revision`, draft `fields` and `missing_fields`. Send
+`PATCH /v1/accounts/{accountId}/kyc` with the same application identity,
+`wallet:access`, a saved idempotency key and the revision you read:
+
+```json
+{
+  "expected_revision": 0,
+  "fields": { "country": "ZA" }
+}
+```
+
+Use the identity fields configured by the provider. Only configured required
+fields are accepted. Omitted fields remain unchanged; a `null` value removes a
+field. Each accepted patch advances the revision. A stale revision or a reused
+key with a different body returns a conflict. Retry an uncertain patch with its
+original body and key; read the current revision before making another edit.
+
+Draft fields are not verified evidence, even when `missing_fields` is empty.
+Every accepted patch invalidates the owner's previous identity acceptance and
+revokes existing grants across their wallets, including shared access. Previously
+issued signatures and submitted transactions may still execute. Saving new facts
+cannot renew old permissions.
+
+When verification is complete, use the access request in step 1 below with the
+same stable user reference, complete current verified identity evidence and fresh
+consent. `mode: "create"` resolves to the reserved default account; named wallets
+must use their original wallet description and consent binding. The access request
+must supply a complete identity assertion; draft fields are not silently promoted.
+The existing Safe address is retained. The TypeScript client provides
+`createAccount`, `accountKyc` and `updateAccountKyc`; call
+`provision(accountId, undefined, idempotencyKey)` for initial setup without a grant.
+
 ## 1. Ask for permission in your application
 
 Sign the person in and complete the agreed identity checks. Use your stable,
@@ -34,8 +96,8 @@ private user reference to identify them; a display name or email is not an accou
 lookup. Read the provider’s current access policy, explain the requested access
 and record the person’s permission.
 
-Creating a new Safe currently requires permission to view the account and request
-transactions within the application's approved rules. Show the person the network,
+For creation through a verified access grant, request permission to view the
+account and request transactions within the application's approved rules. Show the person the network,
 permitted calls, amounts, limits and who pays the fees before collecting consent.
 Read-only permission can open an existing wallet, but cannot create a new Safe.
 If the person has not approved the transaction terms, stop before provisioning.

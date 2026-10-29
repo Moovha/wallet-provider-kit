@@ -13,6 +13,8 @@ export {
 export type { DiditConfiguration, SumsubConfiguration } from './vendors.js';
 export { accessType } from './types.js';
 export type {
+  AccountKycInput,
+  CreateAccountInput,
   OnboardingPolicy,
   ApplicationPolicy,
   WalletSharingPolicy,

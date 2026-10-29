@@ -22,7 +22,7 @@
         "summary": "Choose a wallet network",
         "tags": ["Service status"],
         "description": "**Why this exists:** Discover the networks offered by this instance and its default for existing integrations.\n\n**Who uses it:** Application developer.\n\n**When you need it:** Read before presenting a network choice or configuring an application’s network services.\n\n**Before you start:** No token is needed. Select a network with Wallet-Network on access-policy, access-request and application-configuration calls. Stored account, request and grant IDs route automatically.\n\n**Result and next step:** 200: network names, chain IDs and execution status. Each network needs its own wallet consent, transaction rules and fee funding.\n\n**Request details:** Discover enabled network configurations. Identity and application registrations are shared; each network has separate wallets, approvals and fee funding. Configured means execution is enabled and current, not that an application has funded it.",
-        "x-task-order": 61,
+        "x-task-order": 64,
         "x-audience": "Application developer",
         "x-purpose": "Discover the networks offered by this instance and its default for existing integrations.",
         "x-when-to-use": "Read before presenting a network choice or configuring an application’s network services.",
@@ -80,7 +80,7 @@
             "description": "Choose a configured network. Omit to use the default; existing wallet, request and grant IDs select their stored network automatically. A conflicting selection is rejected."
           }
         ],
-        "x-task-order": 63,
+        "x-task-order": 66,
         "x-audience": "Application developer",
         "x-purpose": "Learn which transaction methods, network and execution features the service supports.",
         "x-when-to-use": "Use when implementing wallet transactions or checking integration compatibility. GET /v1/capabilities is the simpler first connectivity check.",
@@ -123,7 +123,7 @@
             "description": "Choose a configured network. Omit to use the default; existing wallet, request and grant IDs select their stored network automatically. A conflicting selection is rejected."
           }
         ],
-        "x-task-order": 62,
+        "x-task-order": 65,
         "x-audience": "Anyone connecting an application",
         "x-purpose": "Confirm that the provider responds and see whether it is configured for wallet operations.",
         "x-when-to-use": "Start here when connecting or troubleshooting. This public request needs no token.",
@@ -199,7 +199,7 @@
           }
         ],
         "security": [{ "accessToken": [] }],
-        "x-task-order": 66,
+        "x-task-order": 69,
         "x-audience": "Host integration developer",
         "x-purpose": "Reserve an identity-enrollment request and a login challenge for a custom host-owned identity integration.",
         "x-when-to-use": "Use only when embedding the separate EnrollmentService with your own identity and authority integration. It is not available in the standard configured service.",
@@ -534,7 +534,7 @@
           }
         ],
         "security": [{ "accessToken": [] }],
-        "x-task-order": 67,
+        "x-task-order": 70,
         "x-audience": "Host integration developer",
         "x-purpose": "Submit the completed provider-login identity proof for a reserved enrollment request.",
         "x-when-to-use": "Use only in the custom EnrollmentService flow, after its nonce-bound login. This does not grant application wallet access or spending authority.",
@@ -821,7 +821,7 @@
           }
         ],
         "security": [{ "accessToken": [] }],
-        "x-task-order": 68,
+        "x-task-order": 71,
         "x-audience": "Host integration developer",
         "x-purpose": "Read the decision for a previously reserved custom identity enrollment without returning private identity attributes.",
         "x-when-to-use": "Use only in the separate EnrollmentService integration. Standard applications check their wallet-access request instead.",
@@ -1095,7 +1095,7 @@
         "operationId": "provisionAccount",
         "summary": "Create the person’s blockchain wallet",
         "tags": ["Wallet access"],
-        "description": "**Why this exists:** Create or locate the Safe wallet for an account that already has current approved access.\n\n**Who uses it:** Application developer.\n\n**When you need it:** Use after POST /v1/access-requests returns a granted account. Keep the original retry key if creation is pending or its outcome is uncertain.\n\n**Before you start:** Use the accepted account_id with current owner-granted access and an empty JSON body: {}. Keep the original idempotency key when retrying. Investigate an unknown outcome before trying again.\n\n**Result and next step:** 200: the user Safe account address and provisioning status. Deployment uses accepted application infrastructure. Pending deployment retains its original attempt; retry with the same identity. Wallet creation does not grant spending permission.\n\n**Request details:** Provision a host-authorized account by stored ID with an empty body and durable attempt. When enrollment is configured, current provider acceptance for the same caller/account/owner is also required. Acceptance does not grant signing rights.",
+        "description": "**Why this exists:** Create or locate the Safe wallet using current approved access or creator-only setup authority for an account created without KYC.\n\n**Who uses it:** Application developer.\n\n**When you need it:** Use after createAccountWithoutKyc returns an account ID, or after requestAccountAccess grants access. Keep the original retry key if creation is pending or its outcome is uncertain.\n\n**Before you start:** Supply an empty JSON body and the saved account_id. Verified accounts need current transaction consent. For an account created without KYC, only its creating application can provision it, without a Wallet-Grant-Id header. Accepted fee terms, funded infrastructure and service readiness remain required. Keep the original idempotency key for retries; uncertain setup retains its durable attempt.\n\n**Result and next step:** 200: the user Safe account address and provisioning status. Deployment uses accepted application infrastructure. Pending deployment retains its original attempt; retry with the same identity. Wallet creation does not grant spending permission.\n\n**Request details:** Provision a host-authorized account by stored ID with an empty body and durable attempt. When enrollment is configured, current provider acceptance for the same caller/account/owner is also required. Acceptance does not grant signing rights.",
         "requestBody": {
           "required": true,
           "content": {
@@ -1149,10 +1149,10 @@
           }
         ],
         "security": [{ "accessToken": [] }],
-        "x-task-order": 3,
+        "x-task-order": 6,
         "x-audience": "Application developer",
-        "x-purpose": "Create or locate the Safe wallet for an account that already has current approved access.",
-        "x-when-to-use": "Use after POST /v1/access-requests returns a granted account. Keep the original retry key if creation is pending or its outcome is uncertain.",
+        "x-purpose": "Create or locate the Safe wallet using current approved access or creator-only setup authority for an account created without KYC.",
+        "x-when-to-use": "Use after createAccountWithoutKyc returns an account ID, or after requestAccountAccess grants access. Keep the original retry key if creation is pending or its outcome is uncertain.",
         "responses": {
           "200": {
             "description": "Default Response",
@@ -1472,7 +1472,7 @@
           }
         ],
         "security": [{ "accessToken": [] }],
-        "x-task-order": 7,
+        "x-task-order": 10,
         "x-audience": "Application backend developer",
         "x-purpose": "Inspect current owners and threshold, compare observed chain state with the confirmed policy and reconcile finalized owner changes.",
         "x-when-to-use": "Read before changing ownership and after the owner-change batch reaches finality.",
@@ -1719,7 +1719,7 @@
           }
         ],
         "security": [{ "accessToken": [] }],
-        "x-task-order": 8,
+        "x-task-order": 11,
         "x-audience": "Application backend developer",
         "x-purpose": "Queue an exact standard Safe owner-management transaction under the current on-chain quorum.",
         "x-when-to-use": "Add or remove a signer address or change the number of required owner signatures.",
@@ -1888,7 +1888,7 @@
           }
         ],
         "security": [{ "accessToken": [] }],
-        "x-task-order": 9,
+        "x-task-order": 12,
         "x-audience": "Application backend developer",
         "x-purpose": "List the most recent exact signing requests available to this caller and wallet.",
         "x-when-to-use": "Discover operations awaiting signatures after normal wallet-call admission.",
@@ -2184,7 +2184,7 @@
           }
         ],
         "security": [{ "accessToken": [] }],
-        "x-task-order": 10,
+        "x-task-order": 13,
         "x-audience": "Application backend developer",
         "x-purpose": "Fetch the immutable SafeOp typed payload, signing hash and quorum progress.",
         "x-when-to-use": "Deliver the exact payload to a local wallet or another owner-controlled signer.",
@@ -2504,7 +2504,7 @@
           }
         ],
         "security": [{ "accessToken": [] }],
-        "x-task-order": 11,
+        "x-task-order": 14,
         "x-audience": "Application backend developer",
         "x-purpose": "Verify and retain an external owner signature for the exact admitted operation, then wake its execution worker.",
         "x-when-to-use": "Return a signature produced by a device or another supported ECDSA signer.",
@@ -2806,7 +2806,7 @@
           }
         ],
         "security": [{ "accessToken": [] }],
-        "x-task-order": 12,
+        "x-task-order": 15,
         "x-audience": "Application backend developer",
         "x-purpose": "Stop further toolkit signing and submission before dispatch while retaining nonce and budget evidence.",
         "x-when-to-use": "Stop an operation that is still collecting signatures.",
@@ -3069,7 +3069,7 @@
           }
         ],
         "security": [{ "accessToken": [] }],
-        "x-task-order": 57,
+        "x-task-order": 60,
         "x-audience": "Service operator",
         "x-purpose": "See whether the application’s fee-paying infrastructure is prepared and whether it needs funding.",
         "x-when-to-use": "Use before preparing or troubleshooting wallet creation. This concerns application fee funding, not a person’s wallet balance.",
@@ -3304,7 +3304,7 @@
           }
         ],
         "security": [{ "accessToken": [] }],
-        "x-task-order": 58,
+        "x-task-order": 61,
         "x-audience": "Service operator",
         "x-purpose": "Deploy the application paymaster, fund its fee deposit and transaction submitter, and configure its private bundler service.",
         "x-when-to-use": "Use after accepting its network services and fee agreement. This setup may deploy contracts and consume application funding; it does not create a user wallet.",
@@ -3531,7 +3531,7 @@
           }
         ],
         "security": [{ "accessToken": [] }],
-        "x-task-order": 59,
+        "x-task-order": 62,
         "x-audience": "Service operator",
         "x-purpose": "Create or retrieve the retained address used to fund an application’s accepted network-fee infrastructure.",
         "x-when-to-use": "Use after offering provider fee terms or approving application-submitted terms, including while wallet execution is disabled.",
@@ -3694,6 +3694,997 @@
             "description": "Default Response",
             "content": {
               "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/accounts": {
+      "post": {
+        "operationId": "createAccountWithoutKyc",
+        "summary": "Create an account before KYC",
+        "tags": ["Wallet access"],
+        "description": "**Why this exists:** Bind a new account to your application and stable user reference before identity information is available.\n\n**Who uses it:** Application developer.\n\n**When you need it:** Use when the person needs a wallet address before completing identity checks.\n\n**Before you start:** Your application must have an accepted identity trust agreement. Supply user_id and a saved idempotency key. Named wallets can include their wallet description. This endpoint does not create a grant.\n\n**Result and next step:** 200: account_id, wallet and verification_required status. Call provisionAccount as the creating application to obtain the Safe address. Submit KYC drafts through updateAccountKyc and complete verified identity and fresh consent through requestAccountAccess before transactions.\n\n**Request details:** Create an application-bound account without KYC. Only its creating application can supply KYC or provision its address. No access grant or signing authority is issued. Call provisionAccount to obtain the Safe address.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["user_id"],
+                "properties": {
+                  "user_id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  },
+                  "wallet": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["reference", "name", "kind"],
+                    "properties": {
+                      "reference": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+                      },
+                      "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 80
+                      },
+                      "kind": { "enum": ["personal", "shared"] }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            },
+            "in": "header",
+            "name": "idempotency-key",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": ["base", "base-sepolia", "ethereum", "ethereum-sepolia"]
+            },
+            "in": "header",
+            "name": "wallet-network",
+            "required": false,
+            "description": "Choose a configured network. Omit to use the default; existing wallet, request and grant IDs select their stored network automatically. A conflicting selection is rejected."
+          }
+        ],
+        "security": [{ "accessToken": [] }],
+        "x-task-order": 1,
+        "x-audience": "Application developer",
+        "x-purpose": "Bind a new account to your application and stable user reference before identity information is available.",
+        "x-when-to-use": "Use when the person needs a wallet address before completing identity checks.",
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["account_id", "status", "wallet"],
+                  "properties": {
+                    "account_id": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                    },
+                    "status": { "enum": ["verification_required"] },
+                    "wallet": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["reference", "name", "kind"],
+                      "properties": {
+                        "reference": {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+                        },
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 80
+                        },
+                        "kind": { "enum": ["personal", "shared"] }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Default Response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Default Response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Default Response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Default Response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Default Response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Default Response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Default Response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/accounts/{accountId}/kyc": {
+      "get": {
+        "operationId": "getAccountKyc",
+        "summary": "Read the account’s draft KYC",
+        "tags": ["Wallet access"],
+        "description": "**Why this exists:** Read saved identity fields and the revision needed for the next incremental update.\n\n**Who uses it:** Application developer.\n\n**When you need it:** Use before editing KYC or to recover the current draft after a response is lost.\n\n**Before you start:** Authenticate as the original creating application. Shared wallet access does not allow reading another application’s KYC draft.\n\n**Result and next step:** 200: revision, draft fields and missing_fields. Draft completeness does not establish verified identity or transaction authority.\n\n**Request details:** Read draft KYC fields as the original creating application. Draft fields are not verified identity evidence.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            },
+            "in": "path",
+            "name": "accountId",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": ["base", "base-sepolia", "ethereum", "ethereum-sepolia"]
+            },
+            "in": "header",
+            "name": "wallet-network",
+            "required": false,
+            "description": "Choose a configured network. Omit to use the default; existing wallet, request and grant IDs select their stored network automatically. A conflicting selection is rejected."
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            },
+            "in": "header",
+            "name": "wallet-grant-id",
+            "required": false,
+            "description": "Select this person’s current grant for this wallet. Required for shared wallets; the selector alone grants no authority."
+          }
+        ],
+        "security": [{ "accessToken": [] }],
+        "x-task-order": 2,
+        "x-audience": "Application developer",
+        "x-purpose": "Read saved identity fields and the revision needed for the next incremental update.",
+        "x-when-to-use": "Use before editing KYC or to recover the current draft after a response is lost.",
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "account_id",
+                    "revision",
+                    "fields",
+                    "missing_fields",
+                    "status"
+                  ],
+                  "properties": {
+                    "account_id": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                    },
+                    "revision": { "type": "integer", "minimum": 0 },
+                    "fields": {
+                      "type": "object",
+                      "additionalProperties": { "type": "string" }
+                    },
+                    "missing_fields": {
+                      "type": "array",
+                      "items": { "type": "string" }
+                    },
+                    "status": { "enum": ["draft"] }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Default Response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Default Response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Default Response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Default Response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Default Response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Default Response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Default Response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "operationId": "updateAccountKyc",
+        "summary": "Add or correct the account’s KYC",
+        "tags": ["Wallet access"],
+        "description": "**Why this exists:** Merge configured identity fields into a draft while preserving omitted fields.\n\n**Who uses it:** Application developer.\n\n**When you need it:** Use as identity information arrives or existing facts need correction.\n\n**Before you start:** Authenticate as the original creating application. Supply expected_revision from getAccountKyc, configured fields and a saved idempotency key. Null removes a field. A changed request needs a new key.\n\n**Result and next step:** 200: the saved draft and advanced revision. Existing identity acceptance and grants across the owner’s wallets are invalidated. Fresh verified evidence and consent are required for transactions. Stale revisions and changed retries return 409.\n\n**Request details:** Add or correct configured KYC fields as the original creating application; omitted fields remain and null removes a field. Requires the current revision. Revokes existing owner grants and invalidates identity acceptance across owned wallets. Submit fresh verified identity and consent through requestAccountAccess to authorize use.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["expected_revision", "fields"],
+                "properties": {
+                  "expected_revision": { "type": "integer", "minimum": 0 },
+                  "fields": {
+                    "type": "object",
+                    "minProperties": 1,
+                    "maxProperties": 16,
+                    "additionalProperties": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "nullable": true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            },
+            "in": "path",
+            "name": "accountId",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            },
+            "in": "header",
+            "name": "idempotency-key",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": ["base", "base-sepolia", "ethereum", "ethereum-sepolia"]
+            },
+            "in": "header",
+            "name": "wallet-network",
+            "required": false,
+            "description": "Choose a configured network. Omit to use the default; existing wallet, request and grant IDs select their stored network automatically. A conflicting selection is rejected."
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            },
+            "in": "header",
+            "name": "wallet-grant-id",
+            "required": false,
+            "description": "Select this person’s current grant for this wallet. Required for shared wallets; the selector alone grants no authority."
+          }
+        ],
+        "security": [{ "accessToken": [] }],
+        "x-task-order": 3,
+        "x-audience": "Application developer",
+        "x-purpose": "Merge configured identity fields into a draft while preserving omitted fields.",
+        "x-when-to-use": "Use as identity information arrives or existing facts need correction.",
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "account_id",
+                    "revision",
+                    "fields",
+                    "missing_fields",
+                    "status"
+                  ],
+                  "properties": {
+                    "account_id": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                    },
+                    "revision": { "type": "integer", "minimum": 0 },
+                    "fields": {
+                      "type": "object",
+                      "additionalProperties": { "type": "string" }
+                    },
+                    "missing_fields": {
+                      "type": "array",
+                      "items": { "type": "string" }
+                    },
+                    "status": { "enum": ["draft"] }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Default Response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Default Response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Default Response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Default Response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Default Response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Default Response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "title", "status", "code", "request_id"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "title": { "type": "string" },
+                    "status": { "type": "integer" },
+                    "code": { "type": "string" },
+                    "request_id": { "type": "string" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["not_dispatched", "rejected", "unknown"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Default Response",
+            "content": {
+              "application/problem+json": {
                 "schema": {
                   "type": "object",
                   "additionalProperties": false,
@@ -3938,7 +4929,7 @@
           }
         ],
         "security": [{ "accessToken": [] }],
-        "x-task-order": 1,
+        "x-task-order": 4,
         "x-audience": "Application developer",
         "x-purpose": "Ask the provider to accept completed identity checks and the person’s recorded permission, then obtain account access IDs.",
         "x-when-to-use": "Use after reading the access requirements and obtaining consent inside the application. Creating or reconnecting access is separate from creating the blockchain wallet.",
@@ -5979,7 +6970,7 @@
           }
         ],
         "security": [{ "accessToken": [] }],
-        "x-task-order": 6,
+        "x-task-order": 9,
         "x-audience": "Application developer",
         "x-purpose": "Build a wallet switcher from the wallets this person has currently approved for your application.",
         "x-when-to-use": "Use after access is granted and when switching wallets. The existing Personal wallet is listed first.",
@@ -6337,7 +7328,7 @@
           }
         ],
         "security": [{ "accessToken": [] }],
-        "x-task-order": 13,
+        "x-task-order": 16,
         "x-audience": "Application developer acting for the wallet owner",
         "x-purpose": "Show the owner who has been invited and the permissions available to each member.",
         "x-when-to-use": "Use before inviting someone, changing their permissions or removing them.",
@@ -6719,7 +7710,7 @@
           }
         ],
         "security": [{ "accessToken": [] }],
-        "x-task-order": 14,
+        "x-task-order": 17,
         "x-audience": "Application developer acting for the wallet owner",
         "x-purpose": "Invite a verified application user to a shared wallet, limit their permissions or remove their future access.",
         "x-when-to-use": "Use after the owner chooses View wallet or View and request approved transactions for a member.",
@@ -7068,7 +8059,7 @@
           }
         ],
         "security": [{ "accessToken": [] }],
-        "x-task-order": 5,
+        "x-task-order": 8,
         "x-audience": "Application developer",
         "x-purpose": "End the application’s saved wallet permission when the person withdraws consent.",
         "x-when-to-use": "Use when the person chooses Disconnect or withdraws wallet access in your application. Reconnecting requires new consent; existing signatures cannot be recalled.",
@@ -7323,7 +8314,7 @@
           }
         ],
         "security": [{ "accessToken": [] }],
-        "x-task-order": 64,
+        "x-task-order": 67,
         "x-audience": "Host integration developer",
         "x-purpose": "Submit a batch of application records into the optional hosted, unfunded evaluation flow.",
         "x-when-to-use": "Use only when application-record evaluation is explicitly configured. The standard application-led flow submits each person’s evidence with POST /v1/access-requests instead.",
@@ -7724,7 +8715,7 @@
           }
         ],
         "security": [{ "accessToken": [] }],
-        "x-task-order": 2,
+        "x-task-order": 5,
         "x-audience": "Application developer",
         "x-purpose": "Look up the decision for a saved access request and recover its returned account and permission details.",
         "x-when-to-use": "Use after requesting access, after a lost response, or while a hosted review is pending. This does not submit new evidence or create a wallet.",
@@ -8122,7 +9113,7 @@
           }
         ],
         "security": [{ "accessToken": [] }],
-        "x-task-order": 65,
+        "x-task-order": 68,
         "x-audience": "Host integration developer",
         "x-purpose": "Import shared verification evidence for a pending hosted identity request using a vendor sharing token.",
         "x-when-to-use": "Use only for a separately configured hosted identity integration, with owner consent and agreed vendor funding. It is not used by the standard application-led flow.",
@@ -8501,7 +9492,7 @@
           }
         ],
         "security": [{ "accessToken": [] }],
-        "x-task-order": 4,
+        "x-task-order": 7,
         "x-audience": "Application developer",
         "x-purpose": "Read an approved account’s status and, once provisioned, its receiving address.",
         "x-when-to-use": "Use for the wallet overview or to check whether wallet creation completed. The transaction-wallet read provides the execution address and chain once transaction access is ready.",
@@ -8762,7 +9753,7 @@
           }
         ],
         "security": [{ "accessToken": [] }],
-        "x-task-order": 17,
+        "x-task-order": 20,
         "x-audience": "Application developer",
         "x-purpose": "Receive status updates for an admitted transaction request without repeatedly polling.",
         "x-when-to-use": "Optional: use for live progress in your interface. Poll wallet_getCallsStatus through the wallet endpoint if you do not need a stream.",
@@ -8906,7 +9897,7 @@
           }
         ],
         "security": [{ "accessToken": [] }],
-        "x-task-order": 15,
+        "x-task-order": 18,
         "x-audience": "Application developer",
         "x-purpose": "Get the user’s assigned Safe address and chain for wallet transactions. This is also their receiving address.",
         "x-when-to-use": "Use when preparing transaction calls. GET /v1/accounts/{accountId} is the general account-details read and can be used before the wallet is provisioned.",
@@ -9242,7 +10233,7 @@
           }
         ],
         "security": [{ "accessToken": [] }],
-        "x-task-order": 16,
+        "x-task-order": 19,
         "x-audience": "Application developer",
         "x-purpose": "Request approved contract calls, discover wallet call capabilities, or check a retained transaction result through one wallet endpoint.",
         "x-when-to-use": "Use after wallet access, transaction rules and fee funding are ready. Choose wallet_sendCalls to submit or wallet_getCallsStatus to inspect; these methods have different effects and permissions.",
@@ -9648,7 +10639,7 @@
           }
         ],
         "security": [{ "accessToken": [] }],
-        "x-task-order": 60,
+        "x-task-order": 63,
         "x-audience": "Application developer",
         "x-purpose": "Get the application’s stable funding address and setup status so its operator knows where eligible network fees are funded.",
         "x-when-to-use": "Use after the provider accepts fee sponsorship and prepares the application infrastructure. This address is separate from users’ receiving addresses.",
@@ -9679,7 +10670,7 @@
                     },
                     "execution_funding": {
                       "type": "object",
-                      "description": "Most recent background check of network fee balances and refill constraints. This observation does not authorize spending and expires after 30 seconds.",
+                      "description": "Most recent advisory funding check. Refills follow confirmed usage and a fifteen-minute recovery check. This observation does not authorize spending and expires after fifteen minutes plus a thirty-second recovery grace period.",
                       "additionalProperties": false,
                       "required": ["status", "message"],
                       "properties": {
@@ -10063,7 +11054,7 @@
           }
         ],
         "security": [{ "accessToken": [] }],
-        "x-task-order": 54,
+        "x-task-order": 57,
         "x-audience": "Application developer",
         "x-purpose": "List your saved service connection references and their status without returning secret values.",
         "x-when-to-use": "Use before adding, replacing or removing an application-owned network connection.",
@@ -10367,7 +11358,7 @@
           }
         ],
         "security": [{ "accessToken": [] }],
-        "x-task-order": 56,
+        "x-task-order": 59,
         "x-audience": "Service operator",
         "x-purpose": "Inspect the service origins and saved connection references an application wants the provider to use.",
         "x-when-to-use": "Use while reviewing its network-service agreement. The separate operator route lets you inspect the chosen application without sharing its secret values.",
@@ -10704,7 +11695,7 @@
           }
         ],
         "security": [{ "accessToken": [] }],
-        "x-task-order": 55,
+        "x-task-order": 58,
         "x-audience": "Application developer",
         "x-purpose": "Securely retain an application-owned service endpoint, or revoke it, for use by approved network services.",
         "x-when-to-use": "Use when a service connection is added, changed or removed. The provider must review affected service declarations again; metadata reads never reveal the saved value.",
@@ -10998,7 +11989,7 @@
           }
         ],
         "security": [{ "accessToken": [] }],
-        "x-task-order": 34,
+        "x-task-order": 37,
         "x-audience": "Application developer",
         "x-purpose": "See the transactions, network services and fee terms your application submitted, and whether the provider accepted each one.",
         "x-when-to-use": "Use before changing an agreement or investigating why wallet setup or transactions are blocked.",
@@ -11558,7 +12549,7 @@
           }
         ],
         "security": [{ "accessToken": [] }],
-        "x-task-order": 41,
+        "x-task-order": 44,
         "x-audience": "Service operator",
         "x-purpose": "See one application’s proposed transactions, network services and fee terms before deciding whether to accept them.",
         "x-when-to-use": "Use during application onboarding and after agreement changes. Applications read their own agreements through the separate application route.",
@@ -12169,7 +13160,7 @@
           }
         ],
         "security": [{ "accessToken": [] }],
-        "x-task-order": 38,
+        "x-task-order": 41,
         "x-audience": "Service operator",
         "x-purpose": "Save encrypted application-scoped RPC URLs and approve their verification, submission and observation roles in one revision.",
         "x-when-to-use": "Use the administration console to configure or replace the complete connection set for one application and selected network.",
@@ -12834,7 +13825,7 @@
           }
         ],
         "security": [{ "accessToken": [] }],
-        "x-task-order": 39,
+        "x-task-order": 42,
         "x-audience": "Service operator",
         "x-purpose": "Set the network, fee limits and wallet limits the provider offers to a connected application.",
         "x-when-to-use": "Use to create or replace fee terms before the application accepts and funds its dedicated address.",
@@ -13391,7 +14382,7 @@
           }
         ],
         "security": [{ "accessToken": [] }],
-        "x-task-order": 40,
+        "x-task-order": 43,
         "x-audience": "Application developer",
         "x-purpose": "Record whether this application agrees to the provider’s current network-fee limits and funding terms.",
         "x-when-to-use": "Read the offered terms first, then accept the exact revision before funding or requesting infrastructure preparation.",
@@ -13983,7 +14974,7 @@
           }
         ],
         "security": [{ "accessToken": [] }],
-        "x-task-order": 35,
+        "x-task-order": 38,
         "x-audience": "Application developer",
         "x-purpose": "Describe the business actions and supporting information your application expects to submit for provider review.",
         "x-when-to-use": "Use during application setup or when supported business actions change. Send field definitions, not an actual person’s transaction data.",
@@ -14546,7 +15537,7 @@
           }
         ],
         "security": [{ "accessToken": [] }],
-        "x-task-order": 42,
+        "x-task-order": 45,
         "x-audience": "Service operator",
         "x-purpose": "Record your decision on the current submitted business actions and information requirements.",
         "x-when-to-use": "Use after reviewing an application’s transaction declaration. Acceptance alone does not publish transaction rules or approve anyone’s spending.",
@@ -15134,7 +16125,7 @@
           }
         ],
         "security": [{ "accessToken": [] }],
-        "x-task-order": 36,
+        "x-task-order": 39,
         "x-audience": "Application developer",
         "x-purpose": "Declare the network-reading and verification services the application will pay for and their saved connection references.",
         "x-when-to-use": "Use after saving service connections, or when the selected services change. Submit references rather than secret values.",
@@ -15697,7 +16688,7 @@
           }
         ],
         "security": [{ "accessToken": [] }],
-        "x-task-order": 43,
+        "x-task-order": 46,
         "x-audience": "Service operator",
         "x-purpose": "Record whether the declared network services and saved connection origins are acceptable.",
         "x-when-to-use": "Use after reviewing the current service declaration and connection metadata. Acceptance permits eligible connections to be used; it does not fund them.",
@@ -16356,7 +17347,7 @@
           }
         ],
         "security": [{ "accessToken": [] }],
-        "x-task-order": 37,
+        "x-task-order": 40,
         "x-audience": "Application developer",
         "x-purpose": "Declare the application’s agreement to pay eligible network fees, with bounded costs and account limits.",
         "x-when-to-use": "Use before preparing fee-paying infrastructure or changing fee terms. Saving this agreement does not transfer money or fund the address.",
@@ -16919,7 +17910,7 @@
           }
         ],
         "security": [{ "accessToken": [] }],
-        "x-task-order": 44,
+        "x-task-order": 47,
         "x-audience": "Service operator",
         "x-purpose": "Record your decision on who pays network fees and the proposed cost limits.",
         "x-when-to-use": "Use before preparing application fee infrastructure, and whenever fee terms change. Actual funding remains a separate step.",
@@ -17443,7 +18434,7 @@
           }
         ],
         "security": [{ "accessToken": [] }],
-        "x-task-order": 33,
+        "x-task-order": 36,
         "x-audience": "Application developer or service operator",
         "x-purpose": "List visible application setups and optionally load one application’s current rules and recent proposals.",
         "x-when-to-use": "Use for a setup dashboard. Operators can inspect their configured applications; applications can see only their own setup.",
@@ -19848,7 +20839,7 @@
           }
         ],
         "security": [{ "accessToken": [] }],
-        "x-task-order": 18,
+        "x-task-order": 21,
         "x-audience": "Application developer or service operator",
         "x-purpose": "List the transaction requests you may read, including their queue stages and retained verified outcomes.",
         "x-when-to-use": "Use for history and monitoring. Read an individual transaction’s current status through the wallet endpoint when an observation is still pending.",
@@ -20276,7 +21267,7 @@
           }
         ],
         "security": [{ "accessToken": [] }],
-        "x-task-order": 53,
+        "x-task-order": 56,
         "x-audience": "Service operator",
         "x-purpose": "Choose manual review or limited automatic publication for future application contract and method changes.",
         "x-when-to-use": "Optional: use after publishing baseline rules. Automatic review accepts only changes whose provider-controlled terms exactly match the current policy; it does not approve existing pending proposals.",
@@ -20559,7 +21550,7 @@
           }
         ],
         "security": [{ "accessToken": [] }],
-        "x-task-order": 45,
+        "x-task-order": 48,
         "x-audience": "Application developer",
         "x-purpose": "Read the active allowed calls, identity claims and transaction limits before requesting permission or preparing a change.",
         "x-when-to-use": "Use during application integration and before proposing changes. This reads the published policy, not business declarations or anyone’s wallet permission.",
@@ -21489,7 +22480,7 @@
           }
         ],
         "security": [{ "accessToken": [] }],
-        "x-task-order": 48,
+        "x-task-order": 51,
         "x-audience": "Service operator",
         "x-purpose": "Inspect the active transaction rules for a selected application before approving or changing them.",
         "x-when-to-use": "Use for provider review. The separate application route lets an application read only its own current rules.",
@@ -22419,7 +23410,7 @@
           }
         ],
         "security": [{ "accessToken": [] }],
-        "x-task-order": 51,
+        "x-task-order": 54,
         "x-audience": "Application developer",
         "x-purpose": "Read an immutable published rules version to understand which terms applied at that point.",
         "x-when-to-use": "Optional: use for audit and troubleshooting. Reading history does not reactivate those rules or restore wallet permission.",
@@ -23380,7 +24371,7 @@
           }
         ],
         "security": [{ "accessToken": [] }],
-        "x-task-order": 52,
+        "x-task-order": 55,
         "x-audience": "Provider operator",
         "x-purpose": "Allow an approved application to submit arbitrary external contract calls and native transfers without transaction proposals or contract restrictions.",
         "x-when-to-use": "Choose unrestricted mode only for an application you trust to enforce transaction rules. Restricted mode is the default.",
@@ -24844,7 +25835,7 @@
           }
         ],
         "security": [{ "accessToken": [] }],
-        "x-task-order": 46,
+        "x-task-order": 49,
         "x-audience": "Application developer",
         "x-purpose": "Propose the contract calls and limits your application needs without publishing them yourself.",
         "x-when-to-use": "Use when initially configuring transactions or requesting changes. A provider operator reviews and publishes the proposal unless an explicitly enabled automatic-review rule applies.",
@@ -25716,7 +26707,7 @@
           }
         ],
         "security": [{ "accessToken": [] }],
-        "x-task-order": 47,
+        "x-task-order": 50,
         "x-audience": "Application developer",
         "x-purpose": "Inspect a saved proposal to see its requested rules and publication outcome.",
         "x-when-to-use": "Use after submitting a proposal or losing its response. Keep its ID so you can check the original request.",
@@ -26615,7 +27606,7 @@
           }
         ],
         "security": [{ "accessToken": [] }],
-        "x-task-order": 49,
+        "x-task-order": 52,
         "x-audience": "Service operator",
         "x-purpose": "Make a reviewed application proposal the active transaction policy.",
         "x-when-to-use": "Use for the normal proposal-and-review workflow. This is separate from accepting business declarations; publication defines the exact calls and limits that may be requested.",
@@ -28085,7 +29076,7 @@
           }
         ],
         "security": [{ "accessToken": [] }],
-        "x-task-order": 50,
+        "x-task-order": 53,
         "x-audience": "Service operator",
         "x-purpose": "Publish a provider-authored rules version without first creating an application proposal.",
         "x-when-to-use": "Alternative setup path: use for a baseline or provider-controlled policy change. Use proposal publication instead when reviewing an application’s saved proposal; both retain version history.",
@@ -28945,7 +29936,7 @@
         "tags": ["Service administration"],
         "description": "**Why this exists:** See saved network choices and whether a restart is needed to apply them.\n\n**Who uses it:** Service operator.\n\n**When you need it:** Use the Networks page in administration, or this request for management tools.\n\n**Before you start:** Use a current provider administrator or management-tool token.\n\n**Result and next step:** 200: the fixed default, saved choices, running choices and restart requirement. Network selection does not grant spending authority.\n\n**Request details:** Protected installation and application administration. Management credentials do not activate wallet operations or authorize spending.",
         "security": [{ "accessToken": [] }],
-        "x-task-order": 21,
+        "x-task-order": 24,
         "x-audience": "Service operator",
         "x-purpose": "See saved network choices and whether a restart is needed to apply them.",
         "x-when-to-use": "Use the Networks page in administration, or this request for management tools.",
@@ -29270,7 +30261,7 @@
           }
         ],
         "security": [{ "accessToken": [] }],
-        "x-task-order": 22,
+        "x-task-order": 25,
         "x-audience": "Service operator",
         "x-purpose": "Save network choices while preserving the default used by existing applications.",
         "x-when-to-use": "Use when adding or removing a network, then restart the provider to apply the saved choices.",
@@ -29581,7 +30572,7 @@
           }
         ],
         "security": [{ "accessToken": [] }],
-        "x-task-order": 25,
+        "x-task-order": 28,
         "x-audience": "Provider operator",
         "x-purpose": "Browse stored application-scoped users and their KYC evidence summaries.",
         "x-when-to-use": "Use when building a provider user directory or reviewing users registered through application-led access.",
@@ -29904,7 +30895,7 @@
           }
         ],
         "security": [{ "accessToken": [] }],
-        "x-task-order": 26,
+        "x-task-order": 29,
         "x-audience": "Provider operator",
         "x-purpose": "Read an application-scoped user’s stored identity information and associated wallets.",
         "x-when-to-use": "Use after selecting a provider user ID from the directory.",
@@ -30261,7 +31252,7 @@
         "tags": ["Service administration"],
         "description": "**Why this exists:** See the identity information and permission limits every connected application must follow.\n\n**Who uses it:** Service operator.\n\n**When you need it:** Use when reviewing your service’s user checks. The same settings are available under User checks in administration.\n\n**Before you start:** Sign in as a provider operator. These shared settings are also shown under User checks in administration.\n\n**Result and next step:** 200: required identity fields, the agreed verification label, maximum check age, permission duration and current settings revision. This returns requirements, not anyone’s KYC records.\n\n**Request details:** Read the shared identity information, check age and wallet permission duration required from applications. available is false for hosted compatibility installations. No customer identity records are returned.",
         "security": [{ "accessToken": [] }],
-        "x-task-order": 29,
+        "x-task-order": 32,
         "x-audience": "Service operator",
         "x-purpose": "See the identity information and permission limits every connected application must follow.",
         "x-when-to-use": "Use when reviewing your service’s user checks. The same settings are available under User checks in administration.",
@@ -30609,7 +31600,7 @@
           }
         ],
         "security": [{ "accessToken": [] }],
-        "x-task-order": 30,
+        "x-task-order": 33,
         "x-audience": "Service operator",
         "x-purpose": "Set required identity information, the maximum age of checks and how long wallet permission lasts.",
         "x-when-to-use": "Use when your shared requirements change. Applications read the resulting requirements through GET /v1/access-policy.",
@@ -30911,7 +31902,7 @@
           }
         ],
         "security": [{ "accessToken": [] }],
-        "x-task-order": 23,
+        "x-task-order": 26,
         "x-audience": "Provider operator",
         "x-purpose": "Read the retained execution setting, completed-check references and running readiness for one configured network.",
         "x-when-to-use": "Use Networks & execution in the portal or read before changing a network setting.",
@@ -31231,7 +32222,7 @@
           }
         ],
         "security": [{ "accessToken": [] }],
-        "x-task-order": 24,
+        "x-task-order": 27,
         "x-audience": "Provider operator",
         "x-purpose": "Apply a durable network execution setting without restarting the service.",
         "x-when-to-use": "Enable after completing wallet setup and recovery checks, or pause new requests during maintenance.",
@@ -31535,7 +32526,7 @@
           }
         },
         "security": [],
-        "x-task-order": 19,
+        "x-task-order": 22,
         "x-audience": "Installer",
         "x-purpose": "Establish the administrator for a new, unclaimed installation using its private setup code.",
         "x-when-to-use": "Use once after installation. The First-time setup form in administration sends this request; ordinary sign-in does not use it.",
@@ -31820,7 +32811,7 @@
         "tags": ["Service administration"],
         "description": "**Why this exists:** See whether administration is available, which applications are registered and whether wallet operations are enabled.\n\n**Who uses it:** Service operator.\n\n**When you need it:** Use on your administration dashboard or when troubleshooting service setup.\n\n**Before you start:** Authenticate as a current dedicated provider operator.\n\n**Result and next step:** 200: management availability, application registrations and wallet activation status.\n\n**Request details:** Protected installation and application administration. Management credentials do not activate wallet operations or authorize spending.",
         "security": [{ "accessToken": [] }],
-        "x-task-order": 20,
+        "x-task-order": 23,
         "x-audience": "Service operator",
         "x-purpose": "See whether administration is available, which applications are registered and whether wallet operations are enabled.",
         "x-when-to-use": "Use on your administration dashboard or when troubleshooting service setup.",
@@ -32255,7 +33246,7 @@
         "tags": ["Service administration"],
         "description": "**Why this exists:** List registered connections so you can find the one to inspect or change.\n\n**Who uses it:** Service operator.\n\n**When you need it:** Use when managing registrations. This lists application and tool connections, not wallet owners.\n\n**Before you start:** Authenticate as a current dedicated provider operator.\n\n**Result and next step:** 200: identity metadata without authentication verifiers or secrets.\n\n**Request details:** Protected installation and application administration. Management credentials do not activate wallet operations or authorize spending.",
         "security": [{ "accessToken": [] }],
-        "x-task-order": 27,
+        "x-task-order": 30,
         "x-audience": "Service operator",
         "x-purpose": "List registered connections so you can find the one to inspect or change.",
         "x-when-to-use": "Use when managing registrations. This lists application and tool connections, not wallet owners.",
@@ -32595,7 +33586,7 @@
           }
         ],
         "security": [{ "accessToken": [] }],
-        "x-task-order": 28,
+        "x-task-order": 31,
         "x-audience": "Service operator",
         "x-purpose": "Give an application or administration tool its own connection ID and secret.",
         "x-when-to-use": "Use once per new connection. Most operators can use Add application or Add management tool in administration.",
@@ -32997,7 +33988,7 @@
           }
         ],
         "security": [{ "accessToken": [] }],
-        "x-task-order": 31,
+        "x-task-order": 34,
         "x-audience": "Service operator",
         "x-purpose": "Rename a connection, pause access, or change the agreement and permissions for an application.",
         "x-when-to-use": "Use after adding a connection. Changing trust or permissions ends its current wallet approvals; renaming alone preserves them.",
@@ -33318,7 +34309,7 @@
           }
         ],
         "security": [{ "accessToken": [] }],
-        "x-task-order": 32,
+        "x-task-order": 35,
         "x-audience": "Service operator",
         "x-purpose": "Replace lost or exposed connection details so the old secret and its tokens stop working.",
         "x-when-to-use": "Use for an existing application or management tool. You can also choose Replace secret in administration.",

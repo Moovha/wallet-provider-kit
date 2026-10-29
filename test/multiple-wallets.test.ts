@@ -712,3 +712,208 @@ it.each([
     ).toMatchObject({ chainId, status: 100 });
   },
 );
+
+it('creates accounts without KYC, admits only creator provisioning, and merges revision-checked KYC drafts without granting access', async () => {
+  const f = await fixture();
+  const creation = ctx();
+  const created = await f.service.createAccount(creation, { user_id: 'owner' });
+  expect(await f.service.createAccount(creation, { user_id: 'owner' })).toEqual(
+    created,
+  );
+  expect(
+    (await f.service.createAccount(ctx(), { user_id: 'owner' })).account_id,
+  ).toBe(created.account_id);
+  await expect(
+    f.service.authorizeCurrent(principal(), created.account_id),
+  ).rejects.toMatchObject({ code: 'wallet_authorization_denied' });
+  const authority = await f.service
+    .walletAuthority()
+    .provision(ctx(), created.account_id);
+  expect(authority).toMatchObject({
+    provisioningOnly: true,
+    currentUserStatus: null,
+  });
+  expect(
+    await f.service.canDispatchProvision(
+      authority!.attemptId,
+      created.account_id,
+    ),
+  ).toBe(true);
+  await expect(
+    f.service.walletAuthority().provision(ctx('app-b'), created.account_id),
+  ).rejects.toMatchObject({ code: 'wallet_authorization_denied' });
+  await expect(
+    f.service.updateAccountKyc(ctx('app-b'), created.account_id, {
+      expected_revision: 0,
+      fields: { identity_number: 'dummy' },
+    }),
+  ).rejects.toMatchObject({ code: 'wallet_authorization_denied' });
+  await expect(
+    f.service.accountKyc(ctx('app-b'), created.account_id),
+  ).rejects.toMatchObject({ code: 'wallet_authorization_denied' });
+  const patch = ctx();
+  const input = {
+    expected_revision: 0,
+    fields: { identity_number: '0000000000001' },
+  };
+  const first = await f.service.updateAccountKyc(
+    patch,
+    created.account_id,
+    input,
+  );
+  expect(first.revision).toBe(1);
+  expect(first.missing_fields).toEqual(['document_type', 'issuing_country']);
+  expect(
+    await f.service.updateAccountKyc(patch, created.account_id, input),
+  ).toEqual(first);
+  await expect(
+    f.service.updateAccountKyc(ctx(), created.account_id, input),
+  ).rejects.toMatchObject({ code: 'wallet_attempt_conflict' });
+  await expect(
+    f.service.updateAccountKyc(patch, created.account_id, {
+      ...input,
+      fields: { document_type: 'passport' },
+    }),
+  ).rejects.toMatchObject({ code: 'wallet_attempt_conflict' });
+  const second = await f.service.updateAccountKyc(ctx(), created.account_id, {
+    expected_revision: 1,
+    fields: { document_type: 'national_id', issuing_country: 'ZA' },
+  });
+  expect(second.fields).toEqual(f.input().user!.identity!.fields);
+  expect(second.missing_fields).toEqual([]);
+  await expect(
+    f.service.authorizeCurrent(principal(), created.account_id),
+  ).rejects.toMatchObject({ code: 'wallet_authorization_denied' });
+  const granted = await f.service.request(ctx(), f.input());
+  expect(granted.account_id).toBe(created.account_id);
+  expect(granted.status).toBe('granted');
+  const updated = await f.service.updateAccountKyc(ctx(), created.account_id, {
+    expected_revision: 3,
+    fields: { identity_number: '0000000000002', issuing_country: null },
+  });
+  expect(updated.fields).toEqual({
+    identity_number: '0000000000002',
+    document_type: 'national_id',
+  });
+  await expect(
+    f.service.authorizeCurrent(principal(), created.account_id),
+  ).rejects.toMatchObject({ code: 'wallet_authorization_denied' });
+  const reuse = f.input();
+  delete reuse.user!.identity;
+  await expect(f.service.request(ctx(), reuse)).rejects.toMatchObject({
+    code: 'wallet_authorization_denied',
+  });
+  f.restart();
+  expect(await f.service.accountKyc(ctx(), created.account_id)).toEqual(
+    updated,
+  );
+  await f.store.transaction((s) => {
+    s.accounts[created.account_id].status = 'suspended';
+  });
+  expect(
+    await f.service.canDispatchProvision(
+      authority!.attemptId,
+      created.account_id,
+    ),
+  ).toBe(false);
+});
+
+it('never treats creator-only provisioning authority as signing authority', async () => {
+  const f = await fixture();
+  const created = await f.service.createAccount(ctx(), { user_id: 'owner' });
+  const authority = await f.service
+    .walletAuthority()
+    .provision(ctx(), created.account_id);
+  const createAccount = vi.fn(async () => ({
+    accountId: created.account_id,
+    address: '0x' + '1'.repeat(40),
+  }));
+  const signTypedData = vi.fn();
+  const wallet = new EmbeddedWalletService(
+    { provision: async () => authority, sign: async () => authority as never },
+    {
+      provider: 'offline',
+      createAccount,
+      findAccount: async () => null,
+      signTypedData,
+    },
+  );
+  expect(await wallet.provision(ctx(), created.account_id)).toMatchObject({
+    accountId: created.account_id,
+  });
+  expect(createAccount).toHaveBeenCalledOnce();
+  await expect(wallet.sign(ctx(), randomUUID())).rejects.toMatchObject({
+    code: 'wallet_authorization_denied',
+  });
+  expect(signTypedData).not.toHaveBeenCalled();
+});
+
+it('exposes creator-only KYC and deferred creation through the HTTP client with strict body validation', async () => {
+  const f = await fixture();
+  let caller = principal();
+  const app = await createServer({
+    onboarding: { service: f.service, reviewers: [] },
+    service: new EmbeddedWalletService(f.service.walletAuthority(), {
+      provider: 'offline',
+      createAccount: async () => {
+        throw new Error('No provider effects');
+      },
+      findAccount: async () => null,
+      signTypedData: async () => {
+        throw new Error('No signing');
+      },
+    }),
+    authenticate: async () => caller,
+    ready: async () => true,
+    documentation: false,
+  });
+  const client = createWalletsClient({
+    url: 'https://wallet.example.test',
+    authorization: async () => 'Bearer offline',
+    fetch: (async (url, init) => {
+      const response = await app.inject({
+        method: init!.method as 'POST' | 'PATCH' | 'GET',
+        url: new URL(String(url)).pathname,
+        headers: Object.fromEntries(new Headers(init!.headers)),
+        ...(init!.body ? { payload: String(init!.body) } : {}),
+      });
+      return new Response(response.body, {
+        status: response.statusCode,
+        headers: { 'content-type': 'application/json' },
+      });
+    }) as typeof fetch,
+  });
+  try {
+    const account = await client.createAccount(
+      { user_id: 'later' },
+      randomUUID(),
+    );
+    expect((await client.accountKyc(account.account_id)).revision).toBe(0);
+    const saved = await client.updateAccountKyc(
+      account.account_id,
+      { expected_revision: 0, fields: { identity_number: '0000000000001' } },
+      randomUUID(),
+    );
+    expect(saved.fields).toEqual({ identity_number: '0000000000001' });
+    await expect(
+      client.updateAccountKyc(
+        account.account_id,
+        { expected_revision: 1, fields: { arbitrary: 'rejected' } },
+        randomUUID(),
+      ),
+    ).rejects.toMatchObject({ status: 422 });
+    caller = principal('app-b');
+    await expect(client.accountKyc(account.account_id)).rejects.toMatchObject({
+      status: 403,
+    });
+    await expect(
+      client.updateAccountKyc(
+        account.account_id,
+        { expected_revision: 1, fields: { document_type: 'passport' } },
+        randomUUID(),
+      ),
+    ).rejects.toMatchObject({ status: 403 });
+  } finally {
+    await app.close();
+  }
+});
