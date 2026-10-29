@@ -960,6 +960,11 @@ export declare class OnboardingService {
       userChecks?():
         | (import('./types.js').UserCheckSettings & {
             revision: number;
+            policyBinding?:
+              | (import('./types.js').UserCheckSettings & {
+                  revision: number;
+                })
+              | null;
           })
         | undefined;
       list(): import('./types.js').ApplicationPolicy[];
@@ -1700,6 +1705,20 @@ export interface ProviderState {
     event: string;
     resource: string;
     revision: string;
+    actor?: string;
+    impact?: {
+      invalidatedRequests: number;
+      revokedGrants: number;
+      removedPermissions?: Permission[];
+      trustChanged?: boolean;
+      enabledChanged?: boolean;
+      sharingChanged?: boolean;
+      changedUserChecks?: string[];
+      userChecks?: {
+        before: UserCheckSettings;
+        after: UserCheckSettings;
+      };
+    };
   }[];
 }
 ```

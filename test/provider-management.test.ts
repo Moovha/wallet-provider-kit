@@ -1128,3 +1128,212 @@ it('requires current operator authority and evidence for per-network execution, 
     ),
   ).toMatchObject({ revision: 3, enabled: false });
 });
+
+it.each([
+  { kind: 'personal' as const, persistedChecks: false },
+  { kind: 'shared' as const, persistedChecks: false },
+  { kind: 'personal' as const, persistedChecks: true },
+  { kind: 'shared' as const, persistedChecks: true },
+])(
+  'preserves $kind wallet authority across additions and relaxations (stored checks: $persistedChecks)',
+  async ({ kind, persistedChecks }) => {
+    const { OnboardingService } = await import('../src/onboarding/service.js');
+    const f = await fixture(),
+      adminPassword = password();
+    await f.service.claim({
+      claim: f.claim,
+      username: 'checks-admin',
+      password: adminPassword,
+    });
+    const operator = await f.service.verifyCredentials(
+      'operator-checks-admin',
+      adminPassword,
+      managementScopes,
+    );
+    const created = await f.service.mutate(operator, randomUUID(), 'create', {
+      name: 'Offline application',
+      role: 'application',
+    });
+    if (!('id' in created) || !created.client_secret)
+      throw new Error('Expected new application');
+    await f.service.mutate(operator, randomUUID(), 'update', {
+      id: created.id,
+      expected_revision: created.revision,
+      trust_agreement: 'offline-reviewed-agreement',
+      permissions: ['account:read'],
+    });
+    const caller = await f.service.verifyCredentials(
+      created.id,
+      created.client_secret!,
+      ['wallet:access', 'wallet:access:read', 'wallet:provision'],
+    );
+    await f.store.transaction((s) => {
+      s.requests = {};
+      s.accounts = {};
+      s.evidenceOwners = {};
+      s.idempotency = {};
+      s.admissions = {};
+    });
+    if (persistedChecks) {
+      const {
+        available: _available,
+        revision,
+        ...checks
+      } = await f.service.readUserChecks(operator);
+      await f.service.saveUserChecks(operator, randomUUID(), {
+        ...checks,
+        expected_revision: revision,
+        max_access_days: checks.max_access_days - 1,
+      });
+    }
+    const onboard = () =>
+      new OnboardingService(
+        { ...f.config.policy, applications: [] },
+        f.store,
+        [],
+        undefined,
+        undefined,
+        false,
+        true,
+        {
+          list: () => f.service.applications(),
+          current: (p) => f.service.application(p),
+          userChecks: () => f.service.currentUserChecks(),
+        },
+      );
+    const onboarding = onboard();
+    const context = () => ({ principal: caller, idempotencyKey: randomUUID() });
+    const originalPolicy = onboarding.accessPolicy(caller);
+    const input = {
+      mode: 'create' as const,
+      wallet: { reference: 'offline-wallet', name: 'Offline wallet', kind },
+      user: {
+        id: 'offline-user',
+        identity: {
+          reference: 'offline-evidence',
+          level: 'verified',
+          verified_at: new Date(Date.now() - 1000).toISOString(),
+          fields: { country: 'ZA' } as Record<string, string>,
+        },
+        consent: {
+          reference: 'offline-consent',
+          wallet_reference: 'offline-wallet',
+          granted_at: new Date(Date.now() - 1000).toISOString(),
+          expires_at: new Date(Date.now() + 86_400_000).toISOString(),
+          policy_revision: originalPolicy.policy_revision,
+        },
+      },
+      authorization_details: [
+        {
+          type: 'https://moovha.com/wallet/account-access' as const,
+          actions: ['account:read' as const],
+        },
+      ] as [
+        {
+          type: 'https://moovha.com/wallet/account-access';
+          actions: ['account:read'];
+        },
+      ],
+    };
+    const access = await onboarding.request(context(), input);
+    const admitted = await onboarding.walletAuthority().provision(
+      {
+        ...context(),
+        principal: { ...caller, accessGrantId: access.grant_id },
+      },
+      access.account_id!,
+    );
+    const originalGrant = await f.store.transaction((state) =>
+      structuredClone(Object.values(state.grants)[0]),
+    );
+    const application = f.service
+      .identities(operator)
+      .find((i) => i.id === created.id)!;
+    const expanded = await f.service.mutate(operator, randomUUID(), 'update', {
+      id: created.id,
+      expected_revision: application.revision,
+      permissions: ['account:read', 'members:manage', 'owners:manage'],
+    });
+    expect(() => f.service.currentPrincipal(caller)).not.toThrow();
+    for (const service of [onboarding, onboard()]) {
+      expect(
+        await service.canDispatchProvision(
+          admitted!.attemptId!,
+          access.account_id!,
+        ),
+      ).toBe(true);
+      expect(service.accessPolicy(caller).policy_revision).toBe(
+        originalPolicy.policy_revision,
+      );
+    }
+    expect(
+      await f.store.transaction((state) => state.grants[originalGrant.id]),
+    ).toEqual(originalGrant);
+    expect(originalGrant.permissions).toEqual(['account:read']);
+    await expect(
+      onboarding.members(
+        { ...caller, accessGrantId: access.grant_id },
+        access.account_id!,
+      ),
+    ).rejects.toThrow('wallet_authorization_denied');
+    const checks = await f.service.readUserChecks(operator);
+    await f.service.saveUserChecks(operator, randomUUID(), {
+      expected_revision: checks.revision,
+      required_fields: [],
+      verification_level: checks.verification_level,
+      max_identity_age_days: checks.max_identity_age_days + 1,
+      max_access_days: checks.max_access_days + 1,
+    });
+    for (const service of [onboarding, onboard()]) {
+      expect(
+        await service.canDispatchProvision(
+          admitted!.attemptId!,
+          access.account_id!,
+        ),
+      ).toBe(true);
+      expect(service.accessPolicy(caller).policy_revision).toBe(
+        originalPolicy.policy_revision,
+      );
+    }
+    expect(
+      await f.store.transaction((state) => state.grants[originalGrant.id]),
+    ).toEqual(originalGrant);
+    expect(
+      await f.store.transaction((state) =>
+        state.audit
+          .filter((event) => event.impact)
+          .slice(-2)
+          .map((event) => event.impact?.revokedGrants),
+      ),
+    ).toEqual([0, 0]);
+    await f.service.mutate(operator, randomUUID(), 'update', {
+      id: created.id,
+      expected_revision: 'revision' in expanded ? expanded.revision : 0,
+      permissions: ['members:manage'],
+    });
+    expect(
+      await onboard().canDispatchProvision(
+        admitted!.attemptId!,
+        access.account_id!,
+      ),
+    ).toBe(false);
+    expect(
+      await f.store.transaction(
+        (state) => state.grants[originalGrant.id].state,
+      ),
+    ).toBe('revoked');
+    const current = f.service
+      .identities(operator)
+      .find((i) => i.id === created.id)!;
+    await f.service.mutate(operator, randomUUID(), 'update', {
+      id: created.id,
+      expected_revision: current.revision,
+      permissions: ['account:read', 'members:manage'],
+    });
+    expect(
+      await f.store.transaction(
+        (state) => state.grants[originalGrant.id].state,
+      ),
+    ).toBe('revoked');
+  },
+);
