@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Upgrade oidc-provider to 9.13.0, jose to 6.2.13, Swagger UI assets to 5.34.0,
+  and the Secretlint CLI and recommended rule preset to 13.1.0.
+
 - Schedule application funding checks from confirmed gas usage, with a
   fifteen-minute recovery interval and a 50% refill low-water mark. Keep fresh
   balance snapshots and durable reservations authoritative for admission.
