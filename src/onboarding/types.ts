@@ -352,7 +352,23 @@ export interface ProviderState {
       expiresAt: number;
     }
   >;
-  audit: { at: number; event: string; resource: string; revision: string }[];
+  audit: {
+    at: number;
+    event: string;
+    resource: string;
+    revision: string;
+    actor?: string;
+    impact?: {
+      invalidatedRequests: number;
+      revokedGrants: number;
+      removedPermissions?: Permission[];
+      trustChanged?: boolean;
+      enabledChanged?: boolean;
+      sharingChanged?: boolean;
+      changedUserChecks?: string[];
+      userChecks?: { before: UserCheckSettings; after: UserCheckSettings };
+    };
+  }[];
 }
 /** Callback is synchronous; never make vendor/network calls inside a storage transaction. */
 export interface OnboardingStore {

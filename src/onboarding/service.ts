@@ -105,7 +105,12 @@ export class OnboardingService {
     readonly safeOnlyWallet = false,
     liveApplications?: {
       userChecks?():
-        | (import('./types.js').UserCheckSettings & { revision: number })
+        | (import('./types.js').UserCheckSettings & {
+            revision: number;
+            policyBinding?:
+              | (import('./types.js').UserCheckSettings & { revision: number })
+              | null;
+          })
         | undefined;
       list(): import('./types.js').ApplicationPolicy[];
       current(
@@ -177,9 +182,12 @@ export class OnboardingService {
             enumerable: true,
             get: () => {
               const checks = liveApplications.userChecks!();
-              return checks
-                ? fingerprint([initialRevision, checks])
-                : initialRevision;
+              if (!checks || checks.policyBinding === null)
+                return initialRevision;
+              return fingerprint([
+                initialRevision,
+                checks.policyBinding ?? checks,
+              ]);
             },
           },
         });

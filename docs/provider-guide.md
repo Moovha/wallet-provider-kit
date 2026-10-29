@@ -80,3 +80,27 @@ Applications discover configured networks with `GET /v1/networks`. Its
 application’s readiness or funding. `/health/ready` reports whether any configured network is ready; use the selected network’s `GET /v1/execution-capabilities` for its own status. Show the network name alongside every wallet
 address, balance and consent prompt. Transfers between networks require a bridge
 chosen and orchestrated by the application; selecting a network does not move assets.
+
+## Changing application and user-check settings
+
+Adding allowed application permissions preserves existing wallet grants and issued
+OAuth tokens. Each grant retains its original permissions and expiry: a new
+application capability requires fresh wallet consent before it can be used.
+Removing an allowed permission, changing assertion trust or changing enabled state
+invalidates that application's requests and grants, including dependent shared
+access. Removing OAuth scopes fences issued tokens; adding scopes does not expand
+an existing token. Credential rotation fences tokens while preserving wallet grants.
+
+Removing required identity fields or increasing identity/access age limits preserves
+existing consent authority across restarts. Existing grants and verified profiles
+keep their original expiration dates. Adding required fields, changing the
+verification level or reducing either age limit invalidates existing requests and
+grants across the installation. Saving identical settings, including reordered
+required fields, preserves both the settings revision and authority.
+
+Management audit events record the operator identity hash, invalidated-request and
+revoked-grant counts, and the reason for authority changes. User-check changes also
+retain the before/after settings. Historical revocations remain revoked after an
+upgrade; recovery requires reviewing the original evidence and obtaining any
+necessary fresh consent. These rules do not cancel signatures or transactions
+already submitted.

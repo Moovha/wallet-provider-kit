@@ -8,6 +8,7 @@ import {
 } from 'node:crypto';
 import { walletDescription } from '../onboarding/wallets.js';
 import type { VerifiedPrincipal } from '../domain/principal.js';
+import { defaultPermissions } from '../onboarding/types.js';
 import type {
   ApplicationPolicy,
   OnboardingStore,
@@ -56,7 +57,12 @@ export interface ManagementState {
   claimExpiresAt: number;
   claimed: boolean;
   networkSettings?: { revision: number; networks: ProviderNetwork[] };
-  userChecks?: { revision: number; settings: UserCheckSettings };
+  userChecks?: {
+    revision: number;
+    settings: UserCheckSettings;
+    // Retain consent authority on relaxation; null preserves startup authority.
+    policyBinding?: (UserCheckSettings & { revision: number }) | null;
+  };
   execution?: Partial<Record<ProviderNetwork, NetworkExecutionSetting>>;
   identities: Record<string, ManagedIdentity>;
 }
@@ -326,10 +332,21 @@ export class ManagementService {
       };
     });
   }
-  currentUserChecks(): (UserCheckSettings & { revision: number }) | undefined {
+  currentUserChecks():
+    | (UserCheckSettings & {
+        revision: number;
+        policyBinding?: (UserCheckSettings & { revision: number }) | null;
+      })
+    | undefined {
     const current = this.snapshot()?.userChecks;
     return current
-      ? structuredClone({ ...current.settings, revision: current.revision })
+      ? structuredClone({
+          ...current.settings,
+          revision: current.revision,
+          ...('policyBinding' in current
+            ? { policyBinding: current.policyBinding }
+            : {}),
+        })
       : undefined;
   }
   private userChecks(state: ManagementState) {
@@ -408,16 +425,65 @@ export class ManagementService {
       if (Object.keys(commands).length >= 10000) conflict();
       if (input.expected_revision !== current.revision) conflict();
       const { available: _available, revision: _revision, ...before } = current;
-      if (JSON.stringify(before) !== JSON.stringify(settings)) {
-        state.userChecks = { revision: current.revision + 1, settings };
-        for (const request of Object.values(s.requests ?? {}))
-          request.denied = true;
-        for (const grant of Object.values(s.grants)) grant.state = 'revoked';
+      const sameSettings =
+        canonicalHash({
+          ...before,
+          required_fields: [...before.required_fields].sort(),
+        }) ===
+        canonicalHash({
+          ...settings,
+          required_fields: [...settings.required_fields].sort(),
+        });
+      if (!sameSettings) {
+        const tightensAuthority =
+          settings.required_fields.some(
+            (field) => !before.required_fields.includes(field),
+          ) ||
+          settings.verification_level !== before.verification_level ||
+          settings.max_identity_age_days < before.max_identity_age_days ||
+          settings.max_access_days < before.max_access_days;
+        const previousBinding = state.userChecks
+          ? state.userChecks.policyBinding === undefined
+            ? {
+                ...state.userChecks.settings,
+                revision: state.userChecks.revision,
+              }
+            : state.userChecks.policyBinding
+          : null;
+        state.userChecks = {
+          revision: current.revision + 1,
+          settings,
+          ...(!tightensAuthority ? { policyBinding: previousBinding } : {}),
+        };
+        let invalidatedRequests = 0;
+        let revokedGrants = 0;
+        if (tightensAuthority) {
+          for (const request of Object.values(s.requests ?? {})) {
+            if (!request.denied) invalidatedRequests++;
+            request.denied = true;
+          }
+          for (const grant of Object.values(s.grants)) {
+            if (grant.state !== 'revoked') revokedGrants++;
+            grant.state = 'revoked';
+          }
+        }
         s.audit.push({
           at: this.now(),
           event: 'user_checks_updated',
+          actor: hash(principal.clientId),
           resource: hash(state.installationId),
           revision: String(state.userChecks.revision),
+          impact: {
+            invalidatedRequests,
+            revokedGrants,
+            userChecks: { before, after: settings },
+            changedUserChecks: (
+              Object.keys(settings) as (keyof UserCheckSettings)[]
+            ).filter(
+              (key) =>
+                canonicalHash(before[key]) !== canonicalHash(settings[key]),
+            ),
+          },
         });
       }
       const result = this.userChecks(state);
@@ -876,19 +942,15 @@ export class ManagementService {
           )
             conflict();
         }
-        const grantAuthority = () =>
-          hash(
-            JSON.stringify([
-              identity.enabled,
-              identity.policy?.assertionTrust,
-              [...(identity.policy?.permissions ?? [])].sort(),
-            ]),
-          );
-        const tokenAuthority = () =>
-          hash(JSON.stringify([grantAuthority(), [...identity.scopes].sort()]));
+        const previousEnabled = identity.enabled;
+        const previousTrust = canonicalHash(
+          identity.policy?.assertionTrust ?? null,
+        );
+        const previousPermissions = [
+          ...(identity.policy?.permissions ?? defaultPermissions),
+        ];
+        const previousScopes = [...identity.scopes];
         const previousSharing = JSON.stringify(identity.policy?.walletSharing);
-        const previousGrantAuthority = grantAuthority(),
-          previousTokenAuthority = tokenAuthority();
         if (operation === 'rotate') {
           if (identity.federation) invalid();
           Object.assign(identity, credential);
@@ -1031,13 +1093,37 @@ export class ManagementService {
             }
           }
           if (identity.policy) identity.policy.name = identity.name;
-          if (tokenAuthority() !== previousTokenAuthority)
+          // Existing tokens retain their issued scopes; additions do not expand them.
+          if (
+            identity.enabled !== previousEnabled ||
+            canonicalHash(identity.policy?.assertionTrust ?? null) !==
+              previousTrust ||
+            previousScopes.some((scope) => !identity.scopes.includes(scope)) ||
+            previousPermissions.some(
+              (permission) =>
+                !(identity.policy?.permissions ?? defaultPermissions).includes(
+                  permission,
+                ),
+            )
+          )
             identity.credentialRevision++;
         }
-        const invalidatesGrants = grantAuthority() !== previousGrantAuthority;
+        const removedPermissions = previousPermissions.filter(
+          (permission) =>
+            !(identity.policy?.permissions ?? defaultPermissions).includes(
+              permission,
+            ),
+        );
+        const invalidatesGrants =
+          identity.enabled !== previousEnabled ||
+          canonicalHash(identity.policy?.assertionTrust ?? null) !==
+            previousTrust ||
+          removedPermissions.length > 0;
         const invalidatesSharing =
           invalidatesGrants ||
           previousSharing !== JSON.stringify(identity.policy?.walletSharing);
+        const invalidatedRequests = new Set<string>();
+        const revokedGrants = new Set<string>();
         if (invalidatesSharing) {
           for (const request of Object.values(s.requests ?? {})) {
             if (
@@ -1047,9 +1133,13 @@ export class ManagementService {
                 ]?.sourceSharing?.applicationId === identity.id) &&
               request.caller.issuer === this.issuer
             ) {
+              if (!request.denied) invalidatedRequests.add(request.id);
               request.denied = true;
-              if (request.grantId && s.grants[request.grantId])
+              if (request.grantId && s.grants[request.grantId]) {
+                if (s.grants[request.grantId].state !== 'revoked')
+                  revokedGrants.add(request.grantId);
                 s.grants[request.grantId].state = 'revoked';
+              }
             }
           }
         }
@@ -1058,8 +1148,10 @@ export class ManagementService {
             invalidatesGrants &&
             request.caller.clientId === identity.id &&
             request.caller.issuer === this.issuer
-          )
+          ) {
+            if (!request.denied) invalidatedRequests.add(request.id);
             request.denied = true;
+          }
         }
         identity.revision++;
         for (const grant of Object.values(s.grants))
@@ -1067,8 +1159,29 @@ export class ManagementService {
             invalidatesGrants &&
             grant.caller.clientId === identity.id &&
             grant.caller.issuer === this.issuer
-          )
+          ) {
+            if (grant.state !== 'revoked') revokedGrants.add(grant.id);
             grant.state = 'revoked';
+          }
+        s.audit.push({
+          at: this.now(),
+          event: 'management_authority_evaluated',
+          actor: hash(principal.clientId),
+          resource: hash(identity.id),
+          revision: String(identity.revision),
+          impact: {
+            invalidatedRequests: invalidatedRequests.size,
+            revokedGrants: revokedGrants.size,
+            removedPermissions,
+            trustChanged:
+              canonicalHash(identity.policy?.assertionTrust ?? null) !==
+              previousTrust,
+            enabledChanged: identity.enabled !== previousEnabled,
+            sharingChanged:
+              previousSharing !==
+              JSON.stringify(identity.policy?.walletSharing),
+          },
+        });
       }
       const result = structuredClone(publicIdentity(identity));
       commands[commandKey] = { hash: digest, result, at: this.now() };
