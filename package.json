@@ -136,7 +136,7 @@
     "prettier": "3.9.10",
     "secretlint": "13.0.7",
     "solc": "0.8.38",
-    "swagger-ui-dist": "5.33.3",
+    "swagger-ui-dist": "5.34.0",
     "tsx": "4.23.15",
     "typescript": "5.9.3",
     "viem": "2.57.11",
