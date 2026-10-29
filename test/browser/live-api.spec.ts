@@ -68,7 +68,16 @@ test('deployed Swagger executes same-origin HTTP and displays real success/auth/
   await expect(
     page.getByLabel('Browse requests by task', { exact: true }),
   ).toHaveValue('Wallet access');
-  await expect(page.locator('.opblock')).toHaveCount(6);
+  await expect(page.locator('.opblock')).toHaveCount(9);
+  for (const operation of [
+    'createAccountWithoutKyc',
+    'getAccountKyc',
+    'updateAccountKyc',
+  ]) {
+    await expect(
+      page.locator(`#operations-Wallet_access-${operation}`),
+    ).toBeVisible();
+  }
   await expect(page.locator('.opblock').first()).toHaveAttribute(
     'id',
     'operations-Wallet_access-getAccountAccessPolicy',
