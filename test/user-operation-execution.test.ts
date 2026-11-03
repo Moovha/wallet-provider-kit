@@ -929,6 +929,24 @@ it.each([
           (state) => state.supportedActions![plan.operationId],
         );
         expect(source).toMatchObject({ status: 'denied', nonceReleased: true });
+        await t.f.onboarding.store.transaction((state) => {
+          state.supportedActions![plan.operationId].nonceReleased = false;
+        });
+        t.f.config.acceptance.rpcUrls = ['https://replacement.example.test'];
+        t.f.config.acceptance.rpcVerification = 'single';
+        await t.restart();
+        const spy = vi.spyOn(t.ports.execution, 'refreshSettlement');
+        expect(await t.ports.driver.settleOnce()).toBe(true);
+        expect(spy).toHaveBeenCalledWith(plan.operationId);
+        expect(
+          await t.f.onboarding.store.transaction(
+            (state) => state.supportedActions![plan.operationId].nonceReleased,
+          ),
+        ).toBe(true);
+        expect(t.s.sends).toBe(1);
+        expect(t.f.state.signs).toBe(1);
+        now.mockReturnValue(Number(until + 30n) * 1000);
+        expect(await t.ports.driver.settleOnce()).toBe(false);
       } else {
         expect(latest?.observation.state).not.toBe('expired');
         const source = await t.f.onboarding.store.transaction(

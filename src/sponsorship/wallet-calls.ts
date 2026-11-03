@@ -822,10 +822,35 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
     const accountIds = new Set(
       this.execution.signing.executionBinding().accountIds,
     );
+    const expired = entries.filter(
+      (entry) =>
+        accountIds.has(entry.input.account_id) &&
+        entry.stage === 'expired' &&
+        entry.operationId,
+    );
+    if (expired.length) this.nextSettlementAt = Date.now() + 15000;
+    const unreleasedExpired = new Set(
+      expired.length
+        ? await this.actions.onboarding.store.transaction((state) =>
+            expired
+              .filter(
+                (entry) =>
+                  entry.stage === 'expired' &&
+                  entry.operationId &&
+                  !state.supportedActions?.[entry.operationId]?.nonceReleased &&
+                  state.userOperationExecutions?.[entry.operationId]
+                    ?.observation.state === 'expired' &&
+                  state.userOperationExecutions[entry.operationId].observation
+                    .expiry,
+              )
+              .map((entry) => entry.id),
+          )
+        : [],
+    );
     const included = entries.filter(
       (entry) =>
         accountIds.has(entry.input.account_id) &&
-        entry.stage === 'included' &&
+        (entry.stage === 'included' || unreleasedExpired.has(entry.id)) &&
         !this.lanes.has(entry.metadata.sender.toLowerCase()),
     );
     if (!included.length) return false;
