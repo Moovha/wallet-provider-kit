@@ -1,3 +1,10 @@
+import {
+  fiatMinimumOutput,
+  fiatPairDirection,
+  validUsdZarSnapshot,
+  usdZarAttribution,
+  type UsdZarFxReader,
+} from './usd-zar-fx.js';
 import { Interface, keccak256 } from 'ethers';
 import { WalletProviderError } from '../domain/signing.js';
 import type { UniswapXOrderReview } from './uniswapx-v3.js';
@@ -76,7 +83,7 @@ export function meanTickBounds(
  * The same canonical block supplies code, liquidity, spot and a 30-minute TWAP. */
 export async function assessSolverTwap(
   rpc: OrderRpc,
-  policy: SolverTwapPolicy,
+  policy: SolverPricePolicy,
   review: UniswapXOrderReview,
   snapshot: OrderSnapshot,
   now = Math.floor(Date.now() / 1000),
@@ -168,6 +175,78 @@ export async function assessSolverTwap(
       maximumLossBps: 200,
       twapTicks: ticks,
       minimumRequiredOutUnits: minimum.toString(),
+      minimumAmountOutUnits: review.minimumAmountOutUnits,
+    };
+  } catch {
+    throw new WalletProviderError('wallet_authorization_denied');
+  }
+}
+
+export interface SolverFxPolicy {
+  profile: 'solver-fiat-fx-v1';
+  source: 'exchangerate-api-open';
+  maximumLossBps: 1000;
+  cacheSeconds: 3600;
+  maximumRateAgeSeconds: 129600;
+}
+export type SolverPricePolicy = SolverTwapPolicy | SolverFxPolicy;
+export function validSolverPricePolicy(policy: SolverPricePolicy): boolean {
+  if (!policy) return false;
+  if (policy.profile === 'solver-fiat-fx-v1')
+    return (
+      policy.source === 'exchangerate-api-open' &&
+      policy.maximumLossBps === 1000 &&
+      policy.cacheSeconds === 3600 &&
+      policy.maximumRateAgeSeconds === 129600 &&
+      Object.keys(policy).length === 5
+    );
+  return (
+    policy.profile === 'solver-twap-benchmark-v1' &&
+    policy.lookbackSeconds === 1800 &&
+    policy.maximumLossBps === 200 &&
+    policy.maximumSpotDivergenceBps === 100 &&
+    /^0x[a-fA-F0-9]{40}$/.test(policy.pool?.address) &&
+    BigInt(policy.pool.address) !== 0n &&
+    /^0x[a-f0-9]{64}$/.test(policy.pool.codeHash)
+  );
+}
+/** Recomputed by the signer from the full input and the user's signed net floor.
+ * USD/ZAR is indicative fiat FX; nominal stablecoin pegs are explicit policy assumptions. */
+export async function assessSolverFx(
+  reader: Pick<UsdZarFxReader, 'get'>,
+  policy: SolverFxPolicy,
+  review: UniswapXOrderReview,
+  now: () => number = () => Math.floor(Date.now() / 1000),
+) {
+  try {
+    if (!validSolverPricePolicy(policy)) throw new Error();
+    const direction = fiatPairDirection(review.tokenIn, review.tokenOut);
+    const rate = await reader.get();
+    if (
+      !rate ||
+      !validUsdZarSnapshot(rate, now()) ||
+      !Number.isSafeInteger(review.deadline) ||
+      review.deadline <= now() ||
+      !/^[1-9][0-9]{0,38}$/.test(review.minimumAmountOutUnits)
+    )
+      throw new Error();
+    const amounts = fiatMinimumOutput(
+      review.amountInUnits,
+      direction,
+      rate,
+      1000,
+    );
+    if (
+      BigInt(review.minimumAmountOutUnits) <
+      BigInt(amounts.minimumRequiredOutUnits)
+    )
+      throw new Error();
+    return {
+      profile: policy.profile,
+      maximumLossBps: 1000,
+      reference: rate,
+      attribution: usdZarAttribution,
+      ...amounts,
       minimumAmountOutUnits: review.minimumAmountOutUnits,
     };
   } catch {

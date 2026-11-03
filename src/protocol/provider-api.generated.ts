@@ -5109,6 +5109,17 @@ export interface operations {
                                 maximumLossBps: 200;
                                 /** @enum {unknown} */
                                 maximumSpotDivergenceBps: 100;
+                            } | {
+                                /** @enum {unknown} */
+                                profile: "solver-fiat-fx-v1";
+                                /** @enum {unknown} */
+                                source: "exchangerate-api-open";
+                                /** @enum {unknown} */
+                                maximumLossBps: 1000;
+                                /** @enum {unknown} */
+                                cacheSeconds: 3600;
+                                /** @enum {unknown} */
+                                maximumRateAgeSeconds: 129600;
                             };
                         };
                         contract_call_terms?: {

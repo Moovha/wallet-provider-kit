@@ -1,3 +1,5 @@
+import { validSolverPricePolicy } from './price-policy.js';
+import { fiatPairDirection } from './usd-zar-fx.js';
 import { WalletProviderError } from '../domain/signing.js';
 import {
   assessUniswapXV3Outputs,
@@ -149,7 +151,7 @@ export function hashBaseUniswapXV3Order(
 
 export interface UniswapXOrderPolicy {
   profile: 'uniswapx-v3-order-v1';
-  pricePolicy: import('./price-policy.js').SolverTwapPolicy;
+  pricePolicy: import('./price-policy.js').SolverPricePolicy;
   maximumValiditySeconds: number;
   reactorCodeHash: string;
   cosigner: string;
@@ -180,13 +182,7 @@ export function validateUniswapXOrderPolicy(policy: UniswapXOrderPolicy): void {
   try {
     if (
       policy.profile !== 'uniswapx-v3-order-v1' ||
-      policy.pricePolicy?.profile !== 'solver-twap-benchmark-v1' ||
-      policy.pricePolicy.lookbackSeconds !== 1800 ||
-      policy.pricePolicy.maximumLossBps !== 200 ||
-      policy.pricePolicy.maximumSpotDivergenceBps !== 100 ||
-      !ethers.isAddress(policy.pricePolicy.pool.address) ||
-      BigInt(policy.pricePolicy.pool.address) === 0n ||
-      !/^0x[a-f0-9]{64}$/.test(policy.pricePolicy.pool.codeHash) ||
+      !validSolverPricePolicy(policy.pricePolicy) ||
       !Number.isInteger(policy.maximumValiditySeconds) ||
       policy.maximumValiditySeconds < 30 ||
       policy.maximumValiditySeconds > 600 ||
@@ -201,6 +197,8 @@ export function validateUniswapXOrderPolicy(policy: UniswapXOrderPolicy): void {
       throw new Error();
     const routes = new Set<string>();
     for (const route of policy.routes) {
+      if (policy.pricePolicy.profile === 'solver-fiat-fx-v1')
+        fiatPairDirection(route.tokenIn.address, route.tokenOut.address);
       for (const token of [route.tokenIn, route.tokenOut]) {
         if (
           !ethers.isAddress(token.address) ||

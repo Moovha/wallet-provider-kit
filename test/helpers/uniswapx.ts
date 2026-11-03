@@ -97,8 +97,34 @@ export function orderFixture() {
   return { order, policy, encode, quote, safe: golden.safe };
 }
 
-export async function serviceFixture(orderPermission = true) {
+export async function serviceFixture(orderPermission = true, fx = false) {
   const f = orderFixture();
+  if (fx) {
+    f.policy.pricePolicy = {
+      profile: 'solver-fiat-fx-v1',
+      source: 'exchangerate-api-open',
+      maximumLossBps: 1000,
+      cacheSeconds: 3600,
+      maximumRateAgeSeconds: 129600,
+    };
+    f.order.baseOutputs.forEach((output) => {
+      output.token = '0xb755506531786C8aC63B756BaB1ac387bACB0C04';
+      output.startAmount = (
+        BigInt(output.startAmount) *
+        17n *
+        10n ** 12n
+      ).toString();
+      output.minAmount = (
+        BigInt(output.minAmount) *
+        17n *
+        10n ** 12n
+      ).toString();
+      output.curve.relativeAmounts = output.curve.relativeAmounts.map(
+        (amount) => (BigInt(amount) * 17n * 10n ** 12n).toString(),
+      ) as never;
+    });
+    f.policy.routes[0].tokenOut.address = f.order.baseOutputs[0].token;
+  }
   const directory = await mkdtemp(join(tmpdir(), 'wpk-orders-'));
   let db = openProviderDatabase({ directory, initialize: true });
   const owner = Wallet.createRandom();
@@ -269,8 +295,23 @@ export async function serviceFixture(orderPermission = true) {
     nonce: 0n,
     safeBlock: 98,
     signs: 0,
+    fxFails: false,
+    poolReads: 0,
   };
   const send = vi.fn<typeof fetch>(async (url, init) => {
+    if (String(url) === 'https://open.er-api.com/v6/latest/USD') {
+      if (state.fxFails) throw new Error('offline');
+      const now = Math.floor(Date.now() / 1000);
+      return new Response(
+        JSON.stringify({
+          result: 'success',
+          base_code: 'USD',
+          rates: { USD: 1, ZAR: 17 },
+          time_last_update_unix: now - 100,
+          time_next_update_unix: now + 86300,
+        }),
+      );
+    }
     if (String(url).startsWith('https://trade-api.gateway.uniswap.org/')) {
       state.posts++;
       if (state.postFails) throw new Error('offline lost response');
@@ -318,6 +359,8 @@ export async function serviceFixture(orderPermission = true) {
       const abi = interfaces.find((abi) => abi.getFunction(data.slice(0, 10)));
       if (!abi) throw new Error('unexpected function');
       const name = abi.getFunction(data.slice(0, 10))!.name;
+      if (['token0', 'token1', 'liquidity', 'slot0', 'observe'].includes(name))
+        state.poolReads++;
       const values: Record<string, unknown[]> = {
         VERSION: ['1.4.1'],
         masterCopy: [singleton.address],

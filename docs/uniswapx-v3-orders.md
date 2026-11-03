@@ -23,7 +23,7 @@ shape. Keep the Trading API key in the referenced private environment variable.
 Do not put a key in JSON, an example, a request body or a repository.
 
 The policy pins the reactor runtime, cosigner, input/output token runtimes and any
-proxy implementation, benchmark pool, fee recipient, fee rate, validity and gross
+proxy implementation, price profile, fee recipient, fee rate, validity and gross
 input ceilings. Each route has both `maximumInputUnits` and
 `maximumLifetimeInputUnits`. The lifetime reservation is per application, account
 and input token. A timeout, cancellation or expiry does not restore it. Increasing
@@ -75,6 +75,28 @@ copies retained by the order service and its signing journal use authenticated
 encryption under the existing private credential key.
 
 ## Price review
+
+`solver-fiat-fx-v1` supports only the fixed Base ZARP/USDC token pair. It obtains
+USD/ZAR from the public ExchangeRate-API feed and requires the decoded **net user
+minimum after fees and auction decay** to be at least 90% of the full input's
+nominal fiat value. Integer base-unit arithmetic rounds the required minimum up.
+ZARP/ZAR and USDC/USD are explicit nominal peg assumptions, not redemption or
+depeg guarantees. This profile performs no AMM pool price reads.
+
+The fixed source is `https://open.er-api.com/v6/latest/USD`. Responses are cached
+for at most one hour; source observations must be less than 36 hours old. Future
+or missing timestamps, invalid rates, unavailable data, responses above 64 KiB and
+requests exceeding five seconds deny admission. There is no static or stale-rate
+fallback. The provider retrieves the reference independently; applications cannot
+supply a rate or increase the 10% loss budget. Changing the profile changes the
+order policy revision and requires fresh owner consent; existing call grants and
+retained-order recovery remain independent.
+
+[Rates By Exchange Rate API](https://www.exchangerate-api.com).
+The [open feed](https://www.exchangerate-api.com/docs/free) updates daily; this is
+an indicative fiat-value floor, not a real-time market execution guarantee.
+
+The earlier profile remains supported for existing configurations and recovery:
 
 `solver-twap-benchmark-v1` uses a pinned pool's spot and 30-minute time-weighted
 average price from one canonical block no older than 30 seconds. It requires
