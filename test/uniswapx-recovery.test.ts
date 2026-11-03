@@ -23,9 +23,19 @@ const permit = new Interface([
 ]);
 const tx = '0x' + 'ef'.repeat(32),
   filler = '0x6666666666666666666666666666666666666666';
-function fixture() {
+function fixture(recipient?: string) {
   const f = orderFixture();
-  const review = reviewUniswapXV3Order(f.encode(), f.safe, f.policy);
+  if (recipient) {
+    f.policy.recipientPolicy = 'bound-transfer';
+    f.order.baseOutputs[0].recipient = recipient;
+  }
+  const review = reviewUniswapXV3Order(
+    f.encode(),
+    f.safe,
+    f.policy,
+    undefined,
+    recipient,
+  );
   const event = (
     abi: Interface,
     name: string,
@@ -57,7 +67,12 @@ function fixture() {
         [f.safe, filler, review.amountInUnits],
         review.tokenIn,
       ),
-      event(token, 'Transfer', [filler, f.safe, '990000'], review.tokenOut),
+      event(
+        token,
+        'Transfer',
+        [filler, recipient ?? f.safe, '990000'],
+        review.tokenOut,
+      ),
       event(
         token,
         'Transfer',
@@ -247,4 +262,72 @@ describe('receipt effects and read-only fill recovery', () => {
       ),
     ).rejects.toThrow('wallet_provider_unavailable');
   });
+});
+
+it('proves direct delivery to the signed recipient and rejects self delivery, diversion or recipient debits', async () => {
+  const recipient = '0x7777777777777777777777777777777777777777';
+  const f = fixture(recipient);
+  const review = f.review;
+  const event = (from: string, to: string, amount: string) => ({
+    address: review.tokenOut,
+    ...token.encodeEventLog(token.getEvent('Transfer')!, [from, to, amount]),
+    transactionHash: tx,
+    blockHash,
+    blockNumber: '0x64',
+  });
+  const receipt = structuredClone(f.receipt);
+  receipt.logs[1] = event(filler, recipient, '990000');
+  expect(verifyOrderFillReceipt(review, receipt)?.outputAmountUnits).toBe(
+    '990000',
+  );
+  const selfDelivered = structuredClone(receipt);
+  selfDelivered.logs[1] = event(filler, review.swapper, '990000');
+  expect(verifyOrderFillReceipt(review, selfDelivered)).toBeNull();
+  expect(
+    await recoverUniswapXFill(f.rpc, review, 100, genesisHash),
+  ).toMatchObject({ state: 'filled' });
+  for (const extra of [
+    event(recipient, filler, '1'),
+    event(filler, review.swapper, '1'),
+  ]) {
+    const invalid = structuredClone(receipt);
+    invalid.logs.splice(2, 0, extra);
+    expect(verifyOrderFillReceipt(review, invalid)).toBeNull();
+  }
+  expect(
+    verifyOrderFillReceipt({ ...review, recipient: filler }, receipt),
+  ).toBeNull();
+});
+it('attributes a shared recipient to the target fill window in a batched settlement', () => {
+  const recipient = '0x7777777777777777777777777777777777777777';
+  const value = fixture(recipient);
+  const before = [
+    value.event(
+      token,
+      'Transfer',
+      [filler, recipient, '5000000'],
+      value.review.tokenOut,
+    ),
+    value.event(
+      token,
+      'Transfer',
+      [filler, value.review.fee.recipient, '50000'],
+      value.review.tokenOut,
+    ),
+    value.event(
+      reactor,
+      'Fill',
+      [
+        '0x' + '12'.repeat(32),
+        filler,
+        '0x8888888888888888888888888888888888888888',
+        2,
+      ],
+      baseDutchV3Reactor,
+    ),
+  ];
+  value.receipt.logs.splice(1, 0, ...before);
+  expect(
+    verifyOrderFillReceipt(value.review, value.receipt)?.outputAmountUnits,
+  ).toBe('990000');
 });

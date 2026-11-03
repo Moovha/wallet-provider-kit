@@ -548,5 +548,13 @@
     "No helper RPC, migration, DDL or probe row written",
     "No relational database, RLS policy or SQL RPC exists in this SQLite profile"
   ],
-  "schemaFingerprint": "4891b369b46afbf62f685e9f6586299fc26572e10af8d803d4e0e3e4917aad74"
+  "schemaFingerprint": "4891b369b46afbf62f685e9f6586299fc26572e10af8d803d4e0e3e4917aad74",
+  "recipientBindingReview": {
+    "date": "2026-11-03",
+    "method": "Fresh read-only sqlite_master, table_info, foreign_key_list and index_list inspection",
+    "affectedTables": ["onboarding_records", "admissions", "attempts"],
+    "result": "Existing JSON-valid journal columns and current keys/indexes support an optional recipient inside retained order review; no DDL, helper RPC, row write or migration required.",
+    "triggers": "No triggers on the inspected tables",
+    "rls": "SQLite has no PostgreSQL RLS policies"
+  }
 }

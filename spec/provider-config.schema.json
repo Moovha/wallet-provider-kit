@@ -1948,6 +1948,10 @@
                   }
                 }
               ]
+            },
+            "recipientPolicy": {
+              "enum": ["self", "bound-transfer"],
+              "description": "Defaults to self. bound-transfer permits an explicit recipient matching the signed output and requires fresh order consent."
             }
           }
         },

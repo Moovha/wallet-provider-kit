@@ -85,6 +85,7 @@ export const uniswapXOrderReceiptSchema = {
       properties: {
         profile: { const: 'uniswapx-v3-order-v1' },
         swapper: address,
+        recipient: address,
         nonce: { type: 'string', pattern: '^(0|[1-9][0-9]{0,77})$' },
         tokenIn: address,
         tokenOut: address,
@@ -178,7 +179,7 @@ export async function registerUniswapXOrderRoutes(
   );
   app.post<{
     Params: { accountId: string };
-    Body: { quote: Record<string, unknown> };
+    Body: { quote: Record<string, unknown>; recipient?: string };
   }>(
     '/v1/accounts/:accountId/uniswapx-orders',
     {
@@ -187,7 +188,7 @@ export async function registerUniswapXOrderRoutes(
         operationId: 'submitUniswapXV3Order',
         security: [{ accessToken: [] }],
         description:
-          'Submit one bounded Base UniswapX V3 self-swap under an explicit orders:authorize grant. The provider decodes and validates the witness, reviews its net minimum against the canonical spot/TWAP policy, journals exact signing and posting, and verifies receipt effects before success. This is not a general signing endpoint. Retry the same idempotency key and body; unknown outcomes reconcile without another POST.',
+          'Submit one bounded Base UniswapX V3 order under an explicit orders:authorize grant. A bound-transfer policy permits an explicit recipient matching the signed output; omitted recipients remain self-swaps. The provider decodes and validates the witness, reviews its net minimum against the configured price policy, journals exact signing and posting, and verifies receipt effects before success. This is not a general signing endpoint. Retry the same idempotency key and body; unknown outcomes reconcile without another POST.',
         params: {
           type: 'object',
           additionalProperties: false,
@@ -204,6 +205,7 @@ export async function registerUniswapXOrderRoutes(
           additionalProperties: false,
           required: ['quote'],
           properties: {
+            recipient: address,
             quote: {
               type: 'object',
               required: ['encodedOrder', 'orderId', 'orderInfo'],
@@ -241,6 +243,7 @@ export async function registerUniswapXOrderRoutes(
         },
         request.params.accountId,
         request.body.quote,
+        request.body.recipient,
       );
       return reply.code(202).header('cache-control', 'no-store').send(result);
     },

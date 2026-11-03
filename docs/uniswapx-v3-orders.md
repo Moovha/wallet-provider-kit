@@ -1,6 +1,6 @@
 # Submit a bounded Base UniswapX order
 
-The optional order service signs one exact UniswapX V3 self-swap for a deployed
+The optional order service signs one exact UniswapX V3 swap or recipient-bound transfer for a deployed
 personal Safe 1.4.1 wallet. It requires one current owner, threshold one, the pinned
 Safe4337 fallback handler, an explicit `orders:authorize` grant and a fresh price
 review. Applications receive an order receipt; they never receive the signature.
@@ -44,11 +44,42 @@ authorize orders. Keep this new grant separately from any call grant. OAuth
 `wallet:actions` and `wallet:sign` scopes are necessary but do not grant spending
 authority.
 
+## Deliver directly to a transfer recipient
+
+Omitting `policy.recipientPolicy`, or setting it to `self`, keeps the existing
+self-swap restriction. To permit direct transfers, set it to `bound-transfer` in
+the operator's reviewed policy. This changes the order policy revision and
+requires fresh owner consent; existing call or self-swap grants do not gain
+transfer authority.
+
+Request the quote with the sender's Safe as `swapper` and the intended destination
+as `recipient`. Submit `{ "quote": <unsigned quote>, "recipient": "0x..." }`
+to the order endpoint. The separately supplied address must match the decoded
+signed output. The provider binds that destination into its immutable request,
+financial approval and signature; changing it under the same idempotency key is
+a conflict. Zero, fee, token and settlement infrastructure destinations are
+rejected. Input limits and lifetime reservations remain per sending account and
+input token, shared across all destinations.
+
+The filler pays the signed net output directly to that recipient and the
+configured fee output to the fee recipient in the fill transaction. No follow-up
+transfer or new settlement contract is used. Treat the transfer as pending until
+canonical recovery proves the sender's exact debit, recipient's output and fee.
+Receipt accounting rejects output redirected to the sender, a different
+recipient, the filler itself, or a receipt that debits the recipient's output.
+Order acceptance alone is not delivery. Existing records without a recipient
+field continue to recover as self-swaps.
+
+This capability is opt-in and experimental. A live third-party fill and
+application recipient/history integration must be verified before enabling it
+for customer transfers. It does not enable the connected application's route
+selection or change an existing deployment by itself.
+
 ## Submit and follow an order
 
-1. Obtain an unsigned `DUTCH_V3` exact-input quote for the same Safe and a configured
+1. Obtain an unsigned `DUTCH_V3` exact-input quote for the same sending Safe, intended output recipient and a configured
    route. Include the configured fee as an output-token integrator fee. The entire
-   input is the gross spending budget; the user receives the decoded net output.
+   input is the gross spending budget; the recipient receives the decoded net output.
 2. Send `{ "quote": <unsigned quote> }` to
    `POST /v1/accounts/{accountId}/uniswapx-orders`, with the new `Wallet-Grant-Id`
    and a UUID `Idempotency-Key`. The provider independently decodes the canonical
@@ -77,7 +108,7 @@ encryption under the existing private credential key.
 ## Price review
 
 `solver-fiat-fx-v1` supports only the fixed Base ZARP/USDC token pair. It obtains
-USD/ZAR from the public ExchangeRate-API feed and requires the decoded **net user
+USD/ZAR from the public ExchangeRate-API feed and requires the decoded **net recipient
 minimum after fees and auction decay** to be at least 90% of the full input's
 nominal fiat value. Integer base-unit arithmetic rounds the required minimum up.
 ZARP/ZAR and USDC/USD are explicit nominal peg assumptions, not redemption or
@@ -123,7 +154,7 @@ returns the retained order and performs read-only reconciliation.
 
 The worker scans the bounded signed validity interval even after a long outage.
 Success requires a canonical Base `safe` receipt with the pinned reactor's exact
-Fill hash, swapper and nonce, exact gross input debit, user output and proportional
+Fill hash, swapper and nonce, exact gross input debit, recipient output and proportional
 fee transfers. Ambiguous batch effects, unexplained consumed nonces or malformed
 receipts become `needs_review`. API status and absent lookup results do not prove
 success or failure. `chain_finalized` is separate from Base safe settlement; the

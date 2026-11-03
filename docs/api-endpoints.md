@@ -244,7 +244,7 @@ Request approved contract calls, discover wallet call capabilities, or check a r
 
 ### Submit a bounded UniswapX solver order
 
-Authorize one exact Base UniswapX V3 self-swap with its disclosed output-token fee and net minimum.
+Authorize one exact Base UniswapX V3 swap or recipient-bound transfer with its disclosed output-token fee and net minimum.
 
 **Who uses it:** Application developer.
 

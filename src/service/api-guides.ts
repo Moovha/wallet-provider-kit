@@ -188,13 +188,13 @@ export const operationGuides: Record<string, OperationGuide> = {
     group: 'Transactions',
     audience: 'Application developer',
     purpose:
-      'Authorize one exact Base UniswapX V3 self-swap with its disclosed output-token fee and net minimum.',
+      'Authorize one exact Base UniswapX V3 swap or recipient-bound transfer with its disclosed output-token fee and net minimum.',
     whenToUse:
       'Use only after the provider configures the optional order policy and the owner grants separate order permission.',
     scope: 'wallet:sign',
     permission: 'orders:authorize',
     prerequisite:
-      'Use wallet:actions and wallet:sign scopes, current owner identity and explicit orders:authorize consent bound to order_policy_revision. Submit an unsigned canonical quote and retain the UUID idempotency key. Permit2 allowance uses a separate approved wallet call.',
+      'Use wallet:actions and wallet:sign scopes, current owner identity and explicit orders:authorize consent bound to order_policy_revision. Submit an unsigned canonical quote and retain the UUID idempotency key. Third-party delivery requires bound-transfer policy, fresh consent and an explicit matching recipient. Permit2 allowance uses a separate approved wallet call.',
     success:
       '202: a durable order receipt. Acceptance is pending settlement. Retry the same key and body; never replace an unknown submission. Read the order until canonical receipt effects establish fill, cancellation or expiry.',
   },

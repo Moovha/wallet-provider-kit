@@ -8,8 +8,8 @@ afterEach(async () => {
   for (const app of apps.splice(0)) await app.close();
   for (const f of fixtures.splice(0)) await f.close();
 });
-async function fixture(permission = true) {
-  const f = await serviceFixture(permission);
+async function fixture(permission = true, transfers = false) {
+  const f = await serviceFixture(permission, false, transfers);
   fixtures.push(f);
   const app = await createServer({
     uniswapXOrders: f.service,
@@ -89,4 +89,19 @@ it('exposes disabled endpoints without making them executable', async () => {
     },
   });
   expect(r.statusCode).toBe(503);
+});
+
+it('accepts an explicit bound recipient only under the transfer-enabled policy', async () => {
+  const f = await fixture(true, true);
+  const recipient = '0x7777777777777777777777777777777777777777';
+  f.order.baseOutputs[0].recipient = recipient;
+  const response = await f.app.inject({
+    method: 'POST',
+    url: `/v1/accounts/${f.accountId}/uniswapx-orders`,
+    headers: { 'idempotency-key': f.context.idempotencyKey },
+    payload: { quote: f.quote(), recipient },
+  });
+  expect(response.statusCode).toBe(202);
+  expect(response.json().review.recipient).toBe(recipient);
+  expect(response.json().review.swapper).toBe(f.safe);
 });

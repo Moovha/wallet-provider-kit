@@ -97,8 +97,13 @@ export function orderFixture() {
   return { order, policy, encode, quote, safe: golden.safe };
 }
 
-export async function serviceFixture(orderPermission = true, fx = false) {
+export async function serviceFixture(
+  orderPermission = true,
+  fx = false,
+  transfers = false,
+) {
   const f = orderFixture();
+  if (transfers) f.policy.recipientPolicy = 'bound-transfer';
   if (fx) {
     f.policy.pricePolicy = {
       profile: 'solver-fiat-fx-v1',

@@ -99,11 +99,15 @@ export function verifyOrderFillReceipt(
       same(args.filler, review.swapper)
     )
       throw new Error();
+    const recipient = review.recipient ?? review.swapper;
+    if (same(recipient, args.filler)) throw new Error();
     const preceding =
       fills.filter((fill) => fill.index < target.index).at(-1)?.index ?? -1;
     let inputDebit = 0n,
       inputCredit = 0n,
       outputDebit = 0n,
+      senderOutputDebit = 0n,
+      senderOutputCredit = 0n,
       outputCredit = 0n,
       feeCredit = 0n;
     for (const [index, log] of receipt.logs.entries()) {
@@ -124,9 +128,13 @@ export function verifyOrderFillReceipt(
         }
         if (same(to, review.swapper)) inputCredit += value;
       } else {
-        if (same(from, review.swapper)) outputDebit += value;
+        if (same(from, recipient)) outputDebit += value;
+        if (!same(recipient, review.swapper)) {
+          if (same(from, review.swapper)) senderOutputDebit += value;
+          if (same(to, review.swapper)) senderOutputCredit += value;
+        }
         if (index > preceding && index < target.index) {
-          if (same(to, review.swapper)) {
+          if (same(to, recipient)) {
             if (!same(from, args.filler)) throw new Error();
             outputCredit += value;
           }
@@ -141,6 +149,8 @@ export function verifyOrderFillReceipt(
       inputDebit !== BigInt(review.amountInUnits) ||
       inputCredit !== 0n ||
       outputDebit !== 0n ||
+      senderOutputDebit !== 0n ||
+      senderOutputCredit !== 0n ||
       outputCredit < BigInt(review.minimumAmountOutUnits) ||
       feeCredit < BigInt(review.fee.minimumAmountUnits)
     )

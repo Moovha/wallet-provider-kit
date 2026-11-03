@@ -151,6 +151,8 @@ export function hashBaseUniswapXV3Order(
 
 export interface UniswapXOrderPolicy {
   profile: 'uniswapx-v3-order-v1';
+  /** Omitted policies authorize self-swaps only. Enabling transfers changes consent revision. */
+  recipientPolicy?: 'self' | 'bound-transfer';
   pricePolicy: import('./price-policy.js').SolverPricePolicy;
   maximumValiditySeconds: number;
   reactorCodeHash: string;
@@ -166,6 +168,8 @@ export interface UniswapXOrderPolicy {
 export interface UniswapXOrderReview extends UniswapXV3Digests {
   profile: 'uniswapx-v3-order-v1';
   swapper: string;
+  /** Omitted only on legacy/self-swap records; their recipient is the swapper. */
+  recipient?: string;
   nonce: string;
   tokenIn: string;
   tokenOut: string;
@@ -182,6 +186,8 @@ export function validateUniswapXOrderPolicy(policy: UniswapXOrderPolicy): void {
   try {
     if (
       policy.profile !== 'uniswapx-v3-order-v1' ||
+      (policy.recipientPolicy !== undefined &&
+        !['self', 'bound-transfer'].includes(policy.recipientPolicy)) ||
       !validSolverPricePolicy(policy.pricePolicy) ||
       !Number.isInteger(policy.maximumValiditySeconds) ||
       policy.maximumValiditySeconds < 30 ||
@@ -244,9 +250,22 @@ export function reviewUniswapXV3Order(
   safe: string,
   policy: UniswapXOrderPolicy,
   now = Math.floor(Date.now() / 1000),
+  recipient?: string,
 ): UniswapXOrderReview {
   try {
     validateUniswapXOrderPolicy(policy);
+    const destination = recipient ?? safe;
+    if (
+      !ethers.isAddress(destination) ||
+      BigInt(destination) === 0n ||
+      sameAddress(policy.fee.recipient, safe) ||
+      (!sameAddress(destination, safe) &&
+        policy.recipientPolicy !== 'bound-transfer') ||
+      [baseDutchV3Reactor, uniswapXPermit2].some((address) =>
+        sameAddress(destination, address),
+      )
+    )
+      throw new Error();
     const digests = hashBaseUniswapXV3Order(encodedOrder, safe);
     const [order] = ethers.AbiCoder.defaultAbiCoder().decode(
       [dutchV3OrderAbi],
@@ -263,6 +282,9 @@ export function reviewUniswapXV3Order(
     const deadline = Number(order.info.deadline);
     if (
       !route ||
+      [route.tokenIn.address, route.tokenOut.address].some((address) =>
+        sameAddress(destination, address),
+      ) ||
       !Number.isSafeInteger(deadline) ||
       deadline <= now ||
       deadline > now + policy.maximumValiditySeconds ||
@@ -287,7 +309,7 @@ export function reviewUniswapXV3Order(
       outputs: order.baseOutputs,
       cosignerOutputAmounts: order.baseOutputs.map(() => 0n),
       tokenOut: route.tokenOut.address,
-      recipient: safe,
+      recipient: destination,
       feePolicy: policy.fee,
     });
     if (!economics.outputFee) throw new Error();
@@ -295,6 +317,9 @@ export function reviewUniswapXV3Order(
       ...digests,
       profile: 'uniswapx-v3-order-v1',
       swapper: ethers.getAddress(safe),
+      ...(recipient !== undefined
+        ? { recipient: ethers.getAddress(destination) }
+        : {}),
       nonce: order.info.nonce.toString(),
       tokenIn: ethers.getAddress(input.token),
       tokenOut: ethers.getAddress(route.tokenOut.address),

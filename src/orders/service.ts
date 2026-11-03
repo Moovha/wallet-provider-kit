@@ -2,6 +2,8 @@ import { UsdZarFxReader } from './usd-zar-fx.js';
 import { randomUUID } from 'node:crypto';
 import {
   Interface,
+  getAddress,
+  isAddress,
   TypedDataEncoder,
   ZeroAddress,
   keccak256,
@@ -77,6 +79,20 @@ const permitAbi = new Interface([
 const same = (left: string, right: string) =>
   left.toLowerCase() === right.toLowerCase();
 const namespace = 'uniswapx-signing-v1';
+function orderRequestHash(
+  accountId: string,
+  quote: Record<string, unknown>,
+  revision: string,
+  recipient?: string,
+) {
+  return fingerprint([
+    accountId,
+    quote,
+    revision,
+    ...(recipient !== undefined ? [recipient] : []),
+  ]);
+}
+
 function walletAuthorityHash(wallet: SafeWalletAccount) {
   return fingerprint([
     wallet.accountId,
@@ -515,15 +531,18 @@ export class UniswapXOrderService {
                 String(record.plan.quote.encodedOrder),
                 wallet.binding.address,
                 this.policy,
+                undefined,
+                record.plan.review.recipient,
               ),
             ) !== fingerprint(record.plan.review) ||
             record.plan.review.safeMessageDigest !==
               approval.action.payload_hash ||
-            fingerprint([
+            orderRequestHash(
               record.plan.accountId,
               record.plan.quote,
               this.policyRevision,
-            ]) !== record.plan.requestHash ||
+              record.plan.review.recipient,
+            ) !== record.plan.requestHash ||
             approval.action.plan_hash !== '0x' + record.plan.requestHash
           )
             deny();
@@ -557,6 +576,7 @@ export class UniswapXOrderService {
     context: AuthorityContext,
     accountId: string,
     input: Record<string, unknown>,
+    recipient?: string,
   ) {
     context = structuredClone(context);
     input = structuredClone(input);
@@ -567,6 +587,11 @@ export class UniswapXOrderService {
       accountId,
       (_state, _grant, wallet) => structuredClone(wallet),
     );
+    if (recipient !== undefined) {
+      if (!isAddress(recipient) || same(recipient, ZeroAddress))
+        throw new WalletProviderError('wallet_provider_input');
+      recipient = getAddress(recipient);
+    }
     const quote = this.quote(input);
     const key = fingerprint([
       'uniswapx-order',
@@ -575,7 +600,12 @@ export class UniswapXOrderService {
       context.principal.subject,
       context.idempotencyKey,
     ]);
-    const requestHash = fingerprint([accountId, quote, this.policyRevision]);
+    const requestHash = orderRequestHash(
+      accountId,
+      quote,
+      this.policyRevision,
+      recipient,
+    );
     let record = await this.current(context.principal, accountId, (state) => {
       const entry = state.idempotency[key];
       if (!entry) return undefined;
@@ -601,6 +631,8 @@ export class UniswapXOrderService {
       String(quote.encodedOrder),
       wallet.binding.address,
       this.policy,
+      undefined,
+      recipient,
     );
     if (quote.orderId !== review.witnessHash)
       throw new WalletProviderError('wallet_provider_input');
@@ -806,6 +838,8 @@ export class UniswapXOrderService {
           String(record.plan.quote.encodedOrder),
           record.plan.review.swapper,
           this.policy,
+          undefined,
+          record.plan.review.recipient,
         ),
       ) !== fingerprint(record.plan.review)
     )

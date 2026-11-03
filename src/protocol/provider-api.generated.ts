@@ -802,17 +802,17 @@ export interface paths {
         put?: never;
         /**
          * Submit a bounded UniswapX solver order
-         * @description **Why this exists:** Authorize one exact Base UniswapX V3 self-swap with its disclosed output-token fee and net minimum.
+         * @description **Why this exists:** Authorize one exact Base UniswapX V3 swap or recipient-bound transfer with its disclosed output-token fee and net minimum.
          *
          *     **Who uses it:** Application developer.
          *
          *     **When you need it:** Use only after the provider configures the optional order policy and the owner grants separate order permission.
          *
-         *     **Before you start:** Use wallet:actions and wallet:sign scopes, current owner identity and explicit orders:authorize consent bound to order_policy_revision. Submit an unsigned canonical quote and retain the UUID idempotency key. Permit2 allowance uses a separate approved wallet call.
+         *     **Before you start:** Use wallet:actions and wallet:sign scopes, current owner identity and explicit orders:authorize consent bound to order_policy_revision. Submit an unsigned canonical quote and retain the UUID idempotency key. Third-party delivery requires bound-transfer policy, fresh consent and an explicit matching recipient. Permit2 allowance uses a separate approved wallet call.
          *
          *     **Result and next step:** 202: a durable order receipt. Acceptance is pending settlement. Retry the same key and body; never replace an unknown submission. Read the order until canonical receipt effects establish fill, cancellation or expiry.
          *
-         *     **Request details:** Submit one bounded Base UniswapX V3 self-swap under an explicit orders:authorize grant. The provider decodes and validates the witness, reviews its net minimum against the canonical spot/TWAP policy, journals exact signing and posting, and verifies receipt effects before success. This is not a general signing endpoint. Retry the same idempotency key and body; unknown outcomes reconcile without another POST.
+         *     **Request details:** Submit one bounded Base UniswapX V3 order under an explicit orders:authorize grant. A bound-transfer policy permits an explicit recipient matching the signed output; omitted recipients remain self-swaps. The provider decodes and validates the witness, reviews its net minimum against the configured price policy, journals exact signing and posting, and verifies receipt effects before success. This is not a general signing endpoint. Retry the same idempotency key and body; unknown outcomes reconcile without another POST.
          */
         post: operations["submitUniswapXV3Order"];
         delete?: never;
@@ -5121,6 +5121,11 @@ export interface operations {
                                 /** @enum {unknown} */
                                 maximumRateAgeSeconds: 129600;
                             };
+                            /**
+                             * @description Defaults to self. bound-transfer permits an explicit recipient matching the signed output and requires fresh order consent.
+                             * @enum {unknown}
+                             */
+                            recipientPolicy?: "self" | "bound-transfer";
                         };
                         contract_call_terms?: {
                             policy: {
@@ -7306,6 +7311,7 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
+                    recipient?: string;
                     quote: {
                         encodedOrder: string;
                         orderId: string;
@@ -7348,6 +7354,7 @@ export interface operations {
                             /** @enum {unknown} */
                             profile: "uniswapx-v3-order-v1";
                             swapper: string;
+                            recipient?: string;
                             nonce: string;
                             tokenIn: string;
                             tokenOut: string;
@@ -7607,6 +7614,7 @@ export interface operations {
                             /** @enum {unknown} */
                             profile: "uniswapx-v3-order-v1";
                             swapper: string;
+                            recipient?: string;
                             nonce: string;
                             tokenIn: string;
                             tokenOut: string;

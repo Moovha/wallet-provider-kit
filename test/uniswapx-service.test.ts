@@ -3,8 +3,8 @@ import { randomUUID } from 'node:crypto';
 import { readFile, readdir } from 'node:fs/promises';
 import { serviceFixture } from './helpers/uniswapx.js';
 const fixtures: Awaited<ReturnType<typeof serviceFixture>>[] = [];
-async function fixture(permission = true) {
-  const f = await serviceFixture(permission);
+async function fixture(permission = true, transfers = false) {
+  const f = await serviceFixture(permission, false, transfers);
   fixtures.push(f);
   return f;
 }
@@ -210,4 +210,100 @@ describe('durable exact-order provider signing', () => {
     expect(f.state.posts).toBe(1);
     expect(f.state.signs).toBe(1);
   });
+});
+
+it('binds an explicitly consented transfer recipient through signing, restart and idempotency', async () => {
+  const f = await fixture(true, true);
+  const recipient = '0x7777777777777777777777777777777777777777';
+  f.order.baseOutputs[0].recipient = recipient;
+  const result = await f.service.submit(
+    f.context,
+    f.accountId,
+    f.quote(),
+    recipient,
+  );
+  expect(result.status).toBe('open');
+  expect(result.review.recipient).toBe(recipient);
+  expect(result.review.swapper).toBe(f.safe);
+  await f.restart();
+  expect(
+    (await f.service.submit(f.context, f.accountId, f.quote(), recipient))
+      .order_id,
+  ).toBe(result.order_id);
+  await expect(
+    f.service.submit(f.context, f.accountId, f.quote(), f.safe),
+  ).rejects.toThrow('wallet_attempt_conflict');
+  expect(f.state.signs).toBe(1);
+  expect(f.state.posts).toBe(1);
+});
+it('denies third-party outputs under existing self-swap consent before any RPC or signature', async () => {
+  const f = await fixture();
+  const recipient = '0x7777777777777777777777777777777777777777';
+  f.order.baseOutputs[0].recipient = recipient;
+  await expect(
+    f.service.submit(f.context, f.accountId, f.quote(), recipient),
+  ).rejects.toThrow('wallet_provider_input');
+  expect(f.state.rpc).toBe(0);
+  expect(f.state.signs).toBe(0);
+  expect(f.state.posts).toBe(0);
+});
+it('rejects missing or substituted transfer recipients even with transfer consent', async () => {
+  const f = await fixture(true, true);
+  f.order.baseOutputs[0].recipient =
+    '0x7777777777777777777777777777777777777777';
+  for (const recipient of [
+    undefined,
+    '0x8888888888888888888888888888888888888888',
+  ]) {
+    await expect(
+      f.service.submit(f.context, f.accountId, f.quote(), recipient),
+    ).rejects.toThrow('wallet_provider_input');
+  }
+  expect(f.state.rpc).toBe(0);
+  expect(f.state.signs).toBe(0);
+});
+
+it('requires fresh consent after enabling transfers while retaining read access to old self-swap orders', async () => {
+  const f = await fixture();
+  const old = await f.service.submit(f.context, f.accountId, f.quote());
+  f.policy.recipientPolicy = 'bound-transfer';
+  await f.restart();
+  const saved = await f.service.read(
+    f.context.principal,
+    f.accountId,
+    old.order_id,
+    false,
+  );
+  expect(saved.review.recipient).toBeUndefined();
+  expect(saved.order_id).toBe(old.order_id);
+  const before = f.state.rpc;
+  await expect(
+    f.service.submit(
+      { ...f.context, idempotencyKey: randomUUID() },
+      f.accountId,
+      f.quote(),
+    ),
+  ).rejects.toThrow('wallet_authorization_denied');
+  expect(f.state.rpc).toBe(before);
+  expect(f.state.signs).toBe(1);
+  expect(f.state.posts).toBe(1);
+});
+it('keeps one lifetime input budget across different transfer recipients', async () => {
+  const f = await fixture(true, true);
+  const first = '0x7777777777777777777777777777777777777777';
+  f.order.baseOutputs[0].recipient = first;
+  await f.service.submit(f.context, f.accountId, f.quote(), first);
+  const second = '0x8888888888888888888888888888888888888888';
+  f.order.baseOutputs[0].recipient = second;
+  f.order.info.nonce = Number(f.order.info.nonce) + 1;
+  await expect(
+    f.service.submit(
+      { ...f.context, idempotencyKey: randomUUID() },
+      f.accountId,
+      f.quote(),
+      second,
+    ),
+  ).rejects.toThrow();
+  expect(f.state.signs).toBe(1);
+  expect(f.state.posts).toBe(1);
 });
