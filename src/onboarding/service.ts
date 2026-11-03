@@ -118,6 +118,7 @@ export class OnboardingService {
       ): import('./types.js').ApplicationPolicy;
     },
     consentNetwork?: import('../networks.js').ProviderNetwork,
+    readonly orderPolicy?: import('../orders/uniswapx-v3.js').UniswapXOrderPolicy,
   ) {
     const resolved = defineOnboardingPolicy(input);
     if (
@@ -250,19 +251,29 @@ export class OnboardingService {
   private actionRevision(
     state: ProviderState,
     principal: AccessRequest['caller'],
+    orders = false,
   ) {
-    return this.runtimeContracts
+    const base = this.runtimeContracts
       ? fingerprint([
           this.actionPolicyRevision,
           currentRuntimePolicy(state, principal),
         ])
       : this.actionPolicyRevision;
+    if (!orders) return base;
+    if (!this.orderPolicy || !base) deny();
+    return fingerprint(['uniswapx-v3-order-v1', base, this.orderPolicy]);
   }
   private requestRevisionCurrent(state: ProviderState, request: AccessRequest) {
     try {
       return (
         request.actionPolicyRevision ===
-        this.actionRevision(state, request.caller)
+        this.actionRevision(
+          state,
+          request.caller,
+          request.input.authorization_details[0].actions.includes(
+            'orders:authorize',
+          ),
+        )
       );
     } catch {
       return false;
@@ -290,6 +301,16 @@ export class OnboardingService {
       return {
         ...terms,
         action_policy_revision: this.actionRevision(state, principal),
+        ...(this.orderPolicy
+          ? {
+              order_policy_revision: this.actionRevision(
+                state,
+                principal,
+                true,
+              ),
+              order_authorization: this.orderPolicy,
+            }
+          : {}),
         required_fields: [
           ...new Set([
             ...terms.required_fields,
@@ -311,7 +332,7 @@ export class OnboardingService {
       request.revision !== this.policy.revision ||
       (!allowExpired && request.expiresAt <= Date.now()) ||
       (request.input.authorization_details[0].actions.some((permission) =>
-        ['contracts:request'].includes(permission),
+        ['contracts:request', 'orders:authorize'].includes(permission),
       ) &&
         (!this.actionPolicyRevision ||
           !this.requestRevisionCurrent(state, request)))
@@ -341,7 +362,7 @@ export class OnboardingService {
     if (
       request.revision !== this.policy.revision ||
       (request.input.authorization_details[0].actions.some((permission) =>
-        ['contracts:request'].includes(permission),
+        ['contracts:request', 'orders:authorize'].includes(permission),
       ) &&
         !this.requestRevisionCurrent(state, request))
     )
@@ -507,7 +528,8 @@ export class OnboardingService {
     )
       invalid();
     const delegatesTransfers = normalized.authorization_details[0].actions.some(
-      (permission) => ['contracts:request'].includes(permission),
+      (permission) =>
+        ['contracts:request', 'orders:authorize'].includes(permission),
     );
     if (delegatesTransfers && !this.actionPolicyRevision) deny();
     const key = fingerprint([
@@ -529,8 +551,21 @@ export class OnboardingService {
           ? currentRuntimePolicy(state, context.principal)
           : undefined;
       const actionRevision = delegatesTransfers
-        ? this.actionRevision(state, context.principal)
+        ? this.actionRevision(
+            state,
+            context.principal,
+            normalized.authorization_details[0].actions.includes(
+              'orders:authorize',
+            ),
+          )
         : undefined;
+      if (
+        normalized.authorization_details[0].actions.includes(
+          'orders:authorize',
+        ) &&
+        normalized.user?.consent.action_policy_revision !== actionRevision
+      )
+        deny();
       if (this.policy.access.mode === 'application' && input.user) {
         input.user = resolveApplicationAssertion(
           this.policy,
@@ -748,6 +783,16 @@ export class OnboardingService {
       ...(this.actionPolicyRevision
         ? {
             action_policy_revision: this.actionPolicyRevision,
+          }
+        : {}),
+      ...(this.orderPolicy && !this.runtimeContracts
+        ? {
+            order_policy_revision: fingerprint([
+              'uniswapx-v3-order-v1',
+              this.actionPolicyRevision,
+              this.orderPolicy,
+            ]),
+            order_authorization: this.orderPolicy,
           }
         : {}),
       max_identity_age_days: this.policy.identity.maxAgeDays,
@@ -1531,12 +1576,20 @@ export class OnboardingService {
         undefined
     )
       deny();
-    if (permission === 'contracts:request') {
+    if (
+      permission === 'contracts:request' ||
+      permission === 'orders:authorize'
+    ) {
       const request = state.requests[grant.requestId];
       const consent = request?.consent;
       if (
         !this.actionPolicyRevision ||
-        grant.actionPolicyRevision !== this.actionRevision(state, principal) ||
+        grant.actionPolicyRevision !==
+          this.actionRevision(
+            state,
+            principal,
+            grant.permissions.includes('orders:authorize'),
+          ) ||
         !request ||
         !this.requestRevisionCurrent(state, request) ||
         !consent ||

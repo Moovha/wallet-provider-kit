@@ -462,6 +462,7 @@ See the [HTTP reference](http-reference.md).
 
 ```ts
 export interface ServerOptions {
+  uniswapXOrders?: import('../orders/service.js').UniswapXOrderService;
   networkContexts?: readonly NetworkContext[];
   resolveNetwork?: ResolveNetwork;
   management?: ManagementService;
@@ -946,6 +947,8 @@ export declare class OnboardingService {
   readonly store: OnboardingStore;
   readonly runtimeContracts: boolean;
   readonly safeOnlyWallet: boolean;
+  readonly orderPolicy?:
+    import('../orders/uniswapx-v3.js').UniswapXOrderPolicy | undefined;
   readonly policy: import('./types.js').ResolvedPolicy;
   readonly installationPolicyRevision: string;
   constructor(
@@ -973,6 +976,8 @@ export declare class OnboardingService {
       ): import('./types.js').ApplicationPolicy;
     },
     consentNetwork?: import('../networks.js').ProviderNetwork,
+    orderPolicy?:
+      import('../orders/uniswapx-v3.js').UniswapXOrderPolicy | undefined,
   );
   applicationAccessPolicy(
     principal: VerifiedPrincipal,
@@ -996,14 +1001,20 @@ export declare class OnboardingService {
         verification_level?: string | undefined;
         max_identity_age_days: number;
         max_access_days: number;
+        order_policy_revision?: string | undefined;
+        order_authorization?:
+          import('../orders/uniswapx-v3.js').UniswapXOrderPolicy | undefined;
         action_policy_revision?: string | undefined;
         flow: 'application' | 'hosted';
         policy_revision: string;
       }
     | {
-        action_policy_revision: string | undefined;
         required_fields: string[];
         runtime_contract_terms: import('../runtime-configuration/authority.js').RuntimePolicySnapshot;
+        order_policy_revision?: string | undefined;
+        order_authorization?:
+          import('../orders/uniswapx-v3.js').UniswapXOrderPolicy | undefined;
+        action_policy_revision: string | undefined;
         wallet_sharing?:
           | {
               source_application_id: string;
@@ -1080,6 +1091,7 @@ export declare class OnboardingService {
           | 'account:read'
           | 'operations:request'
           | 'contracts:request'
+          | 'orders:authorize'
           | 'members:manage'
           | 'owners:manage'
         )[]
@@ -1111,6 +1123,7 @@ export declare class OnboardingService {
           | 'account:read'
           | 'operations:request'
           | 'contracts:request'
+          | 'orders:authorize'
           | 'members:manage'
           | 'owners:manage'
         )[]
@@ -1144,6 +1157,9 @@ export declare class OnboardingService {
     verification_level?: string | undefined;
     max_identity_age_days: number;
     max_access_days: number;
+    order_policy_revision?: string | undefined;
+    order_authorization?:
+      import('../orders/uniswapx-v3.js').UniswapXOrderPolicy | undefined;
     action_policy_revision?: string | undefined;
     flow: 'application' | 'hosted';
     policy_revision: string;
@@ -1178,6 +1194,7 @@ export declare class OnboardingService {
       | 'account:read'
       | 'operations:request'
       | 'contracts:request'
+      | 'orders:authorize'
       | 'members:manage'
       | 'owners:manage'
     )[];
@@ -1195,6 +1212,7 @@ export declare class OnboardingService {
           | 'account:read'
           | 'operations:request'
           | 'contracts:request'
+          | 'orders:authorize'
           | 'members:manage'
           | 'owners:manage'
         )[]
@@ -1228,6 +1246,7 @@ export declare class OnboardingService {
           | 'account:read'
           | 'operations:request'
           | 'contracts:request'
+          | 'orders:authorize'
           | 'members:manage'
           | 'owners:manage'
         )[]
@@ -1309,6 +1328,7 @@ export declare class OnboardingService {
           | 'account:read'
           | 'operations:request'
           | 'contracts:request'
+          | 'orders:authorize'
           | 'members:manage'
           | 'owners:manage'
         )[]
@@ -1375,6 +1395,7 @@ export declare class OnboardingService {
         | 'account:read'
         | 'operations:request'
         | 'contracts:request'
+        | 'orders:authorize'
         | 'members:manage'
         | 'owners:manage'
       )[];
@@ -1394,6 +1415,7 @@ export declare class OnboardingService {
         | 'account:read'
         | 'operations:request'
         | 'contracts:request'
+        | 'orders:authorize'
         | 'members:manage'
         | 'owners:manage'
       )[];
@@ -1425,6 +1447,7 @@ export declare class OnboardingService {
         | 'account:read'
         | 'operations:request'
         | 'contracts:request'
+        | 'orders:authorize'
         | 'members:manage'
         | 'owners:manage'
       )[];
@@ -1459,6 +1482,7 @@ export declare class OnboardingService {
           | 'account:read'
           | 'operations:request'
           | 'contracts:request'
+          | 'orders:authorize'
           | 'members:manage'
           | 'owners:manage'
         )[]
@@ -1489,10 +1513,11 @@ export declare class OnboardingService {
         | 'account:read'
         | 'operations:request'
         | 'contracts:request'
+        | 'orders:authorize'
         | 'members:manage'
         | 'owners:manage'
       )[];
-      state: 'active' | 'suspended' | 'revoked';
+      state: 'active' | 'revoked' | 'suspended';
       expiresAt: number;
     }[]
   >;
@@ -1502,7 +1527,7 @@ export declare class OnboardingService {
     identity: OwnerIdentity | VerifiedPrincipal,
   ): Promise<{
     grant_id: string;
-    status: 'suspended' | 'revoked';
+    status: 'revoked' | 'suspended';
   }>;
   /** Use on an existing financial authority; exact-action approval still belongs to that authority. */
   bindWalletAuthority(
@@ -1644,6 +1669,10 @@ export interface ProviderState {
     string,
     import('../sponsorship/admission.js').SponsorshipAdmission
   >;
+  uniswapXOrders?: Record<
+    string,
+    import('../orders/service.js').UniswapXOrderRecord
+  >;
   supportedActions?: Record<string, ApprovedCallsRecord>;
   deploymentBindings?: Record<
     string,
@@ -1653,6 +1682,7 @@ export interface ProviderState {
       binding: string;
       network?: import('../networks.js').ProviderNetwork;
       activeRevision?: string;
+      uniswapXOrderPolicyRevision?: string;
       transportRevision?: string;
       networkSetRevision?: string;
       managementInstallationId?: string;
@@ -2216,6 +2246,8 @@ export interface FinancialApproval {
 
 ```ts
 export interface FinancialAuthorityOptions {
+  /** Optional host-owned encryption for retained signing results. */
+  signatureProtection?: SignatureProtection;
   namespace: string;
   provider: string;
   /** Recheck live owner/grant/KYC/consent, unchanged plan, dependencies and any step-up proof. No vendor effects. */
@@ -2325,6 +2357,7 @@ export declare function openProviderDatabase(
     id: string,
     maximum: string,
     configuredRevision?: string,
+    revisionField?: 'activeRevision' | 'uniswapXOrderPolicyRevision',
   ): Promise<void>;
   ensureAssetBudget(
     origin: string,
@@ -2875,6 +2908,11 @@ export declare function predictSafeAddress(
 
 ```ts
 export interface ProviderConfiguration {
+  uniswapXOrders?: {
+    enabled: boolean;
+    policy: import('../orders/uniswapx-v3.js').UniswapXOrderPolicy;
+    apiKey: SecretReference;
+  };
   management?: {
     claim: SecretReference;
     localOrigin?: string;
@@ -2887,6 +2925,7 @@ export interface ProviderConfiguration {
     safeWallet?: ProviderConfiguration['safeWallet'];
     safeProvisioning?: ProviderConfiguration['safeProvisioning'];
     approvedCalls?: ProviderConfiguration['approvedCalls'];
+    uniswapXOrders?: ProviderConfiguration['uniswapXOrders'];
     activation?: ProviderConfiguration['activation'];
   }[];
   safeProvisioning?: import('../provisioning/safe.js').SafeProvisioningConfiguration;

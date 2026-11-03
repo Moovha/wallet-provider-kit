@@ -9,6 +9,7 @@ export interface NetworkServices extends Pick<
   | 'service'
   | 'safeWallet'
   | 'walletCalls'
+  | 'uniswapXOrders'
   | 'runtimeConfiguration'
   | 'onboarding'
   | 'ready'

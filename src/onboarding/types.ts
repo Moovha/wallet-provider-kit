@@ -11,6 +11,7 @@ export const permissions = [
   'account:read',
   'operations:request',
   'contracts:request',
+  'orders:authorize',
   'members:manage',
   'owners:manage',
 ] as const;
@@ -306,6 +307,10 @@ export interface ProviderState {
     string,
     import('../sponsorship/admission.js').SponsorshipAdmission
   >;
+  uniswapXOrders?: Record<
+    string,
+    import('../orders/service.js').UniswapXOrderRecord
+  >;
   supportedActions?: Record<string, ApprovedCallsRecord>;
   deploymentBindings?: Record<
     string,
@@ -315,6 +320,7 @@ export interface ProviderState {
       binding: string;
       network?: import('../networks.js').ProviderNetwork;
       activeRevision?: string;
+      uniswapXOrderPolicyRevision?: string;
       transportRevision?: string;
       networkSetRevision?: string;
       managementInstallationId?: string;

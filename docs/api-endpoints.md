@@ -242,6 +242,26 @@ Request approved contract calls, discover wallet call capabilities, or check a r
 
 [`POST /v1/accounts/{accountId}/wallet`](http-reference.md#post-v1-accounts-accountid-wallet) — request body, permissions, effects and response details.
 
+### Submit a bounded UniswapX solver order
+
+Authorize one exact Base UniswapX V3 self-swap with its disclosed output-token fee and net minimum.
+
+**Who uses it:** Application developer.
+
+**When you need it:** Use only after the provider configures the optional order policy and the owner grants separate order permission.
+
+[`POST /v1/accounts/{accountId}/uniswapx-orders`](http-reference.md#post-v1-accounts-accountid-uniswapx-orders) — request body, permissions, effects and response details.
+
+### Recover a UniswapX order result
+
+Read a retained solver order and reconcile canonical fill effects without submitting another order.
+
+**Who uses it:** Application developer.
+
+**When you need it:** Use after admission, a timeout or a process restart. Retain order_id independently from wallet call batch IDs.
+
+[`GET /v1/accounts/{accountId}/uniswapx-orders/{orderId}`](http-reference.md#get-v1-accounts-accountid-uniswapx-orders-orderid) — request body, permissions, effects and response details.
+
 ### Follow a transaction’s progress live
 
 Receive status updates for an admitted transaction request without repeatedly polling.

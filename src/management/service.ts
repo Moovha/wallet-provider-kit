@@ -1020,6 +1020,7 @@ export class ManagementService {
                     ![
                       'account:read',
                       'contracts:request',
+                      'orders:authorize',
                       'operations:request',
                       'members:manage',
                       'owners:manage',

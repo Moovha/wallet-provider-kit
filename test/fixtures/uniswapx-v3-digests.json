@@ -1,0 +1,53 @@
+{
+  "provenance": "Unsigned synthetic fixture; expected values generated with @uniswap/uniswapx-sdk 3.1.6 and ethers 5.7.2. No signature or spend authority.",
+  "safe": "0x1111111111111111111111111111111111111111",
+  "order": {
+    "info": {
+      "reactor": "0x000000008a8330B5d1F43A62Bf4C673A49f27ba0",
+      "swapper": "0x1111111111111111111111111111111111111111",
+      "nonce": 1003,
+      "deadline": 1800000000,
+      "additionalValidationContract": "0x0000000000000000000000000000000000000000",
+      "additionalValidationData": "0x"
+    },
+    "cosigner": "0x3333333333333333333333333333333333333333",
+    "startingBaseFee": 123,
+    "baseInput": {
+      "token": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      "startAmount": 500000,
+      "maxAmount": 500000,
+      "curve": {
+        "relativeBlocks": 0,
+        "relativeAmounts": []
+      },
+      "adjustmentPerGweiBaseFee": 0
+    },
+    "baseOutputs": [
+      {
+        "token": "0xb755506531786C8aC63B756BaB1ac387bACB0C04",
+        "startAmount": "6000000000000000000",
+        "minAmount": "5000000000000000000",
+        "curve": {
+          "relativeBlocks": 655363,
+          "relativeAmounts": [100, 200]
+        },
+        "recipient": "0x1111111111111111111111111111111111111111",
+        "adjustmentPerGweiBaseFee": 0
+      }
+    ],
+    "cosignerData": {
+      "decayStartBlock": 50000000,
+      "exclusiveFiller": "0x0000000000000000000000000000000000000000",
+      "exclusivityOverrideBps": 0,
+      "inputAmount": 0,
+      "outputAmounts": [0]
+    },
+    "cosignature": "0x"
+  },
+  "expected": {
+    "witnessHash": "0x6b3d1cf8d90ed25905612e3801962d0b05208c11d2dd7081e75b77c7d64b6d13",
+    "permit2Digest": "0x9693f481c9ae03ca4620232117f498c94c5d766969094e2e3a7aa63050e7e828",
+    "safeMessageDigest": "0x08898aa3e136262338237ae283267d24dddea12d66a304f76c4eec346b279166",
+    "cosignerDigest": "0x51d59dda73c28f729b34791ce2e246f2482e8bef85af170eb84f03f4cf6a4b05"
+  }
+}

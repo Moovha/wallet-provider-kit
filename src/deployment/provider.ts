@@ -1,3 +1,4 @@
+import { UniswapXOrderService } from '../orders/service.js';
 import { networkConfigurations } from './network-configuration.js';
 import {
   createNetworkResolver,
@@ -314,6 +315,7 @@ async function createNetworkContext(
         }
       : undefined,
     database.networkScope,
+    config.uniswapXOrders?.policy,
   );
   const login = config.ownerLogin
     ? await createOwnerLogin(
@@ -352,7 +354,11 @@ async function createNetworkContext(
       }
       for (const grant of Object.values(state.grants)) {
         let actionPolicyCurrent = true;
-        if (grant.permissions.includes('contracts:request')) {
+        if (
+          grant.permissions.some((permission) =>
+            ['contracts:request', 'orders:authorize'].includes(permission),
+          )
+        ) {
           try {
             const expected = onboarding!.runtimeContracts
               ? fingerprint([
@@ -360,7 +366,15 @@ async function createNetworkContext(
                   currentRuntimePolicy(state, grant.caller),
                 ])
               : actionPolicyRevision;
-            actionPolicyCurrent = grant.actionPolicyRevision === expected;
+            const orderExpected = grant.permissions.includes('orders:authorize')
+              ? config.uniswapXOrders &&
+                fingerprint([
+                  'uniswapx-v3-order-v1',
+                  expected,
+                  config.uniswapXOrders.policy,
+                ])
+              : expected;
+            actionPolicyCurrent = grant.actionPolicyRevision === orderExpected;
           } catch {
             actionPolicyCurrent = false;
           }
@@ -485,12 +499,36 @@ async function createNetworkContext(
           transportRevision,
     );
 
+  const uniswapXOrders =
+    config.uniswapXOrders && runtimeConfiguration
+      ? new UniswapXOrderService(
+          onboarding!,
+          database,
+          runtimeConfiguration,
+          createOwsSigningBackend(backendOptions),
+          new ApplicationCredentialCipher(
+            resolveSecret(config.runtimeConfiguration!.credentialKey!),
+            database.networkScope,
+          ),
+          {
+            policy: config.uniswapXOrders.policy,
+            module: config.safeWallet!.module,
+            genesisHash: config.safeWallet!.genesisHash,
+            authorityRevision: activeRevision!,
+            apiKey: () => resolveSecret(config.uniswapXOrders!.apiKey),
+            active: () =>
+              config.activation.enabled && config.uniswapXOrders!.enabled,
+          },
+        )
+      : undefined;
+  await uniswapXOrders?.initialize();
   return {
     network: network.name,
     database,
     execution: { defaults: baselineActivation, sync: syncExecution },
     service,
     safeWallet,
+    uniswapXOrders,
     walletCalls: safeWallet
       ? new WalletCallsService(actions!, safeWallet.walletDriver())
       : undefined,
@@ -518,9 +556,11 @@ async function createNetworkContext(
       }
     },
     start: async () => {
+      uniswapXOrders?.start();
       await syncExecution();
     },
     close: async () => {
+      await uniswapXOrders?.close();
       await safeWallet?.close();
       database.close();
     },

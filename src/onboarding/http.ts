@@ -142,6 +142,8 @@ function escape(value: unknown): string {
   );
 }
 const permissionLabels = {
+  'orders:authorize':
+    'Authorize bounded UniswapX swap orders, including their input, minimum output, fee and expiry.',
   'account:read': 'Read your wallet address and account status',
   'operations:request':
     'Request wallet operations, subject to your provider’s approvals',
@@ -585,6 +587,10 @@ export async function registerOnboardingRoutes(
               flow: { type: 'string', enum: ['application', 'hosted'] },
               policy_revision: { type: 'string' },
               action_policy_revision: { type: 'string' },
+              order_policy_revision: { type: 'string' },
+              order_authorization:
+                providerConfigurationSchema.properties.uniswapXOrders.properties
+                  .policy,
               contract_call_terms: callTermsSchema,
               runtime_contract_terms: runtimeSnapshotSchema,
               max_identity_age_days: { type: 'integer' },

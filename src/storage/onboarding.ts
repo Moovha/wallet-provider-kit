@@ -9,6 +9,7 @@ const collections = [
   'management',
   'managementCommands',
   'supportedActions',
+  'uniswapXOrders',
   'assetReservations',
   'assetBudgetBindings',
   'executionBindings',

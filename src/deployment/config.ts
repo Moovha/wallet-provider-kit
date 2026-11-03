@@ -1,3 +1,4 @@
+import { validateUniswapXOrderPolicy } from '../orders/uniswapx-v3.js';
 import { validateFundingAllocation } from '../sponsorship/infrastructure-funding.js';
 import { networkConfigurations } from './network-configuration.js';
 import type { ProviderNetwork } from '../networks.js';
@@ -28,6 +29,11 @@ export interface SecretReference {
   env: string;
 }
 export interface ProviderConfiguration {
+  uniswapXOrders?: {
+    enabled: boolean;
+    policy: import('../orders/uniswapx-v3.js').UniswapXOrderPolicy;
+    apiKey: SecretReference;
+  };
   management?: {
     claim: SecretReference;
     localOrigin?: string;
@@ -40,6 +46,7 @@ export interface ProviderConfiguration {
     safeWallet?: ProviderConfiguration['safeWallet'];
     safeProvisioning?: ProviderConfiguration['safeProvisioning'];
     approvedCalls?: ProviderConfiguration['approvedCalls'];
+    uniswapXOrders?: ProviderConfiguration['uniswapXOrders'];
     activation?: ProviderConfiguration['activation'];
   }[];
   safeProvisioning?: import('../provisioning/safe.js').SafeProvisioningConfiguration;
@@ -141,6 +148,16 @@ export function validateProviderConfiguration(
   const config = structuredClone(input) as unknown as ProviderConfiguration;
   try {
     assertSafeWalletConfiguration(config);
+    for (const candidate of networkConfigurations(config))
+      if (candidate.uniswapXOrders) {
+        if (
+          candidate.network !== 'base' ||
+          !candidate.safeWallet ||
+          !candidate.runtimeConfiguration?.credentialKey
+        )
+          throw new Error();
+        validateUniswapXOrderPolicy(candidate.uniswapXOrders.policy);
+      }
     for (const wallet of [
       config.safeWallet,
       ...(config.additionalNetworks ?? []).map((n) => n.safeWallet),
