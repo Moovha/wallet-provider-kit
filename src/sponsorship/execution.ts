@@ -331,6 +331,11 @@ export class UserOperationExecutionCoordinator {
       if (current.observationRevision !== before.observationRevision) return;
       current.observation = observation;
       current.observationRevision++;
+      if (observation.state === 'expired' && observation.expiry) {
+        const source = state.supportedActions?.[id] ?? deny();
+        source.status = 'denied';
+        source.nonceReleased = true;
+      }
     });
     if (
       observation.receipt &&

@@ -925,7 +925,17 @@ it.each([
         expect(ranges).toContainEqual([200n, 299n]);
         expect(ranges).toContainEqual([300n, 355n]);
         expect(await t.status()).toMatchObject({ status: 400 });
-      } else expect(latest?.observation.state).not.toBe('expired');
+        const source = await t.f.onboarding.store.transaction(
+          (state) => state.supportedActions![plan.operationId],
+        );
+        expect(source).toMatchObject({ status: 'denied', nonceReleased: true });
+      } else {
+        expect(latest?.observation.state).not.toBe('expired');
+        const source = await t.f.onboarding.store.transaction(
+          (state) => state.supportedActions![plan.operationId],
+        );
+        expect(source.nonceReleased).not.toBe(true);
+      }
     } finally {
       now.mockRestore();
     }
