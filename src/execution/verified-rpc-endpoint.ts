@@ -18,20 +18,21 @@ export async function verifiedRpcEndpoint(options: {
         true,
         'endpoint-failover',
       );
-      await reader.verifyGenesis(
-        JSON.stringify([options.chainId, options.genesisHash]),
-        async () => {
-          const [chain, genesis] = await Promise.all([
-            reader.call('eth_chainId', []),
-            reader.call('eth_getBlockByNumber', ['0x0', false]),
+      const [chain] = await Promise.all([
+        reader.call('eth_chainId', []),
+        // Use the same genesis-only verification contract as the state and
+        // receipt readers. Chain ID remains a fresh independent check.
+        reader.verifyGenesis(options.genesisHash, async () => {
+          const genesis = await reader.call('eth_getBlockByNumber', [
+            '0x0',
+            false,
           ]);
-          if (
-            BigInt(String(chain)) !== BigInt(options.chainId) ||
-            (genesis as { hash?: string })?.hash !== options.genesisHash
-          )
+          if ((genesis as { hash?: string })?.hash !== options.genesisHash)
             throw new WalletProviderError('wallet_provider_configuration');
-        },
-      );
+        }),
+      ]);
+      if (BigInt(String(chain)) !== BigInt(options.chainId))
+        throw new WalletProviderError('wallet_provider_configuration');
       return endpoint;
     },
     ['genesis'],

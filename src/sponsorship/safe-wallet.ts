@@ -420,22 +420,8 @@ export class SafeWalletRuntime {
             true,
             'endpoint-failover',
           );
-          const [chain, fees] = await Promise.all([
-            reader.feed('eth_chainId', []),
-            quoteNetworkFees(reader, sponsorshipGas(agreement)),
-            reader.verifyGenesis(
-              this.config.safeWallet!.genesisHash,
-              async () => {
-                const block = (await reader.call('eth_getBlockByNumber', [
-                  '0x0',
-                  false,
-                ])) as { hash: string };
-                if (block.hash !== this.config.safeWallet!.genesisHash) deny();
-              },
-            ),
-          ]);
-          if (chain !== this.network.hex) deny();
-          return fees;
+          // The selected endpoint has already passed chain and genesis verification.
+          return quoteNetworkFees(reader, sponsorshipGas(agreement));
         },
         this.request,
       )

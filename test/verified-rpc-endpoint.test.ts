@@ -73,3 +73,46 @@ it('rejects wrong identity without treating it as an availability failure', asyn
     request.mock.calls.some(([url]) => String(url).includes('other')),
   ).toBe(false);
 });
+
+it('shares a verified genesis with state readers while checking the current chain on every selection', async () => {
+  const { RpcReader } = await import('../src/execution/chain.js');
+  let chain = '0x2105';
+  const methods: string[] = [];
+  const request = vi.fn<typeof fetch>(async (_url, init) => {
+    const body = JSON.parse(String(init?.body));
+    methods.push(body.method);
+    return Response.json({
+      jsonrpc: '2.0',
+      id: body.id,
+      result: body.method === 'eth_chainId' ? chain : { hash: genesis },
+    });
+  });
+  const options = {
+    endpoints: ['https://shared.example.test'],
+    request,
+    chainId: 8453,
+    genesisHash: genesis,
+  };
+  await verifiedRpcEndpoint(options);
+  const reader = new RpcReader(
+    options.endpoints[0],
+    request,
+    4,
+    true,
+    'endpoint-failover',
+  );
+  const duplicate = vi.fn(async () => {
+    throw new Error('duplicate genesis lookup');
+  });
+  await reader.verifyGenesis(genesis, duplicate);
+  await verifiedRpcEndpoint(options);
+  expect(duplicate).not.toHaveBeenCalled();
+  expect(
+    methods.filter((method) => method === 'eth_getBlockByNumber'),
+  ).toHaveLength(1);
+  expect(methods.filter((method) => method === 'eth_chainId')).toHaveLength(2);
+  chain = '0x1';
+  await expect(verifiedRpcEndpoint(options)).rejects.toMatchObject({
+    code: 'wallet_provider_configuration',
+  });
+});

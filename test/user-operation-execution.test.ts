@@ -1031,3 +1031,38 @@ it('retains uncertain estimator failures as retryable without signing', async ()
   expect(await t.status()).toMatchObject({ status: 100 });
   expect(t.s.sends + t.f.state.posts + t.f.state.signs).toBe(0);
 });
+
+it('checks full submission authority once at the final dispatch boundary', async () => {
+  const t = await setup();
+  const authorize = vi.spyOn(t.f.service, 'authorizeSubmission');
+  await t.submit();
+  await t.ports.driver.runOnce();
+  expect(t.s.sends).toBe(1);
+  expect(authorize).toHaveBeenCalledOnce();
+  expect(authorize.mock.calls[0][2]).not.toBe(false);
+});
+
+it('rejects revocation after retaining the signed plan and before dispatch', async () => {
+  const t = await setup();
+  const original = t.f.service.authorizeSubmission.bind(t.f.service);
+  vi.spyOn(t.f.service, 'authorizeSubmission').mockImplementation(
+    async (context, id, verifyChain = true) => {
+      const retained = await t.f.onboarding.store.transaction((s) =>
+        Object.values(s.userOperationExecutions ?? {}),
+      );
+      expect(retained).toHaveLength(1);
+      await t.f.onboarding.store.transaction((s) => {
+        s.grants[t.f.grant.grant_id!].state = 'revoked';
+      });
+      return original(context, id, verifyChain);
+    },
+  );
+  await t.submit();
+  await t.ports.driver.runOnce();
+  expect(t.s.sends).toBe(0);
+  const plans = await t.f.onboarding.store.transaction((s) =>
+    Object.values(s.userOperationExecutions ?? {}),
+  );
+  expect(plans).toHaveLength(1);
+  expect(plans[0].dispatch).toBeUndefined();
+});

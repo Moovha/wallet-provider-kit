@@ -145,7 +145,6 @@ export class UserOperationExecutionCoordinator {
       const operation = await this.signing.sign(context, id),
         record = this.database.sponsorship.load(id) ?? deny();
       await this.timestamp(id, 'signed_at');
-      await this.signing.authorizeSubmission(context, id, false);
       await this.actions.withAuthorizedCalls(
         context.principal,
         id,
@@ -176,13 +175,13 @@ export class UserOperationExecutionCoordinator {
         },
       );
     }
-    await this.signing.authorizeSubmission(context, id, false);
     const plan = (await this.load(id)) ?? deny();
     let token: string | undefined;
     try {
       await this.timestamp(id, 'submission_started_at');
       await this.client.send(plan.operation, async () => {
-        // Unavailable preflight reads leave no dispatch claim and can be retried.
+        // Check current consent, funding and chain authority immediately before
+        // the durable dispatch claim. No earlier preflight can replace this check.
         await this.signing.authorizeSubmission(context, id);
         token = await this.actions.withAuthorizedCalls(
           context.principal,
