@@ -1,3 +1,4 @@
+import { verifiedRpcEndpoint } from '../execution/verified-rpc-endpoint.js';
 import {
   FundingMonitor,
   fundingRecoveryIntervalMs,
@@ -387,7 +388,12 @@ export class SafeWalletRuntime {
   private async reader(applicationId: string) {
     const endpoints = await this.resources.rpcEndpoints(applicationId);
     return new RpcReader(
-      endpoints[0],
+      await verifiedRpcEndpoint({
+        endpoints,
+        request: this.request,
+        chainId: Number(this.domain.chainId),
+        genesisHash: this.config.safeWallet!.genesisHash,
+      }),
       this.request,
       4,
       true,
@@ -403,7 +409,12 @@ export class SafeWalletRuntime {
         async (endpoints) => {
           const agreement = await this.agreement(applicationId);
           const reader = new RpcReader(
-            endpoints[0],
+            await verifiedRpcEndpoint({
+              endpoints,
+              request: this.request,
+              chainId: Number(this.domain.chainId),
+              genesisHash: this.config.safeWallet!.genesisHash,
+            }),
             this.request,
             4,
             true,
@@ -444,7 +455,13 @@ export class SafeWalletRuntime {
     if (method === 'eth_sendRawTransaction') await this.current(applicationId);
     const id = randomUUID();
     try {
-      const response = await this.request(endpoints[0], {
+      const endpoint = await verifiedRpcEndpoint({
+        endpoints,
+        request: this.request,
+        chainId: Number(this.domain.chainId),
+        genesisHash: this.config.safeWallet!.genesisHash,
+      });
+      const response = await this.request(endpoint, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ jsonrpc: '2.0', id, method, params }),
