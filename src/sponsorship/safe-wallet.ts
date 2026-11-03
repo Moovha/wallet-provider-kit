@@ -1,3 +1,4 @@
+import { FundingDepositReader } from './funding-deposit.js';
 import { verifiedRpcEndpoint } from '../execution/verified-rpc-endpoint.js';
 import {
   FundingMonitor,
@@ -284,6 +285,7 @@ export class SafeWalletRuntime {
     }, delay);
     this.walletTimer.unref();
   }
+  private readonly fundingDeposits = new FundingDepositReader();
   private readonly fees = new Map<
     string,
     Promise<import('../execution/network-fees.js').NetworkFeeQuote>
@@ -2261,42 +2263,14 @@ export class SafeWalletRuntime {
     const infrastructure = await this.current(applicationId);
     if (!infrastructure.paymaster) deny();
     const reader = await this.reader(applicationId);
-    const block = (await reader.call('eth_getBlockByNumber', [
-      'latest',
-      false,
-    ])) as { number?: string; hash?: string };
-    if (
-      !block?.number ||
-      !/^0x[0-9a-fA-F]+$/.test(block.number) ||
-      !block.hash ||
-      !/^0x[0-9a-fA-F]{64}$/.test(block.hash)
-    )
-      deny();
-    const value = entryAbi.decodeFunctionResult(
-      'balanceOf',
-      String(
-        await reader.call('eth_call', [
-          {
-            to: this.domain.entryPoint,
-            data: entryAbi.encodeFunctionData('balanceOf', [
-              infrastructure.paymaster.address,
-            ]),
-          },
-          block.number,
-        ]),
-      ),
-    )[0] as bigint;
-    const current = (await reader.call('eth_getBlockByNumber', [
-      block.number,
-      false,
-    ])) as { hash?: string };
-    if (current?.hash !== block.hash) deny();
-    return {
-      balanceWei: value.toString(),
-      blockNumber: block.number,
-      checkedAt: new Date().toISOString(),
-    };
+    return this.fundingDeposits.read(
+      reader,
+      applicationId,
+      this.domain.entryPoint,
+      infrastructure.paymaster.address,
+    );
   }
+
   private configGas() {
     return {
       callGasLimit: '0x493e0',
