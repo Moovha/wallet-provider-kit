@@ -392,7 +392,9 @@ export class Safe4337SigningService {
         structuredClone(context),
         structuredClone(terms),
       );
-    } catch {
+    } catch (error) {
+      // Preserve already-sanitized denials; unknown transport exceptions stay private.
+      if (error instanceof WalletProviderError) throw error;
       throw new WalletProviderError('wallet_attempt_unavailable');
     }
     if (
@@ -512,7 +514,9 @@ export class Safe4337SigningService {
     >;
     try {
       consent = await this.authorizeConsent(context, structuredClone(terms));
-    } catch {
+    } catch (error) {
+      // Preserve already-sanitized denials; unknown transport exceptions stay private.
+      if (error instanceof WalletProviderError) throw error;
       throw new WalletProviderError('wallet_attempt_unavailable');
     }
     if (
