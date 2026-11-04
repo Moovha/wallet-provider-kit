@@ -339,14 +339,109 @@ it.each(['0x1', '0xaa36a7'])(
     expect(bundlerNetworkProfile(chain)).toEqual({
       'chain-type': 'default',
       'block-time': 12000,
+      'gas-price-refresh-interval': 0,
     });
     for (const chain of ['0x14a34', '0x2105'])
       expect(bundlerNetworkProfile(chain)).toEqual({
         'chain-type': 'op-stack',
         'block-time': 2000,
+        'gas-price-refresh-interval': 0,
       });
     expect(() => bundlerNetworkProfile('0x2')).toThrow(
       'Unsupported private bundler chain',
     );
   },
 );
+
+it.each([402, 429])(
+  'backs off HTTP %s without idle probes and recovers on demand after Retry-After',
+  async (status) => {
+    vi.useFakeTimers();
+    let throttled = true;
+    const f = fixture((_url, b) =>
+      throttled
+        ? new Response('quota unavailable', {
+            status,
+            headers: { 'Retry-After': '120' },
+          })
+        : Response.json({ jsonrpc: '2.0', id: b.id, result: '0x2' }),
+    );
+    await expect(f.rpc(body(1))).rejects.toThrow('RPC unavailable');
+    const attempts = f.calls.length;
+    await vi.advanceTimersByTimeAsync(119999);
+    expect(f.calls).toHaveLength(attempts);
+    await expect(f.rpc(body(2))).rejects.toThrow('RPC unavailable');
+    expect(f.calls).toHaveLength(attempts);
+    throttled = false;
+    await vi.advanceTimersByTimeAsync(1);
+    expect(f.calls).toHaveLength(attempts);
+    expect((await f.rpc(body(3))).result).toBe('0x2');
+  },
+);
+
+it.each([
+  [undefined, 60000],
+  ['invalid', 60000],
+  ['999999', 300000],
+  [new Date('2030-01-01T00:01:30Z').toUTCString(), 90000],
+] as const)(
+  'bounds throttle backoff for Retry-After %s',
+  async (header, delay) => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2030-01-01T00:00:00Z'));
+    const f = fixture(
+      () =>
+        new Response(null, {
+          status: 429,
+          headers: header ? { 'Retry-After': header } : undefined,
+        }),
+    );
+    await expect(f.rpc(body(1))).rejects.toThrow('RPC unavailable');
+    const attempts = f.calls.length;
+    await vi.advanceTimersByTimeAsync(delay - 1);
+    await expect(f.rpc(body(2))).rejects.toThrow('RPC unavailable');
+    expect(f.calls).toHaveLength(attempts);
+    await vi.advanceTimersByTimeAsync(1);
+    await expect(f.rpc(body(3))).rejects.toThrow('RPC unavailable');
+    expect(f.calls.length).toBeGreaterThan(attempts);
+  },
+);
+
+it('uses a healthy fallback for fees while a JSON-RPC quota rejection cools down', async () => {
+  vi.useFakeTimers();
+  const f = fixture((url, b) =>
+    Response.json({
+      jsonrpc: '2.0',
+      id: b.id,
+      ...(url === config.rpcUrls[0]
+        ? { error: { code: 429, message: 'Monthly capacity limit exceeded' } }
+        : { result: '0x2' }),
+    }),
+  );
+  expect((await f.rpc(body(1, 'eth_gasPrice', []))).result).toBe('0x2');
+  await vi.advanceTimersByTimeAsync(10000);
+  expect((await f.rpc(body(2, 'eth_gasPrice', []))).result).toBe('0x2');
+  expect(
+    f.calls.filter(
+      (c) => c.endpoint === config.rpcUrls[0] && c.method === 'eth_gasPrice',
+    ),
+  ).toHaveLength(1);
+});
+
+it('backs off throttled identity checks before dispatch and never retries a throttled broadcast', async () => {
+  vi.useFakeTimers();
+  const request = vi.fn(async () => new Response(null, { status: 429 }));
+  const rpc = createBundlerRpc(() => config, request);
+  await expect(rpc(body(1))).rejects.toThrow('RPC unavailable');
+  const attempts = request.mock.calls.length;
+  await vi.advanceTimersByTimeAsync(10000);
+  await expect(rpc(body(2))).rejects.toThrow('RPC unavailable');
+  expect(request).toHaveBeenCalledTimes(attempts);
+  const broadcast = fixture(() => new Response(null, { status: 429 }));
+  await expect(
+    broadcast.rpc(body(3, 'eth_sendRawTransaction', ['0x1234'])),
+  ).rejects.toThrow('RPC unavailable');
+  expect(
+    broadcast.calls.filter((c) => c.method === 'eth_sendRawTransaction'),
+  ).toHaveLength(1);
+});

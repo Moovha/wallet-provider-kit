@@ -4,8 +4,8 @@ import { spawn, execFile, type ChildProcess } from 'node:child_process';
 import { promisify } from 'node:util';
 import { once } from 'node:events';
 import { createServer } from 'node:net';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { createServer as createHttpServer } from 'node:http';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { randomUUID, createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
@@ -36,14 +36,18 @@ import {
 } from '../../src/sponsorship/index.js';
 import { WalletCallsService } from '../../src/wallet-calls/service.js';
 import { safeSetupInterface } from '../../src/provisioning/safe.js';
+import { bundlerNetworkProfile } from '../../scripts/bundler-rpc.mjs';
 
 const execute = promisify(execFile);
 const docker = (...args: string[]) =>
   execute('docker', args, { timeout: 120000, maxBuffer: 1024 * 1024 });
 const prefix = 'wpk-e2e-' + randomUUID();
-const directory = await mkdtemp(join(tmpdir(), 'wpk-e2e-'));
+// Keep bind-mounted fixtures in the checkout, which desktop Docker shares.
+await mkdir('artifacts', { recursive: true });
+const directory = await mkdtemp(join(process.cwd(), 'artifacts', 'wpk-e2e-'));
 let anvil: ChildProcess | undefined;
 let rpc: JsonRpcProvider | undefined;
+let bundlerProxy: ReturnType<typeof createHttpServer> | undefined;
 const containers: string[] = [];
 let networkCreated = false;
 let volumeCreated = false;
@@ -55,6 +59,10 @@ afterAll(async () => {
   }
   for (const name of containers.reverse())
     await docker('rm', '--force', name).catch(() => undefined);
+  if (bundlerProxy) {
+    bundlerProxy.closeAllConnections();
+    await new Promise<void>((resolve) => bundlerProxy!.close(() => resolve()));
+  }
   if (networkCreated) await docker('network', 'rm', prefix);
   if (volumeCreated) await docker('volume', 'rm', prefix);
   await rm(directory, { recursive: true, force: true });
@@ -99,7 +107,7 @@ async function artifact(name: string) {
   };
 }
 
-it('executes a real Safe operation through Alto and Valkey, then recovers a lost response across provider, bundler and queue restarts without repeating the effect', async () => {
+it('stays RPC-idle before a real Safe operation and recovers a lost response across restarts without repeating the effect', async () => {
   await docker('info', '--format', '{{.ServerVersion}}');
   const port = await availablePort();
   anvil = spawn(
@@ -126,6 +134,28 @@ it('executes a real Safe operation through Alto and Valkey, then recovers a lost
     { stdio: 'ignore', env: { ...process.env, TARGET_TOOL: 'anvil' } },
   );
   const origin = 'http://127.0.0.1:' + port;
+  const bundlerMethods: string[] = [];
+  bundlerProxy = createHttpServer(async (request, response) => {
+    try {
+      const chunks: Buffer[] = [];
+      for await (const chunk of request) chunks.push(Buffer.from(chunk));
+      const body = Buffer.concat(chunks).toString();
+      bundlerMethods.push((JSON.parse(body) as { method: string }).method);
+      const result = await fetch(origin, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body,
+        signal: AbortSignal.timeout(5000),
+      });
+      response.writeHead(result.status, { 'content-type': 'application/json' });
+      response.end(await result.text());
+    } catch {
+      response.writeHead(503).end('{}');
+    }
+  });
+  bundlerProxy.listen(0, '0.0.0.0');
+  await once(bundlerProxy, 'listening');
+  const bundlerRpcPort = (bundlerProxy.address() as { port: number }).port;
   await eventually(async () => {
     const r = await fetch(origin, {
       method: 'POST',
@@ -249,7 +279,13 @@ it('executes a real Safe operation through Alto and Valkey, then recovers a lost
     codeHash: keccak256(await provider.getCode(address)),
   });
   const genesis = (await provider.getBlock(0))!.hash!;
-  await docker('network', 'create', '--internal', prefix);
+  // Desktop Docker reaches the host fixture through its VM gateway.
+  await docker(
+    'network',
+    'create',
+    ...(process.platform === 'linux' ? ['--internal'] : []),
+    prefix,
+  );
   networkCreated = true;
   await docker('volume', 'create', prefix);
   volumeCreated = true;
@@ -281,7 +317,7 @@ it('executes a real Safe operation through Alto and Valkey, then recovers a lost
     entrypoints: entryAddress,
     'executor-private-keys': executor.privateKey,
     'utility-private-key': executor.privateKey,
-    'rpc-url': 'http://host.docker.internal:' + port,
+    'rpc-url': 'http://host.docker.internal:' + bundlerRpcPort,
     port: 3000,
     'bundle-mode': 'manual',
     'safe-mode': false,
@@ -291,7 +327,8 @@ it('executes a real Safe operation through Alto and Valkey, then recovers a lost
     'min-bundle-interval': 100,
     'max-bundle-interval': 100,
     'block-polling-interval': 100,
-    'gas-price-refresh-interval': 1,
+    'gas-price-refresh-interval':
+      bundlerNetworkProfile('0x14a34')['gas-price-refresh-interval'],
     'enable-horizontal-scaling': true,
     'enable-redis-receipt-cache': true,
     'redis-endpoint': 'redis://' + prefix + '-store:6379',
@@ -299,13 +336,14 @@ it('executes a real Safe operation through Alto and Valkey, then recovers a lost
     'mempool-pop-batch-size': 10,
     'max-bundle-count': 1,
     'max-resubmits': 3,
-    'log-level': 'fatal',
+    'log-level': 'error',
     'flush-stuck-transactions-during-startup': false,
   };
   await writeFile(join(directory, 'alto.json'), JSON.stringify(config), {
     mode: 0o600,
   });
   containers.push(prefix + '-bundler');
+  const bundlerPort = await availablePort();
   await docker(
     'run',
     '--detach',
@@ -313,8 +351,11 @@ it('executes a real Safe operation through Alto and Valkey, then recovers a lost
     prefix + '-bundler',
     '--network',
     prefix,
-    '--add-host',
-    'host.docker.internal:' + gateway.trim(),
+    ...(process.platform === 'linux'
+      ? ['--add-host', 'host.docker.internal:' + gateway.trim()]
+      : []),
+    '--publish',
+    '127.0.0.1:' + bundlerPort + ':3000',
     '--mount',
     'type=bind,src=' + directory + ',dst=/fixture,readonly',
     '--entrypoint',
@@ -325,13 +366,7 @@ it('executes a real Safe operation through Alto and Valkey, then recovers a lost
     '--config',
     '/fixture/alto.json',
   );
-  const { stdout: bundlerIp } = await docker(
-    'inspect',
-    '--format',
-    '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}',
-    prefix + '-bundler',
-  );
-  const bundlerUrl = 'http://' + bundlerIp.trim() + ':3000';
+  const bundlerUrl = 'http://127.0.0.1:' + bundlerPort;
   async function bundlerRpc(method: string, params: unknown[]) {
     const r = await fetch(bundlerUrl, {
       method: 'POST',
@@ -355,10 +390,21 @@ it('executes a real Safe operation through Alto and Valkey, then recovers a lost
       '{{.State.Status}}/{{.State.ExitCode}}',
       prefix + '-bundler',
     );
+    const logs = await docker('logs', '--tail', '10', prefix + '-bundler');
+    const diagnostic = (logs.stdout + logs.stderr).replace(
+      /0x[0-9a-fA-F]{40,}/g,
+      '[hex omitted]',
+    );
     throw new Error(
-      'Offline bundler did not become ready; runtime state ' + state.trim(),
+      'Offline bundler did not become ready; runtime state ' +
+        state.trim() +
+        '\n' +
+        diagnostic,
     );
   }
+  const idleCalls = bundlerMethods.length;
+  await new Promise((resolve) => setTimeout(resolve, 3000));
+  expect(bundlerMethods.slice(idleCalls)).toEqual([]);
   const bundler = {
     profile: 'safe4337-bundler-v07' as const,
     url: 'https://bundler.example.test/rpc',
@@ -583,6 +629,7 @@ it('executes a real Safe operation through Alto and Valkey, then recovers a lost
       (await ports.execution.load(plan.operationId))?.observation?.state,
     ).toMatch(/^(included|safe|finalized)$/);
   });
+  expect(bundlerMethods.slice(idleCalls)).toContain('eth_getBlockByNumber');
   expect(await provider.getBalance(recipient)).toBe(4n);
   expect(await counter.calls()).toBe(1n);
   expect(await counter.lastValue()).toBe(42n);
@@ -594,4 +641,12 @@ it('executes a real Safe operation through Alto and Valkey, then recovers a lost
   expect(await provider.getBalance(recipient)).toBe(4n);
   expect(await entryPoint.balanceOf(paymasterAddress)).toBeLessThan(10n ** 17n);
   expect(await paymaster.entryPoint()).toBe(entryAddress);
+  // Advance the chain so block watching observes and clears the settled bundle.
+  for (let i = 0; i < 3; i++) {
+    await provider.send('evm_mine', []);
+    await new Promise((resolve) => setTimeout(resolve, 300));
+  }
+  const settledCalls = bundlerMethods.length;
+  await new Promise((resolve) => setTimeout(resolve, 3000));
+  expect(bundlerMethods.slice(settledCalls)).toEqual([]);
 });

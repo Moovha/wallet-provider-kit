@@ -232,7 +232,6 @@ async function refreshApplications() {
         'min-bundle-interval': 25,
         'max-bundle-interval': 100,
         'block-polling-interval': 250,
-        'gas-price-refresh-interval': 2,
         'enable-horizontal-scaling': true,
         'enable-redis-receipt-cache': true,
         'redis-endpoint': process.env.BUNDLER_REDIS_URL,

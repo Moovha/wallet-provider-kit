@@ -17,4 +17,5 @@ export function createBundlerRpc(
 export function bundlerNetworkProfile(chainId: string): {
   'chain-type': 'default' | 'op-stack';
   'block-time': number;
+  'gas-price-refresh-interval': 0;
 };
