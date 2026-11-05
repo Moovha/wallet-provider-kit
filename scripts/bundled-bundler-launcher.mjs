@@ -1,3 +1,8 @@
+import { Redis } from 'ioredis';
+import {
+  createBundlerStartupGate,
+  hasBundlerRecoveryWork,
+} from './wpk-bundler-startup.mjs';
 import { createBundlerRpc, bundlerNetworkProfile } from './wpk-bundler-rpc.mjs';
 import {
   createBundlerSimulations,
@@ -14,9 +19,19 @@ const root = process.env.SAFE_WALLET_RUNTIME_DIRECTORY;
 if (!root || !process.env.BUNDLER_REDIS_URL)
   throw Error('Missing private bundler configuration');
 const applications = new Map();
-const failures = new Map();
+const configurations = new Map();
+const admissions = new Map();
+const redis = new Redis(process.env.BUNDLER_REDIS_URL, {
+  maxRetriesPerRequest: 1,
+  commandTimeout: 2000,
+  enableOfflineQueue: false,
+});
+redis.on('error', () => {});
+const startup = createBundlerStartupGate((config) =>
+  hasBundlerRecoveryWork(redis, config),
+);
 const allocatedPorts = new Map();
-let refreshing = false;
+let refreshing;
 let nextPort = 3100;
 const equal = (a, b) => {
   const x = Buffer.from(a ?? ''),
@@ -35,23 +50,22 @@ const server = createServer(async (request, response) => {
   response.setHeader('cache-control', 'no-store');
   try {
     const match = /^\/rpc\/([a-f0-9]{64})$/.exec(request.url ?? '');
-    const app = match && applications.get(match[1]);
+    const applicationId = match?.[1];
+    let app = applications.get(applicationId);
+    const config = app?.config ?? configurations.get(applicationId);
     if (
-      !app ||
+      !config ||
       request.method !== 'POST' ||
-      !equal(
-        request.headers.authorization,
-        'Bearer ' + app.config.authorization,
-      )
+      !equal(request.headers.authorization, 'Bearer ' + config.authorization)
     ) {
       response.writeHead(403).end('{}');
       return;
     }
-    if (app.inFlight >= 32) {
+    if ((admissions.get(applicationId) ?? 0) >= 32) {
       response.writeHead(429).end('{}');
       return;
     }
-    app.inFlight++;
+    admissions.set(applicationId, (admissions.get(applicationId) ?? 0) + 1);
     try {
       let data = '';
       for await (const chunk of request) {
@@ -59,28 +73,28 @@ const server = createServer(async (request, response) => {
         if (Buffer.byteLength(data) > 65536) throw Error();
       }
       const body = JSON.parse(data);
-      if (
-        body.jsonrpc !== '2.0' ||
-        !allowed.has(body.method) ||
-        !Array.isArray(body.params)
-      )
-        throw Error();
-      if (
-        ['eth_sendUserOperation', 'eth_estimateUserOperationGas'].includes(
-          body.method,
-        )
-      ) {
-        const [op, entry] = body.params;
-        if (
-          body.params.length !== 2 ||
-          entry?.toLowerCase() !== app.config.entryPoint.toLowerCase() ||
-          !app.config.accounts.some(
-            (a) => a.toLowerCase() === op?.sender?.toLowerCase(),
-          ) ||
-          op?.paymaster?.toLowerCase() !== app.config.paymaster.toLowerCase()
-        )
-          throw Error();
+      validateRequest(body, config);
+      if (!app) {
+        startup.request(applicationId);
+        await refresh();
+        app = applications.get(applicationId);
+        if (!app) throw Error('Bundler unavailable');
       }
+      if (!app.ready) {
+        app.ready = waitForApplication(app).catch((error) => {
+          app.ready = undefined;
+          throw error;
+        });
+      }
+      await app.ready;
+      if (
+        !equal(
+          request.headers.authorization,
+          'Bearer ' + app.config.authorization,
+        )
+      )
+        throw Error('Bundler unavailable');
+      validateRequest(body, app.config);
       const reply = await fetch('http://127.0.0.1:' + app.port, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -108,7 +122,9 @@ const server = createServer(async (request, response) => {
       }
       response.writeHead(reply.status).end(payload);
     } finally {
-      app.inFlight--;
+      const remaining = (admissions.get(applicationId) ?? 1) - 1;
+      if (remaining) admissions.set(applicationId, remaining);
+      else admissions.delete(applicationId);
     }
   } catch {
     response.writeHead(503).end(
@@ -120,6 +136,64 @@ const server = createServer(async (request, response) => {
     );
   }
 });
+function validateRequest(body, config) {
+  if (
+    body.jsonrpc !== '2.0' ||
+    !allowed.has(body.method) ||
+    !Array.isArray(body.params)
+  )
+    throw Error();
+  if (
+    ['eth_sendUserOperation', 'eth_estimateUserOperationGas'].includes(
+      body.method,
+    )
+  ) {
+    const [op, entry] = body.params;
+    if (
+      body.params.length !== 2 ||
+      entry?.toLowerCase() !== config.entryPoint.toLowerCase() ||
+      !config.accounts.some(
+        (a) => a.toLowerCase() === op?.sender?.toLowerCase(),
+      ) ||
+      op?.paymaster?.toLowerCase() !== config.paymaster.toLowerCase()
+    )
+      throw Error();
+  }
+}
+async function waitForApplication(app) {
+  const deadline = Date.now() + 5000;
+  while (
+    Date.now() < deadline &&
+    applications.get(app.config.applicationId) === app
+  ) {
+    try {
+      const response = await fetch('http://127.0.0.1:' + app.port, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'eth_supportedEntryPoints',
+          params: [],
+        }),
+        signal: AbortSignal.timeout(1000),
+      });
+      const body = await response.json();
+      if (
+        response.ok &&
+        body.result?.some(
+          (entry) =>
+            entry.toLowerCase() === app.config.entryPoint.toLowerCase(),
+        )
+      )
+        return;
+    } catch {
+      /* The child may still be starting. No upstream probe is sent here. */
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  throw Error('Bundler unavailable');
+}
 async function refreshApplications() {
   let names;
   try {
@@ -157,11 +231,12 @@ async function refreshApplications() {
           previous.config.genesisHash !== config.genesisHash
         )
           throw Error();
+        configurations.set(config.applicationId, config);
         previous.config = config;
         continue;
       }
-      const failure = failures.get(config.applicationId);
-      if (failure && failure.retryAt > Date.now()) continue;
+      configurations.set(config.applicationId, config);
+      if (!(await startup.shouldStart(config))) continue;
       if (applications.size >= 32) continue;
       const port = allocatedPorts.get(config.applicationId) ?? nextPort++;
       allocatedPorts.set(config.applicationId, port);
@@ -213,10 +288,7 @@ async function refreshApplications() {
         simulations.verifyProbe(result.result);
       } catch {
         proxy.close();
-        failures.set(config.applicationId, {
-          count: 1,
-          retryAt: Date.now() + 10000,
-        });
+        startup.failed(config);
         continue;
       }
       const path = join('/tmp', 'alto-' + config.applicationId + '.json');
@@ -253,16 +325,12 @@ async function refreshApplications() {
         ['/app/src/esm/cli/alto.js', 'run', '--config', path],
         { stdio: 'ignore' },
       );
-      const application = { config, port, proxy, child, rpc, inFlight: 0 };
+      const application = { config, port, proxy, child, rpc };
       applications.set(config.applicationId, application);
+      startup.started(config.applicationId);
       const failed = () => {
         applications.delete(config.applicationId);
-        const count = (failures.get(config.applicationId)?.count ?? 0) + 1;
-        failures.set(config.applicationId, {
-          count,
-          retryAt:
-            Date.now() + Math.min(60000, 5000 * 2 ** Math.min(count - 1, 4)),
-        });
+        startup.failed(config);
         proxy.close();
       };
       child.once('exit', failed);
@@ -272,14 +340,13 @@ async function refreshApplications() {
     }
   }
 }
-async function refresh() {
-  if (refreshing) return;
-  refreshing = true;
-  try {
-    await refreshApplications();
-  } finally {
-    refreshing = false;
+function refresh() {
+  if (!refreshing) {
+    refreshing = refreshApplications().finally(() => {
+      refreshing = undefined;
+    });
   }
+  return refreshing;
 }
 await refresh();
 const timer = setInterval(() => {
@@ -292,6 +359,7 @@ function close() {
     app.child.kill('SIGTERM');
     app.proxy.close();
   }
+  redis.disconnect();
   server.close();
 }
 process.on('SIGTERM', close);
