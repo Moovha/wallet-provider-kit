@@ -109,11 +109,11 @@ it.each(['demand', 'queue'] as const)(
       );
       await writeFile(
         join(directory, 'node_modules/ioredis/package.json'),
-        JSON.stringify({ type: 'module', exports: './index.js' }),
+        JSON.stringify({ type: 'commonjs', exports: './index.js' }),
       );
       await writeFile(
         join(directory, 'node_modules/ioredis/index.js'),
-        `import {existsSync} from 'node:fs'; export class Redis {on(){} async exists(){return existsSync(${JSON.stringify(join(directory, 'pending'))})?1:0} disconnect(){}}`,
+        `const {existsSync}=require('node:fs'); exports.Redis=class Redis {on(){} async exists(){return existsSync(${JSON.stringify(join(directory, 'pending'))})?1:0} disconnect(){}}`,
       );
       await writeFile(
         join(directory, 'alto.mjs'),

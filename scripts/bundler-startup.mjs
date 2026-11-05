@@ -1,4 +1,10 @@
-import { getAddress } from 'viem';
+import { createRequire } from 'node:module';
+let getAddress;
+try {
+  ({ getAddress } = createRequire('/app/src/package.json')('viem'));
+} catch {
+  ({ getAddress } = createRequire(import.meta.url)('viem'));
+}
 
 /** Failed startup probes retry for admitted demand, changed RPCs, or recoverable work. */
 export function createBundlerStartupGate(hasPendingWork, now = Date.now) {

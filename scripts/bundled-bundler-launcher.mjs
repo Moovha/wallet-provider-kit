@@ -1,4 +1,10 @@
-import { Redis } from 'ioredis';
+import { createRequire } from 'node:module';
+let Redis;
+try {
+  ({ Redis } = createRequire('/app/src/package.json')('ioredis'));
+} catch {
+  ({ Redis } = createRequire(import.meta.url)('ioredis'));
+}
 import {
   createBundlerStartupGate,
   hasBundlerRecoveryWork,
