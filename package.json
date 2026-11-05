@@ -108,7 +108,7 @@
   "dependencies": {
     "@fastify/helmet": "13.2.0",
     "@fastify/rate-limit": "11.2.1",
-    "@fastify/swagger": "9.9.2",
+    "@fastify/swagger": "9.9.3",
     "@fastify/swagger-ui": "6.1.2",
     "@open-wallet-standard/core": "1.4.3",
     "@opentelemetry/api": "1.10.0",
