@@ -82,6 +82,7 @@ import {
   type ApplicationCredential,
 } from '../runtime-configuration/credentials.js';
 import { RpcReader } from '../execution/chain.js';
+import { estimateInfrastructureGas } from './infrastructure-estimate.js';
 import { quoteNetworkFees } from '../execution/network-fees.js';
 import {
   type SafeAccountBinding,
@@ -449,13 +450,16 @@ export class SafeWalletRuntime {
         chainId: Number(this.domain.chainId),
         genesisHash: this.config.safeWallet!.genesisHash,
       });
-      const response = await this.request(endpoint, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ jsonrpc: '2.0', id, method, params }),
-        redirect: 'error',
-        signal: AbortSignal.timeout(10000),
-      });
+      const response =
+        method === 'eth_estimateGas'
+          ? await estimateInfrastructureGas(this.request, endpoint, id, params)
+          : await this.request(endpoint, {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({ jsonrpc: '2.0', id, method, params }),
+              redirect: 'error',
+              signal: AbortSignal.timeout(10000),
+            });
       if (!response.ok) {
         await response.body?.cancel();
         throw new Error();
