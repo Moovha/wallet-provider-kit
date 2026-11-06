@@ -1,3 +1,4 @@
+export { upgradeProviderDatabase } from './upgrade.js';
 import { providerNetwork, type ProviderNetwork } from '../networks.js';
 import { ensureAssetBudget } from './asset-budgets.js';
 export { assetBudgetId } from './asset-budgets.js';

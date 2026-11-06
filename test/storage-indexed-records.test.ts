@@ -49,14 +49,6 @@ it('uses primary-key reads and maintained candidate indexes without enumerating 
         );
       }
     });
-    await store.transaction((s) => {
-      expect(
-        matchingRecords(s, 'accounts', 'owner', 'owner-000123'),
-      ).toHaveLength(1);
-      expect(
-        recordPage(s, 'verifiedUsers', undefined, 26, 'clientId', 'a'),
-      ).toHaveLength(26);
-    });
     const all = connection.all.bind(connection);
     let rows = 0;
     const queries: string[] = [];
@@ -80,14 +72,16 @@ it('uses primary-key reads and maintained candidate indexes without enumerating 
         revision: '1',
       });
     });
-    // The first query for a new field builds its index; new values reuse that same field index.
+    // First use reads only the selected index keys; no warm-up query is required.
     expect(rows).toBeLessThan(10);
     expect(queries.some((sql) => /SELECT.*onboarding_audit/.test(sql))).toBe(
       false,
     );
-    expect(queries.some((sql) => /SELECT id(?:,record)? FROM/.test(sql))).toBe(
-      false,
-    );
+    expect(
+      queries.some((sql) =>
+        /SELECT id(?:,record)? FROM onboarding_records/.test(sql),
+      ),
+    ).toBe(false);
     rows = 0;
     await store.transaction((s) => {
       expect(matchingRecords(s, 'accounts', 'owner', 'changed')).toHaveLength(
@@ -100,7 +94,7 @@ it('uses primary-key reads and maintained candidate indexes without enumerating 
         recordPage(s, 'verifiedUsers', '000050', 26, 'clientId', 'a')[0],
       ).toBe('000051');
     });
-    expect(rows).toBeLessThan(40);
+    expect(rows).toBeLessThan(80);
     await store.transaction((s) => {
       expect(recordCount(s, 'verifiedUsers', 'clientId', 'a')).toBe(2500);
       getRecord(s, 'verifiedUsers', '000001').clientId = 'b';

@@ -241,7 +241,7 @@ def inspect_layout(root: Path, source_root: Path | None = None) -> dict:
     ) as db:
         require(
             db.execute("PRAGMA application_id").fetchone()[0] == 0x57504B54
-            and db.execute("PRAGMA user_version").fetchone()[0] == 2,
+            and db.execute("PRAGMA user_version").fetchone()[0] in (2, 3),
             "Unsupported provider database identity or schema.",
         )
         require(
@@ -249,13 +249,14 @@ def inspect_layout(root: Path, source_root: Path | None = None) -> dict:
             and not db.execute("PRAGMA foreign_key_check").fetchall(),
             "Provider database integrity checks failed.",
         )
+        schema_version = db.execute("PRAGMA user_version").fetchone()[0]
         catalog = db.execute(
             "SELECT name,sql FROM sqlite_schema WHERE name NOT LIKE 'sqlite_%' ORDER BY name"
         ).fetchall()
     return {
         "required": sorted(set(required)),
         "images": images,
-        "schemaVersion": 2,
+        "schemaVersion": schema_version,
         "catalogSHA256": hashlib.sha256(json.dumps(catalog).encode()).hexdigest(),
         "originalDirectory": str(source_root),
     }

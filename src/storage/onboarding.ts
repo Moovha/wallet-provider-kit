@@ -3,7 +3,7 @@ import {
   recordValues,
   type CollectionName,
 } from '../onboarding/records.js';
-import { RecordIndexes, lowerBound } from './record-index.js';
+import { RecordIndexes } from './record-index.js';
 import { sharedCollections, scopedCollection } from './network-scope.js';
 export { scopedCollection } from './network-scope.js';
 import { providerNetwork, type ProviderNetwork } from '../networks.js';
@@ -90,17 +90,8 @@ export function sqliteOnboardingStore(
 ): OnboardingStore {
   return {
     async transaction<T>(operation: (state: ProviderState) => T): Promise<T> {
-      let indexes!: RecordIndexes;
-      let externalVersion = '';
-      const changes: { collection: string; id: string; record?: string }[] = [];
-      const result = connection.transaction(() => {
-        externalVersion = String(
-          connection.get('PRAGMA data_version')!.data_version,
-        );
-        indexes = RecordIndexes.current(
-          connection,
-          externalVersion + ':' + connection.recordRevision,
-        );
+      return connection.transaction(() => {
+        const indexes = new RecordIndexes(connection);
         const state = {
           format: 'moovha-onboarding-1',
           audit: [],
@@ -285,13 +276,12 @@ export function sqliteOnboardingStore(
             if (physical.length !== 1)
               return matches(collection, field, key).length;
             const target = targets.get(collection)!();
-            const ids = indexes.ids(physical[0], field, key);
-            let count = ids.length;
+            let count = indexes.count(physical[0], field, key);
             for (const id of new Set([
               ...Object.keys(target),
               ...checkedIds.get(collection)!,
             ])) {
-              const before = ids[lowerBound(ids, id)] === id;
+              const before = indexes.has(physical[0], field, key, id);
               const after = recordValues(read(collection, id), field).includes(
                 key,
               );
@@ -309,12 +299,12 @@ export function sqliteOnboardingStore(
             ];
             const ids = new Set(touched);
             for (const physical of physicals.get(collection)!) {
-              const indexed = indexes.ids(physical, field, key);
-              let start = after ? lowerBound(indexed, after) : 0;
-              if (after && indexed[start] === after) start++;
-              for (const id of indexed.slice(
-                start,
-                start + limit + touched.length,
+              for (const id of indexes.ids(
+                physical,
+                field,
+                key,
+                after,
+                limit + touched.length,
               ))
                 ids.add(id);
             }
@@ -387,10 +377,9 @@ export function sqliteOnboardingStore(
             if (!cell || cell.original() !== encoded) {
               const physical =
                 sources.get(key) ?? scopedCollection(collection, network);
-              changes.push({ collection: physical, id, record: encoded });
               connection.run(
                 'INSERT INTO onboarding_records(collection,id,record) VALUES(?,?,?) ON CONFLICT(collection,id) DO UPDATE SET record=excluded.record',
-                sources.get(key) ?? scopedCollection(collection, network),
+                physical,
                 id,
                 encoded,
               );
@@ -400,11 +389,6 @@ export function sqliteOnboardingStore(
         }
         for (const key of previous.keys()) {
           const [collection, id] = JSON.parse(key) as string[];
-          changes.push({
-            collection:
-              sources.get(key) ?? scopedCollection(collection, network),
-            id,
-          });
           connection.run(
             'DELETE FROM onboarding_records WHERE collection=? AND id=?',
             sources.get(key) ?? scopedCollection(collection, network),
@@ -420,11 +404,6 @@ export function sqliteOnboardingStore(
           );
         return detached;
       });
-      indexes.committed(
-        changes,
-        externalVersion + ':' + connection.recordRevision,
-      );
-      return result;
     },
   };
 }

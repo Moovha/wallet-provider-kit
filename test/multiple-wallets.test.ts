@@ -922,102 +922,112 @@ it('exposes creator-only KYC and deferred creation through the HTTP client with 
   }
 });
 
-it('keeps provisioning reads bounded with retained history and observes revocation from another connection', async () => {
-  const directory = await mkdtemp(join(tmpdir(), 'wpk-provisioning-growth-'));
-  folders.push(directory);
-  const connection = new StorageConnection({ directory, initialize: true });
-  const external = new StorageConnection({ directory });
-  try {
-    const f = await fixture(sqliteOnboardingStore(connection));
-    await f.service.request(ctx(), f.input());
-    connection.transaction(() => {
-      for (let i = 0; i < 5000; i++) {
-        const id = 'unrelated-' + i;
-        for (const collection of [
-          'accounts',
-          'grants',
-          'requests',
-          'admissions',
-          'attempts',
-          'idempotency',
-          'verifiedUsers',
-        ])
-          connection.run(
-            'INSERT INTO onboarding_records(collection,id,record) VALUES(?,?,?)',
-            collection,
-            id,
-            JSON.stringify({
+it(
+  'keeps first-use provisioning reads bounded with retained history and observes external revocation without rebuilding indexes',
+  { timeout: 60_000 },
+  async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'wpk-provisioning-growth-'));
+    folders.push(directory);
+    const connection = new StorageConnection({ directory, initialize: true });
+    const external = new StorageConnection({ directory });
+    try {
+      const f = await fixture(sqliteOnboardingStore(connection));
+      await f.service.request(ctx(), f.input());
+      connection.transaction(() => {
+        for (let i = 0; i < 5000; i++) {
+          const id = 'unrelated-' + i;
+          for (const collection of [
+            'accounts',
+            'grants',
+            'requests',
+            'admissions',
+            'attempts',
+            'idempotency',
+            'verifiedUsers',
+          ])
+            connection.run(
+              'INSERT INTO onboarding_records(collection,id,record) VALUES(?,?,?)',
+              collection,
               id,
-              accountId: id,
-              owner: id,
-              caller: { issuer, subject: 'other', clientId: 'other' },
-              request: {
+              JSON.stringify({
+                id,
                 accountId: id,
-                attemptId: id,
-                namespace: 'other',
-                provider: 'other',
-                resourceKey: id,
-              },
+                owner: id,
+                caller: { issuer, subject: 'other', clientId: 'other' },
+                request: {
+                  accountId: id,
+                  attemptId: id,
+                  namespace: 'other',
+                  provider: 'other',
+                  resourceKey: id,
+                },
+              }),
+            );
+          connection.run(
+            'INSERT INTO onboarding_audit(record) VALUES(?)',
+            JSON.stringify({
+              at: i,
+              event: 'offline-fixture',
+              resource: id,
+              revision: '1',
             }),
           );
-        connection.run(
-          'INSERT INTO onboarding_audit(record) VALUES(?)',
-          JSON.stringify({
-            at: i,
-            event: 'offline-fixture',
-            resource: id,
-            revision: '1',
-          }),
-        );
-      }
-    });
-    const warm = await f.service.request(ctx(), f.extra('warm'));
-    await f.service
-      .walletAuthority()
-      .provision(ctx('app-a', warm.grant_id), warm.account_id!);
-    let returnedBytes = 0;
-    const queries: string[] = [];
-    const all = connection.all.bind(connection),
-      get = connection.get.bind(connection);
-    vi.spyOn(connection, 'all').mockImplementation((sql, ...params) => {
-      queries.push(sql);
-      const result = all(sql, ...params);
-      returnedBytes += Buffer.byteLength(JSON.stringify(result));
-      return result;
-    });
-    vi.spyOn(connection, 'get').mockImplementation((sql, ...params) => {
-      const result = get(sql, ...params);
-      returnedBytes += Buffer.byteLength(JSON.stringify(result) ?? '');
-      return result;
-    });
-    const receipt = await f.service.request(ctx(), f.extra('selected'));
-    const authority = await f.service
-      .walletAuthority()
-      .provision(ctx('app-a', receipt.grant_id), receipt.account_id!);
-    expect(
-      await f.service.canDispatchProvision(
-        authority!.attemptId,
-        receipt.account_id!,
-      ),
-    ).toBe(true);
-    expect(
-      queries.some((sql) =>
-        /SELECT.*(?:id FROM|id,record FROM|onboarding_audit)/.test(sql),
-      ),
-    ).toBe(false);
-    expect(returnedBytes).toBeLessThan(100000);
-    await sqliteOnboardingStore(external).transaction((s) => {
-      getRecord(s, 'grants', receipt.grant_id!).state = 'revoked';
-    });
-    expect(
-      await f.service.canDispatchProvision(
-        authority!.attemptId,
-        receipt.account_id!,
-      ),
-    ).toBe(false);
-  } finally {
-    vi.restoreAllMocks();
-    connection.close();
-    external.close();
-  }
-});
+        }
+      });
+      let returnedBytes = 0;
+      const queries: string[] = [];
+      const all = connection.all.bind(connection),
+        get = connection.get.bind(connection);
+      vi.spyOn(connection, 'all').mockImplementation((sql, ...params) => {
+        queries.push(sql);
+        const result = all(sql, ...params);
+        returnedBytes += Buffer.byteLength(JSON.stringify(result));
+        return result;
+      });
+      vi.spyOn(connection, 'get').mockImplementation((sql, ...params) => {
+        const result = get(sql, ...params);
+        returnedBytes += Buffer.byteLength(JSON.stringify(result) ?? '');
+        return result;
+      });
+      const receipt = await f.service.request(ctx(), f.extra('selected'));
+      const authority = await f.service
+        .walletAuthority()
+        .provision(ctx('app-a', receipt.grant_id), receipt.account_id!);
+      expect(
+        await f.service.canDispatchProvision(
+          authority!.attemptId,
+          receipt.account_id!,
+        ),
+      ).toBe(true);
+      expect(
+        queries.some((sql) =>
+          /SELECT.*(?:id FROM onboarding_records|id,record FROM onboarding_records|onboarding_audit)/.test(
+            sql,
+          ),
+        ),
+      ).toBe(false);
+      expect(returnedBytes).toBeLessThan(100000);
+      returnedBytes = 0;
+      queries.length = 0;
+      await sqliteOnboardingStore(external).transaction((s) => {
+        getRecord(s, 'grants', receipt.grant_id!).state = 'revoked';
+      });
+      expect(
+        await f.service.canDispatchProvision(
+          authority!.attemptId,
+          receipt.account_id!,
+        ),
+      ).toBe(false);
+      expect(returnedBytes).toBeLessThan(10000);
+      expect(
+        queries.some((sql) =>
+          /SELECT id(?:,record)? FROM onboarding_records/.test(sql),
+        ),
+      ).toBe(false);
+    } finally {
+      vi.restoreAllMocks();
+      connection.close();
+      external.close();
+    }
+  },
+);

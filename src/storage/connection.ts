@@ -1,11 +1,17 @@
+import { privatePath } from './private-path.js';
 import { scopedCollection } from './network-scope.js';
 import { providerNetwork, type ProviderNetwork } from '../networks.js';
-import { constants, closeSync, lstatSync, mkdirSync, openSync } from 'node:fs';
+import { constants, closeSync, mkdirSync, openSync } from 'node:fs';
 import { isAbsolute, join } from 'node:path';
-import { DatabaseSync } from 'node:sqlite';
+import { DatabaseSync, type StatementSync } from 'node:sqlite';
 import { WalletProviderError } from '../domain/signing.js';
 import { AuthenticationError } from '../service/auth.js';
-import { applicationId, schema, schemaVersion } from './schema.js';
+import {
+  applicationId,
+  schema,
+  schemaStatements,
+  schemaVersion,
+} from './schema.js';
 
 type StorageValue = string | number | bigint | null;
 type StorageRow = Record<string, StorageValue | Uint8Array>;
@@ -24,23 +30,6 @@ export function unavailable(): never {
   throw new WalletProviderError('wallet_attempt_unavailable', 'unknown');
 }
 
-function privatePath(path: string, directory: boolean): boolean {
-  try {
-    const stat = lstatSync(path);
-    if (
-      stat.isSymbolicLink() ||
-      (stat.mode & 0o077) !== 0 ||
-      stat.uid !== process.getuid?.() ||
-      (directory ? !stat.isDirectory() : !stat.isFile() || stat.nlink !== 1)
-    )
-      throw new Error();
-    return true;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false;
-    throw new WalletProviderError('wallet_provider_configuration');
-  }
-}
-
 function normalize(sql: string) {
   return sql.trim().replace(/;$/, '').replace(/\s+/g, ' ');
 }
@@ -50,7 +39,7 @@ export class StorageConnection {
   private readonly db: DatabaseSync;
   private closed = false;
   private poisoned = false;
-  recordRevision = 0;
+  private readonly statements = new Map<string, StatementSync>();
 
   constructor(private readonly options: ProviderDatabaseOptions) {
     if (
@@ -163,7 +152,7 @@ export class StorageConnection {
       this.db.prepare('PRAGMA foreign_keys').get()!.foreign_keys !== 1
     )
       throw new Error();
-    const expected = schema.split(';').map(normalize).filter(Boolean).sort();
+    const expected = schemaStatements.map(normalize).sort();
     const actual = this.db
       .prepare("SELECT sql FROM sqlite_schema WHERE name NOT GLOB 'sqlite_*'")
       .all()
@@ -180,10 +169,20 @@ export class StorageConnection {
     if (this.closed || this.poisoned || !this.db.isTransaction) unavailable();
   }
 
+  private statement(sql: string): StatementSync {
+    let statement = this.statements.get(sql);
+    if (!statement) {
+      statement = this.db.prepare(sql);
+      if (this.statements.size >= 128)
+        this.statements.delete(this.statements.keys().next().value!);
+      this.statements.set(sql, statement);
+    }
+    return statement;
+  }
   all(sql: string, ...values: StorageValue[]): StorageRow[] {
     if (this.closed || this.poisoned) unavailable();
     try {
-      return this.db.prepare(sql).all(...values);
+      return this.statement(sql).all(...values);
     } catch {
       return unavailable();
     }
@@ -197,14 +196,7 @@ export class StorageConnection {
   ): { changes: number | bigint; lastInsertRowid: number | bigint } {
     if (this.closed || this.poisoned) unavailable();
     try {
-      const result = this.db.prepare(sql).run(...values);
-      if (
-        /\b(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+onboarding_records\b/i.test(
-          sql,
-        )
-      )
-        this.recordRevision++;
-      return result;
+      return this.statement(sql).run(...values);
     } catch {
       return unavailable();
     }
@@ -278,6 +270,7 @@ export class StorageConnection {
   }
   close() {
     if (!this.closed) {
+      this.statements.clear();
       this.db.close();
       this.closed = true;
     }

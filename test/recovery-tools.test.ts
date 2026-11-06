@@ -1,3 +1,5 @@
+import { schemaV2 } from '../src/storage/schema-v2.js';
+import { applicationId, schemaVersion } from '../src/storage/schema.js';
 import { afterEach, expect, it } from 'vitest';
 import { randomUUID } from 'node:crypto';
 import { owsCommand } from '../src/providers/ows-process.js';
@@ -39,7 +41,7 @@ afterEach(async () => {
   );
 });
 
-async function fixture() {
+async function fixture(version = schemaVersion) {
   const work = await mkdtemp(join(tmpdir(), 'provider-recovery-'));
   temporary.push(work);
   // macOS temporary directories can have a symlinked ancestor.
@@ -68,7 +70,22 @@ async function fixture() {
     24,
     join(source, '.provider-vault'),
   );
-  const db = new DatabaseSync(join(source, '.provider-data/provider.sqlite'));
+  let db = new DatabaseSync(join(source, '.provider-data/provider.sqlite'));
+  if (version === 2) {
+    // Construct a legacy recovery fixture without invoking a downgrade on retained data.
+    db.close();
+    await rm(join(source, '.provider-data/provider.sqlite'));
+    const legacy = new DatabaseSync(
+      join(source, '.provider-data/provider.sqlite'),
+    );
+    legacy.exec(schemaV2);
+    legacy.exec(
+      `PRAGMA application_id=${applicationId}; PRAGMA user_version=2`,
+    );
+    legacy.close();
+    await chmod(join(source, '.provider-data/provider.sqlite'), 0o600);
+    db = new DatabaseSync(join(source, '.provider-data/provider.sqlite'));
+  }
   db.exec(`INSERT INTO budgets VALUES ('fixture-budget','1','1');
     INSERT INTO approvals VALUES ('fixture-approval','fixture-account','sign_typed_data','fixture-fingerprint','{}',0);
     INSERT INTO admissions VALUES ('fixture','fixture','fixture-attempt','fixture-resource','fixture-fingerprint','{}','fixture-approval',NULL,'fixture-budget','1');
@@ -134,124 +151,133 @@ async function fixture() {
   };
 }
 
-it('restores the same offline signer and uncertain attempt while fencing every network and container', async () => {
-  const f = await fixture();
-  const accountId = randomUUID();
-  const scopedPath = join('accounts-v1', accountId);
-  await owsCommand({
-    command: 'create',
-    vaultPath: join(f.source, '.provider-vault'),
-    name: `moovha-${accountId}`,
-    secret: f.env.OWS_OWNER_PASSPHRASE,
-  });
-  const scopedWallet = listWallets(
-    join(f.source, '.provider-vault', scopedPath),
-  )[0];
-  f.config.activation = {
-    enabled: true,
-    backendAcceptance: 'offline fixture',
-    recoveryAcceptance: 'offline fixture',
-  };
-  f.config.additionalNetworks[0].activation = f.config.activation;
-  await writeFile(
-    join(f.source, 'provider.config.json'),
-    JSON.stringify(f.config),
-  );
-  await writeFile(
-    join(f.source, '.bundler-data/offline-queue'),
-    'retained pending queue',
-  );
-  await f.backup();
-  await f.verify();
-  expect((await stat(f.archive)).mode & 0o777).toBe(0o600);
-  await f.restore();
-  const destination = join(f.root, 'restored');
-  expect(await readFile(join(destination, 'provider.env'), 'utf8')).toBe(
-    await readFile(join(f.source, 'provider.env'), 'utf8'),
-  );
-  const wallets = listWallets(join(destination, '.provider-vault'));
-  expect(wallets).toEqual([f.wallet]);
-  const payload = {
-    domain: { name: 'Offline recovery proof', version: '1', chainId: '84532' },
-    types: { Proof: [{ name: 'value', type: 'uint256' }] },
-    primaryType: 'Proof',
-    message: { value: '1' },
-  };
-  for (const [wallet, vaultPath] of [
-    [wallets[0], join(destination, '.provider-vault')],
-    [scopedWallet, join(destination, '.provider-vault', scopedPath)],
-  ] as const) {
-    expect(listWallets(vaultPath)).toEqual([wallet]);
-    const account = wallet.accounts.find((a) => a.chainId === 'eip155:1')!;
-    const result = signTypedData(
-      wallet.id,
-      'eip155:84532',
-      JSON.stringify({
-        ...payload,
-        domain: {
-          ...payload.domain,
-          chainId: '0x' + BigInt(84532).toString(16).padStart(64, '0'),
-        },
-        types: {
-          ...payload.types,
-          EIP712Domain: [
-            { name: 'name', type: 'string' },
-            { name: 'version', type: 'string' },
-            { name: 'chainId', type: 'uint256' },
-          ],
-        },
-        message: { value: '0x' + '1'.padStart(64, '0') },
-      }),
-      f.env.OWS_OWNER_PASSPHRASE,
-      0,
-      vaultPath,
-      account.address,
+it.each([2, schemaVersion])(
+  'restores a schema %s snapshot with the same signer and uncertain attempt while fencing every network and container',
+  async (version) => {
+    const f = await fixture(version);
+    const accountId = randomUUID();
+    const scopedPath = join('accounts-v1', accountId);
+    await owsCommand({
+      command: 'create',
+      vaultPath: join(f.source, '.provider-vault'),
+      name: `moovha-${accountId}`,
+      secret: f.env.OWS_OWNER_PASSPHRASE,
+    });
+    const scopedWallet = listWallets(
+      join(f.source, '.provider-vault', scopedPath),
+    )[0];
+    f.config.activation = {
+      enabled: true,
+      backendAcceptance: 'offline fixture',
+      recoveryAcceptance: 'offline fixture',
+    };
+    f.config.additionalNetworks[0].activation = f.config.activation;
+    await writeFile(
+      join(f.source, 'provider.config.json'),
+      JSON.stringify(f.config),
     );
+    await writeFile(
+      join(f.source, '.bundler-data/offline-queue'),
+      'retained pending queue',
+    );
+    await f.backup();
+    await f.verify();
+    expect((await stat(f.archive)).mode & 0o777).toBe(0o600);
+    await f.restore();
+    const destination = join(f.root, 'restored');
+    expect(await readFile(join(destination, 'provider.env'), 'utf8')).toBe(
+      await readFile(join(f.source, 'provider.env'), 'utf8'),
+    );
+    const wallets = listWallets(join(destination, '.provider-vault'));
+    expect(wallets).toEqual([f.wallet]);
+    const payload = {
+      domain: {
+        name: 'Offline recovery proof',
+        version: '1',
+        chainId: '84532',
+      },
+      types: { Proof: [{ name: 'value', type: 'uint256' }] },
+      primaryType: 'Proof',
+      message: { value: '1' },
+    };
+    for (const [wallet, vaultPath] of [
+      [wallets[0], join(destination, '.provider-vault')],
+      [scopedWallet, join(destination, '.provider-vault', scopedPath)],
+    ] as const) {
+      expect(listWallets(vaultPath)).toEqual([wallet]);
+      const account = wallet.accounts.find((a) => a.chainId === 'eip155:1')!;
+      const result = signTypedData(
+        wallet.id,
+        'eip155:84532',
+        JSON.stringify({
+          ...payload,
+          domain: {
+            ...payload.domain,
+            chainId: '0x' + BigInt(84532).toString(16).padStart(64, '0'),
+          },
+          types: {
+            ...payload.types,
+            EIP712Domain: [
+              { name: 'name', type: 'string' },
+              { name: 'version', type: 'string' },
+              { name: 'chainId', type: 'uint256' },
+            ],
+          },
+          message: { value: '0x' + '1'.padStart(64, '0') },
+        }),
+        f.env.OWS_OWNER_PASSPHRASE,
+        0,
+        vaultPath,
+        account.address,
+      );
+      expect(
+        recoverAddress(
+          TypedDataEncoder.hash(payload.domain, payload.types, payload.message),
+          `0x${result.signature}`,
+        ).toLowerCase(),
+      ).toBe(account.address.toLowerCase());
+    }
+    const db = new DatabaseSync(
+      join(destination, '.provider-data/provider.sqlite'),
+      { readOnly: true },
+    );
+    expect(db.prepare('PRAGMA user_version').get()!.user_version).toBe(version);
     expect(
-      recoverAddress(
-        TypedDataEncoder.hash(payload.domain, payload.types, payload.message),
-        `0x${result.signature}`,
-      ).toLowerCase(),
-    ).toBe(account.address.toLowerCase());
-  }
-  const db = new DatabaseSync(
-    join(destination, '.provider-data/provider.sqlite'),
-    { readOnly: true },
-  );
-  expect(
-    db.prepare('SELECT state,attempt_id FROM attempts').get(),
-  ).toMatchObject({ state: 'unknown', attempt_id: 'fixture-attempt' });
-  db.close();
-  expect(
-    await readFile(join(destination, '.bundler-data/offline-queue'), 'utf8'),
-  ).toBe('retained pending queue');
-  const config = JSON.parse(
-    await readFile(join(destination, 'provider.config.json'), 'utf8'),
-  );
-  expect(config.activation.enabled).toBe(false);
-  expect(
-    config.additionalNetworks.every(
-      (n: { activation: { enabled: boolean } }) => !n.activation.enabled,
-    ),
-  ).toBe(true);
-  const compose = JSON.parse(
-    await readFile(join(destination, 'compose.json'), 'utf8'),
-  );
-  expect(compose.name).not.toBe('wallet-provider');
-  for (const service of Object.values(compose.services) as Record<
-    string,
-    unknown
-  >[]) {
-    expect(service.entrypoint).toEqual(['/bin/false']);
-    expect(service.network_mode).toBe('none');
-    expect(service.restart).toBe('no');
-    expect(service).not.toHaveProperty('ports');
-    for (const volume of service.volumes as { source: string }[])
-      expect(volume.source.startsWith(destination + '/')).toBe(true);
-  }
-  await expect(f.restore()).rejects.toThrow();
-  await expect(f.backup()).rejects.toThrow();
-}, 30000);
+      db.prepare('SELECT state,attempt_id FROM attempts').get(),
+    ).toMatchObject({ state: 'unknown', attempt_id: 'fixture-attempt' });
+    db.close();
+    expect(
+      await readFile(join(destination, '.bundler-data/offline-queue'), 'utf8'),
+    ).toBe('retained pending queue');
+    const config = JSON.parse(
+      await readFile(join(destination, 'provider.config.json'), 'utf8'),
+    );
+    expect(config.activation.enabled).toBe(false);
+    expect(
+      config.additionalNetworks.every(
+        (n: { activation: { enabled: boolean } }) => !n.activation.enabled,
+      ),
+    ).toBe(true);
+    const compose = JSON.parse(
+      await readFile(join(destination, 'compose.json'), 'utf8'),
+    );
+    expect(compose.name).not.toBe('wallet-provider');
+    for (const service of Object.values(compose.services) as Record<
+      string,
+      unknown
+    >[]) {
+      expect(service.entrypoint).toEqual(['/bin/false']);
+      expect(service.network_mode).toBe('none');
+      expect(service.restart).toBe('no');
+      expect(service).not.toHaveProperty('ports');
+      for (const volume of service.volumes as { source: string }[])
+        expect(volume.source.startsWith(destination + '/')).toBe(true);
+    }
+    await expect(f.restore()).rejects.toThrow();
+    await expect(f.backup()).rejects.toThrow();
+  },
+  30000,
+);
 
 it('rejects wrong recovery identities, corrupted and truncated ciphertext without publishing a restore', async () => {
   const f = await fixture();

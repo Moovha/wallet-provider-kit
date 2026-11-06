@@ -2170,6 +2170,7 @@ Import from `@moovha/wallet-provider-kit/storage`. [Integration guide](storage.m
 - [PolicyBudgetCharge](#policybudgetcharge)
 - [ProviderDatabase](#providerdatabase)
 - [ProviderDatabaseOptions](#providerdatabaseoptions)
+- [upgradeProviderDatabase](#upgradeproviderdatabase)
 
 ### AssetBudgetCharge
 
@@ -2460,6 +2461,21 @@ export interface ProviderDatabaseOptions {
   /** Explicitly initialize an empty toolkit database. Never upgrades an existing schema. */
   initialize?: boolean;
 }
+```
+
+### upgradeProviderDatabase
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/storage/upgrade.ts).
+
+```ts
+/**
+ * Offline, explicit schema 2-to-3 upgrade.
+ * Stop every writer and retain a verified recovery backup first.
+ */
+export declare function upgradeProviderDatabase(directory: string): {
+  fromVersion: number;
+  toVersion: number;
+};
 ```
 
 ## Configuration-first provider service

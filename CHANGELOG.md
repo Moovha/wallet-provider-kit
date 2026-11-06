@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Persist SQLite lookup indexes and counts in schema version 3, maintained by
+  transactional triggers for local and external record writes. First-use lookups
+  and external commits no longer rebuild whole-collection indexes.
+- Add the explicit offline `upgrade-storage` command for version 2 databases.
+  Upgrades preserve retained wallet and financial records and require stopped
+  writers and a verified recovery backup; startup does not migrate storage.
+
 - Store Safe wallet metadata per account with atomic conversion of legacy inline records and bounded application capacity checks.
 - Isolate native OWS operations by account and preserve legacy encrypted wallets during startup preparation.
 - Use direct SQLite record reads and candidate indexes for provisioning, wallet ownership and administrative pagination; append audit events without loading history.
