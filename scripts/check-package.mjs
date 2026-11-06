@@ -17,6 +17,9 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
+const sourceManifest = JSON.parse(
+  await readFile(join(root, 'package.json'), 'utf8'),
+);
 const temporary = await mkdtemp(join(tmpdir(), 'wallet-provider-consumer-'));
 const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 function run(command, args, cwd = temporary) {
@@ -77,7 +80,13 @@ try {
   }
   await writeFile(
     join(temporary, 'package.json'),
-    JSON.stringify({ private: true, type: 'module' }),
+    JSON.stringify({
+      private: true,
+      type: 'module',
+      dependencies: {
+        '@types/node': sourceManifest.devDependencies['@types/node'],
+      },
+    }),
   );
   run(npm, [
     'install',
