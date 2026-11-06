@@ -18,6 +18,14 @@ and receipt contracts, consent revisions for equivalent policies, and recovery
 of retained attempts when separating components. Verify both sides independently
 and document installation order before changing a deployed integration.
 
+Public documentation follows the same boundary. Keep installation and wallet guides
+application-neutral. Put product walkthroughs, asset/fiat examples, pricing profiles
+and application activation instructions in the owning application repository.
+Protocol adapter references may name supported protocols and document their exact
+interfaces, authorization constraints and recovery behavior. Preserve existing API
+identifiers and documentation links; do not hide an implemented interface or weaken
+a safeguard to make a guide appear generic.
+
 ## Propose a change
 
 For bugs, include the version, expected behavior and an offline reproduction.
