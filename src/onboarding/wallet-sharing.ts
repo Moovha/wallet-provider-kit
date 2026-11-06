@@ -1,3 +1,4 @@
+import { matchingRecords, getRecord } from './records.js';
 import { WalletProviderError } from '../domain/signing.js';
 import type { VerifiedPrincipal } from '../domain/principal.js';
 import type {
@@ -61,7 +62,7 @@ function sourceEvidence(
   sourceId: string,
 ) {
   const terms = sharingTerms(policy, principal, sourceId);
-  const account = state.accounts[source.accountId];
+  const account = getRecord(state, 'accounts', source.accountId);
   const evidence = source.input.user;
   const sourceApp = policy.applications.find(
     (a) =>
@@ -123,10 +124,15 @@ export function matchSharedAccount(
   )
     deny();
   const matches = new Map<string, AccessRequest>();
-  for (const source of Object.values(state.requests)) {
+  for (const source of matchingRecords(
+    state,
+    'requests',
+    'input.user.identity.fields.identity_number',
+    user.identity.fields.identity_number,
+  )) {
     try {
       sourceEvidence(policy, state, source, request.caller, user, sourceId);
-      const account = state.accounts[source.accountId];
+      const account = getRecord(state, 'accounts', source.accountId);
       if (
         request.input.source_account_id
           ? source.accountId !== request.input.source_account_id
@@ -145,8 +151,13 @@ export function matchSharedAccount(
   }
   if (matches.size !== 1) deny();
   const source = [...matches.values()][0];
-  const account = state.accounts[source.accountId];
-  const previous = Object.values(state.accounts).find(
+  const account = getRecord(state, 'accounts', source.accountId);
+  const previous = matchingRecords(
+    state,
+    'accounts',
+    '$walletOwner',
+    subjectOwner,
+  ).find(
     (a) => a.owner === subjectOwner || a.linkedOwners?.includes(subjectOwner),
   );
   if (
@@ -190,7 +201,8 @@ export function validateSharedAccess(
     request.input.source_application_id !== sharing.sourceApplicationId
   )
     deny();
-  const source = state.requests[sharing.sourceRequestId] ?? deny();
+  const source =
+    getRecord(state, 'requests', sharing.sourceRequestId) ?? deny();
   const { terms, account } = sourceEvidence(
     policy,
     state,

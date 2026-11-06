@@ -495,7 +495,7 @@ export async function fixture(
       principal.clientId,
     );
     const r = s.deploymentBindings!['service-v1'].runtimeConfiguration!;
-    r.safeWalletAccounts = {
+    s.safeWalletAccounts = {
       [accountId]: {
         applicationId: applicationId,
         accountId,

@@ -1,3 +1,4 @@
+import { getRecord, matchingRecords } from '../onboarding/records.js';
 import { solidityPacked } from 'ethers';
 import {
   initialSafeOwnerPolicy,
@@ -289,19 +290,23 @@ export class Safe4337SigningService {
       (state, grant) => {
         if (
           record.configurationHash !== this.configurationHash ||
-          state.deploymentBindings?.['service-v1']?.activeRevision !==
-            this.actions.revision ||
+          getRecord(state, 'deploymentBindings', 'service-v1')
+            ?.activeRevision !== this.actions.revision ||
           grant.owner !== record.source.ownerSubject ||
           ['issuer', 'subject', 'clientId'].some(
             (key) =>
               principal[key as 'issuer' | 'subject' | 'clientId'] !==
               record.source.caller[key as 'issuer' | 'subject' | 'clientId'],
           ) ||
-          state.accounts[grant.accountId].address?.toLowerCase() !==
+          getRecord(
+            state,
+            'accounts',
+            grant.accountId,
+          ).address?.toLowerCase() !==
             (
               record.source.userAccount ?? record.source.account
             ).address.toLowerCase() ||
-          fingerprint(state.supportedActions?.[id]?.approval) !==
+          fingerprint(getRecord(state, 'supportedActions', id)?.approval) !==
             fingerprint(record.source)
         )
           deny();
@@ -802,7 +807,7 @@ export class Safe4337SigningService {
         initialSafeOwnerPolicy(record.source.account.address),
     );
     await this.actions.withAuthorizedCalls(context.principal, id, (state) => {
-      const latest = state.sponsorships?.[id] ?? deny();
+      const latest = getRecord(state, 'sponsorships', id) ?? deny();
       if (latest.signatureCollection) {
         if (
           fingerprint(latest.signatureCollection.action) !==
@@ -812,9 +817,12 @@ export class Safe4337SigningService {
           deny();
       } else
         latest.signatureCollection = {
-          batchId: Object.values(state.userOperationBatches ?? {}).find(
-            (batch) => batch.operationId === id,
-          )?.metadata.id,
+          batchId: matchingRecords(
+            state,
+            'userOperationBatches',
+            'operationId',
+            id,
+          ).find((batch) => batch.operationId === id)?.metadata.id,
           scanFromBlock,
           calls: this.terms(record).preparation.intent.calls,
           action:
@@ -884,7 +892,8 @@ export class Safe4337SigningService {
       throw new WalletProviderError('wallet_provider_input');
     }
     await this.actions.withAuthorizedCalls(context.principal, id, (state) => {
-      const current = state.sponsorships?.[id]?.signatureCollection ?? deny();
+      const current =
+        getRecord(state, 'sponsorships', id)?.signatureCollection ?? deny();
       if (
         current.state !== 'collecting' ||
         fingerprint(current.action) !== fingerprint(collection.action) ||
@@ -906,10 +915,10 @@ export class Safe4337SigningService {
     }
     await this.current(context, record);
     await this.actions.withAuthorizedCalls(context.principal, id, (state) => {
-      if (state.userOperationExecutions?.[id]?.dispatch)
+      if (getRecord(state, 'userOperationExecutions', id)?.dispatch)
         throw new WalletProviderError('wallet_attempt_conflict');
       const collection =
-        state.sponsorships?.[id]?.signatureCollection ?? deny();
+        getRecord(state, 'sponsorships', id)?.signatureCollection ?? deny();
       collection.state = 'cancelled';
     });
     return this.collectionView(this.load(id));
@@ -971,7 +980,7 @@ export class Safe4337SigningService {
       { owner: authority.account.address, signature },
     ];
     await this.actions.withAuthorizedCalls(context.principal, id, (state) => {
-      const current = state.sponsorships?.[id]?.signatureCollection;
+      const current = getRecord(state, 'sponsorships', id)?.signatureCollection;
       if (current?.state === 'cancelled') deny();
       if (current) current.signatures[policy.providerSigner] = signature;
     });

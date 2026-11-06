@@ -1,4 +1,6 @@
 import { afterEach, expect, it } from 'vitest';
+import { randomUUID } from 'node:crypto';
+import { owsCommand } from '../src/providers/ows-process.js';
 import { execFile } from 'node:child_process';
 import { promisify, parseEnv } from 'node:util';
 import {
@@ -134,6 +136,17 @@ async function fixture() {
 
 it('restores the same offline signer and uncertain attempt while fencing every network and container', async () => {
   const f = await fixture();
+  const accountId = randomUUID();
+  const scopedPath = join('accounts-v1', accountId);
+  await owsCommand({
+    command: 'create',
+    vaultPath: join(f.source, '.provider-vault'),
+    name: `moovha-${accountId}`,
+    secret: f.env.OWS_OWNER_PASSPHRASE,
+  });
+  const scopedWallet = listWallets(
+    join(f.source, '.provider-vault', scopedPath),
+  )[0];
   f.config.activation = {
     enabled: true,
     backendAcceptance: 'offline fixture',
@@ -164,37 +177,43 @@ it('restores the same offline signer and uncertain attempt while fencing every n
     primaryType: 'Proof',
     message: { value: '1' },
   };
-  const account = wallets[0].accounts.find((a) => a.chainId === 'eip155:1')!;
-  const result = signTypedData(
-    wallets[0].id,
-    'eip155:84532',
-    JSON.stringify({
-      ...payload,
-      domain: {
-        ...payload.domain,
-        chainId: '0x' + BigInt(84532).toString(16).padStart(64, '0'),
-      },
-      types: {
-        ...payload.types,
-        EIP712Domain: [
-          { name: 'name', type: 'string' },
-          { name: 'version', type: 'string' },
-          { name: 'chainId', type: 'uint256' },
-        ],
-      },
-      message: { value: '0x' + '1'.padStart(64, '0') },
-    }),
-    f.env.OWS_OWNER_PASSPHRASE,
-    0,
-    join(destination, '.provider-vault'),
-    account.address,
-  );
-  expect(
-    recoverAddress(
-      TypedDataEncoder.hash(payload.domain, payload.types, payload.message),
-      `0x${result.signature}`,
-    ).toLowerCase(),
-  ).toBe(account.address.toLowerCase());
+  for (const [wallet, vaultPath] of [
+    [wallets[0], join(destination, '.provider-vault')],
+    [scopedWallet, join(destination, '.provider-vault', scopedPath)],
+  ] as const) {
+    expect(listWallets(vaultPath)).toEqual([wallet]);
+    const account = wallet.accounts.find((a) => a.chainId === 'eip155:1')!;
+    const result = signTypedData(
+      wallet.id,
+      'eip155:84532',
+      JSON.stringify({
+        ...payload,
+        domain: {
+          ...payload.domain,
+          chainId: '0x' + BigInt(84532).toString(16).padStart(64, '0'),
+        },
+        types: {
+          ...payload.types,
+          EIP712Domain: [
+            { name: 'name', type: 'string' },
+            { name: 'version', type: 'string' },
+            { name: 'chainId', type: 'uint256' },
+          ],
+        },
+        message: { value: '0x' + '1'.padStart(64, '0') },
+      }),
+      f.env.OWS_OWNER_PASSPHRASE,
+      0,
+      vaultPath,
+      account.address,
+    );
+    expect(
+      recoverAddress(
+        TypedDataEncoder.hash(payload.domain, payload.types, payload.message),
+        `0x${result.signature}`,
+      ).toLowerCase(),
+    ).toBe(account.address.toLowerCase());
+  }
   const db = new DatabaseSync(
     join(destination, '.provider-data/provider.sqlite'),
     { readOnly: true },

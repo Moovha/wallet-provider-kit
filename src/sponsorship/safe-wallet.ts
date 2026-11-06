@@ -1,3 +1,10 @@
+import {
+  getRecord,
+  putRecord,
+  matchingRecords,
+  recordCount,
+} from '../onboarding/records.js';
+import { prepareSafeWalletRecords } from './wallet-records.js';
 import { FundingDepositReader } from './funding-deposit.js';
 import { verifiedRpcEndpoint } from '../execution/verified-rpc-endpoint.js';
 import {
@@ -229,8 +236,8 @@ export class SafeWalletRuntime {
     const snapshot = await this.database.onboardingStore.transaction(
       (state) => {
         if (
-          state.deploymentBindings?.['service-v1']?.activeRevision !==
-          this.actions.revision
+          getRecord(state, 'deploymentBindings', 'service-v1')
+            ?.activeRevision !== this.actions.revision
         )
           deny();
         return Object.values(state.userOperationBatches ?? {});
@@ -347,12 +354,13 @@ export class SafeWalletRuntime {
     ) => T,
   ) {
     return this.database.onboardingStore.transaction((s) => {
-      const deployment = s.deploymentBindings?.['service-v1'];
+      const deployment = getRecord(s, 'deploymentBindings', 'service-v1');
       if (
         deployment?.activeRevision !== this.actions.revision ||
         !deployment.runtimeConfiguration
       )
         deny();
+      prepareSafeWalletRecords(s);
       return fn(deployment.runtimeConfiguration, s);
     });
   }
@@ -1403,8 +1411,13 @@ export class SafeWalletRuntime {
         )
       : infrastructureFundingPlan(balances, watermark);
     const pendingWallets = allocation
-      ? await this.transaction((r) =>
-          Object.values(r.safeWalletAccounts ?? {}).filter(
+      ? await this.transaction((r, state) =>
+          matchingRecords(
+            state,
+            'safeWalletAccounts',
+            'applicationId',
+            applicationId,
+          ).filter(
             (wallet) =>
               wallet.applicationId === applicationId &&
               wallet.status !== 'ready' &&
@@ -1622,16 +1635,18 @@ export class SafeWalletRuntime {
           accountId,
           (s, grant) => ({
             owner: grant.owner,
-            account: s.accounts[accountId],
+            account: getRecord(s, 'accounts', accountId),
             shared: Boolean(
-              (grant.requestId && s.requests[grant.requestId]?.sharing) ||
-              (grant.requestId && s.requests[grant.requestId]?.membership),
+              (grant.requestId &&
+                getRecord(s, 'requests', grant.requestId)?.sharing) ||
+              (grant.requestId &&
+                getRecord(s, 'requests', grant.requestId)?.membership),
             ),
           }),
         );
       const current = await authority();
-      const retainedWallet = await this.transaction(
-        (r) => r.safeWalletAccounts?.[accountId],
+      const retainedWallet = await this.transaction((r, state) =>
+        getRecord(state, 'safeWalletAccounts', accountId),
       );
       if (
         current.shared &&
@@ -1699,12 +1714,12 @@ export class SafeWalletRuntime {
           },
         );
       }
-      await this.transaction((r) => {
-        const accounts = (r.safeWalletAccounts ??= {});
-        if (accounts[accountId]) {
+      await this.transaction((r, state) => {
+        const existing = getRecord(state, 'safeWalletAccounts', accountId);
+        if (existing) {
           if (
-            accounts[accountId].owner !== current.owner ||
-            accounts[accountId].applicationId !== applicationId
+            existing.owner !== current.owner ||
+            existing.applicationId !== applicationId
           )
             deny();
           return;
@@ -1712,16 +1727,19 @@ export class SafeWalletRuntime {
         const accepted = r.obligations?.records[applicationId + ':sponsorship']
           ?.value as ApplicationObligations['sponsorship'];
         if (
-          Object.values(accounts).filter(
-            (a) => a.applicationId === applicationId,
-          ).length >= (accepted.maximum_execution_accounts ?? 0)
+          recordCount(
+            state,
+            'safeWalletAccounts',
+            'applicationId',
+            applicationId,
+          ) >= (accepted.maximum_execution_accounts ?? 0)
         )
           deny();
         const signer = {
           accountId,
           address: current.account.address ?? deny(),
         };
-        accounts[accountId] = {
+        putRecord(state, 'safeWalletAccounts', accountId, {
           applicationId,
           accountId,
           owner: current.owner,
@@ -1740,10 +1758,10 @@ export class SafeWalletRuntime {
               this.config.safeWallet!.module.address,
             ),
           },
-        };
+        });
       });
-      let wallet = await this.transaction(
-        (r) => r.safeWalletAccounts![accountId],
+      let wallet = await this.transaction((r, state) =>
+        getRecord(state, 'safeWalletAccounts', accountId),
       );
       this.assertRecoveryRecipe(wallet);
       if (wallet.status !== 'ready') {
@@ -1813,8 +1831,8 @@ export class SafeWalletRuntime {
           saltNonce: salt.toString(),
           proxyCreationCode,
         });
-        await this.transaction((r) => {
-          const saved = r.safeWalletAccounts![accountId];
+        await this.transaction((r, state) => {
+          const saved = getRecord(state, 'safeWalletAccounts', accountId);
           saved.binding.address = address;
           if (recovery) saved.recovery = recovery;
         });
@@ -1830,8 +1848,8 @@ export class SafeWalletRuntime {
             await authority();
           },
         );
-        wallet = await this.transaction(
-          (r) => r.safeWalletAccounts![accountId],
+        wallet = await this.transaction((r, state) =>
+          getRecord(state, 'safeWalletAccounts', accountId),
         );
       }
       if (
@@ -1918,8 +1936,8 @@ export class SafeWalletRuntime {
         wallet.signer.address,
       );
       await authority();
-      await this.transaction((r) => {
-        r.safeWalletAccounts![accountId].status = 'ready';
+      await this.transaction((r, state) => {
+        getRecord(state, 'safeWalletAccounts', accountId).status = 'ready';
       });
       await this.publishBundler(applicationId);
 
@@ -1946,8 +1964,8 @@ export class SafeWalletRuntime {
       context.principal.issuer,
       context.principal.clientId,
     );
-    const wallet = await this.transaction(
-      (r) => r.safeWalletAccounts?.[accountId],
+    const wallet = await this.transaction((r, state) =>
+      getRecord(state, 'safeWalletAccounts', accountId),
     );
     if (
       !wallet ||
@@ -2024,8 +2042,8 @@ export class SafeWalletRuntime {
     )
       deny();
     await access();
-    await this.transaction((r) => {
-      r.safeWalletAccounts![accountId].recovery = manifest;
+    await this.transaction((r, state) => {
+      getRecord(state, 'safeWalletAccounts', accountId).recovery = manifest;
     });
     return structuredClone(manifest);
   }
@@ -2204,12 +2222,45 @@ export class SafeWalletRuntime {
         ])
       : applicationId;
   }
+  private applicationWallets(state: ProviderState, applicationId: string) {
+    const candidates = new Map(
+      matchingRecords(
+        state,
+        'safeWalletAccounts',
+        'applicationId',
+        applicationId,
+      ).map((wallet) => [wallet.accountId, wallet]),
+    );
+    const app = this.config.policy.applications.find(
+      (app) => runtimeApplicationId(app.issuer, app.clientId) === applicationId,
+    );
+    if (app)
+      for (const grant of matchingRecords(
+        state,
+        'grants',
+        'caller.clientId',
+        app.clientId,
+      )) {
+        if (
+          grant.caller.issuer !== app.issuer ||
+          !this.onboarding.hasSharedWalletAccess(
+            state,
+            applicationId,
+            grant.accountId,
+          )
+        )
+          continue;
+        const wallet = getRecord(state, 'safeWalletAccounts', grant.accountId);
+        if (wallet) candidates.set(wallet.accountId, wallet);
+      }
+    return [...candidates.values()];
+  }
   private async writeBundler(applicationId: string) {
     const infrastructure = await this.current(applicationId),
       urls = await this.resources.rpcEndpoints(applicationId);
     if (!infrastructure.paymaster) deny();
     const accounts = await this.transaction((r, state) =>
-      Object.values(r.safeWalletAccounts ?? {})
+      this.applicationWallets(state, applicationId)
         .filter(
           (a) =>
             (a.applicationId === applicationId ||
@@ -2323,7 +2374,7 @@ export class SafeWalletRuntime {
   }
   private async currentDriver(applicationId: string, accountId: string) {
     await this.transaction((r, state) => {
-      const wallet = r.safeWalletAccounts?.[accountId];
+      const wallet = getRecord(state, 'safeWalletAccounts', accountId);
       if (
         !wallet ||
         (wallet.applicationId !== applicationId &&
@@ -2340,7 +2391,9 @@ export class SafeWalletRuntime {
     const currentAgreement = await this.agreement(applicationId);
     const currentOwnerPolicy = fingerprint(
       await this.transaction(
-        (r) => r.safeWalletAccounts?.[accountId]?.binding.ownerPolicy ?? null,
+        (r, state) =>
+          getRecord(state, 'safeWalletAccounts', accountId)?.binding
+            .ownerPolicy ?? null,
       ),
     );
     const ownerDriver = this.drivers.get(driverKey);
@@ -2373,9 +2426,10 @@ export class SafeWalletRuntime {
         (a) => runtimeApplicationId(a.issuer, a.clientId) === applicationId,
       ) ?? deny();
     const accounts = await this.transaction((r, state) =>
-      Object.values(r.safeWalletAccounts ?? {})
+      [getRecord(state, 'safeWalletAccounts', accountId)]
         .filter(
           (a) =>
+            a &&
             (a.applicationId === applicationId ||
               this.onboarding.hasSharedWalletAccess(
                 state,
@@ -2682,17 +2736,29 @@ export class SafeWalletRuntime {
           refresh,
         ),
       list: async (principal, authorize) => {
-        const wallets = await this.transaction((r) =>
-          Object.values(r.safeWalletAccounts ?? {}).filter(
-            (a) => a.status === 'ready',
-          ),
+        const wallets = await this.transaction((r, state) =>
+          (authorize
+            ? Object.values(state.safeWalletAccounts ?? {})
+            : this.applicationWallets(
+                state,
+                runtimeApplicationId(principal.issuer, principal.clientId),
+              )
+          ).filter((a) => a.status === 'ready'),
         );
         const shared = await this.onboarding.store.transaction((state) =>
-          Object.values(state.grants)
+          (authorize
+            ? Object.values(state.grants)
+            : matchingRecords(
+                state,
+                'grants',
+                'caller.clientId',
+                principal.clientId,
+              )
+          )
             .filter(
               (grant) =>
-                (state.requests[grant.requestId]?.sharing ||
-                  state.requests[grant.requestId]?.membership) &&
+                (getRecord(state, 'requests', grant.requestId)?.sharing ||
+                  getRecord(state, 'requests', grant.requestId)?.membership) &&
                 (authorize ||
                   (grant.caller.issuer === principal.issuer &&
                     grant.caller.clientId === principal.clientId)),
@@ -2736,8 +2802,8 @@ export class SafeWalletRuntime {
     };
   }
   async start() {
-    const wallets = await this.transaction((r) =>
-      Object.values(r.safeWalletAccounts ?? {}).filter(
+    const wallets = await this.transaction((r, state) =>
+      Object.values(state.safeWalletAccounts ?? {}).filter(
         (a) => a.status === 'ready',
       ),
     );
@@ -2751,8 +2817,8 @@ export class SafeWalletRuntime {
       Object.values(state.grants)
         .filter(
           (grant) =>
-            state.requests[grant.requestId]?.sharing ||
-            state.requests[grant.requestId]?.membership,
+            getRecord(state, 'requests', grant.requestId)?.sharing ||
+            getRecord(state, 'requests', grant.requestId)?.membership,
         )
         .map((grant) => ({
           accountId: grant.accountId,

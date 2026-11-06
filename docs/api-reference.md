@@ -1517,7 +1517,7 @@ export declare class OnboardingService {
         | 'members:manage'
         | 'owners:manage'
       )[];
-      state: 'active' | 'revoked' | 'suspended';
+      state: 'active' | 'suspended' | 'revoked';
       expiresAt: number;
     }[]
   >;
@@ -1527,7 +1527,7 @@ export declare class OnboardingService {
     identity: OwnerIdentity | VerifiedPrincipal,
   ): Promise<{
     grant_id: string;
-    status: 'revoked' | 'suspended';
+    status: 'suspended' | 'revoked';
   }>;
   /** Use on an existing financial authority; exact-action approval still belongs to that authority. */
   bindWalletAuthority(
@@ -1672,6 +1672,10 @@ export interface ProviderState {
   uniswapXOrders?: Record<
     string,
     import('../orders/service.js').UniswapXOrderRecord
+  >;
+  safeWalletAccounts?: Record<
+    string,
+    import('../sponsorship/safe-wallet.js').SafeWalletAccount
   >;
   supportedActions?: Record<string, ApprovedCallsRecord>;
   deploymentBindings?: Record<
@@ -2103,6 +2107,7 @@ Import from `@moovha/wallet-provider-kit/ows`. [Integration guide](ows-adapter.m
 - [createOwsSigningBackend](#createowssigningbackend)
 - [createOwsWalletProvider](#createowswalletprovider)
 - [OwsProviderOptions](#owsprovideroptions)
+- [prepareOwsVault](#prepareowsvault)
 
 ### createOwsSigningBackend
 
@@ -2139,6 +2144,15 @@ export interface OwsProviderOptions {
   /** Owner credential from the host secret store. Never from an HTTP caller. */
   passphrase(): Promise<string>;
 }
+```
+
+### prepareOwsVault
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/providers/ows.ts).
+
+```ts
+/** Prepare account-scoped encrypted storage before accepting wallet operations. Retains legacy originals. */
+export declare function prepareOwsVault(vaultPath: string): Promise<void>;
 ```
 
 ## Durable storage

@@ -1,3 +1,9 @@
+import {
+  getRecord,
+  putRecord,
+  matchingRecords,
+} from '../onboarding/records.js';
+import { safeWalletRecord } from '../sponsorship/wallet-records.js';
 import { UsdZarFxReader } from './usd-zar-fx.js';
 import { randomUUID } from 'node:crypto';
 import {
@@ -234,7 +240,7 @@ export class UniswapXOrderService {
   }
   async initialize() {
     await this.onboarding.store.transaction((state) => {
-      const deployment = state.deploymentBindings?.['service-v1'];
+      const deployment = getRecord(state, 'deploymentBindings', 'service-v1');
       if (!deployment) deny();
       deployment.uniswapXOrderPolicyRevision = this.policyRevision;
     });
@@ -263,10 +269,9 @@ export class UniswapXOrderService {
           principal.issuer,
           principal.clientId,
         );
-        const deployment = state.deploymentBindings?.['service-v1'];
-        const wallet =
-          deployment?.runtimeConfiguration?.safeWalletAccounts?.[accountId];
-        const request = state.requests[grant.requestId];
+        const deployment = getRecord(state, 'deploymentBindings', 'service-v1');
+        const wallet = safeWalletRecord(state, accountId);
+        const request = getRecord(state, 'requests', grant.requestId);
         if (
           deployment?.activeRevision !== this.options.authorityRevision ||
           deployment.uniswapXOrderPolicyRevision !== this.policyRevision ||
@@ -277,7 +282,8 @@ export class UniswapXOrderService {
           wallet.ownerAdministration?.status === 'suspended' ||
           request?.membership ||
           request?.sharing ||
-          walletDescription(state.accounts[accountId]).kind !== 'personal'
+          walletDescription(getRecord(state, 'accounts', accountId)).kind !==
+            'personal'
         )
           deny();
         const snapshot = currentRuntimePolicy(state, principal);
@@ -517,7 +523,11 @@ export class UniswapXOrderService {
         context.principal,
         approval.userAccount?.accountId ?? '',
         (state, grant, wallet) => {
-          const record = state.uniswapXOrders?.[approval.action.action_id];
+          const record = getRecord(
+            state,
+            'uniswapXOrders',
+            approval.action.action_id,
+          );
           if (
             !record ||
             record.state === 'authorizing' ||
@@ -607,9 +617,9 @@ export class UniswapXOrderService {
       recipient,
     );
     let record = await this.current(context.principal, accountId, (state) => {
-      const entry = state.idempotency[key];
+      const entry = getRecord(state, 'idempotency', key);
       if (!entry) return undefined;
-      const saved = state.uniswapXOrders?.[entry.id];
+      const saved = getRecord(state, 'uniswapXOrders', entry.id);
       if (!saved || entry.hash !== requestHash)
         throw new WalletProviderError('wallet_attempt_conflict');
       return saved;
@@ -642,14 +652,19 @@ export class UniswapXOrderService {
         context.principal,
         accountId,
         (state, grant, currentWallet) => {
-          const previous = state.idempotency[key];
+          const previous = getRecord(state, 'idempotency', key);
           if (previous) {
-            const saved = state.uniswapXOrders?.[previous.id];
+            const saved = getRecord(state, 'uniswapXOrders', previous.id);
             if (!saved || previous.hash !== requestHash) deny();
             return saved;
           }
-          const records = (state.uniswapXOrders ??= {});
-          for (const saved of Object.values(records))
+
+          for (const saved of matchingRecords(
+            state,
+            'uniswapXOrders',
+            '$orderNonce',
+            JSON.stringify([review.swapper.toLowerCase(), review.nonce]),
+          ))
             if (
               same(saved.plan.review.swapper, review.swapper) &&
               saved.plan.review.nonce === review.nonce
@@ -731,8 +746,8 @@ export class UniswapXOrderService {
             state: 'authorizing',
             postDispatched: false,
           };
-          records[id] = saved;
-          state.idempotency[key] = { id, hash: requestHash };
+          putRecord(state, 'uniswapXOrders', id, saved);
+          putRecord(state, 'idempotency', key, { id, hash: requestHash });
           return saved;
         },
       );
@@ -763,12 +778,13 @@ export class UniswapXOrderService {
     );
     await this.database.approveAction(record.plan.approval);
     await this.current(context.principal, accountId, (state) => {
-      const saved = state.uniswapXOrders![retained.plan.id];
+      const saved = getRecord(state, 'uniswapXOrders', retained.plan.id);
       if (saved.state === 'authorizing') saved.state = 'prepared';
     });
     if (verified.allowance < BigInt(review.amountInUnits)) {
       await this.current(context.principal, accountId, (state) => {
-        state.uniswapXOrders![retained.plan.id].state = 'requires_approval';
+        getRecord(state, 'uniswapXOrders', retained.plan.id).state =
+          'requires_approval';
       });
       return this.receipt({ ...record, state: 'requires_approval' });
     }
@@ -803,7 +819,7 @@ export class UniswapXOrderService {
       if (valid[0] !== '0x1626ba7e') deny();
     } catch (error) {
       await this.onboarding.store.transaction((state) => {
-        const saved = state.uniswapXOrders?.[retained.plan.id];
+        const saved = getRecord(state, 'uniswapXOrders', retained.plan.id);
         if (saved && !saved.postDispatched) {
           saved.state = 'unknown';
           saved.code = 'signing_pending';
@@ -812,7 +828,7 @@ export class UniswapXOrderService {
       throw error;
     }
     await this.current(context.principal, accountId, (state) => {
-      const saved = state.uniswapXOrders![retained.plan.id];
+      const saved = getRecord(state, 'uniswapXOrders', retained.plan.id);
       saved.signature = this.cipher.seal(
         this.signatureMetadata(saved.plan.id, saved.plan.applicationId),
         signature,
@@ -824,7 +840,7 @@ export class UniswapXOrderService {
   }
   private async dispatch(id: string) {
     const record = await this.onboarding.store.transaction(
-      (state) => state.uniswapXOrders?.[id] ?? deny(),
+      (state) => getRecord(state, 'uniswapXOrders', id) ?? deny(),
     );
     if (
       record.postDispatched ||
@@ -870,7 +886,7 @@ export class UniswapXOrderService {
       record.plan.context.principal,
       record.plan.accountId,
       (state, grant, wallet) => {
-        const saved = state.uniswapXOrders![id];
+        const saved = getRecord(state, 'uniswapXOrders', id);
         if (saved.postDispatched) return false;
         if (
           grant.id !== record.plan.grantId ||
@@ -892,7 +908,7 @@ export class UniswapXOrderService {
         record.plan.review.witnessHash,
       );
       await this.onboarding.store.transaction((state) => {
-        const saved = state.uniswapXOrders![id];
+        const saved = getRecord(state, 'uniswapXOrders', id);
         if (saved.state === 'unknown') {
           saved.state = 'open';
           delete saved.code;
@@ -987,7 +1003,7 @@ export class UniswapXOrderService {
         ]);
       }
       await this.onboarding.store.transaction((state) => {
-        const saved = state.uniswapXOrders?.[record.plan.id];
+        const saved = getRecord(state, 'uniswapXOrders', record.plan.id);
         if (!saved || saved.chainFinalized) return;
         if (proof.state === 'filled') {
           saved.state = 'succeeded';
@@ -1022,7 +1038,7 @@ export class UniswapXOrderService {
       });
     } catch {
       await this.onboarding.store.transaction((state) => {
-        const saved = state.uniswapXOrders?.[record.plan.id];
+        const saved = getRecord(state, 'uniswapXOrders', record.plan.id);
         if (!saved || saved.chainFinalized) return;
         if (canonicalityLost) {
           saved.state = 'needs_review';
@@ -1043,7 +1059,7 @@ export class UniswapXOrderService {
       deny();
     await this.onboarding.authorize(principal, accountId, 'account:read');
     const record = await this.onboarding.store.transaction((state) => {
-      const saved = state.uniswapXOrders?.[id];
+      const saved = getRecord(state, 'uniswapXOrders', id);
       if (
         !saved ||
         saved.plan.accountId !== accountId ||
@@ -1054,8 +1070,8 @@ export class UniswapXOrderService {
       return saved;
     });
     if (refresh) await this.reconcile(record);
-    const latest = await this.onboarding.store.transaction(
-      (state) => state.uniswapXOrders![id],
+    const latest = await this.onboarding.store.transaction((state) =>
+      getRecord(state, 'uniswapXOrders', id),
     );
     return this.receipt(latest);
   }

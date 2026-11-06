@@ -1,3 +1,4 @@
+import { removeRecord, putRecord, getRecord } from './records.js';
 import { randomBytes } from 'node:crypto';
 import * as client from 'openid-client';
 import { decodeProtectedHeader } from 'jose';
@@ -66,16 +67,16 @@ export async function createOwnerLogin(
       await store.transaction((data) => {
         const now = Date.now();
         for (const [key, login] of Object.entries(data.logins))
-          if (login.expiresAt <= now) delete data.logins[key];
+          if (login.expiresAt <= now) removeRecord(data, 'logins', key);
         for (const [key, session] of Object.entries(data.sessions))
-          if (session.expiresAt <= now) delete data.sessions[key];
-        data.logins[fingerprint(state)] = {
+          if (session.expiresAt <= now) removeRecord(data, 'sessions', key);
+        putRecord(data, 'logins', fingerprint(state), {
           verifier,
           nonce,
           browserHash: fingerprint(browserToken),
           requestId,
           expiresAt: now + 300000,
-        };
+        });
       });
       return client.buildAuthorizationUrl(config, {
         redirect_uri: callback,
@@ -97,14 +98,14 @@ export async function createOwnerLogin(
         throw new AuthenticationError(401);
       const state = url.searchParams.get('state') ?? '';
       const login = await store.transaction((data) => {
-        const pending = data.logins[fingerprint(state)];
+        const pending = getRecord(data, 'logins', fingerprint(state));
         if (
           !pending ||
           pending.expiresAt <= Date.now() ||
           pending.browserHash !== fingerprint(browserToken)
         )
           throw new AuthenticationError(401);
-        delete data.logins[fingerprint(state)];
+        removeRecord(data, 'logins', fingerprint(state));
         return pending;
       });
       try {
@@ -145,7 +146,7 @@ export async function createOwnerLogin(
           throw new Error();
         const sessionToken = randomBytes(32).toString('base64url');
         await store.transaction((data) => {
-          data.sessions[fingerprint(sessionToken)] = {
+          putRecord(data, 'sessions', fingerprint(sessionToken), {
             owner: {
               issuer: input.issuer,
               subject: claims.sub,
@@ -156,7 +157,7 @@ export async function createOwnerLogin(
               claims.auth_time! * 1000 + 300000,
             ),
             csrf: randomBytes(32).toString('base64url'),
-          };
+          });
         });
         return { sessionToken, requestId: login.requestId };
       } catch {
@@ -165,7 +166,7 @@ export async function createOwnerLogin(
     },
     async session(token) {
       return store.transaction((data) => {
-        const session = data.sessions[fingerprint(token)];
+        const session = getRecord(data, 'sessions', fingerprint(token));
         if (!session || session.expiresAt <= Date.now())
           throw new AuthenticationError(401);
         return { identity: session.owner, csrf: session.csrf };

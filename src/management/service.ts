@@ -1,3 +1,9 @@
+import {
+  matchingRecords,
+  recordPage,
+  appendAudit,
+  getRecord,
+} from '../onboarding/records.js';
 import { providerNetwork, type ProviderNetwork } from '../networks.js';
 import {
   createHash,
@@ -103,7 +109,7 @@ export class ManagementService {
     if (!/^[A-Za-z0-9_-]{43,128}$/.test(claim)) invalid();
     await this.store.transaction((s) => {
       s.management ??= {};
-      const binding = s.deploymentBindings?.['service-v1'];
+      const binding = getRecord(s, 'deploymentBindings', 'service-v1');
       if (s.management.provider) {
         if (
           binding &&
@@ -134,7 +140,7 @@ export class ManagementService {
       if (state.claimed) deny();
       state.claimHash = hash(claim);
       state.claimExpiresAt = this.now() + 30 * 60_000;
-      s.audit.push({
+      appendAudit(s, {
         at: this.now(),
         event: 'installation_claim_renewed',
         resource: hash(state.installationId),
@@ -162,7 +168,7 @@ export class ManagementService {
         scopes: [...managementScopes],
       };
       state.identities[id] = identity;
-      s.audit.push({
+      appendAudit(s, {
         at: this.now(),
         event: 'administrator_recovered',
         resource: hash(id),
@@ -218,17 +224,19 @@ export class ManagementService {
       invalid();
     return this.store.transaction((state) => {
       this.assertOperator(principal, this.state(state));
-      const ids = Object.keys(state.verifiedUsers ?? {})
-        .sort()
-        .filter(
-          (id) =>
-            (!input.after || id > input.after) &&
-            (!input.application_id ||
-              state.verifiedUsers![id].clientId === input.application_id),
-        );
+      const ids = recordPage(
+        state,
+        'verifiedUsers',
+        input.after,
+        limit + 1,
+        input.application_id ? 'clientId' : undefined,
+        input.application_id,
+      );
       const page = ids.slice(0, limit);
       return {
-        users: page.map((id) => this.userSummary(state.verifiedUsers![id])),
+        users: page.map((id) =>
+          this.userSummary(getRecord(state, 'verifiedUsers', id)),
+        ),
         next_cursor: ids.length > limit ? page.at(-1)! : null,
       };
     });
@@ -253,7 +261,7 @@ export class ManagementService {
     if (!/^[a-f0-9]{64}$/.test(id)) invalid();
     const result = await this.store.transaction((state) => {
       this.assertOperator(principal, this.state(state));
-      const user = state.verifiedUsers?.[id];
+      const user = getRecord(state, 'verifiedUsers', id);
       if (!user) return null;
       return {
         ...this.userSummary(user),
@@ -262,7 +270,7 @@ export class ManagementService {
           reference: user.identity.reference,
           fields: { ...user.identity.fields },
         },
-        wallets: Object.values(state.accounts ?? {})
+        wallets: matchingRecords(state, 'accounts', '$walletPerson', id)
           .flatMap((account) => {
             const member = account.members?.[id];
             const role =
@@ -467,7 +475,7 @@ export class ManagementService {
             grant.state = 'revoked';
           }
         }
-        s.audit.push({
+        appendAudit(s, {
           at: this.now(),
           event: 'user_checks_updated',
           actor: hash(principal.clientId),
@@ -602,7 +610,7 @@ export class ManagementService {
       const next = { ...values, revision: before.revision + (changed ? 1 : 0) };
       if (changed) {
         (management.execution ??= {})[network] = next;
-        state.audit.push({
+        appendAudit(state, {
           at: this.now(),
           event: 'network_execution_changed',
           resource: hash(network),
@@ -683,7 +691,7 @@ export class ManagementService {
       };
       management.networkSettings = next;
       commands[commandKey] = { hash: digest, result: next, at: this.now() };
-      state.audit.push({
+      appendAudit(state, {
         at: this.now(),
         event: 'network_settings_saved',
         resource: hash(management.installationId),
@@ -725,7 +733,7 @@ export class ManagementService {
       state.claimed = true;
       state.claimHash = '';
       state.claimExpiresAt = 0;
-      s.audit.push({
+      appendAudit(s, {
         at: this.now(),
         event: 'installation_claimed',
         resource: hash(id),
@@ -803,7 +811,7 @@ export class ManagementService {
           scopes: [...managementScopes],
         };
         state.identities[id] = identity;
-        s.audit.push({
+        appendAudit(s, {
           at: this.now(),
           event: 'federated_administrator_registered',
           resource: hash(id),
@@ -814,7 +822,7 @@ export class ManagementService {
         state.claimed = true;
         state.claimHash = '';
         state.claimExpiresAt = 0;
-        s.audit.push({
+        appendAudit(s, {
           at: this.now(),
           event: 'installation_claimed',
           resource: hash(id),
@@ -1129,17 +1137,17 @@ export class ManagementService {
           for (const request of Object.values(s.requests ?? {})) {
             if (
               (request.sharing?.sourceApplicationId === identity.id ||
-                s.accounts?.[request.accountId]?.members?.[
+                getRecord(s, 'accounts', request.accountId)?.members?.[
                   request.membership?.personId ?? ''
                 ]?.sourceSharing?.applicationId === identity.id) &&
               request.caller.issuer === this.issuer
             ) {
               if (!request.denied) invalidatedRequests.add(request.id);
               request.denied = true;
-              if (request.grantId && s.grants[request.grantId]) {
-                if (s.grants[request.grantId].state !== 'revoked')
+              if (request.grantId && getRecord(s, 'grants', request.grantId)) {
+                if (getRecord(s, 'grants', request.grantId).state !== 'revoked')
                   revokedGrants.add(request.grantId);
-                s.grants[request.grantId].state = 'revoked';
+                getRecord(s, 'grants', request.grantId).state = 'revoked';
               }
             }
           }
@@ -1164,7 +1172,7 @@ export class ManagementService {
             if (grant.state !== 'revoked') revokedGrants.add(grant.id);
             grant.state = 'revoked';
           }
-        s.audit.push({
+        appendAudit(s, {
           at: this.now(),
           event: 'management_authority_evaluated',
           actor: hash(principal.clientId),
@@ -1186,7 +1194,7 @@ export class ManagementService {
       }
       const result = structuredClone(publicIdentity(identity));
       commands[commandKey] = { hash: digest, result, at: this.now() };
-      s.audit.push({
+      appendAudit(s, {
         at: this.now(),
         event: 'management_identity_' + operation,
         resource: hash(identity.id),

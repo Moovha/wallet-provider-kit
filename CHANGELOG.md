@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Store Safe wallet metadata per account with atomic conversion of legacy inline records and bounded application capacity checks.
+- Isolate native OWS operations by account and preserve legacy encrypted wallets during startup preparation.
+- Use direct SQLite record reads and candidate indexes for provisioning, wallet ownership and administrative pagination; append audit events without loading history.
+
 - Resolve OWS wallet lookups inside the worker and return only the requested
   wallet. Provisioning and reconciliation no longer fail when the complete
   vault inventory exceeds the worker's response-size limit. Duplicate wallet

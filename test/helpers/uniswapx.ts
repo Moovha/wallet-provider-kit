@@ -279,9 +279,7 @@ export async function serviceFixture(
   );
   const accountId = receipt.account_id!;
   await db.onboardingStore.transaction((state) => {
-    state.deploymentBindings![
-      'service-v1'
-    ].runtimeConfiguration!.safeWalletAccounts = {
+    state.safeWalletAccounts = {
       [accountId]: {
         accountId,
         applicationId,

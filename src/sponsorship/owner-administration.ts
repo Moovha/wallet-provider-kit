@@ -1,3 +1,5 @@
+import { getRecord, matchingRecords } from '../onboarding/records.js';
+import { safeWalletRecord } from './wallet-records.js';
 import type {
   AuthorityContext,
   VerifiedPrincipal,
@@ -65,13 +67,11 @@ export class SafeOwnerAdministration {
       accountId,
       administration ? 'owners:manage' : 'account:read',
       (state, grant) => {
-        const wallet =
-          state.deploymentBindings?.['service-v1']?.runtimeConfiguration
-            ?.safeWalletAccounts?.[accountId];
-        const request = state.requests[grant.requestId];
+        const wallet = safeWalletRecord(state, accountId);
+        const request = getRecord(state, 'requests', grant.requestId);
         if (
-          state.deploymentBindings?.['service-v1']?.activeRevision !==
-            this.actions.revision ||
+          getRecord(state, 'deploymentBindings', 'service-v1')
+            ?.activeRevision !== this.actions.revision ||
           !wallet ||
           wallet.status !== 'ready' ||
           (administration &&
@@ -99,7 +99,12 @@ export class SafeOwnerAdministration {
     const pending = wallet.ownerAdministration?.pending;
     const batch = pending
       ? await this.database.onboardingStore.transaction((state) =>
-          Object.values(state.userOperationBatches ?? {}).find(
+          matchingRecords(
+            state,
+            'userOperationBatches',
+            'input.account_id',
+            accountId,
+          ).find(
             (b) =>
               b.metadata.id === pending.batchId &&
               b.input.account_id === accountId,
@@ -116,8 +121,8 @@ export class SafeOwnerAdministration {
         !!this.database.sponsorship.load(batch.operationId)?.signatureCollection
           ?.expiry);
     const execution = batch?.operationId
-      ? await this.database.onboardingStore.transaction(
-          (state) => state.userOperationExecutions?.[batch.operationId!],
+      ? await this.database.onboardingStore.transaction((state) =>
+          getRecord(state, 'userOperationExecutions', batch.operationId!),
         )
       : undefined;
     const confirm =
@@ -151,9 +156,7 @@ export class SafeOwnerAdministration {
       accountId,
       'account:read',
       (state) => {
-        const current =
-          state.deploymentBindings?.['service-v1']?.runtimeConfiguration
-            ?.safeWalletAccounts?.[accountId] ?? deny();
+        const current = safeWalletRecord(state, accountId) ?? deny();
         if (fingerprint(current) !== fingerprint(wallet))
           throw new WalletProviderError('wallet_attempt_conflict');
         current.ownerAdministration = {
@@ -215,7 +218,12 @@ export class SafeOwnerAdministration {
       throw new WalletProviderError('wallet_attempt_conflict');
     if (previous) {
       const queued = await this.database.onboardingStore.transaction((state) =>
-        Object.values(state.userOperationBatches ?? {}).some(
+        matchingRecords(
+          state,
+          'userOperationBatches',
+          'input.account_id',
+          accountId,
+        ).some(
           (b) =>
             b.metadata.id === previous.batchId &&
             b.input.account_id === accountId,
@@ -246,12 +254,10 @@ export class SafeOwnerAdministration {
       accountId,
       'owners:manage',
       (state) => {
-        const wallet =
-          state.deploymentBindings?.['service-v1']?.runtimeConfiguration
-            ?.safeWalletAccounts?.[accountId] ?? deny();
+        const wallet = safeWalletRecord(state, accountId) ?? deny();
         if (
-          state.deploymentBindings?.['service-v1']?.activeRevision !==
-            this.actions.revision ||
+          getRecord(state, 'deploymentBindings', 'service-v1')
+            ?.activeRevision !== this.actions.revision ||
           (wallet.binding.ownerPolicy &&
             fingerprint(wallet.binding.ownerPolicy) !==
               fingerprint(read.confirmed))
@@ -264,7 +270,12 @@ export class SafeOwnerAdministration {
           throw new WalletProviderError('wallet_attempt_conflict');
         if (!wallet.binding.ownerPolicy) {
           if (
-            Object.values(state.userOperationBatches ?? {}).some(
+            matchingRecords(
+              state,
+              'userOperationBatches',
+              'input.account_id',
+              accountId,
+            ).some(
               (b) =>
                 b.input.account_id === accountId &&
                 !['complete', 'expired', 'failed'].includes(b.stage),
@@ -290,7 +301,12 @@ export class SafeOwnerAdministration {
     );
     const driver = await this.driver(applicationId, accountId);
     const queued = await this.database.onboardingStore.transaction((state) =>
-      Object.values(state.userOperationBatches ?? {}).some(
+      matchingRecords(
+        state,
+        'userOperationBatches',
+        'input.account_id',
+        accountId,
+      ).some(
         (b) => b.metadata.id === batchId && b.input.account_id === accountId,
       ),
     );

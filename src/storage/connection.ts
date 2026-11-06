@@ -50,6 +50,7 @@ export class StorageConnection {
   private readonly db: DatabaseSync;
   private closed = false;
   private poisoned = false;
+  recordRevision = 0;
 
   constructor(private readonly options: ProviderDatabaseOptions) {
     if (
@@ -196,7 +197,14 @@ export class StorageConnection {
   ): { changes: number | bigint; lastInsertRowid: number | bigint } {
     if (this.closed || this.poisoned) unavailable();
     try {
-      return this.db.prepare(sql).run(...values);
+      const result = this.db.prepare(sql).run(...values);
+      if (
+        /\b(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+onboarding_records\b/i.test(
+          sql,
+        )
+      )
+        this.recordRevision++;
+      return result;
     } catch {
       return unavailable();
     }

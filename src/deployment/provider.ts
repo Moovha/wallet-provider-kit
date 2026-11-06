@@ -1,3 +1,4 @@
+import { appendAudit, getRecord } from '../onboarding/records.js';
 import { UniswapXOrderService } from '../orders/service.js';
 import { networkConfigurations } from './network-configuration.js';
 import {
@@ -12,6 +13,7 @@ import { createManagementAuthorizationServer } from '../management/authorization
 import { SafeWalletRuntime } from '../sponsorship/safe-wallet.js';
 import {
   createOwsWalletProvider,
+  prepareOwsVault,
   createOwsSigningBackend,
 } from '../providers/ows.js';
 import { ApplicationCredentialCipher } from '../runtime-configuration/credentials.js';
@@ -217,6 +219,7 @@ async function createNetworkContext(
     passphrase: async () => passphrase,
     network: config.network,
   };
+  await prepareOwsVault(backendOptions.vaultPath);
   const provision = createOwsWalletProvider(backendOptions, {
     namespace:
       'onboarding-' + fingerprint(config.policy.provider.origin).slice(0, 32),
@@ -227,10 +230,10 @@ async function createNetworkContext(
       !!activeRevision &&
       (await database.onboardingStore.transaction(
         (state) =>
-          state.deploymentBindings?.['service-v1']?.activeRevision ===
-            activeRevision &&
-          state.deploymentBindings?.['service-v1']?.transportRevision ===
-            transportRevision,
+          getRecord(state, 'deploymentBindings', 'service-v1')
+            ?.activeRevision === activeRevision &&
+          getRecord(state, 'deploymentBindings', 'service-v1')
+            ?.transportRevision === transportRevision,
       )) &&
       (await onboarding.canDispatchProvision(
         request.attemptId,
@@ -247,7 +250,7 @@ async function createNetworkContext(
       accessMode: config.policy.access?.mode ?? 'hosted',
       network: network.name,
     };
-    const previous = state.deploymentBindings?.['service-v1'];
+    const previous = getRecord(state, 'deploymentBindings', 'service-v1');
     if (
       previous
         ? fingerprint({
@@ -347,7 +350,7 @@ async function createNetworkContext(
     ...(config.apiExplorer ? [config.apiExplorer, config.oauth] : []),
   ]);
   await database.onboardingStore.transaction((state) => {
-    const binding = state.deploymentBindings!['service-v1'];
+    const binding = getRecord(state, 'deploymentBindings', 'service-v1');
     if (binding.activeRevision !== activeRevision) {
       for (const record of Object.values(state.supportedActions ?? {})) {
         if (record.revision !== activeRevision) record.status = 'denied';
@@ -385,7 +388,7 @@ async function createNetworkContext(
         )
           grant.state = 'revoked';
       }
-      state.audit.push({
+      appendAudit(state, {
         at: Date.now(),
         event: 'configured_policy_activated',
         resource: 'service-v1',
@@ -493,10 +496,10 @@ async function createNetworkContext(
   const currentConfiguration = () =>
     database.onboardingStore.transaction(
       (state) =>
-        state.deploymentBindings?.['service-v1']?.activeRevision ===
+        getRecord(state, 'deploymentBindings', 'service-v1')?.activeRevision ===
           activeRevision &&
-        state.deploymentBindings?.['service-v1']?.transportRevision ===
-          transportRevision,
+        getRecord(state, 'deploymentBindings', 'service-v1')
+          ?.transportRevision === transportRevision,
     );
 
   const uniswapXOrders =

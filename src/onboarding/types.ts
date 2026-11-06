@@ -311,6 +311,10 @@ export interface ProviderState {
     string,
     import('../orders/service.js').UniswapXOrderRecord
   >;
+  safeWalletAccounts?: Record<
+    string,
+    import('../sponsorship/safe-wallet.js').SafeWalletAccount
+  >;
   supportedActions?: Record<string, ApprovedCallsRecord>;
   deploymentBindings?: Record<
     string,

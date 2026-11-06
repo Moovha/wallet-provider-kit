@@ -943,8 +943,8 @@ it('publishes concurrent readiness updates atomically without temporary-file col
     const r = s.deploymentBindings!['service-v1'].runtimeConfiguration!;
     r.safeWalletInfrastructure![t.applicationId].paymaster =
       t.f.config.acceptance.paymaster;
-    const first = Object.values(r.safeWalletAccounts!)[0];
-    r.safeWalletAccounts![secondId] = {
+    const first = Object.values(s.safeWalletAccounts!)[0];
+    s.safeWalletAccounts![secondId] = {
       ...first,
       accountId: secondId,
       binding: {
@@ -1023,7 +1023,7 @@ it('retains the complete original deployment recipe before attempting its transa
     r.safeWalletInfrastructure![t.applicationId].transactions = [];
     r.safeWalletInfrastructure![t.applicationId].paymaster =
       t.f.config.acceptance.paymaster;
-    delete r.safeWalletAccounts![t.f.grant.account_id!];
+    delete s.safeWalletAccounts![t.f.grant.account_id!];
     const snapshot = currentRuntimePolicy(s, t.f.context.principal);
     const revision = fingerprint(['financial-terms', snapshot]);
     for (const grant of Object.values(s.grants)) {
@@ -1083,7 +1083,7 @@ it('retains the complete original deployment recipe before attempting its transa
   );
   await t.f.db.onboardingStore.transaction((s) => {
     const r = s.deploymentBindings!['service-v1'].runtimeConfiguration!;
-    delete r.safeWalletAccounts![t.f.grant.account_id!].recovery;
+    delete s.safeWalletAccounts![t.f.grant.account_id!].recovery;
     r.safeWalletInfrastructure![t.applicationId].transactions = [];
   });
   await expect(
@@ -1106,11 +1106,8 @@ it('retains the complete original deployment recipe before attempting its transa
       .owner,
   ).toBe(originalOwner);
   await t.f.db.onboardingStore.transaction((s) => {
-    s.deploymentBindings![
-      'service-v1'
-    ].runtimeConfiguration!.safeWalletAccounts![
-      t.f.grant.account_id!
-    ].recovery!.proxyCodeHash = '0x' + '00'.repeat(32);
+    s.safeWalletAccounts![t.f.grant.account_id!].recovery!.proxyCodeHash =
+      '0x' + '00'.repeat(32);
   });
   await expect(
     t.runtime.provision(t.f.context, t.f.grant.account_id!),

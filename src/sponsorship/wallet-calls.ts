@@ -1,3 +1,10 @@
+import {
+  getRecord,
+  appendAudit,
+  matchingRecords,
+  recordCount,
+  putRecord,
+} from '../onboarding/records.js';
 import { failureOrigin } from './failure-origin.js';
 import { WalletProviderError } from '../domain/signing.js';
 import { NetworkFeeLimitError } from '../execution/network-fees.js';
@@ -118,7 +125,7 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
     return this.execution.subscribe((id) => {
       void this.actions.onboarding.store
         .transaction((state) =>
-          Object.values(state.userOperationBatches ?? {})
+          matchingRecords(state, 'userOperationBatches', 'operationId', id)
             .filter((b) => b.operationId === id)
             .map((b) => b.metadata.id),
         )
@@ -142,7 +149,12 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
       () => true,
     );
     const ids = await this.actions.onboarding.store.transaction((state) =>
-      Object.values(state.userOperationBatches ?? {})
+      matchingRecords(
+        state,
+        'userOperationBatches',
+        'input.account_id',
+        accountId,
+      )
         .filter(
           (b) =>
             b.input.account_id === accountId &&
@@ -150,7 +162,8 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
             b.context.principal.subject === principal.subject &&
             b.context.principal.clientId === principal.clientId &&
             b.operationId &&
-            state.sponsorships?.[b.operationId]?.signatureCollection,
+            getRecord(state, 'sponsorships', b.operationId)
+              ?.signatureCollection,
         )
         .sort((a, b) => b.sequence - a.sequence)
         .slice(0, 100)
@@ -185,7 +198,12 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
     );
     if (!['cancelled', 'expired'].includes(result.state)) {
       await this.actions.onboarding.store.transaction((state) => {
-        for (const batch of Object.values(state.userOperationBatches ?? {}))
+        for (const batch of matchingRecords(
+          state,
+          'userOperationBatches',
+          'operationId',
+          id,
+        ))
           if (batch.operationId === id && batch.stage === 'awaiting-signatures')
             batch.stage = 'processing';
       });
@@ -204,7 +222,12 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
       id,
     );
     await this.actions.onboarding.store.transaction((state) => {
-      for (const batch of Object.values(state.userOperationBatches ?? {}))
+      for (const batch of matchingRecords(
+        state,
+        'userOperationBatches',
+        'operationId',
+        id,
+      ))
         if (batch.operationId === id) batch.stage = 'awaiting-signatures';
     });
     return result;
@@ -263,15 +286,20 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
       'contracts:request',
       (state, grant) => {
         if (
-          state.deploymentBindings?.['service-v1']?.activeRevision !==
-            this.actions.revision ||
+          getRecord(state, 'deploymentBindings', 'service-v1')
+            ?.activeRevision !== this.actions.revision ||
           authority.owner !== grant.owner ||
           authority.grantId !== grant.id ||
           authority.consentReference !== grant.requestId ||
-          state.accounts[grant.accountId].address !== authority.address
+          getRecord(state, 'accounts', grant.accountId).address !==
+            authority.address
         )
           deny();
-        const publication = state.requests[grant.requestId]?.runtimePolicy;
+        const publication = getRecord(
+          state,
+          'requests',
+          grant.requestId,
+        )?.runtimePolicy;
         if (
           !publication ||
           publication.policy_hash !== metadata.policyHash ||
@@ -279,9 +307,14 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
           metadata.sender.toLowerCase() !== authority.safeAddress
         )
           deny();
-        const entries = (state.userOperationBatches ??= {});
+        const lane = matchingRecords(
+          state,
+          'userOperationBatches',
+          '$batchSender',
+          authority.safeAddress,
+        );
         if (
-          Object.values(entries).some(
+          lane.some(
             (e) =>
               e.metadata.id === metadata.id &&
               e.metadata.sender.toLowerCase() === authority.safeAddress &&
@@ -290,9 +323,6 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
           )
         )
           return 5720;
-        const lane = Object.values(entries).filter(
-          (e) => e.metadata.sender.toLowerCase() === authority.safeAddress,
-        );
         if (
           lane.filter(
             (e) =>
@@ -301,17 +331,15 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
         )
           return 5740;
         if (
-          Object.values(entries).filter(
-            (e) =>
-              !['included', 'complete', 'expired', 'failed'].includes(e.stage),
-          ).length >= (this.config.maxDepthTotal ?? 512)
+          recordCount(state, 'userOperationBatches', '$pendingBatch', 'yes') >=
+          (this.config.maxDepthTotal ?? 512)
         )
           return 5740;
         const sequence =
           lane.reduce((max, e) => Math.max(max, e.sequence), 0) + 1;
         if (!Number.isSafeInteger(sequence)) deny();
         const id = randomUUID();
-        entries[id] = {
+        putRecord(state, 'userOperationBatches', id, {
           id,
           metadata,
           context: {
@@ -329,8 +357,8 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
           sequence,
           stage: 'queued',
           timings: { queued_at: new Date().toISOString() },
-        };
-        state.audit.push({
+        });
+        appendAudit(state, {
           at: Date.now(),
           event: 'user_operation_batch_queued',
           resource: id,
@@ -352,11 +380,16 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
       'account:read',
       (state, grant) => {
         if (
-          state.deploymentBindings?.['service-v1']?.activeRevision !==
-          this.actions.revision
+          getRecord(state, 'deploymentBindings', 'service-v1')
+            ?.activeRevision !== this.actions.revision
         )
           deny();
-        return Object.values(state.userOperationBatches ?? {}).find(
+        return matchingRecords(
+          state,
+          'userOperationBatches',
+          'metadata.id',
+          id,
+        ).find(
           (e) =>
             e.metadata.id === id &&
             e.input.account_id === accountId &&
@@ -439,12 +472,17 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
       deny();
     const entries = await this.actions.onboarding.store.transaction((state) => {
       if (
-        state.deploymentBindings?.['service-v1']?.activeRevision !==
+        getRecord(state, 'deploymentBindings', 'service-v1')?.activeRevision !==
         this.actions.revision
       )
         deny();
       authorizeOperator?.(state);
-      return Object.values(state.userOperationBatches ?? {})
+      return matchingRecords(
+        state,
+        'userOperationBatches',
+        'configurationHash',
+        this.configurationHash,
+      )
         .filter(
           (e) =>
             e.configurationHash === this.configurationHash &&
@@ -494,7 +532,7 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
   }
   private async timestamp(entry: UserOperationBatch, field: string) {
     await this.actions.onboarding.store.transaction((s) => {
-      const current = s.userOperationBatches?.[entry.id];
+      const current = getRecord(s, 'userOperationBatches', entry.id);
       if (!current || current.configurationHash !== this.configurationHash)
         deny();
       (current.timings ??= {})[field] ??= new Date().toISOString();
@@ -514,7 +552,7 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
         context.idempotencyKey,
       ]);
       const recovered = await this.actions.onboarding.store.transaction(
-        (s) => s.idempotency[key]?.id,
+        (s) => getRecord(s, 'idempotency', key)?.id,
       );
       if (recovered) entry.operationId = recovered;
     }
@@ -539,24 +577,26 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
         )
           throw error;
         await this.actions.onboarding.store.transaction((state) => {
-          const current = state.userOperationBatches?.[entry.id] ?? deny();
+          const current =
+            getRecord(state, 'userOperationBatches', entry.id) ?? deny();
           if (
             current.configurationHash !== this.configurationHash ||
-            state.deploymentBindings?.['service-v1']?.activeRevision !==
-              this.actions.revision
+            getRecord(state, 'deploymentBindings', 'service-v1')
+              ?.activeRevision !== this.actions.revision
           )
             deny();
           // Recover any concurrently admitted action before ending a request that has no financial effects.
-          const admitted =
-            state.idempotency[
-              fingerprint([
-                'supported-call',
-                context.principal.issuer,
-                context.principal.subject,
-                context.principal.clientId,
-                context.idempotencyKey,
-              ])
-            ]?.id;
+          const admitted = getRecord(
+            state,
+            'idempotency',
+            fingerprint([
+              'supported-call',
+              context.principal.issuer,
+              context.principal.subject,
+              context.principal.clientId,
+              context.idempotencyKey,
+            ]),
+          )?.id;
           if (admitted) current.operationId = admitted;
           else if (
             !current.operationId &&
@@ -670,10 +710,11 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
     stage: UserOperationBatch['stage'],
   ) {
     await this.actions.onboarding.store.transaction((state) => {
-      const current = state.userOperationBatches?.[entry.id] ?? deny();
+      const current =
+        getRecord(state, 'userOperationBatches', entry.id) ?? deny();
       if (
         current.configurationHash !== this.configurationHash ||
-        state.deploymentBindings?.['service-v1']?.activeRevision !==
+        getRecord(state, 'deploymentBindings', 'service-v1')?.activeRevision !==
           this.actions.revision ||
         (current.operationId &&
           entry.operationId &&
@@ -761,11 +802,12 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
                 ? error.code
                 : 'wallet_execution_unavailable';
           await this.actions.onboarding.store.transaction((state) => {
-            const current = state.userOperationBatches?.[entry.id] ?? deny();
+            const current =
+              getRecord(state, 'userOperationBatches', entry.id) ?? deny();
             if (
               current.configurationHash !== this.configurationHash ||
-              state.deploymentBindings?.['service-v1']?.activeRevision !==
-                this.actions.revision
+              getRecord(state, 'deploymentBindings', 'service-v1')
+                ?.activeRevision !== this.actions.revision
             )
               deny();
             const origin = failureOrigin(error);
@@ -837,11 +879,12 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
                 (entry) =>
                   entry.stage === 'expired' &&
                   entry.operationId &&
-                  !state.supportedActions?.[entry.operationId]?.nonceReleased &&
-                  state.userOperationExecutions?.[entry.operationId]
+                  !getRecord(state, 'supportedActions', entry.operationId)
+                    ?.nonceReleased &&
+                  getRecord(state, 'userOperationExecutions', entry.operationId)
                     ?.observation.state === 'expired' &&
-                  state.userOperationExecutions[entry.operationId].observation
-                    .expiry,
+                  getRecord(state, 'userOperationExecutions', entry.operationId)
+                    .observation.expiry,
               )
               .map((entry) => entry.id),
           )
@@ -862,10 +905,11 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
         : null;
       if (plan?.observation.state === 'finalized')
         await this.actions.onboarding.store.transaction((state) => {
-          const current = state.userOperationBatches?.[entry.id] ?? deny();
+          const current =
+            getRecord(state, 'userOperationBatches', entry.id) ?? deny();
           if (
-            state.deploymentBindings?.['service-v1']?.activeRevision !==
-              this.actions.revision ||
+            getRecord(state, 'deploymentBindings', 'service-v1')
+              ?.activeRevision !== this.actions.revision ||
             current.configurationHash !== entry.configurationHash ||
             current.operationId !== plan.operationId ||
             current.stage !== 'included'

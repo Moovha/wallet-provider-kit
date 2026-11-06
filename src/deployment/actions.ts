@@ -1,3 +1,10 @@
+import {
+  getRecord,
+  appendAudit,
+  putRecord,
+  matchingRecords,
+} from '../onboarding/records.js';
+import { safeWalletRecord } from '../sponsorship/wallet-records.js';
 import { runtimeApplicationId } from '../runtime-configuration/service.js';
 import {
   providerNetwork,
@@ -122,9 +129,9 @@ export class SupportedActions {
       principal.issuer,
       principal.clientId,
     );
-    const deployment = state.deploymentBindings?.['service-v1'];
+    const deployment = getRecord(state, 'deploymentBindings', 'service-v1');
     const registry = deployment?.runtimeConfiguration;
-    const wallet = registry?.safeWalletAccounts?.[accountId];
+    const wallet = safeWalletRecord(state, accountId);
     if (
       !wallet ||
       (wallet.applicationId !== applicationId &&
@@ -135,7 +142,7 @@ export class SupportedActions {
         )) ||
       wallet.status !== 'ready' ||
       wallet.ownerAdministration?.status === 'suspended' ||
-      wallet.owner !== state.accounts[wallet.accountId]?.owner ||
+      wallet.owner !== getRecord(state, 'accounts', wallet.accountId)?.owner ||
       deployment?.activeRevision !== this.revision ||
       (currentRuntimePolicy(state, principal).policy.transaction_mode ===
       'unrestricted'
@@ -160,7 +167,7 @@ export class SupportedActions {
       input.account_id,
       'owners:manage',
       (state, grant) => {
-        const request = state.requests[grant.requestId];
+        const request = getRecord(state, 'requests', grant.requestId);
         if (!request || request.membership || request.sharing) deny();
       },
     );
@@ -190,8 +197,8 @@ export class SupportedActions {
   private currentRuntime(state: ProviderState, record: ApprovedCallsRecord) {
     if (record.intent) {
       if (record.intent.input.kind === 'owner-change') {
-        const grant = state.grants[record.approval.grantId];
-        const request = grant && state.requests[grant.requestId];
+        const grant = getRecord(state, 'grants', record.approval.grantId);
+        const request = grant && getRecord(state, 'requests', grant.requestId);
         if (
           !grant?.permissions.includes('owners:manage') ||
           !request ||
@@ -331,13 +338,14 @@ export class SupportedActions {
     );
     const account = await this.onboarding.store.transaction((state) => {
       if (
-        state.deploymentBindings?.['service-v1']?.activeRevision !==
+        getRecord(state, 'deploymentBindings', 'service-v1')?.activeRevision !==
         this.revision
       )
         deny();
-      const current = state.accounts[accountId];
+      const current = getRecord(state, 'accounts', accountId);
       if (
-        fingerprint(state.grants[grant.id]) !== fingerprint(grant) ||
+        fingerprint(getRecord(state, 'grants', grant.id)) !==
+          fingerprint(grant) ||
         !current ||
         !current.address ||
         current.owner !== grant.owner ||
@@ -547,11 +555,14 @@ export class SupportedActions {
       ...(authority.snapshot ? [authority.snapshot] : []),
     ]);
     const previous = await this.onboarding.store.transaction((state) => {
-      const entry = state.idempotency[key];
+      const entry = getRecord(state, 'idempotency', key);
       if (!entry) return undefined;
-      if (entry.hash !== hash || !state.supportedActions?.[entry.id])
+      if (
+        entry.hash !== hash ||
+        !getRecord(state, 'supportedActions', entry.id)
+      )
         throw new WalletProviderError('wallet_attempt_conflict');
-      return state.supportedActions[entry.id];
+      return getRecord(state, 'supportedActions', entry.id);
     });
     const expiresAt =
       requestedExpiresAt ?? this.queueExpiry(authority.validity);
@@ -581,14 +592,23 @@ export class SupportedActions {
     )
       deny();
     const record = await this.onboarding.store.transaction((state) => {
-      const entry = state.idempotency[key];
+      const entry = getRecord(state, 'idempotency', key);
       if (entry) {
-        if (entry.hash !== hash || !state.supportedActions?.[entry.id]) deny();
-        return state.supportedActions[entry.id];
+        if (
+          entry.hash !== hash ||
+          !getRecord(state, 'supportedActions', entry.id)
+        )
+          deny();
+        return getRecord(state, 'supportedActions', entry.id);
       }
-      const records = (state.supportedActions ??= {});
+
       // Expired actions release a nonce only when the same transaction proves no signing admission ever existed.
-      for (const record of Object.values(records)) {
+      for (const record of matchingRecords(
+        state,
+        'supportedActions',
+        '$actionNonce',
+        JSON.stringify([intent.account.address.toLowerCase(), intent.nonce]),
+      )) {
         if (
           record.nonceDomain !== 'safe-4337-v07' ||
           record.nonceReleased ||
@@ -601,14 +621,14 @@ export class SupportedActions {
           Date.parse(record.approval.action.expires_at) > Date.now() ||
           this.database.hasActionAttempts(record.approval.action.action_id) ||
           Object.keys(
-            state.sponsorships?.[record.approval.action.action_id]
+            getRecord(state, 'sponsorships', record.approval.action.action_id)
               ?.signatureCollection?.signatures ?? {},
           ).length > 0
         )
           throw new WalletProviderError('wallet_attempt_conflict');
         record.status = 'denied';
         record.nonceReleased = true;
-        state.audit.push({
+        appendAudit(state, {
           at: Date.now(),
           event: 'unsigned_nonce_released',
           resource: record.approval.action.action_id,
@@ -667,9 +687,9 @@ export class SupportedActions {
         },
       };
       this.currentRuntime(state, created);
-      records[id] = created;
-      state.idempotency[key] = { id, hash };
-      state.audit.push({
+      putRecord(state, 'supportedActions', id, created);
+      putRecord(state, 'idempotency', key, { id, hash });
+      appendAudit(state, {
         at: Date.now(),
         event: 'contract_action_requested',
         resource: id,
@@ -692,7 +712,11 @@ export class SupportedActions {
     await this.database.approveAction(record.approval);
     await this.permitted(context.principal, record);
     await this.onboarding.store.transaction((state) => {
-      const latest = state.supportedActions?.[record.approval.action.action_id];
+      const latest = getRecord(
+        state,
+        'supportedActions',
+        record.approval.action.action_id,
+      );
       if (
         !latest ||
         fingerprint(latest.approval) !== fingerprint(record.approval)
@@ -725,7 +749,7 @@ export class SupportedActions {
   private async load(id: string) {
     if (!uuid.test(id)) invalid();
     return this.onboarding.store.transaction((state) => {
-      const record = state.supportedActions?.[id];
+      const record = getRecord(state, 'supportedActions', id);
       if (!record) deny();
       return record;
     });
@@ -749,9 +773,9 @@ export class SupportedActions {
       (before.approval.userAccount ?? before.approval.account).accountId,
       'contracts:request',
       (state, grant) => {
-        const latest = state.supportedActions?.[id];
+        const latest = getRecord(state, 'supportedActions', id);
         const approval = before.approval;
-        const account = state.accounts[grant.accountId];
+        const account = getRecord(state, 'accounts', grant.accountId);
         if (
           !latest ||
           latest.status !== 'authorized' ||
@@ -768,8 +792,8 @@ export class SupportedActions {
           account.acceptanceRevision !== this.onboarding.policy.revision ||
           account.address?.toLowerCase() !==
             (approval.userAccount ?? approval.account).address.toLowerCase() ||
-          state.deploymentBindings?.['service-v1']?.activeRevision !==
-            this.revision
+          getRecord(state, 'deploymentBindings', 'service-v1')
+            ?.activeRevision !== this.revision
         )
           deny();
         this.currentRuntime(state, latest);
