@@ -209,7 +209,7 @@ test('browser consent, verification handoff, review and revocation preserve Orig
     await review.locator('[name=identity_matches_owner]').check();
     await review.getByRole('button', { name: 'Accept verified user' }).click();
     await expect(
-      page.getByText('No requests need review.', { exact: true }),
+      page.getByText('No requests need review on this page.', { exact: true }),
     ).toBeVisible();
     const granted = await onboarding.read(
       { principal, idempotencyKey: randomUUID() },
@@ -423,7 +423,7 @@ test('application records require browser owner consent and a separate provider 
       .getByRole('button', { name: 'Accept submitted record' })
       .click();
     await expect(
-      page.getByText('No requests need review.', { exact: true }),
+      page.getByText('No requests need review on this page.', { exact: true }),
     ).toBeVisible();
     const granted = await onboarding.read(
       { principal, idempotencyKey: randomUUID() },
