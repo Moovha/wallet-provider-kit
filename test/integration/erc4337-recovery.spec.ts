@@ -366,7 +366,17 @@ it('stays RPC-idle before a real Safe operation and recovers a lost response acr
     '--config',
     '/fixture/alto.json',
   );
-  const bundlerUrl = 'http://127.0.0.1:' + bundlerPort;
+  // Linux hosts can reach an internal bridge directly; desktop Docker needs its published port.
+  const { stdout: bundlerAddress } = await docker(
+    'inspect',
+    '--format',
+    '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}',
+    prefix + '-bundler',
+  );
+  const bundlerUrl =
+    process.platform === 'linux'
+      ? 'http://' + bundlerAddress.trim() + ':3000'
+      : 'http://127.0.0.1:' + bundlerPort;
   async function bundlerRpc(method: string, params: unknown[]) {
     const r = await fetch(bundlerUrl, {
       method: 'POST',
