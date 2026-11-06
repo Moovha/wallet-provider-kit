@@ -105,29 +105,57 @@ independently and checked through the actual Safe ERC-1271 handler. Signature
 copies retained by the order service and its signing journal use authenticated
 encryption under the existing private credential key.
 
-## Price review
+## Application-owned price policies
 
-`solver-fiat-fx-v1` supports only the fixed Base ZARP/USDC token pair. It obtains
-USD/ZAR from the public ExchangeRate-API feed and requires the decoded **net recipient
-minimum after fees and auction decay** to be at least 90% of the full input's
-nominal fiat value. Integer base-unit arithmetic rounds the required minimum up.
-ZARP/ZAR and USDC/USD are explicit nominal peg assumptions, not redemption or
-depeg guarantees. This profile performs no AMM pool price reads.
+The toolkit does not select fiat assets, nominal peg mappings, commercial loss
+budgets or reference-feed vendors. The application backend owns that logic and
+builds a dependency-free ES module implementing `OrderPricePolicyAdapter`.
+Install only operator-reviewed code: adapters run with the provider process's
+privileges, not in a sandbox. The module exports `createOrderPricePolicyAdapter`
+and returns version `1`, `validate(policy, routes)` and `assess(input)` functions.
+The factory receives the host's `fetch` implementation. The assessment receives
+copies of the configured policy and independently decoded order plus an abort
+signal; it receives no signer, key, grant or signature.
 
-The fixed source is `https://open.er-api.com/v6/latest/USD`. Responses are cached
-for at most one hour; source observations must be less than 36 hours old. Future
-or missing timestamps, invalid rates, unavailable data, responses above 64 KiB and
-requests exceeding five seconds deny admission. There is no static or stale-rate
-fallback. The provider retrieves the reference independently; applications cannot
-supply a rate or increase the 10% loss budget. Changing the profile changes the
-order policy revision and requires fresh owner consent; existing call grants and
-retained-order recovery remain independent.
+Configure `uniswapXOrders.pricePolicyAdapter` with its local `path` and exact
+`sha256` digest. Paths resolve from the provider configuration directory. The
+loader verifies the bytes before importing them; the module must be self-contained
+and must not depend on the application's runtime or a sibling checkout. The
+adapter validates its policy and allowed token routes, independently reads its
+reference and returns `minimumRequiredOutUnits`, `validUntil` and a bounded JSON
+`proof`. The toolkit enforces a positive integer floor against the decoded net
+minimum, evidence expiry and order expiry, and allows at most five seconds for
+an assessment. Missing, invalid, unavailable or expired pricing denies admission.
+All owner, grant, consent, fee, input/lifetime-limit, nonce, chain, signing and
+recovery checks remain in the toolkit.
 
-[Rates By Exchange Rate API](https://www.exchangerate-api.com).
-The [open feed](https://www.exchangerate-api.com/docs/free) updates daily; this is
-an indicative fiat-value floor, not a real-time market execution guarantee.
+### Upgrade an existing application price policy
 
-The earlier profile remains supported for existing configurations and recovery:
+Build and test the application-owned module first, then install it on the provider
+host and pin its SHA-256 before upgrading the toolkit. For the existing
+`solver-fiat-fx-v1` integration, the DeFi backend owns the unchanged pricing
+implementation and its module build command; follow that repository's installation
+instructions. Preserve the existing `policy` object, including the profile,
+source, limits, route pins and field values. Installing equivalent code does not
+change the order consent hash, request body, receipt shape or idempotency identity.
+The module path and hash are host settings and are not returned in access policy.
+Semantic changes require a new policy profile/revision and fresh consent; never
+reuse an old profile name for different economics.
+
+Deployments using an application-defined policy require the adapter for **new**
+orders. Deploying the toolkit without it intentionally denies those admissions;
+there is no fallback to an application-supplied rate or an unconditional approval.
+Existing signed/dispatched orders retain their original policy, encrypted artifacts
+and price proof. Their read-only recovery does not require another price assessment,
+and an unavailable price reference never authorizes re-signing or re-posting.
+If the module cannot load, disable new order execution and omit the adapter host
+reference to run recovery with the original policy. Keep a compatible recovery
+process and the complete backup set during upgrades.
+No database migration or application HTTP payload change is required.
+
+## Built-in protocol price benchmark
+
+The reusable on-chain benchmark remains available for existing configurations and recovery:
 
 `solver-twap-benchmark-v1` uses a pinned pool's spot and 30-minute time-weighted
 average price from one canonical block no older than 30 seconds. It requires

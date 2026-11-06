@@ -5,6 +5,19 @@ project, a small documentation improvement is a good place to start. Follow the
 [code of conduct](CODE_OF_CONDUCT.md); report vulnerabilities through
 [SECURITY.md](SECURITY.md).
 
+## Application and provider boundary
+
+Do not put application-specific business logic in Wallet Provider Kit. Product
+routing, token-to-fiat mappings, reference-feed selection, pricing rules and
+customer workflows belong to the application backend. The toolkit owns reusable
+protocol validation, current authorization, private signing, durable dispatch
+and recovery. Application-owned policy adapters run only when explicitly
+installed and reviewed by the provider operator; application requests cannot
+select executable code or replace provider safeguards. Preserve public request
+and receipt contracts, consent revisions for equivalent policies, and recovery
+of retained attempts when separating components. Verify both sides independently
+and document installation order before changing a deployed integration.
+
 ## Propose a change
 
 For bugs, include the version, expected behavior and an offline reproduction.

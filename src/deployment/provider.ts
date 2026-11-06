@@ -1,3 +1,4 @@
+import { loadOrderPricePolicyAdapter } from '../orders/application-price-policy.js';
 import { readState } from '../onboarding/record-pages.js';
 import { appendAudit, getRecord } from '../onboarding/records.js';
 import { UniswapXOrderService } from '../orders/service.js';
@@ -517,6 +518,10 @@ async function createNetworkContext(
           ),
           {
             policy: config.uniswapXOrders.policy,
+            pricePolicyAdapter: await loadOrderPricePolicyAdapter(
+              config.uniswapXOrders.pricePolicyAdapter,
+              directory,
+            ),
             module: config.safeWallet!.module,
             genesisHash: config.safeWallet!.genesisHash,
             authorityRevision: activeRevision!,

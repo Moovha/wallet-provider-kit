@@ -6,7 +6,10 @@ import {
   matchingRecords,
 } from '../onboarding/records.js';
 import { safeWalletRecord } from '../sponsorship/wallet-records.js';
-import { UsdZarFxReader } from './usd-zar-fx.js';
+import {
+  assessApplicationPrice,
+  type OrderPricePolicyAdapter,
+} from './application-price-policy.js';
 import { randomUUID } from 'node:crypto';
 import {
   Interface,
@@ -62,7 +65,7 @@ import {
 } from './uniswapx-v3.js';
 import {
   assessSolverTwap,
-  assessSolverFx,
+  type SolverTwapPolicy,
   type OrderSnapshot,
 } from './price-policy.js';
 import { UniswapXTransport } from './transport.js';
@@ -127,8 +130,7 @@ export interface UniswapXOrderRecord {
     approval: FinancialApproval;
     startBlock: number;
     priceProof:
-      | Awaited<ReturnType<typeof assessSolverTwap>>
-      | Awaited<ReturnType<typeof assessSolverFx>>;
+      Awaited<ReturnType<typeof assessSolverTwap>> | Record<string, unknown>;
   };
   state:
     | 'authorizing'
@@ -164,13 +166,13 @@ export interface UniswapXServiceOptions {
   apiKey: () => string;
   active: () => boolean;
   fetch?: typeof fetch;
+  pricePolicyAdapter?: OrderPricePolicyAdapter;
 }
 /** Owns exact-order signing and durable dispatch. Recovering a process never
  * grants another signature or a replacement order. Existing wallet grants do
  * not include the separate orders:authorize permission. */
 export class UniswapXOrderService {
   private readonly policy: UniswapXOrderPolicy;
-  private readonly fx: UsdZarFxReader;
   private readonly policyRevision: string;
   private readonly transport: UniswapXTransport;
   private readonly financial: ReturnType<
@@ -189,7 +191,14 @@ export class UniswapXOrderService {
     private readonly options: UniswapXServiceOptions,
   ) {
     validateUniswapXOrderPolicy(options.policy);
-    this.fx = new UsdZarFxReader({ fetch: options.fetch });
+    if (
+      options.pricePolicyAdapter &&
+      options.pricePolicyAdapter.validate(
+        structuredClone(options.policy.pricePolicy),
+        structuredClone(options.policy.routes),
+      ) !== true
+    )
+      throw new WalletProviderError('wallet_provider_configuration');
     this.policy = structuredClone(options.policy);
     this.policyRevision = fingerprint(['uniswapx-v3-order-v1', this.policy]);
     if (!/^[\x21-\x7e]{16,512}$/.test(options.apiKey()))
@@ -462,13 +471,17 @@ export class UniswapXOrderService {
     )
       deny();
     const price =
-      this.policy.pricePolicy.profile === 'solver-fiat-fx-v1'
-        ? await assessSolverFx(this.fx, this.policy.pricePolicy, review)
-        : await assessSolverTwap(
+      this.policy.pricePolicy.profile === 'solver-twap-benchmark-v1'
+        ? await assessSolverTwap(
             reader,
-            this.policy.pricePolicy,
+            this.policy.pricePolicy as SolverTwapPolicy,
             review,
             snapshot,
+          )
+        : await assessApplicationPrice(
+            this.options.pricePolicyAdapter,
+            this.policy.pricePolicy,
+            review,
           );
     const latest = (await reader.call('eth_getBlockByNumber', [
       '0x' + snapshot.number.toString(16),

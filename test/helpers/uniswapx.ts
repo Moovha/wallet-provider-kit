@@ -101,12 +101,20 @@ export async function serviceFixture(
   orderPermission = true,
   fx = false,
   transfers = false,
+  applicationPrice?: {
+    policy: import('../../src/orders/price-policy.js').SolverPricePolicy;
+    createAdapter: (
+      request: typeof fetch,
+    ) =>
+      | import('../../src/orders/application-price-policy.js').OrderPricePolicyAdapter
+      | undefined;
+  },
 ) {
   const f = orderFixture();
   if (transfers) f.policy.recipientPolicy = 'bound-transfer';
   if (fx) {
     f.policy.pricePolicy = {
-      profile: 'solver-fiat-fx-v1',
+      profile: 'fixture-price-policy-v1',
       source: 'exchangerate-api-open',
       maximumLossBps: 1000,
       cacheSeconds: 3600,
@@ -130,6 +138,7 @@ export async function serviceFixture(
     });
     f.policy.routes[0].tokenOut.address = f.order.baseOutputs[0].token;
   }
+  if (applicationPrice) f.policy.pricePolicy = applicationPrice.policy;
   const directory = await mkdtemp(join(tmpdir(), 'wpk-orders-'));
   let db = openProviderDatabase({ directory, initialize: true });
   const owner = Wallet.createRandom();
@@ -417,6 +426,26 @@ export async function serviceFixture(
     apiKey: () => 'offline-placeholder-key',
     active: () => true,
     fetch: send,
+    pricePolicyAdapter: applicationPrice
+      ? applicationPrice.createAdapter(send)
+      : fx
+        ? {
+            version: 1 as const,
+            validate: () => true,
+            assess: async () => {
+              if (state.fxFails)
+                throw new Error('offline price reference unavailable');
+              return {
+                minimumRequiredOutUnits: '1',
+                validUntil: Math.floor(Date.now() / 1000) + 60,
+                proof: {
+                  profile: 'fixture-price-policy-v1',
+                  minimumRequiredOutUnits: '1',
+                },
+              };
+            },
+          }
+        : undefined,
   };
   let service = new UniswapXOrderService(
     onboarding,
@@ -443,7 +472,8 @@ export async function serviceFixture(
     get service() {
       return service;
     },
-    async restart() {
+    async restart(withoutPriceAdapter = false) {
+      if (withoutPriceAdapter) options.pricePolicyAdapter = undefined;
       await service.close();
       db.close();
       db = openProviderDatabase({ directory });

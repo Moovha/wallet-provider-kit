@@ -1921,31 +1921,18 @@
                 },
                 {
                   "type": "object",
-                  "additionalProperties": false,
-                  "required": [
-                    "profile",
-                    "source",
-                    "maximumLossBps",
-                    "cacheSeconds",
-                    "maximumRateAgeSeconds"
-                  ],
+                  "required": ["profile"],
+                  "maxProperties": 32,
                   "properties": {
                     "profile": {
-                      "const": "solver-fiat-fx-v1"
-                    },
-                    "source": {
-                      "const": "exchangerate-api-open"
-                    },
-                    "maximumLossBps": {
-                      "const": 1000
-                    },
-                    "cacheSeconds": {
-                      "const": 3600
-                    },
-                    "maximumRateAgeSeconds": {
-                      "const": 129600
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9-]{0,127}$",
+                      "not": {
+                        "const": "solver-twap-benchmark-v1"
+                      }
                     }
-                  }
+                  },
+                  "additionalProperties": true
                 }
               ]
             },
@@ -1969,6 +1956,22 @@
         "enabled": {
           "type": "boolean",
           "description": "Allow new order signing and dispatch. False retains read-only recovery of existing orders."
+        },
+        "pricePolicyAdapter": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "sha256"],
+          "properties": {
+            "path": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          }
         }
       }
     }

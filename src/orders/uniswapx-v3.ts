@@ -1,5 +1,4 @@
 import { validSolverPricePolicy } from './price-policy.js';
-import { fiatPairDirection } from './usd-zar-fx.js';
 import { WalletProviderError } from '../domain/signing.js';
 import {
   assessUniswapXV3Outputs,
@@ -203,8 +202,6 @@ export function validateUniswapXOrderPolicy(policy: UniswapXOrderPolicy): void {
       throw new Error();
     const routes = new Set<string>();
     for (const route of policy.routes) {
-      if (policy.pricePolicy.profile === 'solver-fiat-fx-v1')
-        fiatPairDirection(route.tokenIn.address, route.tokenOut.address);
       for (const token of [route.tokenIn, route.tokenOut]) {
         if (
           !ethers.isAddress(token.address) ||

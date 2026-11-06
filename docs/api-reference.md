@@ -2557,6 +2557,8 @@ Import from `@moovha/wallet-provider-kit/deployment`. [Integration guide](setup.
 - [networkConfigurations](#networkconfigurations)
 - [OperationAdapters](#operationadapters)
 - [OperationAdapterTerms](#operationadapterterms)
+- [OrderPriceAssessment](#orderpriceassessment)
+- [OrderPricePolicyAdapter](#orderpricepolicyadapter)
 - [PinnedContract](#pinnedcontract)
 - [predictSafeAddress](#predictsafeaddress)
 - [ProviderConfiguration](#providerconfiguration)
@@ -2957,6 +2959,39 @@ export interface OperationAdapterTerms {
 }
 ```
 
+### OrderPriceAssessment
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/orders/application-price-policy.ts).
+
+```ts
+export interface OrderPriceAssessment {
+  minimumRequiredOutUnits: string;
+  /** Expiry of the independently obtained price evidence, in Unix seconds. */
+  validUntil: number;
+  proof: Record<string, unknown>;
+}
+```
+
+### OrderPricePolicyAdapter
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/orders/application-price-policy.ts).
+
+```ts
+/** Trusted host code, selected by the operator, never by an application request. */
+export interface OrderPricePolicyAdapter {
+  version: 1;
+  validate(
+    policy: SolverPricePolicy,
+    routes: UniswapXOrderPolicy['routes'],
+  ): boolean;
+  assess(input: {
+    policy: SolverPricePolicy;
+    review: UniswapXOrderReview;
+    signal: AbortSignal;
+  }): Promise<OrderPriceAssessment>;
+}
+```
+
 ### PinnedContract
 
 [Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/approved-calls.ts).
@@ -2996,6 +3031,10 @@ export interface ProviderConfiguration {
     enabled: boolean;
     policy: import('../orders/uniswapx-v3.js').UniswapXOrderPolicy;
     apiKey: SecretReference;
+    pricePolicyAdapter?: {
+      path: string;
+      sha256: string;
+    };
   };
   management?: {
     claim: SecretReference;

@@ -2712,31 +2712,18 @@ Success response schema:
             },
             {
               "type": "object",
-              "additionalProperties": false,
-              "required": [
-                "profile",
-                "source",
-                "maximumLossBps",
-                "cacheSeconds",
-                "maximumRateAgeSeconds"
-              ],
+              "required": ["profile"],
+              "maxProperties": 32,
               "properties": {
                 "profile": {
-                  "enum": ["solver-fiat-fx-v1"]
-                },
-                "source": {
-                  "enum": ["exchangerate-api-open"]
-                },
-                "maximumLossBps": {
-                  "enum": [1000]
-                },
-                "cacheSeconds": {
-                  "enum": [3600]
-                },
-                "maximumRateAgeSeconds": {
-                  "enum": [129600]
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9-]{0,127}$",
+                  "not": {
+                    "enum": ["solver-twap-benchmark-v1"]
+                  }
                 }
-              }
+              },
+              "additionalProperties": true
             }
           ]
         },

@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Move application-specific fiat pricing to application-owned, operator-installed
+  price adapters. The provider verifies a pinned module hash and independently
+  enforces decoded order limits, current authority, signing and recovery.
+- Preserve order HTTP bodies, receipts and equivalent policy consent hashes.
+  Existing application price profiles require their adapter before upgrading;
+  missing pricing denies new orders while retained-order recovery remains available.
+
 - Keep full SQLite integrity checks at startup and offline maintenance, while
   request readiness verifies the bounded catalog and connection settings.
 - Read reports through bounded, read-only pages; yield during bulk recovery and

@@ -5109,18 +5109,11 @@ export interface operations {
                                 maximumLossBps: 200;
                                 /** @enum {unknown} */
                                 maximumSpotDivergenceBps: 100;
-                            } | {
-                                /** @enum {unknown} */
-                                profile: "solver-fiat-fx-v1";
-                                /** @enum {unknown} */
-                                source: "exchangerate-api-open";
-                                /** @enum {unknown} */
-                                maximumLossBps: 1000;
-                                /** @enum {unknown} */
-                                cacheSeconds: 3600;
-                                /** @enum {unknown} */
-                                maximumRateAgeSeconds: 129600;
-                            };
+                            } | ({
+                                profile: string;
+                            } & {
+                                [key: string]: unknown;
+                            });
                             /**
                              * @description Defaults to self. bound-transfer permits an explicit recipient matching the signed output and requires fresh order consent.
                              * @enum {unknown}

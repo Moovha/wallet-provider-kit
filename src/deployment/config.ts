@@ -33,6 +33,7 @@ export interface ProviderConfiguration {
     enabled: boolean;
     policy: import('../orders/uniswapx-v3.js').UniswapXOrderPolicy;
     apiKey: SecretReference;
+    pricePolicyAdapter?: { path: string; sha256: string };
   };
   management?: {
     claim: SecretReference;
