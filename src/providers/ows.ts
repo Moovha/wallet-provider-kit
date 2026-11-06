@@ -77,21 +77,22 @@ export function createOwsSigningBackend(
     const walletName = name(accountId);
     checkVault();
     try {
-      const wallets = (await owsCommand({
-        command: 'list',
+      const wallet = (await owsCommand({
+        command: 'find',
         vaultPath,
-      })) as WalletInfo[];
-      const matches = wallets.filter((wallet) => wallet.name === walletName);
-      if (matches.length === 0) return null;
-      if (matches.length !== 1 || !uuid.test(matches[0].id)) throw new Error();
+        walletName,
+      })) as Pick<WalletInfo, 'id' | 'name' | 'accounts'> | null;
+      if (wallet === null) return null;
+      if (wallet.name !== walletName || !uuid.test(wallet.id))
+        throw new Error();
       // OWS stores one EVM-family account at the default derivation index.
-      const accounts = matches[0].accounts.filter(
+      const accounts = wallet.accounts.filter(
         (account) => account.chainId === 'eip155:1',
       );
       if (accounts.length !== 1 || /^0x0{40}$/.test(accounts[0].address))
         throw new Error();
       return {
-        walletId: matches[0].id,
+        walletId: wallet.id,
         account: { accountId, address: getAddress(accounts[0].address) },
       };
     } catch {

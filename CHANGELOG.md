@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Resolve OWS wallet lookups inside the worker and return only the requested
+  wallet. Provisioning and reconciliation no longer fail when the complete
+  vault inventory exceeds the worker's response-size limit. Duplicate wallet
+  names remain rejected.
+
 - Upgrade oidc-provider to 9.13.0, jose to 6.2.13, Swagger UI assets to 5.34.0,
   and the Secretlint CLI and recommended rule preset to 13.1.0.
 
