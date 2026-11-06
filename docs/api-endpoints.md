@@ -272,7 +272,7 @@ Receive status updates for an admitted transaction request without repeatedly po
 
 [`GET /v1/accounts/{accountId}/wallet/calls/{batchId}/events`](http-reference.md#get-v1-accounts-accountid-wallet-calls-batchid-events) — request body, permissions, effects and response details.
 
-### See recent transaction requests
+### Browse transaction requests
 
 List the transaction requests you may read, including their queue stages and retained verified outcomes.
 

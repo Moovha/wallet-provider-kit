@@ -1140,9 +1140,21 @@ it('bounds historical observation batches without blocking admission and rotates
   drivers.forEach((driver, index) => worker.drivers.set(String(index), driver));
   try {
     await worker.runWallets();
+    expect(
+      drivers.reduce(
+        (sum, driver) => sum + driver.runOnce.mock.calls.length,
+        0,
+      ),
+    ).toBe(10);
+    await new Promise<void>((resolve) => setImmediate(resolve));
     await worker.runWallets();
-    for (const driver of drivers)
-      expect(driver.runOnce).toHaveBeenCalledTimes(2);
+    for (const driver of drivers) expect(driver.runOnce).toHaveBeenCalled();
+    expect(
+      drivers.reduce(
+        (sum, driver) => sum + driver.runOnce.mock.calls.length,
+        0,
+      ),
+    ).toBe(20);
     for (const driver of drivers.slice(0, 10))
       expect(driver.settleOnce).toHaveBeenCalledOnce();
     for (const driver of drivers.slice(10))
@@ -1153,10 +1165,7 @@ it('bounds historical observation batches without blocking admission and rotates
     await worker.settlement;
     for (const driver of drivers.slice(10))
       expect(driver.settleOnce).toHaveBeenCalledOnce();
-    expect(drivers[0].runOnce.mock.calls[0]).toEqual([
-      expect.any(Array),
-      false,
-    ]);
+    expect(drivers[0].runOnce.mock.calls[0]).toEqual([undefined, false]);
   } finally {
     release();
     await t.runtime.close();

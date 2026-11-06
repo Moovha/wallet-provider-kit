@@ -79,8 +79,9 @@ export class WalletCallsService {
   async list(
     principal: VerifiedPrincipal,
     authorizeOperator?: (state: ProviderState) => void,
+    page?: import('../onboarding/record-pages.js').RecordPageInput,
   ) {
-    return this.driver.list(principal, authorizeOperator);
+    return this.driver.list(principal, authorizeOperator, page);
   }
   /** Streams current authorized status; notifications contain no account data. */
   async *watch(

@@ -1066,3 +1066,47 @@ it('rejects revocation after retaining the signed plan and before dispatch', asy
   expect(plans).toHaveLength(1);
   expect(plans[0].dispatch).toBeUndefined();
 });
+
+it('pages batch reports across retained history without returning another caller’s entries', async () => {
+  const t = await setup();
+  await t.submit();
+  await t.f.onboarding.store.transaction((state) => {
+    const template = structuredClone(
+      Object.values(state.userOperationBatches!)[0],
+    );
+    for (let i = 0; i < 205; i++) {
+      const id = '00000000-0000-4000-8000-' + String(i).padStart(12, '0');
+      state.userOperationBatches![id] = {
+        ...structuredClone(template),
+        id,
+        stage: 'complete',
+        context: {
+          ...template.context,
+          principal: {
+            ...template.context.principal,
+            subject: 'other-offline-caller',
+          },
+        },
+      };
+    }
+  });
+  const summaries = [];
+  let after: string | undefined;
+  let pages = 0;
+  do {
+    const page = await t.ports.driver.list(t.f.context.principal, undefined, {
+      after,
+      limit: 7,
+    });
+    expect(page.batches.length).toBeLessThanOrEqual(7);
+    expect(page.truncated).toBe(page.next_cursor !== null);
+    summaries.push(...page.batches);
+    after = page.next_cursor ?? undefined;
+    pages++;
+  } while (after);
+  expect(pages).toBe(30);
+  expect(summaries).toHaveLength(1);
+  await t.ports.driver.runOnce();
+  expect(t.s.sends).toBe(1);
+  expect(t.f.state.signs).toBe(1);
+});

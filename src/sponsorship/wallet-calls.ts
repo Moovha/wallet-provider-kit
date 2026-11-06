@@ -1,4 +1,10 @@
 import {
+  recordPages,
+  readState,
+  readRecordPage,
+  type RecordPageInput,
+} from '../onboarding/record-pages.js';
+import {
   getRecord,
   appendAudit,
   matchingRecords,
@@ -467,68 +473,96 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
   async list(
     principal: VerifiedPrincipal,
     authorizeOperator?: (state: ProviderState) => void,
+    input: RecordPageInput = {},
   ) {
     if (!authorizeOperator && !principal.scopes.includes('wallet:execute:read'))
       deny();
-    const entries = await this.actions.onboarding.store.transaction((state) => {
-      if (
-        getRecord(state, 'deploymentBindings', 'service-v1')?.activeRevision !==
-        this.actions.revision
-      )
-        deny();
-      authorizeOperator?.(state);
-      return matchingRecords(
-        state,
-        'userOperationBatches',
-        'configurationHash',
-        this.configurationHash,
-      )
-        .filter(
-          (e) =>
-            e.configurationHash === this.configurationHash &&
-            (authorizeOperator ||
-              ['issuer', 'subject', 'clientId'].every(
-                (k) =>
-                  e.context.principal[
-                    k as 'issuer' | 'subject' | 'clientId'
-                  ] === principal[k as 'issuer' | 'subject' | 'clientId'],
-              )),
-        )
-        .sort((a, b) => b.sequence - a.sequence || a.id.localeCompare(b.id));
-    });
+    const page = await readRecordPage(
+      this.actions.onboarding.store,
+      'userOperationBatches',
+      input,
+      (_state, entry) => entry.id,
+      (state) => {
+        this.assertListAuthority(state, principal, authorizeOperator);
+      },
+      'configurationHash',
+      this.configurationHash,
+    );
     const batches: WalletCallsBatchSummary[] = [];
-    for (const entry of entries.slice(0, 100)) {
-      if (!authorizeOperator)
-        await this.load(principal, entry.input.account_id, entry.metadata.id);
-      const plan = entry.operationId
-        ? await this.execution.load(entry.operationId)
-        : null;
-      batches.push({
-        account_id: entry.input.account_id,
-        sender: entry.metadata.sender,
-        queue_stage:
-          entry.stage === 'awaiting-signatures'
-            ? 'blocked'
-            : entry.stage === 'processing'
-              ? 'executing'
-              : entry.stage === 'included' || entry.stage === 'complete'
-                ? 'succeeded'
-                : entry.stage,
-        policy_revision: entry.metadata.policyRevision,
-        expires_at: entry.expiresAt,
-        application_id: runtimeApplicationId(
-          entry.context.principal.issuer,
-          entry.context.principal.clientId,
-        ),
-        ...this.projection(
-          entry,
-          plan,
-          !!plan?.observation.receipt &&
-            ['included', 'safe', 'finalized'].includes(plan.observation.state),
-        ),
-      });
+    for (const id of page.items) {
+      const summary = await this.listEntry(principal, id, authorizeOperator);
+      if (summary) batches.push(summary);
     }
-    return { truncated: entries.length > 100, batches };
+    return {
+      truncated: page.next_cursor !== null,
+      next_cursor: page.next_cursor,
+      batches,
+    };
+  }
+  private assertListAuthority(
+    state: ProviderState,
+    principal: VerifiedPrincipal,
+    authorizeOperator?: (state: ProviderState) => void,
+  ) {
+    if (
+      (!authorizeOperator &&
+        !principal.scopes.includes('wallet:execute:read')) ||
+      getRecord(state, 'deploymentBindings', 'service-v1')?.activeRevision !==
+        this.actions.revision
+    )
+      deny();
+    authorizeOperator?.(state);
+  }
+  /** Current authorized summary for an internal batch record ID. */
+  async listEntry(
+    principal: VerifiedPrincipal,
+    id: string,
+    authorizeOperator?: (state: ProviderState) => void,
+  ): Promise<WalletCallsBatchSummary | undefined> {
+    const entry = await readState(this.actions.onboarding.store, (state) => {
+      this.assertListAuthority(state, principal, authorizeOperator);
+      const entry = getRecord(state, 'userOperationBatches', id);
+      if (
+        !entry ||
+        entry.configurationHash !== this.configurationHash ||
+        (!authorizeOperator &&
+          !(['issuer', 'subject', 'clientId'] as const).every(
+            (k) => entry.context.principal[k] === principal[k],
+          ))
+      )
+        return undefined;
+      return entry;
+    });
+    if (!entry) return undefined;
+    if (!authorizeOperator)
+      await this.load(principal, entry.input.account_id, entry.metadata.id);
+    const plan = entry.operationId
+      ? await this.execution.load(entry.operationId)
+      : null;
+    return {
+      account_id: entry.input.account_id,
+      sender: entry.metadata.sender,
+      queue_stage:
+        entry.stage === 'awaiting-signatures'
+          ? 'blocked'
+          : entry.stage === 'processing'
+            ? 'executing'
+            : entry.stage === 'included' || entry.stage === 'complete'
+              ? 'succeeded'
+              : entry.stage,
+      policy_revision: entry.metadata.policyRevision,
+      expires_at: entry.expiresAt,
+      application_id: runtimeApplicationId(
+        entry.context.principal.issuer,
+        entry.context.principal.clientId,
+      ),
+      ...this.projection(
+        entry,
+        plan,
+        !!plan?.observation.receipt &&
+          ['included', 'safe', 'finalized'].includes(plan.observation.state),
+      ),
+    };
   }
   private async timestamp(entry: UserOperationBatch, field: string) {
     await this.actions.onboarding.store.transaction((s) => {
@@ -726,16 +760,51 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
         current.stage = stage;
     });
   }
+  private async retainedBatches(settlement = false) {
+    const entries: UserOperationBatch[] = [];
+    const accounts = settlement
+      ? [...new Set(this.execution.signing.executionBinding().accountIds)]
+      : [this.configurationHash];
+    for (const key of accounts) {
+      for await (const page of recordPages(
+        this.actions.onboarding.store,
+        'userOperationBatches',
+        (state, entry) => {
+          if (!settlement)
+            return !['complete', 'expired', 'failed'].includes(entry.stage)
+              ? entry
+              : undefined;
+          if (entry.stage === 'included') return entry;
+          if (
+            entry.stage === 'expired' &&
+            entry.operationId &&
+            !getRecord(state, 'supportedActions', entry.operationId)
+              ?.nonceReleased &&
+            getRecord(state, 'userOperationExecutions', entry.operationId)
+              ?.observation.expiry
+          )
+            return entry;
+          return undefined;
+        },
+        (state) => {
+          if (
+            getRecord(state, 'deploymentBindings', 'service-v1')
+              ?.activeRevision !== this.actions.revision
+          )
+            deny();
+        },
+        settlement ? 'input.account_id' : 'configurationHash',
+        key,
+      ))
+        entries.push(...page);
+    }
+    return entries;
+  }
   async runOnce(
     snapshot?: readonly UserOperationBatch[],
     settlement = true,
   ): Promise<void> {
-    const entries = (
-      snapshot ??
-      (await this.actions.onboarding.store.transaction((s) =>
-        Object.values(s.userOperationBatches ?? {}),
-      ))
-    )
+    const entries = (snapshot ?? (await this.retainedBatches()))
       .filter(
         (e) =>
           e.configurationHash === this.configurationHash &&
@@ -849,18 +918,23 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
   /** Observe historical inclusion separately so finality reads cannot hold an admission worker. */
   async settleOnce(snapshot?: readonly UserOperationBatch[]): Promise<boolean> {
     if (this.settling || Date.now() < this.nextSettlementAt) return false;
-    const running = this.settle(snapshot).finally(() => {
-      if (this.settling === running) this.settling = undefined;
-    });
+    const running = this.settle(snapshot)
+      .catch((error) => {
+        if (
+          error instanceof WalletProviderError &&
+          error.code === 'wallet_authorization_denied'
+        )
+          return false;
+        throw error;
+      })
+      .finally(() => {
+        if (this.settling === running) this.settling = undefined;
+      });
     this.settling = running;
     return running;
   }
   private async settle(snapshot?: readonly UserOperationBatch[]) {
-    const entries =
-      snapshot ??
-      (await this.actions.onboarding.store.transaction((state) =>
-        Object.values(state.userOperationBatches ?? {}),
-      ));
+    const entries = snapshot ?? (await this.retainedBatches(true));
     const accountIds = new Set(
       this.execution.signing.executionBinding().accountIds,
     );

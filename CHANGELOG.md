@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Keep full SQLite integrity checks at startup and offline maintenance, while
+  request readiness verifies the bounded catalog and connection settings.
+- Read reports through bounded, read-only pages; yield during bulk recovery and
+  account reports, and stream bundler allowlists before atomic publication.
+- Add continuation cursors to transaction history and the hosted reviewer screen.
+  Native transaction-history pages default to 50 scanned records in internal ID
+  order; filtered pages can be empty before the end of the ledger.
+
 - Persist SQLite lookup indexes and counts in schema version 3, maintained by
   transactional triggers for local and external record writes. First-use lookups
   and external commits no longer rebuild whole-collection indexes.

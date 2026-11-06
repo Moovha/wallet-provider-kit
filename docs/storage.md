@@ -45,14 +45,32 @@ derived lookup tables are not a public write interface.
 
 Schema version 3 adds these tables and triggers. Its explicit version 2 upgrade
 builds them once, transactionally, from the retained records. Plan maintenance time
-and disk space for that operation and its journal. Startup and readiness integrity
-checks still inspect the database; indexing does not make integrity verification
-or a complete backup constant-time.
+and disk space for that operation and its journal. Startup and the offline `doctor` command still verify database integrity and
+foreign keys before acceptance. Request readiness checks verify the bounded schema
+catalog, database identity and connection settings; they do not repeat a full
+integrity scan or attest to every stored row. Physical corruption or I/O failures
+observed by record reads or writes fence the connection. Full verification and a
+complete backup still take time proportional to stored data.
 
-Full reports, whole-collection replacement and global revocation still enumerate
-the records they affect. File-backed reference stores retain their existing
-in-memory behavior. These paths are distinct from ordinary SQLite provisioning
-and account lookup.
+SQLite reports use read-only transactions without reserving the writer lock.
+The reviewer page and transaction ledger read bounded pages. Bulk account reports,
+wallet recovery scans and bundler configuration publication yield between pages
+of at most 100 records; no transaction spans a yield. Bundler configuration is
+written in chunks and replaces the previous file only after completion. Current
+authority is checked again before provider effects; a report is not authorization.
+
+Pages are not a consistent full-database snapshot. Concurrent inserts, updates or
+deletes can change later pages. Full exports and recovery scans still perform work
+proportional to the relevant history and share CPU and disk capacity with the
+service. Pagination bounds individual reads and permits provisioning between them;
+it does not make bulk work free. File-backed reference stores remain suitable only
+for small fixtures and retain their whole-file transaction behavior.
+
+Global policy tightening, whole-collection replacement and revocation are writes
+that still enumerate their affected records atomically. Schedule broad authority
+changes and storage upgrades as maintenance; splitting those commits could expose
+partially revoked authority. Full startup checks can delay service startup, before
+it accepts provisioning requests. They are not repeated by request readiness.
 
 Safe wallet metadata is stored as one `safeWalletAccounts` record per account,
 scoped to its network. Runtime initialization moves an older inline wallet map

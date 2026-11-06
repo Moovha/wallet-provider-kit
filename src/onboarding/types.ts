@@ -382,5 +382,7 @@ export interface ProviderState {
 }
 /** Callback is synchronous; never make vendor/network calls inside a storage transaction. */
 export interface OnboardingStore {
+  /** Optional read-only transaction. SQLite reads do not reserve the writer lock. */
+  read?<T>(operation: (state: ProviderState) => T): Promise<T>;
   transaction<T>(operation: (state: ProviderState) => T): Promise<T>;
 }

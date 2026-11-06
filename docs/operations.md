@@ -107,3 +107,19 @@ independent writable replicas are not a scaling option.
 Rehearse recovery with the old writer stopped or fenced out. Missing evidence in
 a backup does not prove an operation never happened. Use [launch checks](conformance.md)
 to review the distinction between offline checks and deployment acceptance.
+
+## Separate readiness from storage verification
+
+Routine readiness checks validate the database identity, schema and connection
+settings. They do not scan all stored records or certify database integrity. Full
+integrity and foreign-key checks run when storage opens and through the offline
+`doctor` command. Run the doctor during planned maintenance, as the storage owner,
+using the retained configuration and matching toolkit build. Follow
+[backup and maintenance](provider-maintenance.md) before changing storage.
+
+Review pages and transaction-history pages are bounded. Complete bulk reports and
+recovery still use disk and CPU as history grows, but their SQLite reads release
+transactions and yield between pages. Broad revocation and policy changes remain
+atomic writes and can hold the writer lock; schedule large changes outside normal
+provisioning traffic. A successful readiness response does not replace recovery
+drills, integrity verification or monitoring storage capacity.

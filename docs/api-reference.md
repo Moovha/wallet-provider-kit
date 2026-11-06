@@ -535,8 +535,10 @@ export declare class WalletCallsService {
   list(
     principal: VerifiedPrincipal,
     authorizeOperator?: (state: ProviderState) => void,
+    page?: import('../onboarding/record-pages.js').RecordPageInput,
   ): Promise<{
     truncated: boolean;
+    next_cursor?: string | null;
     batches: import('./types.js').WalletCallsBatchSummary[];
   }>;
   /** Streams current authorized status; notifications contain no account data. */
@@ -588,6 +590,7 @@ Import from `@moovha/wallet-provider-kit/onboarding`. [Integration guide](onboar
 - [OwnerLoginConfiguration](#ownerloginconfiguration)
 - [Permission](#permission)
 - [ProviderState](#providerstate)
+- [RecordPageInput](#recordpageinput)
 - [SumsubConfiguration](#sumsubconfiguration)
 - [VendorPrice](#vendorprice)
 - [VerifiedUserRecord](#verifieduserrecord)
@@ -1286,6 +1289,27 @@ export declare class OnboardingService {
         url?: undefined;
       }
   >;
+  /** Bounded review page; an empty page can still have a continuation cursor. */
+  reviewPage(
+    principal: VerifiedPrincipal,
+    input?: RecordPageInput,
+  ): Promise<{
+    items: {
+      applicationRecord?: ApplicationIdentityRecord | undefined;
+      application?: string | undefined;
+      requestId: string;
+      owner: Pick<OwnerIdentity, 'issuer' | 'subject'> | undefined;
+      vendor: Vendor | undefined;
+      reference: string | undefined;
+      verifiedAt: string | undefined;
+      status: string;
+    }[];
+    next_cursor: string | null;
+  }>;
+  /**
+   * Bulk report that yields between pages; results are not a snapshot.
+   * Use reviewPage for request handlers.
+   */
   reviews(principal: VerifiedPrincipal): Promise<
     {
       applicationRecord?: ApplicationIdentityRecord | undefined;
@@ -1298,6 +1322,21 @@ export declare class OnboardingService {
       status: string;
     }[]
   >;
+  providerAccountPage(
+    principal: VerifiedPrincipal,
+    input?: RecordPageInput,
+  ): Promise<{
+    items: {
+      id: string;
+      status: 'active' | 'suspended';
+      provisioned: boolean;
+    }[];
+    next_cursor: string | null;
+  }>;
+  /**
+   * Bulk report that yields between pages; results are not a snapshot.
+   * Use providerAccountPage for request handlers.
+   */
   providerAccounts(principal: VerifiedPrincipal): Promise<
     {
       id: string;
@@ -1550,6 +1589,8 @@ export declare class OnboardingService {
 ```ts
 /** Callback is synchronous; never make vendor/network calls inside a storage transaction. */
 export interface OnboardingStore {
+  /** Optional read-only transaction. SQLite reads do not reserve the writer lock. */
+  read?<T>(operation: (state: ProviderState) => T): Promise<T>;
   transaction<T>(operation: (state: ProviderState) => T): Promise<T>;
 }
 ```
@@ -1754,6 +1795,19 @@ export interface ProviderState {
       };
     };
   }[];
+}
+```
+
+### RecordPageInput
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/onboarding/record-pages.ts).
+
+```ts
+export interface RecordPageInput {
+  /** Continuation cursor returned by the previous page. */
+  after?: string;
+  /** Page size, from 1 to 100; defaults to 50. */
+  limit?: number;
 }
 ```
 
@@ -3521,8 +3575,10 @@ export declare class WalletCallsService {
   list(
     principal: VerifiedPrincipal,
     authorizeOperator?: (state: ProviderState) => void,
+    page?: import('../onboarding/record-pages.js').RecordPageInput,
   ): Promise<{
     truncated: boolean;
+    next_cursor?: string | null;
     batches: import('./types.js').WalletCallsBatchSummary[];
   }>;
   /** Streams current authorized status; notifications contain no account data. */
@@ -5072,10 +5128,18 @@ export declare class UserOperationWalletCallsDriver implements WalletCallsDriver
   list(
     principal: VerifiedPrincipal,
     authorizeOperator?: (state: ProviderState) => void,
+    input?: RecordPageInput,
   ): Promise<{
     truncated: boolean;
+    next_cursor: string | null;
     batches: WalletCallsBatchSummary[];
   }>;
+  /** Current authorized summary for an internal batch record ID. */
+  listEntry(
+    principal: VerifiedPrincipal,
+    id: string,
+    authorizeOperator?: (state: ProviderState) => void,
+  ): Promise<WalletCallsBatchSummary | undefined>;
   runOnce(
     snapshot?: readonly UserOperationBatch[],
     settlement?: boolean,
@@ -5117,8 +5181,10 @@ export interface WalletCallsDriver {
     authorizeOperator?: (
       state: import('../onboarding/types.js').ProviderState,
     ) => void,
+    page?: import('../onboarding/record-pages.js').RecordPageInput,
   ): Promise<{
     truncated: boolean;
+    next_cursor?: string | null;
     batches: WalletCallsBatchSummary[];
   }>;
 }

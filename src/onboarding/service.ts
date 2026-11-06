@@ -1,4 +1,9 @@
 import {
+  readRecordPage,
+  recordPages,
+  type RecordPageInput,
+} from './record-pages.js';
+import {
   matchingRecords,
   matchingEntries,
   appendAudit,
@@ -1285,46 +1290,96 @@ export class OnboardingService {
       deny();
     return fingerprint([principal.issuer, principal.subject]);
   }
-  async reviews(principal: VerifiedPrincipal) {
-    this.reviewer(principal);
-    return this.store.transaction((state) =>
-      Object.values(state.requests)
-        .filter(
-          (r) =>
-            r.consent &&
-            !r.denied &&
-            !r.grantId &&
-            !r.acceptance &&
-            r.revision === this.policy.revision,
-        )
-        .map((r) => ({
-          requestId: r.id,
-          owner: r.ownerIdentity,
-          vendor: r.evidence?.vendor ?? r.importAttempt?.vendor,
-          reference: r.evidence?.reference ?? r.verification?.reference,
-          verifiedAt: r.evidence?.verifiedAt,
-          status: this.stateOf(state, r),
-          ...(this.policy.identity.records && r.input.identity_record
-            ? {
-                applicationRecord: structuredClone(r.input.identity_record),
-                application: application(this.policy, {
-                  ...r.caller,
-                  scopes: [],
-                }).name,
-              }
-            : {}),
-        })),
+  private reviewRecord(state: ProviderState, r: AccessRequest) {
+    if (
+      !r.consent ||
+      r.denied ||
+      r.grantId ||
+      r.acceptance ||
+      r.revision !== this.policy.revision
+    )
+      return undefined;
+    return {
+      requestId: r.id,
+      owner: r.ownerIdentity,
+      vendor: r.evidence?.vendor ?? r.importAttempt?.vendor,
+      reference: r.evidence?.reference ?? r.verification?.reference,
+      verifiedAt: r.evidence?.verifiedAt,
+      status: this.stateOf(state, r),
+      ...(this.policy.identity.records && r.input.identity_record
+        ? {
+            applicationRecord: structuredClone(r.input.identity_record),
+            application: application(this.policy, { ...r.caller, scopes: [] })
+              .name,
+          }
+        : {}),
+    };
+  }
+  /** Bounded review page; an empty page can still have a continuation cursor. */
+  async reviewPage(principal: VerifiedPrincipal, input: RecordPageInput = {}) {
+    return readRecordPage(
+      this.store,
+      'requests',
+      input,
+      (state, r) => this.reviewRecord(state, r),
+      () => {
+        this.reviewer(principal);
+      },
     );
   }
+  /**
+   * Bulk report that yields between pages; results are not a snapshot.
+   * Use reviewPage for request handlers.
+   */
+  async reviews(principal: VerifiedPrincipal) {
+    this.reviewer(principal);
+    const result: NonNullable<ReturnType<OnboardingService['reviewRecord']>>[] =
+      [];
+    for await (const rows of recordPages(
+      this.store,
+      'requests',
+      (state, r) => this.reviewRecord(state, r),
+      () => {
+        this.reviewer(principal);
+      },
+    ))
+      result.push(...rows);
+    return result;
+  }
+  private accountSummary(a: ProviderState['accounts'][string]) {
+    return { id: a.id, status: a.status, provisioned: Boolean(a.address) };
+  }
+  async providerAccountPage(
+    principal: VerifiedPrincipal,
+    input: RecordPageInput = {},
+  ) {
+    return readRecordPage(
+      this.store,
+      'accounts',
+      input,
+      (_state, a) => this.accountSummary(a),
+      () => {
+        this.reviewer(principal);
+      },
+    );
+  }
+  /**
+   * Bulk report that yields between pages; results are not a snapshot.
+   * Use providerAccountPage for request handlers.
+   */
   async providerAccounts(principal: VerifiedPrincipal) {
     this.reviewer(principal);
-    return this.store.transaction((state) =>
-      Object.values(state.accounts).map((a) => ({
-        id: a.id,
-        status: a.status,
-        provisioned: Boolean(a.address),
-      })),
-    );
+    const result: ReturnType<OnboardingService['accountSummary']>[] = [];
+    for await (const rows of recordPages(
+      this.store,
+      'accounts',
+      (_state, a) => this.accountSummary(a),
+      () => {
+        this.reviewer(principal);
+      },
+    ))
+      result.push(...rows);
+    return result;
   }
   async suspendAccount(principal: VerifiedPrincipal, id: string) {
     this.reviewer(principal);

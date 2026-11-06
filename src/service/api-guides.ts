@@ -816,7 +816,7 @@ export const operationGuides: Record<string, OperationGuide> = {
       '200: enabled application summaries and selected policy/proposal details. The provider sees its configured applications; applications see only their own registration. No spending authority is granted.',
   },
   listWalletBatches: {
-    title: 'See recent transaction requests',
+    title: 'Browse transaction requests',
     group: 'Transactions',
     audience: 'Application developer or service operator',
     purpose:
@@ -829,7 +829,7 @@ export const operationGuides: Record<string, OperationGuide> = {
     prerequisite:
       'Applications need current owner account-read access and execute read scope. Exact configured provider operators can inspect the provider ledger using configuration write scope. No application token can become an operator through scopes alone.',
     success:
-      '200: up to 100 readable batch summaries, queue stages and retained finalized RPC-quorum receipts. Unfinalized observations remain pending in this list; applications can refresh individual wallet_getCallsStatus results. Listing never signs, submits or retries.',
+      '200: up to 100 readable batch summaries, queue stages and retained finalized RPC-quorum receipts. Unfinalized observations remain pending in this list; applications can refresh individual wallet_getCallsStatus results. Pass next_cursor as after until it is null, keeping the caller and selected network unchanged. Native pages use limit (default 50, maximum 100) and ascending internal record ID order; filtered pages can be empty and still have a cursor. Pages are not a snapshot. Listing never signs, submits or retries.',
   },
   setApplicationTransactionMode: {
     title: 'Choose transaction permissions for a trusted application',

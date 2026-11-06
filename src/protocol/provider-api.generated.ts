@@ -1411,7 +1411,7 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * See recent transaction requests
+         * Browse transaction requests
          * @description **Why this exists:** List the transaction requests you may read, including their queue stages and retained verified outcomes.
          *
          *     **Who uses it:** Application developer or service operator.
@@ -1420,7 +1420,7 @@ export interface paths {
          *
          *     **Before you start:** Applications need current owner account-read access and execute read scope. Exact configured provider operators can inspect the provider ledger using configuration write scope. No application token can become an operator through scopes alone.
          *
-         *     **Result and next step:** 200: up to 100 readable batch summaries, queue stages and retained finalized RPC-quorum receipts. Unfinalized observations remain pending in this list; applications can refresh individual wallet_getCallsStatus results. Listing never signs, submits or retries.
+         *     **Result and next step:** 200: up to 100 readable batch summaries, queue stages and retained finalized RPC-quorum receipts. Unfinalized observations remain pending in this list; applications can refresh individual wallet_getCallsStatus results. Pass next_cursor as after until it is null, keeping the caller and selected network unchanged. Native pages use limit (default 50, maximum 100) and ascending internal record ID order; filtered pages can be empty and still have a cursor. Pages are not a snapshot. Listing never signs, submits or retries.
          *
          *     **Request details:** Optional runtime configuration control plane. Application proposals and provider publications are configuration records, not wallet grants, signing authority or execution activation. Publications become readable immediately without restarting the service. Immutable historical revisions remain available. Requires the documented scope and configured application or operator identity.
          */
@@ -12793,7 +12793,10 @@ export interface operations {
     };
     listWalletBatches: {
         parameters: {
-            query?: never;
+            query?: {
+                after?: string;
+                limit?: number;
+            };
             header?: {
                 /** @description Choose a configured network. Omit to use the default; existing wallet, request and grant IDs select their stored network automatically. A conflicting selection is rejected. */
                 "wallet-network"?: "base" | "base-sepolia" | "ethereum" | "ethereum-sepolia";
@@ -12811,6 +12814,7 @@ export interface operations {
                 content: {
                     "application/json": {
                         truncated: boolean;
+                        next_cursor?: string | null;
                         batches: {
                             id: string;
                             account_id: string;

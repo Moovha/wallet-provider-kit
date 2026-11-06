@@ -146,3 +146,20 @@ customer information; responses use `Cache-Control: no-store`.
 
 See the [endpoint guide](api-endpoints.md#service-administration) and
 [HTTP reference](http-reference.md#get-v1-provider-users) for the exact contracts.
+
+## Page through transaction history
+
+`GET /v1/wallet/batches` returns a bounded page from the selected network's ledger.
+Use `limit` from 1 to 100 (default 50). Pass `next_cursor` as `after` for the next
+page, keeping the caller and selected network unchanged. A null cursor ends the
+scan. `truncated` indicates that a continuation exists. The native driver scans
+records in ascending internal ID order; this is not newest-first ordering.
+
+Only currently readable entries appear. A filtered page can be empty and still
+have a continuation cursor. Keep following the cursor to complete the report;
+do not treat an empty page as the end. Pages are not a snapshot across concurrent
+changes. For current execution status, read the individual transaction instead.
+
+The hosted reviewer screen also provides separate next-page links for identity
+reviews and wallet accounts. A page with no pending reviews can still have more
+records to inspect. These lists do not grant wallet or transaction permissions.

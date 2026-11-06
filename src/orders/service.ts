@@ -1,3 +1,5 @@
+import { setImmediate } from 'node:timers/promises';
+import { readRecordPage } from '../onboarding/record-pages.js';
 import {
   getRecord,
   putRecord,
@@ -1119,17 +1121,24 @@ export class UniswapXOrderService {
         : {}),
     };
   }
-  private recoveryCursor = 0;
+  private recoveryCursor?: string;
   async runOnce() {
-    const records = await this.onboarding.store.transaction((state) =>
-      Object.values(state.uniswapXOrders ?? {}).filter(
-        (record) => !record.chainFinalized,
-      ),
-    );
-    const cohort = Array.from(
-      { length: Math.min(10, records.length) },
-      () => records[this.recoveryCursor++ % records.length],
-    );
+    const cohort: UniswapXOrderRecord[] = [];
+    do {
+      await setImmediate();
+      const page = await readRecordPage(
+        this.onboarding.store,
+        'uniswapXOrders',
+        { after: this.recoveryCursor, limit: 100 },
+        (_state, record) => (record.chainFinalized ? undefined : record),
+      );
+      const selected = page.items.slice(0, 10 - cohort.length);
+      cohort.push(...selected);
+      this.recoveryCursor =
+        selected.length < page.items.length
+          ? selected.at(-1)!.plan.id
+          : (page.next_cursor ?? undefined);
+    } while (cohort.length < 10 && this.recoveryCursor !== undefined);
     for (const record of cohort) {
       if (record.state === 'signed' && !record.postDispatched) {
         try {

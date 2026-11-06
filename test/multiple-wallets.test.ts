@@ -1031,3 +1031,59 @@ it(
     }
   },
 );
+
+it('admits provisioning between pages of a concurrent full account report', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'wpk-report-provision-'));
+  folders.push(directory);
+  const connection = new StorageConnection({ directory, initialize: true });
+  try {
+    const store = sqliteOnboardingStore(connection);
+    const f = await fixture(store);
+    connection.transaction(() => {
+      for (let i = 0; i < 2000; i++)
+        connection.run(
+          'INSERT INTO onboarding_records VALUES(?,?,?)',
+          'accounts',
+          'unrelated-' + i,
+          JSON.stringify({
+            id: 'unrelated-' + i,
+            owner: 'unrelated',
+            status: 'active',
+          }),
+        );
+    });
+    const staff = {
+      issuer,
+      subject: 'staff',
+      clientId: 'staff',
+      scopes: ['wallet:review'],
+    };
+    let finished = false;
+    const read = vi.spyOn(store, 'read');
+    const report = f.service.providerAccounts(staff).then((result) => {
+      finished = true;
+      return result;
+    });
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(read).toHaveBeenCalled();
+    expect(finished).toBe(false);
+    const receipt = await f.service.request(ctx(), f.input());
+    const authority = await f.service
+      .walletAuthority()
+      .provision(ctx('app-a', receipt.grant_id), receipt.account_id!);
+    expect(
+      await f.service.canDispatchProvision(
+        authority!.attemptId,
+        receipt.account_id!,
+      ),
+    ).toBe(true);
+    expect(finished).toBe(false);
+    expect((await report).length).toBeGreaterThanOrEqual(2000);
+    const page = await f.service.providerAccountPage(staff, { limit: 10 });
+    expect(page.items).toHaveLength(10);
+    expect(page.next_cursor).not.toBeNull();
+  } finally {
+    vi.restoreAllMocks();
+    connection.close();
+  }
+});

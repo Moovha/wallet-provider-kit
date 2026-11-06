@@ -87,8 +87,16 @@ export function sqliteOnboardingStore(
   connection: StorageConnection,
   network?: ProviderNetwork,
   allNetworkAccounts = false,
+  readOnly = false,
 ): OnboardingStore {
   return {
+    read: (operation) =>
+      sqliteOnboardingStore(
+        connection,
+        network,
+        allNetworkAccounts,
+        true,
+      ).transaction(operation),
     async transaction<T>(operation: (state: ProviderState) => T): Promise<T> {
       return connection.transaction(() => {
         const indexes = new RecordIndexes(connection);
@@ -374,7 +382,12 @@ export function sqliteOnboardingStore(
               continue;
             }
             const encoded = JSON.stringify(target[id]);
-            if (!cell || cell.original() !== encoded) {
+            if (
+              !cell ||
+              (cell.original() !== encoded &&
+                (!readOnly ||
+                  JSON.stringify(JSON.parse(cell.original())) !== encoded))
+            ) {
               const physical =
                 sources.get(key) ?? scopedCollection(collection, network);
               connection.run(
@@ -403,7 +416,7 @@ export function sqliteOnboardingStore(
             JSON.stringify(network ? { ...event, network } : event),
           );
         return detached;
-      });
+      }, readOnly);
     },
   };
 }

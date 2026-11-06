@@ -1,3 +1,4 @@
+import { readState } from '../onboarding/record-pages.js';
 import { appendAudit, getRecord } from '../onboarding/records.js';
 import { UniswapXOrderService } from '../orders/service.js';
 import { networkConfigurations } from './network-configuration.js';
@@ -494,7 +495,8 @@ async function createNetworkContext(
     await workersStarting;
   };
   const currentConfiguration = () =>
-    database.onboardingStore.transaction(
+    readState(
+      database.onboardingStore,
       (state) =>
         getRecord(state, 'deploymentBindings', 'service-v1')?.activeRevision ===
           activeRevision &&
