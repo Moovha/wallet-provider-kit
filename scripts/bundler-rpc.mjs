@@ -1,10 +1,38 @@
 /** Select fee accounting from the server-bound chain, never from an application request. */
 export function bundlerNetworkProfile(chainId) {
+  // Alto refreshes fees on demand when the interval is zero. Idle instances do no fee polling.
   if (chainId === '0xaa36a7' || chainId === '0x1')
-    return { 'chain-type': 'default', 'block-time': 12000 };
+    return {
+      'chain-type': 'default',
+      'block-time': 12000,
+      'gas-price-refresh-interval': 0,
+    };
   if (chainId === '0x14a34' || chainId === '0x2105')
-    return { 'chain-type': 'op-stack', 'block-time': 2000 };
+    return {
+      'chain-type': 'op-stack',
+      'block-time': 2000,
+      'gas-price-refresh-interval': 0,
+    };
   throw Error('Unsupported private bundler chain');
+}
+
+class RpcUnavailable extends Error {
+  constructor(retryAfterMs = 0) {
+    super('RPC unavailable');
+    this.retryAfterMs = retryAfterMs;
+  }
+}
+
+function throttleDelay(response) {
+  const value = response.headers.get('retry-after');
+  const milliseconds = value
+    ? /^\d+$/.test(value)
+      ? Number(value) * 1000
+      : Date.parse(value) - Date.now()
+    : NaN;
+  return Number.isFinite(milliseconds) && milliseconds > 0
+    ? Math.max(1000, Math.min(300000, milliseconds))
+    : 60000;
 }
 
 /** Application-scoped read distribution. Broadcasts are sent once, without transport failover. */
@@ -65,7 +93,11 @@ export function createBundlerRpc(configuration, request = fetch) {
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(5000),
     });
-    if (!response.body || response.status === 429 || response.status >= 500) {
+    if (response.status === 402 || response.status === 429) {
+      await response.body?.cancel();
+      throw new RpcUnavailable(throttleDelay(response));
+    }
+    if (!response.body || response.status >= 500) {
       await response.body?.cancel();
       throw Error('RPC unavailable');
     }
@@ -87,11 +119,15 @@ export function createBundlerRpc(configuration, request = fetch) {
     if (!response.ok && !result.error) throw Error('RPC unavailable');
     return result;
   }
-  function unavailable(s) {
+  function unavailable(s, error) {
     const now = Date.now();
     s.failures = now - s.lastFailure >= 30000 ? 1 : Math.min(5, s.failures + 1);
     s.lastFailure = now;
-    s.cooldown = now + Math.min(15000, 1000 * 2 ** (s.failures - 1));
+    const delay =
+      error instanceof RpcUnavailable && error.retryAfterMs > 0
+        ? error.retryAfterMs
+        : Math.min(15000, 1000 * 2 ** (s.failures - 1));
+    s.cooldown = Math.max(s.cooldown, now + delay);
   }
   async function identity(endpoint, config) {
     const s = state(endpoint);
@@ -201,7 +237,7 @@ export function createBundlerRpc(configuration, request = fetch) {
           await identity(endpoint, config);
         } catch (error) {
           if (error.identityMismatch) throw error;
-          unavailable(s);
+          unavailable(s, error);
           continue;
         }
         // After identity verification, a mutation has exactly one upstream dispatch.
@@ -267,6 +303,8 @@ export function createBundlerRpc(configuration, request = fetch) {
             result.error?.code === 3 &&
             typeof result.error.data === 'string' &&
             /^0x(?:[0-9a-f]{2})*$/i.test(result.error.data);
+          if (result.error?.code === 402 || result.error?.code === 429)
+            throw new RpcUnavailable(60000);
           if (
             transient.has(result.error?.code) ||
             (result.error?.code >= 0 && !executionRevert)
@@ -277,8 +315,8 @@ export function createBundlerRpc(configuration, request = fetch) {
             until: Date.now() + 300000,
           });
           return result;
-        } catch {
-          unavailable(s);
+        } catch (error) {
+          unavailable(s, error);
         } finally {
           if (releaseProbe) {
             s.probing.delete(feature);

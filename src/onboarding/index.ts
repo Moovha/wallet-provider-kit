@@ -1,3 +1,4 @@
+export type { RecordPageInput } from './record-pages.js';
 export { createOnboardingProvider } from './provider.js';
 export type { OnboardingProviderConfiguration } from './provider.js';
 export { defineOnboardingPolicy } from './policy.js';

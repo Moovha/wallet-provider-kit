@@ -1,3 +1,4 @@
+export { upgradeProviderDatabase } from './upgrade.js';
 import { providerNetwork, type ProviderNetwork } from '../networks.js';
 import { ensureAssetBudget } from './asset-budgets.js';
 export { assetBudgetId } from './asset-budgets.js';
@@ -111,7 +112,13 @@ export function openProviderDatabase(options: ProviderDatabaseOptions) {
         UNION ALL SELECT 1 FROM attempts UNION ALL SELECT 1 FROM financial_audit UNION ALL SELECT 1 FROM enrollments LIMIT 1`);
     },
     /** Configured writers must fence budget changes against the active service revision. */
-    async setBudget(id: string, maximum: string, configuredRevision?: string) {
+    async setBudget(
+      id: string,
+      maximum: string,
+      configuredRevision?: string,
+      revisionField:
+        'activeRevision' | 'uniswapXOrderPolicyRevision' = 'activeRevision',
+    ) {
       if (!text(id)) throw new WalletProviderError('wallet_provider_input');
       const limit = units(maximum);
       connection.transaction(() => {
@@ -123,7 +130,7 @@ export function openProviderDatabase(options: ProviderDatabaseOptions) {
           );
           if (
             !binding ||
-            JSON.parse(String(binding.record)).activeRevision !==
+            JSON.parse(String(binding.record))[revisionField] !==
               configuredRevision
           )
             throw new WalletProviderError('wallet_authorization_denied');

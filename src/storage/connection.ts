@@ -1,11 +1,17 @@
+import { privatePath } from './private-path.js';
 import { scopedCollection } from './network-scope.js';
 import { providerNetwork, type ProviderNetwork } from '../networks.js';
-import { constants, closeSync, lstatSync, mkdirSync, openSync } from 'node:fs';
+import { constants, closeSync, mkdirSync, openSync } from 'node:fs';
 import { isAbsolute, join } from 'node:path';
-import { DatabaseSync } from 'node:sqlite';
+import { DatabaseSync, type StatementSync } from 'node:sqlite';
 import { WalletProviderError } from '../domain/signing.js';
 import { AuthenticationError } from '../service/auth.js';
-import { applicationId, schema, schemaVersion } from './schema.js';
+import {
+  applicationId,
+  schema,
+  schemaStatements,
+  schemaVersion,
+} from './schema.js';
 
 type StorageValue = string | number | bigint | null;
 type StorageRow = Record<string, StorageValue | Uint8Array>;
@@ -24,23 +30,6 @@ export function unavailable(): never {
   throw new WalletProviderError('wallet_attempt_unavailable', 'unknown');
 }
 
-function privatePath(path: string, directory: boolean): boolean {
-  try {
-    const stat = lstatSync(path);
-    if (
-      stat.isSymbolicLink() ||
-      (stat.mode & 0o077) !== 0 ||
-      stat.uid !== process.getuid?.() ||
-      (directory ? !stat.isDirectory() : !stat.isFile() || stat.nlink !== 1)
-    )
-      throw new Error();
-    return true;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false;
-    throw new WalletProviderError('wallet_provider_configuration');
-  }
-}
-
 function normalize(sql: string) {
   return sql.trim().replace(/;$/, '').replace(/\s+/g, ' ');
 }
@@ -50,6 +39,7 @@ export class StorageConnection {
   private readonly db: DatabaseSync;
   private closed = false;
   private poisoned = false;
+  private readonly statements = new Map<string, StatementSync>();
 
   constructor(private readonly options: ProviderDatabaseOptions) {
     if (
@@ -101,7 +91,7 @@ export class StorageConnection {
       // Inspect the actual catalog before any schema work, even for a newly created file.
       const catalog = database
         .prepare(
-          "SELECT type, name, sql FROM sqlite_schema WHERE name NOT GLOB 'sqlite_*'",
+          "SELECT type, name, sql FROM sqlite_schema WHERE name NOT GLOB 'sqlite_*' LIMIT 1",
         )
         .all();
       const version = database.prepare('PRAGMA user_version').get()!
@@ -141,6 +131,7 @@ export class StorageConnection {
       }
       this.db = database;
       this.validateSchema();
+      this.validateIntegrity();
       if (
         database.prepare('PRAGMA journal_mode = WAL').get()!.journal_mode !==
         'wal'
@@ -162,15 +153,19 @@ export class StorageConnection {
       this.db.prepare('PRAGMA foreign_keys').get()!.foreign_keys !== 1
     )
       throw new Error();
-    const expected = schema.split(';').map(normalize).filter(Boolean).sort();
+    const expected = schemaStatements.map(normalize).sort();
     const actual = this.db
-      .prepare("SELECT sql FROM sqlite_schema WHERE name NOT GLOB 'sqlite_*'")
+      .prepare(
+        `SELECT sql FROM sqlite_schema WHERE name NOT GLOB 'sqlite_*' LIMIT ${schemaStatements.length + 1}`,
+      )
       .all()
       .map((r) => normalize(String(r.sql)))
       .sort();
     if (JSON.stringify(expected) !== JSON.stringify(actual)) throw new Error();
-    if (this.db.prepare('PRAGMA foreign_key_check').all().length)
-      throw new Error();
+  }
+
+  private validateIntegrity() {
+    if (this.db.prepare('PRAGMA foreign_key_check').get()) throw new Error();
     if (this.db.prepare('PRAGMA quick_check').get()!.quick_check !== 'ok')
       throw new Error();
   }
@@ -179,12 +174,29 @@ export class StorageConnection {
     if (this.closed || this.poisoned || !this.db.isTransaction) unavailable();
   }
 
+  private statement(sql: string): StatementSync {
+    let statement = this.statements.get(sql);
+    if (!statement) {
+      statement = this.db.prepare(sql);
+      if (this.statements.size >= 128)
+        this.statements.delete(this.statements.keys().next().value!);
+      this.statements.set(sql, statement);
+    }
+    return statement;
+  }
+  private storageFailure(error: unknown): never {
+    const code = (error as { errcode?: number } | null)?.errcode;
+    // Primary SQLite error codes: IOERR, CORRUPT and NOTADB, including their extended variants.
+    if (typeof code === 'number' && [10, 11, 26].includes(code & 255))
+      this.poisoned = true;
+    return unavailable();
+  }
   all(sql: string, ...values: StorageValue[]): StorageRow[] {
     if (this.closed || this.poisoned) unavailable();
     try {
-      return this.db.prepare(sql).all(...values);
-    } catch {
-      return unavailable();
+      return this.statement(sql).all(...values);
+    } catch (error) {
+      return this.storageFailure(error);
     }
   }
   get(sql: string, ...values: StorageValue[]): StorageRow | undefined {
@@ -196,18 +208,19 @@ export class StorageConnection {
   ): { changes: number | bigint; lastInsertRowid: number | bigint } {
     if (this.closed || this.poisoned) unavailable();
     try {
-      return this.db.prepare(sql).run(...values);
-    } catch {
-      return unavailable();
+      return this.statement(sql).run(...values);
+    } catch (error) {
+      return this.storageFailure(error);
     }
   }
   recordCollection(name: string) {
     return scopedCollection(name, this.options.networkScope);
   }
-  transaction<T>(operation: () => T): T {
+  transaction<T>(operation: () => T, readOnly = false): T {
     if (this.closed || this.poisoned || this.db.isTransaction) unavailable();
     try {
-      this.db.exec('BEGIN IMMEDIATE');
+      if (readOnly) this.db.exec('PRAGMA query_only=ON');
+      this.db.exec(readOnly ? 'BEGIN' : 'BEGIN IMMEDIATE');
       if (this.options.expectedNetworkSetRevision !== undefined) {
         const host = this.get(
           'SELECT record FROM onboarding_records WHERE collection=? AND id=?',
@@ -246,6 +259,15 @@ export class StorageConnection {
       )
         throw error;
       return unavailable();
+    } finally {
+      if (readOnly) {
+        try {
+          this.db.exec('PRAGMA query_only=OFF');
+        } catch {
+          this.poisoned = true;
+          unavailable();
+        }
+      }
     }
   }
   audit(event: string, reference: string) {
@@ -259,6 +281,7 @@ export class StorageConnection {
   async ready(): Promise<boolean> {
     try {
       if (this.closed || this.poisoned) return false;
+      // Startup and the offline doctor verify all pages. Request readiness checks only the bounded catalog and connection settings.
       this.validateSchema();
       return (
         this.db.prepare('PRAGMA synchronous').get()!.synchronous === 2 &&
@@ -270,6 +293,7 @@ export class StorageConnection {
   }
   close() {
     if (!this.closed) {
+      this.statements.clear();
       this.db.close();
       this.closed = true;
     }

@@ -1,4 +1,17 @@
 import {
+  readRecordPage,
+  recordPages,
+  type RecordPageInput,
+} from './record-pages.js';
+import {
+  matchingRecords,
+  matchingEntries,
+  appendAudit,
+  getRecord,
+  putRecord,
+} from './records.js';
+import { safeWalletRecord } from '../sponsorship/wallet-records.js';
+import {
   creatorAccount,
   deferredAccount,
   createDeferredAccount,
@@ -86,7 +99,7 @@ function audit(
   resource: string,
   revision: string,
 ) {
-  state.audit.push({ at: Date.now(), event, resource, revision });
+  appendAudit(state, { at: Date.now(), event, resource, revision });
 }
 const day = 86400000;
 
@@ -118,6 +131,7 @@ export class OnboardingService {
       ): import('./types.js').ApplicationPolicy;
     },
     consentNetwork?: import('../networks.js').ProviderNetwork,
+    readonly orderPolicy?: import('../orders/uniswapx-v3.js').UniswapXOrderPolicy,
   ) {
     const resolved = defineOnboardingPolicy(input);
     if (
@@ -250,19 +264,29 @@ export class OnboardingService {
   private actionRevision(
     state: ProviderState,
     principal: AccessRequest['caller'],
+    orders = false,
   ) {
-    return this.runtimeContracts
+    const base = this.runtimeContracts
       ? fingerprint([
           this.actionPolicyRevision,
           currentRuntimePolicy(state, principal),
         ])
       : this.actionPolicyRevision;
+    if (!orders) return base;
+    if (!this.orderPolicy || !base) deny();
+    return fingerprint(['uniswapx-v3-order-v1', base, this.orderPolicy]);
   }
   private requestRevisionCurrent(state: ProviderState, request: AccessRequest) {
     try {
       return (
         request.actionPolicyRevision ===
-        this.actionRevision(state, request.caller)
+        this.actionRevision(
+          state,
+          request.caller,
+          request.input.authorization_details[0].actions.includes(
+            'orders:authorize',
+          ),
+        )
       );
     } catch {
       return false;
@@ -290,6 +314,16 @@ export class OnboardingService {
       return {
         ...terms,
         action_policy_revision: this.actionRevision(state, principal),
+        ...(this.orderPolicy
+          ? {
+              order_policy_revision: this.actionRevision(
+                state,
+                principal,
+                true,
+              ),
+              order_authorization: this.orderPolicy,
+            }
+          : {}),
         required_fields: [
           ...new Set([
             ...terms.required_fields,
@@ -305,13 +339,13 @@ export class OnboardingService {
     id: string,
     allowExpired = false,
   ): AccessRequest {
-    const request = state.requests[id];
+    const request = getRecord(state, 'requests', id);
     if (
       !request ||
       request.revision !== this.policy.revision ||
       (!allowExpired && request.expiresAt <= Date.now()) ||
       (request.input.authorization_details[0].actions.some((permission) =>
-        ['contracts:request'].includes(permission),
+        ['contracts:request', 'orders:authorize'].includes(permission),
       ) &&
         (!this.actionPolicyRevision ||
           !this.requestRevisionCurrent(state, request)))
@@ -341,16 +375,16 @@ export class OnboardingService {
     if (
       request.revision !== this.policy.revision ||
       (request.input.authorization_details[0].actions.some((permission) =>
-        ['contracts:request'].includes(permission),
+        ['contracts:request', 'orders:authorize'].includes(permission),
       ) &&
         !this.requestRevisionCurrent(state, request))
     )
       return 'policy_changed';
     if (request.grantId) {
-      const grant = state.grants[request.grantId];
+      const grant = getRecord(state, 'grants', request.grantId);
       if (grant.state !== 'active') return grant.state;
       if (grant.expiresAt <= Date.now()) return 'expired';
-      const account = state.accounts[grant.accountId];
+      const account = getRecord(state, 'accounts', grant.accountId);
       if (
         !account ||
         account.status !== 'active' ||
@@ -419,14 +453,19 @@ export class OnboardingService {
         ? {
             account_id: request.accountId,
             ...(this.policy.access.mode === 'application'
-              ? { wallet: walletDescription(state.accounts[request.accountId]) }
+              ? {
+                  wallet: walletDescription(
+                    getRecord(state, 'accounts', request.accountId),
+                  ),
+                }
               : {}),
             ...(request.membership
               ? { membership_revision: request.membership.revision }
               : {}),
-            permissions: state.grants[request.grantId!].permissions,
+            permissions: getRecord(state, 'grants', request.grantId!)
+              .permissions,
             expires_at: new Date(
-              state.grants[request.grantId!].expiresAt,
+              getRecord(state, 'grants', request.grantId!).expiresAt,
             ).toISOString(),
           }
         : {}),
@@ -466,7 +505,7 @@ export class OnboardingService {
     ) => T,
   ): Promise<T> {
     return this.store.transaction((state) => {
-      const account = state.accounts[accountId];
+      const account = getRecord(state, 'accounts', accountId);
       if (account?.deferredCreation && account.acceptedUntil <= Date.now()) {
         const current = deferredAccount(
           this.policy,
@@ -507,7 +546,8 @@ export class OnboardingService {
     )
       invalid();
     const delegatesTransfers = normalized.authorization_details[0].actions.some(
-      (permission) => ['contracts:request'].includes(permission),
+      (permission) =>
+        ['contracts:request', 'orders:authorize'].includes(permission),
     );
     if (delegatesTransfers && !this.actionPolicyRevision) deny();
     const key = fingerprint([
@@ -529,8 +569,21 @@ export class OnboardingService {
           ? currentRuntimePolicy(state, context.principal)
           : undefined;
       const actionRevision = delegatesTransfers
-        ? this.actionRevision(state, context.principal)
+        ? this.actionRevision(
+            state,
+            context.principal,
+            normalized.authorization_details[0].actions.includes(
+              'orders:authorize',
+            ),
+          )
         : undefined;
+      if (
+        normalized.authorization_details[0].actions.includes(
+          'orders:authorize',
+        ) &&
+        normalized.user?.consent.action_policy_revision !== actionRevision
+      )
+        deny();
       if (this.policy.access.mode === 'application' && input.user) {
         input.user = resolveApplicationAssertion(
           this.policy,
@@ -554,10 +607,10 @@ export class OnboardingService {
       const hash = delegatesTransfers
         ? fingerprint([normalized, actionRevision])
         : fingerprint(normalized);
-      const previous = state.idempotency[key];
+      const previous = getRecord(state, 'idempotency', key);
       if (previous) {
         if (previous.hash !== hash) conflict();
-        return this.receipt(state, state.requests[previous.id]);
+        return this.receipt(state, getRecord(state, 'requests', previous.id));
       }
       const request: AccessRequest = {
         id: randomUUID(),
@@ -582,11 +635,11 @@ export class OnboardingService {
           input.user!.identity.reference,
         ]);
         if (
-          state.evidenceOwners[evidenceKey] &&
-          state.evidenceOwners[evidenceKey] !== assertion.owner
+          getRecord(state, 'evidenceOwners', evidenceKey) &&
+          getRecord(state, 'evidenceOwners', evidenceKey) !== assertion.owner
         )
           deny();
-        state.evidenceOwners[evidenceKey] = assertion.owner;
+        putRecord(state, 'evidenceOwners', evidenceKey, assertion.owner);
         request.userOwner = assertion.owner;
         request.owner = assertion.owner;
         if (input.mode === 'create') {
@@ -596,7 +649,12 @@ export class OnboardingService {
             input.user!.consent.wallet_reference !== description.reference
           )
             deny();
-          const existing = Object.values(state.accounts).find(
+          const existing = matchingRecords(
+            state,
+            'accounts',
+            '$walletOwner',
+            assertion.owner,
+          ).find(
             (account) =>
               walletDescription(account).reference === description.reference &&
               (account.owner === assertion.owner ||
@@ -618,7 +676,8 @@ export class OnboardingService {
             request.accountId = existing.id;
           }
         } else if (input.mode === 'connect') {
-          const account = state.accounts[request.accountId] ?? deny();
+          const account =
+            getRecord(state, 'accounts', request.accountId) ?? deny();
           if (account.owner !== assertion.owner)
             connectWalletMember(this.policy, state, request, assertion.owner);
           else if (
@@ -642,17 +701,17 @@ export class OnboardingService {
         if (input.mode === 'connect_from_application') {
           matchSharedAccount(this.policy, state, request, assertion.owner);
         } else if (!request.membership) {
-          const existing = state.accounts[request.accountId];
+          const existing = getRecord(state, 'accounts', request.accountId);
           if (existing)
             creatorAccount(this.policy, state, context.principal, existing.id);
           if (
             !existing &&
-            Object.values(state.accounts).filter(
+            matchingRecords(state, 'accounts', 'owner', assertion.owner).filter(
               (account) => account.owner === assertion.owner,
             ).length >= 100
           )
             deny();
-          state.accounts[request.accountId] = {
+          putRecord(state, 'accounts', request.accountId, {
             ...existing,
             creatorApplication: existing?.creatorApplication ?? {
               issuer: context.principal.issuer,
@@ -666,7 +725,7 @@ export class OnboardingService {
             acceptanceRevision: this.policy.revision,
             evidenceHash: assertion.evidenceHash,
             identitySource: 'application_attestation',
-          };
+          });
         }
         const consent = input.user!.consent;
         if (
@@ -674,11 +733,17 @@ export class OnboardingService {
             consent.account_id !== request.accountId) ||
           (consent.wallet_reference !== undefined &&
             consent.wallet_reference !==
-              walletDescription(state.accounts[request.accountId]).reference)
+              walletDescription(getRecord(state, 'accounts', request.accountId))
+                .reference)
         )
           deny();
-        for (const grant of Object.values(state.grants)) {
-          const previousRequest = state.requests[grant.requestId];
+        for (const grant of matchingRecords(
+          state,
+          'grants',
+          'accountId',
+          request.accountId,
+        )) {
+          const previousRequest = getRecord(state, 'requests', grant.requestId);
           if (
             grant.accountId === request.accountId &&
             requestPerson(previousRequest) === assertion.owner &&
@@ -690,7 +755,12 @@ export class OnboardingService {
           )
             deny();
         }
-        for (const previous of Object.values(state.requests)) {
+        for (const previous of matchingRecords(
+          state,
+          'requests',
+          '$person',
+          assertion.owner,
+        )) {
           if (
             requestPerson(previous) === assertion.owner &&
             previous.input.user?.consent.reference ===
@@ -700,7 +770,7 @@ export class OnboardingService {
             deny();
         }
         if (!request.sharing && !request.membership) {
-          const account = state.accounts[request.accountId];
+          const account = getRecord(state, 'accounts', request.accountId);
           creatorAccount(this.policy, state, context.principal, account.id);
           account.kycDraft = {
             revision: (account.kycDraft?.revision ?? 0) + 1,
@@ -715,8 +785,8 @@ export class OnboardingService {
           assertion,
         );
         this.grant(state, request);
-        state.grants[request.grantId!].expiresAt = Math.min(
-          state.grants[request.grantId!].expiresAt,
+        getRecord(state, 'grants', request.grantId!).expiresAt = Math.min(
+          getRecord(state, 'grants', request.grantId!).expiresAt,
           assertion.expiresAt,
         );
         audit(
@@ -726,8 +796,8 @@ export class OnboardingService {
           this.policy.revision,
         );
       }
-      state.requests[request.id] = request;
-      state.idempotency[key] = { hash, id: request.id };
+      putRecord(state, 'requests', request.id, request);
+      putRecord(state, 'idempotency', key, { hash, id: request.id });
       audit(state, 'access_requested', request.id, this.policy.revision);
       return this.receipt(state, request);
     });
@@ -735,7 +805,7 @@ export class OnboardingService {
   async read(context: AuthorityContext, id: string) {
     const current = this.context(context, 'wallet:access:read');
     return this.store.transaction((state) => {
-      const request = state.requests[id];
+      const request = getRecord(state, 'requests', id);
       if (!request || !sameCaller(request.caller, current.principal)) deny();
       return this.receipt(state, request);
     });
@@ -748,6 +818,16 @@ export class OnboardingService {
       ...(this.actionPolicyRevision
         ? {
             action_policy_revision: this.actionPolicyRevision,
+          }
+        : {}),
+      ...(this.orderPolicy && !this.runtimeContracts
+        ? {
+            order_policy_revision: fingerprint([
+              'uniswapx-v3-order-v1',
+              this.actionPolicyRevision,
+              this.orderPolicy,
+            ]),
+            order_authorization: this.orderPolicy,
           }
         : {}),
       max_identity_age_days: this.policy.identity.maxAgeDays,
@@ -826,9 +906,12 @@ export class OnboardingService {
       records.map((record, index) => inputs[index] ?? record),
     );
     await this.store.transaction((state) => {
-      const previous = state.idempotency[key];
+      const previous = getRecord(state, 'idempotency', key);
       if (previous && previous.hash !== hash) conflict();
-      state.idempotency[key] = { hash, id: context.idempotencyKey };
+      putRecord(state, 'idempotency', key, {
+        hash,
+        id: context.idempotencyKey,
+      });
     });
     const results: (
       | { index: number; status: 'invalid'; required_fields: string[] }
@@ -875,7 +958,7 @@ export class OnboardingService {
       if (request.owner && request.owner !== owner) deny();
       if (
         request.input.mode === 'connect' &&
-        state.accounts[request.accountId]?.owner !== owner
+        getRecord(state, 'accounts', request.accountId)?.owner !== owner
       )
         deny();
       const status = this.stateOf(state, request);
@@ -900,7 +983,7 @@ export class OnboardingService {
     });
   }
   private grant(state: ProviderState, request: AccessRequest) {
-    const account = state.accounts[request.accountId];
+    const account = getRecord(state, 'accounts', request.accountId);
     if (
       !request.owner ||
       !request.consent ||
@@ -912,11 +995,16 @@ export class OnboardingService {
     )
       deny();
     if (request.grantId) return;
-    for (const previous of Object.values(state.grants)) {
+    for (const previous of matchingRecords(
+      state,
+      'grants',
+      'accountId',
+      request.accountId,
+    )) {
       if (
         previous.accountId === request.accountId &&
         sameCaller(previous.caller, request.caller) &&
-        requestPerson(state.requests[previous.requestId]) ===
+        requestPerson(getRecord(state, 'requests', previous.requestId)) ===
           requestPerson(request) &&
         previous.state !== 'revoked'
       ) {
@@ -941,7 +1029,7 @@ export class OnboardingService {
       ),
       state: 'active',
     };
-    state.grants[grant.id] = grant;
+    putRecord(state, 'grants', grant.id, grant);
     request.grantId = grant.id;
     audit(state, 'access_granted', grant.id, this.policy.revision);
   }
@@ -952,7 +1040,7 @@ export class OnboardingService {
       if (request.denied || (request.owner && request.owner !== owner)) deny();
       if (
         request.input.mode === 'connect' &&
-        state.accounts[request.accountId]?.owner !== owner
+        getRecord(state, 'accounts', request.accountId)?.owner !== owner
       )
         deny();
       request.owner = owner;
@@ -962,7 +1050,8 @@ export class OnboardingService {
       };
       if (!approve) {
         request.denied = true;
-        if (request.grantId) state.grants[request.grantId].state = 'revoked';
+        if (request.grantId)
+          getRecord(state, 'grants', request.grantId).state = 'revoked';
       } else if (!request.consent)
         request.consent = {
           at: Date.now(),
@@ -971,12 +1060,15 @@ export class OnboardingService {
         };
       if (approve) {
         // One account per authenticated owner in this provider product. Concurrent create requests converge.
-        const existing = Object.values(state.accounts).find(
-          (a) => a.owner === owner,
-        );
+        const existing = matchingRecords(
+          state,
+          'accounts',
+          'owner',
+          owner,
+        ).find((a) => a.owner === owner);
         if (request.input.mode === 'create' && existing)
           request.accountId = existing.id;
-        const account = state.accounts[request.accountId];
+        const account = getRecord(state, 'accounts', request.accountId);
         if (
           account &&
           account.status === 'active' &&
@@ -1015,16 +1107,19 @@ export class OnboardingService {
     const mutationHash = fingerprint([id, hash]);
     const admission = await this.store.transaction((state) => {
       const request = this.caller(state, context, id);
-      const previous = state.idempotency[mutationKey];
+      const previous = getRecord(state, 'idempotency', mutationKey);
       if (previous && previous.hash !== mutationHash) conflict();
       if (!request.consent || !request.owner) deny();
       if (request.importAttempt) {
         if (request.importAttempt.fingerprint !== hash) conflict();
-        state.idempotency[mutationKey] = { hash: mutationHash, id };
+        putRecord(state, 'idempotency', mutationKey, {
+          hash: mutationHash,
+          id,
+        });
         return { dispatch: false, receipt: this.receipt(state, request) };
       }
       if (request.denied || request.grantId) deny();
-      state.idempotency[mutationKey] = { hash: mutationHash, id };
+      putRecord(state, 'idempotency', mutationKey, { hash: mutationHash, id });
       const app = application(this.policy, context.principal);
       const terms = adapter.price;
       const budgetKey = fingerprint([
@@ -1032,7 +1127,7 @@ export class OnboardingService {
         app.clientId,
         new Date().toISOString().slice(0, 7),
       ]);
-      const used = state.budgets[budgetKey] ?? 0;
+      const used = getRecord(state, 'budgets', budgetKey) ?? 0;
       if (
         !terms ||
         !app.funding ||
@@ -1048,7 +1143,7 @@ export class OnboardingService {
         };
       }
       delete request.fundingRequired;
-      state.budgets[budgetKey] = used + terms.maximumMinor;
+      putRecord(state, 'budgets', budgetKey, used + terms.maximumMinor);
       request.importAttempt = {
         vendor,
         fingerprint: hash,
@@ -1076,14 +1171,14 @@ export class OnboardingService {
       evidence = await adapter.importShared(token, id);
     } catch {
       await this.store.transaction((state) => {
-        const attempt = state.requests[id]?.importAttempt;
+        const attempt = getRecord(state, 'requests', id)?.importAttempt;
         if (attempt?.fingerprint === hash) attempt.state = 'unknown';
         audit(state, 'identity_import_unknown', id, this.policy.revision);
       });
       throw new WalletProviderError('wallet_identity_unavailable', 'unknown');
     }
     return this.store.transaction((state) => {
-      const request = state.requests[id];
+      const request = getRecord(state, 'requests', id);
       if (
         request.importAttempt?.fingerprint !== hash ||
         request.importAttempt.state !== 'pending'
@@ -1130,7 +1225,7 @@ export class OnboardingService {
         app.clientId,
         new Date().toISOString().slice(0, 7),
       ]);
-      const used = state.budgets[budgetKey] ?? 0;
+      const used = getRecord(state, 'budgets', budgetKey) ?? 0;
       if (
         !terms ||
         !app.funding ||
@@ -1140,7 +1235,7 @@ export class OnboardingService {
         return { dispatch: false, status: 'funding_approval_required' };
       }
       delete request.fundingRequired;
-      state.budgets[budgetKey] = used + terms.maximumMinor;
+      putRecord(state, 'budgets', budgetKey, used + terms.maximumMinor);
       request.importAttempt = {
         vendor,
         fingerprint: fingerprint(['fresh', vendor]),
@@ -1169,13 +1264,13 @@ export class OnboardingService {
       started = await adapter.startVerification(id);
     } catch {
       await this.store.transaction((state) => {
-        state.requests[id].importAttempt!.state = 'unknown';
+        getRecord(state, 'requests', id).importAttempt!.state = 'unknown';
         audit(state, 'verification_unknown', id, this.policy.revision);
       });
       throw new WalletProviderError('wallet_identity_unavailable', 'unknown');
     }
     return this.store.transaction((state) => {
-      const request = state.requests[id];
+      const request = getRecord(state, 'requests', id);
       request.verification = { vendor, ...started };
       request.importAttempt!.state = 'complete';
       return {
@@ -1195,54 +1290,104 @@ export class OnboardingService {
       deny();
     return fingerprint([principal.issuer, principal.subject]);
   }
-  async reviews(principal: VerifiedPrincipal) {
-    this.reviewer(principal);
-    return this.store.transaction((state) =>
-      Object.values(state.requests)
-        .filter(
-          (r) =>
-            r.consent &&
-            !r.denied &&
-            !r.grantId &&
-            !r.acceptance &&
-            r.revision === this.policy.revision,
-        )
-        .map((r) => ({
-          requestId: r.id,
-          owner: r.ownerIdentity,
-          vendor: r.evidence?.vendor ?? r.importAttempt?.vendor,
-          reference: r.evidence?.reference ?? r.verification?.reference,
-          verifiedAt: r.evidence?.verifiedAt,
-          status: this.stateOf(state, r),
-          ...(this.policy.identity.records && r.input.identity_record
-            ? {
-                applicationRecord: structuredClone(r.input.identity_record),
-                application: application(this.policy, {
-                  ...r.caller,
-                  scopes: [],
-                }).name,
-              }
-            : {}),
-        })),
+  private reviewRecord(state: ProviderState, r: AccessRequest) {
+    if (
+      !r.consent ||
+      r.denied ||
+      r.grantId ||
+      r.acceptance ||
+      r.revision !== this.policy.revision
+    )
+      return undefined;
+    return {
+      requestId: r.id,
+      owner: r.ownerIdentity,
+      vendor: r.evidence?.vendor ?? r.importAttempt?.vendor,
+      reference: r.evidence?.reference ?? r.verification?.reference,
+      verifiedAt: r.evidence?.verifiedAt,
+      status: this.stateOf(state, r),
+      ...(this.policy.identity.records && r.input.identity_record
+        ? {
+            applicationRecord: structuredClone(r.input.identity_record),
+            application: application(this.policy, { ...r.caller, scopes: [] })
+              .name,
+          }
+        : {}),
+    };
+  }
+  /** Bounded review page; an empty page can still have a continuation cursor. */
+  async reviewPage(principal: VerifiedPrincipal, input: RecordPageInput = {}) {
+    return readRecordPage(
+      this.store,
+      'requests',
+      input,
+      (state, r) => this.reviewRecord(state, r),
+      () => {
+        this.reviewer(principal);
+      },
     );
   }
+  /**
+   * Bulk report that yields between pages; results are not a snapshot.
+   * Use reviewPage for request handlers.
+   */
+  async reviews(principal: VerifiedPrincipal) {
+    this.reviewer(principal);
+    const result: NonNullable<ReturnType<OnboardingService['reviewRecord']>>[] =
+      [];
+    for await (const rows of recordPages(
+      this.store,
+      'requests',
+      (state, r) => this.reviewRecord(state, r),
+      () => {
+        this.reviewer(principal);
+      },
+    ))
+      result.push(...rows);
+    return result;
+  }
+  private accountSummary(a: ProviderState['accounts'][string]) {
+    return { id: a.id, status: a.status, provisioned: Boolean(a.address) };
+  }
+  async providerAccountPage(
+    principal: VerifiedPrincipal,
+    input: RecordPageInput = {},
+  ) {
+    return readRecordPage(
+      this.store,
+      'accounts',
+      input,
+      (_state, a) => this.accountSummary(a),
+      () => {
+        this.reviewer(principal);
+      },
+    );
+  }
+  /**
+   * Bulk report that yields between pages; results are not a snapshot.
+   * Use providerAccountPage for request handlers.
+   */
   async providerAccounts(principal: VerifiedPrincipal) {
     this.reviewer(principal);
-    return this.store.transaction((state) =>
-      Object.values(state.accounts).map((a) => ({
-        id: a.id,
-        status: a.status,
-        provisioned: Boolean(a.address),
-      })),
-    );
+    const result: ReturnType<OnboardingService['accountSummary']>[] = [];
+    for await (const rows of recordPages(
+      this.store,
+      'accounts',
+      (_state, a) => this.accountSummary(a),
+      () => {
+        this.reviewer(principal);
+      },
+    ))
+      result.push(...rows);
+    return result;
   }
   async suspendAccount(principal: VerifiedPrincipal, id: string) {
     this.reviewer(principal);
     return this.store.transaction((state) => {
-      const account = state.accounts[id];
+      const account = getRecord(state, 'accounts', id);
       if (!account) deny();
       account.status = 'suspended';
-      for (const grant of Object.values(state.grants))
+      for (const grant of matchingRecords(state, 'grants', 'accountId', id))
         if (grant.accountId === id) grant.state = 'revoked';
       audit(state, 'provider_suspended_account', id, this.policy.revision);
     });
@@ -1251,9 +1396,9 @@ export class OnboardingService {
     this.reviewer(principal);
     if (!this.walletReader || !uuid.test(id)) invalid();
     await this.store.transaction((state) => {
-      if (!state.accounts[id]) deny();
+      if (!getRecord(state, 'accounts', id)) deny();
       if (
-        Object.values(state.attempts).some(
+        matchingRecords(state, 'attempts', 'request.accountId', id).some(
           (a) =>
             a.request.accountId === id &&
             a.state === 'dispatch' &&
@@ -1278,9 +1423,14 @@ export class OnboardingService {
       throw new WalletProviderError('wallet_onboarding_unavailable', 'unknown');
     }
     return this.store.transaction((state) => {
-      const record = state.accounts[id];
+      const record = getRecord(state, 'accounts', id);
       if (!record || (record.address && record.address !== address)) conflict();
-      const attempts = Object.values(state.attempts).filter(
+      const attempts = matchingRecords(
+        state,
+        'attempts',
+        'request.accountId',
+        id,
+      ).filter(
         (a) => a.request.accountId === id && a.request.kind === 'provision',
       );
       if (
@@ -1441,16 +1591,19 @@ export class OnboardingService {
       const { evidenceKey, expiresAt } = proof;
       const evidenceHash = proof.evidenceHash ?? evidenceKey;
       if (
-        state.evidenceOwners[evidenceKey] &&
-        state.evidenceOwners[evidenceKey] !== request.owner
+        getRecord(state, 'evidenceOwners', evidenceKey) &&
+        getRecord(state, 'evidenceOwners', evidenceKey) !== request.owner
       )
         deny();
-      const existing = Object.values(state.accounts).find(
-        (a) => a.owner === request.owner,
-      );
+      const existing = matchingRecords(
+        state,
+        'accounts',
+        'owner',
+        request.owner!,
+      ).find((a) => a.owner === request.owner);
       if (request.input.mode === 'create' && existing)
         request.accountId = existing.id;
-      const account = state.accounts[request.accountId];
+      const account = getRecord(state, 'accounts', request.accountId);
       if (account && account.owner !== request.owner) deny();
       if (proof.evidence) request.evidence = proof.evidence;
       request.acceptance = {
@@ -1461,8 +1614,8 @@ export class OnboardingService {
         ...(proof.source ? { source: proof.source } : {}),
       };
       if (request.importAttempt) request.importAttempt.state = 'complete';
-      state.evidenceOwners[evidenceKey] = request.owner!;
-      state.accounts[request.accountId] = {
+      putRecord(state, 'evidenceOwners', evidenceKey, request.owner!);
+      putRecord(state, 'accounts', request.accountId, {
         ...account,
         id: request.accountId,
         owner: request.owner!,
@@ -1471,9 +1624,9 @@ export class OnboardingService {
         acceptanceRevision: this.policy.revision,
         evidenceHash,
         ...(proof.source ? { identitySource: proof.source } : {}),
-      };
+      });
       if (!proof.source)
-        delete state.accounts[request.accountId].identitySource;
+        delete getRecord(state, 'accounts', request.accountId).identitySource;
       // A completed identity review can be reused, but expired application consent cannot create access.
       if (request.expiresAt > Date.now()) this.grant(state, request);
       audit(state, 'provider_accepted', id, this.policy.revision);
@@ -1486,7 +1639,7 @@ export class OnboardingService {
     accountId: string,
     permission?: Permission,
   ) {
-    const account = state.accounts[accountId];
+    const account = getRecord(state, 'accounts', accountId);
     if (
       !account ||
       account.status !== 'active' ||
@@ -1501,8 +1654,8 @@ export class OnboardingService {
     )
       deny();
     const candidates = principal.accessGrantId
-      ? [state.grants[principal.accessGrantId]]
-      : Object.values(state.grants);
+      ? [getRecord(state, 'grants', principal.accessGrantId)]
+      : matchingRecords(state, 'grants', 'accountId', accountId);
     const grant = candidates.find(
       (g) =>
         g &&
@@ -1516,7 +1669,7 @@ export class OnboardingService {
         (!permission || g.permissions.includes(permission)),
     );
     if (!grant) deny();
-    const accessRequest = state.requests[grant.requestId];
+    const accessRequest = getRecord(state, 'requests', grant.requestId);
     if (accessRequest?.sharing)
       validateSharedAccess(this.policy, state, accessRequest);
     if (accessRequest?.membership)
@@ -1531,12 +1684,20 @@ export class OnboardingService {
         undefined
     )
       deny();
-    if (permission === 'contracts:request') {
-      const request = state.requests[grant.requestId];
+    if (
+      permission === 'contracts:request' ||
+      permission === 'orders:authorize'
+    ) {
+      const request = getRecord(state, 'requests', grant.requestId);
       const consent = request?.consent;
       if (
         !this.actionPolicyRevision ||
-        grant.actionPolicyRevision !== this.actionRevision(state, principal) ||
+        grant.actionPolicyRevision !==
+          this.actionRevision(
+            state,
+            principal,
+            grant.permissions.includes('orders:authorize'),
+          ) ||
         !request ||
         !this.requestRevisionCurrent(state, request) ||
         !consent ||
@@ -1570,11 +1731,16 @@ export class OnboardingService {
     applicationId: string,
     accountId: string,
   ): boolean {
-    for (const grant of Object.values(state.grants)) {
+    for (const grant of matchingRecords(
+      state,
+      'grants',
+      'accountId',
+      accountId,
+    )) {
       if (
         grant.accountId !== accountId ||
-        (!state.requests[grant.requestId]?.sharing &&
-          !state.requests[grant.requestId]?.membership) ||
+        (!getRecord(state, 'requests', grant.requestId)?.sharing &&
+          !getRecord(state, 'requests', grant.requestId)?.membership) ||
         runtimeApplicationId(grant.caller.issuer, grant.caller.clientId) !==
           applicationId
       )
@@ -1624,7 +1790,7 @@ export class OnboardingService {
   async account(principal: VerifiedPrincipal, accountId: string) {
     return this.store.transaction((state) => {
       this.activeGrant(state, principal, accountId, 'account:read');
-      const account = state.accounts[accountId];
+      const account = getRecord(state, 'accounts', accountId);
       return {
         account_id: account.id,
         ...(this.policy.access.mode === 'application'
@@ -1637,12 +1803,9 @@ export class OnboardingService {
             }
           : {}),
         ...(this.safeOnlyWallet
-          ? state.deploymentBindings?.['service-v1']?.runtimeConfiguration
-              ?.safeWalletAccounts?.[accountId]?.status === 'ready'
+          ? safeWalletRecord(state, accountId)?.status === 'ready'
             ? {
-                address:
-                  state.deploymentBindings['service-v1'].runtimeConfiguration!
-                    .safeWalletAccounts![accountId].binding.address,
+                address: safeWalletRecord(state, accountId).binding.address,
               }
             : {}
           : account.address
@@ -1650,8 +1813,7 @@ export class OnboardingService {
             : {}),
         status: (
           this.safeOnlyWallet
-            ? state.deploymentBindings?.['service-v1']?.runtimeConfiguration
-                ?.safeWalletAccounts?.[accountId]?.status === 'ready'
+            ? safeWalletRecord(state, accountId)?.status === 'ready'
             : !!account.address
         )
           ? 'provisioned'
@@ -1667,20 +1829,30 @@ export class OnboardingService {
     return this.store.transaction((state) => {
       const accounts = [];
       const defaultAccount =
-        Object.values(state.accounts).find(
+        matchingRecords(state, 'accounts', '$walletOwner', personId).find(
           (account) =>
             account.owner === personId &&
             walletDescription(account).reference === 'personal',
         ) ??
-        Object.values(state.accounts).find(
+        matchingRecords(state, 'accounts', '$walletOwner', personId).find(
           (account) =>
             account.linkedOwners?.includes(personId) &&
             walletDescription(account).reference === 'personal',
         );
-      for (const grant of Object.values(state.grants)) {
+      for (const grant of matchingRecords(
+        state,
+        'grants',
+        '$caller',
+        JSON.stringify([
+          current.principal.issuer,
+          current.principal.subject,
+          current.principal.clientId,
+        ]),
+      )) {
         if (
           !sameCaller(grant.caller, current.principal) ||
-          requestPerson(state.requests[grant.requestId]) !== personId
+          requestPerson(getRecord(state, 'requests', grant.requestId)) !==
+            personId
         )
           continue;
         try {
@@ -1690,7 +1862,7 @@ export class OnboardingService {
             grant.accountId,
             'account:read',
           );
-          const account = state.accounts[grant.accountId];
+          const account = getRecord(state, 'accounts', grant.accountId);
           accounts.push({
             account_id: account.id,
             is_default: defaultAccount?.id === account.id,
@@ -1698,7 +1870,7 @@ export class OnboardingService {
             grant_id: grant.id,
             permissions: [...grant.permissions],
             expires_at: new Date(grant.expiresAt).toISOString(),
-            role: state.requests[grant.requestId].membership
+            role: getRecord(state, 'requests', grant.requestId).membership
               ? 'member'
               : 'owner',
           });
@@ -1731,8 +1903,8 @@ export class OnboardingService {
       accountId,
       'members:manage',
     );
-    const account = state.accounts[accountId],
-      request = state.requests[grant.requestId];
+    const account = getRecord(state, 'accounts', accountId),
+      request = getRecord(state, 'requests', grant.requestId);
     if (
       walletDescription(account).kind !== 'shared' ||
       request.membership ||
@@ -1877,14 +2049,19 @@ export class OnboardingService {
         };
         members[id] = member;
         account.membersRevision = (account.membersRevision ?? 0) + 1;
-        for (const request of Object.values(state.requests))
+        for (const request of matchingRecords(
+          state,
+          'requests',
+          'accountId',
+          accountId,
+        ))
           if (
             request.accountId === accountId &&
             request.membership?.personId === id
           ) {
             request.denied = true;
             if (request.grantId)
-              state.grants[request.grantId].state = 'revoked';
+              getRecord(state, 'grants', request.grantId).state = 'revoked';
           }
         audit(
           state,
@@ -1905,7 +2082,7 @@ export class OnboardingService {
     const current = this.context(context);
     if (this.policy.access.mode !== 'application') deny();
     return this.store.transaction((state) => {
-      const grant = state.grants[id];
+      const grant = getRecord(state, 'grants', id);
       if (!grant || !sameCaller(grant.caller, current.principal)) deny();
       const key = fingerprint([
         current.principal.issuer,
@@ -1915,24 +2092,32 @@ export class OnboardingService {
         current.idempotencyKey,
       ]);
       const hash = fingerprint(id);
-      if (state.idempotency[key] && state.idempotency[key].hash !== hash)
+      if (
+        getRecord(state, 'idempotency', key) &&
+        getRecord(state, 'idempotency', key).hash !== hash
+      )
         conflict();
-      state.idempotency[key] = { hash, id };
+      putRecord(state, 'idempotency', key, { hash, id });
       const withdrawnAt = grant.withdrawnAt ?? Date.now();
-      const reference =
-        state.requests[grant.requestId]?.input.user?.consent.reference;
-      for (const related of Object.values(state.grants)) {
+      const reference = getRecord(state, 'requests', grant.requestId)?.input
+        .user?.consent.reference;
+      for (const related of matchingRecords(
+        state,
+        'grants',
+        'accountId',
+        grant.accountId,
+      )) {
         if (
           related.id === grant.id ||
           (reference &&
             related.accountId === grant.accountId &&
-            requestPerson(state.requests[related.requestId]) ===
-              requestPerson(state.requests[grant.requestId]) &&
+            requestPerson(getRecord(state, 'requests', related.requestId)) ===
+              requestPerson(getRecord(state, 'requests', grant.requestId)) &&
             related.owner === grant.owner &&
             related.caller.issuer === grant.caller.issuer &&
             related.caller.clientId === grant.caller.clientId &&
-            state.requests[related.requestId]?.input.user?.consent.reference ===
-              reference)
+            getRecord(state, 'requests', related.requestId)?.input.user?.consent
+              .reference === reference)
         ) {
           related.state = 'revoked';
           related.withdrawnAt ??= withdrawnAt;
@@ -1945,7 +2130,7 @@ export class OnboardingService {
   async ownerRequests(identity: OwnerIdentity) {
     const owner = this.freshOwner(identity);
     return this.store.transaction((state) =>
-      Object.values(state.requests)
+      matchingRecords(state, 'requests', 'owner', owner)
         .filter(
           (r) => r.owner === owner && !r.denied && !r.grantId && !r.acceptance,
         )
@@ -1964,7 +2149,7 @@ export class OnboardingService {
   async cancelPending(id: string, identity: OwnerIdentity) {
     const owner = this.freshOwner(identity);
     return this.store.transaction((state) => {
-      const request = state.requests[id];
+      const request = getRecord(state, 'requests', id);
       if (
         !request ||
         request.owner !== owner ||
@@ -1980,7 +2165,7 @@ export class OnboardingService {
   async ownerGrants(identity: OwnerIdentity) {
     const owner = this.freshOwner(identity);
     return this.store.transaction((state) =>
-      Object.values(state.grants)
+      matchingRecords(state, 'grants', 'owner', owner)
         .filter((g) => g.owner === owner)
         .map((g) => ({
           id: g.id,
@@ -2006,7 +2191,7 @@ export class OnboardingService {
       'authenticatedAt' in identity ? this.freshOwner(identity) : undefined;
     if (!owner) this.reviewer(identity as VerifiedPrincipal);
     return this.store.transaction((state) => {
-      const grant = state.grants[id];
+      const grant = getRecord(state, 'grants', id);
       if (!grant || (owner && grant.owner !== owner)) deny();
       if (grant.state === 'revoked' && stateValue !== 'revoked') deny();
       grant.state = stateValue;
@@ -2053,7 +2238,7 @@ export class OnboardingService {
       provision: async (input, accountId) => {
         const context = this.context(input, 'wallet:provision');
         return this.store.transaction((state) => {
-          const account = state.accounts[accountId];
+          const account = getRecord(state, 'accounts', accountId);
           if (
             account?.deferredCreation &&
             account.acceptedUntil <= Date.now()
@@ -2064,21 +2249,25 @@ export class OnboardingService {
               context.principal,
               accountId,
             );
-            const prior = Object.entries(state.admissions).find(
-              ([, a]) => a.accountId === accountId,
-            );
+            const prior = matchingEntries(
+              state,
+              'admissions',
+              'accountId',
+              accountId,
+            ).find(([, a]) => a.accountId === accountId);
             const attemptId = prior?.[0] ?? randomUUID();
             if (prior && !prior[1].deferred) deny();
-            state.admissions[attemptId] ??= {
-              accountId,
-              grantId: '',
-              caller: {
-                issuer: context.principal.issuer,
-                clientId: context.principal.clientId,
-                subject: context.principal.subject,
-              },
-              deferred: true,
-            };
+            getRecord(state, 'admissions', attemptId) ??
+              putRecord(state, 'admissions', attemptId, {
+                accountId,
+                grantId: '',
+                caller: {
+                  issuer: context.principal.issuer,
+                  clientId: context.principal.clientId,
+                  subject: context.principal.subject,
+                },
+                deferred: true,
+              });
             return {
               sessionSubject: current.owner,
               ownerSubject: current.owner,
@@ -2089,7 +2278,7 @@ export class OnboardingService {
             };
           }
           const grant = this.activeGrant(state, context.principal, accountId);
-          const access = state.requests[grant.requestId];
+          const access = getRecord(state, 'requests', grant.requestId);
           if (access?.membership || access?.sharing) deny();
           const key = fingerprint([
             context.principal.issuer,
@@ -2099,25 +2288,33 @@ export class OnboardingService {
             context.idempotencyKey,
           ]);
           const hash = fingerprint(accountId);
-          const previous = state.idempotency[key];
+          const previous = getRecord(state, 'idempotency', key);
           if (previous && previous.hash !== hash) conflict();
           // One durable creation attempt per account, even if the requester changes its idempotency key.
-          const prior = Object.entries(state.admissions).find(
-            ([, a]) => a.accountId === accountId,
-          );
+          const prior = matchingEntries(
+            state,
+            'admissions',
+            'accountId',
+            accountId,
+          ).find(([, a]) => a.accountId === accountId);
           const attemptId = previous?.id ?? prior?.[0] ?? randomUUID();
-          state.idempotency[key] = { hash, id: attemptId };
-          if (!state.admissions[attemptId])
-            state.admissions[attemptId] = {
+          putRecord(state, 'idempotency', key, { hash, id: attemptId });
+          if (!getRecord(state, 'admissions', attemptId))
+            putRecord(state, 'admissions', attemptId, {
               accountId,
               grantId: grant.id,
               caller: { ...grant.caller },
-            };
-          const original = state.admissions[attemptId];
+            });
+          const original = getRecord(state, 'admissions', attemptId);
           const completed =
             original.grantId !== grant.id &&
-            state.grants[original.grantId]?.owner === grant.owner
-              ? Object.values(state.attempts).find(
+            getRecord(state, 'grants', original.grantId)?.owner === grant.owner
+              ? matchingRecords(
+                  state,
+                  'attempts',
+                  'request.attemptId',
+                  attemptId,
+                ).find(
                   (attempt) =>
                     attempt.request.attemptId === attemptId &&
                     attempt.request.accountId === accountId &&
@@ -2126,7 +2323,7 @@ export class OnboardingService {
                     attempt.result?.kind === 'provision' &&
                     attempt.result.account.accountId === accountId &&
                     attempt.result.account.address ===
-                      state.accounts[accountId].address,
+                      getRecord(state, 'accounts', accountId).address,
                 )
               : undefined;
           return {
@@ -2147,7 +2344,7 @@ export class OnboardingService {
   async canDispatchProvision(attemptId: string, accountId: string) {
     try {
       return await this.store.transaction((state) => {
-        const admission = state.admissions[attemptId];
+        const admission = getRecord(state, 'admissions', attemptId);
         if (!admission || admission.accountId !== accountId) return false;
         if (admission.deferred) {
           const account = creatorAccount(
@@ -2158,7 +2355,7 @@ export class OnboardingService {
           );
           return account.deferredCreation?.revision === this.policy.revision;
         }
-        const grant = state.grants[admission.grantId];
+        const grant = getRecord(state, 'grants', admission.grantId);
         if (!grant) return false;
         const current = this.activeGrant(
           state,

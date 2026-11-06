@@ -1,3 +1,9 @@
+import {
+  matchingRecords,
+  getRecord,
+  putRecord,
+  appendAudit,
+} from './records.js';
 import { randomUUID } from 'node:crypto';
 import type {
   WalletAttemptJournal,
@@ -18,7 +24,7 @@ export function createOnboardingJournal(
     request: WalletAttemptRequest,
     lease: string,
   ): StoredAttempt {
-    const record = state.attempts[key(request)];
+    const record = getRecord(state, 'attempts', key(request));
     if (
       !record ||
       fingerprint(record.request) !== fingerprint(request) ||
@@ -39,7 +45,7 @@ export function createOnboardingJournal(
         };
         if (request.kind !== 'provision')
           return { ...identity, state: 'conflict' as const };
-        const existing = state.attempts[key(request)];
+        const existing = getRecord(state, 'attempts', key(request));
         if (existing) {
           if (fingerprint(existing.request) !== fingerprint(request))
             return { ...identity, state: 'conflict' as const };
@@ -66,7 +72,16 @@ export function createOnboardingJournal(
           };
         }
         if (
-          Object.values(state.attempts).some(
+          matchingRecords(
+            state,
+            'attempts',
+            '$resource',
+            JSON.stringify([
+              request.namespace,
+              request.provider,
+              request.resourceKey,
+            ]),
+          ).some(
             (a) =>
               a.request.namespace === request.namespace &&
               a.request.provider === request.provider &&
@@ -74,18 +89,18 @@ export function createOnboardingJournal(
           )
         )
           return { ...identity, state: 'conflict' as const };
-        const admission = state.admissions[request.attemptId];
+        const admission = getRecord(state, 'admissions', request.attemptId);
         if (!admission || admission.accountId !== request.accountId)
           return { ...identity, state: 'conflict' as const };
         const lease = randomUUID();
         const expiresAt = Date.now() + 30000;
-        state.attempts[key(request)] = {
+        putRecord(state, 'attempts', key(request), {
           request: structuredClone(request),
           grantId: admission.grantId,
           state: 'dispatch',
           lease,
           expiresAt,
-        };
+        });
         return {
           ...identity,
           state: 'dispatch' as const,
@@ -106,12 +121,14 @@ export function createOnboardingJournal(
           );
         attempt.state = 'succeeded';
         attempt.result = structuredClone(result);
-        state.accounts[request.accountId].address = result.account.address;
-        state.audit.push({
+        getRecord(state, 'accounts', request.accountId).address =
+          result.account.address;
+        appendAudit(state, {
           at: Date.now(),
           event: 'wallet_provisioned',
           resource: request.accountId,
-          revision: state.accounts[request.accountId].acceptanceRevision,
+          revision: getRecord(state, 'accounts', request.accountId)
+            .acceptanceRevision,
         });
       }),
     fail: (request, lease, failure) =>
@@ -119,11 +136,12 @@ export function createOnboardingJournal(
         const attempt = owned(state, request, lease);
         attempt.state = failure.outcome === 'unknown' ? 'unknown' : 'failed';
         attempt.failure = { ...failure };
-        state.audit.push({
+        appendAudit(state, {
           at: Date.now(),
           event: 'wallet_attempt_' + attempt.state,
           resource: request.accountId,
-          revision: state.accounts[request.accountId].acceptanceRevision,
+          revision: getRecord(state, 'accounts', request.accountId)
+            .acceptanceRevision,
         });
       }),
   };

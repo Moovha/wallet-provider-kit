@@ -11,6 +11,7 @@ export const permissions = [
   'account:read',
   'operations:request',
   'contracts:request',
+  'orders:authorize',
   'members:manage',
   'owners:manage',
 ] as const;
@@ -306,6 +307,14 @@ export interface ProviderState {
     string,
     import('../sponsorship/admission.js').SponsorshipAdmission
   >;
+  uniswapXOrders?: Record<
+    string,
+    import('../orders/service.js').UniswapXOrderRecord
+  >;
+  safeWalletAccounts?: Record<
+    string,
+    import('../sponsorship/safe-wallet.js').SafeWalletAccount
+  >;
   supportedActions?: Record<string, ApprovedCallsRecord>;
   deploymentBindings?: Record<
     string,
@@ -315,6 +324,7 @@ export interface ProviderState {
       binding: string;
       network?: import('../networks.js').ProviderNetwork;
       activeRevision?: string;
+      uniswapXOrderPolicyRevision?: string;
       transportRevision?: string;
       networkSetRevision?: string;
       managementInstallationId?: string;
@@ -372,5 +382,7 @@ export interface ProviderState {
 }
 /** Callback is synchronous; never make vendor/network calls inside a storage transaction. */
 export interface OnboardingStore {
+  /** Optional read-only transaction. SQLite reads do not reserve the writer lock. */
+  read?<T>(operation: (state: ProviderState) => T): Promise<T>;
   transaction<T>(operation: (state: ProviderState) => T): Promise<T>;
 }

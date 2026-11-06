@@ -386,7 +386,11 @@ export function sqliteFinancialAuthority(
 
   return {
     authority,
-    journal: sqliteJournal(connection),
+    journal: sqliteJournal(
+      connection,
+      undefined,
+      inputOptions.signatureProtection,
+    ),
     authorizeAttempt: (request: WalletAttemptRequest) =>
       authorizeRequest(request, false),
     authorizeStatus: (request: WalletAttemptRequest) =>

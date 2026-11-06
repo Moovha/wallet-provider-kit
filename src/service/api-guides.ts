@@ -1,5 +1,6 @@
 export interface OperationGuide {
   management?: boolean;
+  uniswapXOrders?: boolean;
   title: string;
   group: string;
   scope?: string;
@@ -15,6 +16,7 @@ export interface OperationGuide {
     | 'account:read'
     | 'operations:request'
     | 'contracts:request'
+    | 'orders:authorize'
     | 'members:manage'
     | 'owners:manage';
   audience: string;
@@ -97,6 +99,8 @@ export const apiOperationOrder = [
   'saveWalletMember',
   'readWalletExecutionAccount',
   'walletCallsRpc',
+  'submitUniswapXV3Order',
+  'getUniswapXV3Order',
   'streamWalletCallsStatus',
   'listWalletBatches',
   'claimProviderInstallation',
@@ -178,6 +182,38 @@ export function operationGuideDescription(guide: OperationGuide) {
 
 // Shared operator guidance. Runtime authentication and authority remain authoritative.
 export const operationGuides: Record<string, OperationGuide> = {
+  submitUniswapXV3Order: {
+    uniswapXOrders: true,
+    title: 'Submit a bounded UniswapX solver order',
+    group: 'Transactions',
+    audience: 'Application developer',
+    purpose:
+      'Authorize one exact Base UniswapX V3 swap or recipient-bound transfer with its disclosed output-token fee and net minimum.',
+    whenToUse:
+      'Use only after the provider configures the optional order policy and the owner grants separate order permission.',
+    scope: 'wallet:sign',
+    permission: 'orders:authorize',
+    prerequisite:
+      'Use wallet:actions and wallet:sign scopes, current owner identity and explicit orders:authorize consent bound to order_policy_revision. Submit an unsigned canonical quote and retain the UUID idempotency key. Third-party delivery requires bound-transfer policy, fresh consent and an explicit matching recipient. Permit2 allowance uses a separate approved wallet call.',
+    success:
+      '202: a durable order receipt. Acceptance is pending settlement. Retry the same key and body; never replace an unknown submission. Read the order until canonical receipt effects establish fill, cancellation or expiry.',
+  },
+  getUniswapXV3Order: {
+    uniswapXOrders: true,
+    title: 'Recover a UniswapX order result',
+    group: 'Transactions',
+    audience: 'Application developer',
+    purpose:
+      'Read a retained solver order and reconcile canonical fill effects without submitting another order.',
+    whenToUse:
+      'Use after admission, a timeout or a process restart. Retain order_id independently from wallet call batch IDs.',
+    scope: 'wallet:execute:read',
+    permission: 'account:read',
+    prerequisite:
+      'Use the same application and account with current account-read permission. The provider recovery worker continues observing signed orders after signing permission expires.',
+    success:
+      '200: the retained state, disclosed economics and any verified fill. Base safe settlement and chain_finalized are separate. Unknown effects remain held; API labels or a consumed nonce alone never establish success.',
+  },
   getSafeOwnerPolicy: {
     title: 'Read on-chain wallet owners',
     group: 'Wallet owners and signatures',
@@ -780,7 +816,7 @@ export const operationGuides: Record<string, OperationGuide> = {
       '200: enabled application summaries and selected policy/proposal details. The provider sees its configured applications; applications see only their own registration. No spending authority is granted.',
   },
   listWalletBatches: {
-    title: 'See recent transaction requests',
+    title: 'Browse transaction requests',
     group: 'Transactions',
     audience: 'Application developer or service operator',
     purpose:
@@ -793,7 +829,7 @@ export const operationGuides: Record<string, OperationGuide> = {
     prerequisite:
       'Applications need current owner account-read access and execute read scope. Exact configured provider operators can inspect the provider ledger using configuration write scope. No application token can become an operator through scopes alone.',
     success:
-      '200: up to 100 readable batch summaries, queue stages and retained finalized RPC-quorum receipts. Unfinalized observations remain pending in this list; applications can refresh individual wallet_getCallsStatus results. Listing never signs, submits or retries.',
+      '200: up to 100 readable batch summaries, queue stages and retained finalized RPC-quorum receipts. Unfinalized observations remain pending in this list; applications can refresh individual wallet_getCallsStatus results. Pass next_cursor as after until it is null, keeping the caller and selected network unchanged. Native pages use limit (default 50, maximum 100) and ascending internal record ID order; filtered pages can be empty and still have a cursor. Pages are not a snapshot. Listing never signs, submits or retries.',
   },
   setApplicationTransactionMode: {
     title: 'Choose transaction permissions for a trusted application',
@@ -1256,6 +1292,7 @@ export const operationGuides: Record<string, OperationGuide> = {
 
 export interface ApiFeatures {
   management?: boolean;
+  uniswapXOrders?: boolean;
   onboarding: boolean;
   enrollment: boolean;
   walletCalls?: boolean;
@@ -1283,6 +1320,8 @@ export function operationUnavailableReason(
     ].includes(id)
   )
     return undefined;
+  if (guide.uniswapXOrders && !features.uniswapXOrders)
+    return 'The optional bounded UniswapX order service is not configured';
   if (guide.management)
     return features.management
       ? undefined

@@ -1,16 +1,214 @@
-import { mkdtempSync, rmSync, chmodSync } from 'node:fs';
+import {
+  mkdtempSync,
+  rmSync,
+  chmodSync,
+  readFileSync,
+  writeFileSync,
+  mkdirSync,
+  readdirSync,
+  existsSync,
+  symlinkSync,
+  linkSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
 import { TypedDataEncoder, recoverAddress } from 'ethers';
-import { listWallets } from '@open-wallet-standard/core';
-import { createOwsWalletProvider } from '../src/providers/ows.js';
+import { createWallet, listWallets } from '@open-wallet-standard/core';
+import {
+  createOwsWalletProvider,
+  prepareOwsVault,
+} from '../src/providers/ows.js';
 import { EmbeddedWalletService } from '../src/domain/embedded-wallet.js';
 import type { TypedDataAction } from '../src/domain/signing.js';
+import { owsCommand } from '../src/providers/ows-process.js';
 import { TestJournal } from './helpers/journal.js';
 
+function scopedVault(root: string, accountId: string) {
+  return join(root, 'accounts-v1', accountId);
+}
+
 describe('real OWS 1.4.3 offline engine integration', () => {
+  it('prepares legacy wallets once and provisions without scanning unrelated account vaults', async () => {
+    const vaultPath = mkdtempSync(join(tmpdir(), 'moovha-ows-growth-'));
+    try {
+      const secret = randomUUID();
+      const accountId = randomUUID();
+      const seed = createWallet('moovha-' + accountId, secret, 24, vaultPath);
+      const source = join(vaultPath, 'wallets', seed.id + '.json');
+      const originalBytes = readFileSync(source);
+      const fixture = JSON.parse(originalBytes.toString('utf8'));
+      // Only the original key is used for signing; copies are disposable inventory fixtures.
+      for (let count = 1; count < 1000; count++) {
+        const id = randomUUID();
+        writeFileSync(
+          join(vaultPath, 'wallets', id + '.json'),
+          JSON.stringify({
+            ...fixture,
+            id,
+            name: 'moovha-' + randomUUID(),
+          }),
+          { flag: 'wx', mode: 0o600 },
+        );
+      }
+      const options = { vaultPath, passphrase: async () => secret };
+      const attempts = {
+        namespace: 'ows-growth-test',
+        journal: new TestJournal(),
+        authorizeAttempt: async () => true,
+      };
+      const provider = createOwsWalletProvider(options, attempts);
+      const account = await provider.findAccount(accountId);
+      expect(account?.address).toBe(
+        seed.accounts.find((a) => a.chainId === 'eip155:1')!.address,
+      );
+      expect(readFileSync(source)).toEqual(originalBytes);
+      expect(readdirSync(join(vaultPath, 'accounts-v1'))).toHaveLength(1000);
+      expect(listWallets(scopedVault(vaultPath, accountId))).toHaveLength(1);
+      // An unreadable unrelated sub-vault must not participate in lookup or creation.
+      const unrelated = readdirSync(join(vaultPath, 'accounts-v1')).find(
+        (id) => id !== accountId,
+      )!;
+      chmodSync(scopedVault(vaultPath, unrelated), 0o000);
+      try {
+        const nextId = randomUUID(),
+          attemptId = randomUUID();
+        const created = await provider.createAccount(nextId, attemptId);
+        expect(await provider.createAccount(nextId, attemptId)).toEqual(
+          created,
+        );
+        const restarted = createOwsWalletProvider(options, attempts);
+        expect(await restarted.findAccount(accountId)).toEqual(account);
+        expect(await restarted.findAccount(nextId)).toEqual(created);
+        expect(await restarted.findAccount(randomUUID())).toBeNull();
+        expect(readdirSync(join(vaultPath, 'accounts-v1'))).toHaveLength(1001);
+      } finally {
+        chmodSync(scopedVault(vaultPath, unrelated), 0o700);
+      }
+      expect(listWallets(vaultPath)).toHaveLength(1000);
+      expect(
+        [...attempts.journal.records.values()].every(
+          (a) => a.state === 'succeeded',
+        ),
+      ).toBe(true);
+    } finally {
+      rmSync(vaultPath, { recursive: true, force: true });
+    }
+  }, 30000);
+
+  it('rejects duplicate legacy names before copying and resumes an interrupted encrypted copy without overwriting it', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'moovha-ows-prepare-'));
+    try {
+      const accountId = randomUUID();
+      const seed = createWallet('moovha-' + accountId, randomUUID(), 24, root);
+      const original = join(root, 'wallets', seed.id + '.json');
+      const bytes = readFileSync(original);
+      const duplicateId = randomUUID();
+      const duplicate = join(root, 'wallets', duplicateId + '.json');
+      writeFileSync(
+        duplicate,
+        JSON.stringify({ ...JSON.parse(bytes.toString()), id: duplicateId }),
+        { flag: 'wx', mode: 0o600 },
+      );
+      await expect(prepareOwsVault(root)).rejects.toMatchObject({
+        code: 'wallet_provider_unavailable',
+      });
+      expect(existsSync(join(root, 'accounts-v1'))).toBe(false);
+      rmSync(duplicate);
+      const directory = join(scopedVault(root, accountId), 'wallets');
+      mkdirSync(directory, { recursive: true, mode: 0o700 });
+      const copied = join(directory, seed.id + '.json');
+      writeFileSync(copied, bytes, { flag: 'wx', mode: 0o600 });
+      const interrupted = copied + '.' + randomUUID() + '.tmp';
+      linkSync(copied, interrupted);
+      await prepareOwsVault(root);
+      expect(existsSync(interrupted)).toBe(false);
+      expect(readFileSync(copied)).toEqual(bytes);
+      expect(readFileSync(original)).toEqual(bytes);
+      writeFileSync(copied, '{}');
+      await expect(
+        owsCommand({ command: 'prepare', vaultPath: root }),
+      ).rejects.toThrow();
+      expect(readFileSync(copied, 'utf8')).toBe('{}');
+      expect(readFileSync(original)).toEqual(bytes);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects a redirected account directory and rechecks authority before admitting creation', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'moovha-ows-scoped-denial-'));
+    const outside = mkdtempSync(join(tmpdir(), 'moovha-ows-outside-'));
+    try {
+      const accountId = randomUUID();
+      mkdirSync(join(root, 'accounts-v1'), { mode: 0o700 });
+      symlinkSync(outside, scopedVault(root, accountId));
+      const journal = new TestJournal();
+      const passphrase = vi.fn(async () => randomUUID());
+      const authorizeAttempt = vi.fn(async () => true);
+      const provider = createOwsWalletProvider(
+        { vaultPath: root, passphrase },
+        { namespace: 'ows-scoped-denial', journal, authorizeAttempt },
+      );
+      await expect(
+        provider.createAccount(accountId, randomUUID()),
+      ).rejects.toMatchObject({ code: 'wallet_provider_unavailable' });
+      expect(readdirSync(outside)).toEqual([]);
+      const records = journal.records.size;
+      authorizeAttempt.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+      await expect(
+        provider.createAccount(randomUUID(), randomUUID()),
+      ).rejects.toMatchObject({ code: 'wallet_authorization_denied' });
+      expect(journal.records.size).toBe(records);
+      expect(passphrase).toHaveBeenCalledOnce();
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+      rmSync(outside, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects ambiguous wallet names without creating another key', async () => {
+    const vaultPath = mkdtempSync(join(tmpdir(), 'moovha-ows-duplicate-'));
+    try {
+      const secret = randomUUID();
+      const options = { vaultPath, passphrase: async () => secret };
+      const provider = createOwsWalletProvider(options, {
+        namespace: 'ows-duplicate-test',
+        journal: new TestJournal(),
+        authorizeAttempt: async () => true,
+      });
+      const account = await provider.createAccount(randomUUID(), randomUUID());
+      const scoped = scopedVault(vaultPath, account.accountId);
+      const seed = listWallets(scoped)[0];
+      const fixture = JSON.parse(
+        readFileSync(join(scoped, 'wallets', seed.id + '.json'), 'utf8'),
+      );
+      const id = randomUUID();
+      writeFileSync(
+        join(scoped, 'wallets', id + '.json'),
+        JSON.stringify({ ...fixture, id }),
+        { flag: 'wx', mode: 0o600 },
+      );
+      await expect(
+        provider.findAccount(account.accountId),
+      ).rejects.toMatchObject({
+        code: 'wallet_provider_unavailable',
+      });
+      const freshJournal = createOwsWalletProvider(options, {
+        namespace: 'ows-duplicate-test',
+        journal: new TestJournal(),
+        authorizeAttempt: async () => true,
+      });
+      await expect(
+        freshJournal.createAccount(account.accountId, randomUUID()),
+      ).rejects.toMatchObject({ code: 'wallet_provider_unavailable' });
+      expect(listWallets(scoped)).toHaveLength(2);
+    } finally {
+      rmSync(vaultPath, { recursive: true, force: true });
+    }
+  });
+
   it('provisions, restarts, signs exact large/nested integers, replays and denies revoked authority', async () => {
     const vaultPath = mkdtempSync(join(tmpdir(), 'moovha-ows-test-'));
     try {
@@ -35,7 +233,7 @@ describe('real OWS 1.4.3 offline engine integration', () => {
         await restarted.createAccount(accountId, provisionAttempt),
       ).toEqual(account);
       expect(await restarted.findAccount(accountId)).toEqual(account);
-      expect(listWallets(vaultPath)).toHaveLength(1);
+      expect(listWallets(scopedVault(vaultPath, accountId))).toHaveLength(1);
       expect(options.passphrase).toHaveBeenCalledOnce();
 
       const payload = {

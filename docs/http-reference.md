@@ -2291,7 +2291,7 @@ Request body (application/json):
           "actions": {
             "type": "array",
             "minItems": 1,
-            "maxItems": 5,
+            "maxItems": 6,
             "uniqueItems": true,
             "items": {
               "type": "string",
@@ -2299,6 +2299,7 @@ Request body (application/json):
                 "account:read",
                 "operations:request",
                 "contracts:request",
+                "orders:authorize",
                 "members:manage",
                 "owners:manage"
               ]
@@ -2422,6 +2423,7 @@ Success response schema:
           "account:read",
           "operations:request",
           "contracts:request",
+          "orders:authorize",
           "members:manage",
           "owners:manage"
         ]
@@ -2526,6 +2528,210 @@ Success response schema:
     },
     "action_policy_revision": {
       "type": "string"
+    },
+    "order_policy_revision": {
+      "type": "string"
+    },
+    "order_authorization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "maximumValiditySeconds",
+        "reactorCodeHash",
+        "cosigner",
+        "fee",
+        "routes",
+        "pricePolicy"
+      ],
+      "properties": {
+        "profile": {
+          "enum": ["uniswapx-v3-order-v1"]
+        },
+        "maximumValiditySeconds": {
+          "type": "integer",
+          "minimum": 30,
+          "maximum": 600
+        },
+        "reactorCodeHash": {
+          "type": "string",
+          "pattern": "^0x[a-f0-9]{64}$"
+        },
+        "cosigner": {
+          "type": "string",
+          "pattern": "^0x[0-9a-fA-F]{40}$"
+        },
+        "fee": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["basisPoints", "recipient"],
+          "properties": {
+            "basisPoints": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500
+            },
+            "recipient": {
+              "type": "string",
+              "pattern": "^0x[0-9a-fA-F]{40}$"
+            }
+          }
+        },
+        "routes": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "tokenIn",
+              "tokenOut",
+              "maximumInputUnits",
+              "maximumLifetimeInputUnits"
+            ],
+            "properties": {
+              "tokenIn": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["address", "codeHash"],
+                "properties": {
+                  "address": {
+                    "type": "string",
+                    "pattern": "^0x[0-9a-fA-F]{40}$"
+                  },
+                  "codeHash": {
+                    "type": "string",
+                    "pattern": "^0x[a-f0-9]{64}$"
+                  },
+                  "implementation": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["address", "codeHash"],
+                    "properties": {
+                      "address": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                      },
+                      "codeHash": {
+                        "type": "string",
+                        "pattern": "^0x[a-f0-9]{64}$"
+                      },
+                      "storageLayout": {
+                        "enum": ["eip1967", "zeppelinos"]
+                      }
+                    }
+                  }
+                }
+              },
+              "tokenOut": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["address", "codeHash"],
+                "properties": {
+                  "address": {
+                    "type": "string",
+                    "pattern": "^0x[0-9a-fA-F]{40}$"
+                  },
+                  "codeHash": {
+                    "type": "string",
+                    "pattern": "^0x[a-f0-9]{64}$"
+                  },
+                  "implementation": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["address", "codeHash"],
+                    "properties": {
+                      "address": {
+                        "type": "string",
+                        "pattern": "^0x[0-9a-fA-F]{40}$"
+                      },
+                      "codeHash": {
+                        "type": "string",
+                        "pattern": "^0x[a-f0-9]{64}$"
+                      },
+                      "storageLayout": {
+                        "enum": ["eip1967", "zeppelinos"]
+                      }
+                    }
+                  }
+                }
+              },
+              "maximumInputUnits": {
+                "type": "string",
+                "pattern": "^[1-9][0-9]{0,38}$"
+              },
+              "maximumLifetimeInputUnits": {
+                "type": "string",
+                "pattern": "^[1-9][0-9]{0,38}$"
+              }
+            }
+          }
+        },
+        "pricePolicy": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "profile",
+                "pool",
+                "lookbackSeconds",
+                "maximumLossBps",
+                "maximumSpotDivergenceBps"
+              ],
+              "properties": {
+                "profile": {
+                  "enum": ["solver-twap-benchmark-v1"]
+                },
+                "pool": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["address", "codeHash"],
+                  "properties": {
+                    "address": {
+                      "type": "string",
+                      "pattern": "^0x[0-9a-fA-F]{40}$"
+                    },
+                    "codeHash": {
+                      "type": "string",
+                      "pattern": "^0x[a-f0-9]{64}$"
+                    }
+                  }
+                },
+                "lookbackSeconds": {
+                  "enum": [1800]
+                },
+                "maximumLossBps": {
+                  "enum": [200]
+                },
+                "maximumSpotDivergenceBps": {
+                  "enum": [100]
+                }
+              }
+            },
+            {
+              "type": "object",
+              "required": ["profile"],
+              "maxProperties": 32,
+              "properties": {
+                "profile": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9-]{0,127}$",
+                  "not": {
+                    "enum": ["solver-twap-benchmark-v1"]
+                  }
+                }
+              },
+              "additionalProperties": true
+            }
+          ]
+        },
+        "recipientPolicy": {
+          "enum": ["self", "bound-transfer"],
+          "description": "Defaults to self. bound-transfer permits an explicit recipient matching the signed output and requires fresh order consent."
+        }
+      }
     },
     "contract_call_terms": {
       "type": "object",
@@ -3933,6 +4139,7 @@ Success response schema:
                 "account:read",
                 "operations:request",
                 "contracts:request",
+                "orders:authorize",
                 "members:manage",
                 "owners:manage"
               ]
@@ -4480,6 +4687,7 @@ Success response schema:
                     "account:read",
                     "operations:request",
                     "contracts:request",
+                    "orders:authorize",
                     "members:manage",
                     "owners:manage"
                   ]
@@ -4628,6 +4836,7 @@ Success response schema:
           "account:read",
           "operations:request",
           "contracts:request",
+          "orders:authorize",
           "members:manage",
           "owners:manage"
         ]
@@ -4793,6 +5002,7 @@ Success response schema:
           "account:read",
           "operations:request",
           "contracts:request",
+          "orders:authorize",
           "members:manage",
           "owners:manage"
         ]
@@ -4882,6 +5092,666 @@ Success response schema:
     "address": {
       "type": "string",
       "pattern": "^0x[0-9a-fA-F]{40}$"
+    }
+  }
+}
+```
+
+## POST `/v1/accounts/{accountId}/uniswapx-orders`
+
+Operation: `submitUniswapXV3Order`.
+
+**Why this exists:** Authorize one exact Base UniswapX V3 swap or recipient-bound transfer with its disclosed output-token fee and net minimum.
+
+**Who uses it:** Application developer.
+
+**When you need it:** Use only after the provider configures the optional order policy and the owner grants separate order permission.
+
+**Before you start:** Use wallet:actions and wallet:sign scopes, current owner identity and explicit orders:authorize consent bound to order_policy_revision. Submit an unsigned canonical quote and retain the UUID idempotency key. Third-party delivery requires bound-transfer policy, fresh consent and an explicit matching recipient. Permit2 allowance uses a separate approved wallet call.
+
+**Result and next step:** 202: a durable order receipt. Acceptance is pending settlement. Retry the same key and body; never replace an unknown submission. Read the order until canonical receipt effects establish fill, cancellation or expiry.
+
+**Request details:** Submit one bounded Base UniswapX V3 order under an explicit orders:authorize grant. A bound-transfer policy permits an explicit recipient matching the signed output; omitted recipients remain self-swaps. The provider decodes and validates the witness, reviews its net minimum against the configured price policy, journals exact signing and posting, and verifies receipt effects before success. This is not a general signing endpoint. Retry the same idempotency key and body; unknown outcomes reconcile without another POST.
+
+| Parameter         | Location | Required | Schema                                                                                                |
+| ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
+| `accountId`       | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+| `idempotency-key` | header   | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+| `wallet-network`  | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum","ethereum-sepolia"]}`                      |
+| `wallet-grant-id` | header   | no       | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+
+Request body (application/json):
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["quote"],
+  "properties": {
+    "recipient": {
+      "type": "string",
+      "pattern": "^0x[0-9a-fA-F]{40}$"
+    },
+    "quote": {
+      "type": "object",
+      "required": ["encodedOrder", "orderId", "orderInfo"],
+      "properties": {
+        "encodedOrder": {
+          "type": "string",
+          "pattern": "^0x[0-9a-fA-F]+$",
+          "maxLength": 32770
+        },
+        "orderId": {
+          "type": "string",
+          "pattern": "^0x[0-9a-fA-F]{64}$"
+        },
+        "orderInfo": {
+          "type": "object",
+          "required": ["chainId"],
+          "properties": {
+            "chainId": {
+              "enum": [8453]
+            }
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+| Status | Content type     | Description      |
+| ------ | ---------------- | ---------------- |
+| 202    | application/json | Default Response |
+| 400    | application/json | Default Response |
+| 401    | application/json | Default Response |
+| 403    | application/json | Default Response |
+| 409    | application/json | Default Response |
+| 413    | application/json | Default Response |
+| 415    | application/json | Default Response |
+| 422    | application/json | Default Response |
+| 429    | application/json | Default Response |
+| 500    | application/json | Default Response |
+| 503    | application/json | Default Response |
+
+Success response schema:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["order_id", "order_hash", "account_id", "status", "review"],
+  "properties": {
+    "order_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "order_hash": {
+      "type": "string",
+      "pattern": "^0x[0-9a-fA-F]{64}$"
+    },
+    "account_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "status": {
+      "enum": [
+        "authorizing",
+        "prepared",
+        "requires_approval",
+        "signed",
+        "open",
+        "unknown",
+        "succeeded",
+        "expired",
+        "cancelled",
+        "needs_review"
+      ]
+    },
+    "chain_finalized": {
+      "type": "boolean"
+    },
+    "cancellation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["transactionHash", "blockHash", "blockNumber"],
+      "properties": {
+        "transactionHash": {
+          "type": "string",
+          "pattern": "^0x[0-9a-fA-F]{64}$"
+        },
+        "blockHash": {
+          "type": "string",
+          "pattern": "^0x[0-9a-fA-F]{64}$"
+        },
+        "blockNumber": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "cancellation_calls": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["to", "value", "data"],
+        "properties": {
+          "to": {
+            "type": "string",
+            "pattern": "^0x[0-9a-fA-F]{40}$"
+          },
+          "value": {
+            "enum": ["0x0"]
+          },
+          "data": {
+            "type": "string",
+            "pattern": "^0x[0-9a-fA-F]+$",
+            "maxLength": 138
+          }
+        }
+      }
+    },
+    "code": {
+      "enum": [
+        "signing_pending",
+        "post_unknown",
+        "chain_unavailable",
+        "unexpected_effect"
+      ]
+    },
+    "review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "swapper",
+        "nonce",
+        "tokenIn",
+        "tokenOut",
+        "amountInUnits",
+        "minimumAmountOutUnits",
+        "deadline",
+        "fee",
+        "witnessHash",
+        "permit2Digest",
+        "safeMessageDigest",
+        "cosignerDigest"
+      ],
+      "properties": {
+        "profile": {
+          "enum": ["uniswapx-v3-order-v1"]
+        },
+        "swapper": {
+          "type": "string",
+          "pattern": "^0x[0-9a-fA-F]{40}$"
+        },
+        "recipient": {
+          "type": "string",
+          "pattern": "^0x[0-9a-fA-F]{40}$"
+        },
+        "nonce": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,77})$"
+        },
+        "tokenIn": {
+          "type": "string",
+          "pattern": "^0x[0-9a-fA-F]{40}$"
+        },
+        "tokenOut": {
+          "type": "string",
+          "pattern": "^0x[0-9a-fA-F]{40}$"
+        },
+        "amountInUnits": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]{0,38}$"
+        },
+        "minimumAmountOutUnits": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]{0,38}$"
+        },
+        "deadline": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "witnessHash": {
+          "type": "string",
+          "pattern": "^0x[0-9a-fA-F]{64}$"
+        },
+        "permit2Digest": {
+          "type": "string",
+          "pattern": "^0x[0-9a-fA-F]{64}$"
+        },
+        "safeMessageDigest": {
+          "type": "string",
+          "pattern": "^0x[0-9a-fA-F]{64}$"
+        },
+        "cosignerDigest": {
+          "type": "string",
+          "pattern": "^0x[0-9a-fA-F]{64}$"
+        },
+        "fee": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "policy",
+            "token",
+            "recipient",
+            "basisPoints",
+            "minimumAmountUnits",
+            "quotedStartAmountUnits"
+          ],
+          "properties": {
+            "policy": {
+              "enum": ["uniswapx_output_fee_v1"]
+            },
+            "token": {
+              "type": "string",
+              "pattern": "^0x[0-9a-fA-F]{40}$"
+            },
+            "recipient": {
+              "type": "string",
+              "pattern": "^0x[0-9a-fA-F]{40}$"
+            },
+            "basisPoints": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500
+            },
+            "minimumAmountUnits": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,38}$"
+            },
+            "quotedStartAmountUnits": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,38}$"
+            }
+          }
+        }
+      }
+    },
+    "approval_calls": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["to", "value", "data"],
+        "properties": {
+          "to": {
+            "type": "string",
+            "pattern": "^0x[0-9a-fA-F]{40}$"
+          },
+          "value": {
+            "enum": ["0x0"]
+          },
+          "data": {
+            "type": "string",
+            "pattern": "^0x[0-9a-fA-F]+$",
+            "maxLength": 8194
+          }
+        }
+      }
+    },
+    "fill": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "transactionHash",
+        "blockHash",
+        "blockNumber",
+        "finality",
+        "safeBlockHash",
+        "inputAmountUnits",
+        "outputAmountUnits",
+        "feeAmountUnits"
+      ],
+      "properties": {
+        "transactionHash": {
+          "type": "string",
+          "pattern": "^0x[0-9a-fA-F]{64}$"
+        },
+        "blockHash": {
+          "type": "string",
+          "pattern": "^0x[0-9a-fA-F]{64}$"
+        },
+        "blockNumber": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "finality": {
+          "enum": ["base-safe"]
+        },
+        "safeBlockHash": {
+          "type": "string",
+          "pattern": "^0x[0-9a-fA-F]{64}$"
+        },
+        "inputAmountUnits": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]{0,38}$"
+        },
+        "outputAmountUnits": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]{0,38}$"
+        },
+        "feeAmountUnits": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]{0,38}$"
+        }
+      }
+    }
+  }
+}
+```
+
+## GET `/v1/accounts/{accountId}/uniswapx-orders/{orderId}`
+
+Operation: `getUniswapXV3Order`.
+
+**Why this exists:** Read a retained solver order and reconcile canonical fill effects without submitting another order.
+
+**Who uses it:** Application developer.
+
+**When you need it:** Use after admission, a timeout or a process restart. Retain order_id independently from wallet call batch IDs.
+
+**Before you start:** Use the same application and account with current account-read permission. The provider recovery worker continues observing signed orders after signing permission expires.
+
+**Result and next step:** 200: the retained state, disclosed economics and any verified fill. Base safe settlement and chain_finalized are separate. Unknown effects remain held; API labels or a consumed nonce alone never establish success.
+
+**Request details:** Read the account-authorized durable order state. Receipt effects at the Base safe block level establish success; API status, absent lookups and consumed nonces alone do not. No signature or raw order is returned.
+
+| Parameter         | Location | Required | Schema                                                                                                |
+| ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
+| `accountId`       | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+| `orderId`         | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+| `wallet-network`  | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum","ethereum-sepolia"]}`                      |
+| `wallet-grant-id` | header   | no       | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+
+| Status | Content type     | Description      |
+| ------ | ---------------- | ---------------- |
+| 200    | application/json | Default Response |
+| 400    | application/json | Default Response |
+| 401    | application/json | Default Response |
+| 403    | application/json | Default Response |
+| 409    | application/json | Default Response |
+| 413    | application/json | Default Response |
+| 415    | application/json | Default Response |
+| 422    | application/json | Default Response |
+| 429    | application/json | Default Response |
+| 500    | application/json | Default Response |
+| 503    | application/json | Default Response |
+
+Success response schema:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["order_id", "order_hash", "account_id", "status", "review"],
+  "properties": {
+    "order_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "order_hash": {
+      "type": "string",
+      "pattern": "^0x[0-9a-fA-F]{64}$"
+    },
+    "account_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "status": {
+      "enum": [
+        "authorizing",
+        "prepared",
+        "requires_approval",
+        "signed",
+        "open",
+        "unknown",
+        "succeeded",
+        "expired",
+        "cancelled",
+        "needs_review"
+      ]
+    },
+    "chain_finalized": {
+      "type": "boolean"
+    },
+    "cancellation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["transactionHash", "blockHash", "blockNumber"],
+      "properties": {
+        "transactionHash": {
+          "type": "string",
+          "pattern": "^0x[0-9a-fA-F]{64}$"
+        },
+        "blockHash": {
+          "type": "string",
+          "pattern": "^0x[0-9a-fA-F]{64}$"
+        },
+        "blockNumber": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "cancellation_calls": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["to", "value", "data"],
+        "properties": {
+          "to": {
+            "type": "string",
+            "pattern": "^0x[0-9a-fA-F]{40}$"
+          },
+          "value": {
+            "enum": ["0x0"]
+          },
+          "data": {
+            "type": "string",
+            "pattern": "^0x[0-9a-fA-F]+$",
+            "maxLength": 138
+          }
+        }
+      }
+    },
+    "code": {
+      "enum": [
+        "signing_pending",
+        "post_unknown",
+        "chain_unavailable",
+        "unexpected_effect"
+      ]
+    },
+    "review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "swapper",
+        "nonce",
+        "tokenIn",
+        "tokenOut",
+        "amountInUnits",
+        "minimumAmountOutUnits",
+        "deadline",
+        "fee",
+        "witnessHash",
+        "permit2Digest",
+        "safeMessageDigest",
+        "cosignerDigest"
+      ],
+      "properties": {
+        "profile": {
+          "enum": ["uniswapx-v3-order-v1"]
+        },
+        "swapper": {
+          "type": "string",
+          "pattern": "^0x[0-9a-fA-F]{40}$"
+        },
+        "recipient": {
+          "type": "string",
+          "pattern": "^0x[0-9a-fA-F]{40}$"
+        },
+        "nonce": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,77})$"
+        },
+        "tokenIn": {
+          "type": "string",
+          "pattern": "^0x[0-9a-fA-F]{40}$"
+        },
+        "tokenOut": {
+          "type": "string",
+          "pattern": "^0x[0-9a-fA-F]{40}$"
+        },
+        "amountInUnits": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]{0,38}$"
+        },
+        "minimumAmountOutUnits": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]{0,38}$"
+        },
+        "deadline": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "witnessHash": {
+          "type": "string",
+          "pattern": "^0x[0-9a-fA-F]{64}$"
+        },
+        "permit2Digest": {
+          "type": "string",
+          "pattern": "^0x[0-9a-fA-F]{64}$"
+        },
+        "safeMessageDigest": {
+          "type": "string",
+          "pattern": "^0x[0-9a-fA-F]{64}$"
+        },
+        "cosignerDigest": {
+          "type": "string",
+          "pattern": "^0x[0-9a-fA-F]{64}$"
+        },
+        "fee": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "policy",
+            "token",
+            "recipient",
+            "basisPoints",
+            "minimumAmountUnits",
+            "quotedStartAmountUnits"
+          ],
+          "properties": {
+            "policy": {
+              "enum": ["uniswapx_output_fee_v1"]
+            },
+            "token": {
+              "type": "string",
+              "pattern": "^0x[0-9a-fA-F]{40}$"
+            },
+            "recipient": {
+              "type": "string",
+              "pattern": "^0x[0-9a-fA-F]{40}$"
+            },
+            "basisPoints": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500
+            },
+            "minimumAmountUnits": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,38}$"
+            },
+            "quotedStartAmountUnits": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,38}$"
+            }
+          }
+        }
+      }
+    },
+    "approval_calls": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["to", "value", "data"],
+        "properties": {
+          "to": {
+            "type": "string",
+            "pattern": "^0x[0-9a-fA-F]{40}$"
+          },
+          "value": {
+            "enum": ["0x0"]
+          },
+          "data": {
+            "type": "string",
+            "pattern": "^0x[0-9a-fA-F]+$",
+            "maxLength": 8194
+          }
+        }
+      }
+    },
+    "fill": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "transactionHash",
+        "blockHash",
+        "blockNumber",
+        "finality",
+        "safeBlockHash",
+        "inputAmountUnits",
+        "outputAmountUnits",
+        "feeAmountUnits"
+      ],
+      "properties": {
+        "transactionHash": {
+          "type": "string",
+          "pattern": "^0x[0-9a-fA-F]{64}$"
+        },
+        "blockHash": {
+          "type": "string",
+          "pattern": "^0x[0-9a-fA-F]{64}$"
+        },
+        "blockNumber": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "finality": {
+          "enum": ["base-safe"]
+        },
+        "safeBlockHash": {
+          "type": "string",
+          "pattern": "^0x[0-9a-fA-F]{64}$"
+        },
+        "inputAmountUnits": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]{0,38}$"
+        },
+        "outputAmountUnits": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]{0,38}$"
+        },
+        "feeAmountUnits": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]{0,38}$"
+        }
+      }
     }
   }
 }
@@ -11900,12 +12770,14 @@ Operation: `listWalletBatches`.
 
 **Before you start:** Applications need current owner account-read access and execute read scope. Exact configured provider operators can inspect the provider ledger using configuration write scope. No application token can become an operator through scopes alone.
 
-**Result and next step:** 200: up to 100 readable batch summaries, queue stages and retained finalized RPC-quorum receipts. Unfinalized observations remain pending in this list; applications can refresh individual wallet_getCallsStatus results. Listing never signs, submits or retries.
+**Result and next step:** 200: up to 100 readable batch summaries, queue stages and retained finalized RPC-quorum receipts. Unfinalized observations remain pending in this list; applications can refresh individual wallet_getCallsStatus results. Pass next_cursor as after until it is null, keeping the caller and selected network unchanged. Native pages use limit (default 50, maximum 100) and ascending internal record ID order; filtered pages can be empty and still have a cursor. Pages are not a snapshot. Listing never signs, submits or retries.
 
 **Request details:** Optional runtime configuration control plane. Application proposals and provider publications are configuration records, not wallet grants, signing authority or execution activation. Publications become readable immediately without restarting the service. Immutable historical revisions remain available. Requires the documented scope and configured application or operator identity.
 
 | Parameter        | Location | Required | Schema                                                                           |
 | ---------------- | -------- | -------- | -------------------------------------------------------------------------------- |
+| `after`          | query    | no       | `{"type":"string","minLength":1,"maxLength":256}`                                |
+| `limit`          | query    | no       | `{"type":"integer","minimum":1,"maximum":100}`                                   |
 | `wallet-network` | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum","ethereum-sepolia"]}` |
 
 | Status | Content type             | Description      |
@@ -11932,6 +12804,11 @@ Success response schema:
   "properties": {
     "truncated": {
       "type": "boolean"
+    },
+    "next_cursor": {
+      "type": "string",
+      "maxLength": 256,
+      "nullable": true
     },
     "batches": {
       "type": "array",
@@ -19990,12 +20867,13 @@ Request body (application/json):
     "permissions": {
       "type": "array",
       "minItems": 1,
-      "maxItems": 4,
+      "maxItems": 6,
       "uniqueItems": true,
       "items": {
         "enum": [
           "account:read",
           "contracts:request",
+          "orders:authorize",
           "operations:request",
           "members:manage",
           "owners:manage"

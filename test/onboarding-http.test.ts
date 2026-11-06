@@ -445,3 +445,34 @@ it('allows only the configured fixed explorer login return target', async () => 
     if (enabled) expect(response.headers.location).toBe('/docs/');
   }
 });
+
+it('pages hosted reviews and accounts independently, including empty filtered review pages', async () => {
+  const f = await setup();
+  await f.onboarding.store.transaction((state) => {
+    const account = structuredClone(Object.values(state.accounts)[0]);
+    const request = structuredClone(Object.values(state.requests)[0]);
+    for (let i = 0; i < 55; i++) {
+      const id = '00000000-0000-4000-8000-' + String(i).padStart(12, '0');
+      state.accounts[id] = { ...account, id, status: 'active' };
+      state.requests[id] = { ...request, id, denied: true };
+    }
+  });
+  const headers = { cookie: formHeaders('b').cookie };
+  const first = await f.app.inject({ url: '/onboarding/review', headers });
+  expect(first.statusCode).toBe(200);
+  expect(first.body).toContain('Next review page');
+  expect(first.body).toContain('No requests need review on this page.');
+  expect(first.body.match(/value="reconcile"/g)).toHaveLength(50);
+  const next = /href="([^"]+)">Next wallet page/
+    .exec(first.body)![1]
+    .replaceAll('&amp;', '&');
+  const second = await f.app.inject({ url: next, headers });
+  expect(second.statusCode).toBe(200);
+  expect(second.body.match(/value="reconcile"/g)).toHaveLength(5);
+  expect(second.body).not.toContain('Next wallet page');
+  const invalid = await f.app.inject({
+    url: '/onboarding/review?accounts_after=' + 'a'.repeat(257),
+    headers,
+  });
+  expect(invalid.statusCode).toBe(400);
+});

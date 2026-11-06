@@ -2,6 +2,37 @@
 
 ## Unreleased
 
+- Move application-specific fiat pricing to application-owned, operator-installed
+  price adapters. The provider verifies a pinned module hash and independently
+  enforces decoded order limits, current authority, signing and recovery.
+- Preserve order HTTP bodies, receipts and equivalent policy consent hashes.
+  Existing application price profiles require their adapter before upgrading;
+  missing pricing denies new orders while retained-order recovery remains available.
+
+- Keep full SQLite integrity checks at startup and offline maintenance, while
+  request readiness verifies the bounded catalog and connection settings.
+- Read reports through bounded, read-only pages; yield during bulk recovery and
+  account reports, and stream bundler allowlists before atomic publication.
+- Add continuation cursors to transaction history and the hosted reviewer screen.
+  Native transaction-history pages default to 50 scanned records in internal ID
+  order; filtered pages can be empty before the end of the ledger.
+
+- Persist SQLite lookup indexes and counts in schema version 3, maintained by
+  transactional triggers for local and external record writes. First-use lookups
+  and external commits no longer rebuild whole-collection indexes.
+- Add the explicit offline `upgrade-storage` command for version 2 databases.
+  Upgrades preserve retained wallet and financial records and require stopped
+  writers and a verified recovery backup; startup does not migrate storage.
+
+- Store Safe wallet metadata per account with atomic conversion of legacy inline records and bounded application capacity checks.
+- Isolate native OWS operations by account and preserve legacy encrypted wallets during startup preparation.
+- Use direct SQLite record reads and candidate indexes for provisioning, wallet ownership and administrative pagination; append audit events without loading history.
+
+- Resolve OWS wallet lookups inside the worker and return only the requested
+  wallet. Provisioning and reconciliation no longer fail when the complete
+  vault inventory exceeds the worker's response-size limit. Duplicate wallet
+  names remain rejected.
+
 - Upgrade oidc-provider to 9.13.0, jose to 6.2.13, Swagger UI assets to 5.34.0,
   and the Secretlint CLI and recommended rule preset to 13.1.0.
 

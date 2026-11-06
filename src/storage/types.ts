@@ -50,7 +50,19 @@ export interface FinancialAuthorization {
   expiresAt: string;
 }
 
+export interface SignatureProtection {
+  seal(
+    request: import('../domain/attempt-journal.js').WalletAttemptRequest,
+    signature: string,
+  ): string;
+  open(
+    request: import('../domain/attempt-journal.js').WalletAttemptRequest,
+    sealed: string,
+  ): string;
+}
 export interface FinancialAuthorityOptions {
+  /** Optional host-owned encryption for retained signing results. */
+  signatureProtection?: SignatureProtection;
   namespace: string;
   provider: string;
   /** Recheck live owner/grant/KYC/consent, unchanged plan, dependencies and any step-up proof. No vendor effects. */

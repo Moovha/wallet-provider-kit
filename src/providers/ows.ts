@@ -29,16 +29,66 @@ export interface OwsProviderOptions {
 
 const uuid =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+const preparedVaults = new Map<
+  string,
+  { identity: string; ready: Promise<void> }
+>();
+
+/** Prepare account-scoped encrypted storage before accepting wallet operations. Retains legacy originals. */
+export async function prepareOwsVault(vaultPath: string): Promise<void> {
+  let identity: string;
+  try {
+    const stat = lstatSync(vaultPath);
+    if (
+      !isAbsolute(vaultPath) ||
+      !stat.isDirectory() ||
+      stat.isSymbolicLink() ||
+      stat.mode & 0o077 ||
+      stat.uid !== process.getuid?.()
+    )
+      throw new Error();
+    identity = `${stat.dev}:${stat.ino}`;
+  } catch {
+    throw new WalletProviderError('wallet_provider_configuration');
+  }
+  let prepared = preparedVaults.get(vaultPath);
+  if (!prepared || prepared.identity !== identity) {
+    prepared = {
+      identity,
+      ready: owsCommand({ command: 'prepare', vaultPath }).then(
+        () => undefined,
+      ),
+    };
+    preparedVaults.set(vaultPath, prepared);
+  }
+  try {
+    await prepared.ready;
+  } catch {
+    if (preparedVaults.get(vaultPath) === prepared)
+      preparedVaults.delete(vaultPath);
+    throw new WalletProviderError('wallet_provider_unavailable');
+  }
+}
 
 /** Experimental local OWS owner-credential profile. No export, broadcast or raw signing. */
 export function createOwsWalletProvider(
   options: OwsProviderOptions,
   attempts: JournaledProviderOptions,
 ): WalletSigningProvider {
-  return createJournaledWalletProvider(
-    createOwsSigningBackend(options),
-    attempts,
-  );
+  const authorizeAttempt = attempts?.authorizeAttempt;
+  if (typeof authorizeAttempt !== 'function')
+    throw new WalletProviderError('wallet_provider_configuration');
+  const backend = createOwsSigningBackend(options);
+  const vaultPath = options.vaultPath;
+  return createJournaledWalletProvider(backend, {
+    ...attempts,
+    authorizeAttempt: async (request) => {
+      if ((await authorizeAttempt(request)) !== true) return false;
+      // Preparation precedes the durable dispatch lease; recheck authority after it completes.
+      await prepareOwsVault(vaultPath);
+      return authorizeAttempt(request);
+    },
+  });
 }
 
 /** Internal backend; the caller must supply its durable financial journal. */
@@ -77,21 +127,23 @@ export function createOwsSigningBackend(
     const walletName = name(accountId);
     checkVault();
     try {
-      const wallets = (await owsCommand({
-        command: 'list',
+      await prepareOwsVault(vaultPath);
+      const wallet = (await owsCommand({
+        command: 'find',
         vaultPath,
-      })) as WalletInfo[];
-      const matches = wallets.filter((wallet) => wallet.name === walletName);
-      if (matches.length === 0) return null;
-      if (matches.length !== 1 || !uuid.test(matches[0].id)) throw new Error();
+        walletName,
+      })) as Pick<WalletInfo, 'id' | 'name' | 'accounts'> | null;
+      if (wallet === null) return null;
+      if (wallet.name !== walletName || !uuid.test(wallet.id))
+        throw new Error();
       // OWS stores one EVM-family account at the default derivation index.
-      const accounts = matches[0].accounts.filter(
+      const accounts = wallet.accounts.filter(
         (account) => account.chainId === 'eip155:1',
       );
       if (accounts.length !== 1 || /^0x0{40}$/.test(accounts[0].address))
         throw new Error();
       return {
-        walletId: matches[0].id,
+        walletId: wallet.id,
         account: { accountId, address: getAddress(accounts[0].address) },
       };
     } catch {
@@ -150,6 +202,7 @@ export function createOwsSigningBackend(
       const secret = await credential();
       name(boundAccount.accountId);
       checkVault();
+      await prepareOwsVault(vaultPath);
       evmTypedDataPayload(boundAccount, boundAction, selected.name); // Recheck expiry after secret-store work.
       const { EIP712Domain: _domain, ...types } = boundAction.payload.types;
       // OWS 1.4.3 accepts full-width integer hex; its decimal parser is limited to u128.

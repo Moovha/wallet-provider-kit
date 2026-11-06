@@ -1,3 +1,5 @@
+import { appendAudit, getRecord } from '../onboarding/records.js';
+import { prepareSafeWalletRecords } from '../sponsorship/wallet-records.js';
 import { etherscanEndpoint } from '../execution/etherscan.js';
 import { RpcEndpointPool } from '../execution/rpc-pool.js';
 import {
@@ -114,6 +116,7 @@ export interface RuntimeReview {
   approved_by: string;
 }
 export interface RuntimeConfigurationState {
+  /** Legacy inline storage, split transactionally into ProviderState.safeWalletAccounts on initialization. */
   safeWalletAccounts?: Record<
     string,
     import('../sponsorship/safe-wallet.js').SafeWalletAccount
@@ -419,7 +422,7 @@ export class RuntimeConfigurationService {
   }
   assertOperatorState(principal: VerifiedPrincipal, state: ProviderState) {
     this.assertOperator(principal);
-    const binding = state.deploymentBindings?.['service-v1'];
+    const binding = getRecord(state, 'deploymentBindings', 'service-v1');
     if (
       binding?.activeRevision !== this.deploymentRevision ||
       binding.transportRevision !== this.transportRevision
@@ -444,12 +447,13 @@ export class RuntimeConfigurationService {
     operation: (registry: RuntimeConfigurationState, state: ProviderState) => T,
   ) {
     return this.store.transaction((state) => {
-      const binding = state.deploymentBindings?.['service-v1'];
+      const binding = getRecord(state, 'deploymentBindings', 'service-v1');
       if (
         binding?.activeRevision !== this.deploymentRevision ||
         binding.transportRevision !== this.transportRevision
       )
         deny();
+      prepareSafeWalletRecords(state);
       return operation((binding.runtimeConfiguration ??= empty()), state);
     });
   }
@@ -522,7 +526,7 @@ export class RuntimeConfigurationService {
     registry.revisions[id] = record;
     registry.heads[applicationId] = revision;
     registry.idempotency[key] = { hash, kind: 'revision', id };
-    state.audit.push({
+    appendAudit(state, {
       at: Date.now(),
       event: 'runtime_policy_published',
       resource: applicationId,
@@ -1039,7 +1043,7 @@ export class RuntimeConfigurationService {
         kind: 'proposal',
         id: record.proposal_id,
       };
-      state.audit.push({
+      appendAudit(state, {
         at: Date.now(),
         event: 'runtime_policy_proposed',
         resource: record.proposal_id,
@@ -1068,7 +1072,7 @@ export class RuntimeConfigurationService {
             review.approved_by,
             record.proposal_id,
           );
-          state.audit.push({
+          appendAudit(state, {
             at: Date.now(),
             event: 'runtime_contracts_auto_accepted',
             resource: record.proposal_id,
@@ -1215,7 +1219,7 @@ export class RuntimeConfigurationService {
       const review = reviews[applicationId];
       (registry.reviewReceipts ??= {})[key] = structuredClone(review);
       registry.idempotency[key] = { hash, kind: 'review', id: applicationId };
-      state.audit.push({
+      appendAudit(state, {
         at: Date.now(),
         event: 'runtime_review_mode_changed',
         resource: applicationId,

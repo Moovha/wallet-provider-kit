@@ -1,0 +1,560 @@
+{
+  "inspectedAt": "2026-11-03T12:51:34.035Z",
+  "readOnly": true,
+  "engine": "SQLite",
+  "scope": "Existing private provider deployment; schema-only catalog inspection",
+  "method": "query_only connection, sqlite_master, table_info, foreign_key_list and index_list",
+  "objects": [
+    {
+      "type": "index",
+      "name": "approvals_account",
+      "tbl_name": "approvals",
+      "sql": "CREATE INDEX approvals_account ON approvals(account_id)"
+    },
+    {
+      "type": "index",
+      "name": "attempts_state",
+      "tbl_name": "attempts",
+      "sql": "CREATE INDEX attempts_state ON attempts(state, lease_expires_at)"
+    },
+    {
+      "type": "table",
+      "name": "admissions",
+      "tbl_name": "admissions",
+      "sql": "CREATE TABLE admissions (\n  namespace TEXT NOT NULL,\n  provider TEXT NOT NULL,\n  attempt_id TEXT NOT NULL,\n  resource_key TEXT NOT NULL,\n  request_hash TEXT NOT NULL,\n  request TEXT NOT NULL CHECK(json_valid(request)),\n  approval_id TEXT REFERENCES approvals(id),\n  context TEXT CHECK(context IS NULL OR json_valid(context)),\n  budget_id TEXT NOT NULL REFERENCES budgets(id),\n  units TEXT NOT NULL,\n  PRIMARY KEY(namespace, provider, attempt_id),\n  UNIQUE(namespace, provider, resource_key)\n) STRICT"
+    },
+    {
+      "type": "table",
+      "name": "approvals",
+      "tbl_name": "approvals",
+      "sql": "CREATE TABLE approvals (\n  id TEXT PRIMARY KEY NOT NULL,\n  account_id TEXT NOT NULL,\n  kind TEXT NOT NULL CHECK(kind='sign_typed_data'),\n  fingerprint TEXT NOT NULL,\n  record TEXT NOT NULL CHECK(json_valid(record)),\n  revoked INTEGER NOT NULL DEFAULT 0 CHECK(revoked IN (0,1))\n) STRICT"
+    },
+    {
+      "type": "table",
+      "name": "attempts",
+      "tbl_name": "attempts",
+      "sql": "CREATE TABLE attempts (\n  namespace TEXT NOT NULL,\n  provider TEXT NOT NULL,\n  attempt_id TEXT NOT NULL,\n  state TEXT NOT NULL CHECK(state IN ('dispatch','succeeded','failed','unknown')),\n  lease_token TEXT NOT NULL,\n  lease_expires_at INTEGER NOT NULL,\n  result TEXT CHECK(result IS NULL OR json_valid(result)),\n  failure TEXT CHECK(failure IS NULL OR json_valid(failure)),\n  PRIMARY KEY(namespace, provider, attempt_id),\n  FOREIGN KEY(namespace, provider, attempt_id) REFERENCES admissions(namespace, provider, attempt_id),\n  CHECK((state = 'succeeded' AND result IS NOT NULL AND failure IS NULL) OR (state != 'succeeded' AND result IS NULL))\n) STRICT"
+    },
+    {
+      "type": "table",
+      "name": "budgets",
+      "tbl_name": "budgets",
+      "sql": "CREATE TABLE budgets (\n  id TEXT PRIMARY KEY NOT NULL,\n  maximum TEXT NOT NULL,\n  reserved TEXT NOT NULL DEFAULT '0'\n) STRICT"
+    },
+    {
+      "type": "table",
+      "name": "idempotency",
+      "tbl_name": "idempotency",
+      "sql": "CREATE TABLE idempotency (\n  namespace TEXT NOT NULL,\n  provider TEXT NOT NULL,\n  caller_key TEXT NOT NULL,\n  idempotency_key TEXT NOT NULL,\n  approval_id TEXT NOT NULL REFERENCES approvals(id),\n  attempt_id TEXT NOT NULL,\n  PRIMARY KEY(namespace, provider, caller_key, idempotency_key),\n  FOREIGN KEY(namespace, provider, attempt_id) REFERENCES admissions(namespace, provider, attempt_id)\n) STRICT"
+    },
+    {
+      "type": "table",
+      "name": "onboarding_records",
+      "tbl_name": "onboarding_records",
+      "sql": "CREATE TABLE onboarding_records (\n  collection TEXT NOT NULL,\n  id TEXT NOT NULL,\n  record TEXT NOT NULL CHECK(json_valid(record)),\n  PRIMARY KEY(collection, id)\n) STRICT"
+    }
+  ],
+  "metadata": {
+    "onboarding_records": {
+      "columns": [
+        {
+          "cid": 0,
+          "name": "collection",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 2
+        },
+        {
+          "cid": 2,
+          "name": "record",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        }
+      ],
+      "foreignKeys": [],
+      "indexes": [
+        {
+          "seq": 0,
+          "name": "sqlite_autoindex_onboarding_records_1",
+          "unique": 1,
+          "origin": "pk",
+          "partial": 0
+        }
+      ]
+    },
+    "approvals": {
+      "columns": [
+        {
+          "cid": 0,
+          "name": "id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "account_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "kind",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "fingerprint",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "record",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 5,
+          "name": "revoked",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": "0",
+          "pk": 0
+        }
+      ],
+      "foreignKeys": [],
+      "indexes": [
+        {
+          "seq": 0,
+          "name": "approvals_account",
+          "unique": 0,
+          "origin": "c",
+          "partial": 0
+        },
+        {
+          "seq": 1,
+          "name": "sqlite_autoindex_approvals_1",
+          "unique": 1,
+          "origin": "pk",
+          "partial": 0
+        }
+      ]
+    },
+    "admissions": {
+      "columns": [
+        {
+          "cid": 0,
+          "name": "namespace",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "provider",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 2
+        },
+        {
+          "cid": 2,
+          "name": "attempt_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 3
+        },
+        {
+          "cid": 3,
+          "name": "resource_key",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "request_hash",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 5,
+          "name": "request",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 6,
+          "name": "approval_id",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 7,
+          "name": "context",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 8,
+          "name": "budget_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 9,
+          "name": "units",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        }
+      ],
+      "foreignKeys": [
+        {
+          "id": 0,
+          "seq": 0,
+          "table": "budgets",
+          "from": "budget_id",
+          "to": "id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        },
+        {
+          "id": 1,
+          "seq": 0,
+          "table": "approvals",
+          "from": "approval_id",
+          "to": "id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        }
+      ],
+      "indexes": [
+        {
+          "seq": 0,
+          "name": "sqlite_autoindex_admissions_2",
+          "unique": 1,
+          "origin": "u",
+          "partial": 0
+        },
+        {
+          "seq": 1,
+          "name": "sqlite_autoindex_admissions_1",
+          "unique": 1,
+          "origin": "pk",
+          "partial": 0
+        }
+      ]
+    },
+    "attempts": {
+      "columns": [
+        {
+          "cid": 0,
+          "name": "namespace",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "provider",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 2
+        },
+        {
+          "cid": 2,
+          "name": "attempt_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 3
+        },
+        {
+          "cid": 3,
+          "name": "state",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "lease_token",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 5,
+          "name": "lease_expires_at",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 6,
+          "name": "result",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 7,
+          "name": "failure",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        }
+      ],
+      "foreignKeys": [
+        {
+          "id": 0,
+          "seq": 0,
+          "table": "admissions",
+          "from": "namespace",
+          "to": "namespace",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        },
+        {
+          "id": 0,
+          "seq": 1,
+          "table": "admissions",
+          "from": "provider",
+          "to": "provider",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        },
+        {
+          "id": 0,
+          "seq": 2,
+          "table": "admissions",
+          "from": "attempt_id",
+          "to": "attempt_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        }
+      ],
+      "indexes": [
+        {
+          "seq": 0,
+          "name": "attempts_state",
+          "unique": 0,
+          "origin": "c",
+          "partial": 0
+        },
+        {
+          "seq": 1,
+          "name": "sqlite_autoindex_attempts_1",
+          "unique": 1,
+          "origin": "pk",
+          "partial": 0
+        }
+      ]
+    },
+    "budgets": {
+      "columns": [
+        {
+          "cid": 0,
+          "name": "id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "maximum",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "reserved",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "'0'",
+          "pk": 0
+        }
+      ],
+      "foreignKeys": [],
+      "indexes": [
+        {
+          "seq": 0,
+          "name": "sqlite_autoindex_budgets_1",
+          "unique": 1,
+          "origin": "pk",
+          "partial": 0
+        }
+      ]
+    },
+    "idempotency": {
+      "columns": [
+        {
+          "cid": 0,
+          "name": "namespace",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "provider",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 2
+        },
+        {
+          "cid": 2,
+          "name": "caller_key",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 3
+        },
+        {
+          "cid": 3,
+          "name": "idempotency_key",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 4
+        },
+        {
+          "cid": 4,
+          "name": "approval_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 5,
+          "name": "attempt_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        }
+      ],
+      "foreignKeys": [
+        {
+          "id": 0,
+          "seq": 0,
+          "table": "admissions",
+          "from": "namespace",
+          "to": "namespace",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        },
+        {
+          "id": 0,
+          "seq": 1,
+          "table": "admissions",
+          "from": "provider",
+          "to": "provider",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        },
+        {
+          "id": 0,
+          "seq": 2,
+          "table": "admissions",
+          "from": "attempt_id",
+          "to": "attempt_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        },
+        {
+          "id": 1,
+          "seq": 0,
+          "table": "approvals",
+          "from": "approval_id",
+          "to": "id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        }
+      ],
+      "indexes": [
+        {
+          "seq": 0,
+          "name": "sqlite_autoindex_idempotency_1",
+          "unique": 1,
+          "origin": "pk",
+          "partial": 0
+        }
+      ]
+    }
+  },
+  "conclusion": "Existing JSON records and attempt results support a network-scoped order journal and encrypted signing artifacts without DDL. This establishes storage shape, not signing authority or live solver acceptance.",
+  "limitations": [
+    "No row contents or credentials inspected",
+    "No helper RPC, migration, DDL or probe row written",
+    "No relational database, RLS policy or SQL RPC exists in this SQLite profile"
+  ],
+  "schemaFingerprint": "4891b369b46afbf62f685e9f6586299fc26572e10af8d803d4e0e3e4917aad74",
+  "recipientBindingReview": {
+    "date": "2026-11-03",
+    "method": "Fresh read-only sqlite_master, table_info, foreign_key_list and index_list inspection",
+    "affectedTables": ["onboarding_records", "admissions", "attempts"],
+    "result": "Existing JSON-valid journal columns and current keys/indexes support an optional recipient inside retained order review; no DDL, helper RPC, row write or migration required.",
+    "triggers": "No triggers on the inspected tables",
+    "rls": "SQLite has no PostgreSQL RLS policies"
+  }
+}

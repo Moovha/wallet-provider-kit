@@ -1,3 +1,9 @@
+import {
+  registerStateAccess,
+  recordValues,
+  type CollectionName,
+} from '../onboarding/records.js';
+import { RecordIndexes } from './record-index.js';
 import { sharedCollections, scopedCollection } from './network-scope.js';
 export { scopedCollection } from './network-scope.js';
 import { providerNetwork, type ProviderNetwork } from '../networks.js';
@@ -9,6 +15,8 @@ const collections = [
   'management',
   'managementCommands',
   'supportedActions',
+  'safeWalletAccounts',
+  'uniswapXOrders',
   'assetReservations',
   'assetBudgetBindings',
   'executionBindings',
@@ -79,10 +87,19 @@ export function sqliteOnboardingStore(
   connection: StorageConnection,
   network?: ProviderNetwork,
   allNetworkAccounts = false,
+  readOnly = false,
 ): OnboardingStore {
   return {
+    read: (operation) =>
+      sqliteOnboardingStore(
+        connection,
+        network,
+        allNetworkAccounts,
+        true,
+      ).transaction(operation),
     async transaction<T>(operation: (state: ProviderState) => T): Promise<T> {
       return connection.transaction(() => {
+        const indexes = new RecordIndexes(connection);
         const state = {
           format: 'moovha-onboarding-1',
           audit: [],
@@ -90,13 +107,15 @@ export function sqliteOnboardingStore(
         const previous = new Set<string>();
         const encode = new Map<string, ReturnType<typeof lazyJson>>();
         const sources = new Map<string, string>();
-        const present = connection
-          .all('SELECT DISTINCT collection FROM onboarding_records')
-          .map((row) => String(row.collection));
+        const present = indexes.collections;
         for (const collection of present)
           if (!knownCollection(collection)) throw new Error();
         const loaded = new Set<string>();
         const loaders = new Map<string, () => void>();
+        const targets = new Map<string, () => Record<string, unknown>>();
+        const readers = new Map<string, (id: string) => unknown>();
+        const physicals = new Map<string, string[]>();
+        const checkedIds = new Map<string, Set<string>>();
         for (const collection of collections) {
           const physicalCollections =
             allNetworkAccounts &&
@@ -106,33 +125,57 @@ export function sqliteOnboardingStore(
                   ...present.filter((name) => name.endsWith(':' + collection)),
                 ]
               : [scopedCollection(collection, network)];
-          let value: object;
-          const load = () => {
-            if (loaded.has(collection)) return;
-            loaded.add(collection);
-            value = Object.create(null);
-            for (const physical of physicalCollections)
-              for (const row of connection.all(
-                'SELECT id FROM onboarding_records WHERE collection=?',
-                physical,
-              )) {
-                const key = JSON.stringify([collection, row.id]);
-                if (sources.has(key)) throw new Error();
-                sources.set(key, physical);
-                encode.set(
-                  key,
-                  lazyJson(value, String(row.id), () => {
-                    const record = connection.get(
-                      'SELECT record FROM onboarding_records WHERE collection=? AND id=?',
-                      physical,
-                      String(row.id),
-                    );
-                    if (typeof record?.record !== 'string') throw new Error();
-                    return record.record;
-                  }),
+          physicals.set(collection, physicalCollections);
+          let value: Record<string, unknown> = Object.create(null);
+          let enumerated = false,
+            replaced = false;
+          const checked = new Set<string>();
+          checkedIds.set(collection, checked);
+          const attach = (physical: string, id: string, original?: string) => {
+            checked.add(id);
+            const key = JSON.stringify([collection, id]);
+            if (sources.has(key)) {
+              if (sources.get(key) !== physical) throw new Error();
+              return;
+            }
+            sources.set(key, physical);
+            encode.set(
+              key,
+              lazyJson(value, id, () => {
+                if (original !== undefined) return original;
+                const record = connection.get(
+                  'SELECT record FROM onboarding_records WHERE collection=? AND id=?',
+                  physical,
+                  id,
                 );
-                previous.add(key);
+                if (typeof record?.record !== 'string') throw new Error();
+                return record.record;
+              }),
+            );
+            previous.add(key);
+          };
+          const load = () => {
+            loaded.add(collection);
+            if (enumerated) return;
+            enumerated = true;
+            for (const physical of physicalCollections)
+              for (const id of indexes.ids(physical)) attach(physical, id);
+          };
+          const read = (id: string) => {
+            loaded.add(collection);
+            if (replaced) return value[id];
+            if (!checked.has(id) && !enumerated) {
+              checked.add(id);
+              for (const physical of physicalCollections) {
+                const row = connection.get(
+                  'SELECT record FROM onboarding_records WHERE collection=? AND id=?',
+                  physical,
+                  id,
+                );
+                if (row) attach(physical, id, String(row.record));
               }
+            }
+            return value[id];
           };
           const get = () => {
             load();
@@ -140,13 +183,31 @@ export function sqliteOnboardingStore(
           };
           const set = (replacement: object) => {
             load();
-            value = replacement;
+            value = replacement as Record<string, unknown>;
+            replaced = true;
           };
           Object.defineProperty(state, collection, {
             get,
             set,
             enumerable: true,
             configurable: true,
+          });
+          const current = () => {
+            const descriptor = Object.getOwnPropertyDescriptor(
+              state,
+              collection,
+            );
+            if (descriptor?.get !== get || descriptor.set !== set) {
+              load();
+              replaced = true;
+              return Reflect.get(state, collection) as Record<string, unknown>;
+            }
+            return value;
+          };
+          targets.set(collection, current);
+          readers.set(collection, (id) => {
+            const target = current();
+            return replaced ? target[id] : read(id);
           });
           loaders.set(collection, () => {
             const descriptor = Object.getOwnPropertyDescriptor(
@@ -156,6 +217,7 @@ export function sqliteOnboardingStore(
             if (descriptor?.get !== get || descriptor.set !== set) load();
           });
         }
+        const pendingAudit: ProviderState['audit'] = [];
         let originalAudit: ReturnType<StorageConnection['all']> | undefined;
         let auditEncoders: ReturnType<typeof lazyJson>[] = [];
         let audit: ProviderState['audit'];
@@ -176,6 +238,7 @@ export function sqliteOnboardingStore(
               }),
             );
           }
+          if (pendingAudit.length) audit.push(...pendingAudit.splice(0));
           return audit;
         };
         const replaceAudit = (replacement: ProviderState['audit']) => {
@@ -187,6 +250,87 @@ export function sqliteOnboardingStore(
           set: replaceAudit,
           enumerable: true,
           configurable: true,
+        });
+        const read = (collection: CollectionName, id: string) =>
+          readers.get(collection)!(id);
+        const matches = (
+          collection: CollectionName,
+          field: string,
+          key: string,
+        ) => {
+          const target = targets.get(collection)!();
+          const ids = new Set<string>(Object.keys(target));
+          for (const physical of physicals.get(collection)!)
+            for (const id of indexes.ids(physical, field, key)) ids.add(id);
+          return [...ids]
+            .sort()
+            .map((id) => [id, read(collection, id)] as [string, unknown])
+            .filter(([, row]) => recordValues(row, field).includes(key));
+        };
+        registerStateAccess(state, {
+          get: read,
+          set(collection, id, value) {
+            read(collection, id);
+            targets.get(collection)!()[id] = value;
+            loaded.add(collection);
+          },
+          remove(collection, id) {
+            read(collection, id);
+            delete targets.get(collection)!()[id];
+          },
+          select: matches,
+          count(collection, field, key) {
+            const physical = physicals.get(collection)!;
+            if (physical.length !== 1)
+              return matches(collection, field, key).length;
+            const target = targets.get(collection)!();
+            let count = indexes.count(physical[0], field, key);
+            for (const id of new Set([
+              ...Object.keys(target),
+              ...checkedIds.get(collection)!,
+            ])) {
+              const before = indexes.has(physical[0], field, key, id);
+              const after = recordValues(read(collection, id), field).includes(
+                key,
+              );
+              count += Number(after) - Number(before);
+            }
+            return count;
+          },
+          page(collection, after, limit, field, key) {
+            const target = targets.get(collection)!();
+            const touched = [
+              ...new Set([
+                ...Object.keys(target),
+                ...checkedIds.get(collection)!,
+              ]),
+            ];
+            const ids = new Set(touched);
+            for (const physical of physicals.get(collection)!) {
+              for (const id of indexes.ids(
+                physical,
+                field,
+                key,
+                after,
+                limit + touched.length,
+              ))
+                ids.add(id);
+            }
+            return [...ids]
+              .sort()
+              .filter(
+                (id) =>
+                  (!after || id > after) &&
+                  read(collection, id) !== undefined &&
+                  (!field ||
+                    recordValues(read(collection, id), field).includes(key!)),
+              )
+              .slice(0, limit);
+          },
+          append(event) {
+            if (originalAudit) state.audit.push(event);
+            else pendingAudit.push(structuredClone(event));
+          },
         });
         const result = operation(state);
         if (result && typeof (result as { then?: unknown }).then === 'function')
@@ -227,27 +371,32 @@ export function sqliteOnboardingStore(
         for (const collection of collections) {
           loaders.get(collection)!();
           if (!loaded.has(collection)) continue;
-          if (
-            !state[collection] ||
-            typeof state[collection] !== 'object' ||
-            Array.isArray(state[collection])
-          )
+          const target = targets.get(collection)!();
+          if (!target || typeof target !== 'object' || Array.isArray(target))
             throw new Error();
-          for (const id of Object.keys(state[collection])) {
+          for (const id of Object.keys(target)) {
             const key = JSON.stringify([collection, id]);
             const cell = encode.get(key);
-            if (cell?.untouched(state[collection])) {
+            if (cell?.untouched(target)) {
               previous.delete(key);
               continue;
             }
-            const encoded = JSON.stringify(state[collection][id]);
-            if (!cell || cell.original() !== encoded)
+            const encoded = JSON.stringify(target[id]);
+            if (
+              !cell ||
+              (cell.original() !== encoded &&
+                (!readOnly ||
+                  JSON.stringify(JSON.parse(cell.original())) !== encoded))
+            ) {
+              const physical =
+                sources.get(key) ?? scopedCollection(collection, network);
               connection.run(
                 'INSERT INTO onboarding_records(collection,id,record) VALUES(?,?,?) ON CONFLICT(collection,id) DO UPDATE SET record=excluded.record',
-                sources.get(key) ?? scopedCollection(collection, network),
+                physical,
                 id,
                 encoded,
               );
+            }
             previous.delete(key);
           }
         }
@@ -261,13 +410,13 @@ export function sqliteOnboardingStore(
         }
         for (const event of originalAudit
           ? state.audit.slice(originalAudit.length)
-          : [])
+          : pendingAudit)
           connection.run(
             'INSERT INTO onboarding_audit(record) VALUES(?)',
             JSON.stringify(network ? { ...event, network } : event),
           );
         return detached;
-      });
+      }, readOnly);
     },
   };
 }

@@ -1,3 +1,4 @@
+import { getRecord, matchingRecords } from '../onboarding/records.js';
 import { randomUUID } from 'node:crypto';
 import { WalletProviderError } from '../domain/signing.js';
 import type {
@@ -100,22 +101,30 @@ export class UserOperationExecutionCoordinator {
   async load(id: string) {
     return this.loadPlan(id, false);
   }
-  private async loadPlan(id: string, settlement: boolean) {
+  private async loadPlan(
+    id: string,
+    settlement: boolean,
+  ): Promise<UserOperationExecution | null> {
     const plan = await this.actions.onboarding.store.transaction((state) => {
       if (
         settlement &&
-        state.deploymentBindings?.['service-v1']?.activeRevision !==
+        getRecord(state, 'deploymentBindings', 'service-v1')?.activeRevision !==
           this.actions.revision
       )
         deny();
-      return state.userOperationExecutions?.[id] ?? null;
+      return getRecord(state, 'userOperationExecutions', id) ?? null;
     });
     if (plan) this.check(plan, settlement);
     return plan;
   }
   private async timestamp(id: string, field: string) {
     await this.actions.onboarding.store.transaction((state) => {
-      for (const batch of Object.values(state.userOperationBatches ?? {})) {
+      for (const batch of matchingRecords(
+        state,
+        'userOperationBatches',
+        'operationId',
+        id,
+      )) {
         if (
           batch.operationId === id &&
           batch.revision === this.actions.revision
@@ -145,7 +154,6 @@ export class UserOperationExecutionCoordinator {
       const operation = await this.signing.sign(context, id),
         record = this.database.sponsorship.load(id) ?? deny();
       await this.timestamp(id, 'signed_at');
-      await this.signing.authorizeSubmission(context, id, false);
       await this.actions.withAuthorizedCalls(
         context.principal,
         id,
@@ -176,23 +184,24 @@ export class UserOperationExecutionCoordinator {
         },
       );
     }
-    await this.signing.authorizeSubmission(context, id, false);
     const plan = (await this.load(id)) ?? deny();
     let token: string | undefined;
     try {
       await this.timestamp(id, 'submission_started_at');
       await this.client.send(plan.operation, async () => {
-        // Unavailable preflight reads leave no dispatch claim and can be retried.
+        // Check current consent, funding and chain authority immediately before
+        // the durable dispatch claim. No earlier preflight can replace this check.
         await this.signing.authorizeSubmission(context, id);
         token = await this.actions.withAuthorizedCalls(
           context.principal,
           id,
           (state) => {
-            const current = state.userOperationExecutions?.[id] ?? deny();
+            const current =
+              getRecord(state, 'userOperationExecutions', id) ?? deny();
             this.check(current);
             if (
-              state.sponsorships?.[id]?.signatureCollection?.state ===
-              'cancelled'
+              getRecord(state, 'sponsorships', id)?.signatureCollection
+                ?.state === 'cancelled'
             )
               deny();
             if (current.dispatch)
@@ -226,7 +235,7 @@ export class UserOperationExecutionCoordinator {
     if (collection.expiry) return true;
     if (Number(record.validUntil) * 1000 > Date.now()) return false;
     const intent = await this.actions.onboarding.store.transaction(
-      (state) => state.supportedActions?.[id]?.intent ?? deny(),
+      (state) => getRecord(state, 'supportedActions', id)?.intent ?? deny(),
     );
     const observation = await this.observer.observe(
       {
@@ -253,21 +262,21 @@ export class UserOperationExecutionCoordinator {
     if (observation.state !== 'expired' || !observation.expiry) return false;
     await this.actions.onboarding.store.transaction((state) => {
       if (
-        state.deploymentBindings?.['service-v1']?.activeRevision !==
+        getRecord(state, 'deploymentBindings', 'service-v1')?.activeRevision !==
         this.actions.revision
       )
         deny();
-      const current = state.sponsorships?.[id] ?? deny();
+      const current = getRecord(state, 'sponsorships', id) ?? deny();
       if (
         current.configurationHash !== record.configurationHash ||
         current.termsHash !== record.termsHash ||
         current.signatureCollection?.action.payload_hash !==
           collection.action.payload_hash ||
-        state.userOperationExecutions?.[id]?.dispatch
+        getRecord(state, 'userOperationExecutions', id)?.dispatch
       )
         deny();
       current.signatureCollection!.expiry = observation.expiry;
-      const source = state.supportedActions?.[id] ?? deny();
+      const source = getRecord(state, 'supportedActions', id) ?? deny();
       source.status = 'denied';
       source.nonceReleased = true;
     });
@@ -320,10 +329,10 @@ export class UserOperationExecutionCoordinator {
       hint,
     );
     await this.actions.onboarding.store.transaction((state) => {
-      const current = state.userOperationExecutions?.[id] ?? deny();
+      const current = getRecord(state, 'userOperationExecutions', id) ?? deny();
       if (
         settlement &&
-        state.deploymentBindings?.['service-v1']?.activeRevision !==
+        getRecord(state, 'deploymentBindings', 'service-v1')?.activeRevision !==
           this.actions.revision
       )
         deny();
@@ -331,6 +340,11 @@ export class UserOperationExecutionCoordinator {
       if (current.observationRevision !== before.observationRevision) return;
       current.observation = observation;
       current.observationRevision++;
+      if (observation.state === 'expired' && observation.expiry) {
+        const source = getRecord(state, 'supportedActions', id) ?? deny();
+        source.status = 'denied';
+        source.nonceReleased = true;
+      }
     });
     if (
       observation.receipt &&

@@ -1,3 +1,16 @@
+import {
+  recordPages,
+  readState,
+  readRecordPage,
+  type RecordPageInput,
+} from '../onboarding/record-pages.js';
+import {
+  getRecord,
+  appendAudit,
+  matchingRecords,
+  recordCount,
+  putRecord,
+} from '../onboarding/records.js';
 import { failureOrigin } from './failure-origin.js';
 import { WalletProviderError } from '../domain/signing.js';
 import { NetworkFeeLimitError } from '../execution/network-fees.js';
@@ -118,7 +131,7 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
     return this.execution.subscribe((id) => {
       void this.actions.onboarding.store
         .transaction((state) =>
-          Object.values(state.userOperationBatches ?? {})
+          matchingRecords(state, 'userOperationBatches', 'operationId', id)
             .filter((b) => b.operationId === id)
             .map((b) => b.metadata.id),
         )
@@ -142,7 +155,12 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
       () => true,
     );
     const ids = await this.actions.onboarding.store.transaction((state) =>
-      Object.values(state.userOperationBatches ?? {})
+      matchingRecords(
+        state,
+        'userOperationBatches',
+        'input.account_id',
+        accountId,
+      )
         .filter(
           (b) =>
             b.input.account_id === accountId &&
@@ -150,7 +168,8 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
             b.context.principal.subject === principal.subject &&
             b.context.principal.clientId === principal.clientId &&
             b.operationId &&
-            state.sponsorships?.[b.operationId]?.signatureCollection,
+            getRecord(state, 'sponsorships', b.operationId)
+              ?.signatureCollection,
         )
         .sort((a, b) => b.sequence - a.sequence)
         .slice(0, 100)
@@ -185,7 +204,12 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
     );
     if (!['cancelled', 'expired'].includes(result.state)) {
       await this.actions.onboarding.store.transaction((state) => {
-        for (const batch of Object.values(state.userOperationBatches ?? {}))
+        for (const batch of matchingRecords(
+          state,
+          'userOperationBatches',
+          'operationId',
+          id,
+        ))
           if (batch.operationId === id && batch.stage === 'awaiting-signatures')
             batch.stage = 'processing';
       });
@@ -204,7 +228,12 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
       id,
     );
     await this.actions.onboarding.store.transaction((state) => {
-      for (const batch of Object.values(state.userOperationBatches ?? {}))
+      for (const batch of matchingRecords(
+        state,
+        'userOperationBatches',
+        'operationId',
+        id,
+      ))
         if (batch.operationId === id) batch.stage = 'awaiting-signatures';
     });
     return result;
@@ -263,15 +292,20 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
       'contracts:request',
       (state, grant) => {
         if (
-          state.deploymentBindings?.['service-v1']?.activeRevision !==
-            this.actions.revision ||
+          getRecord(state, 'deploymentBindings', 'service-v1')
+            ?.activeRevision !== this.actions.revision ||
           authority.owner !== grant.owner ||
           authority.grantId !== grant.id ||
           authority.consentReference !== grant.requestId ||
-          state.accounts[grant.accountId].address !== authority.address
+          getRecord(state, 'accounts', grant.accountId).address !==
+            authority.address
         )
           deny();
-        const publication = state.requests[grant.requestId]?.runtimePolicy;
+        const publication = getRecord(
+          state,
+          'requests',
+          grant.requestId,
+        )?.runtimePolicy;
         if (
           !publication ||
           publication.policy_hash !== metadata.policyHash ||
@@ -279,9 +313,14 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
           metadata.sender.toLowerCase() !== authority.safeAddress
         )
           deny();
-        const entries = (state.userOperationBatches ??= {});
+        const lane = matchingRecords(
+          state,
+          'userOperationBatches',
+          '$batchSender',
+          authority.safeAddress,
+        );
         if (
-          Object.values(entries).some(
+          lane.some(
             (e) =>
               e.metadata.id === metadata.id &&
               e.metadata.sender.toLowerCase() === authority.safeAddress &&
@@ -290,9 +329,6 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
           )
         )
           return 5720;
-        const lane = Object.values(entries).filter(
-          (e) => e.metadata.sender.toLowerCase() === authority.safeAddress,
-        );
         if (
           lane.filter(
             (e) =>
@@ -301,17 +337,15 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
         )
           return 5740;
         if (
-          Object.values(entries).filter(
-            (e) =>
-              !['included', 'complete', 'expired', 'failed'].includes(e.stage),
-          ).length >= (this.config.maxDepthTotal ?? 512)
+          recordCount(state, 'userOperationBatches', '$pendingBatch', 'yes') >=
+          (this.config.maxDepthTotal ?? 512)
         )
           return 5740;
         const sequence =
           lane.reduce((max, e) => Math.max(max, e.sequence), 0) + 1;
         if (!Number.isSafeInteger(sequence)) deny();
         const id = randomUUID();
-        entries[id] = {
+        putRecord(state, 'userOperationBatches', id, {
           id,
           metadata,
           context: {
@@ -329,8 +363,8 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
           sequence,
           stage: 'queued',
           timings: { queued_at: new Date().toISOString() },
-        };
-        state.audit.push({
+        });
+        appendAudit(state, {
           at: Date.now(),
           event: 'user_operation_batch_queued',
           resource: id,
@@ -352,11 +386,16 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
       'account:read',
       (state, grant) => {
         if (
-          state.deploymentBindings?.['service-v1']?.activeRevision !==
-          this.actions.revision
+          getRecord(state, 'deploymentBindings', 'service-v1')
+            ?.activeRevision !== this.actions.revision
         )
           deny();
-        return Object.values(state.userOperationBatches ?? {}).find(
+        return matchingRecords(
+          state,
+          'userOperationBatches',
+          'metadata.id',
+          id,
+        ).find(
           (e) =>
             e.metadata.id === id &&
             e.input.account_id === accountId &&
@@ -434,67 +473,100 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
   async list(
     principal: VerifiedPrincipal,
     authorizeOperator?: (state: ProviderState) => void,
+    input: RecordPageInput = {},
   ) {
     if (!authorizeOperator && !principal.scopes.includes('wallet:execute:read'))
       deny();
-    const entries = await this.actions.onboarding.store.transaction((state) => {
-      if (
-        state.deploymentBindings?.['service-v1']?.activeRevision !==
-        this.actions.revision
-      )
-        deny();
-      authorizeOperator?.(state);
-      return Object.values(state.userOperationBatches ?? {})
-        .filter(
-          (e) =>
-            e.configurationHash === this.configurationHash &&
-            (authorizeOperator ||
-              ['issuer', 'subject', 'clientId'].every(
-                (k) =>
-                  e.context.principal[
-                    k as 'issuer' | 'subject' | 'clientId'
-                  ] === principal[k as 'issuer' | 'subject' | 'clientId'],
-              )),
-        )
-        .sort((a, b) => b.sequence - a.sequence || a.id.localeCompare(b.id));
-    });
+    const page = await readRecordPage(
+      this.actions.onboarding.store,
+      'userOperationBatches',
+      input,
+      (_state, entry) => entry.id,
+      (state) => {
+        this.assertListAuthority(state, principal, authorizeOperator);
+      },
+      'configurationHash',
+      this.configurationHash,
+    );
     const batches: WalletCallsBatchSummary[] = [];
-    for (const entry of entries.slice(0, 100)) {
-      if (!authorizeOperator)
-        await this.load(principal, entry.input.account_id, entry.metadata.id);
-      const plan = entry.operationId
-        ? await this.execution.load(entry.operationId)
-        : null;
-      batches.push({
-        account_id: entry.input.account_id,
-        sender: entry.metadata.sender,
-        queue_stage:
-          entry.stage === 'awaiting-signatures'
-            ? 'blocked'
-            : entry.stage === 'processing'
-              ? 'executing'
-              : entry.stage === 'included' || entry.stage === 'complete'
-                ? 'succeeded'
-                : entry.stage,
-        policy_revision: entry.metadata.policyRevision,
-        expires_at: entry.expiresAt,
-        application_id: runtimeApplicationId(
-          entry.context.principal.issuer,
-          entry.context.principal.clientId,
-        ),
-        ...this.projection(
-          entry,
-          plan,
-          !!plan?.observation.receipt &&
-            ['included', 'safe', 'finalized'].includes(plan.observation.state),
-        ),
-      });
+    for (const id of page.items) {
+      const summary = await this.listEntry(principal, id, authorizeOperator);
+      if (summary) batches.push(summary);
     }
-    return { truncated: entries.length > 100, batches };
+    return {
+      truncated: page.next_cursor !== null,
+      next_cursor: page.next_cursor,
+      batches,
+    };
+  }
+  private assertListAuthority(
+    state: ProviderState,
+    principal: VerifiedPrincipal,
+    authorizeOperator?: (state: ProviderState) => void,
+  ) {
+    if (
+      (!authorizeOperator &&
+        !principal.scopes.includes('wallet:execute:read')) ||
+      getRecord(state, 'deploymentBindings', 'service-v1')?.activeRevision !==
+        this.actions.revision
+    )
+      deny();
+    authorizeOperator?.(state);
+  }
+  /** Current authorized summary for an internal batch record ID. */
+  async listEntry(
+    principal: VerifiedPrincipal,
+    id: string,
+    authorizeOperator?: (state: ProviderState) => void,
+  ): Promise<WalletCallsBatchSummary | undefined> {
+    const entry = await readState(this.actions.onboarding.store, (state) => {
+      this.assertListAuthority(state, principal, authorizeOperator);
+      const entry = getRecord(state, 'userOperationBatches', id);
+      if (
+        !entry ||
+        entry.configurationHash !== this.configurationHash ||
+        (!authorizeOperator &&
+          !(['issuer', 'subject', 'clientId'] as const).every(
+            (k) => entry.context.principal[k] === principal[k],
+          ))
+      )
+        return undefined;
+      return entry;
+    });
+    if (!entry) return undefined;
+    if (!authorizeOperator)
+      await this.load(principal, entry.input.account_id, entry.metadata.id);
+    const plan = entry.operationId
+      ? await this.execution.load(entry.operationId)
+      : null;
+    return {
+      account_id: entry.input.account_id,
+      sender: entry.metadata.sender,
+      queue_stage:
+        entry.stage === 'awaiting-signatures'
+          ? 'blocked'
+          : entry.stage === 'processing'
+            ? 'executing'
+            : entry.stage === 'included' || entry.stage === 'complete'
+              ? 'succeeded'
+              : entry.stage,
+      policy_revision: entry.metadata.policyRevision,
+      expires_at: entry.expiresAt,
+      application_id: runtimeApplicationId(
+        entry.context.principal.issuer,
+        entry.context.principal.clientId,
+      ),
+      ...this.projection(
+        entry,
+        plan,
+        !!plan?.observation.receipt &&
+          ['included', 'safe', 'finalized'].includes(plan.observation.state),
+      ),
+    };
   }
   private async timestamp(entry: UserOperationBatch, field: string) {
     await this.actions.onboarding.store.transaction((s) => {
-      const current = s.userOperationBatches?.[entry.id];
+      const current = getRecord(s, 'userOperationBatches', entry.id);
       if (!current || current.configurationHash !== this.configurationHash)
         deny();
       (current.timings ??= {})[field] ??= new Date().toISOString();
@@ -514,7 +586,7 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
         context.idempotencyKey,
       ]);
       const recovered = await this.actions.onboarding.store.transaction(
-        (s) => s.idempotency[key]?.id,
+        (s) => getRecord(s, 'idempotency', key)?.id,
       );
       if (recovered) entry.operationId = recovered;
     }
@@ -539,24 +611,26 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
         )
           throw error;
         await this.actions.onboarding.store.transaction((state) => {
-          const current = state.userOperationBatches?.[entry.id] ?? deny();
+          const current =
+            getRecord(state, 'userOperationBatches', entry.id) ?? deny();
           if (
             current.configurationHash !== this.configurationHash ||
-            state.deploymentBindings?.['service-v1']?.activeRevision !==
-              this.actions.revision
+            getRecord(state, 'deploymentBindings', 'service-v1')
+              ?.activeRevision !== this.actions.revision
           )
             deny();
           // Recover any concurrently admitted action before ending a request that has no financial effects.
-          const admitted =
-            state.idempotency[
-              fingerprint([
-                'supported-call',
-                context.principal.issuer,
-                context.principal.subject,
-                context.principal.clientId,
-                context.idempotencyKey,
-              ])
-            ]?.id;
+          const admitted = getRecord(
+            state,
+            'idempotency',
+            fingerprint([
+              'supported-call',
+              context.principal.issuer,
+              context.principal.subject,
+              context.principal.clientId,
+              context.idempotencyKey,
+            ]),
+          )?.id;
           if (admitted) current.operationId = admitted;
           else if (
             !current.operationId &&
@@ -670,10 +744,11 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
     stage: UserOperationBatch['stage'],
   ) {
     await this.actions.onboarding.store.transaction((state) => {
-      const current = state.userOperationBatches?.[entry.id] ?? deny();
+      const current =
+        getRecord(state, 'userOperationBatches', entry.id) ?? deny();
       if (
         current.configurationHash !== this.configurationHash ||
-        state.deploymentBindings?.['service-v1']?.activeRevision !==
+        getRecord(state, 'deploymentBindings', 'service-v1')?.activeRevision !==
           this.actions.revision ||
         (current.operationId &&
           entry.operationId &&
@@ -685,16 +760,51 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
         current.stage = stage;
     });
   }
+  private async retainedBatches(settlement = false) {
+    const entries: UserOperationBatch[] = [];
+    const accounts = settlement
+      ? [...new Set(this.execution.signing.executionBinding().accountIds)]
+      : [this.configurationHash];
+    for (const key of accounts) {
+      for await (const page of recordPages(
+        this.actions.onboarding.store,
+        'userOperationBatches',
+        (state, entry) => {
+          if (!settlement)
+            return !['complete', 'expired', 'failed'].includes(entry.stage)
+              ? entry
+              : undefined;
+          if (entry.stage === 'included') return entry;
+          if (
+            entry.stage === 'expired' &&
+            entry.operationId &&
+            !getRecord(state, 'supportedActions', entry.operationId)
+              ?.nonceReleased &&
+            getRecord(state, 'userOperationExecutions', entry.operationId)
+              ?.observation.expiry
+          )
+            return entry;
+          return undefined;
+        },
+        (state) => {
+          if (
+            getRecord(state, 'deploymentBindings', 'service-v1')
+              ?.activeRevision !== this.actions.revision
+          )
+            deny();
+        },
+        settlement ? 'input.account_id' : 'configurationHash',
+        key,
+      ))
+        entries.push(...page);
+    }
+    return entries;
+  }
   async runOnce(
     snapshot?: readonly UserOperationBatch[],
     settlement = true,
   ): Promise<void> {
-    const entries = (
-      snapshot ??
-      (await this.actions.onboarding.store.transaction((s) =>
-        Object.values(s.userOperationBatches ?? {}),
-      ))
-    )
+    const entries = (snapshot ?? (await this.retainedBatches()))
       .filter(
         (e) =>
           e.configurationHash === this.configurationHash &&
@@ -761,11 +871,12 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
                 ? error.code
                 : 'wallet_execution_unavailable';
           await this.actions.onboarding.store.transaction((state) => {
-            const current = state.userOperationBatches?.[entry.id] ?? deny();
+            const current =
+              getRecord(state, 'userOperationBatches', entry.id) ?? deny();
             if (
               current.configurationHash !== this.configurationHash ||
-              state.deploymentBindings?.['service-v1']?.activeRevision !==
-                this.actions.revision
+              getRecord(state, 'deploymentBindings', 'service-v1')
+                ?.activeRevision !== this.actions.revision
             )
               deny();
             const origin = failureOrigin(error);
@@ -807,25 +918,56 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
   /** Observe historical inclusion separately so finality reads cannot hold an admission worker. */
   async settleOnce(snapshot?: readonly UserOperationBatch[]): Promise<boolean> {
     if (this.settling || Date.now() < this.nextSettlementAt) return false;
-    const running = this.settle(snapshot).finally(() => {
-      if (this.settling === running) this.settling = undefined;
-    });
+    const running = this.settle(snapshot)
+      .catch((error) => {
+        if (
+          error instanceof WalletProviderError &&
+          error.code === 'wallet_authorization_denied'
+        )
+          return false;
+        throw error;
+      })
+      .finally(() => {
+        if (this.settling === running) this.settling = undefined;
+      });
     this.settling = running;
     return running;
   }
   private async settle(snapshot?: readonly UserOperationBatch[]) {
-    const entries =
-      snapshot ??
-      (await this.actions.onboarding.store.transaction((state) =>
-        Object.values(state.userOperationBatches ?? {}),
-      ));
+    const entries = snapshot ?? (await this.retainedBatches(true));
     const accountIds = new Set(
       this.execution.signing.executionBinding().accountIds,
+    );
+    const expired = entries.filter(
+      (entry) =>
+        accountIds.has(entry.input.account_id) &&
+        entry.stage === 'expired' &&
+        entry.operationId,
+    );
+    if (expired.length) this.nextSettlementAt = Date.now() + 15000;
+    const unreleasedExpired = new Set(
+      expired.length
+        ? await this.actions.onboarding.store.transaction((state) =>
+            expired
+              .filter(
+                (entry) =>
+                  entry.stage === 'expired' &&
+                  entry.operationId &&
+                  !getRecord(state, 'supportedActions', entry.operationId)
+                    ?.nonceReleased &&
+                  getRecord(state, 'userOperationExecutions', entry.operationId)
+                    ?.observation.state === 'expired' &&
+                  getRecord(state, 'userOperationExecutions', entry.operationId)
+                    .observation.expiry,
+              )
+              .map((entry) => entry.id),
+          )
+        : [],
     );
     const included = entries.filter(
       (entry) =>
         accountIds.has(entry.input.account_id) &&
-        entry.stage === 'included' &&
+        (entry.stage === 'included' || unreleasedExpired.has(entry.id)) &&
         !this.lanes.has(entry.metadata.sender.toLowerCase()),
     );
     if (!included.length) return false;
@@ -837,10 +979,11 @@ export class UserOperationWalletCallsDriver implements WalletCallsDriver {
         : null;
       if (plan?.observation.state === 'finalized')
         await this.actions.onboarding.store.transaction((state) => {
-          const current = state.userOperationBatches?.[entry.id] ?? deny();
+          const current =
+            getRecord(state, 'userOperationBatches', entry.id) ?? deny();
           if (
-            state.deploymentBindings?.['service-v1']?.activeRevision !==
-              this.actions.revision ||
+            getRecord(state, 'deploymentBindings', 'service-v1')
+              ?.activeRevision !== this.actions.revision ||
             current.configurationHash !== entry.configurationHash ||
             current.operationId !== plan.operationId ||
             current.stage !== 'included'

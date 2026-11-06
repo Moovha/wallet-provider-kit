@@ -1,3 +1,7 @@
+import { loadOrderPricePolicyAdapter } from '../orders/application-price-policy.js';
+import { readState } from '../onboarding/record-pages.js';
+import { appendAudit, getRecord } from '../onboarding/records.js';
+import { UniswapXOrderService } from '../orders/service.js';
 import { networkConfigurations } from './network-configuration.js';
 import {
   createNetworkResolver,
@@ -11,6 +15,7 @@ import { createManagementAuthorizationServer } from '../management/authorization
 import { SafeWalletRuntime } from '../sponsorship/safe-wallet.js';
 import {
   createOwsWalletProvider,
+  prepareOwsVault,
   createOwsSigningBackend,
 } from '../providers/ows.js';
 import { ApplicationCredentialCipher } from '../runtime-configuration/credentials.js';
@@ -216,6 +221,7 @@ async function createNetworkContext(
     passphrase: async () => passphrase,
     network: config.network,
   };
+  await prepareOwsVault(backendOptions.vaultPath);
   const provision = createOwsWalletProvider(backendOptions, {
     namespace:
       'onboarding-' + fingerprint(config.policy.provider.origin).slice(0, 32),
@@ -226,10 +232,10 @@ async function createNetworkContext(
       !!activeRevision &&
       (await database.onboardingStore.transaction(
         (state) =>
-          state.deploymentBindings?.['service-v1']?.activeRevision ===
-            activeRevision &&
-          state.deploymentBindings?.['service-v1']?.transportRevision ===
-            transportRevision,
+          getRecord(state, 'deploymentBindings', 'service-v1')
+            ?.activeRevision === activeRevision &&
+          getRecord(state, 'deploymentBindings', 'service-v1')
+            ?.transportRevision === transportRevision,
       )) &&
       (await onboarding.canDispatchProvision(
         request.attemptId,
@@ -246,7 +252,7 @@ async function createNetworkContext(
       accessMode: config.policy.access?.mode ?? 'hosted',
       network: network.name,
     };
-    const previous = state.deploymentBindings?.['service-v1'];
+    const previous = getRecord(state, 'deploymentBindings', 'service-v1');
     if (
       previous
         ? fingerprint({
@@ -314,6 +320,7 @@ async function createNetworkContext(
         }
       : undefined,
     database.networkScope,
+    config.uniswapXOrders?.policy,
   );
   const login = config.ownerLogin
     ? await createOwnerLogin(
@@ -345,14 +352,18 @@ async function createNetworkContext(
     ...(config.apiExplorer ? [config.apiExplorer, config.oauth] : []),
   ]);
   await database.onboardingStore.transaction((state) => {
-    const binding = state.deploymentBindings!['service-v1'];
+    const binding = getRecord(state, 'deploymentBindings', 'service-v1');
     if (binding.activeRevision !== activeRevision) {
       for (const record of Object.values(state.supportedActions ?? {})) {
         if (record.revision !== activeRevision) record.status = 'denied';
       }
       for (const grant of Object.values(state.grants)) {
         let actionPolicyCurrent = true;
-        if (grant.permissions.includes('contracts:request')) {
+        if (
+          grant.permissions.some((permission) =>
+            ['contracts:request', 'orders:authorize'].includes(permission),
+          )
+        ) {
           try {
             const expected = onboarding!.runtimeContracts
               ? fingerprint([
@@ -360,7 +371,15 @@ async function createNetworkContext(
                   currentRuntimePolicy(state, grant.caller),
                 ])
               : actionPolicyRevision;
-            actionPolicyCurrent = grant.actionPolicyRevision === expected;
+            const orderExpected = grant.permissions.includes('orders:authorize')
+              ? config.uniswapXOrders &&
+                fingerprint([
+                  'uniswapx-v3-order-v1',
+                  expected,
+                  config.uniswapXOrders.policy,
+                ])
+              : expected;
+            actionPolicyCurrent = grant.actionPolicyRevision === orderExpected;
           } catch {
             actionPolicyCurrent = false;
           }
@@ -371,7 +390,7 @@ async function createNetworkContext(
         )
           grant.state = 'revoked';
       }
-      state.audit.push({
+      appendAudit(state, {
         at: Date.now(),
         event: 'configured_policy_activated',
         resource: 'service-v1',
@@ -477,20 +496,49 @@ async function createNetworkContext(
     await workersStarting;
   };
   const currentConfiguration = () =>
-    database.onboardingStore.transaction(
+    readState(
+      database.onboardingStore,
       (state) =>
-        state.deploymentBindings?.['service-v1']?.activeRevision ===
+        getRecord(state, 'deploymentBindings', 'service-v1')?.activeRevision ===
           activeRevision &&
-        state.deploymentBindings?.['service-v1']?.transportRevision ===
-          transportRevision,
+        getRecord(state, 'deploymentBindings', 'service-v1')
+          ?.transportRevision === transportRevision,
     );
 
+  const uniswapXOrders =
+    config.uniswapXOrders && runtimeConfiguration
+      ? new UniswapXOrderService(
+          onboarding!,
+          database,
+          runtimeConfiguration,
+          createOwsSigningBackend(backendOptions),
+          new ApplicationCredentialCipher(
+            resolveSecret(config.runtimeConfiguration!.credentialKey!),
+            database.networkScope,
+          ),
+          {
+            policy: config.uniswapXOrders.policy,
+            pricePolicyAdapter: await loadOrderPricePolicyAdapter(
+              config.uniswapXOrders.pricePolicyAdapter,
+              directory,
+            ),
+            module: config.safeWallet!.module,
+            genesisHash: config.safeWallet!.genesisHash,
+            authorityRevision: activeRevision!,
+            apiKey: () => resolveSecret(config.uniswapXOrders!.apiKey),
+            active: () =>
+              config.activation.enabled && config.uniswapXOrders!.enabled,
+          },
+        )
+      : undefined;
+  await uniswapXOrders?.initialize();
   return {
     network: network.name,
     database,
     execution: { defaults: baselineActivation, sync: syncExecution },
     service,
     safeWallet,
+    uniswapXOrders,
     walletCalls: safeWallet
       ? new WalletCallsService(actions!, safeWallet.walletDriver())
       : undefined,
@@ -518,9 +566,11 @@ async function createNetworkContext(
       }
     },
     start: async () => {
+      uniswapXOrders?.start();
       await syncExecution();
     },
     close: async () => {
+      await uniswapXOrders?.close();
       await safeWallet?.close();
       database.close();
     },

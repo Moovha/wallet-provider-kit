@@ -791,6 +791,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/accounts/{accountId}/uniswapx-orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Submit a bounded UniswapX solver order
+         * @description **Why this exists:** Authorize one exact Base UniswapX V3 swap or recipient-bound transfer with its disclosed output-token fee and net minimum.
+         *
+         *     **Who uses it:** Application developer.
+         *
+         *     **When you need it:** Use only after the provider configures the optional order policy and the owner grants separate order permission.
+         *
+         *     **Before you start:** Use wallet:actions and wallet:sign scopes, current owner identity and explicit orders:authorize consent bound to order_policy_revision. Submit an unsigned canonical quote and retain the UUID idempotency key. Third-party delivery requires bound-transfer policy, fresh consent and an explicit matching recipient. Permit2 allowance uses a separate approved wallet call.
+         *
+         *     **Result and next step:** 202: a durable order receipt. Acceptance is pending settlement. Retry the same key and body; never replace an unknown submission. Read the order until canonical receipt effects establish fill, cancellation or expiry.
+         *
+         *     **Request details:** Submit one bounded Base UniswapX V3 order under an explicit orders:authorize grant. A bound-transfer policy permits an explicit recipient matching the signed output; omitted recipients remain self-swaps. The provider decodes and validates the witness, reviews its net minimum against the configured price policy, journals exact signing and posting, and verifies receipt effects before success. This is not a general signing endpoint. Retry the same idempotency key and body; unknown outcomes reconcile without another POST.
+         */
+        post: operations["submitUniswapXV3Order"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/accounts/{accountId}/uniswapx-orders/{orderId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Recover a UniswapX order result
+         * @description **Why this exists:** Read a retained solver order and reconcile canonical fill effects without submitting another order.
+         *
+         *     **Who uses it:** Application developer.
+         *
+         *     **When you need it:** Use after admission, a timeout or a process restart. Retain order_id independently from wallet call batch IDs.
+         *
+         *     **Before you start:** Use the same application and account with current account-read permission. The provider recovery worker continues observing signed orders after signing permission expires.
+         *
+         *     **Result and next step:** 200: the retained state, disclosed economics and any verified fill. Base safe settlement and chain_finalized are separate. Unknown effects remain held; API labels or a consumed nonce alone never establish success.
+         *
+         *     **Request details:** Read the account-authorized durable order state. Receipt effects at the Base safe block level establish success; API status, absent lookups and consumed nonces alone do not. No signature or raw order is returned.
+         */
+        get: operations["getUniswapXV3Order"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/accounts/{accountId}/wallet/calls/{batchId}/events": {
         parameters: {
             query?: never;
@@ -1351,7 +1411,7 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * See recent transaction requests
+         * Browse transaction requests
          * @description **Why this exists:** List the transaction requests you may read, including their queue stages and retained verified outcomes.
          *
          *     **Who uses it:** Application developer or service operator.
@@ -1360,7 +1420,7 @@ export interface paths {
          *
          *     **Before you start:** Applications need current owner account-read access and execute read scope. Exact configured provider operators can inspect the provider ledger using configuration write scope. No application token can become an operator through scopes alone.
          *
-         *     **Result and next step:** 200: up to 100 readable batch summaries, queue stages and retained finalized RPC-quorum receipts. Unfinalized observations remain pending in this list; applications can refresh individual wallet_getCallsStatus results. Listing never signs, submits or retries.
+         *     **Result and next step:** 200: up to 100 readable batch summaries, queue stages and retained finalized RPC-quorum receipts. Unfinalized observations remain pending in this list; applications can refresh individual wallet_getCallsStatus results. Pass next_cursor as after until it is null, keeping the caller and selected network unchanged. Native pages use limit (default 50, maximum 100) and ascending internal record ID order; filtered pages can be empty and still have a cursor. Pages are not a snapshot. Listing never signs, submits or retries.
          *
          *     **Request details:** Optional runtime configuration control plane. Application proposals and provider publications are configuration records, not wallet grants, signing authority or execution activation. Publications become readable immediately without restarting the service. Immutable historical revisions remain available. Requires the documented scope and configured application or operator identity.
          */
@@ -4748,7 +4808,7 @@ export interface operations {
                     authorization_details: {
                         /** @enum {string} */
                         type: "https://moovha.com/wallet/account-access";
-                        actions: ("account:read" | "operations:request" | "contracts:request" | "members:manage" | "owners:manage")[];
+                        actions: ("account:read" | "operations:request" | "contracts:request" | "orders:authorize" | "members:manage" | "owners:manage")[];
                     }[];
                 };
             };
@@ -4787,7 +4847,7 @@ export interface operations {
                             action_policy_revision?: string;
                         };
                         account_id?: string;
-                        permissions?: ("account:read" | "operations:request" | "contracts:request" | "members:manage" | "owners:manage")[];
+                        permissions?: ("account:read" | "operations:request" | "contracts:request" | "orders:authorize" | "members:manage" | "owners:manage")[];
                         /** Format: date-time */
                         expires_at?: string;
                     };
@@ -5001,6 +5061,65 @@ export interface operations {
                         flow?: "application" | "hosted";
                         policy_revision?: string;
                         action_policy_revision?: string;
+                        order_policy_revision?: string;
+                        order_authorization?: {
+                            /** @enum {unknown} */
+                            profile: "uniswapx-v3-order-v1";
+                            maximumValiditySeconds: number;
+                            reactorCodeHash: string;
+                            cosigner: string;
+                            fee: {
+                                basisPoints: number;
+                                recipient: string;
+                            };
+                            routes: {
+                                tokenIn: {
+                                    address: string;
+                                    codeHash: string;
+                                    implementation?: {
+                                        address: string;
+                                        codeHash: string;
+                                        /** @enum {unknown} */
+                                        storageLayout?: "eip1967" | "zeppelinos";
+                                    };
+                                };
+                                tokenOut: {
+                                    address: string;
+                                    codeHash: string;
+                                    implementation?: {
+                                        address: string;
+                                        codeHash: string;
+                                        /** @enum {unknown} */
+                                        storageLayout?: "eip1967" | "zeppelinos";
+                                    };
+                                };
+                                maximumInputUnits: string;
+                                maximumLifetimeInputUnits: string;
+                            }[];
+                            pricePolicy: {
+                                /** @enum {unknown} */
+                                profile: "solver-twap-benchmark-v1";
+                                pool: {
+                                    address: string;
+                                    codeHash: string;
+                                };
+                                /** @enum {unknown} */
+                                lookbackSeconds: 1800;
+                                /** @enum {unknown} */
+                                maximumLossBps: 200;
+                                /** @enum {unknown} */
+                                maximumSpotDivergenceBps: 100;
+                            } | ({
+                                profile: string;
+                            } & {
+                                [key: string]: unknown;
+                            });
+                            /**
+                             * @description Defaults to self. bound-transfer permits an explicit recipient matching the signed output and requires fresh order consent.
+                             * @enum {unknown}
+                             */
+                            recipientPolicy?: "self" | "bound-transfer";
+                        };
                         contract_call_terms?: {
                             policy: {
                                 /** @enum {unknown} */
@@ -5528,7 +5647,7 @@ export interface operations {
                                 kind: "personal" | "shared";
                             };
                             grant_id: string;
-                            permissions: ("account:read" | "operations:request" | "contracts:request" | "members:manage" | "owners:manage")[];
+                            permissions: ("account:read" | "operations:request" | "contracts:request" | "orders:authorize" | "members:manage" | "owners:manage")[];
                             expires_at: string;
                             /** @enum {unknown} */
                             role: "owner" | "member";
@@ -6368,7 +6487,7 @@ export interface operations {
                                     action_policy_revision?: string;
                                 };
                                 account_id?: string;
-                                permissions?: ("account:read" | "operations:request" | "contracts:request" | "members:manage" | "owners:manage")[];
+                                permissions?: ("account:read" | "operations:request" | "contracts:request" | "orders:authorize" | "members:manage" | "owners:manage")[];
                                 /** Format: date-time */
                                 expires_at?: string;
                             };
@@ -6595,7 +6714,7 @@ export interface operations {
                             action_policy_revision?: string;
                         };
                         account_id?: string;
-                        permissions?: ("account:read" | "operations:request" | "contracts:request" | "members:manage" | "owners:manage")[];
+                        permissions?: ("account:read" | "operations:request" | "contracts:request" | "orders:authorize" | "members:manage" | "owners:manage")[];
                         /** Format: date-time */
                         expires_at?: string;
                     };
@@ -6829,7 +6948,7 @@ export interface operations {
                             action_policy_revision?: string;
                         };
                         account_id?: string;
-                        permissions?: ("account:read" | "operations:request" | "contracts:request" | "members:manage" | "owners:manage")[];
+                        permissions?: ("account:read" | "operations:request" | "contracts:request" | "orders:authorize" | "members:manage" | "owners:manage")[];
                         /** Format: date-time */
                         expires_at?: string;
                     };
@@ -7155,6 +7274,540 @@ export interface operations {
                 };
                 content: {
                     "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+        };
+    };
+    submitUniswapXV3Order: {
+        parameters: {
+            query?: never;
+            header: {
+                "idempotency-key": string;
+                /** @description Choose a configured network. Omit to use the default; existing wallet, request and grant IDs select their stored network automatically. A conflicting selection is rejected. */
+                "wallet-network"?: "base" | "base-sepolia" | "ethereum" | "ethereum-sepolia";
+                /** @description Select this person’s current grant for this wallet. Required for shared wallets; the selector alone grants no authority. */
+                "wallet-grant-id"?: string;
+            };
+            path: {
+                accountId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    recipient?: string;
+                    quote: {
+                        encodedOrder: string;
+                        orderId: string;
+                        orderInfo: {
+                            /** @enum {unknown} */
+                            chainId: 8453;
+                        };
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description Default Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        order_id: string;
+                        order_hash: string;
+                        account_id: string;
+                        /** @enum {unknown} */
+                        status: "authorizing" | "prepared" | "requires_approval" | "signed" | "open" | "unknown" | "succeeded" | "expired" | "cancelled" | "needs_review";
+                        chain_finalized?: boolean;
+                        cancellation?: {
+                            transactionHash: string;
+                            blockHash: string;
+                            blockNumber: number;
+                        };
+                        cancellation_calls?: {
+                            to: string;
+                            /** @enum {unknown} */
+                            value: "0x0";
+                            data: string;
+                        }[];
+                        /** @enum {unknown} */
+                        code?: "signing_pending" | "post_unknown" | "chain_unavailable" | "unexpected_effect";
+                        review: {
+                            /** @enum {unknown} */
+                            profile: "uniswapx-v3-order-v1";
+                            swapper: string;
+                            recipient?: string;
+                            nonce: string;
+                            tokenIn: string;
+                            tokenOut: string;
+                            amountInUnits: string;
+                            minimumAmountOutUnits: string;
+                            deadline: number;
+                            witnessHash: string;
+                            permit2Digest: string;
+                            safeMessageDigest: string;
+                            cosignerDigest: string;
+                            fee: {
+                                /** @enum {unknown} */
+                                policy: "uniswapx_output_fee_v1";
+                                token: string;
+                                recipient: string;
+                                basisPoints: number;
+                                minimumAmountUnits: string;
+                                quotedStartAmountUnits: string;
+                            };
+                        };
+                        approval_calls?: {
+                            to: string;
+                            /** @enum {unknown} */
+                            value: "0x0";
+                            data: string;
+                        }[];
+                        fill?: {
+                            transactionHash: string;
+                            blockHash: string;
+                            blockNumber: number;
+                            /** @enum {unknown} */
+                            finality: "base-safe";
+                            safeBlockHash: string;
+                            inputAmountUnits: string;
+                            outputAmountUnits: string;
+                            feeAmountUnits: string;
+                        };
+                    };
+                };
+            };
+            /** @description Default Response */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+        };
+    };
+    getUniswapXV3Order: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Choose a configured network. Omit to use the default; existing wallet, request and grant IDs select their stored network automatically. A conflicting selection is rejected. */
+                "wallet-network"?: "base" | "base-sepolia" | "ethereum" | "ethereum-sepolia";
+                /** @description Select this person’s current grant for this wallet. Required for shared wallets; the selector alone grants no authority. */
+                "wallet-grant-id"?: string;
+            };
+            path: {
+                accountId: string;
+                orderId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        order_id: string;
+                        order_hash: string;
+                        account_id: string;
+                        /** @enum {unknown} */
+                        status: "authorizing" | "prepared" | "requires_approval" | "signed" | "open" | "unknown" | "succeeded" | "expired" | "cancelled" | "needs_review";
+                        chain_finalized?: boolean;
+                        cancellation?: {
+                            transactionHash: string;
+                            blockHash: string;
+                            blockNumber: number;
+                        };
+                        cancellation_calls?: {
+                            to: string;
+                            /** @enum {unknown} */
+                            value: "0x0";
+                            data: string;
+                        }[];
+                        /** @enum {unknown} */
+                        code?: "signing_pending" | "post_unknown" | "chain_unavailable" | "unexpected_effect";
+                        review: {
+                            /** @enum {unknown} */
+                            profile: "uniswapx-v3-order-v1";
+                            swapper: string;
+                            recipient?: string;
+                            nonce: string;
+                            tokenIn: string;
+                            tokenOut: string;
+                            amountInUnits: string;
+                            minimumAmountOutUnits: string;
+                            deadline: number;
+                            witnessHash: string;
+                            permit2Digest: string;
+                            safeMessageDigest: string;
+                            cosignerDigest: string;
+                            fee: {
+                                /** @enum {unknown} */
+                                policy: "uniswapx_output_fee_v1";
+                                token: string;
+                                recipient: string;
+                                basisPoints: number;
+                                minimumAmountUnits: string;
+                                quotedStartAmountUnits: string;
+                            };
+                        };
+                        approval_calls?: {
+                            to: string;
+                            /** @enum {unknown} */
+                            value: "0x0";
+                            data: string;
+                        }[];
+                        fill?: {
+                            transactionHash: string;
+                            blockHash: string;
+                            blockNumber: number;
+                            /** @enum {unknown} */
+                            finality: "base-safe";
+                            safeBlockHash: string;
+                            inputAmountUnits: string;
+                            outputAmountUnits: string;
+                            feeAmountUnits: string;
+                        };
+                    };
+                };
+            };
+            /** @description Default Response */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
                         type: string;
                         title: string;
                         status: number;
@@ -12133,7 +12786,10 @@ export interface operations {
     };
     listWalletBatches: {
         parameters: {
-            query?: never;
+            query?: {
+                after?: string;
+                limit?: number;
+            };
             header?: {
                 /** @description Choose a configured network. Omit to use the default; existing wallet, request and grant IDs select their stored network automatically. A conflicting selection is rejected. */
                 "wallet-network"?: "base" | "base-sepolia" | "ethereum" | "ethereum-sepolia";
@@ -12151,6 +12807,7 @@ export interface operations {
                 content: {
                     "application/json": {
                         truncated: boolean;
+                        next_cursor?: string | null;
                         batches: {
                             id: string;
                             account_id: string;
@@ -18179,7 +18836,7 @@ export interface operations {
                         matchingFields: string[];
                         agreement: string;
                     } | null;
-                    permissions?: ("account:read" | "contracts:request" | "operations:request" | "members:manage" | "owners:manage")[];
+                    permissions?: ("account:read" | "contracts:request" | "orders:authorize" | "operations:request" | "members:manage" | "owners:manage")[];
                 };
             };
         };
