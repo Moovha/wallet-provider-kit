@@ -33,10 +33,13 @@ db.close();
 await import('/app/dist/deployment/provider.js');
 const vaultPath = mkdtempSync('/tmp/wpk-container-');
 try {
-  await owsCommand({ command: 'create', name: 'offline-fixture', secret: randomUUID(), vaultPath });
-  const wallets = await owsCommand({ command: 'list', vaultPath });
-  assert.equal(wallets.length, 1);
-  assert.equal(wallets[0].name, 'offline-fixture');
+  const walletName = 'moovha-' + randomUUID();
+  await owsCommand({ command: 'prepare', vaultPath });
+  await owsCommand({ command: 'create', name: walletName, secret: randomUUID(), vaultPath });
+  const wallet = await owsCommand({ command: 'find', vaultPath, walletName });
+  assert.equal(wallet.name, walletName);
+  assert.equal(wallet.accounts.length, 1);
+  assert.equal(await owsCommand({ command: 'find', vaultPath, walletName: 'moovha-' + randomUUID() }), null);
 } finally {
   rmSync(vaultPath, { recursive: true, force: true });
 }
