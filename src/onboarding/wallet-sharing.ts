@@ -8,7 +8,10 @@ import type {
   ResolvedPolicy,
 } from './types.js';
 import { application, deny, fingerprint } from './policy.js';
-import { checkApplicationAssertion } from './application-access.js';
+import {
+  checkApplicationAssertion,
+  matchesApplicationIdentityEvidence,
+} from './application-access.js';
 
 export const documentMatchFields = [
   'identity_number',
@@ -85,13 +88,13 @@ function sourceEvidence(
     source.acceptance.evidenceHash !== account.evidenceHash ||
     !Number.isFinite(verifiedAt) ||
     verifiedAt > Date.now() ||
-    fingerprint([
-      source.caller.issuer,
-      source.caller.clientId,
-      evidence?.identity,
-      sourceApp?.assertionTrust,
-    ]) !== account.evidenceHash ||
     !evidence ||
+    !matchesApplicationIdentityEvidence(
+      source.caller,
+      evidence.identity,
+      sourceApp?.assertionTrust,
+      account.evidenceHash,
+    ) ||
     source.acceptance.expiresAt <= Date.now() ||
     Date.parse(evidence.identity.verified_at) +
       policy.identity.maxAgeDays * 86400000 <=
@@ -224,7 +227,13 @@ export function validateSharedAccess(
     user.consent.sharing_revision !== sharing.revision ||
     user.consent.source_application_id !== sharing.sourceApplicationId ||
     asserted.owner !== sharing.subjectOwner ||
-    asserted.evidenceHash !== request.acceptance?.evidenceHash ||
+    !request.acceptance ||
+    !matchesApplicationIdentityEvidence(
+      request.caller,
+      user.identity,
+      application(policy, { ...request.caller, scopes: [] }).assertionTrust,
+      request.acceptance.evidenceHash,
+    ) ||
     request.accountId !== source.accountId ||
     request.owner !== account.owner ||
     account.evidenceHash !== sharing.evidenceHash ||

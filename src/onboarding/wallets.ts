@@ -1,3 +1,4 @@
+import { matchesApplicationIdentityEvidence } from './application-access.js';
 import { matchingRecords, putRecord, getRecord } from './records.js';
 import type { VerifiedPrincipal } from '../domain/principal.js';
 import type {
@@ -59,12 +60,12 @@ export function resolveWalletInput(
           user &&
           request.acceptance?.source === 'application_attestation' &&
           request.acceptance.expiresAt > Date.now() &&
-          fingerprint([
-            principal.issuer,
-            principal.clientId,
+          matchesApplicationIdentityEvidence(
+            principal,
             user.identity,
             app.assertionTrust,
-          ]) === request.acceptance.evidenceHash
+            request.acceptance.evidenceHash,
+          )
         ) {
           profile = {
             id,
@@ -83,12 +84,12 @@ export function resolveWalletInput(
       !profile ||
       profile.revision !== policy.revision ||
       profile.acceptedUntil <= Date.now() ||
-      fingerprint([
-        principal.issuer,
-        principal.clientId,
+      !matchesApplicationIdentityEvidence(
+        principal,
         profile.identity,
         app.assertionTrust,
-      ]) !== profile.evidenceHash
+        profile.evidenceHash,
+      )
     )
       deny();
     result.user.identity = structuredClone(profile.identity);
@@ -169,12 +170,12 @@ export function validateWalletMember(
     request.userOwner !== membership.personId ||
     profile.revision !== policy.revision ||
     profile.acceptedUntil <= Date.now() ||
-    fingerprint([
-      request.caller.issuer,
-      request.caller.clientId,
+    !matchesApplicationIdentityEvidence(
+      request.caller,
       profile.identity,
       app.assertionTrust,
-    ]) !== profile.evidenceHash ||
+      profile.evidenceHash,
+    ) ||
     member.state !== 'active' ||
     member.revision !== membership.revision ||
     member.issuer !== request.caller.issuer ||

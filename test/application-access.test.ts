@@ -685,3 +685,53 @@ it('renews operator-managed access across policy changes and retains the origina
     changed.renewManaged(ctx, first.request_id, input.user!.id),
   ).rejects.toThrow();
 });
+
+it.each([undefined, false, true])(
+  'retains identity evidence with renewal metadata %s when management is enabled',
+  async (legacyFlag) => {
+    const f = await fixture('a'.repeat(64));
+    const current = structuredClone(policy.applications[0]);
+    const service = new OnboardingService(
+      { ...policy, applications: [] },
+      f.store,
+      [],
+      undefined,
+      'a'.repeat(64),
+      false,
+      false,
+      { list: () => [current], current: () => current },
+    );
+    const input = f.input();
+    input.user!.consent.policy_revision = service.policy.revision;
+    input.user!.consent.action_policy_revision = 'a'.repeat(64);
+    input.authorization_details[0].actions = [
+      'account:read',
+      'contracts:request',
+    ];
+    const original = await service.request(context(), input);
+    await f.store.transaction((state) => {
+      const profile = Object.values(state.verifiedUsers!)[0];
+      profile.evidenceHash = fingerprint([
+        context().principal.issuer,
+        context().principal.clientId,
+        profile.identity,
+        {
+          agreement: current.assertionTrust!.agreement,
+          ...(legacyFlag === undefined ? {} : { managedRenewal: legacyFlag }),
+        },
+      ]);
+    });
+    current.assertionTrust!.managedRenewal = true;
+    const renewed = await service.renewManaged(
+      context(),
+      original.request_id,
+      input.user!.id,
+    );
+    expect(renewed.status).toBe('granted');
+    expect(renewed.account_id).toBe(original.account_id);
+    current.assertionTrust!.agreement = 'different-identity-agreement';
+    await expect(
+      service.renewManaged(context(), renewed.request_id, input.user!.id),
+    ).rejects.toThrow();
+  },
+);

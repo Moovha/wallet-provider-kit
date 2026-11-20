@@ -271,6 +271,9 @@ trust agreement must assign the application authority to manage access for the
 personal wallets it created. The access-policy response exposes
 `managed_renewal_available` so the application can select this workflow.
 
+Changing the renewal mode preserves identity evidence bound to the same reviewed
+identity agreement. Changing that agreement still invalidates the evidence.
+
 Send `POST /v1/access-requests/{requestId}/renew` with `user_id`, the original
 request ID and a UUID `Idempotency-Key`. The provider derives the account,
 permissions and withdrawal reference from the original request. It checks the
