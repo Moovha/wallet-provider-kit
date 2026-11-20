@@ -1,3 +1,10 @@
+import {
+  matchingRecords,
+  getRecord,
+  putRecord,
+  appendAudit,
+  removeRecord,
+} from './records.js';
 import { randomUUID } from 'node:crypto';
 import type {
   AuthorityContext,
@@ -27,7 +34,7 @@ export function creatorAccount(
   accountId: string,
 ) {
   const app = application(policy, principal);
-  const account = state.accounts[accountId];
+  const account = getRecord(state, 'accounts', accountId);
   if (
     policy.access.mode !== 'application' ||
     !app.assertionTrust ||
@@ -63,7 +70,7 @@ export function kycReceipt(
   const account = creatorAccount(policy, state, principal, accountId);
   const fields =
     account.kycDraft?.fields ??
-    state.verifiedUsers?.[account.owner]?.identity.fields ??
+    getRecord(state, 'verifiedUsers', account.owner)?.identity.fields ??
     {};
   return {
     account_id: accountId,
@@ -111,12 +118,12 @@ export function createDeferredAccount(
     context.idempotencyKey,
   ]);
   const hash = fingerprint(input);
-  const previous = state.idempotency[key];
+  const previous = getRecord(state, 'idempotency', key);
   if (previous && previous.hash !== hash)
     throw new WalletProviderError('wallet_attempt_conflict');
   const existing = previous
-    ? state.accounts[previous.id]
-    : Object.values(state.accounts).find(
+    ? getRecord(state, 'accounts', previous.id)
+    : matchingRecords(state, 'accounts', 'owner', owner).find(
         (a) =>
           a.owner === owner &&
           walletDescription(a).reference === wallet.reference,
@@ -125,7 +132,7 @@ export function createDeferredAccount(
     creatorAccount(policy, state, context.principal, existing.id);
     if (fingerprint(walletDescription(existing)) !== fingerprint(wallet))
       throw new WalletProviderError('wallet_attempt_conflict');
-    state.idempotency[key] = { hash, id: existing.id };
+    putRecord(state, 'idempotency', key, { hash, id: existing.id });
     return {
       account_id: existing.id,
       status: 'verification_required' as const,
@@ -133,11 +140,13 @@ export function createDeferredAccount(
     };
   }
   if (
-    Object.values(state.accounts).filter((a) => a.owner === owner).length >= 100
+    matchingRecords(state, 'accounts', 'owner', owner).filter(
+      (a) => a.owner === owner,
+    ).length >= 100
   )
     deny();
   const id = randomUUID();
-  state.accounts[id] = {
+  putRecord(state, 'accounts', id, {
     id,
     owner,
     creatorApplication: {
@@ -151,9 +160,9 @@ export function createDeferredAccount(
     evidenceHash: '',
     deferredCreation: { revision: policy.revision },
     kycDraft: { revision: 0, fields: {} },
-  };
-  state.idempotency[key] = { hash, id };
-  state.audit.push({
+  });
+  putRecord(state, 'idempotency', key, { hash, id });
+  appendAudit(state, {
     at: Date.now(),
     event: 'account_created_without_kyc',
     resource: id,
@@ -202,7 +211,7 @@ export function patchAccountKyc(
     context.idempotencyKey,
   ]);
   const hash = fingerprint(input);
-  const previous = state.managementCommands?.[key];
+  const previous = getRecord(state, 'managementCommands', key);
   if (previous) {
     if (previous.hash !== hash)
       throw new WalletProviderError('wallet_attempt_conflict');
@@ -212,7 +221,7 @@ export function patchAccountKyc(
     throw new WalletProviderError('wallet_attempt_conflict');
   const fields = {
     ...(account.kycDraft?.fields ??
-      state.verifiedUsers?.[account.owner]?.identity.fields ??
+      getRecord(state, 'verifiedUsers', account.owner)?.identity.fields ??
       {}),
   };
   for (const [key, value] of Object.entries(input.fields)) {
@@ -221,12 +230,22 @@ export function patchAccountKyc(
   }
   account.kycDraft = { revision: input.expected_revision + 1, fields };
   // Changed identity facts require new evidence and fresh consent across the owner's wallets.
-  if (state.verifiedUsers) delete state.verifiedUsers[account.owner];
-  for (const owned of Object.values(state.accounts))
+  removeRecord(state, 'verifiedUsers', account.owner);
+  for (const owned of matchingRecords(
+    state,
+    'accounts',
+    'owner',
+    account.owner,
+  ))
     if (owned.owner === account.owner) owned.acceptedUntil = 0;
-  for (const grant of Object.values(state.grants))
+  for (const grant of matchingRecords(state, 'grants', 'owner', account.owner))
     if (grant.owner === account.owner) grant.state = 'revoked';
-  for (const request of Object.values(state.requests))
+  for (const request of matchingRecords(
+    state,
+    'requests',
+    'owner',
+    account.owner,
+  ))
     if (request.owner === account.owner) request.denied = true;
   const result = kycReceipt(policy, state, context.principal, accountId);
   (state.managementCommands ??= {})[key] = {
@@ -234,7 +253,7 @@ export function patchAccountKyc(
     result: structuredClone(result),
     at: Date.now(),
   };
-  state.audit.push({
+  appendAudit(state, {
     at: Date.now(),
     event: 'account_kyc_updated',
     resource: accountId,

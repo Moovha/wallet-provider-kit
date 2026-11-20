@@ -1,3 +1,4 @@
+import { readState } from './record-pages.js';
 import { EmbeddedWalletService } from '../domain/embedded-wallet.js';
 import { WalletProviderError } from '../domain/signing.js';
 import type { WalletSigningProvider } from '../domain/signing.js';
@@ -104,6 +105,6 @@ export async function createOnboardingProvider(
       reviewers: [...(config.reviewers ?? [])],
     },
     ready: async () =>
-      (await config.ready()) && (await store.transaction(() => true)),
+      (await config.ready()) && (await readState(store, () => true)),
   });
 }

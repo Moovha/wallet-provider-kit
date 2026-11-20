@@ -1,6 +1,44 @@
 import type { VerifiedPrincipal } from '../domain/principal.js';
-import type { ApplicationUserAssertion, ResolvedPolicy } from './types.js';
+import type {
+  ApplicationUserAssertion,
+  ApplicationPolicy,
+  ResolvedPolicy,
+} from './types.js';
 import { application, deny, fingerprint, invalid, text } from './policy.js';
+
+/** Identity evidence remains bound to the identity agreement across renewal-mode changes. */
+export function applicationIdentityEvidenceHash(
+  principal: Pick<VerifiedPrincipal, 'issuer' | 'clientId'>,
+  identity: ApplicationUserAssertion['identity'],
+  trust: ApplicationPolicy['assertionTrust'],
+): string {
+  if (!trust) deny();
+  return fingerprint([
+    principal.issuer,
+    principal.clientId,
+    identity,
+    { agreement: trust.agreement },
+  ]);
+}
+
+/** Read evidence saved before renewal authority was separated from identity attestation. */
+export function matchesApplicationIdentityEvidence(
+  principal: Pick<VerifiedPrincipal, 'issuer' | 'clientId'>,
+  identity: ApplicationUserAssertion['identity'],
+  trust: ApplicationPolicy['assertionTrust'],
+  evidenceHash: string,
+): boolean {
+  if (!trust) return false;
+  return [
+    { agreement: trust.agreement },
+    { agreement: trust.agreement, managedRenewal: false },
+    { agreement: trust.agreement, managedRenewal: true },
+  ].some(
+    (terms) =>
+      fingerprint([principal.issuer, principal.clientId, identity, terms]) ===
+      evidenceHash,
+  );
+}
 
 /** Omitted labels bind to the current agreement; saved assertions retain complete authority metadata. */
 export function resolveApplicationAssertion(
@@ -150,11 +188,10 @@ export function checkApplicationAssertion(
     acceptedUntil,
     consentAt,
     expiresAt: Math.min(acceptedUntil, consentExpiry),
-    evidenceHash: fingerprint([
-      principal.issuer,
-      principal.clientId,
+    evidenceHash: applicationIdentityEvidenceHash(
+      principal,
       user.identity,
       app.assertionTrust,
-    ]),
+    ),
   };
 }

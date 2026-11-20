@@ -248,25 +248,31 @@ it('retains current estimated refill fees before calculating percentage funding 
     },
     domain: { entryPoint: '0x' + '11'.repeat(20) },
     transaction: async (
-      work: (state: { safeWalletAccounts: Record<string, unknown> }) => unknown,
+      work: (
+        registry: object,
+        state: { safeWalletAccounts: Record<string, unknown> },
+      ) => unknown,
     ) =>
-      work({
-        safeWalletAccounts: pendingWallet
-          ? {
-              test: {
-                applicationId: 'application',
-                accountId: 'test',
-                status: 'prepared',
-                recovery: {
-                  factory: { address: '0x' + '33'.repeat(20) },
-                  singleton: { address: '0x' + '44'.repeat(20) },
-                  initializer: '0x',
-                  saltNonce: '1',
+      work(
+        {},
+        {
+          safeWalletAccounts: pendingWallet
+            ? {
+                test: {
+                  applicationId: 'application',
+                  accountId: 'test',
+                  status: 'prepared',
+                  recovery: {
+                    factory: { address: '0x' + '33'.repeat(20) },
+                    singleton: { address: '0x' + '44'.repeat(20) },
+                    initializer: '0x',
+                    saltNonce: '1',
+                  },
                 },
-              },
-            }
-          : {},
-      }),
+              }
+            : {},
+        },
+      ),
     assertRecoveryRecipe: vi.fn(),
     fundingObservations: new Map(),
     recoverSetup: async () => {},

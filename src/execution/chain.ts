@@ -21,6 +21,8 @@ const rpcReadMethods = [
 type RpcMethod = (typeof rpcReadMethods)[number];
 class RpcThrottled extends Error {}
 class RpcReadRetryable extends Error {}
+class RpcLogRangeLimited extends Error {}
+const logPageSizes = new WeakMap<RpcCapacity, bigint>();
 export class RpcStateOverrideUnsupported extends WalletProviderError {
   constructor() {
     super('wallet_provider_unavailable', 'not_dispatched');
@@ -135,6 +137,19 @@ export class RpcReader {
     method: RpcMethod,
     params: unknown[],
   ): Promise<unknown> {
+    if (method === 'eth_getLogs' && logPageSizes.has(this.capacity)) {
+      const filter = params[0];
+      if (
+        record(filter) &&
+        typeof filter.fromBlock === 'string' &&
+        typeof filter.toBlock === 'string' &&
+        /^0x[0-9a-f]+$/i.test(filter.fromBlock) &&
+        /^0x[0-9a-f]+$/i.test(filter.toBlock) &&
+        BigInt(filter.toBlock) - BigInt(filter.fromBlock) + 1n >
+          logPageSizes.get(this.capacity)!
+      )
+        return this.readLogPages(params);
+    }
     for (let attempt = 0; attempt < 3; attempt++) {
       const delay = this.capacity.retryAfter - Date.now();
       if (delay > 0 && this.retryMode === 'endpoint-failover') unavailable();
@@ -144,6 +159,10 @@ export class RpcReader {
       try {
         return await this.read(method, params);
       } catch (error) {
+        if (error instanceof RpcLogRangeLimited) {
+          logPageSizes.set(this.capacity, 100n);
+          return this.readLogPages(params);
+        }
         if (error instanceof RpcStateOverrideUnsupported) throw error;
         if (this.retryMode === 'endpoint-failover') {
           if (error instanceof RpcThrottled) {
@@ -179,6 +198,40 @@ export class RpcReader {
       }
     }
     return unavailable();
+  }
+  /** Exhaust the original explicit range; a failed page never returns partial absence evidence. */
+  private async readLogPages(params: unknown[]): Promise<unknown[]> {
+    const filter = params[0];
+    if (
+      params.length !== 1 ||
+      !record(filter) ||
+      'blockHash' in filter ||
+      typeof filter.fromBlock !== 'string' ||
+      typeof filter.toBlock !== 'string' ||
+      !/^0x[0-9a-f]+$/i.test(filter.fromBlock) ||
+      !/^0x[0-9a-f]+$/i.test(filter.toBlock)
+    )
+      unavailable();
+    const from = BigInt(filter.fromBlock),
+      to = BigInt(filter.toBlock);
+    const span = to - from + 1n;
+    const pageSize = logPageSizes.get(this.capacity) ?? 100n;
+    if (span <= pageSize || span > 32000n) unavailable();
+    const logs: unknown[] = [];
+    for (let start = from; start <= to; start += pageSize) {
+      const end = start + pageSize - 1n;
+      const page = await this.readWithRetry('eth_getLogs', [
+        {
+          ...filter,
+          fromBlock: '0x' + start.toString(16),
+          toBlock: '0x' + (end < to ? end : to).toString(16),
+        },
+      ]);
+      if (!Array.isArray(page) || logs.length + page.length > 8192)
+        unavailable();
+      logs.push(...page);
+    }
+    return logs;
   }
   private async read(method: RpcMethod, params: unknown[]): Promise<unknown> {
     return this.capacity.run(() => this.readRequest(method, params));
@@ -257,6 +310,16 @@ export class RpcReader {
         this.capacity.unsupportedFor('state-overrides');
         throw new RpcStateOverrideUnsupported();
       }
+      if (
+        method === 'eth_getLogs' &&
+        envelope.jsonrpc === '2.0' &&
+        envelope.id === 1 &&
+        record(envelope.error) &&
+        envelope.error.code === 35 &&
+        typeof envelope.error.message === 'string' &&
+        /block.*range|range.*block/i.test(envelope.error.message)
+      )
+        throw new RpcLogRangeLimited();
       if (!response.ok) unavailable();
       if (
         method === 'eth_getBlockByNumber' &&
@@ -309,7 +372,8 @@ export class RpcReader {
       if (
         error instanceof RpcThrottled ||
         error instanceof RpcReadRetryable ||
-        error instanceof RpcStateOverrideUnsupported
+        error instanceof RpcStateOverrideUnsupported ||
+        error instanceof RpcLogRangeLimited
       )
         throw error;
       if (!(error instanceof WalletProviderError))

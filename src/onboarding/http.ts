@@ -68,6 +68,15 @@ export const accessReceiptSchema = {
   additionalProperties: false,
   required: ['request_id', 'status'],
   properties: {
+    managed_authorization: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['sourceRequestId', 'agreement'],
+      properties: {
+        sourceRequestId: uuidSchema,
+        agreement: { type: 'string' },
+      },
+    },
     wallet: walletDescriptionSchema,
     membership_revision: { type: 'integer', minimum: 1 },
     request_id: uuidSchema,
@@ -142,6 +151,8 @@ function escape(value: unknown): string {
   );
 }
 const permissionLabels = {
+  'orders:authorize':
+    'Authorize bounded UniswapX swap orders, including their input, minimum output, fee and expiry.',
   'account:read': 'Read your wallet address and account status',
   'operations:request':
     'Request wallet operations, subject to your provider’s approvals',
@@ -580,11 +591,16 @@ export async function registerOnboardingRoutes(
               required_fields: { type: 'array', items: { type: 'string' } },
               maximum_field_characters: { type: 'integer' },
               owner_consent_required: { type: 'boolean', enum: [true] },
+              managed_renewal_available: { type: 'boolean' },
               provider_review_required: { type: 'boolean' },
               provider_login_required: { type: 'boolean' },
               flow: { type: 'string', enum: ['application', 'hosted'] },
               policy_revision: { type: 'string' },
               action_policy_revision: { type: 'string' },
+              order_policy_revision: { type: 'string' },
+              order_authorization:
+                providerConfigurationSchema.properties.uniswapXOrders.properties
+                  .policy,
               contract_call_terms: callTermsSchema,
               runtime_contract_terms: runtimeSnapshotSchema,
               max_identity_age_days: { type: 'integer' },
@@ -899,6 +915,29 @@ export async function registerOnboardingRoutes(
       service(request).submitRecords(
         await context(request, 'wallet:access'),
         request.body.records,
+      ),
+  );
+  app.post<{ Params: { requestId: string }; Body: { user_id: string } }>(
+    '/v1/access-requests/:requestId/renew',
+    {
+      schema: schema(
+        'renewManagedAccountAccess',
+        {
+          type: 'object',
+          additionalProperties: false,
+          required: ['user_id'],
+          properties: {
+            user_id: { type: 'string', minLength: 1, maxLength: 256 },
+          },
+        },
+        requestParams,
+      ),
+    },
+    async (request) =>
+      service(request).renewManaged(
+        await context(request, 'wallet:access'),
+        request.params.requestId,
+        request.body.user_id,
       ),
   );
   app.get<{ Params: { requestId: string } }>(
@@ -1235,14 +1274,51 @@ export async function registerOnboardingRoutes(
     );
     ui.get(
       '/onboarding/review',
-      { schema: { hide: true } },
+      {
+        schema: {
+          hide: true,
+          querystring: {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              reviews_after: { type: 'string', minLength: 1, maxLength: 256 },
+              accounts_after: { type: 'string', minLength: 1, maxLength: 256 },
+            },
+          },
+        },
+      },
       async (request, reply) => {
         const current = await session(request, reply, 'review');
         if (!current) return;
-        const pending = await service(request).reviews(staff(current.identity));
-        const accounts = await service(request).providerAccounts(
+        const query = request.query as {
+          reviews_after?: string;
+          accounts_after?: string;
+        };
+        const pendingPage = await service(request).reviewPage(
           staff(current.identity),
+          { after: query.reviews_after },
         );
+        const accountPage = await service(request).providerAccountPage(
+          staff(current.identity),
+          { after: query.accounts_after },
+        );
+        const pending = pendingPage.items;
+        const accounts = accountPage.items;
+        const continuation = (
+          field: string,
+          cursor: string | null,
+          label: string,
+        ) => {
+          if (!cursor) return '';
+          const parameters = new URLSearchParams(
+            Object.entries(query).filter(
+              (entry): entry is [string, string] =>
+                typeof entry[1] === 'string',
+            ),
+          );
+          parameters.set(field, cursor);
+          return `<p><a href="/onboarding/review?${escape(parameters.toString())}">${label}</a></p>`;
+        };
         return html(
           reply,
           'Help people connect their wallets',
@@ -1285,8 +1361,8 @@ ${
 </article>`,
                   )
                   .join('')
-              : '<p>No requests need review.</p>'
-          }<h2>Wallet accounts</h2>${accounts
+              : '<p>No requests need review on this page.</p>'
+          }${continuation('reviews_after', pendingPage.next_cursor, 'Next review page')}<h2>Wallet accounts</h2>${accounts
             .map(
               (a) => `<article>
 <code>${escape(a.id)}</code>
@@ -1298,7 +1374,9 @@ ${
 </form>
 </article>`,
             )
-            .join('')}`,
+            .join(
+              '',
+            )}${continuation('accounts_after', accountPage.next_cursor, 'Next wallet page')}`,
         );
       },
     );

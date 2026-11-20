@@ -30,7 +30,7 @@ async function safeOnlyFixture() {
   await f.db.onboardingStore.transaction((s) => {
     s.accounts[f.input.account_id].address = userAddress;
     const r = s.deploymentBindings!['service-v1'].runtimeConfiguration!;
-    r.safeWalletAccounts = {
+    s.safeWalletAccounts = {
       [f.input.account_id]: {
         applicationId,
         accountId: f.input.account_id,
@@ -157,10 +157,7 @@ it('signs through the private Safe owner while retaining the logical user grant 
 it('hides the internal signer and refuses execution until the Safe is ready', async () => {
   const { f, actions, service } = await safeOnlyFixture();
   await f.db.onboardingStore.transaction((s) => {
-    s.deploymentBindings![
-      'service-v1'
-    ].runtimeConfiguration!.safeWalletAccounts![f.input.account_id].status =
-      'prepared';
+    s.safeWalletAccounts![f.input.account_id].status = 'prepared';
   });
   const onboarding = new OnboardingService(
     (({ revision: _revision, ...policy }) => policy)(f.onboarding.policy),

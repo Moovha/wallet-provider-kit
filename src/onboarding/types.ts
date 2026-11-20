@@ -11,6 +11,7 @@ export const permissions = [
   'account:read',
   'operations:request',
   'contracts:request',
+  'orders:authorize',
   'members:manage',
   'owners:manage',
 ] as const;
@@ -93,7 +94,7 @@ export interface ApplicationPolicy {
   name: string;
   enabled?: boolean;
   /** Explicit permission to attest user identity and consent; an OAuth scope alone is insufficient. */
-  assertionTrust?: { agreement: string };
+  assertionTrust?: { agreement: string; managedRenewal?: boolean };
   walletSharing?: WalletSharingPolicy;
   permissions?: Permission[];
   /** Contractually agreed reimbursement, not a payment instruction or vendor price quote. */
@@ -183,6 +184,7 @@ export interface WalletMember {
   sourceSharing?: { applicationId: string; revision: string };
 }
 export interface AccessRequest {
+  managedAuthorization?: { sourceRequestId: string; agreement: string };
   userOwner?: string;
   membership?: { personId: string; revision: number };
   sharing?: {
@@ -306,6 +308,14 @@ export interface ProviderState {
     string,
     import('../sponsorship/admission.js').SponsorshipAdmission
   >;
+  uniswapXOrders?: Record<
+    string,
+    import('../orders/service.js').UniswapXOrderRecord
+  >;
+  safeWalletAccounts?: Record<
+    string,
+    import('../sponsorship/safe-wallet.js').SafeWalletAccount
+  >;
   supportedActions?: Record<string, ApprovedCallsRecord>;
   deploymentBindings?: Record<
     string,
@@ -315,6 +325,7 @@ export interface ProviderState {
       binding: string;
       network?: import('../networks.js').ProviderNetwork;
       activeRevision?: string;
+      uniswapXOrderPolicyRevision?: string;
       transportRevision?: string;
       networkSetRevision?: string;
       managementInstallationId?: string;
@@ -372,5 +383,7 @@ export interface ProviderState {
 }
 /** Callback is synchronous; never make vendor/network calls inside a storage transaction. */
 export interface OnboardingStore {
+  /** Optional read-only transaction. SQLite reads do not reserve the writer lock. */
+  read?<T>(operation: (state: ProviderState) => T): Promise<T>;
   transaction<T>(operation: (state: ProviderState) => T): Promise<T>;
 }

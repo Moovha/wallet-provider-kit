@@ -1,5 +1,6 @@
 const modules = new Set([
   'sponsorship/signing',
+  'sponsorship/safe-wallet',
   'sponsorship/preparation',
   'sponsorship/estimated-gas',
   'sponsorship/verifier',

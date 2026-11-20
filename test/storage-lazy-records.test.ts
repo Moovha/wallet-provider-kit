@@ -66,7 +66,7 @@ it('reads only requested JSON payloads as retained history grows, and detaches r
     expect(bytes).toBeLessThan(100000);
     expect(queries.some((sql) => sql.includes('onboarding_audit'))).toBe(false);
     expect(queries).toContain(
-      'SELECT id FROM onboarding_records WHERE collection=?',
+      'SELECT id FROM onboarding_records WHERE collection=? ORDER BY id',
     );
     expect(queries).not.toContain(
       'SELECT collection,id FROM onboarding_records',

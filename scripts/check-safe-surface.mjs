@@ -58,3 +58,16 @@ assert.match(
   await readFile('docs/.vitepress/config.mts', 'utf8'),
   /local-adapters\/\*\*/,
 );
+
+// Product-specific pricing belongs to application-owned adapters.
+await assert.rejects(access('src/orders/usd-zar-fx.ts'), { code: 'ENOENT' });
+for (const path of [
+  'src/orders/price-policy.ts',
+  'src/orders/application-price-policy.ts',
+  'src/orders/service.ts',
+  'src/orders/uniswapx-v3.ts',
+])
+  assert.doesNotMatch(
+    await readFile(path, 'utf8'),
+    /solver-fiat-fx-v1|open\.er-api\.com|baseZarp|baseUsdc/,
+  );

@@ -213,6 +213,10 @@ export default defineConfig({
             link: '/docs/user-operation-execution',
           },
           {
+            text: 'Order protocol adapter',
+            link: '/docs/uniswapx-v3-orders',
+          },
+          {
             text: 'Signature boundaries',
             link: '/docs/durable-safe-op-signing',
           },

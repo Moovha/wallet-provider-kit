@@ -462,6 +462,7 @@ See the [HTTP reference](http-reference.md).
 
 ```ts
 export interface ServerOptions {
+  uniswapXOrders?: import('../orders/service.js').UniswapXOrderService;
   networkContexts?: readonly NetworkContext[];
   resolveNetwork?: ResolveNetwork;
   management?: ManagementService;
@@ -534,8 +535,10 @@ export declare class WalletCallsService {
   list(
     principal: VerifiedPrincipal,
     authorizeOperator?: (state: ProviderState) => void,
+    page?: import('../onboarding/record-pages.js').RecordPageInput,
   ): Promise<{
     truncated: boolean;
+    next_cursor?: string | null;
     batches: import('./types.js').WalletCallsBatchSummary[];
   }>;
   /** Streams current authorized status; notifications contain no account data. */
@@ -587,6 +590,7 @@ Import from `@moovha/wallet-provider-kit/onboarding`. [Integration guide](onboar
 - [OwnerLoginConfiguration](#ownerloginconfiguration)
 - [Permission](#permission)
 - [ProviderState](#providerstate)
+- [RecordPageInput](#recordpageinput)
 - [SumsubConfiguration](#sumsubconfiguration)
 - [VendorPrice](#vendorprice)
 - [VerifiedUserRecord](#verifieduserrecord)
@@ -682,6 +686,7 @@ export interface ApplicationPolicy {
   /** Explicit permission to attest user identity and consent; an OAuth scope alone is insufficient. */
   assertionTrust?: {
     agreement: string;
+    managedRenewal?: boolean;
   };
   walletSharing?: WalletSharingPolicy;
   permissions?: Permission[];
@@ -946,6 +951,8 @@ export declare class OnboardingService {
   readonly store: OnboardingStore;
   readonly runtimeContracts: boolean;
   readonly safeOnlyWallet: boolean;
+  readonly orderPolicy?:
+    import('../orders/uniswapx-v3.js').UniswapXOrderPolicy | undefined;
   readonly policy: import('./types.js').ResolvedPolicy;
   readonly installationPolicyRevision: string;
   constructor(
@@ -973,6 +980,8 @@ export declare class OnboardingService {
       ): import('./types.js').ApplicationPolicy;
     },
     consentNetwork?: import('../networks.js').ProviderNetwork,
+    orderPolicy?:
+      import('../orders/uniswapx-v3.js').UniswapXOrderPolicy | undefined,
   );
   applicationAccessPolicy(
     principal: VerifiedPrincipal,
@@ -996,14 +1005,21 @@ export declare class OnboardingService {
         verification_level?: string | undefined;
         max_identity_age_days: number;
         max_access_days: number;
+        order_policy_revision?: string | undefined;
+        order_authorization?:
+          import('../orders/uniswapx-v3.js').UniswapXOrderPolicy | undefined;
         action_policy_revision?: string | undefined;
         flow: 'application' | 'hosted';
+        managed_renewal_available: boolean;
         policy_revision: string;
       }
     | {
-        action_policy_revision: string | undefined;
         required_fields: string[];
         runtime_contract_terms: import('../runtime-configuration/authority.js').RuntimePolicySnapshot;
+        order_policy_revision?: string | undefined;
+        order_authorization?:
+          import('../orders/uniswapx-v3.js').UniswapXOrderPolicy | undefined;
+        action_policy_revision: string | undefined;
         wallet_sharing?:
           | {
               source_application_id: string;
@@ -1021,6 +1037,7 @@ export declare class OnboardingService {
         max_identity_age_days: number;
         max_access_days: number;
         flow: 'application' | 'hosted';
+        managed_renewal_available: boolean;
         policy_revision: string;
       }
   >;
@@ -1080,6 +1097,7 @@ export declare class OnboardingService {
           | 'account:read'
           | 'operations:request'
           | 'contracts:request'
+          | 'orders:authorize'
           | 'members:manage'
           | 'owners:manage'
         )[]
@@ -1099,8 +1117,53 @@ export declare class OnboardingService {
       | undefined;
     grant_id?: string | undefined;
     consent_url?: string | undefined;
-    request_id: string;
     status: string;
+    managed_authorization?:
+      | {
+          sourceRequestId: string;
+          agreement: string;
+        }
+      | undefined;
+    request_id: string;
+  }>;
+  renewManaged(
+    context: AuthorityContext,
+    sourceRequestId: string,
+    userId: string,
+  ): Promise<{
+    permissions?:
+      | (
+          | 'account:read'
+          | 'operations:request'
+          | 'contracts:request'
+          | 'orders:authorize'
+          | 'members:manage'
+          | 'owners:manage'
+        )[]
+      | undefined;
+    expires_at?: string | undefined;
+    membership_revision?: number | undefined;
+    wallet?: import('./types.js').WalletDescription | undefined;
+    account_id?: string | undefined;
+    consent?:
+      | {
+          action_policy_revision?: string | undefined;
+          reference: string;
+          granted_at: string;
+          expires_at: string;
+          policy_revision: string;
+        }
+      | undefined;
+    grant_id?: string | undefined;
+    consent_url?: string | undefined;
+    status: string;
+    managed_authorization?:
+      | {
+          sourceRequestId: string;
+          agreement: string;
+        }
+      | undefined;
+    request_id: string;
   }>;
   read(
     context: AuthorityContext,
@@ -1111,6 +1174,7 @@ export declare class OnboardingService {
           | 'account:read'
           | 'operations:request'
           | 'contracts:request'
+          | 'orders:authorize'
           | 'members:manage'
           | 'owners:manage'
         )[]
@@ -1130,8 +1194,14 @@ export declare class OnboardingService {
       | undefined;
     grant_id?: string | undefined;
     consent_url?: string | undefined;
-    request_id: string;
     status: string;
+    managed_authorization?:
+      | {
+          sourceRequestId: string;
+          agreement: string;
+        }
+      | undefined;
+    request_id: string;
   }>;
   accessPolicy(principal: VerifiedPrincipal): {
     source: string;
@@ -1144,8 +1214,12 @@ export declare class OnboardingService {
     verification_level?: string | undefined;
     max_identity_age_days: number;
     max_access_days: number;
+    order_policy_revision?: string | undefined;
+    order_authorization?:
+      import('../orders/uniswapx-v3.js').UniswapXOrderPolicy | undefined;
     action_policy_revision?: string | undefined;
     flow: 'application' | 'hosted';
+    managed_renewal_available: boolean;
     policy_revision: string;
   };
   submitRecords(
@@ -1178,6 +1252,7 @@ export declare class OnboardingService {
       | 'account:read'
       | 'operations:request'
       | 'contracts:request'
+      | 'orders:authorize'
       | 'members:manage'
       | 'owners:manage'
     )[];
@@ -1195,6 +1270,7 @@ export declare class OnboardingService {
           | 'account:read'
           | 'operations:request'
           | 'contracts:request'
+          | 'orders:authorize'
           | 'members:manage'
           | 'owners:manage'
         )[]
@@ -1214,8 +1290,14 @@ export declare class OnboardingService {
       | undefined;
     grant_id?: string | undefined;
     consent_url?: string | undefined;
-    request_id: string;
     status: string;
+    managed_authorization?:
+      | {
+          sourceRequestId: string;
+          agreement: string;
+        }
+      | undefined;
+    request_id: string;
   }>;
   importIdentity(
     inputContext: AuthorityContext,
@@ -1228,6 +1310,7 @@ export declare class OnboardingService {
           | 'account:read'
           | 'operations:request'
           | 'contracts:request'
+          | 'orders:authorize'
           | 'members:manage'
           | 'owners:manage'
         )[]
@@ -1247,8 +1330,14 @@ export declare class OnboardingService {
       | undefined;
     grant_id?: string | undefined;
     consent_url?: string | undefined;
-    request_id: string;
     status: string;
+    managed_authorization?:
+      | {
+          sourceRequestId: string;
+          agreement: string;
+        }
+      | undefined;
+    request_id: string;
   }>;
   verificationVendors(): Vendor[];
   startVerification(
@@ -1267,6 +1356,27 @@ export declare class OnboardingService {
         url?: undefined;
       }
   >;
+  /** Bounded review page; an empty page can still have a continuation cursor. */
+  reviewPage(
+    principal: VerifiedPrincipal,
+    input?: RecordPageInput,
+  ): Promise<{
+    items: {
+      applicationRecord?: ApplicationIdentityRecord | undefined;
+      application?: string | undefined;
+      requestId: string;
+      owner: Pick<OwnerIdentity, 'issuer' | 'subject'> | undefined;
+      vendor: Vendor | undefined;
+      reference: string | undefined;
+      verifiedAt: string | undefined;
+      status: string;
+    }[];
+    next_cursor: string | null;
+  }>;
+  /**
+   * Bulk report that yields between pages; results are not a snapshot.
+   * Use reviewPage for request handlers.
+   */
   reviews(principal: VerifiedPrincipal): Promise<
     {
       applicationRecord?: ApplicationIdentityRecord | undefined;
@@ -1279,6 +1389,21 @@ export declare class OnboardingService {
       status: string;
     }[]
   >;
+  providerAccountPage(
+    principal: VerifiedPrincipal,
+    input?: RecordPageInput,
+  ): Promise<{
+    items: {
+      id: string;
+      status: 'active' | 'suspended';
+      provisioned: boolean;
+    }[];
+    next_cursor: string | null;
+  }>;
+  /**
+   * Bulk report that yields between pages; results are not a snapshot.
+   * Use providerAccountPage for request handlers.
+   */
   providerAccounts(principal: VerifiedPrincipal): Promise<
     {
       id: string;
@@ -1309,6 +1434,7 @@ export declare class OnboardingService {
           | 'account:read'
           | 'operations:request'
           | 'contracts:request'
+          | 'orders:authorize'
           | 'members:manage'
           | 'owners:manage'
         )[]
@@ -1328,8 +1454,14 @@ export declare class OnboardingService {
       | undefined;
     grant_id?: string | undefined;
     consent_url?: string | undefined;
-    request_id: string;
     status: string;
+    managed_authorization?:
+      | {
+          sourceRequestId: string;
+          agreement: string;
+        }
+      | undefined;
+    request_id: string;
   }>;
   /** Verify a current, independently consented sharing grant for an application-bound Safe. */
   hasSharedWalletAccess(
@@ -1375,6 +1507,7 @@ export declare class OnboardingService {
         | 'account:read'
         | 'operations:request'
         | 'contracts:request'
+        | 'orders:authorize'
         | 'members:manage'
         | 'owners:manage'
       )[];
@@ -1394,6 +1527,7 @@ export declare class OnboardingService {
         | 'account:read'
         | 'operations:request'
         | 'contracts:request'
+        | 'orders:authorize'
         | 'members:manage'
         | 'owners:manage'
       )[];
@@ -1425,6 +1559,7 @@ export declare class OnboardingService {
         | 'account:read'
         | 'operations:request'
         | 'contracts:request'
+        | 'orders:authorize'
         | 'members:manage'
         | 'owners:manage'
       )[];
@@ -1459,6 +1594,7 @@ export declare class OnboardingService {
           | 'account:read'
           | 'operations:request'
           | 'contracts:request'
+          | 'orders:authorize'
           | 'members:manage'
           | 'owners:manage'
         )[]
@@ -1478,8 +1614,14 @@ export declare class OnboardingService {
       | undefined;
     grant_id?: string | undefined;
     consent_url?: string | undefined;
-    request_id: string;
     status: string;
+    managed_authorization?:
+      | {
+          sourceRequestId: string;
+          agreement: string;
+        }
+      | undefined;
+    request_id: string;
   }>;
   ownerGrants(identity: OwnerIdentity): Promise<
     {
@@ -1489,6 +1631,7 @@ export declare class OnboardingService {
         | 'account:read'
         | 'operations:request'
         | 'contracts:request'
+        | 'orders:authorize'
         | 'members:manage'
         | 'owners:manage'
       )[];
@@ -1525,6 +1668,8 @@ export declare class OnboardingService {
 ```ts
 /** Callback is synchronous; never make vendor/network calls inside a storage transaction. */
 export interface OnboardingStore {
+  /** Optional read-only transaction. SQLite reads do not reserve the writer lock. */
+  read?<T>(operation: (state: ProviderState) => T): Promise<T>;
   transaction<T>(operation: (state: ProviderState) => T): Promise<T>;
 }
 ```
@@ -1644,6 +1789,14 @@ export interface ProviderState {
     string,
     import('../sponsorship/admission.js').SponsorshipAdmission
   >;
+  uniswapXOrders?: Record<
+    string,
+    import('../orders/service.js').UniswapXOrderRecord
+  >;
+  safeWalletAccounts?: Record<
+    string,
+    import('../sponsorship/safe-wallet.js').SafeWalletAccount
+  >;
   supportedActions?: Record<string, ApprovedCallsRecord>;
   deploymentBindings?: Record<
     string,
@@ -1653,6 +1806,7 @@ export interface ProviderState {
       binding: string;
       network?: import('../networks.js').ProviderNetwork;
       activeRevision?: string;
+      uniswapXOrderPolicyRevision?: string;
       transportRevision?: string;
       networkSetRevision?: string;
       managementInstallationId?: string;
@@ -1720,6 +1874,19 @@ export interface ProviderState {
       };
     };
   }[];
+}
+```
+
+### RecordPageInput
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/onboarding/record-pages.ts).
+
+```ts
+export interface RecordPageInput {
+  /** Continuation cursor returned by the previous page. */
+  after?: string;
+  /** Page size, from 1 to 100; defaults to 50. */
+  limit?: number;
 }
 ```
 
@@ -2073,6 +2240,7 @@ Import from `@moovha/wallet-provider-kit/ows`. [Integration guide](ows-adapter.m
 - [createOwsSigningBackend](#createowssigningbackend)
 - [createOwsWalletProvider](#createowswalletprovider)
 - [OwsProviderOptions](#owsprovideroptions)
+- [prepareOwsVault](#prepareowsvault)
 
 ### createOwsSigningBackend
 
@@ -2111,6 +2279,15 @@ export interface OwsProviderOptions {
 }
 ```
 
+### prepareOwsVault
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/providers/ows.ts).
+
+```ts
+/** Prepare account-scoped encrypted storage before accepting wallet operations. Retains legacy originals. */
+export declare function prepareOwsVault(vaultPath: string): Promise<void>;
+```
+
 ## Durable storage
 
 Import from `@moovha/wallet-provider-kit/storage`. [Integration guide](storage.md).
@@ -2126,6 +2303,7 @@ Import from `@moovha/wallet-provider-kit/storage`. [Integration guide](storage.m
 - [PolicyBudgetCharge](#policybudgetcharge)
 - [ProviderDatabase](#providerdatabase)
 - [ProviderDatabaseOptions](#providerdatabaseoptions)
+- [upgradeProviderDatabase](#upgradeproviderdatabase)
 
 ### AssetBudgetCharge
 
@@ -2216,6 +2394,8 @@ export interface FinancialApproval {
 
 ```ts
 export interface FinancialAuthorityOptions {
+  /** Optional host-owned encryption for retained signing results. */
+  signatureProtection?: SignatureProtection;
   namespace: string;
   provider: string;
   /** Recheck live owner/grant/KYC/consent, unchanged plan, dependencies and any step-up proof. No vendor effects. */
@@ -2325,6 +2505,7 @@ export declare function openProviderDatabase(
     id: string,
     maximum: string,
     configuredRevision?: string,
+    revisionField?: 'activeRevision' | 'uniswapXOrderPolicyRevision',
   ): Promise<void>;
   ensureAssetBudget(
     origin: string,
@@ -2415,6 +2596,21 @@ export interface ProviderDatabaseOptions {
 }
 ```
 
+### upgradeProviderDatabase
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/storage/upgrade.ts).
+
+```ts
+/**
+ * Offline, explicit schema 2-to-3 upgrade.
+ * Stop every writer and retain a verified recovery backup first.
+ */
+export declare function upgradeProviderDatabase(directory: string): {
+  fromVersion: number;
+  toVersion: number;
+};
+```
+
 ## Configuration-first provider service
 
 Import from `@moovha/wallet-provider-kit/deployment`. [Integration guide](setup.md).
@@ -2440,6 +2636,8 @@ Import from `@moovha/wallet-provider-kit/deployment`. [Integration guide](setup.
 - [networkConfigurations](#networkconfigurations)
 - [OperationAdapters](#operationadapters)
 - [OperationAdapterTerms](#operationadapterterms)
+- [OrderPriceAssessment](#orderpriceassessment)
+- [OrderPricePolicyAdapter](#orderpricepolicyadapter)
 - [PinnedContract](#pinnedcontract)
 - [predictSafeAddress](#predictsafeaddress)
 - [ProviderConfiguration](#providerconfiguration)
@@ -2840,6 +3038,39 @@ export interface OperationAdapterTerms {
 }
 ```
 
+### OrderPriceAssessment
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/orders/application-price-policy.ts).
+
+```ts
+export interface OrderPriceAssessment {
+  minimumRequiredOutUnits: string;
+  /** Expiry of the independently obtained price evidence, in Unix seconds. */
+  validUntil: number;
+  proof: Record<string, unknown>;
+}
+```
+
+### OrderPricePolicyAdapter
+
+[Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/orders/application-price-policy.ts).
+
+```ts
+/** Trusted host code, selected by the operator, never by an application request. */
+export interface OrderPricePolicyAdapter {
+  version: 1;
+  validate(
+    policy: SolverPricePolicy,
+    routes: UniswapXOrderPolicy['routes'],
+  ): boolean;
+  assess(input: {
+    policy: SolverPricePolicy;
+    review: UniswapXOrderReview;
+    signal: AbortSignal;
+  }): Promise<OrderPriceAssessment>;
+}
+```
+
 ### PinnedContract
 
 [Source declaration](https://github.com/Moovha/wallet-provider-kit/blob/main/src/execution/approved-calls.ts).
@@ -2875,6 +3106,15 @@ export declare function predictSafeAddress(
 
 ```ts
 export interface ProviderConfiguration {
+  uniswapXOrders?: {
+    enabled: boolean;
+    policy: import('../orders/uniswapx-v3.js').UniswapXOrderPolicy;
+    apiKey: SecretReference;
+    pricePolicyAdapter?: {
+      path: string;
+      sha256: string;
+    };
+  };
   management?: {
     claim: SecretReference;
     localOrigin?: string;
@@ -2887,6 +3127,7 @@ export interface ProviderConfiguration {
     safeWallet?: ProviderConfiguration['safeWallet'];
     safeProvisioning?: ProviderConfiguration['safeProvisioning'];
     approvedCalls?: ProviderConfiguration['approvedCalls'];
+    uniswapXOrders?: ProviderConfiguration['uniswapXOrders'];
     activation?: ProviderConfiguration['activation'];
   }[];
   safeProvisioning?: import('../provisioning/safe.js').SafeProvisioningConfiguration;
@@ -3452,8 +3693,10 @@ export declare class WalletCallsService {
   list(
     principal: VerifiedPrincipal,
     authorizeOperator?: (state: ProviderState) => void,
+    page?: import('../onboarding/record-pages.js').RecordPageInput,
   ): Promise<{
     truncated: boolean;
+    next_cursor?: string | null;
     batches: import('./types.js').WalletCallsBatchSummary[];
   }>;
   /** Streams current authorized status; notifications contain no account data. */
@@ -5003,10 +5246,18 @@ export declare class UserOperationWalletCallsDriver implements WalletCallsDriver
   list(
     principal: VerifiedPrincipal,
     authorizeOperator?: (state: ProviderState) => void,
+    input?: RecordPageInput,
   ): Promise<{
     truncated: boolean;
+    next_cursor: string | null;
     batches: WalletCallsBatchSummary[];
   }>;
+  /** Current authorized summary for an internal batch record ID. */
+  listEntry(
+    principal: VerifiedPrincipal,
+    id: string,
+    authorizeOperator?: (state: ProviderState) => void,
+  ): Promise<WalletCallsBatchSummary | undefined>;
   runOnce(
     snapshot?: readonly UserOperationBatch[],
     settlement?: boolean,
@@ -5048,8 +5299,10 @@ export interface WalletCallsDriver {
     authorizeOperator?: (
       state: import('../onboarding/types.js').ProviderState,
     ) => void,
+    page?: import('../onboarding/record-pages.js').RecordPageInput,
   ): Promise<{
     truncated: boolean;
+    next_cursor?: string | null;
     batches: WalletCallsBatchSummary[];
   }>;
 }

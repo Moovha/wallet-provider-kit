@@ -1,3 +1,5 @@
+import { matchesApplicationIdentityEvidence } from './application-access.js';
+import { matchingRecords, putRecord, getRecord } from './records.js';
 import type { VerifiedPrincipal } from '../domain/principal.js';
 import type {
   AccessInput,
@@ -47,9 +49,9 @@ export function resolveWalletInput(
     if (!text(result.user.id)) invalid();
     const id = userOwner(principal, result.user.id),
       app = application(policy, principal);
-    let profile = state.verifiedUsers?.[id];
+    let profile = getRecord(state, 'verifiedUsers', id);
     if (!profile) {
-      for (const request of Object.values(state.requests)) {
+      for (const request of matchingRecords(state, 'requests', '$person', id)) {
         const user = request.input.user;
         if (
           !request.denied &&
@@ -58,12 +60,12 @@ export function resolveWalletInput(
           user &&
           request.acceptance?.source === 'application_attestation' &&
           request.acceptance.expiresAt > Date.now() &&
-          fingerprint([
-            principal.issuer,
-            principal.clientId,
+          matchesApplicationIdentityEvidence(
+            principal,
             user.identity,
             app.assertionTrust,
-          ]) === request.acceptance.evidenceHash
+            request.acceptance.evidenceHash,
+          )
         ) {
           profile = {
             id,
@@ -82,12 +84,12 @@ export function resolveWalletInput(
       !profile ||
       profile.revision !== policy.revision ||
       profile.acceptedUntil <= Date.now() ||
-      fingerprint([
-        principal.issuer,
-        principal.clientId,
+      !matchesApplicationIdentityEvidence(
+        principal,
         profile.identity,
         app.assertionTrust,
-      ]) !== profile.evidenceHash
+        profile.evidenceHash,
+      )
     )
       deny();
     result.user.identity = structuredClone(profile.identity);
@@ -111,9 +113,9 @@ export function saveVerifiedUser(
     acceptedUntil: assertion.acceptedUntil,
     revision: policy.revision,
   };
-  (state.verifiedUsers ??= {})[profile.id] = profile;
+  putRecord(state, 'verifiedUsers', profile.id, profile);
   // Refresh identity facts across owned wallets, without issuing or extending any consent grant.
-  for (const account of Object.values(state.accounts))
+  for (const account of matchingRecords(state, 'accounts', 'owner', profile.id))
     if (account.owner === profile.id) {
       account.acceptedUntil = profile.acceptedUntil;
       account.acceptanceRevision = profile.revision;
@@ -126,7 +128,7 @@ export function connectWalletMember(
   request: AccessRequest,
   personId: string,
 ) {
-  const account = state.accounts[request.accountId] ?? deny();
+  const account = getRecord(state, 'accounts', request.accountId) ?? deny();
   const member = account.members?.[personId] ?? deny();
   const consent = request.input.user!.consent;
   if (
@@ -157,9 +159,10 @@ export function validateWalletMember(
   request: AccessRequest,
 ) {
   const membership = request.membership ?? deny();
-  const account = state.accounts[request.accountId] ?? deny();
+  const account = getRecord(state, 'accounts', request.accountId) ?? deny();
   const member = account.members?.[membership.personId] ?? deny();
-  const profile = state.verifiedUsers?.[membership.personId] ?? deny();
+  const profile =
+    getRecord(state, 'verifiedUsers', membership.personId) ?? deny();
   const app = application(policy, { ...request.caller, scopes: [] });
   if (
     request.denied ||
@@ -167,12 +170,12 @@ export function validateWalletMember(
     request.userOwner !== membership.personId ||
     profile.revision !== policy.revision ||
     profile.acceptedUntil <= Date.now() ||
-    fingerprint([
-      request.caller.issuer,
-      request.caller.clientId,
+    !matchesApplicationIdentityEvidence(
+      request.caller,
       profile.identity,
       app.assertionTrust,
-    ]) !== profile.evidenceHash ||
+      profile.evidenceHash,
+    ) ||
     member.state !== 'active' ||
     member.revision !== membership.revision ||
     member.issuer !== request.caller.issuer ||

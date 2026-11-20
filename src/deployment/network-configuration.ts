@@ -5,9 +5,9 @@ import { configureSafeWalletRuntime } from './application-defaults.js';
 export function networkConfigurations(
   config: ProviderConfiguration,
 ): ProviderConfiguration[] {
-  const { additionalNetworks, ...primary } = config;
+  const { additionalNetworks, uniswapXOrders, ...primary } = config;
   return [
-    primary,
+    { ...primary, ...(uniswapXOrders ? { uniswapXOrders } : {}) },
     ...[...(additionalNetworks ?? [])]
       .sort((a, b) => a.network.localeCompare(b.network))
       .map((entry) => {
@@ -29,6 +29,7 @@ export function networkConfigurations(
           'safeProvisioning',
           'approvedCalls',
           'activation',
+          'uniswapXOrders',
         ] as const)
           if (entry[key]) Object.assign(expanded, { [key]: entry[key] });
         return expanded;

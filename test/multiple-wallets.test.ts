@@ -1,4 +1,8 @@
 import { afterEach, expect, it, vi } from 'vitest';
+import { StorageConnection } from '../src/storage/connection.js';
+import { sqliteOnboardingStore } from '../src/storage/onboarding.js';
+import type { OnboardingStore } from '../src/onboarding/types.js';
+import { getRecord } from '../src/onboarding/records.js';
 import { randomUUID } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -40,7 +44,7 @@ const ctx = (app = 'app-a', grant?: string) => ({
   idempotencyKey: randomUUID(),
 });
 const actionRevision = 'f'.repeat(64);
-async function fixture() {
+async function fixture(suppliedStore?: OnboardingStore) {
   const directory = await mkdtemp(join(tmpdir(), 'wpk-multiple-wallets-'));
   folders.push(directory);
   const policy: OnboardingPolicy = {
@@ -85,7 +89,7 @@ async function fixture() {
     access: { mode: 'application', maxAgeDays: 7 },
   };
   const applications = structuredClone(policy.applications);
-  const store = createFileOnboardingStore(directory);
+  const store = suppliedStore ?? createFileOnboardingStore(directory);
   const construct = () =>
     new OnboardingService(
       policy,
@@ -915,5 +919,171 @@ it('exposes creator-only KYC and deferred creation through the HTTP client with 
     ).rejects.toMatchObject({ status: 403 });
   } finally {
     await app.close();
+  }
+});
+
+it(
+  'keeps first-use provisioning reads bounded with retained history and observes external revocation without rebuilding indexes',
+  { timeout: 60_000 },
+  async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'wpk-provisioning-growth-'));
+    folders.push(directory);
+    const connection = new StorageConnection({ directory, initialize: true });
+    const external = new StorageConnection({ directory });
+    try {
+      const f = await fixture(sqliteOnboardingStore(connection));
+      await f.service.request(ctx(), f.input());
+      connection.transaction(() => {
+        for (let i = 0; i < 5000; i++) {
+          const id = 'unrelated-' + i;
+          for (const collection of [
+            'accounts',
+            'grants',
+            'requests',
+            'admissions',
+            'attempts',
+            'idempotency',
+            'verifiedUsers',
+          ])
+            connection.run(
+              'INSERT INTO onboarding_records(collection,id,record) VALUES(?,?,?)',
+              collection,
+              id,
+              JSON.stringify({
+                id,
+                accountId: id,
+                owner: id,
+                caller: { issuer, subject: 'other', clientId: 'other' },
+                request: {
+                  accountId: id,
+                  attemptId: id,
+                  namespace: 'other',
+                  provider: 'other',
+                  resourceKey: id,
+                },
+              }),
+            );
+          connection.run(
+            'INSERT INTO onboarding_audit(record) VALUES(?)',
+            JSON.stringify({
+              at: i,
+              event: 'offline-fixture',
+              resource: id,
+              revision: '1',
+            }),
+          );
+        }
+      });
+      let returnedBytes = 0;
+      const queries: string[] = [];
+      const all = connection.all.bind(connection),
+        get = connection.get.bind(connection);
+      vi.spyOn(connection, 'all').mockImplementation((sql, ...params) => {
+        queries.push(sql);
+        const result = all(sql, ...params);
+        returnedBytes += Buffer.byteLength(JSON.stringify(result));
+        return result;
+      });
+      vi.spyOn(connection, 'get').mockImplementation((sql, ...params) => {
+        const result = get(sql, ...params);
+        returnedBytes += Buffer.byteLength(JSON.stringify(result) ?? '');
+        return result;
+      });
+      const receipt = await f.service.request(ctx(), f.extra('selected'));
+      const authority = await f.service
+        .walletAuthority()
+        .provision(ctx('app-a', receipt.grant_id), receipt.account_id!);
+      expect(
+        await f.service.canDispatchProvision(
+          authority!.attemptId,
+          receipt.account_id!,
+        ),
+      ).toBe(true);
+      expect(
+        queries.some((sql) =>
+          /SELECT.*(?:id FROM onboarding_records|id,record FROM onboarding_records|onboarding_audit)/.test(
+            sql,
+          ),
+        ),
+      ).toBe(false);
+      expect(returnedBytes).toBeLessThan(100000);
+      returnedBytes = 0;
+      queries.length = 0;
+      await sqliteOnboardingStore(external).transaction((s) => {
+        getRecord(s, 'grants', receipt.grant_id!).state = 'revoked';
+      });
+      expect(
+        await f.service.canDispatchProvision(
+          authority!.attemptId,
+          receipt.account_id!,
+        ),
+      ).toBe(false);
+      expect(returnedBytes).toBeLessThan(10000);
+      expect(
+        queries.some((sql) =>
+          /SELECT id(?:,record)? FROM onboarding_records/.test(sql),
+        ),
+      ).toBe(false);
+    } finally {
+      vi.restoreAllMocks();
+      connection.close();
+      external.close();
+    }
+  },
+);
+
+it('admits provisioning between pages of a concurrent full account report', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'wpk-report-provision-'));
+  folders.push(directory);
+  const connection = new StorageConnection({ directory, initialize: true });
+  try {
+    const store = sqliteOnboardingStore(connection);
+    const f = await fixture(store);
+    connection.transaction(() => {
+      for (let i = 0; i < 2000; i++)
+        connection.run(
+          'INSERT INTO onboarding_records VALUES(?,?,?)',
+          'accounts',
+          'unrelated-' + i,
+          JSON.stringify({
+            id: 'unrelated-' + i,
+            owner: 'unrelated',
+            status: 'active',
+          }),
+        );
+    });
+    const staff = {
+      issuer,
+      subject: 'staff',
+      clientId: 'staff',
+      scopes: ['wallet:review'],
+    };
+    let finished = false;
+    const read = vi.spyOn(store, 'read');
+    const report = f.service.providerAccounts(staff).then((result) => {
+      finished = true;
+      return result;
+    });
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(read).toHaveBeenCalled();
+    expect(finished).toBe(false);
+    const receipt = await f.service.request(ctx(), f.input());
+    const authority = await f.service
+      .walletAuthority()
+      .provision(ctx('app-a', receipt.grant_id), receipt.account_id!);
+    expect(
+      await f.service.canDispatchProvision(
+        authority!.attemptId,
+        receipt.account_id!,
+      ),
+    ).toBe(true);
+    expect(finished).toBe(false);
+    expect((await report).length).toBeGreaterThanOrEqual(2000);
+    const page = await f.service.providerAccountPage(staff, { limit: 10 });
+    expect(page.items).toHaveLength(10);
+    expect(page.next_cursor).not.toBeNull();
+  } finally {
+    vi.restoreAllMocks();
+    connection.close();
   }
 });

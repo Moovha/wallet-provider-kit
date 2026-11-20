@@ -44,9 +44,7 @@ it('binds member admission to its grant, shares the Safe nonce, and denies signi
   };
   await f.db.onboardingStore.transaction((s) => {
     s.accounts[accountId].address = f.wallet.address;
-    s.deploymentBindings![
-      'service-v1'
-    ].runtimeConfiguration!.safeWalletAccounts![accountId] = {
+    s.safeWalletAccounts![accountId] = {
       accountId,
       applicationId: runtimeApplicationId(
         ownerPrincipal.issuer,
@@ -126,9 +124,7 @@ it('binds member admission to its grant, shares the Safe nonce, and denies signi
     principal = { ...f.context.principal, accessGrantId: granted.grant_id },
     context = { principal, idempotencyKey: randomUUID() };
   await f.db.onboardingStore.transaction((s) => {
-    const wallets =
-      s.deploymentBindings!['service-v1'].runtimeConfiguration!
-        .safeWalletAccounts!;
+    const wallets = s.safeWalletAccounts!;
     delete wallets[f.input.account_id];
     wallets[accountId].applicationId = runtimeApplicationId(
       ownerPrincipal.issuer,

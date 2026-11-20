@@ -20,10 +20,13 @@ export async function owsCommand(
     const chunks: Buffer[] = [];
     let size = 0;
     let failed = false;
-    const timer = setTimeout(() => {
-      failed = true;
-      child.kill('SIGKILL');
-    }, 10000);
+    const timer = setTimeout(
+      () => {
+        failed = true;
+        child.kill('SIGKILL');
+      },
+      input.command === 'prepare' ? 300000 : 10000,
+    );
     child.on('error', () => {
       failed = true;
     });

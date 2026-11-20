@@ -226,8 +226,8 @@ that it can use this scheme. Large quorums must also fit the application's accep
 gas ceilings; estimation includes signature length and additional signer work.
 
 The persistent records use the existing network-specific structured service
-records and schema version 2. No new SQL tables or automatic DDL migration is
-required. Older schema versions remain unsupported. Back up private provider
+records. SQLite schema version 3 maintains their lookup indexes transactionally.
+Existing version 2 databases require the explicit [storage upgrade](provider-maintenance.md#upgrade-sqlite-storage-from-version-2-to-3). Back up private provider
 storage and protect signing payloads/signatures from application logs. See
 [storage](storage.md), [signing](durable-safe-op-signing.md) and the
 [HTTP reference](http-reference.md).

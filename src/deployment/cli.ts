@@ -13,8 +13,15 @@ import {
   secretReferences,
   type ProviderConfiguration,
 } from './config.js';
-import { applicationId, schema, schemaVersion } from '../storage/schema.js';
-import { openProviderDatabase } from '../storage/index.js';
+import {
+  applicationId,
+  schemaStatements,
+  schemaVersion,
+} from '../storage/schema.js';
+import {
+  openProviderDatabase,
+  upgradeProviderDatabase,
+} from '../storage/index.js';
 
 export async function inspectSetup(
   config: ProviderConfiguration,
@@ -101,7 +108,7 @@ export async function inspectSetup(
       .all()
       .map((r) => normalize(String(r.sql)))
       .sort();
-    const expected = schema.split(';').map(normalize).filter(Boolean).sort();
+    const expected = schemaStatements.map(normalize).sort();
     if (
       database.prepare('PRAGMA application_id').get()?.application_id !==
         applicationId ||
@@ -158,7 +165,7 @@ export async function setupCommand(args: string[]): Promise<boolean> {
   if (!args.length) return false;
   if (args.length === 1 && ['help', '--help', '-h'].includes(args[0])) {
     process.stdout.write(
-      'wallet-provider-kit runtime check\nwallet-provider-kit runtime install\nwallet-provider-kit local-setup --config file [--install-runtime]\nwallet-provider-kit init [file]\nwallet-provider-kit validate --config file\nwallet-provider-kit doctor --config file\nwallet-provider-kit init-secrets --config file\nwallet-provider-kit init-storage --config file\nwallet-provider-kit renew-claim --config file\nwallet-provider-kit recover-admin --config file\nwallet-provider-kit run --config file\n',
+      'wallet-provider-kit runtime check\nwallet-provider-kit runtime install\nwallet-provider-kit local-setup --config file [--install-runtime]\nwallet-provider-kit init [file]\nwallet-provider-kit validate --config file\nwallet-provider-kit doctor --config file\nwallet-provider-kit init-secrets --config file\nwallet-provider-kit init-storage --config file\nwallet-provider-kit upgrade-storage --config file\nwallet-provider-kit renew-claim --config file\nwallet-provider-kit recover-admin --config file\nwallet-provider-kit run --config file\n',
     );
     return true;
   }
@@ -362,13 +369,22 @@ export async function setupCommand(args: string[]): Promise<boolean> {
   if (
     args.length !== 3 ||
     args[1] !== '--config' ||
-    !['validate', 'doctor', 'init-storage', 'run'].includes(args[0])
+    !['validate', 'doctor', 'init-storage', 'upgrade-storage', 'run'].includes(
+      args[0],
+    )
   )
     throw new Error('Invalid command');
   if (args[0] === 'run') return false;
   const { config, directory } = await loadProviderConfiguration(args[2]);
   if (args[0] === 'validate')
     process.stdout.write('Configuration valid; no integrations activated\n');
+  if (args[0] === 'upgrade-storage') {
+    upgradeProviderDatabase(resolve(directory, config.storage.directory));
+    process.stdout.write(
+      'Storage schema 3 verified. Start only a compatible build with the retained vault and recovery material.\n',
+    );
+    return true;
+  }
   if (args[0] === 'init-storage') {
     const db = openProviderDatabase({
       directory: resolve(directory, config.storage.directory),

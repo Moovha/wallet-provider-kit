@@ -4,6 +4,7 @@ USER root
 RUN apk upgrade --no-cache
 COPY scripts/bundled-bundler-launcher.mjs /app/wpk-bundler-launcher.mjs
 COPY scripts/bundler-rpc.mjs /app/wpk-bundler-rpc.mjs
+COPY scripts/bundler-startup.mjs /app/wpk-bundler-startup.mjs
 COPY scripts/bundler-simulations.mjs /app/wpk-bundler-simulations.mjs
 COPY scripts/bundler-funding.mjs /app/wpk-bundler-funding.mjs
 COPY scripts/bundler-funding.d.mts /app/wpk-bundler-funding.d.mts

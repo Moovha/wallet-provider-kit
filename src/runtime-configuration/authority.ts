@@ -1,3 +1,4 @@
+import { getRecord } from '../onboarding/records.js';
 import { Interface, id } from 'ethers';
 import { networkForChain } from '../networks.js';
 import type { VerifiedPrincipal } from '../domain/principal.js';
@@ -52,8 +53,11 @@ export function currentRuntimePolicy(
     principal.issuer,
     principal.clientId,
   );
-  const registry =
-    state.deploymentBindings?.['service-v1']?.runtimeConfiguration;
+  const registry = getRecord(
+    state,
+    'deploymentBindings',
+    'service-v1',
+  )?.runtimeConfiguration;
   const revision = registry?.heads[application_id];
   const publication =
     revision && registry?.revisions[application_id + ':' + revision];

@@ -1,3 +1,4 @@
+import { registerUniswapXOrderRoutes } from '../orders/http.js';
 import { registerOwnerRoutes } from '../sponsorship/owner-http.js';
 import { walletSetupSchema } from './schemas.js';
 import { providerNetwork } from '../networks.js';
@@ -62,6 +63,7 @@ import {
 } from './schemas.js';
 
 export interface ServerOptions {
+  uniswapXOrders?: import('../orders/service.js').UniswapXOrderService;
   networkContexts?: readonly NetworkContext[];
   resolveNetwork?: ResolveNetwork;
   management?: ManagementService;
@@ -230,6 +232,7 @@ export async function createServer(options: ServerOptions = {}) {
           onboarding: !!options.onboarding,
           enrollment: !!options.enrollment,
           walletCalls: !!options.walletCalls,
+          uniswapXOrders: !!options.uniswapXOrders,
           safeWallet: !!options.safeWallet,
           runtimeConfiguration: !!options.runtimeConfiguration,
           wallet:
@@ -888,6 +891,12 @@ export async function createServer(options: ServerOptions = {}) {
     options.onboarding,
     options.authenticate,
     isReady,
+    options.resolveNetwork,
+  );
+  await registerUniswapXOrderRoutes(
+    app,
+    options.uniswapXOrders,
+    options.authenticate,
     options.resolveNetwork,
   );
   await registerWalletCallsRoutes(

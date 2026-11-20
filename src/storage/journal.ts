@@ -12,7 +12,7 @@ import type { WalletAttemptJournal } from '../domain/attempt-journal.js';
 import { failureCodes } from '../providers/attempt-lifecycle.js';
 import { fingerprint, text, uuid } from '../onboarding/policy.js';
 import { StorageConnection, unavailable } from './connection.js';
-import type { FinancialApproval } from './types.js';
+import type { FinancialApproval, SignatureProtection } from './types.js';
 
 export interface AttemptAdmission {
   request: WalletAttemptRequest;
@@ -114,16 +114,36 @@ function identity(request: WalletAttemptRequest) {
 function claimValue(
   row: NonNullable<ReturnType<typeof claimed>>,
   request: WalletAttemptRequest,
+  protection?: SignatureProtection,
 ): WalletAttemptClaim {
   const id = identity(request);
   if (fingerprint(JSON.parse(String(row.request))) !== fingerprint(request))
     return { ...id, state: 'conflict' };
-  if (row.state === 'succeeded')
+  if (row.state === 'succeeded') {
+    const stored = JSON.parse(String(row.result));
+    let result: WalletAttemptResult = stored;
+    if (
+      stored.kind === 'sign_typed_data' &&
+      (protection || stored.signature_sealed)
+    ) {
+      if (
+        !protection ||
+        typeof stored.signature_sealed !== 'string' ||
+        stored.signature !== undefined
+      )
+        unavailable();
+      result = {
+        kind: 'sign_typed_data',
+        signature: protection.open(request, stored.signature_sealed),
+      };
+      if (!/^0x[0-9a-fA-F]{130}$/.test(result.signature)) unavailable();
+    }
     return {
       ...id,
       state: 'succeeded',
-      result: JSON.parse(String(row.result)),
+      result,
     };
+  }
   if (row.state === 'failed')
     return { ...id, state: 'failed', failure: JSON.parse(String(row.failure)) };
   return {
@@ -186,6 +206,7 @@ function checkedResult(
 export function sqliteJournal(
   connection: StorageConnection,
   beforeClaim?: () => void,
+  signatureProtection?: SignatureProtection,
 ): WalletAttemptJournal & {
   read(request: WalletAttemptRequest): Promise<WalletAttemptClaim | null>;
 } {
@@ -214,7 +235,7 @@ export function sqliteJournal(
             );
             connection.audit('attempt_unknown', request.attemptId);
           }
-          return claimValue(previous, request);
+          return claimValue(previous, request, signatureProtection);
         }
         const admitted = connection.get(
           'SELECT * FROM admissions WHERE namespace=? AND provider=? AND attempt_id=?',
@@ -282,7 +303,7 @@ export function sqliteJournal(
       validateRequest(request);
       try {
         const row = claimed(connection, request);
-        return row ? claimValue(row, request) : null;
+        return row ? claimValue(row, request, signatureProtection) : null;
       } catch {
         return unavailable();
       }
@@ -304,7 +325,17 @@ export function sqliteJournal(
         checkedResult(connection, request, result, row.approval_id);
         connection.run(
           "UPDATE attempts SET state='succeeded',result=? WHERE namespace=? AND provider=? AND attempt_id=?",
-          JSON.stringify(result),
+          JSON.stringify(
+            result.kind === 'sign_typed_data' && signatureProtection
+              ? {
+                  kind: result.kind,
+                  signature_sealed: signatureProtection.seal(
+                    request,
+                    result.signature,
+                  ),
+                }
+              : result,
+          ),
           request.namespace,
           request.provider,
           request.attemptId,

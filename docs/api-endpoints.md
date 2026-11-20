@@ -80,6 +80,16 @@ Ask the provider to accept completed identity checks and the person’s recorded
 
 [`POST /v1/access-requests`](http-reference.md#post-v1-access-requests) — request body, permissions, effects and response details.
 
+### Renew a provider-managed wallet
+
+Renew access under the provider operator’s management agreement for an existing personal wallet.
+
+**Who uses it:** Application developer.
+
+**When you need it:** Use when managed_renewal_available is true and an existing grant expires or its policy changes.
+
+[`POST /v1/access-requests/{requestId}/renew`](http-reference.md#post-v1-access-requests-requestid-renew) — request body, permissions, effects and response details.
+
 ### Check whether wallet access was approved
 
 Look up the decision for a saved access request and recover its returned account and permission details.
@@ -242,6 +252,26 @@ Request approved contract calls, discover wallet call capabilities, or check a r
 
 [`POST /v1/accounts/{accountId}/wallet`](http-reference.md#post-v1-accounts-accountid-wallet) — request body, permissions, effects and response details.
 
+### Submit a bounded UniswapX solver order
+
+Authorize one exact Base UniswapX V3 swap or recipient-bound transfer with its disclosed output-token fee and net minimum.
+
+**Who uses it:** Application developer.
+
+**When you need it:** Use only after the provider configures the optional order policy and the owner grants separate order permission.
+
+[`POST /v1/accounts/{accountId}/uniswapx-orders`](http-reference.md#post-v1-accounts-accountid-uniswapx-orders) — request body, permissions, effects and response details.
+
+### Recover a UniswapX order result
+
+Read a retained solver order and reconcile canonical fill effects without submitting another order.
+
+**Who uses it:** Application developer.
+
+**When you need it:** Use after admission, a timeout or a process restart. Retain order_id independently from wallet call batch IDs.
+
+[`GET /v1/accounts/{accountId}/uniswapx-orders/{orderId}`](http-reference.md#get-v1-accounts-accountid-uniswapx-orders-orderid) — request body, permissions, effects and response details.
+
 ### Follow a transaction’s progress live
 
 Receive status updates for an admitted transaction request without repeatedly polling.
@@ -252,7 +282,7 @@ Receive status updates for an admitted transaction request without repeatedly po
 
 [`GET /v1/accounts/{accountId}/wallet/calls/{batchId}/events`](http-reference.md#get-v1-accounts-accountid-wallet-calls-batchid-events) — request body, permissions, effects and response details.
 
-### See recent transaction requests
+### Browse transaction requests
 
 List the transaction requests you may read, including their queue stages and retained verified outcomes.
 

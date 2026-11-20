@@ -20,8 +20,9 @@ const mutations = [
   {
     name: 'durable-single-dispatch',
     file: 'src/storage/journal.ts',
-    before: 'return claimValue(previous, request);',
-    after: "return { ...claimValue(previous, request), state: 'dispatch' };",
+    before: 'return claimValue(previous, request, signatureProtection);',
+    after:
+      "return { ...claimValue(previous, request, signatureProtection), state: 'dispatch' };",
     test: 'test/sqlite-storage.test.ts',
     title:
       'allows one dispatch across two independent processes and keeps exact large integer reservations',

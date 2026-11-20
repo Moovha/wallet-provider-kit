@@ -1,3 +1,4 @@
+import { schemaVersion } from '../src/storage/schema.js';
 import { defaultSafeProvisioning } from '../src/provisioning/defaults.js';
 import { ApplicationCredentialCipher } from '../src/runtime-configuration/credentials.js';
 import { currentRuntimePolicy } from '../src/runtime-configuration/authority.js';
@@ -388,7 +389,7 @@ describe('runtime application contracts and provider policies', () => {
             ?.count,
         ).toBe(0);
       expect(database.prepare('PRAGMA user_version').get()?.user_version).toBe(
-        2,
+        schemaVersion,
       );
     } finally {
       database.close();

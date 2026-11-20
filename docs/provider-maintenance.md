@@ -301,6 +301,57 @@ actual schema and chain evidence. Do not promise zero downtime for the single-ho
 runtime. Operating-system updates and cloud resource replacement remain with the
 provider's infrastructure tools; the wallet service has no host shell authority.
 
+## Upgrade SQLite storage from version 2 to 3
+
+Schema version 3 adds durable record lookup indexes and counts. A version 3 service
+refuses a version 2 database until you explicitly upgrade it. `init-storage` does
+not upgrade an existing database. New installations initialize version 3 directly.
+
+1. Stop admissions and every database writer, including scheduled jobs. Keep them
+   stopped throughout the upgrade. Retain an encrypted recovery set containing the
+   version 2 database, complete vault, credentials, configuration and old release;
+   verify that backup before proceeding.
+2. Prepare the reviewed version 3 build with the same private storage paths and
+   service identity. Allow maintenance time and free disk space for a one-time
+   scan, the durable indexes and SQLite's transaction journal. Do not start the
+   service yet.
+3. As the storage owner, run the following with the version 3 toolkit executable
+   and your retained configuration:
+
+   ```sh
+   wallet-provider-kit upgrade-storage \
+     --config /private/provider/provider.config.json
+   wallet-provider-kit doctor \
+     --config /private/provider/provider.config.json
+   ```
+
+   For a source build, use `node dist/main.js` in place of `wallet-provider-kit`.
+   For a container installation, run that command in the reviewed toolkit image
+   with the existing private bind mounts and service user; keep the service and
+   other writers stopped. The command loads configuration without activating a
+   provider, unlocking wallets or resolving provider credentials.
+
+4. Require a successful upgrade and review the doctor results before starting the
+   compatible service. Complete the authority and recovery checks in the upgrade
+   procedure above before reopening admissions. Take and verify a new recovery
+   set after acceptance.
+
+The upgrade accepts only the exact toolkit version 2 schema or an already current
+version 3 schema. It preserves existing record bytes, wallet bindings and financial
+attempts. Index creation, backfill and the schema version change commit together;
+a failure rolls back the upgrade. An interrupted transaction must recover through
+SQLite before retrying. Keep its journal files and the pre-upgrade backup intact.
+Do not change the schema version manually or recreate an empty database to clear
+an error. Running the command on version 3 verifies the schema without rebuilding
+its indexes.
+
+An older toolkit cannot open the upgraded database. A downgrade requires an
+isolated, consistent recovery set and reconciliation of any subsequent activity;
+swapping the image alone is insufficient. The recovery tools accept version 2 and
+version 3 snapshots and report the retained version. Restoring a version 2 snapshot
+does not upgrade it: keep the restored service fenced and follow this procedure
+with a compatible build before considering resumption.
+
 ## Choose the right release
 
 Use a reviewed release bundle with verified provenance and compatibility.

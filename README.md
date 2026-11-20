@@ -5,9 +5,7 @@
 **Build a blockchain wallet service that lets applications request transactions on behalf of your users.**
 
 Wallet Provider Kit is a configurable wallet service and TypeScript toolkit for
-teams building and operating blockchain wallets for their users. Rooted in Moovha's
-work with blockchain payments and decentralised finance (DeFi), it makes access
-to on-chain assets such as USDC and ZARP easier to integrate into everyday products.
+teams building and operating blockchain wallets for their users.
 It brings account creation,
 application-led access, account provisioning and approved-action signing into one toolkit. OWS stores the private owner signer for each user Safe. You define who may use an account
 and retain responsibility for key control and recovery.
@@ -32,12 +30,10 @@ binding, evidence, permissions, revocation and limits. Required fields or an OAu
 scope alone do not establish identity or spending authority.
 
 Connected applications are expected to cover the blockchain network fees, often
-called **gas**, for the supported actions they request. When a provider connects
-its wallets to Moovha with user approval, Moovha takes that sponsorship role for
-admitted operations. Providers should be able to integrate without building their
-own gas-funding rail or asking users to keep a separate gas-token balance.
-The [assets and gas guide](docs/assets-and-gas.md) explains this project-supported
-rail, the application's obligations and the current implementation boundary.
+called **gas**, for the supported actions they request. The provider and application
+agree funding terms and limits before enabling those actions.
+The [assets and gas guide](docs/assets-and-gas.md) explains the funding
+infrastructure, the application's obligations and the current implementation boundary.
 
 [Documentation](https://moovha.github.io/wallet-provider-kit/) ·
 [Get started](docs/README.md) ·
@@ -214,31 +210,20 @@ the stored result; a pending or unknown attempt requires reconciliation.
 
 [View full-size signing diagram](docs/public/diagrams/approved-signing.svg)
 
-## Where it fits in Moovha
+## Separate wallet control from application policy {#where-it-fits-in-moovha}
 
-Moovha's foundations are on-chain transfers, swaps and access to DeFi through
-assets such as USDC and ZARP. These wallets hold blockchain assets and authorise
-transactions involving token and vault contracts. A simple product experience
-still needs to make the asset, network, approval and fees clear.
+The connected application owns its customer experience, transaction intent,
+asset selection, routing, commercial pricing and business settlement. Those
+rules and integration walkthroughs belong in the application's repository.
 
-Wallet Provider Kit lets independent wallet providers connect their services to
-applications such as Moovha. The provider checks access and signs approved actions
-while keeping Safe owner keys within its private OWS vault.
+The provider checks current authority, keeps signing keys private, records exact
+attempts and verifies execution outcomes. Its supported protocol adapters enforce
+specific signing and recovery contracts without choosing the application's product
+policy. See the [architecture guide](docs/architecture.md).
 
-Learn about [Moovha](https://moovha.com/) and explore the
-[Moovha GitHub organization](https://github.com/Moovha).
-
-Moovha's business-operation API coordinates transaction intent,
-sponsorship, execution and settlement. Device-wallet backup and recovery are separate application responsibilities. The [architecture guide](docs/architecture.md)
-explains the provider boundary and application access.
-
-Gas sponsorship is part of that integration design: the connected application
-funds eligible network fees while the provider retains wallet control and checks
-the user's authority. It does not require sharing keys with the application.
-
-Non-custodial application access describes Moovha's relationship to the wallet's
-keys. Exclusive end-user self-custody depends on who can actually control and
-recover the chosen backend. Explain that control and recovery model to your users.
+Connecting an application does not transfer wallet keys to it. Exclusive end-user
+self-custody depends on who can actually control and recover the chosen backend.
+Explain that control and recovery model to your users.
 
 ## What is available today
 
@@ -258,9 +243,8 @@ Start with the [setup guide](docs/README.md); application connection follows dep
 Your first deployment stays disabled while you test your backend, application
 permissions and recovery. The supported runtime uses one active POSIX host with
 persistent [SQLite storage](docs/storage.md). Production custody acceptance and
-funded mainnet acceptance remain pending. USDC and ZARP illustrate the wider project's
-asset use cases; verify the exact network-specific token contract and signing domain before
-configuring transfers.
+funded mainnet acceptance remain pending. Verify the exact network-specific token
+contract and signing domain before configuring transfers.
 
 ## Configure your wallet service
 

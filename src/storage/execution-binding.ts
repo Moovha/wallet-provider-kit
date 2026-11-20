@@ -3,7 +3,7 @@ import { fingerprint } from '../onboarding/policy.js';
 import type { StorageConnection } from './connection.js';
 import type { FinancialApproval } from './types.js';
 
-export type OperationMechanism = 'safe-4337-v07';
+export type OperationMechanism = 'safe-4337-v07' | 'uniswapx-v3-permit2';
 function identity(approval: FinancialApproval) {
   return fingerprint([
     'financial-operation-v1',
@@ -18,6 +18,8 @@ function identity(approval: FinancialApproval) {
 export function approvalMechanism(
   approval: FinancialApproval,
 ): OperationMechanism {
+  if (approval.action.payload.primaryType === 'SafeMessage')
+    return 'uniswapx-v3-permit2';
   if (
     !['SafeOp', 'SafeCallIntent'].includes(approval.action.payload.primaryType)
   )

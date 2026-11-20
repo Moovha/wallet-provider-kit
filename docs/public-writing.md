@@ -22,6 +22,20 @@ Contributor instructions belong in contributor workflows. Operator walkthroughs
 should explain how to use the service, rather than direct a coding agent or
 describe the maintainer's next development session.
 
+## Keep product guidance with its application
+
+Write toolkit installation and wallet guides for any adopting provider. Application
+asset choices, fiat mappings, pricing examples, routing decisions and customer
+workflows belong in the owning application's documentation. Describe the toolkit's
+interfaces and responsibilities without using a particular product as the default.
+
+Keep exact protocol names, endpoint identifiers and security limits in protocol
+adapter and API references. These explain implemented compatibility; they do not
+make the toolkit responsible for application policy. Keep protocol-specific request
+examples in the relevant reference when needed to explain its contract. Put complete
+product integration walkthroughs and activation plans in the application's repository.
+Retain stable documentation URLs and anchors when reorganizing content.
+
 ## Follow the provider's setup journey
 
 Organize installation around preparing a disabled service and opening its persistent

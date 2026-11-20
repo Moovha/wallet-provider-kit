@@ -135,6 +135,7 @@ const batchesSchema = {
   required: ['truncated', 'batches'],
   properties: {
     truncated: { type: 'boolean' },
+    next_cursor: { type: ['string', 'null'], maxLength: 256 },
     batches: {
       type: 'array',
       maxItems: 100,
@@ -718,10 +719,20 @@ export async function registerRuntimeConfigurationRoutes(
       );
     },
   );
-  app.get(
+  app.get<{ Querystring: { after?: string; limit?: number } }>(
     '/v1/wallet/batches',
     {
-      schema: schema('listWalletBatches', batchesSchema),
+      schema: {
+        ...schema('listWalletBatches', batchesSchema),
+        querystring: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            after: { type: 'string', minLength: 1, maxLength: 256 },
+            limit: { type: 'integer', minimum: 1, maximum: 100 },
+          },
+        },
+      },
     },
     async (request) => {
       let caller;
@@ -744,6 +755,7 @@ export async function registerRuntimeConfigurationRoutes(
         provider
           ? (state) => configured(request).assertOperatorState(caller, state)
           : undefined,
+        request.query,
       );
     },
   );

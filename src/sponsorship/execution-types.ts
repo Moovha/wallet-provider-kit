@@ -95,5 +95,10 @@ export interface WalletCallsDriver {
     authorizeOperator?: (
       state: import('../onboarding/types.js').ProviderState,
     ) => void,
-  ): Promise<{ truncated: boolean; batches: WalletCallsBatchSummary[] }>;
+    page?: import('../onboarding/record-pages.js').RecordPageInput,
+  ): Promise<{
+    truncated: boolean;
+    next_cursor?: string | null;
+    batches: WalletCallsBatchSummary[];
+  }>;
 }

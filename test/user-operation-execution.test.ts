@@ -925,7 +925,35 @@ it.each([
         expect(ranges).toContainEqual([200n, 299n]);
         expect(ranges).toContainEqual([300n, 355n]);
         expect(await t.status()).toMatchObject({ status: 400 });
-      } else expect(latest?.observation.state).not.toBe('expired');
+        const source = await t.f.onboarding.store.transaction(
+          (state) => state.supportedActions![plan.operationId],
+        );
+        expect(source).toMatchObject({ status: 'denied', nonceReleased: true });
+        await t.f.onboarding.store.transaction((state) => {
+          state.supportedActions![plan.operationId].nonceReleased = false;
+        });
+        t.f.config.acceptance.rpcUrls = ['https://replacement.example.test'];
+        t.f.config.acceptance.rpcVerification = 'single';
+        await t.restart();
+        const spy = vi.spyOn(t.ports.execution, 'refreshSettlement');
+        expect(await t.ports.driver.settleOnce()).toBe(true);
+        expect(spy).toHaveBeenCalledWith(plan.operationId);
+        expect(
+          await t.f.onboarding.store.transaction(
+            (state) => state.supportedActions![plan.operationId].nonceReleased,
+          ),
+        ).toBe(true);
+        expect(t.s.sends).toBe(1);
+        expect(t.f.state.signs).toBe(1);
+        now.mockReturnValue(Number(until + 30n) * 1000);
+        expect(await t.ports.driver.settleOnce()).toBe(false);
+      } else {
+        expect(latest?.observation.state).not.toBe('expired');
+        const source = await t.f.onboarding.store.transaction(
+          (state) => state.supportedActions![plan.operationId],
+        );
+        expect(source.nonceReleased).not.toBe(true);
+      }
     } finally {
       now.mockRestore();
     }
@@ -1002,4 +1030,83 @@ it('retains uncertain estimator failures as retryable without signing', async ()
   await t.ports.driver.runOnce();
   expect(await t.status()).toMatchObject({ status: 100 });
   expect(t.s.sends + t.f.state.posts + t.f.state.signs).toBe(0);
+});
+
+it('checks full submission authority once at the final dispatch boundary', async () => {
+  const t = await setup();
+  const authorize = vi.spyOn(t.f.service, 'authorizeSubmission');
+  await t.submit();
+  await t.ports.driver.runOnce();
+  expect(t.s.sends).toBe(1);
+  expect(authorize).toHaveBeenCalledOnce();
+  expect(authorize.mock.calls[0][2]).not.toBe(false);
+});
+
+it('rejects revocation after retaining the signed plan and before dispatch', async () => {
+  const t = await setup();
+  const original = t.f.service.authorizeSubmission.bind(t.f.service);
+  vi.spyOn(t.f.service, 'authorizeSubmission').mockImplementation(
+    async (context, id, verifyChain = true) => {
+      const retained = await t.f.onboarding.store.transaction((s) =>
+        Object.values(s.userOperationExecutions ?? {}),
+      );
+      expect(retained).toHaveLength(1);
+      await t.f.onboarding.store.transaction((s) => {
+        s.grants[t.f.grant.grant_id!].state = 'revoked';
+      });
+      return original(context, id, verifyChain);
+    },
+  );
+  await t.submit();
+  await t.ports.driver.runOnce();
+  expect(t.s.sends).toBe(0);
+  const plans = await t.f.onboarding.store.transaction((s) =>
+    Object.values(s.userOperationExecutions ?? {}),
+  );
+  expect(plans).toHaveLength(1);
+  expect(plans[0].dispatch).toBeUndefined();
+});
+
+it('pages batch reports across retained history without returning another caller’s entries', async () => {
+  const t = await setup();
+  await t.submit();
+  await t.f.onboarding.store.transaction((state) => {
+    const template = structuredClone(
+      Object.values(state.userOperationBatches!)[0],
+    );
+    for (let i = 0; i < 205; i++) {
+      const id = '00000000-0000-4000-8000-' + String(i).padStart(12, '0');
+      state.userOperationBatches![id] = {
+        ...structuredClone(template),
+        id,
+        stage: 'complete',
+        context: {
+          ...template.context,
+          principal: {
+            ...template.context.principal,
+            subject: 'other-offline-caller',
+          },
+        },
+      };
+    }
+  });
+  const summaries = [];
+  let after: string | undefined;
+  let pages = 0;
+  do {
+    const page = await t.ports.driver.list(t.f.context.principal, undefined, {
+      after,
+      limit: 7,
+    });
+    expect(page.batches.length).toBeLessThanOrEqual(7);
+    expect(page.truncated).toBe(page.next_cursor !== null);
+    summaries.push(...page.batches);
+    after = page.next_cursor ?? undefined;
+    pages++;
+  } while (after);
+  expect(pages).toBe(30);
+  expect(summaries).toHaveLength(1);
+  await t.ports.driver.runOnce();
+  expect(t.s.sends).toBe(1);
+  expect(t.f.state.signs).toBe(1);
 });

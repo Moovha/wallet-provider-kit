@@ -153,7 +153,12 @@ export function defineOnboardingPolicy(
         sharing.matchingFields.sort();
       }
       if (app.assertionTrust) {
-        keys(app.assertionTrust, ['agreement']);
+        keys(app.assertionTrust, ['agreement', 'managedRenewal']);
+        if (
+          app.assertionTrust.managedRenewal !== undefined &&
+          typeof app.assertionTrust.managedRenewal !== 'boolean'
+        )
+          throw new Error();
         if (!text(app.assertionTrust.agreement)) throw new Error();
       }
       if (mode === 'application' && !app.assertionTrust) throw new Error();

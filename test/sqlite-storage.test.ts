@@ -211,7 +211,7 @@ describe('toolkit-owned SQLite storage', () => {
       inspect
         .prepare("SELECT name FROM sqlite_schema WHERE type='trigger'")
         .all(),
-    ).toEqual([]);
+    ).toHaveLength(5);
     inspect.close();
     db.close();
     expect(await db.ready()).toBe(false);
