@@ -411,6 +411,7 @@ it('keeps other application revisions stable and denies pending authority after 
     id: first.id,
     expected_revision: 1,
     trust_agreement: 'First agreement',
+    managed_renewal: true,
   });
   const principal = await f.service.verifyCredentials(
     first.id,
@@ -418,6 +419,9 @@ it('keeps other application revisions stable and denies pending authority after 
     ['wallet:access'],
   );
   expect(application(onboarding.policy, principal).name).toBe('First');
+  expect(
+    application(onboarding.policy, principal).assertionTrust?.managedRenewal,
+  ).toBe(true);
   await f.store.transaction((s) => {
     s.requests = { pending: { caller: principal } as never };
   });

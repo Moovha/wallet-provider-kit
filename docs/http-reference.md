@@ -2334,6 +2334,20 @@ Success response schema:
   "additionalProperties": false,
   "required": ["request_id", "status"],
   "properties": {
+    "managed_authorization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceRequestId", "agreement"],
+      "properties": {
+        "sourceRequestId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "agreement": {
+          "type": "string"
+        }
+      }
+    },
     "wallet": {
       "type": "object",
       "additionalProperties": false,
@@ -2512,6 +2526,9 @@ Success response schema:
     "owner_consent_required": {
       "type": "boolean",
       "enum": [true]
+    },
+    "managed_renewal_available": {
+      "type": "boolean"
     },
     "provider_review_required": {
       "type": "boolean"
@@ -4593,6 +4610,20 @@ Success response schema:
             "additionalProperties": false,
             "required": ["request_id", "status"],
             "properties": {
+              "managed_authorization": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["sourceRequestId", "agreement"],
+                "properties": {
+                  "sourceRequestId": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                  },
+                  "agreement": {
+                    "type": "string"
+                  }
+                }
+              },
               "wallet": {
                 "type": "object",
                 "additionalProperties": false,
@@ -4706,6 +4737,182 @@ Success response schema:
 }
 ```
 
+## POST `/v1/access-requests/{requestId}/renew`
+
+Operation: `renewManagedAccountAccess`.
+
+**Why this exists:** Renew access under the provider operator’s management agreement for an existing personal wallet.
+
+**Who uses it:** Application developer.
+
+**When you need it:** Use when managed_renewal_available is true and an existing grant expires or its policy changes.
+
+**Before you start:** The operator must enable assertionTrust.managedRenewal on the trusted application. Send the original request ID, its user_id and a retained UUID Idempotency-Key. The provider derives the account, permissions and withdrawal reference and validates current identity and policy.
+
+**Result and next step:** 200: the current access decision. A granted receipt preserves the account and includes managed_authorization with the source request and agreement. Retry lost responses with the original key. Withdrawn grants, shared membership and wallets created by another application are rejected. Reconcile retained financial batches before dispatch.
+
+| Parameter         | Location | Required | Schema                                                                                                |
+| ----------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
+| `requestId`       | path     | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+| `idempotency-key` | header   | yes      | `{"type":"string","pattern":"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}` |
+| `wallet-network`  | header   | no       | `{"type":"string","enum":["base","base-sepolia","ethereum","ethereum-sepolia"]}`                      |
+
+Request body (application/json):
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["user_id"],
+  "properties": {
+    "user_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    }
+  }
+}
+```
+
+| Status | Content type             | Description      |
+| ------ | ------------------------ | ---------------- |
+| 200    | application/json         | Default Response |
+| 400    | application/problem+json | Default Response |
+| 401    | application/problem+json | Default Response |
+| 403    | application/problem+json | Default Response |
+| 409    | application/problem+json | Default Response |
+| 413    | application/problem+json | Default Response |
+| 415    | application/problem+json | Default Response |
+| 422    | application/problem+json | Default Response |
+| 429    | application/problem+json | Default Response |
+| 500    | application/problem+json | Default Response |
+| 503    | application/problem+json | Default Response |
+
+Success response schema:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["request_id", "status"],
+  "properties": {
+    "managed_authorization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceRequestId", "agreement"],
+      "properties": {
+        "sourceRequestId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "agreement": {
+          "type": "string"
+        }
+      }
+    },
+    "wallet": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reference", "name", "kind"],
+      "properties": {
+        "reference": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "kind": {
+          "enum": ["personal", "shared"]
+        }
+      }
+    },
+    "membership_revision": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "request_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "consent_required",
+        "verification_required",
+        "funding_approval_required",
+        "identity_pending",
+        "reconciliation_required",
+        "provider_review_required",
+        "granted",
+        "denied",
+        "expired",
+        "suspended",
+        "revoked",
+        "policy_changed"
+      ]
+    },
+    "consent_url": {
+      "type": "string",
+      "format": "uri",
+      "description": "Hosted compatibility only. Application-led grants have no provider user redirect."
+    },
+    "grant_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "consent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reference", "granted_at", "expires_at", "policy_revision"],
+      "properties": {
+        "reference": {
+          "type": "string"
+        },
+        "granted_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "expires_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "policy_revision": {
+          "type": "string"
+        },
+        "action_policy_revision": {
+          "type": "string"
+        }
+      }
+    },
+    "account_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "permissions": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "account:read",
+          "operations:request",
+          "contracts:request",
+          "orders:authorize",
+          "members:manage",
+          "owners:manage"
+        ]
+      }
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}
+```
+
 ## GET `/v1/access-requests/{requestId}`
 
 Operation: `getAccountAccessRequest`.
@@ -4747,6 +4954,20 @@ Success response schema:
   "additionalProperties": false,
   "required": ["request_id", "status"],
   "properties": {
+    "managed_authorization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceRequestId", "agreement"],
+      "properties": {
+        "sourceRequestId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "agreement": {
+          "type": "string"
+        }
+      }
+    },
     "wallet": {
       "type": "object",
       "additionalProperties": false,
@@ -4913,6 +5134,20 @@ Success response schema:
   "additionalProperties": false,
   "required": ["request_id", "status"],
   "properties": {
+    "managed_authorization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceRequestId", "agreement"],
+      "properties": {
+        "sourceRequestId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "agreement": {
+          "type": "string"
+        }
+      }
+    },
     "wallet": {
       "type": "object",
       "additionalProperties": false,
@@ -20821,6 +21056,9 @@ Request body (application/json):
       }
     },
     "enabled": {
+      "type": "boolean"
+    },
+    "managed_renewal": {
       "type": "boolean"
     },
     "trust_agreement": {

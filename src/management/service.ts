@@ -850,6 +850,7 @@ export class ManagementService {
       expected_revision?: number;
       enabled?: boolean;
       trust_agreement?: string | null;
+      managed_renewal?: boolean;
       permissions?: ApplicationPolicy['permissions'];
       wallet_sharing?: Omit<
         import('../onboarding/types.js').WalletSharingPolicy,
@@ -937,6 +938,7 @@ export class ManagementService {
             deny();
           if (
             input.trust_agreement !== undefined ||
+            input.managed_renewal !== undefined ||
             input.permissions !== undefined ||
             input.wallet_sharing !== undefined
           )
@@ -952,7 +954,7 @@ export class ManagementService {
         }
         const previousEnabled = identity.enabled;
         const previousTrust = canonicalHash(
-          identity.policy?.assertionTrust ?? null,
+          identity.policy?.assertionTrust?.agreement ?? null,
         );
         const previousPermissions = [
           ...(identity.policy?.permissions ?? defaultPermissions),
@@ -985,6 +987,7 @@ export class ManagementService {
           }
           if (
             input.trust_agreement !== undefined ||
+            input.managed_renewal !== undefined ||
             input.permissions !== undefined
           ) {
             if (identity.role !== 'application') invalid();
@@ -1002,7 +1005,17 @@ export class ManagementService {
                 : {}),
               permissions: input.permissions ??
                 identity.policy?.permissions ?? ['account:read'],
-              ...(agreement ? { assertionTrust: { agreement } } : {}),
+              ...(agreement
+                ? {
+                    assertionTrust: {
+                      agreement,
+                      managedRenewal:
+                        input.managed_renewal ??
+                        identity.policy?.assertionTrust?.managedRenewal ??
+                        false,
+                    },
+                  }
+                : {}),
             };
             if (agreement !== null && agreement !== undefined) {
               try {
@@ -1105,8 +1118,9 @@ export class ManagementService {
           // Existing tokens retain their issued scopes; additions do not expand them.
           if (
             identity.enabled !== previousEnabled ||
-            canonicalHash(identity.policy?.assertionTrust ?? null) !==
-              previousTrust ||
+            canonicalHash(
+              identity.policy?.assertionTrust?.agreement ?? null,
+            ) !== previousTrust ||
             previousScopes.some((scope) => !identity.scopes.includes(scope)) ||
             previousPermissions.some(
               (permission) =>
@@ -1125,7 +1139,7 @@ export class ManagementService {
         );
         const invalidatesGrants =
           identity.enabled !== previousEnabled ||
-          canonicalHash(identity.policy?.assertionTrust ?? null) !==
+          canonicalHash(identity.policy?.assertionTrust?.agreement ?? null) !==
             previousTrust ||
           removedPermissions.length > 0;
         const invalidatesSharing =
@@ -1183,8 +1197,9 @@ export class ManagementService {
             revokedGrants: revokedGrants.size,
             removedPermissions,
             trustChanged:
-              canonicalHash(identity.policy?.assertionTrust ?? null) !==
-              previousTrust,
+              canonicalHash(
+                identity.policy?.assertionTrust?.agreement ?? null,
+              ) !== previousTrust,
             enabledChanged: identity.enabled !== previousEnabled,
             sharingChanged:
               previousSharing !==

@@ -94,7 +94,7 @@ export interface ApplicationPolicy {
   name: string;
   enabled?: boolean;
   /** Explicit permission to attest user identity and consent; an OAuth scope alone is insufficient. */
-  assertionTrust?: { agreement: string };
+  assertionTrust?: { agreement: string; managedRenewal?: boolean };
   walletSharing?: WalletSharingPolicy;
   permissions?: Permission[];
   /** Contractually agreed reimbursement, not a payment instruction or vendor price quote. */
@@ -184,6 +184,7 @@ export interface WalletMember {
   sourceSharing?: { applicationId: string; revision: string };
 }
 export interface AccessRequest {
+  managedAuthorization?: { sourceRequestId: string; agreement: string };
   userOwner?: string;
   membership?: { personId: string; revision: number };
   sharing?: {

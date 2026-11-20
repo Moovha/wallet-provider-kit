@@ -80,6 +80,16 @@ Ask the provider to accept completed identity checks and the person’s recorded
 
 [`POST /v1/access-requests`](http-reference.md#post-v1-access-requests) — request body, permissions, effects and response details.
 
+### Renew a provider-managed wallet
+
+Renew access under the provider operator’s management agreement for an existing personal wallet.
+
+**Who uses it:** Application developer.
+
+**When you need it:** Use when managed_renewal_available is true and an existing grant expires or its policy changes.
+
+[`POST /v1/access-requests/{requestId}/renew`](http-reference.md#post-v1-access-requests-requestid-renew) — request body, permissions, effects and response details.
+
 ### Check whether wallet access was approved
 
 Look up the decision for a saved access request and recover its returned account and permission details.

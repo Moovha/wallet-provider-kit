@@ -68,6 +68,15 @@ export const accessReceiptSchema = {
   additionalProperties: false,
   required: ['request_id', 'status'],
   properties: {
+    managed_authorization: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['sourceRequestId', 'agreement'],
+      properties: {
+        sourceRequestId: uuidSchema,
+        agreement: { type: 'string' },
+      },
+    },
     wallet: walletDescriptionSchema,
     membership_revision: { type: 'integer', minimum: 1 },
     request_id: uuidSchema,
@@ -582,6 +591,7 @@ export async function registerOnboardingRoutes(
               required_fields: { type: 'array', items: { type: 'string' } },
               maximum_field_characters: { type: 'integer' },
               owner_consent_required: { type: 'boolean', enum: [true] },
+              managed_renewal_available: { type: 'boolean' },
               provider_review_required: { type: 'boolean' },
               provider_login_required: { type: 'boolean' },
               flow: { type: 'string', enum: ['application', 'hosted'] },
@@ -905,6 +915,29 @@ export async function registerOnboardingRoutes(
       service(request).submitRecords(
         await context(request, 'wallet:access'),
         request.body.records,
+      ),
+  );
+  app.post<{ Params: { requestId: string }; Body: { user_id: string } }>(
+    '/v1/access-requests/:requestId/renew',
+    {
+      schema: schema(
+        'renewManagedAccountAccess',
+        {
+          type: 'object',
+          additionalProperties: false,
+          required: ['user_id'],
+          properties: {
+            user_id: { type: 'string', minLength: 1, maxLength: 256 },
+          },
+        },
+        requestParams,
+      ),
+    },
+    async (request) =>
+      service(request).renewManaged(
+        await context(request, 'wallet:access'),
+        request.params.requestId,
+        request.body.user_id,
       ),
   );
   app.get<{ Params: { requestId: string } }>(

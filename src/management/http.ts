@@ -662,6 +662,7 @@ export async function registerManagementRoutes(
       name?: string;
       enabled?: boolean;
       trust_agreement?: string | null;
+      managed_renewal?: boolean;
       wallet_sharing?: Omit<
         import('../onboarding/types.js').WalletSharingPolicy,
         'revision'
@@ -695,6 +696,7 @@ export async function registerManagementRoutes(
             },
           },
           enabled: { type: 'boolean' },
+          managed_renewal: { type: 'boolean' },
           trust_agreement: {
             anyOf: [
               { type: 'string', minLength: 1, maxLength: 256 },

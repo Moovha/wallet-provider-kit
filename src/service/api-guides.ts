@@ -84,6 +84,7 @@ export const apiOperationOrder = [
   'getAccountKyc',
   'updateAccountKyc',
   'requestAccountAccess',
+  'renewManagedAccountAccess',
   'getAccountAccessRequest',
   'provisionAccount',
   'readGrantedAccount',
@@ -1126,6 +1127,20 @@ export const operationGuides: Record<string, OperationGuide> = {
       'Authenticate as the original creating application. Supply expected_revision from getAccountKyc, configured fields and a saved idempotency key. Null removes a field. A changed request needs a new key.',
     success:
       '200: the saved draft and advanced revision. Existing identity acceptance and grants across the owner’s wallets are invalidated. Fresh verified evidence and consent are required for transactions. Stale revisions and changed retries return 409.',
+  },
+  renewManagedAccountAccess: {
+    title: 'Renew a provider-managed wallet',
+    group: 'Wallet access',
+    audience: 'Application developer',
+    scope: 'wallet:access',
+    purpose:
+      'Renew access under the provider operator’s management agreement for an existing personal wallet.',
+    whenToUse:
+      'Use when managed_renewal_available is true and an existing grant expires or its policy changes.',
+    prerequisite:
+      'The operator must enable assertionTrust.managedRenewal on the trusted application. Send the original request ID, its user_id and a retained UUID Idempotency-Key. The provider derives the account, permissions and withdrawal reference and validates current identity and policy.',
+    success:
+      '200: the current access decision. A granted receipt preserves the account and includes managed_authorization with the source request and agreement. Retry lost responses with the original key. Withdrawn grants, shared membership and wallets created by another application are rejected. Reconcile retained financial batches before dispatch.',
   },
   requestAccountAccess: {
     title: 'Submit a person’s checks and wallet permission',

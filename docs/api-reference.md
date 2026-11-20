@@ -686,6 +686,7 @@ export interface ApplicationPolicy {
   /** Explicit permission to attest user identity and consent; an OAuth scope alone is insufficient. */
   assertionTrust?: {
     agreement: string;
+    managedRenewal?: boolean;
   };
   walletSharing?: WalletSharingPolicy;
   permissions?: Permission[];
@@ -1009,6 +1010,7 @@ export declare class OnboardingService {
           import('../orders/uniswapx-v3.js').UniswapXOrderPolicy | undefined;
         action_policy_revision?: string | undefined;
         flow: 'application' | 'hosted';
+        managed_renewal_available: boolean;
         policy_revision: string;
       }
     | {
@@ -1035,6 +1037,7 @@ export declare class OnboardingService {
         max_identity_age_days: number;
         max_access_days: number;
         flow: 'application' | 'hosted';
+        managed_renewal_available: boolean;
         policy_revision: string;
       }
   >;
@@ -1114,8 +1117,53 @@ export declare class OnboardingService {
       | undefined;
     grant_id?: string | undefined;
     consent_url?: string | undefined;
-    request_id: string;
     status: string;
+    managed_authorization?:
+      | {
+          sourceRequestId: string;
+          agreement: string;
+        }
+      | undefined;
+    request_id: string;
+  }>;
+  renewManaged(
+    context: AuthorityContext,
+    sourceRequestId: string,
+    userId: string,
+  ): Promise<{
+    permissions?:
+      | (
+          | 'account:read'
+          | 'operations:request'
+          | 'contracts:request'
+          | 'orders:authorize'
+          | 'members:manage'
+          | 'owners:manage'
+        )[]
+      | undefined;
+    expires_at?: string | undefined;
+    membership_revision?: number | undefined;
+    wallet?: import('./types.js').WalletDescription | undefined;
+    account_id?: string | undefined;
+    consent?:
+      | {
+          action_policy_revision?: string | undefined;
+          reference: string;
+          granted_at: string;
+          expires_at: string;
+          policy_revision: string;
+        }
+      | undefined;
+    grant_id?: string | undefined;
+    consent_url?: string | undefined;
+    status: string;
+    managed_authorization?:
+      | {
+          sourceRequestId: string;
+          agreement: string;
+        }
+      | undefined;
+    request_id: string;
   }>;
   read(
     context: AuthorityContext,
@@ -1146,8 +1194,14 @@ export declare class OnboardingService {
       | undefined;
     grant_id?: string | undefined;
     consent_url?: string | undefined;
-    request_id: string;
     status: string;
+    managed_authorization?:
+      | {
+          sourceRequestId: string;
+          agreement: string;
+        }
+      | undefined;
+    request_id: string;
   }>;
   accessPolicy(principal: VerifiedPrincipal): {
     source: string;
@@ -1165,6 +1219,7 @@ export declare class OnboardingService {
       import('../orders/uniswapx-v3.js').UniswapXOrderPolicy | undefined;
     action_policy_revision?: string | undefined;
     flow: 'application' | 'hosted';
+    managed_renewal_available: boolean;
     policy_revision: string;
   };
   submitRecords(
@@ -1235,8 +1290,14 @@ export declare class OnboardingService {
       | undefined;
     grant_id?: string | undefined;
     consent_url?: string | undefined;
-    request_id: string;
     status: string;
+    managed_authorization?:
+      | {
+          sourceRequestId: string;
+          agreement: string;
+        }
+      | undefined;
+    request_id: string;
   }>;
   importIdentity(
     inputContext: AuthorityContext,
@@ -1269,8 +1330,14 @@ export declare class OnboardingService {
       | undefined;
     grant_id?: string | undefined;
     consent_url?: string | undefined;
-    request_id: string;
     status: string;
+    managed_authorization?:
+      | {
+          sourceRequestId: string;
+          agreement: string;
+        }
+      | undefined;
+    request_id: string;
   }>;
   verificationVendors(): Vendor[];
   startVerification(
@@ -1387,8 +1454,14 @@ export declare class OnboardingService {
       | undefined;
     grant_id?: string | undefined;
     consent_url?: string | undefined;
-    request_id: string;
     status: string;
+    managed_authorization?:
+      | {
+          sourceRequestId: string;
+          agreement: string;
+        }
+      | undefined;
+    request_id: string;
   }>;
   /** Verify a current, independently consented sharing grant for an application-bound Safe. */
   hasSharedWalletAccess(
@@ -1541,8 +1614,14 @@ export declare class OnboardingService {
       | undefined;
     grant_id?: string | undefined;
     consent_url?: string | undefined;
-    request_id: string;
     status: string;
+    managed_authorization?:
+      | {
+          sourceRequestId: string;
+          agreement: string;
+        }
+      | undefined;
+    request_id: string;
   }>;
   ownerGrants(identity: OwnerIdentity): Promise<
     {

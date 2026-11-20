@@ -425,6 +425,9 @@ export class OnboardingService {
     const status = this.stateOf(state, request);
     return {
       request_id: request.id,
+      ...(request.managedAuthorization
+        ? { managed_authorization: request.managedAuthorization }
+        : {}),
       status,
       ...(this.policy.access.mode === 'hosted'
         ? {
@@ -532,6 +535,118 @@ export class OnboardingService {
     );
   }
   async request(inputContext: AuthorityContext, value: AccessRequestInput) {
+    return this.requestAccess(inputContext, value);
+  }
+
+  async renewManaged(
+    context: AuthorityContext,
+    sourceRequestId: string,
+    userId: string,
+  ) {
+    const current = this.context(context);
+    const input = await this.store.transaction((state) => {
+      const source = getRecord(state, 'requests', sourceRequestId);
+      const key = fingerprint([
+        current.principal.issuer,
+        current.principal.subject,
+        current.principal.clientId,
+        'request',
+        context.idempotencyKey,
+      ]);
+      const saved = getRecord(state, 'idempotency', key);
+      if (saved) {
+        const retained = getRecord(state, 'requests', saved.id);
+        const trust = application(
+          this.policy,
+          current.principal,
+        ).assertionTrust;
+        const grant =
+          source?.grantId && getRecord(state, 'grants', source.grantId);
+        if (
+          !trust?.managedRenewal ||
+          !retained ||
+          !sameCaller(retained.caller, current.principal) ||
+          retained.managedAuthorization?.sourceRequestId !== sourceRequestId ||
+          retained.input.user?.id !== userId ||
+          !grant ||
+          grant.withdrawnAt !== undefined
+        )
+          deny();
+        return { retained: this.receipt(state, retained) };
+      }
+      this.managedSource(state, current.principal, sourceRequestId, userId);
+      return {
+        mode: 'connect' as const,
+        account_id: source.accountId,
+        user: {
+          id: userId,
+          consent: {
+            reference: source.input.user!.consent.reference,
+            account_id: source.accountId,
+            granted_at: new Date().toISOString(),
+            expires_at: new Date(
+              Date.now() + this.policy.access.maxAgeDays * day,
+            ).toISOString(),
+          },
+        },
+        authorization_details: structuredClone(
+          source.input.authorization_details,
+        ),
+      };
+    });
+    if ('retained' in input) {
+      if (!input.retained) deny();
+      return input.retained;
+    }
+    return this.requestAccess(context, input, sourceRequestId);
+  }
+
+  private managedSource(
+    state: ProviderState,
+    principal: VerifiedPrincipal,
+    id: string,
+    userId: string,
+  ) {
+    const trusted = application(this.policy, principal).assertionTrust;
+    const source = getRecord(state, 'requests', id);
+    if (
+      !trusted?.managedRenewal ||
+      this.policy.access.mode !== 'application' ||
+      !source ||
+      !sameCaller(source.caller, principal) ||
+      source.input.user?.id !== userId ||
+      source.denied ||
+      source.sharing ||
+      source.membership ||
+      !source.grantId ||
+      source.input.authorization_details[0].actions.some(
+        (action) => !['account:read', 'contracts:request'].includes(action),
+      )
+    )
+      deny();
+    const account = creatorAccount(
+      this.policy,
+      state,
+      principal,
+      source.accountId,
+    );
+    const grant = getRecord(state, 'grants', source.grantId);
+    if (
+      !account ||
+      walletDescription(account).kind !== 'personal' ||
+      !grant ||
+      grant.state !== 'active' ||
+      grant.withdrawnAt !== undefined
+    )
+      deny();
+    return { sourceRequestId: id, agreement: trusted.agreement };
+  }
+
+  private async requestAccess(
+    inputContext: AuthorityContext,
+    value: AccessRequestInput,
+    managedSourceId?: string,
+  ) {
     const context = this.context(inputContext);
     const normalized = normalizeInput(
       structuredClone(value) as AccessInput,
@@ -558,6 +673,14 @@ export class OnboardingService {
       context.idempotencyKey,
     ]);
     return this.store.transaction((state) => {
+      const managedAuthorization = managedSourceId
+        ? this.managedSource(
+            state,
+            context.principal,
+            managedSourceId,
+            normalized.user!.id,
+          )
+        : undefined;
       const input = resolveWalletInput(
         this.policy,
         state,
@@ -604,15 +727,18 @@ export class OnboardingService {
             )
           : undefined;
       if (snapshot) validateRuntimeClaims(snapshot, input.user);
-      const hash = delegatesTransfers
-        ? fingerprint([normalized, actionRevision])
-        : fingerprint(normalized);
+      const hash = managedSourceId
+        ? fingerprint(['managed-renewal', managedSourceId, normalized.user!.id])
+        : delegatesTransfers
+          ? fingerprint([normalized, actionRevision])
+          : fingerprint(normalized);
       const previous = getRecord(state, 'idempotency', key);
       if (previous) {
         if (previous.hash !== hash) conflict();
         return this.receipt(state, getRecord(state, 'requests', previous.id));
       }
       const request: AccessRequest = {
+        ...(managedAuthorization ? { managedAuthorization } : {}),
         id: randomUUID(),
         caller: {
           issuer: context.principal.issuer,
@@ -798,7 +924,14 @@ export class OnboardingService {
       }
       putRecord(state, 'requests', request.id, request);
       putRecord(state, 'idempotency', key, { hash, id: request.id });
-      audit(state, 'access_requested', request.id, this.policy.revision);
+      audit(
+        state,
+        managedAuthorization
+          ? 'provider_managed_access_renewed'
+          : 'access_requested',
+        request.id,
+        this.policy.revision,
+      );
       return this.receipt(state, request);
     });
   }
@@ -814,6 +947,9 @@ export class OnboardingService {
     application(this.policy, principal);
     return {
       flow: this.policy.access.mode,
+      managed_renewal_available:
+        application(this.policy, principal).assertionTrust?.managedRenewal ===
+        true,
       policy_revision: this.policy.consentRevision ?? this.policy.revision,
       ...(this.actionPolicyRevision
         ? {

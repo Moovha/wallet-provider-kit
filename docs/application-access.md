@@ -262,3 +262,26 @@ Use request-status reads to investigate the earlier outcome.
 Keep application/user IDs, vault bindings and recovery records across restarts.
 Changing the application identity is not an account migration. Next,
 [test the connection](staging-walkthrough.md), including withdrawal and retry cases.
+
+## Renew provider-managed wallets
+
+An operator can enable `assertionTrust.managedRenewal` for a trusted application,
+or set `managed_renewal` through the provider identity update API. The reviewed
+trust agreement must assign the application authority to manage access for the
+personal wallets it created. The access-policy response exposes
+`managed_renewal_available` so the application can select this workflow.
+
+Send `POST /v1/access-requests/{requestId}/renew` with `user_id`, the original
+request ID and a UUID `Idempotency-Key`. The provider derives the account,
+permissions and withdrawal reference from the original request. It checks the
+creating application, recorded owner, current identity, current permissions and
+current transaction rules. Its receipt includes `managed_authorization` with the
+source request and operator agreement. The audit event is
+`provider_managed_access_renewed`. The renewal records the provider's management
+authority separately from an owner's interactive approval.
+
+The endpoint supports personal wallets created by that application. Shared
+membership, cross-application connections, withdrawn grants, suspended accounts
+and provider denials require their corresponding authorization workflows.
+Reuse the original idempotency key after a lost response. Reconcile any retained
+financial batch before retrying its dispatch.

@@ -707,6 +707,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/access-requests/{requestId}/renew": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Renew a provider-managed wallet
+         * @description **Why this exists:** Renew access under the provider operator’s management agreement for an existing personal wallet.
+         *
+         *     **Who uses it:** Application developer.
+         *
+         *     **When you need it:** Use when managed_renewal_available is true and an existing grant expires or its policy changes.
+         *
+         *     **Before you start:** The operator must enable assertionTrust.managedRenewal on the trusted application. Send the original request ID, its user_id and a retained UUID Idempotency-Key. The provider derives the account, permissions and withdrawal reference and validates current identity and policy.
+         *
+         *     **Result and next step:** 200: the current access decision. A granted receipt preserves the account and includes managed_authorization with the source request and agreement. Retry lost responses with the original key. Withdrawn grants, shared membership and wallets created by another application are rejected. Reconcile retained financial batches before dispatch.
+         */
+        post: operations["renewManagedAccountAccess"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/access-requests/{requestId}": {
         parameters: {
             query?: never;
@@ -4821,6 +4849,10 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
+                        managed_authorization?: {
+                            sourceRequestId: string;
+                            agreement: string;
+                        };
                         wallet?: {
                             reference: string;
                             name: string;
@@ -5055,6 +5087,7 @@ export interface operations {
                         maximum_field_characters: number;
                         /** @enum {boolean} */
                         owner_consent_required: true;
+                        managed_renewal_available?: boolean;
                         provider_review_required: boolean;
                         provider_login_required?: boolean;
                         /** @enum {string} */
@@ -6461,6 +6494,10 @@ export interface operations {
                             status: "submitted" | "invalid";
                             required_fields?: string[];
                             receipt?: {
+                                managed_authorization?: {
+                                    sourceRequestId: string;
+                                    agreement: string;
+                                };
                                 wallet?: {
                                     reference: string;
                                     name: string;
@@ -6667,6 +6704,242 @@ export interface operations {
             };
         };
     };
+    renewManagedAccountAccess: {
+        parameters: {
+            query?: never;
+            header: {
+                "idempotency-key": string;
+                /** @description Choose a configured network. Omit to use the default; existing wallet, request and grant IDs select their stored network automatically. A conflicting selection is rejected. */
+                "wallet-network"?: "base" | "base-sepolia" | "ethereum" | "ethereum-sepolia";
+            };
+            path: {
+                requestId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    user_id: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        managed_authorization?: {
+                            sourceRequestId: string;
+                            agreement: string;
+                        };
+                        wallet?: {
+                            reference: string;
+                            name: string;
+                            /** @enum {unknown} */
+                            kind: "personal" | "shared";
+                        };
+                        membership_revision?: number;
+                        request_id: string;
+                        /** @enum {string} */
+                        status: "consent_required" | "verification_required" | "funding_approval_required" | "identity_pending" | "reconciliation_required" | "provider_review_required" | "granted" | "denied" | "expired" | "suspended" | "revoked" | "policy_changed";
+                        /**
+                         * Format: uri
+                         * @description Hosted compatibility only. Application-led grants have no provider user redirect.
+                         */
+                        consent_url?: string;
+                        grant_id?: string;
+                        consent?: {
+                            reference: string;
+                            /** Format: date-time */
+                            granted_at: string;
+                            /** Format: date-time */
+                            expires_at: string;
+                            policy_revision: string;
+                            action_policy_revision?: string;
+                        };
+                        account_id?: string;
+                        permissions?: ("account:read" | "operations:request" | "contracts:request" | "orders:authorize" | "members:manage" | "owners:manage")[];
+                        /** Format: date-time */
+                        expires_at?: string;
+                    };
+                };
+            };
+            /** @description Default Response */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+            /** @description Default Response */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        type: string;
+                        title: string;
+                        status: number;
+                        code: string;
+                        request_id: string;
+                        /** @enum {string} */
+                        outcome?: "not_dispatched" | "rejected" | "unknown";
+                    };
+                };
+            };
+        };
+    };
     getAccountAccessRequest: {
         parameters: {
             query?: never;
@@ -6688,6 +6961,10 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
+                        managed_authorization?: {
+                            sourceRequestId: string;
+                            agreement: string;
+                        };
                         wallet?: {
                             reference: string;
                             name: string;
@@ -6922,6 +7199,10 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
+                        managed_authorization?: {
+                            sourceRequestId: string;
+                            agreement: string;
+                        };
                         wallet?: {
                             reference: string;
                             name: string;
@@ -18828,6 +19109,7 @@ export interface operations {
                     name?: string;
                     scopes?: ("wallet:configuration:read" | "wallet:configuration:propose" | "wallet:access" | "wallet:access:read" | "wallet:account:read" | "wallet:provision" | "wallet:actions" | "wallet:sign" | "wallet:execute" | "wallet:execute:read" | "provider:manage" | "wallet:configuration:write")[];
                     enabled?: boolean;
+                    managed_renewal?: boolean;
                     trust_agreement?: string | null;
                     /** @description Allow selected applications to request these wallets under a reviewed identity-and-consent sharing agreement. Null disables sharing and ends dependent approvals. Each requester needs its own consent and permissions. */
                     wallet_sharing?: {

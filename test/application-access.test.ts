@@ -618,3 +618,70 @@ it.each([
     ).toHaveLength(0);
   },
 );
+
+it('renews operator-managed access across policy changes and retains the original account', async () => {
+  const f = await fixture('a'.repeat(64));
+  const managedPolicy = structuredClone(policy);
+  managedPolicy.applications[0].assertionTrust!.managedRenewal = true;
+  const original = new OnboardingService(
+    managedPolicy,
+    f.store,
+    [],
+    undefined,
+    'a'.repeat(64),
+  );
+  const input = f.input();
+  input.user!.consent.action_policy_revision = 'a'.repeat(64);
+  input.authorization_details[0].actions = [
+    'account:read',
+    'contracts:request',
+  ];
+  input.user!.consent.policy_revision = original.policy.revision;
+  const first = await original.request(context(), input);
+  const changed = new OnboardingService(
+    managedPolicy,
+    f.store,
+    [],
+    undefined,
+    'b'.repeat(64),
+  );
+  expect((await changed.read(context(), first.request_id)).status).toBe(
+    'policy_changed',
+  );
+  const ctx = context();
+  const renewed = await changed.renewManaged(
+    ctx,
+    first.request_id,
+    input.user!.id,
+  );
+  expect(renewed.status).toBe('granted');
+  expect(renewed.account_id).toBe(first.account_id);
+  expect(renewed.managed_authorization?.sourceRequestId).toBe(first.request_id);
+  expect(renewed.consent?.reference).toBe(first.consent?.reference);
+  expect(
+    await changed.renewManaged(ctx, first.request_id, input.user!.id),
+  ).toEqual(renewed);
+  await expect(
+    changed.renewManaged(context('app-b'), first.request_id, input.user!.id),
+  ).rejects.toThrow();
+  await expect(
+    changed.renewManaged(context(), first.request_id, 'different-user'),
+  ).rejects.toThrow();
+  const untrusted = new OnboardingService(
+    policy,
+    f.store,
+    [],
+    undefined,
+    'b'.repeat(64),
+  );
+  await expect(
+    untrusted.renewManaged(context(), renewed.request_id, input.user!.id),
+  ).rejects.toThrow();
+  await changed.revokeApplicationGrant(context(), renewed.grant_id!);
+  await expect(
+    changed.renewManaged(context(), renewed.request_id, input.user!.id),
+  ).rejects.toThrow();
+  await expect(
+    changed.renewManaged(ctx, first.request_id, input.user!.id),
+  ).rejects.toThrow();
+});

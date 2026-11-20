@@ -124,6 +124,7 @@
                 "additionalProperties": false,
                 "required": ["agreement"],
                 "properties": {
+                  "managedRenewal": { "type": "boolean", "default": false },
                   "agreement": {
                     "type": "string",
                     "minLength": 1,
